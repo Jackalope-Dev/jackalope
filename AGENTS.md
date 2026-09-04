@@ -22,6 +22,7 @@ To guarantee seamless context hand-offs between any agent:
 ---
 
 ## 3. 🎨 UI & Theming Standards
+- **Read [`docs/DESIGN.md`](docs/DESIGN.md) first.** The standing mandate: nothing cookie-cutter, nothing generic-SaaS-template, nothing standard-desktop-app. Refined, focused, and 100% driven by the user's actions/goals — not a data dashboard. Check every new or revisited screen against it.
 - **Flat Surface Hierarchy**: Use subtle directional gradients (`bg-gradient-to-b from-surface to-surface-sunken`) and soft tinted drop shadows. Avoid harsh skeuomorphic borders.
 - **Dynamic Theming (Arc / Zen Style)**: Never hardcode arbitrary hex values in component styling. Always reference CSS variables derived via `theme-engine.ts`:
   - `--color-accent`

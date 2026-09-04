@@ -52,6 +52,8 @@ When you begin an agent turn or hand-off in this project, execute the following 
 
 ## 🎨 UI & Design Principles
 
+**Read [`DESIGN.md`](./DESIGN.md) first** — the standing visual/UX mandate (nothing cookie-cutter or generic-SaaS, action/goal-driven, refined over feature-dense) plus the current state of the Jackalope logo/mascot direction. The points below are the mechanical rules that follow from it.
+
 1. **Flat with Subtle Elevation**:
    - Do NOT use heavy, skeuomorphic bevels or harsh solid borders.
    - Use subtle surface gradients (e.g. `bg-gradient-to-b from-surface to-surface-sunken`).

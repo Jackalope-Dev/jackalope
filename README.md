@@ -32,7 +32,8 @@ jackalope/
 │   ├── STATUS.md              # Live status, completed features, active focus
 │   ├── ROADMAP.md             # Multi-phase milestone roadmap
 │   ├── TODO.md                # Prioritized backlog of tasks
-│   └── ARCHITECTURE.md        # Technical architecture, IPC protocols, and data models
+│   ├── ARCHITECTURE.md        # Technical architecture, IPC protocols, and data models
+│   └── DESIGN.md              # Visual/UX direction and mascot-logo guidance
 ├── pnpm-workspace.yaml        # Monorepo workspace configuration
 └── package.json
 ```
