@@ -43,3 +43,27 @@ To guarantee seamless context hand-offs between any agent:
 ## 4. 🌿 Git Worktree Isolation
 - Concurrent agent tasks must execute inside `.worktrees/<task-slug>`.
 - Never pollute the primary branch with unfinished multi-file drafts.
+
+---
+
+## 5. 🤝 Concurrent Work Coordination
+
+As of 2026-09-04, a dedicated app-experience/UI-UX agent is about to
+start (or already is) working directly on this app's frontend — layout,
+component structure, and possibly file locations are subject to change
+from that work, separate from whatever this document's reader is doing.
+
+- **If you're doing UI/UX work**: check `docs/STATUS.md` for whether
+  that agent's work has landed on `master` yet, and check
+  `git worktree list` for an in-progress worktree (e.g.
+  `.worktrees/art-direction` / branch `art/character-direction` as of
+  2026-09-04) before starting — don't duplicate or collide with it.
+- **If you're doing backend/infra/non-UI work**: prefer that over UI
+  work right now precisely to avoid stepping on the incoming UI/UX
+  agent's changes. Good candidates: the Rust `src-tauri` backend (PTY
+  streaming, keychain, wiring commands to real behavior), build/tooling
+  work, docs, or anything that doesn't touch `apps/desktop/src/components/`
+  layout or `apps/desktop/src-tauri/tauri.conf.json`'s window/bundle shape.
+- **At a natural stopping point**, prefer switching to backend/infra
+  work over starting new UI work, so the codebase is in a low-conflict
+  state for whoever picks up the UI/UX thread next.
