@@ -1,0 +1,12 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="48" fill="#14171d" />
+  <path d="M38 34 C36 24 26 18 20 12 C24 16 28 22 28 26 M23 15 C20 18 16 20 13 22 M27 21 C24 23 20 25 17 28" stroke="#f97316" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M62 34 C64 24 74 18 80 12 C76 16 72 22 72 26 M77 15 C80 18 84 20 87 22 M73 21 C76 23 80 25 83 28" stroke="#f97316" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <ellipse cx="38" cy="28" rx="5" ry="16" transform="rotate(-15 38 28)" fill="#f3f4f6" />
+  <ellipse cx="62" cy="28" rx="5" ry="16" transform="rotate(15 62 28)" fill="#f3f4f6" />
+  <ellipse cx="50" cy="70" rx="24" ry="20" fill="#f3f4f6" />
+  <circle cx="50" cy="46" r="17" fill="#f3f4f6" />
+  <polygon points="50,49 47,46 53,46" fill="#f97316" />
+  <circle cx="43" cy="43" r="2.8" fill="#111827" />
+  <circle cx="57" cy="43" r="2.8" fill="#111827" />
+</svg>

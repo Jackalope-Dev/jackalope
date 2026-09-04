@@ -1,0 +1,42 @@
+# Node & Package Managers
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust & Tauri
+target/
+src-tauri/target/
+**/gen/schemas/
+*.pdb
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# IDE & Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Generated
+Thumbs.db
+.DS_Store
+
+# Temporary & agent scratch
+scratch/
+tmp/

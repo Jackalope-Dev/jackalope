@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Dynamic Theme Defaults (Derived by theme-engine.ts) */
+    --accent-h: 24;
+    --accent-s: 95%;
+    --accent-l: 53%;
+
+    --color-accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+    --color-accent-hover: hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l) - 6%));
+    --color-accent-subtle: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.12);
+    --color-accent-glow: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.25);
+
+    /* Surface Hierarchy - Flat with subtle tonal depth */
+    --color-bg: #0d0f12;
+    --color-surface: #14171d;
+    --color-surface-hover: #1b2028;
+    --color-surface-elevated: #1f2530;
+    --color-surface-sunken: #090a0d;
+
+    /* Subtle Border and Divider */
+    --color-border: #262c37;
+    --color-border-subtle: #1c212a;
+    --color-border-focus: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.6);
+
+    /* Text & Foregrounds */
+    --color-text-primary: #f3f4f6;
+    --color-text-secondary: #9ca3af;
+    --color-text-muted: #6b7280;
+
+    /* Tinted Subtle Surface Drop Shadows */
+    --shadow-flat: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+    --shadow-surface: 0 4px 16px -2px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--color-border);
+    --shadow-pop: 0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 20px -3px var(--color-accent-glow);
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a313e;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #394254;
+  }
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Subtle flat gradients */
+.surface-gradient {
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-sunken) 100%);
+}
+
+.surface-card {
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-surface);
+}
+
+.accent-glow {
+  box-shadow: 0 0 15px -2px var(--color-accent-glow);
+}

@@ -1,0 +1,25 @@
+{
+  "name": "jackalope-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jackalope - Ultra-performant desktop shell and harness for agentic workflows",
+  "scripts": {
+    "dev": "pnpm --filter @jackalope/desktop dev",
+    "build": "pnpm --filter @jackalope/desktop build",
+    "tauri": "pnpm --filter @jackalope/desktop tauri",
+    "lint": "pnpm --filter @jackalope/desktop lint",
+    "typecheck": "pnpm --filter @jackalope/desktop typecheck"
+  },
+  "keywords": [
+    "tauri",
+    "rust",
+    "desktop",
+    "ai-agents",
+    "worktrees",
+    "kanban",
+    "productivity"
+  ],
+  "author": "Jackalope Contributors",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.11.0"
+}
