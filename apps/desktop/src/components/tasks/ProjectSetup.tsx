@@ -1,4 +1,3 @@
-import { useDialogFocus } from '../ui/useDialogFocus';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, FolderOpen, X } from 'lucide-react';
 import { useState } from 'react';
@@ -6,6 +5,7 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { useDialogFocus } from '../ui/useDialogFocus';
 
 export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialogFocus = useDialogFocus();

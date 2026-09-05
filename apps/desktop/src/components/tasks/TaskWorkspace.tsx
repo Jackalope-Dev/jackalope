@@ -5,15 +5,19 @@ import {
   Check,
   ChevronRight,
   CircleCheck,
+  Eye,
   FileDiff,
   FolderOpen,
   GitBranch,
   ListTodo,
   Plus,
   Square,
+  Wand2,
   Workflow,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog.ts';
+import { assemblePrompt } from '../../lib/skills/context-assembler.ts';
 import {
   isActive,
   nativeTask,
@@ -358,6 +362,7 @@ export function TaskWorkspace() {
   const [filter, setFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
   const [composing, setComposing] = useState(false);
+  const [showPromptPreview, setShowPromptPreview] = useState(false);
   useEffect(() => {
     if (composing) document.getElementById('task-intent')?.focus();
   }, [composing]);
@@ -373,19 +378,40 @@ export function TaskWorkspace() {
   );
   const runner = runners.find((r) => r.id === current.agent);
   const desktop = isTauriEnvironment();
+
+  const detectedSkills = useMemo(() => detectSkillsFromPrompt(current.prompt), [current.prompt]);
+  const activeSkills = current.skills ?? [];
+  const assembled = useMemo(() => {
+    return assemblePrompt({
+      rawPrompt: current.prompt.trim(),
+      selectedSkillIds: activeSkills,
+      executionMode: current.isolated ? 'isolated' : 'current',
+    });
+  }, [current.prompt, activeSkills, current.isolated]);
+
+  const toggleSkill = (skillId: string) => {
+    const next = activeSkills.includes(skillId)
+      ? activeSkills.filter((id) => id !== skillId)
+      : [...activeSkills, skillId];
+    draft(key, { skills: next });
+  };
+
   const launch = async () => {
     if (!project || !current.prompt.trim()) return;
     setSubmitError('');
+    const finalPrompt = assembled.hasSupplementation
+      ? assembled.assembledPrompt
+      : current.prompt.trim();
     try {
       await start({
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
         agent: current.agent,
-        prompt: current.prompt.trim(),
+        prompt: finalPrompt,
         isolated: current.isolated,
       });
-      draft(key, { prompt: '' });
+      draft(key, { prompt: '', skills: [] });
     } catch (error) {
       setSubmitError(String(error));
     }
@@ -490,6 +516,59 @@ export function TaskWorkspace() {
                 }
               }}
             />
+            {/* Vetted Skills & Quality Guidelines Bar */}
+            <div className="task-skill-bar">
+              <span className="task-skill-label">
+                <Wand2 size={13} aria-hidden="true" />
+                Guidelines:
+              </span>
+              {VETTED_SKILLS.map((skill) => {
+                const isSelected = activeSkills.includes(skill.id);
+                const isDetected = detectedSkills.some((d) => d.id === skill.id);
+                return (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onClick={() => toggleSkill(skill.id)}
+                    className={`task-skill-chip ${isSelected ? 'is-active' : ''} ${isDetected && !isSelected ? 'is-suggested' : ''}`}
+                    title={skill.description}
+                  >
+                    <span>{skill.shortLabel}</span>
+                    {isSelected && <Check size={11} className="shrink-0" />}
+                  </button>
+                );
+              })}
+              {assembled.hasSupplementation && (
+                <button
+                  type="button"
+                  onClick={() => setShowPromptPreview(!showPromptPreview)}
+                  className="task-preview-toggle"
+                  title="Inspect the supplemented prompt that will be sent to the agent"
+                >
+                  <Eye size={12} />
+                  <span>{showPromptPreview ? 'Hide preview' : 'Preview prompt'}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Collapsible Prompt Preview */}
+            {showPromptPreview && assembled.hasSupplementation && (
+              <div className="task-prompt-preview">
+                <div className="task-preview-header">
+                  <span>
+                    Assembled agent prompt preview ({assembled.activeSkillCount} active guidelines)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPromptPreview(false)}
+                    className="task-preview-close"
+                  >
+                    Close
+                  </button>
+                </div>
+                <pre>{assembled.assembledPrompt}</pre>
+              </div>
+            )}
             <div className="task-composer-footer">
               <div className="task-context-controls">
                 <label htmlFor="taskworkspace-field-2" className="task-context-chip">

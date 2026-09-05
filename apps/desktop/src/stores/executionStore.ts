@@ -14,8 +14,9 @@ export interface TaskDraft {
   prompt: string;
   agent: string;
   isolated: boolean;
+  skills?: string[];
 }
-export const emptyDraft: TaskDraft = { prompt: '', agent: 'codex', isolated: true };
+export const emptyDraft: TaskDraft = { prompt: '', agent: 'codex', isolated: true, skills: [] };
 interface ExecutionState {
   runs: TaskRun[];
   runners: Runner[];

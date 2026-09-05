@@ -72,6 +72,32 @@ pub async fn git_list_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>,
     Ok(worktrees)
 }
 
+/// Rejects anything but a plain relative path under the repository: no `..`
+/// segment, no absolute path (leading `/` or `\`, or a drive letter), no
+/// empty segment. `worktree_path` comes straight from user-typed input (the
+/// "Folder name" field in the worktree creation form) with no other check
+/// between it and `git worktree add` — without this, a crafted value like
+/// `../../../../Windows/System32/evil` would make Git check out a worktree
+/// outside the project entirely, since `git worktree add` otherwise accepts
+/// any path relative to `current_dir` unchanged.
+fn relative_and_contained(path: &str) -> Result<(), String> {
+    let invalid = path.is_empty()
+        || path.len() > 300
+        || path.starts_with('/')
+        || path.starts_with('\\')
+        || path.contains(':')
+        || path
+            .split(['/', '\\'])
+            .any(|segment| segment == ".." || segment.is_empty());
+    if invalid {
+        return Err(
+            "Worktree path must be a relative path inside the repository, without parent-directory references."
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn git_create_worktree(
     repo_path: String,
@@ -79,6 +105,7 @@ pub async fn git_create_worktree(
     branch_name: String,
     base_commit: Option<String>,
 ) -> Result<WorktreeEntry, String> {
+    relative_and_contained(&worktree_path)?;
     let mut args = vec!["worktree", "add", "-b", &branch_name, &worktree_path];
     if let Some(ref base) = base_commit {
         args.push(base);
@@ -189,5 +216,66 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&repo);
+    }
+
+    #[test]
+    fn relative_and_contained_rejects_every_escape_shape() {
+        for path in [
+            "../outside",
+            ".worktrees/../../outside",
+            "/etc/passwd",
+            "\\Windows\\System32",
+            "C:/outside",
+            "",
+            ".worktrees//double-slash",
+        ] {
+            assert!(
+                relative_and_contained(path).is_err(),
+                "expected {path:?} to be rejected"
+            );
+        }
+        for path in [".worktrees/task-123", "task-123", "nested/task-123"] {
+            assert!(
+                relative_and_contained(path).is_ok(),
+                "expected {path:?} to be accepted"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn worktree_creation_refuses_a_traversal_attempt_and_creates_nothing_outside_the_repo() {
+        let root = std::env::temp_dir().join(format!(
+            "jackalope-git-traversal-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let repo = root.join("repo");
+        let escape_target = root.join("outside-the-repo");
+        fs::create_dir_all(&repo).unwrap();
+
+        run(&repo, &["init", "-q"]);
+        run(&repo, &["config", "user.email", "test@example.com"]);
+        run(&repo, &["config", "user.name", "Test"]);
+        fs::write(repo.join("README.md"), "hello").unwrap();
+        run(&repo, &["add", "."]);
+        run(&repo, &["commit", "-q", "-m", "initial"]);
+
+        let repo_path = repo.to_string_lossy().to_string();
+        // Relative traversal out of the repo, landing exactly on a sibling
+        // directory name we can check was never created.
+        let traversal = "../outside-the-repo".to_string();
+
+        let result = git_create_worktree(repo_path, traversal, "feat/escape".to_string(), None)
+            .await;
+
+        assert!(result.is_err(), "a traversal attempt must be rejected");
+        assert!(
+            !escape_target.exists(),
+            "no worktree should ever be created outside the repository"
+        );
+
+        let _ = fs::remove_dir_all(&root);
     }
 }

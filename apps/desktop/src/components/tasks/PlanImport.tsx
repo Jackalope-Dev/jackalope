@@ -1,10 +1,10 @@
-import { useDialogFocus } from '../ui/useDialogFocus';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { useDialogFocus } from '../ui/useDialogFocus';
 
 interface PlanEntry {
   key: string;

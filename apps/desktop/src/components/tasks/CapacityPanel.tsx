@@ -1,7 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { nativeTask } from '../../lib/task-runtime';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import './capacity-panel.css';
 
