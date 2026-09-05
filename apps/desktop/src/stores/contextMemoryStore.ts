@@ -76,7 +76,7 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
             category: 'discovery',
             severity: 'warning',
             title: 'Codebase Discovery Incomplete',
-            message: `Discovery finished with fallback defaults: ${String(error)}`,
+            message: `Could not read repository context: ${String(error)}`,
           });
           throw error;
         }

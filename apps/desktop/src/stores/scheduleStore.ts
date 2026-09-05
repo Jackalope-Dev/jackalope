@@ -55,11 +55,14 @@ export const useScheduleStore = create<ScheduleState>()(
     }),
     {
       name: 'jackalope-schedules',
-      version: 1,
+      version: 2,
       migrate: (persisted) => ({
-        schedules: ((persisted as { schedules?: ScheduledTask[] }).schedules ?? []).filter(
-          (schedule) => !['sched-1', 'sched-2', 'sched-3'].includes(schedule.id),
-        ),
+        schedules: ((persisted as { schedules?: ScheduledTask[] }).schedules ?? [])
+          .filter((schedule) => !['sched-1', 'sched-2', 'sched-3'].includes(schedule.id))
+          .map(({ lastRun: _lastRun, ...schedule }) => ({
+            ...schedule,
+            nextRun: 'Automatic execution unavailable',
+          })),
       }),
       partialize: (state) => ({ schedules: state.schedules }),
     },

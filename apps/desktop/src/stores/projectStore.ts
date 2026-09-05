@@ -35,6 +35,7 @@ interface ProjectState {
   projects: Project[];
   activeProjectId: string | null;
   loading: boolean;
+  worktreesError: string | null;
   addProject: (project: Omit<Project, 'worktrees'>) => Promise<void>;
   updateProject: (id: string, partial: Partial<Omit<Project, 'id' | 'worktrees'>>) => void;
   updateProjectPreferences: (id: string, prefs: Partial<ProjectPreferences>) => void;
@@ -53,6 +54,7 @@ export const useProjectStore = create<ProjectState>()(
       projects: [],
       activeProjectId: null,
       loading: false,
+      worktreesError: null,
 
       addProject: async (proj) => {
         const newProject: Project = { ...proj, worktrees: [] };
@@ -86,7 +88,7 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       selectProject: (id: string) => {
-        set({ activeProjectId: id });
+        set({ activeProjectId: id, worktreesError: null });
         get().loadWorktreesForActiveProject();
       },
 
@@ -95,13 +97,20 @@ export const useProjectStore = create<ProjectState>()(
         if (!active) return;
 
         try {
-          set({ loading: true });
+          set({ loading: true, worktreesError: null });
           const worktrees = await listWorktrees(active.path);
           set((state) => ({
             projects: state.projects.map((p) => (p.id === active.id ? { ...p, worktrees } : p)),
           }));
         } catch (e) {
-          console.warn('Failed to load worktrees', e);
+          if (get().activeProjectId === active.id) {
+            set((state) => ({
+              worktreesError: e instanceof Error ? e.message : String(e),
+              projects: state.projects.map((p) =>
+                p.id === active.id ? { ...p, worktrees: [] } : p,
+              ),
+            }));
+          }
         } finally {
           set({ loading: false });
         }
@@ -125,7 +134,18 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: 'jackalope-projects',
-      partialize: (state) => ({ projects: state.projects, activeProjectId: state.activeProjectId }),
+      version: 1,
+      migrate: (persisted) => {
+        const state = persisted as { projects?: Project[]; activeProjectId?: string | null };
+        return {
+          projects: (state.projects ?? []).map((project) => ({ ...project, worktrees: [] })),
+          activeProjectId: state.activeProjectId ?? null,
+        };
+      },
+      partialize: (state) => ({
+        projects: state.projects.map((project) => ({ ...project, worktrees: [] })),
+        activeProjectId: state.activeProjectId,
+      }),
     },
   ),
 );

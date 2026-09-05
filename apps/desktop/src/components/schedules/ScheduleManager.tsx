@@ -1,9 +1,10 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertCircle, Bot, CalendarClock, CheckCircle2, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useTaskStore } from '../../stores/taskStore';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useScheduleStore } from '../../stores/scheduleStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -11,6 +12,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
 export function ScheduleManager() {
+  const runners = useExecutionStore((state) => state.runners);
   const dialogFocus = useDialogFocus();
   const { schedules, toggleSchedule, addSchedule, deleteSchedule } = useScheduleStore();
   const projectId = useProjectStore((state) => state.activeProjectId);
@@ -21,7 +23,7 @@ export function ScheduleManager() {
   const [description, setDescription] = useState('');
   const [cronExpression, setCronExpression] = useState('0 2 * * *');
   const [prompt, setPrompt] = useState('');
-  const [assignedAgentProvider, setAssignedAgentProvider] = useState('Agent Antigravity');
+  const [assignedAgentProvider, setAssignedAgentProvider] = useState('Unassigned');
 
   const handleManualRun = (id: string) => {
     const schedule = schedules.find((item) => item.id === id);
@@ -37,14 +39,14 @@ export function ScheduleManager() {
   };
 
   const handleCreateSchedule = () => {
-    if (!name.trim()) return;
+    if (!name.trim() || !prompt.trim()) return;
     addSchedule({
       name,
-      description: description || 'Autonomous recurring agent job',
+      description: description.trim(),
       cronExpression,
       targetProjectId: projectId ?? '',
       assignedAgentProvider,
-      prompt: prompt || 'Execute automated verification',
+      prompt: prompt.trim(),
       enabled: true,
     });
     setName('');
@@ -249,10 +251,13 @@ export function ScheduleManager() {
                   onValueChange={(value) => setAssignedAgentProvider(value)}
                   className="w-full"
                 >
-                  <SelectItem value="Agent Antigravity">Agent Antigravity</SelectItem>
-                  <SelectItem value="Agent Claude-3.7-Sonnet">Agent Claude-3.7-Sonnet</SelectItem>
-                  <SelectItem value="Local Ollama">Local Ollama</SelectItem>
-                  <SelectItem value="Agent Aider">Agent Aider</SelectItem>
+                  <SelectItem value="Unassigned">Unassigned</SelectItem>
+                  {runners.map((runner) => (
+                    <SelectItem key={runner.id} value={runner.id} disabled={!runner.available}>
+                      {runner.name}
+                      {runner.available ? '' : ' (unavailable)'}
+                    </SelectItem>
+                  ))}
                 </Select>
               </div>
 
@@ -278,7 +283,7 @@ export function ScheduleManager() {
               <Button variant="ghost" onClick={() => setShowAddModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateSchedule} disabled={!name.trim()}>
+              <Button onClick={handleCreateSchedule} disabled={!name.trim() || !prompt.trim()}>
                 Save schedule
               </Button>
             </div>

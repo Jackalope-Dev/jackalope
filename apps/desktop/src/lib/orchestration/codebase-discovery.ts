@@ -1,5 +1,5 @@
-import { nativeTask } from '../task-runtime.ts';
 import { useAgentConfigStore } from '../../stores/agentConfigStore.ts';
+import { nativeTask } from '../task-runtime.ts';
 import type { DiscoveredCodebaseMemory, OpenTaskItem } from './types.ts';
 
 export interface DiscoveryOptions {
@@ -214,12 +214,6 @@ export async function discoverCodebaseContext(
     for (const c of parseConventions(statusContent)) {
       conventions.add(c);
     }
-  }
-
-  // Fallback defaults if empty
-  if (conventions.size === 0) {
-    conventions.add('Preserve existing comments and project invariants.');
-    conventions.add('Ensure all builds and typechecks pass before committing.');
   }
 
   const duration = Date.now() - startTime;

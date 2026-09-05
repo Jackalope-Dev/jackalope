@@ -26,8 +26,15 @@ interface CapacityRecord {
 
 const names: Record<string, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
 function windowName(window: CapacityWindow) {
+  if (window.window === 'weekly') return 'Weekly allowance';
+  if (window.window === 'monthly') return 'Monthly allowance';
+  if (window.window === 'billing') return 'Included allowance';
   const minutes = window.durationMinutes;
-  if (!minutes) return `${window.window === 'primary' ? 'Primary' : 'Secondary'} window`;
+  if (!minutes) {
+    if (window.window === 'primary') return 'Primary window';
+    if (window.window === 'secondary') return 'Secondary window';
+    return 'Usage window';
+  }
   if (minutes % 1440 === 0) return `${minutes / 1440}-day window`;
   if (minutes % 60 === 0) return `${minutes / 60}-hour window`;
   return `${minutes}-minute window`;

@@ -8,8 +8,14 @@ import { Input } from '../ui/input';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
-  const { projects, activeProjectId, loadWorktreesForActiveProject, spawnTaskWorktree, loading } =
-    useProjectStore();
+  const {
+    projects,
+    activeProjectId,
+    loadWorktreesForActiveProject,
+    spawnTaskWorktree,
+    loading,
+    worktreesError,
+  } = useProjectStore();
   const project = projects.find((p) => p.id === activeProjectId);
   const [creating, setCreating] = useState(false);
   const [slug, setSlug] = useState('');
@@ -20,8 +26,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const branchName = branch ?? `feat/${slug.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const desktop = isTauriEnvironment();
   useEffect(() => {
-    void loadWorktreesForActiveProject();
-  }, [loadWorktreesForActiveProject]);
+    if (activeProjectId) void loadWorktreesForActiveProject();
+  }, [loadWorktreesForActiveProject, activeProjectId]);
   const nameInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (creating) nameInput.current?.focus();
@@ -171,7 +177,12 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               </Button>
             </article>
           ))}
-          {!loading && !project.worktrees?.length && (
+          {worktreesError && (
+            <p role="alert" className="task-error">
+              {worktreesError}
+            </p>
+          )}
+          {!loading && !worktreesError && !project.worktrees?.length && (
             <EmptyState
               icon={GitBranch}
               title="A place for parallel work"

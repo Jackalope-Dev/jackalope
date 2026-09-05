@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Bot, CheckCircle2, GitBranch, Play, Sparkles, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
@@ -24,30 +25,30 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
   const { spawnTaskWorktree, activeProjectId } = useProjectStore();
   const { say, setMood } = useMascotStore();
 
+  const runners = useExecutionStore((state) => state.runners);
   const existingTask = tasks.find((t) => t.id === taskId);
   const isNew = !existingTask;
 
   const [title, setTitle] = useState(existingTask?.title || '');
   const [rawPrompt, setRawPrompt] = useState(existingTask?.rawPrompt || '');
   const [refinedPrompt, setRefinedPrompt] = useState(existingTask?.refinedPrompt || '');
-  const [assignedAgent, setAssignedAgent] = useState(
-    existingTask?.assignedAgent || 'Agent Claude-3.7-Sonnet',
-  );
+  const [assignedAgent, setAssignedAgent] = useState(existingTask?.assignedAgent || 'Unassigned');
   const [showRefiner, setShowRefiner] = useState(false);
   const [isSpawningWorktree, setIsSpawningWorktree] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
-    if (!title.trim()) return;
+    if (!title.trim() || (isNew && !activeProjectId)) return;
 
     if (isNew) {
+      if (!activeProjectId) return;
       addTask({
-        projectId: activeProjectId || 'jackalope-core',
+        projectId: activeProjectId,
         title,
         rawPrompt,
         refinedPrompt: refinedPrompt || undefined,
-        status: refinedPrompt ? 'in_progress' : 'refinement',
+        status: 'refinement',
         assignedAgent,
       });
       say('Task ticket created! Ready to spin out worktree.', 3500);
@@ -81,7 +82,6 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
     if (res.ok) {
       updateTask(existingTask.id, {
         worktreePath: res.entry.path,
-        status: 'in_progress',
       });
       setMood('success');
       say(`Worktree created at ${res.entry.path}! Agent can operate safely.`, 4500);
@@ -220,12 +220,19 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   onValueChange={(value) => setAssignedAgent(value)}
                   className="w-full"
                 >
-                  <SelectItem value="Agent Claude-3.7-Sonnet">Agent Claude-3.7-Sonnet</SelectItem>
-                  <SelectItem value="Agent Antigravity (DeepMind)">
-                    Agent Antigravity (DeepMind)
-                  </SelectItem>
-                  <SelectItem value="Agent Aider (Pairing)">Agent Aider (Pairing)</SelectItem>
-                  <SelectItem value="Local Ollama (Offline)">Local Ollama (Offline)</SelectItem>
+                  <SelectItem value="Unassigned">Unassigned</SelectItem>
+                  {assignedAgent !== 'Unassigned' &&
+                    !runners.some((runner) => runner.id === assignedAgent) && (
+                      <SelectItem value={assignedAgent}>
+                        {assignedAgent} (saved assignment)
+                      </SelectItem>
+                    )}
+                  {runners.map((runner) => (
+                    <SelectItem key={runner.id} value={runner.id} disabled={!runner.available}>
+                      {runner.name}
+                      {runner.available ? '' : ' (unavailable)'}
+                    </SelectItem>
+                  ))}
                 </Select>
               </div>
 

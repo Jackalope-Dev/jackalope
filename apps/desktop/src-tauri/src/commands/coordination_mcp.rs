@@ -133,7 +133,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Navigate the in-app browser session to a local or remote URL (e.g. http://localhost:5173/onboarding). Returns reachable status and response code.",
+        description = "Select a target URL for later headless captures. This does not navigate a live browser or check reachability.",
         annotations(read_only_hint = false, open_world_hint = true)
     )]
     async fn browser_navigate(
@@ -148,7 +148,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Capture a real rendered screenshot of the target URL or current browser viewport. Saves the image into the task workspace artifacts and returns the artifact file path.",
+        description = "Capture a real rendered screenshot of the target URL in a fresh headless browser. Saves the image into the task workspace artifacts and returns the artifact file path.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn browser_screenshot(
@@ -173,7 +173,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Dump the DOM text or rendered HTML structure of the current browser page to inspect elements, verify accessibility, or find CSS selectors.",
+        description = "Capture rendered HTML for the target URL in a fresh headless browser. This does not share interactive session state.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn browser_snapshot(
@@ -188,7 +188,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Perform a browser interaction on the active page: click a button, type text into an input, or select an option.",
+        description = "Browser interaction is currently unavailable. This tool returns an error without performing an action.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn browser_interact(

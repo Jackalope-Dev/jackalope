@@ -62,7 +62,7 @@ pub struct BrowserNavigateRequest {
 pub struct BrowserScreenshotRequest {
     #[schemars(description = "Optional label or filename for the screenshot, e.g. 'onboarding_step_1'")]
     pub name: Option<String>,
-    #[schemars(description = "The URL to capture. If omitted, uses the last navigated URL or localhost:5173")]
+    #[schemars(description = "The URL to capture. If omitted, uses the last selected URL; an explicit URL is required when none is selected")]
     pub url: Option<String>,
 }
 
@@ -166,43 +166,32 @@ pub fn find_browser_executable() -> Option<PathBuf> {
     None
 }
 
-/// Executes browser navigation and basic health check
 pub async fn browser_navigate(url: &str) -> Result<serde_json::Value, String> {
     if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("file://") {
         return Err("URL must start with http://, https://, or file://".into());
     }
     *harness().last_browser_url.lock().unwrap() = Some(url.to_string());
-
-    let is_reachable = if url.starts_with("http://") || url.starts_with("https://") {
-        match tokio::time::timeout(
-            Duration::from_millis(1500),
-            tokio::net::TcpStream::connect(
-                url.trim_start_matches("http://")
-                    .trim_start_matches("https://")
-                    .split('/')
-                    .next()
-                    .unwrap_or(""),
-            ),
-        )
-        .await
-        {
-            Ok(Ok(_)) => true,
-            _ => false,
-        }
-    } else {
-        true
-    };
-
     Ok(serde_json::json!({
-        "status": "navigated",
+        "status": "target_selected",
         "url": url,
-        "reachable": is_reachable,
-        "message": format!("Navigated browser session to {url}"),
+        "message": "Target saved for a fresh headless screenshot or DOM capture. No browser navigation has occurred.",
         "timestamp": Utc::now().to_rfc3339(),
     }))
 }
 
-/// Captures a browser screenshot using headless Edge/Chromium or fallback
+fn png_dimensions(bytes: &[u8]) -> Result<(u32, u32), String> {
+    if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" || &bytes[12..16] != b"IHDR" {
+        return Err("Browser did not produce a PNG screenshot".into());
+    }
+    let width = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
+    let height = u32::from_be_bytes(bytes[20..24].try_into().unwrap());
+    if width == 0 || height == 0 {
+        return Err("Browser produced an empty screenshot".into());
+    }
+    Ok((width, height))
+}
+
+/// Captures a browser screenshot using headless Edge/Chromium
 pub async fn browser_screenshot(
     workspace_path: &Path,
     name: Option<String>,
@@ -210,14 +199,14 @@ pub async fn browser_screenshot(
 ) -> Result<ScreenshotArtifact, String> {
     let url = target_url
         .or_else(|| harness().last_browser_url.lock().unwrap().clone())
-        .unwrap_or_else(|| "http://localhost:5173".to_string());
+        .ok_or("Choose a target URL before capturing browser evidence")?;
 
     let artifact_dir = workspace_path.join(".jackalope").join("artifacts").join("screenshots");
     std::fs::create_dir_all(&artifact_dir).map_err(|e| e.to_string())?;
 
     let filename = format!(
         "screenshot_{}_{}.png",
-        Utc::now().format("%Y%m%d_%H%M%S"),
+        Uuid::new_v4(),
         name.unwrap_or_else(|| "viewport".into())
             .chars()
             .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
@@ -237,28 +226,24 @@ pub async fn browser_screenshot(
             &url,
         ]);
         let output = cmd.output().map_err(|e| format!("Browser execution failed: {e}"))?;
-        if !output.status.success() && !output_path.exists() {
+        if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(format!("Headless browser failed to capture screenshot: {stderr}"));
         }
     } else {
-        let minimal_png: [u8; 67] = [
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
-            0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
-            0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78,
-            0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
-        ];
-        std::fs::write(&output_path, &minimal_png).map_err(|e| e.to_string())?;
+        return Err("No supported browser is installed. Screenshot capture is unavailable.".into());
     }
+
+    let bytes = std::fs::read(&output_path).map_err(|e| format!("Could not read screenshot: {e}"))?;
+    let (width, height) = png_dimensions(&bytes)?;
 
     Ok(ScreenshotArtifact {
         id: Uuid::new_v4().to_string(),
         name: filename,
         url,
         file_path: output_path.to_string_lossy().to_string(),
-        width: 1280,
-        height: 800,
+        width,
+        height,
         timestamp: Utc::now().to_rfc3339(),
     })
 }
@@ -267,7 +252,7 @@ pub async fn browser_screenshot(
 pub async fn browser_snapshot(target_url: Option<String>) -> Result<serde_json::Value, String> {
     let url = target_url
         .or_else(|| harness().last_browser_url.lock().unwrap().clone())
-        .unwrap_or_else(|| "http://localhost:5173".to_string());
+        .ok_or("Choose a target URL before capturing browser evidence")?;
 
     if let Some(browser_exe) = find_browser_executable() {
         let mut cmd = Command::new(&browser_exe);
@@ -293,28 +278,13 @@ pub async fn browser_snapshot(target_url: Option<String>) -> Result<serde_json::
         }
     }
 
-    Ok(serde_json::json!({
-        "url": url,
-        "status": "simulated",
-        "dom_snippet": "<html><body><div id=\"root\"><main>Active application session</main></div></body></html>",
-        "length": 84,
-        "timestamp": Utc::now().to_rfc3339(),
-    }))
+    Err("Browser DOM capture failed or no supported browser is installed.".into())
 }
 
-/// Performs a simulated or scripted browser interaction
 pub async fn browser_interact(
-    req: BrowserInteractRequest,
+    _req: BrowserInteractRequest,
 ) -> Result<serde_json::Value, String> {
-    let url = harness().last_browser_url.lock().unwrap().clone().unwrap_or_default();
-    Ok(serde_json::json!({
-        "status": "interacted",
-        "action": req.action,
-        "selector": req.selector,
-        "text": req.text,
-        "url": url,
-        "timestamp": Utc::now().to_rfc3339(),
-    }))
+    Err("Browser interaction is not implemented. No action was performed.".into())
 }
 
 /// Registers a pending user prompt and awaits resolution or returns pending prompt record
@@ -371,5 +341,36 @@ pub fn resolve_user_prompt(prompt_id: &str, answer: &str) -> bool {
         true
     } else {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn target_selection_does_not_claim_navigation() {
+        let result = browser_navigate("https://example.com").await.unwrap();
+        assert_eq!(result["status"], "target_selected");
+        assert!(result.get("reachable").is_none());
+        assert!(browser_navigate("invalid").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn unsupported_interaction_fails() {
+        assert!(browser_interact(BrowserInteractRequest {
+            action: "click".into(), selector: "button".into(), text: None,
+        }).await.is_err());
+    }
+
+    #[test]
+    fn screenshot_dimensions_come_from_file() {
+        assert!(png_dimensions(b"not an image").is_err());
+        let mut header = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        header.extend_from_slice(&960_u32.to_be_bytes());
+        header.extend_from_slice(&640_u32.to_be_bytes());
+        assert_eq!(png_dimensions(&header).unwrap(), (960, 640));
+        header[16..20].fill(0);
+        assert!(png_dimensions(&header).is_err());
     }
 }

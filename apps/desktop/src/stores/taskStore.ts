@@ -34,76 +34,7 @@ interface TaskState {
 export const useTaskStore = create<TaskState>()(
   persist(
     (set) => ({
-      tasks: [
-        {
-          id: 'task-1',
-          projectId: 'jackalope-core',
-          title: 'Dynamic Palette OKLCH Color Engine',
-          rawPrompt: 'Implement the Arc and Zen browser style color picker with custom accents',
-          refinedPrompt:
-            'Add dynamic HSL/OKLCH color derivation with live CSS property injection into :root for surface-tinting, button focus glows, and contrast compliance.',
-          status: 'done',
-          assignedAgent: 'Agent Antigravity',
-          worktreePath: '.worktrees/feat-color-engine',
-          createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'task-2',
-          projectId: 'jackalope-core',
-          title: 'Proactive Intent Detection & Meta-Prompt Clarification',
-          rawPrompt: 'Analyze user task tickets before running agent',
-          refinedPrompt:
-            'Build heuristic analyzer that detects ambiguities in user feature requests, surfacing interactive multi-choice questions to refine requirements prior to worktree creation.',
-          status: 'in_progress',
-          assignedAgent: 'Agent Claude-3.7-Sonnet',
-          worktreePath: '.worktrees/feat-auto-prompt',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-          updatedAt: new Date().toISOString(),
-          clarifications: [
-            {
-              question:
-                'Should intent detection run automatically on paste or via explicit Refine button?',
-              answer: 'Both: auto-detect on typing pause, explicit button for full review',
-              suggestedOptions: ['Auto on pause', 'Explicit button only', 'Both'],
-            },
-          ],
-        },
-        {
-          id: 'task-3',
-          projectId: 'jackalope-core',
-          title: 'Native PTY Streaming & Process Harness',
-          rawPrompt: 'Run CLI agents with live terminal output in desktop window',
-          refinedPrompt:
-            'Implement Tauri Rust backend command using portable-pty to multiplex streaming stdout/stderr with ANSI color escape code parsing for real-time agent monitoring.',
-          status: 'refinement',
-          assignedAgent: 'Unassigned',
-          createdAt: new Date(Date.now() - 1800000).toISOString(),
-          updatedAt: new Date().toISOString(),
-          clarifications: [
-            {
-              question: 'Which terminal emulation renderer should be embedded?',
-              suggestedOptions: [
-                'xterm.js',
-                'Canvas minimal ANSI renderer',
-                'HTML stream pre block',
-              ],
-            },
-          ],
-        },
-        {
-          id: 'task-4',
-          projectId: 'jackalope-core',
-          title: 'Scheduled Autonomous Maintenance Tasks',
-          rawPrompt: 'Add cron schedules for agents to run nightly checks',
-          refinedPrompt:
-            'Provide GUI scheduler enabling automated nightly dependency auditing, git branch stales, and automated PR reviews with notifications.',
-          status: 'backlog',
-          assignedAgent: 'Unassigned',
-          createdAt: new Date(Date.now() - 900000).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
+      tasks: [],
       activeModalTaskId: null,
 
       addTask: (taskData) => {
@@ -145,6 +76,12 @@ export const useTaskStore = create<TaskState>()(
     }),
     {
       name: 'jackalope-tasks',
+      version: 1,
+      migrate: (persisted) => ({
+        tasks: ((persisted as { tasks?: TaskTicket[] }).tasks ?? []).filter(
+          (task) => !(task.projectId === 'jackalope-core' && /^task-[1-4]$/.test(task.id)),
+        ),
+      }),
       partialize: (state) => ({ tasks: state.tasks }),
     },
   ),

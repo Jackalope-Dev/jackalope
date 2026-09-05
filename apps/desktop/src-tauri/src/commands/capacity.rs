@@ -13,6 +13,9 @@ use tokio::{
     time::timeout,
 };
 
+mod client;
+mod connected;
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CapacityWindow {
@@ -41,6 +44,8 @@ pub struct CapacityRecord {
 struct Cache {
     checked: Option<Instant>,
     codex: Option<CapacityRecord>,
+    claude: Option<CapacityRecord>,
+    grok: Option<CapacityRecord>,
 }
 
 #[derive(Default)]
@@ -51,31 +56,17 @@ fn unavailable(agent: &str, status: &str, detail: &str, account: Option<String>)
         agent: agent.into(),
         status: status.into(),
         account: account.unwrap_or_else(|| "Account identity not available for this agent".into()),
-        source: if agent == "codex" {
-            "Codex account/rateLimits/read"
-        } else {
-            "No connected quota adapter"
+        source: match agent {
+            "codex" => "Codex account/rateLimits/read",
+            "claude" => "Claude CLI get_usage (experimental)",
+            "grok" => "Grok CLI x.ai/billing",
+            _ => "No connected quota adapter",
         }
         .into(),
         observed_at: None,
         detail: detail.into(),
         windows: vec![],
     }
-}
-
-/// Reuses the same `claude auth status` probe `task_runners` already performs
-/// to discover the signed-in account's email, so users see the same real
-/// identity here even though quota itself isn't readable for Claude yet.
-async fn claude_account() -> Option<String> {
-    let path = super::tasks::executable("claude").ok()?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let output = super::tasks::probe_auth(path, vec!["auth", "status"]).ok()?;
-        let auth: Value = serde_json::from_slice(&output.stdout).ok()?;
-        auth["email"].as_str().map(str::to_string)
-    })
-    .await
-    .ok()
-    .flatten()
 }
 
 fn parse_codex(value: &Value) -> Result<CapacityRecord, String> {
@@ -209,6 +200,29 @@ fn failed_refresh(previous: Option<&CapacityRecord>, message: &str) -> CapacityR
     }
 }
 
+fn connected_refresh(
+    agent: &str,
+    previous: Option<&CapacityRecord>,
+    result: Result<CapacityRecord, String>,
+) -> CapacityRecord {
+    match result {
+        Ok(record) => record,
+        Err(message) => {
+            if super::tasks::executable(agent).is_err() {
+                return unavailable(agent, "notInstalled", &message, None);
+            }
+            if let Some(previous) = previous.filter(|r| r.observed_at.is_some()) {
+                let mut record = previous.clone();
+                record.status = "stale".into();
+                record.detail = format!("{message} Showing the previous account snapshot; its current sign-in and remaining capacity could not be verified.");
+                record
+            } else {
+                unavailable(agent, "unavailable", &message, None)
+            }
+        }
+    }
+}
+
 fn current_snapshot(mut record: CapacityRecord, now: i64) -> CapacityRecord {
     let expired = record
         .windows
@@ -236,39 +250,63 @@ pub async fn capacity_snapshot(
     let should_refresh = age.is_none()
         || (refresh.unwrap_or(false) && age.is_some_and(|age| age >= Duration::from_secs(60)));
     if should_refresh {
-        cache.codex = Some(match read_codex().await {
+        let (codex, claude, grok) = tokio::join!(
+            read_codex(),
+            connected::read_claude(),
+            connected::read_grok()
+        );
+        cache.codex = Some(match codex {
             Ok(record) => record,
             Err(error) => failed_refresh(
                 cache.codex.as_ref().filter(|r| r.observed_at.is_some()),
                 &error,
             ),
         });
+        cache.claude = Some(connected_refresh("claude", cache.claude.as_ref(), claude));
+        cache.grok = Some(connected_refresh("grok", cache.grok.as_ref(), grok));
         cache.checked = Some(Instant::now());
     }
-    let mut records = vec![current_snapshot(
-        cache
-            .codex
-            .clone()
-            .unwrap_or_else(|| unavailable("codex", "unavailable", "No quota snapshot yet", None)),
-        Utc::now().timestamp(),
-    )];
-    for (agent, detail) in [
-        ("claude", "Quota refresh is not connected. Claude exposes subscription windows through its interactive status line after a response; Jackalope's headless runner does not collect that yet."),
-        ("grok", "Quota refresh is not connected. This Grok CLI adapter has no verified standalone subscription balance interface. Account identity is not exposed either — Grok has no separate login-status command."),
-    ] {
-        // Even though quota itself isn't readable, surface the real signed-in
-        // account where we can (Claude exposes it via `auth status`) rather
-        // than a generic placeholder — same identity RunnerConnections shows.
-        let account = if agent == "claude" { claude_account().await } else { None };
-        records.push(if super::tasks::executable(agent).is_ok() { unavailable(agent, "unsupported", detail, account) }
-            else { unavailable(agent, "notInstalled", "Install this agent to connect it. Remaining capacity is unknown.", None) });
-    }
-    Ok(records)
+    Ok([
+        ("codex", &cache.codex),
+        ("claude", &cache.claude),
+        ("grok", &cache.grok),
+    ]
+    .into_iter()
+    .map(|(agent, record)| {
+        current_snapshot(
+            record.clone().unwrap_or_else(|| {
+                unavailable(agent, "unavailable", "No quota snapshot yet", None)
+            }),
+            Utc::now().timestamp(),
+        )
+    })
+    .collect())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_confirmed_account_change_or_unsupported_plan_discards_old_windows() {
+        let mut previous =
+            parse_codex(&json!({"rateLimits":{"primary":{"usedPercent":20}}})).unwrap();
+        previous.agent = "claude".into();
+        previous.account = "old@example.com".into();
+        for status in ["unavailable", "unsupported"] {
+            let next = unavailable(
+                "claude",
+                status,
+                "No subscription data",
+                Some("new@example.com".into()),
+            );
+            let result = connected_refresh("claude", Some(&previous), Ok(next));
+            assert_eq!(result.account, "new@example.com");
+            assert_eq!(result.status, status);
+            assert!(result.windows.is_empty());
+            assert!(result.observed_at.is_none());
+        }
+    }
 
     #[tokio::test]
     #[ignore = "Reads the locally signed-in Codex account; no agent task is started"]
