@@ -102,7 +102,16 @@ impl AgentPolicy {
             {
                 return Err(format!("Model {model} is restricted in Agents."));
             }
-        } else if self.allowed_models.values().any(|allowed| !allowed) {
+        } else if self.allowed_models.iter().any(|(key, allowed)| {
+            !allowed && (!key.contains(':') || key.starts_with(&format!("{agent}:")))
+        }) {
+            // Only a restriction that actually applies to this agent - a bare
+            // model name (global, every agent) or an "agent:model" key
+            // scoped to this one - should force an explicit choice here.
+            // Checking `.values()` alone (the previous code) ignored the key
+            // entirely, so restricting one model for e.g. Codex specifically
+            // would also block Claude/Grok tasks with no model requested,
+            // even though that restriction had nothing to do with them.
             return Err("Choose an explicit allowed model in Agents before launching with model restrictions.".into());
         }
         Ok(model)
@@ -187,5 +196,24 @@ mod tests {
         assert!(policy.model("codex", None).is_err());
         policy.enabled_agents.insert("claude".into(), false);
         assert!(policy.resolve("claude").unwrap_err().contains("disabled"));
+    }
+
+    #[test]
+    fn agent_scoped_model_restriction_does_not_leak_to_other_agents() {
+        let mut policy = AgentPolicy::default();
+        // Restrict a model only for codex; grok has no restrictions at all.
+        policy
+            .allowed_models
+            .insert("codex:gpt-3.5".into(), false);
+        assert!(policy.model("grok", None).unwrap().is_none());
+        assert!(policy
+            .model("codex", None)
+            .unwrap_err()
+            .contains("explicit"));
+        // A bare (unscoped) restriction is genuinely global and must still
+        // require an explicit choice everywhere.
+        let mut global = AgentPolicy::default();
+        global.allowed_models.insert("gpt-3.5".into(), false);
+        assert!(global.model("grok", None).is_err());
     }
 }
