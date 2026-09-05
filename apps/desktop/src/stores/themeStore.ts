@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { PRESET_THEMES, ThemePalette, applyThemeTokens, hexToHsl, hslToHex } from '../lib/theme-engine';
+import {
+  applyThemeTokens,
+  hexToHsl,
+  hslToHex,
+  PRESET_THEMES,
+  type ThemePalette,
+} from '../lib/theme-engine';
 
 interface ThemeState {
   currentTheme: ThemePalette;
@@ -55,6 +61,6 @@ export const useThemeStore = create<ThemeState>()(
       onRehydrateStorage: () => (state) => {
         if (state) applyThemeTokens(state.currentTheme);
       },
-    }
-  )
+    },
+  ),
 );

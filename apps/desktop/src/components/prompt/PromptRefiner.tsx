@@ -1,28 +1,22 @@
-import { useState } from 'react';
+import { ArrowRight, CheckCircle2, HelpCircle, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
+import { useState } from 'react';
 import { useMascotStore } from '../../stores/mascotStore';
-import {
-  Wand2,
-  Sparkles,
-  HelpCircle,
-  CheckCircle2,
-  ArrowRight,
-  RefreshCw,
-} from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+
+export interface PromptClarification {
+  question: string;
+  answer: string;
+}
 
 interface PromptRefinerProps {
   rawPrompt: string;
-  onApplyRefinement: (refinedPrompt: string, clarifications: any[]) => void;
+  onApplyRefinement: (refinedPrompt: string, clarifications: PromptClarification[]) => void;
   onCancel?: () => void;
 }
 
-export function PromptRefiner({
-  rawPrompt,
-  onApplyRefinement,
-  onCancel,
-}: PromptRefinerProps) {
+export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: PromptRefinerProps) {
   const { setMood, say } = useMascotStore();
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedClarifications, setSelectedClarifications] = useState<Record<number, string>>({});
@@ -78,10 +72,7 @@ ${rawPrompt}
 
 ### 📐 Clarified Scope & Constraints:
 ${detectedClarifications
-  .map(
-    (c) =>
-      `- **${c.question}**: ${selectedClarifications[c.id] || c.defaultOption}`
-  )
+  .map((c) => `- **${c.question}**: ${selectedClarifications[c.id] || c.defaultOption}`)
   .join('\n')}
 
 ### 🤖 Agent Execution Instructions:
@@ -182,11 +173,7 @@ ${detectedClarifications
             Skip Refinement
           </Button>
         )}
-        <Button
-          onClick={handleRunRefinement}
-          disabled={analyzing}
-          className="gap-2 ml-auto"
-        >
+        <Button onClick={handleRunRefinement} disabled={analyzing} className="gap-2 ml-auto">
           {analyzing ? (
             <>
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />

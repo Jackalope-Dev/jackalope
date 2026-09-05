@@ -1,37 +1,23 @@
-import { useState, useRef, useEffect } from 'react';
-import { useAgentStore, AgentAccount } from '../../stores/agentStore';
-import { useMascotStore } from '../../stores/mascotStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { Bot, Plus, RefreshCw, Send, Terminal, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  isTauriEnvironment,
   getSystemInfo,
+  isTauriEnvironment,
+  listenPtyExit,
+  listenPtyOutput,
   ptySpawn,
   ptyWrite,
-  listenPtyOutput,
-  listenPtyExit,
 } from '../../lib/tauri-bridge';
+import { type AgentAccount, useAgentStore } from '../../stores/agentStore';
+import { useMascotStore } from '../../stores/mascotStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import {
-  Bot,
-  Plus,
-  Terminal,
-  RefreshCw,
-  Send,
-  Trash2,
-} from 'lucide-react';
 
 export function AgentFleet() {
-  const {
-    accounts,
-    activeAccountId,
-    logs,
-    addAccount,
-    removeAccount,
-    appendLog,
-    clearLogs,
-  } = useAgentStore();
+  const { accounts, activeAccountId, logs, addAccount, removeAccount, appendLog, clearLogs } =
+    useAgentStore();
   const { say, setMood } = useMascotStore();
   const { projects, activeProjectId } = useProjectStore();
 
@@ -51,17 +37,19 @@ export function AgentFleet() {
 
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
+  }, []);
 
   useEffect(() => {
-    getSystemInfo().then((info) => setOsName(info.os)).catch(() => {});
+    getSystemInfo()
+      .then((info) => setOsName(info.os))
+      .catch(() => {});
 
     let unlistenOutput: (() => void) | undefined;
     let unlistenExit: (() => void) | undefined;
 
     listenPtyOutput((payload) => {
       const agentId = Object.entries(accountSessionsRef.current).find(
-        ([, sessionId]) => sessionId === payload.session_id
+        ([, sessionId]) => sessionId === payload.session_id,
       )?.[0];
       if (!agentId) return;
       const trimmed = payload.chunk.replace(/\r?\n$/, '');
@@ -79,7 +67,7 @@ export function AgentFleet() {
 
     listenPtyExit((payload) => {
       const agentId = Object.entries(accountSessionsRef.current).find(
-        ([, sessionId]) => sessionId === payload.session_id
+        ([, sessionId]) => sessionId === payload.session_id,
       )?.[0];
       if (agentId) delete accountSessionsRef.current[agentId];
       if (!agentId) return;
@@ -178,9 +166,7 @@ export function AgentFleet() {
     say('New agent account registered to fleet harness!', 3000);
   };
 
-  const filteredLogs = logs.filter(
-    (l) => streamFilter === 'all' || l.stream === streamFilter
-  );
+  const filteredLogs = logs.filter((l) => streamFilter === 'all' || l.stream === streamFilter);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden p-6 space-y-4">
@@ -194,7 +180,8 @@ export function AgentFleet() {
             <Badge variant="accent">Multi-Account Fleet</Badge>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Orchestrate multiple agent providers, isolate credentials, and monitor streaming process output.
+            Orchestrate multiple agent providers, isolate credentials, and monitor streaming process
+            output.
           </p>
         </div>
 
@@ -259,6 +246,7 @@ export function AgentFleet() {
                         </span>
                       )}
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           removeAccount(acc.id);
@@ -310,6 +298,7 @@ export function AgentFleet() {
               <div className="flex items-center gap-1 bg-[var(--color-surface-sunken)] p-0.5 rounded-lg border border-[var(--color-border)] text-[10px]">
                 {(['all', 'stdout', 'system'] as const).map((filter) => (
                   <button
+                    type="button"
                     key={filter}
                     onClick={() => setStreamFilter(filter)}
                     className={`px-2 py-0.5 rounded capitalize transition-all cursor-pointer ${
@@ -324,6 +313,7 @@ export function AgentFleet() {
               </div>
 
               <button
+                type="button"
                 onClick={() => clearLogs()}
                 className="p-1.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] transition-colors cursor-pointer"
                 title="Clear terminal logs"
@@ -341,9 +331,7 @@ export function AgentFleet() {
                   [{log.timestamp}]
                 </span>
                 {log.stream === 'system' ? (
-                  <span className="text-[var(--color-accent)] font-semibold">
-                    {log.message}
-                  </span>
+                  <span className="text-[var(--color-accent)] font-semibold">{log.message}</span>
                 ) : log.stream === 'stderr' ? (
                   <span className="text-red-400">{log.message}</span>
                 ) : (
@@ -395,10 +383,14 @@ export function AgentFleet() {
 
             <div className="space-y-3 text-left">
               <div>
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor="agent-account-name"
+                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
                   Account Display Label
                 </label>
                 <Input
+                  id="agent-account-name"
                   placeholder="e.g. Personal Claude Code / Antigravity Mesh"
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
@@ -407,12 +399,16 @@ export function AgentFleet() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor="agent-account-provider"
+                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
                   Agent Harness Provider
                 </label>
                 <select
+                  id="agent-account-provider"
                   value={newAccProvider}
-                  onChange={(e) => setNewAccProvider(e.target.value as any)}
+                  onChange={(e) => setNewAccProvider(e.target.value as AgentAccount['provider'])}
                   className="w-full h-9 mt-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] px-3 text-xs text-[var(--color-text-primary)] focus:outline-none"
                 >
                   <option value="claude-code">Claude Code (Anthropic CLI)</option>
@@ -424,10 +420,14 @@ export function AgentFleet() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor="agent-account-secret"
+                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
                   API Key or Socket Endpoint
                 </label>
                 <Input
+                  id="agent-account-secret"
                   type="password"
                   placeholder="sk-... or ws://localhost:11434"
                   value={newAccApiKey}

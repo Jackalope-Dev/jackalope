@@ -1,10 +1,8 @@
-import { useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import {
-  Sparkles,
-} from 'lucide-react';
 
 interface VisualNode {
   id: string;
@@ -17,15 +15,87 @@ interface VisualNode {
 }
 
 const NODES: VisualNode[] = [
-  { id: 'desktop', label: 'Tauri v2 Desktop Core', category: 'core', detail: 'Rust IPC & Tokio event loop', status: 'synced', x: 220, y: 160 },
-  { id: 'git-engine', label: 'Git Worktree Engine', category: 'core', detail: 'Branch isolation & auto-stash', status: 'active', x: 220, y: 280 },
-  { id: 'ui-shell', label: 'React 19 Shell & Radix', category: 'ui', detail: 'WAI-ARIA accessible primitives', status: 'synced', x: 480, y: 80 },
-  { id: 'arc-theme', label: 'Arc/Zen Dynamic Palette', category: 'ui', detail: 'Live OKLCH & surface-tinting', status: 'synced', x: 480, y: 200 },
-  { id: 'mascot', label: 'Jackalope Mascot Engine', category: 'ui', detail: 'Reactive motion & mood states', status: 'active', x: 480, y: 320 },
-  { id: 'agent-harness', label: 'Agent Mesh & Process Harness', category: 'agent', detail: 'Claude Code, Aider, Ollama', status: 'active', x: 740, y: 140 },
-  { id: 'intent-refiner', label: 'Proactive Intent Engine', category: 'agent', detail: 'Clarification questions & meta-prompts', status: 'active', x: 740, y: 260 },
-  { id: 'worktree-1', label: '.worktrees/feat-auto-prompt', category: 'worktree', detail: 'Running Agent Claude-3.7', status: 'active', x: 960, y: 180 },
-  { id: 'browser-tool', label: 'Playwright Browser Automation', category: 'integration', detail: 'Open-source web agent harness', status: 'pending', x: 740, y: 380 },
+  {
+    id: 'desktop',
+    label: 'Tauri v2 Desktop Core',
+    category: 'core',
+    detail: 'Rust IPC & Tokio event loop',
+    status: 'synced',
+    x: 220,
+    y: 160,
+  },
+  {
+    id: 'git-engine',
+    label: 'Git Worktree Engine',
+    category: 'core',
+    detail: 'Branch isolation & auto-stash',
+    status: 'active',
+    x: 220,
+    y: 280,
+  },
+  {
+    id: 'ui-shell',
+    label: 'React 19 Shell & Radix',
+    category: 'ui',
+    detail: 'WAI-ARIA accessible primitives',
+    status: 'synced',
+    x: 480,
+    y: 80,
+  },
+  {
+    id: 'arc-theme',
+    label: 'Arc/Zen Dynamic Palette',
+    category: 'ui',
+    detail: 'Live OKLCH & surface-tinting',
+    status: 'synced',
+    x: 480,
+    y: 200,
+  },
+  {
+    id: 'mascot',
+    label: 'Jackalope Mascot Engine',
+    category: 'ui',
+    detail: 'Reactive motion & mood states',
+    status: 'active',
+    x: 480,
+    y: 320,
+  },
+  {
+    id: 'agent-harness',
+    label: 'Agent Mesh & Process Harness',
+    category: 'agent',
+    detail: 'Claude Code, Aider, Ollama',
+    status: 'active',
+    x: 740,
+    y: 140,
+  },
+  {
+    id: 'intent-refiner',
+    label: 'Proactive Intent Engine',
+    category: 'agent',
+    detail: 'Clarification questions & meta-prompts',
+    status: 'active',
+    x: 740,
+    y: 260,
+  },
+  {
+    id: 'worktree-1',
+    label: '.worktrees/feat-auto-prompt',
+    category: 'worktree',
+    detail: 'Running Agent Claude-3.7',
+    status: 'active',
+    x: 960,
+    y: 180,
+  },
+  {
+    id: 'browser-tool',
+    label: 'Playwright Browser Automation',
+    category: 'integration',
+    detail: 'Open-source web agent harness',
+    status: 'pending',
+    x: 740,
+    y: 380,
+  },
 ];
 
 export function CodebaseMap() {
@@ -54,6 +124,7 @@ export function CodebaseMap() {
         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]">
           {(['all', 'core', 'ui', 'agent', 'worktree'] as const).map((cat) => (
             <button
+              type="button"
               key={cat}
               onClick={() => setFilter(cat)}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all capitalize cursor-pointer ${
@@ -76,14 +147,16 @@ export function CodebaseMap() {
           <div
             className="absolute inset-0 opacity-[0.03] pointer-events-none"
             style={{
-              backgroundImage:
-                'radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)',
+              backgroundImage: 'radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)',
               backgroundSize: '24px 24px',
             }}
           />
 
-          {/* SVG Connection Lines */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-[var(--color-border)] stroke-[1.5] stroke-dasharray-[4]">
+          {/* SVG Connection Lines (decorative) */}
+          <svg
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full pointer-events-none stroke-[var(--color-border)] stroke-[1.5] stroke-dasharray-[4]"
+          >
             <line x1="280" y1="180" x2="480" y2="100" />
             <line x1="280" y1="180" x2="480" y2="220" />
             <line x1="280" y1="180" x2="480" y2="340" />
@@ -121,8 +194,8 @@ export function CodebaseMap() {
                         node.status === 'active'
                           ? 'bg-[var(--color-accent)] animate-pulse'
                           : node.status === 'synced'
-                          ? 'bg-emerald-400'
-                          : 'bg-amber-400'
+                            ? 'bg-emerald-400'
+                            : 'bg-amber-400'
                       }`}
                     />
                   </div>

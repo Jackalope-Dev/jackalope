@@ -1,17 +1,17 @@
+import {
+  CheckCircle2,
+  Cloud,
+  Laptop,
+  Monitor,
+  Plus,
+  RefreshCw,
+  Server,
+  Smartphone,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import {
-  Laptop,
-  Monitor,
-  Server,
-  Smartphone,
-  Cloud,
-  CheckCircle2,
-  RefreshCw,
-  Plus,
-} from 'lucide-react';
 
 interface DeviceItem {
   id: string;
@@ -70,7 +70,8 @@ export function DeviceMesh() {
             <Badge variant="accent">Cross-Device Mesh</Badge>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Synchronize tasks, monitor agent progress, and dispatch work across your workstation, laptop, and headless servers.
+            Synchronize tasks, monitor agent progress, and dispatch work across your workstation,
+            laptop, and headless servers.
           </p>
         </div>
 
@@ -93,6 +94,7 @@ export function DeviceMesh() {
           </div>
           <div className="flex rounded-lg border border-[var(--color-border)] p-0.5 bg-[var(--color-surface-sunken)]">
             <button
+              type="button"
               onClick={() => {
                 setBackendType('cloud');
                 setEndpoint('https://mesh.jackalope.dev/v1');
@@ -106,6 +108,7 @@ export function DeviceMesh() {
               Managed (jackalope.dev)
             </button>
             <button
+              type="button"
               onClick={() => {
                 setBackendType('self-hosted');
                 setEndpoint('ws://127.0.0.1:8080/sync');
@@ -147,10 +150,10 @@ export function DeviceMesh() {
               dev.type === 'desktop'
                 ? Monitor
                 : dev.type === 'laptop'
-                ? Laptop
-                : dev.type === 'server'
-                ? Server
-                : Smartphone;
+                  ? Laptop
+                  : dev.type === 'server'
+                    ? Server
+                    : Smartphone;
 
             return (
               <div

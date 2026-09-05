@@ -36,7 +36,10 @@ export const useMascotStore = create<MascotState>((set, get) => ({
       }, durationMs);
     }
   },
-  clearMessage: () => { clearTimeout(messageTimer); set({ message: null }); },
+  clearMessage: () => {
+    clearTimeout(messageTimer);
+    set({ message: null });
+  },
   pet: () => {
     if (!petTimer) resumeMood = get().mood;
     clearTimeout(petTimer);
@@ -45,7 +48,10 @@ export const useMascotStore = create<MascotState>((set, get) => ({
       petCount: nextCount,
       mood: 'success',
     });
-    get().say(nextCount === 1 ? 'A little encouragement goes a long way.' : 'Right here with you.', 2500);
+    get().say(
+      nextCount === 1 ? 'A little encouragement goes a long way.' : 'Right here with you.',
+      2500,
+    );
     petTimer = setTimeout(() => {
       petTimer = undefined;
       set({ mood: resumeMood });

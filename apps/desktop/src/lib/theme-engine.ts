@@ -76,18 +76,35 @@ export function applyThemeTokens(theme: ThemePalette) {
   root.style.setProperty('--accent-l', `${accentLight}%`);
 
   root.style.setProperty('--color-accent', `hsl(${accentHue} ${accentSat}% ${accentLight}%)`);
-  root.style.setProperty('--color-accent-hover', `hsl(${accentHue} ${accentSat}% ${Math.max(10, accentLight - 6)}%)`);
-  root.style.setProperty('--color-accent-subtle', `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.12)`);
-  root.style.setProperty('--color-accent-glow', `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.28)`);
-  const rgb = hslToHex(accentHue, accentSat, accentLight).slice(1).match(/.{2}/g)!.map((channel) => {
-    const value = parseInt(channel, 16) / 255;
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  root.style.setProperty(
+    '--color-accent-hover',
+    `hsl(${accentHue} ${accentSat}% ${Math.max(10, accentLight - 6)}%)`,
+  );
+  root.style.setProperty(
+    '--color-accent-subtle',
+    `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.12)`,
+  );
+  root.style.setProperty(
+    '--color-accent-glow',
+    `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.28)`,
+  );
+  const rgbChannels =
+    hslToHex(accentHue, accentSat, accentLight)
+      .slice(1)
+      .match(/.{2}/g)
+      ?.map((channel) => {
+        const value = parseInt(channel, 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      }) ?? [];
+  const [r = 0, g = 0, b = 0] = rgbChannels;
+  const luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
   root.style.setProperty('--color-on-accent', luminance > 0.179 ? '#000000' : '#ffffff');
   root.style.setProperty('--color-shell', `hsl(${accentHue} ${atmosphere + 8}% 10%)`);
   root.style.setProperty('--color-shell-end', `hsl(${accentHue} ${atmosphere}% 6%)`);
-  root.style.setProperty('--color-spectrum', 'linear-gradient(90deg, hsl(0 75% 62%), hsl(60 75% 62%), hsl(120 75% 62%), hsl(180 75% 62%), hsl(240 75% 62%), hsl(300 75% 62%), hsl(360 75% 62%))');
+  root.style.setProperty(
+    '--color-spectrum',
+    'linear-gradient(90deg, hsl(0 75% 62%), hsl(60 75% 62%), hsl(120 75% 62%), hsl(180 75% 62%), hsl(240 75% 62%), hsl(300 75% 62%), hsl(360 75% 62%))',
+  );
 
   // Arc/Zen style surface tint: subtly mix the accent hue into dark surfaces
   const tintHue = accentHue;
@@ -116,7 +133,10 @@ export function hslToHex(h: number, s: number, l: number): string {
 export function hexToHsl(hex: string): { h: number; s: number; l: number } {
   let cleanHex = hex.replace('#', '');
   if (cleanHex.length === 3) {
-    cleanHex = cleanHex.split('').map((c) => c + c).join('');
+    cleanHex = cleanHex
+      .split('')
+      .map((c) => c + c)
+      .join('');
   }
   const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
   const g = parseInt(cleanHex.substring(2, 4), 16) / 255;

@@ -1,26 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useProjectStore } from '../../stores/projectStore';
+import { CheckCircle2, ExternalLink, FolderGit2, GitBranch, Plus, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useMascotStore } from '../../stores/mascotStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import {
-  GitBranch,
-  FolderGit2,
-  Plus,
-  RefreshCw,
-  ExternalLink,
-  CheckCircle2,
-} from 'lucide-react';
 
 export function WorktreeManager() {
-  const {
-    projects,
-    activeProjectId,
-    loadWorktreesForActiveProject,
-    spawnTaskWorktree,
-    loading,
-  } = useProjectStore();
+  const { projects, activeProjectId, loadWorktreesForActiveProject, spawnTaskWorktree, loading } =
+    useProjectStore();
   const { say, setMood } = useMascotStore();
 
   const [newWorktreeSlug, setNewWorktreeSlug] = useState('');
@@ -31,7 +19,7 @@ export function WorktreeManager() {
 
   useEffect(() => {
     loadWorktreesForActiveProject();
-  }, [activeProjectId]);
+  }, [loadWorktreesForActiveProject]);
 
   const handleCreate = async () => {
     if (!newWorktreeSlug.trim()) return;
@@ -60,7 +48,8 @@ export function WorktreeManager() {
             <Badge variant="accent">Concurrent Agent Isolation</Badge>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Maintain high velocity by isolating each autonomous agent in a distinct filesystem worktree.
+            Maintain high velocity by isolating each autonomous agent in a distinct filesystem
+            worktree.
           </p>
         </div>
 

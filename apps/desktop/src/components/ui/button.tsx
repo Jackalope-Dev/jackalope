@@ -29,13 +29,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           size === 'md' && 'h-9 px-3.5 text-sm gap-2',
           size === 'lg' && 'h-11 px-5 text-base gap-2.5',
           size === 'icon' && 'h-9 w-9 p-0',
-          className
+          className,
         )}
         {...props}
       >
         {children}
       </button>
     );
-  }
+  },
 );
 Button.displayName = 'Button';

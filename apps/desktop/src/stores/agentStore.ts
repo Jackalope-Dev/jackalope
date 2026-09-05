@@ -128,10 +128,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   addAccount: (acc) => {
     const id = `acc-${Date.now()}`;
     set((state) => ({
-      accounts: [
-        ...state.accounts,
-        { ...acc, id, tokensUsedToday: 0, activeProcesses: 0 },
-      ],
+      accounts: [...state.accounts, { ...acc, id, tokensUsedToday: 0, activeProcesses: 0 }],
     }));
   },
 

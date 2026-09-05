@@ -44,20 +44,30 @@ Before declaring any task or iteration complete:
 
 ## 5. Experience decisions
 
+For usage, quotas, model routing or proactive features, read
+`docs/USAGE-AND-ROUTING.md`. Keep reported measurements distinct from estimates
+and unknowns; route from the same capacity data the user sees. Proactive scans
+are budgeted and accounted; proposed work requires approval before dispatch.
+
 Read `docs/DESIGN.md` before changing a screen. The reference implementation is
 `ThemeEditor.tsx`: direct manipulation, immediate feedback, keyboard parity,
 and a small, deliberate surface. Use `/design-lab.html` in the running Vite app
 to inspect shared components, the mascot, and icon sizes.
 
-- Start with the user's next action. Use `WorkspaceHeading` for its heading and
-  primary action. Do not add a dashboard of implementation details above it.
+- Start with the user's next action. Reuse `WorkspaceHeading` when it fits;
+  do not force every view into the same heading/card layout. Share behavior and
+  visual tokens while designing each surface around its purpose.
+- Read `docs/VISION.md` for committed scope and `docs/PRODUCT-AUDIT.md` for the
+  prototype's known gaps before extending a feature. Demo timers and fixtures
+  do not prove execution; mark work complete only against its user journey.
 - Treat Jackalope as the operator across agents and machines. Read
   `docs/OPERATOR.md` when changing dispatch, context selection, connector/MCP
   setup, or project/workspace navigation. Ask which user intent the screen
   serves and which project/host/capabilities it needs. Keep that context visible
   and correctable; do not infer execution from a UI transition.
-- Keep Tasks, Worktrees, and Agents in the main navigation. Add secondary views
-  to `layout/navigation.ts`; both navigation and command search consume it.
+- Tasks, Worktrees, and Agents are the current primary navigation. Keep labels
+  shared through `layout/navigation.ts`; evolve the hierarchy when a validated
+  user workflow warrants it, rather than treating the initial shell as immutable.
 - Motion must explain a transition, acknowledge an action, or express the
   mascot's personality. Never add a breathing dot or activity badge without a
   real state behind it. A manual task move does not prove an agent started.

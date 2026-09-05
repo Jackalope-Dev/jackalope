@@ -1,18 +1,10 @@
+import { AlertCircle, Bot, CalendarClock, CheckCircle2, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useScheduleStore } from '../../stores/scheduleStore';
 import { useMascotStore } from '../../stores/mascotStore';
+import { useScheduleStore } from '../../stores/scheduleStore';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import {
-  CalendarClock,
-  Plus,
-  Play,
-  CheckCircle2,
-  AlertCircle,
-  Trash2,
-  Bot,
-} from 'lucide-react';
 
 export function ScheduleManager() {
   const { schedules, toggleSchedule, addSchedule, deleteSchedule, runNow } = useScheduleStore();
@@ -63,7 +55,8 @@ export function ScheduleManager() {
             <Badge variant="accent">Autonomous Cron Engine</Badge>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Configure periodic background workflows for dependency auditing, worktree hygiene, and continuous verification.
+            Configure periodic background workflows for dependency auditing, worktree hygiene, and
+            continuous verification.
           </p>
         </div>
 
@@ -112,9 +105,7 @@ export function ScheduleManager() {
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    {sch.description}
-                  </p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">{sch.description}</p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
@@ -138,6 +129,7 @@ export function ScheduleManager() {
                   </Button>
 
                   <button
+                    type="button"
                     onClick={() => deleteSchedule(sch.id)}
                     className="p-2 rounded-lg hover:bg-red-500/20 text-[var(--color-text-muted)] hover:text-red-400 transition-colors cursor-pointer"
                     title="Delete routine"
@@ -187,10 +179,14 @@ export function ScheduleManager() {
 
             <div className="space-y-3 text-left">
               <div>
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor="schedule-name"
+                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
                   Routine Name
                 </label>
                 <Input
+                  id="schedule-name"
                   placeholder="e.g. Daily Build & Performance Benchmark"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -199,25 +195,34 @@ export function ScheduleManager() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor="schedule-cron"
+                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
                   Cron Expression (5-part)
                 </label>
                 <Input
+                  id="schedule-cron"
                   placeholder="0 2 * * *"
                   value={cronExpression}
                   onChange={(e) => setCronExpression(e.target.value)}
                   className="mt-1 text-xs font-mono"
                 />
                 <span className="text-[10px] text-[var(--color-text-muted)] mt-1 block">
-                  Example: <code>0 2 * * *</code> (Every day at 2am) or <code>0 * * * *</code> (Hourly)
+                  Example: <code>0 2 * * *</code> (Every day at 2am) or <code>0 * * * *</code>{' '}
+                  (Hourly)
                 </span>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor="schedule-agent-provider"
+                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
                   Assigned Agent Provider
                 </label>
                 <select
+                  id="schedule-agent-provider"
                   value={assignedAgentProvider}
                   onChange={(e) => setAssignedAgentProvider(e.target.value)}
                   className="w-full h-9 mt-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] px-3 text-xs text-[var(--color-text-primary)] focus:outline-none"
@@ -230,10 +235,14 @@ export function ScheduleManager() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor="schedule-prompt"
+                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
                   Automated Instruction Prompt
                 </label>
                 <textarea
+                  id="schedule-prompt"
                   rows={2}
                   placeholder="What should the agent execute during this routine?"
                   value={prompt}

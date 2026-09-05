@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { WorktreeEntry, listWorktrees, createWorktree } from '../lib/tauri-bridge';
+import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-bridge';
 
 export interface Project {
   id: string;
@@ -60,9 +60,7 @@ export const useProjectStore = create<ProjectState>()(
           set({ loading: true });
           const worktrees = await listWorktrees(active.path);
           set((state) => ({
-            projects: state.projects.map((p) =>
-              p.id === active.id ? { ...p, worktrees } : p
-            ),
+            projects: state.projects.map((p) => (p.id === active.id ? { ...p, worktrees } : p)),
           }));
         } catch (e) {
           console.warn('Failed to load worktrees', e);
@@ -89,6 +87,6 @@ export const useProjectStore = create<ProjectState>()(
     {
       name: 'jackalope-projects',
       partialize: (state) => ({ projects: state.projects, activeProjectId: state.activeProjectId }),
-    }
-  )
+    },
+  ),
 );

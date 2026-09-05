@@ -1,16 +1,12 @@
+import { ArrowRight, CheckCircle2, FolderGit2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useMascotStore } from '../../stores/mascotStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
+import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { useThemeStore } from '../../stores/themeStore';
-import { useMascotStore } from '../../stores/mascotStore';
-import { ThemeEditor } from '../theme/ThemeEditor';
-import {
-  ArrowRight,
-  CheckCircle2,
-  FolderGit2,
-} from 'lucide-react';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -22,7 +18,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const { say, setMood } = useMascotStore();
 
   const [repoPath, setRepoPath] = useState('c:/Users/developer/Desktop/jackalope');
-  const [selectedAgent, setSelectedAgent] = useState<'claude' | 'aider' | 'ollama' | 'antigravity'>('claude');
+  const [selectedAgent, setSelectedAgent] = useState<'claude' | 'aider' | 'ollama' | 'antigravity'>(
+    'claude',
+  );
 
   const handleNext = () => {
     if (step === 1) {
@@ -70,8 +68,8 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   i === step
                     ? 'w-6 bg-[var(--color-accent)]'
                     : i < step
-                    ? 'w-2 bg-[var(--color-accent)]/50'
-                    : 'w-2 bg-[var(--color-border)]'
+                      ? 'w-2 bg-[var(--color-accent)]/50'
+                      : 'w-2 bg-[var(--color-border)]'
                 }`}
               />
             ))}
@@ -102,8 +100,8 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   A little room for your next big idea.
                 </h2>
                 <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                  Bring your project, give an agent a direction, and follow the work
-                  from first thought to final review.
+                  Bring your project, give an agent a direction, and follow the work from first
+                  thought to final review.
                 </p>
               </motion.div>
             )}
@@ -125,7 +123,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   </p>
                 </div>
 
-                <div className="text-left pt-3"><ThemeEditor value={currentTheme} onChange={setTheme} /></div>
+                <div className="text-left pt-3">
+                  <ThemeEditor value={currentTheme} onChange={setTheme} />
+                </div>
               </motion.div>
             )}
 
@@ -156,7 +156,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                     <button
                       key={ag.id}
                       type="button"
-                      onClick={() => setSelectedAgent(ag.id as any)}
+                      onClick={() =>
+                        setSelectedAgent(ag.id as 'claude' | 'aider' | 'ollama' | 'antigravity')
+                      }
                       className={`flex flex-col p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         selectedAgent === ag.id
                           ? 'border-[var(--color-accent)] bg-[var(--color-accent-subtle)]'
@@ -198,11 +200,15 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 </div>
 
                 <div className="text-left space-y-2 pt-1">
-                  <label className="text-xs font-medium text-[var(--color-text-secondary)]">
+                  <label
+                    htmlFor="onboarding-repo-path"
+                    className="text-xs font-medium text-[var(--color-text-secondary)]"
+                  >
                     Local Git Repository Path
                   </label>
                   <div className="flex gap-2">
                     <Input
+                      id="onboarding-repo-path"
                       value={repoPath}
                       onChange={(e) => setRepoPath(e.target.value)}
                       className="font-mono text-xs"

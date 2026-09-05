@@ -24,7 +24,7 @@ export const isTauriEnvironment = (): boolean => {
 };
 
 // Fallback mock state for browser dev mode
-let mockWorktrees: WorktreeEntry[] = [
+const mockWorktrees: WorktreeEntry[] = [
   {
     path: '.worktrees/feat-auto-prompt',
     head: '7fa4b12',

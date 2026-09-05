@@ -1,21 +1,13 @@
-import { useState } from 'react';
+import { ArrowLeft, ArrowRight, Bot, Clock, GitBranch, Plus, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useTaskStore, TaskStatus } from '../../stores/taskStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useState } from 'react';
+import { formatTimeAgo } from '../../lib/utils';
 import { useMascotStore } from '../../stores/mascotStore';
-import { TaskModal } from './TaskModal';
+import { useProjectStore } from '../../stores/projectStore';
+import { type TaskStatus, useTaskStore } from '../../stores/taskStore';
 import { Button } from '../ui/button';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
-import {
-  Plus,
-  GitBranch,
-  Bot,
-  Sparkles,
-  ArrowRight,
-  ArrowLeft,
-  Clock,
-} from 'lucide-react';
-import { formatTimeAgo } from '../../lib/utils';
+import { TaskModal } from './TaskModal';
 
 const COLUMNS: { id: TaskStatus; title: string; hint: string }[] = [
   { id: 'backlog', title: 'Ideas', hint: 'Start with a possibility' },
@@ -32,7 +24,6 @@ export function KanbanBoard() {
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
 
   const handleOpenNew = () => {
     setSelectedTaskId(null);
@@ -70,9 +61,16 @@ export function KanbanBoard() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden p-8 space-y-4">
       {/* Top Header & Actions */}
-      <WorkspaceHeading title="What will you build next?"
+      <WorkspaceHeading
+        title="What will you build next?"
         description="Give an idea a little direction. Follow the work, then make it yours."
-        action={<Button onClick={handleOpenNew} size="sm"><Plus className="size-3.5" />New task</Button>} />
+        action={
+          <Button onClick={handleOpenNew} size="sm">
+            <Plus className="size-3.5" />
+            New task
+          </Button>
+        }
+      />
 
       {/* Kanban Columns */}
       <div className="flex-1 flex gap-3.5 overflow-x-auto pb-4">
@@ -80,10 +78,7 @@ export function KanbanBoard() {
           const colTasks = tasks.filter((t) => t.projectId === projectId && t.status === col.id);
 
           return (
-            <div
-              key={col.id}
-              className="min-w-[208px] flex-1 flex flex-col"
-            >
+            <div key={col.id} className="min-w-[208px] flex-1 flex flex-col">
               {/* Column Header */}
               <div className="px-1 py-3 mb-3 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
                 <div>
@@ -111,10 +106,19 @@ export function KanbanBoard() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="text-xs font-semibold text-[var(--color-text-primary)] line-clamp-2 leading-snug">
-                        <button type="button" onClick={() => handleOpenExisting(task.id)} className="text-left cursor-pointer hover:text-[var(--color-accent)]">{task.title}</button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenExisting(task.id)}
+                          className="text-left cursor-pointer hover:text-[var(--color-accent)]"
+                        >
+                          {task.title}
+                        </button>
                       </h4>
                       {task.refinedPrompt && (
-                        <span title="Refined with Intent Engine" className="text-[var(--color-accent)] shrink-0">
+                        <span
+                          title="Refined with Intent Engine"
+                          className="text-[var(--color-accent)] shrink-0"
+                        >
                           <Sparkles className="w-3.5 h-3.5" />
                         </span>
                       )}
@@ -129,7 +133,9 @@ export function KanbanBoard() {
                       {task.worktreePath && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent)] font-mono text-[9px]">
                           <GitBranch className="w-2.5 h-2.5" />
-                          <span className="truncate max-w-[90px]">{task.worktreePath.replace('.worktrees/', '')}</span>
+                          <span className="truncate max-w-[90px]">
+                            {task.worktreePath.replace('.worktrees/', '')}
+                          </span>
                         </span>
                       )}
                       {task.assignedAgent && (
@@ -185,14 +191,16 @@ export function KanbanBoard() {
       </div>
 
       {/* Task Modal */}
-      {isModalOpen && <TaskModal
-        taskId={selectedTaskId}
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedTaskId(null);
-        }}
-      />}
+      {isModalOpen && (
+        <TaskModal
+          taskId={selectedTaskId}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedTaskId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

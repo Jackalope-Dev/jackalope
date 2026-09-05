@@ -1,15 +1,8 @@
+import { Camera, CheckCircle2, Globe, MousePointer, Play, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { useMascotStore } from '../../stores/mascotStore';
-import {
-  Globe,
-  Camera,
-  Play,
-  RotateCcw,
-  CheckCircle2,
-  MousePointer,
-} from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
 
 interface BrowserActionLog {
   id: string;
@@ -87,7 +80,8 @@ export function BrowserHarness() {
             <Badge variant="accent">Playwright Sandbox</Badge>
           </div>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Headless browser orchestration harness for web scraping, visual verification, and end-to-end agent pairing.
+            Headless browser orchestration harness for web scraping, visual verification, and
+            end-to-end agent pairing.
           </p>
         </div>
 
@@ -155,7 +149,8 @@ export function BrowserHarness() {
                   &lt;html&gt; ... loaded 42 interactive elements &lt;/html&gt;
                 </div>
                 <p className="text-[11px] leading-relaxed">
-                  The agent possesses full Playwright capabilities: clicking buttons, filling forms, solving simple auth challenges, and extracting structured JSON.
+                  The agent possesses full Playwright capabilities: clicking buttons, filling forms,
+                  solving simple auth challenges, and extracting structured JSON.
                 </p>
               </div>
 

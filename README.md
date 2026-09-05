@@ -1,83 +1,78 @@
-# 🐇 Jackalope
+# Jackalope
 
-> **High-performance, cross-platform desktop harness and orchestration shell for autonomous AI agents.**
+Jackalope is a desktop operator for projects and tasks across user-selected
+agents, accounts and machines. It is being built with Tauri/Rust and React,
+with a focused workspace, personal color themes and an animated jackalope companion.
 
-Jackalope is an open-source desktop control plane built with **Tauri v2 + Rust** and **React 19 + Tailwind CSS + Radix UI + Motion**. It provides a flat, tactile user interface with dynamic Arc/Zen-style color palettes, subtle surface elevations, an animated Jackalope mascot pet, and native capabilities to manage projects, spin out isolated git worktrees, auto-refine prompts, orchestrate agent fleets, and visualize codebases.
+**Current stage: early desktop prototype.** The interface and some native
+primitives work; the complete agent orchestration journey is still under
+development. The [product audit](docs/PRODUCT-AUDIT.md) documents known gaps.
+The [vision](docs/VISION.md) and [roadmap](docs/ROADMAP.md) describe intended scope.
 
----
+## Available today
 
-## ✨ Core Highlights
+- Shared vector branding, animated companion, theme color field and atmosphere.
+- Live theme preview with cancel/save, keyboard controls and component lab.
+- Workspace navigation, task-board/dialog UI and locally persisted records.
+- Native Git worktree list/create and basic process/PTY commands.
 
-- **⚡ Native Performance & Low Footprint**: Powered by Tauri v2 and Rust. Uses negligible system resources compared to traditional Electron wrappers.
-- **🎨 Arc / Zen Style Dynamic Theming**: Fluid color wheel and curated palette system deriving dynamic CSS variables, accent luminescences, and surface tinting in real-time.
-- **🐇 Animated Jackalope Companion**: An interactive silhouette mascot living inside the app with reactive states (idle, breathing, thinking, working, celebration).
-- **🌿 Git Worktree & Task Dispatch**: Instantly spin out isolated worktrees for concurrent agent workflows without disturbing active branches.
-- **🎯 Proactive Meta-Prompt Refiner**: Detects intent, spots ambiguities, and asks clarifying questions before dispatching work to agents.
-- **📋 Per-Project Kanban**: Full task lifecycle tracking (Backlog, Refinement, In Progress, Verification, Done) with one-click agent assignment.
-- **🗺️ Codebase Visualizer**: Interactive topology map showing repository modules, active worktrees, and running agent processes.
-- **🌐 Open & Extensible**: Modular agent adapter layer supporting CLI runners (Claude Code, Aider, OpenHands, Antigravity, Ollama) and standardized ACP (Agent Client Protocol).
+Agent accounts, prompt refinement, schedules, browser automation, codebase maps
+and devices still contain demonstration behavior. In particular, the fleet
+input currently writes to a shell, not a configured agent; do not treat it as a
+natural-language agent dispatcher. Real authentication, central MCP connections,
+task execution/review, scheduling and remote operation remain to be implemented.
 
----
+## Product direction
 
-## 📂 Repository Structure
+The goal is a complete path from intent to reviewed result: real project setup,
+multiple agents and existing accounts, useful automatic prompt/context
+supplementation, isolated work, central connections and tools, schedules,
+project/codebase understanding, and grounded usage guidance. The eventual
+remote companion will support multiple devices through self-hosted or managed
+infrastructure. These are commitments, not claims about the current prototype.
 
-```
-jackalope/
-├── apps/
-│   └── desktop/               # Tauri v2 native desktop shell & React client
-│       ├── src-tauri/         # Rust backend (IPC, Git worktrees, process harness)
-│       └── src/               # React 19 UI, theme engine, mascots, kanban, worktrees
-├── docs/                      # In-project docs and agent handoff loop
-│   ├── AGENTS.md              # Operational guide for AI agents working in this repo
-│   ├── STATUS.md              # Live status, completed features, active focus
-│   ├── ROADMAP.md             # Multi-phase milestone roadmap
-│   ├── TODO.md                # Prioritized backlog of tasks
-│   ├── ARCHITECTURE.md        # Technical architecture, IPC protocols, and data models
-│   └── DESIGN.md              # Visual/UX direction and mascot-logo guidance
-├── pnpm-workspace.yaml        # Monorepo workspace configuration
-└── package.json
-```
+See [DESIGN.md](docs/DESIGN.md) for the refined, intentional experience standard
+and [OPERATOR.md](docs/OPERATOR.md) for ownership of context, tools and continuity.
 
----
+## Develop locally
 
-## 🚀 Getting Started
+Use Node 24 (tested with 24.18.0), the pnpm version pinned in `package.json`,
+and Rust/Cargo plus platform build prerequisites for native desktop work.
 
-### Prerequisites
-
-- **Node.js** (v20+ recommended, v24+ supported)
-- **pnpm** (v9+ or v10+)
-- **Rust & Cargo** (for Tauri desktop runtime):
-  - On Windows: `winget install Rustlang.Rustup` or run `rustup-init.exe` from [rustup.rs](https://rustup.rs/)
-
-### Web / UI Development Mode
-
-To quickly develop and preview the frontend and mock Tauri IPC bridges in your browser:
-
-```bash
-pnpm install
+```powershell
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Visit `http://localhost:5173` to interact with the full UI, theme selector, Jackalope mascot, onboarding wizard, and kanban board.
+The browser preview runs at `http://localhost:5173`; `/design-lab.html` renders
+the shared character and theme controls. Browser IPC is mocked. Several current
+feature demos also use fixtures in the native app; see [STATUS.md](docs/STATUS.md).
 
-### Native Desktop Mode
-
-Once Rust is installed:
-
-```bash
+```powershell
+pnpm build
+pnpm --filter @jackalope/desktop test:visual-state
+pnpm lint
 pnpm tauri dev
 ```
 
----
+A successful frontend build is not native feature verification. See
+[the native runbook](.claude/skills/run-jackalope-desktop/SKILL.md) for Windows
+launch/inspection guidance and [the workflow skill](.agents/skills/jackalope-workflow/SKILL.md)
+for project checks.
 
-## 🤖 Agent Loop & Workflow
+## Repository and handoff
 
-Jackalope contains an active agent orchestration loop designed so any AI agent can pick up context, make verifiable progress, and hand off work cleanly:
-- Consult [`docs/AGENTS.md`](docs/AGENTS.md) for conventions, rules of engagement, and commit hygiene.
-- Check [`docs/STATUS.md`](docs/STATUS.md) for immediate tasks and milestones.
+- `apps/desktop/src`: UI, stores, theme engine and IPC bridge.
+- `apps/desktop/src-tauri`: native Git/process/system/PTY commands.
+- [STATUS.md](docs/STATUS.md): verified behavior and immediate priorities.
+- [TODO.md](docs/TODO.md): open work and acceptance checks.
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): actual interfaces and proposed boundaries.
+- [USAGE-AND-ROUTING.md](docs/USAGE-AND-ROUTING.md): usage, connected capacity,
+  best-fit routing and proactive proposal plans.
+- [AGENTS.md](AGENTS.md): collaboration and commit rules.
 
----
+Native startup, memory and responsiveness budgets still need measured baselines.
+Dependency reuse, accessibility, commercially permissive licensing and clear
+extension contracts are delivery requirements.
 
-## 📜 License
-
-Licensed under the [Apache License, Version 2.0](LICENSE).
+Licensed under [Apache-2.0](LICENSE).
