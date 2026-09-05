@@ -14,6 +14,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { Select, SelectItem } from '../ui/Select';
 
 export function AgentFleet() {
   const { accounts, activeAccountId, logs, addAccount, removeAccount, appendLog, clearLogs } =
@@ -421,18 +422,18 @@ export function AgentFleet() {
                 >
                   Agent Harness Provider
                 </label>
-                <select
+                <Select
                   id="agent-account-provider"
                   value={newAccProvider}
-                  onChange={(e) => setNewAccProvider(e.target.value as AgentAccount['provider'])}
-                  className="w-full h-9 mt-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] px-3 text-xs text-[var(--color-text-primary)] focus:outline-none"
+                  onValueChange={(value) => setNewAccProvider(value as AgentAccount['provider'])}
+                  className="w-full"
                 >
-                  <option value="claude-code">Claude Code (Anthropic CLI)</option>
-                  <option value="antigravity">Antigravity (DeepMind Agent)</option>
-                  <option value="aider">Aider (Pairing CLI)</option>
-                  <option value="ollama">Ollama (Local Offline LLM)</option>
-                  <option value="openhands">OpenHands (Software Agent)</option>
-                </select>
+                  <SelectItem value="claude-code">Claude Code (Anthropic CLI)</SelectItem>
+                  <SelectItem value="antigravity">Antigravity (DeepMind Agent)</SelectItem>
+                  <SelectItem value="aider">Aider (Pairing CLI)</SelectItem>
+                  <SelectItem value="ollama">Ollama (Local Offline LLM)</SelectItem>
+                  <SelectItem value="openhands">OpenHands (Software Agent)</SelectItem>
+                </Select>
               </div>
 
               <div>

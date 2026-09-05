@@ -1,16 +1,15 @@
-import { useDialogFocus } from '../ui/useDialogFocus';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
-  CircleAlert,
-  Clock3,
-  Layers3,
-  LoaderCircle,
   ArrowLeft,
   ArrowRight,
   Check,
+  CircleAlert,
+  Clock3,
   GitMerge,
   GitPullRequest,
+  Layers3,
   ListPlus,
+  LoaderCircle,
   Pause,
   Play,
   Plus,
@@ -22,6 +21,8 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { Select, SelectItem } from '../ui/Select';
+import { useDialogFocus } from '../ui/useDialogFocus';
 import { PlanImport } from './PlanImport';
 import './project-queue.css';
 
@@ -188,20 +189,22 @@ function AddWork({
               />
             </label>
             <div className="queue-form-pair">
-              <label>
+              <label htmlFor="projectqueue-field-1">
                 Agent
-                <select
+                <Select
+                  id="projectqueue-field-1"
+                  aria-label="Agent"
                   className="task-input"
                   value={draft.agent}
-                  onChange={(e) => update({ agent: e.target.value })}
+                  onValueChange={(value) => update({ agent: value })}
                 >
                   {['codex', 'claude', 'grok'].map((id) => (
-                    <option key={id} value={id}>
+                    <SelectItem key={id} value={id}>
                       {id === 'claude' ? 'Claude Code' : id === 'codex' ? 'Codex' : 'Grok'}
                       {runners.find((r) => r.id === id)?.available ? '' : ' · not detected'}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 Owned files or folders
@@ -732,26 +735,28 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
       ) : (
         <>
           <div className="queue-controls">
-            <label className="task-label">
+            <label htmlFor="projectqueue-field-2" className="task-label">
               Concurrent agents
-              <select
+              <Select
+                id="projectqueue-field-2"
+                aria-label="Concurrent agents"
                 className="task-input"
-                value={queue.concurrency}
+                value={String(queue.concurrency)}
                 disabled={busy || !desktop}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   void act('queue_dispatch', {
                     projectId: project.id,
                     enabled,
-                    concurrency: Number(e.target.value),
+                    concurrency: Number(value),
                   })
                 }
               >
                 {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <option key={n} value={n}>
+                  <SelectItem key={n} value={String(n)}>
                     {n} across projects
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </label>
             <Button
               disabled={!desktop || busy || (!items.some((i) => state(i) === 'queued') && !enabled)}

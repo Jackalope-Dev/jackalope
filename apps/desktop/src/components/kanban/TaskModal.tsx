@@ -8,6 +8,7 @@ import { PromptRefiner } from '../prompt/PromptRefiner';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { Select, SelectItem } from '../ui/Select';
 
 interface TaskModalProps {
   taskId: string | null;
@@ -213,17 +214,19 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   <Bot className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
                   <span>Assigned Agent Runner</span>
                 </label>
-                <select
+                <Select
                   id="task-assigned-agent"
                   value={assignedAgent}
-                  onChange={(e) => setAssignedAgent(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] px-3 text-xs text-[var(--color-text-primary)] focus:outline-none"
+                  onValueChange={(value) => setAssignedAgent(value)}
+                  className="w-full"
                 >
-                  <option>Agent Claude-3.7-Sonnet</option>
-                  <option>Agent Antigravity (DeepMind)</option>
-                  <option>Agent Aider (Pairing)</option>
-                  <option>Local Ollama (Offline)</option>
-                </select>
+                  <SelectItem value="Agent Claude-3.7-Sonnet">Agent Claude-3.7-Sonnet</SelectItem>
+                  <SelectItem value="Agent Antigravity (DeepMind)">
+                    Agent Antigravity (DeepMind)
+                  </SelectItem>
+                  <SelectItem value="Agent Aider (Pairing)">Agent Aider (Pairing)</SelectItem>
+                  <SelectItem value="Local Ollama (Offline)">Local Ollama (Offline)</SelectItem>
+                </Select>
               </div>
 
               <div className="space-y-1.5">

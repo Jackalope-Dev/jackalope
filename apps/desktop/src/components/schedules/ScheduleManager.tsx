@@ -1,5 +1,4 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useDialogFocus } from '../ui/useDialogFocus';
 import { AlertCircle, Bot, CalendarClock, CheckCircle2, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useMascotStore } from '../../stores/mascotStore';
@@ -7,6 +6,8 @@ import { useScheduleStore } from '../../stores/scheduleStore';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { Select, SelectItem } from '../ui/Select';
+import { useDialogFocus } from '../ui/useDialogFocus';
 
 export function ScheduleManager() {
   const dialogFocus = useDialogFocus();
@@ -221,17 +222,17 @@ export function ScheduleManager() {
                 >
                   Assigned Agent Provider
                 </label>
-                <select
+                <Select
                   id="schedule-agent-provider"
                   value={assignedAgentProvider}
-                  onChange={(e) => setAssignedAgentProvider(e.target.value)}
-                  className="w-full h-9 mt-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] px-3 text-xs text-[var(--color-text-primary)] focus:outline-none"
+                  onValueChange={(value) => setAssignedAgentProvider(value)}
+                  className="w-full"
                 >
-                  <option>Agent Antigravity</option>
-                  <option>Agent Claude-3.7-Sonnet</option>
-                  <option>Local Ollama</option>
-                  <option>Agent Aider</option>
-                </select>
+                  <SelectItem value="Agent Antigravity">Agent Antigravity</SelectItem>
+                  <SelectItem value="Agent Claude-3.7-Sonnet">Agent Claude-3.7-Sonnet</SelectItem>
+                  <SelectItem value="Local Ollama">Local Ollama</SelectItem>
+                  <SelectItem value="Agent Aider">Agent Aider</SelectItem>
+                </Select>
               </div>
 
               <div>

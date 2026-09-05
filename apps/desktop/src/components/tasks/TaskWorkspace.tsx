@@ -1,17 +1,17 @@
 import {
-  Plus,
-  Bot,
-  CircleCheck,
-  ListTodo,
-  Workflow,
   ArrowLeft,
   ArrowRight,
+  Bot,
   Check,
   ChevronRight,
+  CircleCheck,
   FileDiff,
   FolderOpen,
   GitBranch,
+  ListTodo,
+  Plus,
   Square,
+  Workflow,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import {
@@ -22,13 +22,14 @@ import {
   type TaskRun,
 } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { EmptyState } from '../ui/EmptyState';
-import { RunStatus } from './RunStatus';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { EmptyState } from '../ui/EmptyState';
+import { Select, SelectItem } from '../ui/Select';
 import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
+import { RunStatus } from './RunStatus';
 
 const Markdown = lazy(() => import('react-markdown'));
 
@@ -155,18 +156,20 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
       </div>
       {run.workspace && <p className="task-path">{run.workspace}</p>}
       {attempts.length > 1 && (
-        <label className="task-attempt-picker">
+        <label htmlFor="taskworkspace-field-1" className="task-attempt-picker">
           Attempt
-          <select
+          <Select
+            id="taskworkspace-field-1"
+            aria-label="Attempt"
             value={run.id}
-            onChange={(event) => useExecutionStore.getState().select(event.target.value)}
+            onValueChange={(value) => useExecutionStore.getState().select(value)}
           >
             {attempts.map((attempt, index) => (
-              <option key={attempt.id} value={attempt.id}>
+              <SelectItem key={attempt.id} value={attempt.id}>
                 {attempts.length - index} · {statusLabel[attempt.status]}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </Select>
         </label>
       )}
       {attempts.length > 1 && (
@@ -489,30 +492,32 @@ export function TaskWorkspace() {
             />
             <div className="task-composer-footer">
               <div className="task-context-controls">
-                <label className="task-context-chip">
+                <label htmlFor="taskworkspace-field-2" className="task-context-chip">
                   <Bot size={18} aria-hidden="true" />
                   <span className="sr-only">Agent</span>
-                  <select
+                  <Select
+                    id="taskworkspace-field-2"
+                    aria-label="Agent"
                     value={current.agent}
-                    onChange={(event) => draft(key, { agent: event.target.value })}
+                    onValueChange={(value) => draft(key, { agent: value })}
                   >
-                    <option value="codex">Codex</option>
-                    <option value="claude">Claude Code</option>
-                    <option value="grok">Grok</option>
-                  </select>
+                    <SelectItem value="codex">Codex</SelectItem>
+                    <SelectItem value="claude">Claude Code</SelectItem>
+                    <SelectItem value="grok">Grok</SelectItem>
+                  </Select>
                 </label>
-                <label className="task-context-chip">
+                <label htmlFor="taskworkspace-field-3" className="task-context-chip">
                   <span className="sr-only">Execution location</span>
                   <GitBranch size={13} />
-                  <select
+                  <Select
+                    id="taskworkspace-field-3"
+                    aria-label="Execution location"
                     value={current.isolated ? 'isolated' : 'current'}
-                    onChange={(event) =>
-                      draft(key, { isolated: event.target.value === 'isolated' })
-                    }
+                    onValueChange={(value) => draft(key, { isolated: value === 'isolated' })}
                   >
-                    <option value="isolated">New worktree</option>
-                    <option value="current">Current checkout</option>
-                  </select>
+                    <SelectItem value="isolated">New worktree</SelectItem>
+                    <SelectItem value="current">Current checkout</SelectItem>
+                  </Select>
                 </label>
               </div>
               <Button
@@ -585,46 +590,45 @@ export function TaskWorkspace() {
           </fieldset>
         </div>
       )}
-      {project && (
-        loading ? (
-            <p role="status" className="task-muted py-5">
-              Loading task history…
-            </p>
-          ) : filtered.length ? (
-            <div className="task-list">
-              {filtered.map((run) => (
-                <button
-                  type="button"
-                  className="task-list-row"
-                  key={run.id}
-                  onClick={() => select(run.id)}
-                >
-                  <div className="min-w-0">
-                    <span className="block truncate font-medium">
-                      {runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt}
-                    </span>
-                    <span className="task-muted text-xs mt-2 block">
-                      {runners.find((runner) => runner.id === run.agent)?.name ?? run.agent} ·{' '}
-                      {new Date(run.startedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <RunStatus status={run.status} />
-                  <ChevronRight size={15} className="text-[var(--color-text-muted)]" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={ListTodo}
-              title={filter === 'all' ? 'Ready for your first task' : 'Nothing here yet'}
-              description={
-                filter === 'all'
-                  ? 'Describe the work above. Results and review will stay with the task.'
-                  : 'Tasks will appear here as their status changes.'
-              }
-            />
-          )
-      )}
+      {project &&
+        (loading ? (
+          <p role="status" className="task-muted py-5">
+            Loading task history…
+          </p>
+        ) : filtered.length ? (
+          <div className="task-list">
+            {filtered.map((run) => (
+              <button
+                type="button"
+                className="task-list-row"
+                key={run.id}
+                onClick={() => select(run.id)}
+              >
+                <div className="min-w-0">
+                  <span className="block truncate font-medium">
+                    {runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt}
+                  </span>
+                  <span className="task-muted text-xs mt-2 block">
+                    {runners.find((runner) => runner.id === run.agent)?.name ?? run.agent} ·{' '}
+                    {new Date(run.startedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <RunStatus status={run.status} />
+                <ChevronRight size={15} className="text-[var(--color-text-muted)]" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={ListTodo}
+            title={filter === 'all' ? 'Ready for your first task' : 'Nothing here yet'}
+            description={
+              filter === 'all'
+                ? 'Describe the work above. Results and review will stay with the task.'
+                : 'Tasks will appear here as their status changes.'
+            }
+          />
+        ))}
       <ProjectSetup open={setup} onClose={() => setSetup(false)} />
     </section>
   );

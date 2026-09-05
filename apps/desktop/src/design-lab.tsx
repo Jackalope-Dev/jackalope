@@ -3,15 +3,19 @@ import { createRoot } from 'react-dom/client';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
 import { ThemeEditor } from './components/theme/ThemeEditor';
 import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
+import { Select, SelectItem } from './components/ui/Select';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
 import { applyThemeTokens, PRESET_THEMES } from './lib/theme-engine';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
+import './components/ui/experience.css';
 
 function DesignLab() {
   const [theme, setTheme] = useState(PRESET_THEMES[0]);
   const [replay, setReplay] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [period, setPeriod] = useState('30');
   const { mood, setMood } = useMascotStore();
   useEffect(() => applyThemeTokens(theme), [theme]);
 
@@ -82,7 +86,7 @@ function DesignLab() {
                       height={size}
                       alt={`Jackalope head at ${size} pixels`}
                     />
-                    <figcaption className="text-[10px] text-[var(--color-text-muted)] mt-3">
+                    <figcaption className="text-xs text-[var(--color-text-muted)] mt-3">
                       {size}px
                     </figcaption>
                   </figure>
@@ -93,12 +97,63 @@ function DesignLab() {
           <section className="rounded-3xl bg-[var(--color-surface)] p-6 self-start">
             <h2 className="text-sm font-medium mb-6">Find your atmosphere</h2>
             <ThemeEditor value={theme} onChange={setTheme} />
-            <p className="text-[11px] text-[var(--color-text-muted)] mt-6 leading-relaxed">
+            <p className="text-xs text-[var(--color-text-muted)] mt-6 leading-relaxed">
               This playground does not change your saved workspace theme. Motion follows your system
               preference.
             </p>
           </section>
         </div>
+        <section
+          className="rounded-3xl bg-[var(--color-bg)] p-8 mt-8"
+          aria-labelledby="controls-title"
+        >
+          <h2 id="controls-title" className="text-sm font-medium">
+            Considered controls
+          </h2>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-2">
+            Open a menu, use the arrow keys, or switch appearance. Every state belongs to your
+            theme.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-6 mt-6">
+            <label
+              htmlFor="design-lab-field-1"
+              className="grid gap-2 text-xs text-[var(--color-text-secondary)]"
+            >
+              Period
+              <Select
+                id="design-lab-field-1"
+                aria-label="Period"
+                value={period}
+                onValueChange={setPeriod}
+              >
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
+              </Select>
+            </label>
+            <label
+              htmlFor="design-lab-field-2"
+              className="grid gap-2 text-xs text-[var(--color-text-secondary)]"
+            >
+              Project name
+              <Input id="design-lab-field-2" placeholder="Name your project" />
+            </label>
+            <label
+              htmlFor="design-lab-field-3"
+              className="grid gap-2 text-xs text-[var(--color-text-secondary)]"
+            >
+              Unavailable connection
+              <Select
+                id="design-lab-field-3"
+                aria-label="Unavailable connection"
+                value="unavailable"
+                disabled
+              >
+                <SelectItem value="unavailable">No connection available</SelectItem>
+              </Select>
+            </label>
+          </div>
+        </section>
       </div>
     </main>
   );

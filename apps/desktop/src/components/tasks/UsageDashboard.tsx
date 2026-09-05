@@ -4,6 +4,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { CapacityPanel } from './CapacityPanel';
 
@@ -95,33 +96,48 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         }
       />
       <div className="usage-filters">
-        <label>
+        <label htmlFor="usagedashboard-field-1">
           Project
-          <select value={project} onChange={(e) => setProject(e.target.value)}>
-            <option value="all">All projects</option>
+          <Select
+            id="usagedashboard-field-1"
+            aria-label="Project"
+            value={project}
+            onValueChange={(value) => setProject(value)}
+          >
+            <SelectItem value="all">All projects</SelectItem>
             {[...projectNames].map(([id, name]) => (
-              <option key={id} value={id}>
+              <SelectItem key={id} value={id}>
                 {name}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+          </Select>
         </label>
-        <label>
+        <label htmlFor="usagedashboard-field-2">
           Period
-          <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="all">All time</option>
-          </select>
+          <Select
+            id="usagedashboard-field-2"
+            aria-label="Period"
+            value={period}
+            onValueChange={(value) => setPeriod(value)}
+          >
+            <SelectItem value="7">Last 7 days</SelectItem>
+            <SelectItem value="30">Last 30 days</SelectItem>
+            <SelectItem value="all">All time</SelectItem>
+          </Select>
         </label>
-        <label>
+        <label htmlFor="usagedashboard-field-3">
           Sort by
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="tokens">Tokens used</option>
-            <option value="project">Project</option>
-            <option value="agent">Agent</option>
-            <option value="model">Model</option>
-          </select>
+          <Select
+            id="usagedashboard-field-3"
+            aria-label="Sort by"
+            value={sort}
+            onValueChange={(value) => setSort(value)}
+          >
+            <SelectItem value="tokens">Tokens used</SelectItem>
+            <SelectItem value="project">Project</SelectItem>
+            <SelectItem value="agent">Agent</SelectItem>
+            <SelectItem value="model">Model</SelectItem>
+          </Select>
         </label>
       </div>
       {filtered.length > 0 && (
