@@ -60,6 +60,7 @@ pub fn run() {
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
+                app.state::<AppState>().kill_all_pty_sessions();
             }
         });
 }
