@@ -1,7 +1,7 @@
 pub mod commands;
 pub mod state;
 
-use commands::{agent::*, git::*, system::*};
+use commands::{agent::*, git::*, pty::*, system::*};
 use state::AppState;
 
 pub fn run() {
@@ -13,6 +13,10 @@ pub fn run() {
             git_create_worktree,
             agent_spawn_process,
             system_get_info,
+            pty_spawn,
+            pty_write,
+            pty_resize,
+            pty_kill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running jackalope application");
