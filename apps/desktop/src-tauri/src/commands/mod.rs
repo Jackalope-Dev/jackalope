@@ -3,3 +3,7 @@ pub mod agent;
 pub mod pty;
 pub mod system;
 pub mod tasks;
+pub mod coordination;
+pub mod integration;
+pub mod capacity;
+pub mod coordination_mcp;

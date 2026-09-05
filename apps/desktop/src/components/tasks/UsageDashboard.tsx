@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { CapacityPanel } from './CapacityPanel';
 
 export function UsageDashboard({ onTask }: { onTask: () => void }) {
   const { runs, select, loading, error } = useExecutionStore();
@@ -209,13 +210,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
           </table>
         </div>
       )}
-      <div className="usage-capacity">
-        <h2 className="font-medium">Connected capacity</h2>
-        <p className="task-muted mt-2">
-          Remaining subscription allowances and tool quotas are not connected yet. These task totals
-          do not represent your account-wide balance or bill.
-        </p>
-      </div>
+      <CapacityPanel />
     </section>
   );
 }

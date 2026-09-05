@@ -21,6 +21,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
 
 const Markdown = lazy(() => import('react-markdown'));
@@ -349,6 +350,7 @@ export function TaskWorkspace() {
   const [setup, setSetup] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [filter, setFilter] = useState('all');
+  const [parallel, setParallel] = useState(false);
   const key = project?.id ?? 'projectless';
   const current = drafts[key] ?? emptyDraft;
   const selected = runs.find((run) => run.id === selectedId && run.projectId === project?.id);
@@ -379,8 +381,16 @@ export function TaskWorkspace() {
     }
   };
   if (selected) return <TaskDetail key={selected.id} run={selected} onBack={() => select(null)} />;
+  if (parallel && project)
+    return <ProjectQueue key={project.id} project={project} onBack={() => setParallel(false)} />;
   return (
     <section className="task-page task-home">
+      {project && (
+        <button type="button" className="task-link float-right" onClick={() => setParallel(true)}>
+          Plan parallel work
+          <ArrowRight size={15} />
+        </button>
+      )}
       <div className="task-introduction">
         <p className="task-eyebrow">
           {project ? `A little momentum for ${project.name}` : 'A place for your next idea'}

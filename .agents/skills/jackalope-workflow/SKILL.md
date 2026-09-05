@@ -82,3 +82,16 @@ to inspect shared components, the mascot, and icon sizes.
 - Before handoff, verify 1280×840 and 960×640, theme persistence and preview
   rollback, all five mascot moods, and `pnpm --filter @jackalope/desktop
   test:visual-state`. Finish with `pnpm build`.
+
+## 6. Parallel execution and integration
+
+Read `docs/PARALLEL-MVP.md` before editing queue dispatch, coordination, capacity
+or Git integration. The native runtime and coordinator own work; UI state never
+claims or completes it. Keep coordinator mutex -> integration exclusion -> runtime
+mutex ordering, and use the guarded reservation path for every new attempt.
+Dependencies require reachable integrated commits; successful exits are not merges.
+Keep source worktrees and staging intact, invalidate stale previews, and never
+bypass dirty-master or ignored-file protections. Claude coordination uses the
+scoped MCP tools; do not weaken shell permissions to read bridge credentials.
+Run native tests against disposable repositories and inspect the 960x640 review
+and capacity views. General connectors, budgets and routing remain separate scope.

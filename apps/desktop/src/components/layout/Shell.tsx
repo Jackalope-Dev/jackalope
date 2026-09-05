@@ -16,6 +16,8 @@ import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { CodebaseMap } from '../visualizer/CodebaseMap';
 import { CommandPalette } from './CommandPalette';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
+import { ResizeHandles } from './ResizeHandles';
+import { TitleBar } from './TitleBar';
 
 export type { ActiveTab } from './navigation';
 
@@ -41,6 +43,8 @@ export function Shell() {
 
   return (
     <div className="workspace-shell">
+      <ResizeHandles />
+      <TitleBar />
       <header className="workspace-chrome">
         <div className="flex items-center gap-4 min-w-0">
           <img src="/mascot.svg" alt="Jackalope" className="size-8 shrink-0" />

@@ -3,5 +3,14 @@
   "identifier": "default",
   "description": "Default permissions for Jackalope desktop shell",
   "windows": ["main"],
-  "permissions": ["core:default", "shell:allow-open", "shell:allow-execute"]
+  "permissions": [
+    "core:default",
+    "shell:allow-open",
+    "shell:allow-execute",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging"
+  ]
 }

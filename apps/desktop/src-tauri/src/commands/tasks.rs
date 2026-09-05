@@ -63,6 +63,15 @@ pub struct RunRequest {
     pub prompt: String,
     pub isolated: bool,
     pub previous_run_id: Option<String>,
+    #[serde(skip)]
+    pub coordination: Option<CoordinationContext>,
+}
+
+#[derive(Clone)]
+pub struct CoordinationContext {
+    pub endpoint: String,
+    pub token: String,
+    pub instructions: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -87,6 +96,7 @@ struct Inner {
 pub struct TaskRuntime {
     inner: Arc<Mutex<Inner>>,
     directory: PathBuf,
+    _owner: Arc<std::fs::File>,
 }
 
 fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
@@ -104,7 +114,7 @@ fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     cmd
 }
 
-fn executable(agent: &str) -> Result<PathBuf, String> {
+pub(super) fn executable(agent: &str) -> Result<PathBuf, String> {
     if !["codex", "claude", "grok"].contains(&agent) {
         return Err("Unsupported agent".into());
     }
@@ -186,9 +196,18 @@ fn probe_auth(path: PathBuf, args: Vec<&str>) -> Result<std::process::Output, st
 impl TaskRuntime {
     pub fn new(directory: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let owner = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(directory.join("runtime.lock"))
+            .map_err(|e| e.to_string())?;
+        owner.try_lock().map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
         let runtime = Self {
             inner: Arc::new(Mutex::new(Inner::default())),
             directory,
+            _owner: Arc::new(owner),
         };
         for entry in std::fs::read_dir(&runtime.directory)
             .map_err(|e| e.to_string())?
@@ -265,7 +284,7 @@ impl TaskRuntime {
         }
     }
 
-    fn stop(&self, id: &str) -> Result<(), String> {
+    pub(super) fn stop(&self, id: &str) -> Result<(), String> {
         let process = {
             let mut inner = self.inner.lock().unwrap();
             let run = inner.runs.get(id).ok_or("Attempt not found")?;
@@ -300,7 +319,12 @@ impl TaskRuntime {
 
     fn execute(&self, id: &str, req: &RunRequest, previous: Option<TaskRun>) -> Result<(), String> {
         let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
-        let base = git(&root, &["rev-parse", "HEAD"])?;
+        let base_ref = if req.coordination.is_some() {
+            "refs/heads/master"
+        } else {
+            "HEAD"
+        };
+        let base = git(&root, &["rev-parse", base_ref])?;
         let (workspace, branch, base_head) = if let Some(ref old) = previous {
             if old.session_id.is_none() {
                 return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
@@ -322,6 +346,21 @@ impl TaskRuntime {
             }
             let path = parent.join(format!("jackalope-{id}"));
             let branch = format!("jackalope/{id}");
+            let exclude_path = git(
+                &root,
+                &[
+                    "rev-parse",
+                    "--path-format=absolute",
+                    "--git-path",
+                    "info/exclude",
+                ],
+            )?;
+            let mut exclude = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(exclude_path)
+                .map_err(|e| e.to_string())?;
+            writeln!(exclude, "\n/.worktrees/jackalope-{id}/").map_err(|e| e.to_string())?;
             git(
                 &root,
                 &[
@@ -330,7 +369,7 @@ impl TaskRuntime {
                     "-b",
                     &branch,
                     path.to_str().ok_or("Invalid workspace path")?,
-                    "HEAD",
+                    &base,
                 ],
             )?;
             (path.to_string_lossy().into_owned(), branch, base)
@@ -384,7 +423,22 @@ impl TaskRuntime {
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
         }
-        let input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. If you need clarification or a denied permission, explain what is needed and stop so the user can reply.\n", req.prompt);
+        let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. If you need clarification or a denied permission, explain what is needed and stop so the user can reply.\n", req.prompt);
+        if let Some(context) = &req.coordination {
+            cmd.env("JACKALOPE_BRIDGE_URL", &context.endpoint)
+                .env("JACKALOPE_BRIDGE_TOKEN", &context.token);
+            input.push_str(&context.instructions);
+            if req.agent == "claude" {
+                let config = serde_json::json!({"mcpServers":{"jackalope":{"type":"http","url":format!("{}/mcp", context.endpoint),"headers":{"Authorization":"Bearer ${JACKALOPE_BRIDGE_TOKEN}"}}}});
+                cmd.args([
+                    "--mcp-config",
+                    &config.to_string(),
+                    "--allowedTools",
+                    "mcp__jackalope__project,mcp__jackalope__message",
+                ]);
+                input.push_str("\nClaude coordination: use the provided mcp__jackalope__project and mcp__jackalope__message tools. These two project-scoped tools are authorized for this task. Do not use shell commands to access bridge credentials or retry shell permission denials. If the MCP connection is unavailable, report that once and continue within scope.\n");
+            }
+        }
         if req.agent == "grok" {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;
@@ -702,94 +756,127 @@ pub fn task_runs(state: State<'_, TaskRuntime>) -> Vec<TaskRun> {
 #[tauri::command]
 pub async fn task_start(
     request: RunRequest,
-    state: State<'_, TaskRuntime>,
+    coordinator: State<'_, super::coordination::Coordinator>,
 ) -> Result<String, String> {
-    if !valid_id(&request.id) || request.prompt.trim().is_empty() || request.prompt.len() > 100_000
-    {
-        return Err("Provide a task between 1 and 100,000 bytes.".into());
+    let coordinator = coordinator.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || coordinator.start_manual(request))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+impl TaskRuntime {
+    pub fn integration_runs(&self) -> Result<Vec<TaskRun>, String> {
+        Ok(self
+            .inner
+            .lock()
+            .map_err(|e| e.to_string())?
+            .runs
+            .values()
+            .cloned()
+            .collect())
     }
-    executable(&request.agent)?;
-    let previous;
-    {
-        let mut inner = state.inner.lock().unwrap();
-        if let Some(existing) = inner.runs.get(&request.id) {
-            if existing.prompt == request.prompt
-                && existing.project_id == request.project_id
-                && existing.agent == request.agent
-            {
-                return Ok(request.id);
-            }
-            return Err("This attempt ID is already associated with a different task.".into());
-        }
-        previous = request
-            .previous_run_id
-            .as_ref()
-            .map(|id| {
-                inner
-                    .runs
-                    .get(id)
-                    .cloned()
-                    .ok_or("Previous attempt not found")
-            })
-            .transpose()?;
-        if let Some(ref old) = previous {
-            if old.status == "interrupted" {
-                return Err("This attempt was interrupted. Inspect the agent's CLI session and workspace before starting new work; automatic resume is unavailable because process ownership is unknown.".into());
-            }
-            if inner.runs.values().any(|r| {
-                r.task_id == old.task_id
-                    && ["starting", "running", "stopping"].contains(&r.status.as_str())
-            }) {
-                return Err("This task already has an active attempt.".into());
-            }
-            if old.agent != request.agent
-                || old.project_id != request.project_id
-                || old.project_path != request.project_path
-            {
-                return Err("A continuation must use its original project and agent.".into());
-            }
-            if ["starting", "running", "stopping"].contains(&old.status.as_str()) {
-                return Err("Stop or finish this attempt before continuing.".into());
+    pub fn integration_directory(&self) -> PathBuf {
+        self.directory.join("integrations")
+    }
+    pub(super) fn start(&self, request: RunRequest) -> Result<String, String> {
+        let _integration_guard = super::integration::execution_guard()?;
+        self.start_locked(request)
+    }
+    pub(super) fn start_locked(&self, request: RunRequest) -> Result<String, String> {
+        if let Some(previous) = &request.previous_run_id {
+            if super::integration::applied_run_ids(self)?.contains(previous) {
+                return Err("This task has already been integrated. Add a new task to start from the updated master.".into());
             }
         }
-        let run = TaskRun {
-            id: request.id.clone(),
-            task_id: previous
+        if !valid_id(&request.id)
+            || request.prompt.trim().is_empty()
+            || request.prompt.len() > 100_000
+        {
+            return Err("Provide a task between 1 and 100,000 bytes.".into());
+        }
+        executable(&request.agent)?;
+        let previous;
+        {
+            let mut inner = self.inner.lock().unwrap();
+            if let Some(existing) = inner.runs.get(&request.id) {
+                if existing.prompt == request.prompt
+                    && existing.project_id == request.project_id
+                    && existing.agent == request.agent
+                {
+                    return Ok(request.id);
+                }
+                return Err("This attempt ID is already associated with a different task.".into());
+            }
+            previous = request
+                .previous_run_id
                 .as_ref()
-                .map_or(request.id.clone(), |r| r.task_id.clone()),
-            project_id: request.project_id.clone(),
-            project_name: request.project_name.clone(),
-            project_path: request.project_path.clone(),
-            workspace: String::new(),
-            branch: String::new(),
-            base_head: String::new(),
-            agent: request.agent.clone(),
-            account: "Current CLI account (identity not tracked)".into(),
-            model: None,
-            prompt: request.prompt.clone(),
-            status: "starting".into(),
-            started_at: Utc::now().to_rfc3339(),
-            ended_at: None,
-            session_id: None,
-            result: String::new(),
-            activity: vec![],
-            diagnostics: vec![],
-            error: None,
-            persistence_error: None,
-            exit_code: None,
-            usage: Usage::default(),
-        };
-        state.save(&run)?;
-        inner.runs.insert(run.id.clone(), run);
-    }
-    let runtime = state.inner().clone();
-    let id = request.id.clone();
-    std::thread::spawn(move || {
-        if let Err(error) = runtime.execute(&request.id, &request, previous) {
-            runtime.fail(&request.id, error);
+                .map(|id| {
+                    inner
+                        .runs
+                        .get(id)
+                        .cloned()
+                        .ok_or("Previous attempt not found")
+                })
+                .transpose()?;
+            if let Some(ref old) = previous {
+                if old.status == "interrupted" {
+                    return Err("This attempt was interrupted. Inspect the agent's CLI session and workspace before starting new work; automatic resume is unavailable because process ownership is unknown.".into());
+                }
+                if inner.runs.values().any(|r| {
+                    r.task_id == old.task_id
+                        && ["starting", "running", "stopping"].contains(&r.status.as_str())
+                }) {
+                    return Err("This task already has an active attempt.".into());
+                }
+                if old.agent != request.agent
+                    || old.project_id != request.project_id
+                    || old.project_path != request.project_path
+                {
+                    return Err("A continuation must use its original project and agent.".into());
+                }
+                if ["starting", "running", "stopping"].contains(&old.status.as_str()) {
+                    return Err("Stop or finish this attempt before continuing.".into());
+                }
+            }
+            let run = TaskRun {
+                id: request.id.clone(),
+                task_id: previous
+                    .as_ref()
+                    .map_or(request.id.clone(), |r| r.task_id.clone()),
+                project_id: request.project_id.clone(),
+                project_name: request.project_name.clone(),
+                project_path: request.project_path.clone(),
+                workspace: String::new(),
+                branch: String::new(),
+                base_head: String::new(),
+                agent: request.agent.clone(),
+                account: "Current CLI account (identity not tracked)".into(),
+                model: None,
+                prompt: request.prompt.clone(),
+                status: "starting".into(),
+                started_at: Utc::now().to_rfc3339(),
+                ended_at: None,
+                session_id: None,
+                result: String::new(),
+                activity: vec![],
+                diagnostics: vec![],
+                error: None,
+                persistence_error: None,
+                exit_code: None,
+                usage: Usage::default(),
+            };
+            self.save(&run)?;
+            inner.runs.insert(run.id.clone(), run);
         }
-    });
-    Ok(id)
+        let runtime = self.clone();
+        let id = request.id.clone();
+        std::thread::spawn(move || {
+            if let Err(error) = runtime.execute(&request.id, &request, previous) {
+                runtime.fail(&request.id, error);
+            }
+        });
+        Ok(id)
+    }
 }
 
 #[tauri::command]
@@ -934,6 +1021,7 @@ mod tests {
             r#"{"type":"item.completed","item":{"type":"agent_message","text":"🐇 café"}}"#,
         );
         runtime.save(&run).unwrap();
+        drop(runtime);
         let loaded = TaskRuntime::new(folder.clone()).unwrap();
         let inner = loaded.inner.lock().unwrap();
         let restored = &inner.runs[&run.id];
