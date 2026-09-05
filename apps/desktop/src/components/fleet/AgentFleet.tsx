@@ -1,6 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAgentStore, AgentAccount } from '../../stores/agentStore';
 import { useMascotStore } from '../../stores/mascotStore';
+import { useProjectStore } from '../../stores/projectStore';
+import {
+  isTauriEnvironment,
+  getSystemInfo,
+  ptySpawn,
+  ptyWrite,
+  listenPtyOutput,
+  listenPtyExit,
+} from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -24,6 +33,7 @@ export function AgentFleet() {
     clearLogs,
   } = useAgentStore();
   const { say, setMood } = useMascotStore();
+  const { projects, activeProjectId } = useProjectStore();
 
   const [inputCommand, setInputCommand] = useState('');
   const [streamFilter, setStreamFilter] = useState<'all' | 'stdout' | 'system'>('all');
@@ -31,51 +41,124 @@ export function AgentFleet() {
   const [newAccName, setNewAccName] = useState('');
   const [newAccProvider, setNewAccProvider] = useState<AgentAccount['provider']>('claude-code');
   const [newAccApiKey, setNewAccApiKey] = useState('');
+  const [osName, setOsName] = useState('windows');
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  // accountId -> live pty session id. A ref (not state) so the event
+  // listeners set up once below always see the latest mapping without
+  // needing to be re-subscribed on every send.
+  const accountSessionsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
+  useEffect(() => {
+    getSystemInfo().then((info) => setOsName(info.os)).catch(() => {});
 
-  const handleSendPromptToAgent = () => {
+    let unlistenOutput: (() => void) | undefined;
+    let unlistenExit: (() => void) | undefined;
+
+    listenPtyOutput((payload) => {
+      const agentId = Object.entries(accountSessionsRef.current).find(
+        ([, sessionId]) => sessionId === payload.session_id
+      )?.[0];
+      if (!agentId) return;
+      const trimmed = payload.chunk.replace(/\r?\n$/, '');
+      if (!trimmed) return;
+      useAgentStore.getState().appendLog({
+        processId: 0,
+        taskId: 'live-pty',
+        agentId,
+        stream: 'stdout',
+        message: trimmed,
+      });
+    }).then((unlisten) => {
+      unlistenOutput = unlisten;
+    });
+
+    listenPtyExit((payload) => {
+      const agentId = Object.entries(accountSessionsRef.current).find(
+        ([, sessionId]) => sessionId === payload.session_id
+      )?.[0];
+      if (agentId) delete accountSessionsRef.current[agentId];
+      if (!agentId) return;
+      useAgentStore.getState().appendLog({
+        processId: 0,
+        taskId: 'live-pty',
+        agentId,
+        stream: 'system',
+        message: `Process session ended (${payload.session_id}).`,
+      });
+    }).then((unlisten) => {
+      unlistenExit = unlisten;
+    });
+
+    return () => {
+      unlistenOutput?.();
+      unlistenExit?.();
+    };
+    // Intentionally empty: subscribes once for the component's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
+  const activeProjectPath = projects.find((p) => p.id === activeProjectId)?.path;
+
+  const handleSendPromptToAgent = async () => {
     if (!inputCommand.trim()) return;
+    const cmd = inputCommand;
+    setInputCommand('');
     setMood('working');
     say(`Dispatched instruction to ${activeAccount.accountName}...`, 3000);
 
     appendLog({
-      processId: 4892,
-      taskId: 'task-live',
+      processId: 0,
+      taskId: 'live-pty',
       agentId: activeAccount.id,
       stream: 'system',
-      message: `> ${inputCommand}`,
+      message: `> ${cmd}`,
     });
 
-    const cmd = inputCommand;
-    setInputCommand('');
+    if (!isTauriEnvironment()) {
+      // Browser dev-preview: no real process to talk to, so keep the UI
+      // feeling alive with a short simulated response.
+      setTimeout(() => {
+        appendLog({
+          processId: 0,
+          taskId: 'live-pty',
+          agentId: activeAccount.id,
+          stream: 'stdout',
+          message: `(browser preview — no real pty) Analyzing instruction: "${cmd}"...`,
+        });
+        setMood('success');
+      }, 700);
+      return;
+    }
 
-    setTimeout(() => {
-      appendLog({
-        processId: 4892,
-        taskId: 'task-live',
-        agentId: activeAccount.id,
-        stream: 'stdout',
-        message: `Analyzing codebase context for instruction: "${cmd}"...`,
-      });
-    }, 700);
-
-    setTimeout(() => {
-      appendLog({
-        processId: 4892,
-        taskId: 'task-live',
-        agentId: activeAccount.id,
-        stream: 'stdout',
-        message: `Plan established: 2 files to update, 1 worktree verified clean.`,
-      });
+    try {
+      let sessionId = accountSessionsRef.current[activeAccount.id];
+      if (!sessionId) {
+        const isWindows = osName === 'windows';
+        sessionId = await ptySpawn({
+          program: isWindows ? 'cmd.exe' : '/bin/bash',
+          args: [],
+          workingDir: activeProjectPath || '.',
+        });
+        accountSessionsRef.current[activeAccount.id] = sessionId;
+      }
+      await ptyWrite(sessionId, cmd + (osName === 'windows' ? '\r\n' : '\n'));
       setMood('success');
-    }, 1800);
+    } catch (err) {
+      appendLog({
+        processId: 0,
+        taskId: 'live-pty',
+        agentId: activeAccount.id,
+        stream: 'stderr',
+        message: `Failed to dispatch to pty: ${err}`,
+      });
+      setMood('idle');
+    }
   };
 
   const handleCreateAccount = () => {

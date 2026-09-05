@@ -61,6 +61,48 @@ $bmp.Save("<scratchpad>\jackalope-window.png", [System.Drawing.Imaging.ImageForm
 Then use the Read tool on the saved PNG path to actually view it — don't
 just trust that the save succeeded, look at the rendered content.
 
+## ⚠️ Before clicking anything: verify Jackalope is ACTUALLY foreground
+
+`SetForegroundWindow` can silently fail (Windows blocks foreground-stealing
+from a background process under normal focus-stealing prevention rules) —
+the call returning success doesn't mean it worked. If it fails, `GetWindowRect`
+still returns Jackalope's correct coordinates (that's a property of the
+window, not of focus), but `CopyFromScreen` grabs whatever is *actually
+on screen* at those coordinates, and `mouse_event`/`SetCursorPos` clicks
+land on whatever window is *actually on top* — which may be a completely
+different, unrelated application if one happens to overlap that screen
+region. This has actually happened on this machine (2026-09-04): a test
+session's screenshot turned out to be the user's ChatGPT desktop app, not
+Jackalope, and a click may have landed in it.
+
+**Before any click-based interaction** (not just a passive screenshot),
+confirm the real foreground window first:
+
+```powershell
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class WinCheck {
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+}
+"@
+$fg = [WinCheck]::GetForegroundWindow()
+$sb = New-Object System.Text.StringBuilder 256
+[WinCheck]::GetWindowText($fg, $sb, 256) | Out-Null
+$fgProcId = 0
+[WinCheck]::GetWindowThreadProcessId($fg, [ref]$fgProcId) | Out-Null
+if ($fgProcId -ne $jackalopePid) { Write-Host "NOT Jackalope in foreground: '$($sb.ToString())' (PID $fgProcId) — do not click yet" }
+```
+
+If it's not Jackalope, don't click blindly — this machine may have other
+apps or agent sessions open concurrently. Either retry bringing Jackalope
+forward and re-check, or abandon the click-based test for this session
+(a passive screenshot capture with no clicks is comparatively low-risk;
+issuing clicks without confirming foreground is not).
+
 ## 4. Close it
 
 ```powershell

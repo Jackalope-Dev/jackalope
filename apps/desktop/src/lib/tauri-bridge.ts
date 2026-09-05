@@ -115,3 +115,81 @@ export async function spawnAgentProcess(
     message: `Spawned ${program} (browser simulation) in ${workingDir}`,
   };
 }
+
+// --- Native PTY terminal streaming (see src-tauri/src/commands/pty.rs) ---
+
+export interface PtySpawnOptions {
+  program: string;
+  args: string[];
+  workingDir: string;
+  cols?: number;
+  rows?: number;
+}
+
+export interface PtyOutputPayload {
+  session_id: string;
+  chunk: string;
+}
+
+export interface PtyExitPayload {
+  session_id: string;
+  exit_code: number | null;
+}
+
+/** Opens a real OS pty and spawns `program` on it. Returns a session id used
+ * by `ptyWrite`/`ptyKill` and present on every matching `agent-pty-output`/
+ * `agent-pty-exit` event. Browser dev-mode returns a mock id and no process
+ * is actually spawned — callers should treat that mode's output as inert. */
+export async function ptySpawn(opts: PtySpawnOptions): Promise<string> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke<string>('pty_spawn', {
+      program: opts.program,
+      args: opts.args,
+      workingDir: opts.workingDir,
+      cols: opts.cols ?? 80,
+      rows: opts.rows ?? 24,
+    });
+  }
+  return `mock-${opts.program}-${Date.now()}`;
+}
+
+/** Writes raw bytes (e.g. a command plus a newline) to a running pty's stdin. */
+export async function ptyWrite(sessionId: string, data: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('pty_write', { sessionId, data });
+  }
+}
+
+/** Kills a running pty session's child process. */
+export async function ptyKill(sessionId: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('pty_kill', { sessionId });
+  }
+}
+
+/** Subscribes to streamed pty output across *all* sessions — filter by
+ * `payload.session_id` in the callback. Returns an unsubscribe function;
+ * no-ops (and never fires) outside a Tauri runtime. */
+export async function listenPtyOutput(
+  callback: (payload: PtyOutputPayload) => void,
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen<PtyOutputPayload>('agent-pty-output', (event) => callback(event.payload));
+  }
+  return () => {};
+}
+
+/** Subscribes to pty session-exit notifications across all sessions. */
+export async function listenPtyExit(
+  callback: (payload: PtyExitPayload) => void,
+): Promise<() => void> {
+  if (isTauriEnvironment()) {
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen<PtyExitPayload>('agent-pty-exit', (event) => callback(event.payload));
+  }
+  return () => {};
+}
