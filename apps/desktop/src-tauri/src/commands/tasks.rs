@@ -732,36 +732,58 @@ fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str) {
     }
 }
 
+fn discover_runner(policy: &super::agent_policy::AgentPolicy, id: &str) -> Runner {
+    let mut runner = Runner { id: id.to_string(), name: match id { "codex" => "Codex", "claude" => "Claude Code", _ => "Grok" }.into(), available: false, signed_in: false, account: "Current CLI account".into(), detail: String::new() };
+    let mut discovery = policy.clone();
+    discovery.enabled_agents.clear();
+    match discovery.resolve(id) {
+        Err(error) => runner.detail = error,
+        Ok((adapter, path)) => {
+            runner.available = true;
+            if adapter == "grok" { runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into(); return runner; }
+            let args = if adapter == "codex" { vec!["login", "status"] } else { vec!["auth", "status"] };
+            match probe_auth(path, args) {
+                Ok(out) => {
+                    if adapter == "claude" {
+                        if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {
+                            runner.signed_in = auth["loggedIn"] == true;
+                            runner.account = auth["email"].as_str().unwrap_or("Current CLI account").into();
+                        }
+                    } else { runner.signed_in = out.status.success(); }
+                    runner.detail = if runner.signed_in { "Uses your existing CLI sign-in. Model follows your agent configuration." } else { "Sign in using the agent's CLI, then refresh." }.into();
+                }
+                Err(error) => runner.detail = error.to_string(),
+            }
+        }
+    }
+    if let Some(custom) = policy.custom_agents.iter().find(|a| a.id == id) { runner.name = custom.name.clone(); }
+    runner
+}
+
 #[tauri::command]
 pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
     let policy = runtime.policy()?;
     let mut ids: Vec<String> = vec!["codex".into(), "claude".into(), "grok".into()];
     ids.extend(policy.custom_agents.iter().map(|a| a.id.clone()));
-    tauri::async_runtime::spawn_blocking(move || ids.iter().map(|id| {
-        let mut runner = Runner { id: id.to_string(), name: match id.as_str() { "codex" => "Codex", "claude" => "Claude Code", _ => "Grok" }.into(), available: false, signed_in: false, account: "Current CLI account".into(), detail: String::new() };
-        match { let mut discovery = policy.clone(); discovery.enabled_agents.clear(); discovery.resolve(id) } {
-            Err(error) => runner.detail = error,
-            Ok((adapter, path)) => {
-                runner.available = true;
-                if adapter == "grok" { runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into(); return runner; }
-                let args = if adapter == "codex" { vec!["login", "status"] } else { vec!["auth", "status"] };
-                match probe_auth(path, args) {
-                    Ok(out) => {
-                        if adapter == "claude" {
-                            if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {
-                                runner.signed_in = auth["loggedIn"] == true;
-                                runner.account = auth["email"].as_str().unwrap_or("Current CLI account").into();
-                            }
-                        } else { runner.signed_in = out.status.success(); }
-                        runner.detail = if runner.signed_in { "Uses your existing CLI sign-in. Model follows your agent configuration." } else { "Sign in using the agent's CLI, then refresh." }.into();
-                    }
-                    Err(error) => runner.detail = error.to_string(),
-                }
-            }
-        }
-        if let Some(custom) = policy.custom_agents.iter().find(|a| a.id == *id) { runner.name = custom.name.clone(); }
-        runner
-    }).collect()).await.map_err(|e| e.to_string())
+    // Each agent's discovery/sign-in probe can take up to probe_auth's own
+    // 10-second timeout. Running them in one sequential closure (the
+    // previous shape) meant a single slow or hanging CLI added its own
+    // full timeout to the total wait for every OTHER agent's status too -
+    // worst case ~10s per configured agent instead of ~10s overall.
+    // Spawning one blocking task per agent and awaiting them together
+    // bounds the whole call by the slowest single probe, not their sum.
+    let handles: Vec<_> = ids
+        .into_iter()
+        .map(|id| {
+            let policy = policy.clone();
+            tauri::async_runtime::spawn_blocking(move || discover_runner(&policy, &id))
+        })
+        .collect();
+    let mut runners = Vec::with_capacity(handles.len());
+    for handle in handles {
+        runners.push(handle.await.map_err(|e| e.to_string())?);
+    }
+    Ok(runners)
 }
 
 #[tauri::command]
@@ -1307,5 +1329,29 @@ mod tests {
 
         assert!(folder.starts_with(std::env::temp_dir()));
         std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[tokio::test]
+    async fn per_agent_discovery_runs_concurrently_not_sequentially() {
+        // task_runners() used to run every agent's discover_runner() inside
+        // one sequential closure, so a slow probe_auth call (up to its own
+        // 10s timeout) added its full duration to the wait for every OTHER
+        // agent too. Proves the fix's actual shape - one spawn_blocking per
+        // item, collect the handles, then await them - genuinely overlaps
+        // rather than only appearing to, using a synthetic blocking delay in
+        // place of a real CLI probe (which needs an installed executable).
+        let started = std::time::Instant::now();
+        let delay = Duration::from_millis(150);
+        let handles: Vec<_> = (0..4)
+            .map(|_| tauri::async_runtime::spawn_blocking(move || std::thread::sleep(delay)))
+            .collect();
+        for handle in handles {
+            handle.await.unwrap();
+        }
+        assert!(
+            started.elapsed() < delay * 3,
+            "four 150ms blocking tasks should overlap (~150ms total), not sum to ~600ms; took {:?}",
+            started.elapsed()
+        );
     }
 }
