@@ -34,6 +34,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
+import { CodebaseMemoryBar } from './CodebaseMemoryBar';
 import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
 import { RunStatus } from './RunStatus';
@@ -529,6 +530,7 @@ export function TaskWorkspace({
           </div>
         )}
       </div>
+      {project && <CodebaseMemoryBar project={project} />}
       {!project ? (
         <div>
           <EmptyState
