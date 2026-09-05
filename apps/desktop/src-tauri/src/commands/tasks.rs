@@ -50,6 +50,12 @@ pub struct TaskRun {
     pub persistence_error: Option<String>,
     pub exit_code: Option<i32>,
     pub usage: Usage,
+    #[serde(default)]
+    pub prompts: Vec<super::harness::PendingUserPrompt>,
+    #[serde(default)]
+    pub validation_steps: Vec<super::harness::ValidationStep>,
+    #[serde(default)]
+    pub screenshots: Vec<super::harness::ScreenshotArtifact>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -277,7 +283,7 @@ impl TaskRuntime {
             .map_err(|e| e.to_string())
     }
 
-    fn update(&self, id: &str, update: impl FnOnce(&mut TaskRun)) {
+    pub(super) fn update(&self, id: &str, update: impl FnOnce(&mut TaskRun)) {
         let mut inner = self.inner.lock().unwrap();
         if let Some(run) = inner.runs.get_mut(id) {
             update(run);
@@ -460,9 +466,9 @@ impl TaskRuntime {
                     "--mcp-config",
                     &config.to_string(),
                     "--allowedTools",
-                    "mcp__jackalope__project,mcp__jackalope__message",
+                    "mcp__jackalope__project,mcp__jackalope__message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__ask_user,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify",
                 ]);
-                input.push_str("\nClaude coordination: use the provided mcp__jackalope__project and mcp__jackalope__message tools. These two project-scoped tools are authorized for this task. Do not use shell commands to access bridge credentials or retry shell permission denials. If the MCP connection is unavailable, report that once and continue within scope.\n");
+                input.push_str("\nClaude harness tools: You have access to in-app browser automation, interactive user questions, and structured verification via provided mcp__jackalope__* tools (browser_navigate, browser_screenshot, browser_snapshot, browser_interact, ask_user, record_validation_step, computer_verify). If testing UI changes or onboarding flows, proactively use browser_screenshot and record_validation_step to provide verifiable evidence, and ask_user if you need test data or confirmation.\n");
             }
         }
         if req.agent == "grok" {
@@ -790,6 +796,25 @@ pub async fn task_start(
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+pub async fn task_respond_prompt(
+    run_id: String,
+    prompt_id: String,
+    answer: String,
+    runtime: State<'_, TaskRuntime>,
+) -> Result<bool, String> {
+    let resolved = super::harness::resolve_user_prompt(&prompt_id, &answer);
+    runtime.update(&run_id, |r| {
+        if let Some(p) = r.prompts.iter_mut().find(|p| p.id == prompt_id) {
+            p.status = "answered".into();
+            p.answer = Some(answer.clone());
+            p.answered_at = Some(chrono::Utc::now().to_rfc3339());
+        }
+        r.activity.push(format!("User answered prompt: {answer}"));
+    });
+    Ok(resolved)
+}
+
 impl TaskRuntime {
     pub fn integration_runs(&self) -> Result<Vec<TaskRun>, String> {
         Ok(self
@@ -890,6 +915,9 @@ impl TaskRuntime {
                 persistence_error: None,
                 exit_code: None,
                 usage: Usage::default(),
+                prompts: vec![],
+                validation_steps: vec![],
+                screenshots: vec![],
             };
             self.save(&run)?;
             inner.runs.insert(run.id.clone(), run);
@@ -996,6 +1024,9 @@ mod tests {
             persistence_error: None,
             exit_code: None,
             usage: Usage::default(),
+            prompts: vec![],
+            validation_steps: vec![],
+            screenshots: vec![],
         }
     }
 

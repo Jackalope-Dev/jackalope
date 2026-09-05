@@ -1,5 +1,6 @@
 import { Camera, CheckCircle2, Globe, MousePointer, Play, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -14,7 +15,16 @@ interface BrowserActionLog {
 }
 
 export function BrowserHarness() {
-  const [url, setUrl] = useState('https://github.com/trending');
+  const { runs } = useExecutionStore();
+  const latestRun = runs[0];
+  const realScreenshots = latestRun?.screenshots ?? [];
+  const realSteps = latestRun?.validationSteps ?? [];
+
+  const [url, setUrl] = useState(
+    realScreenshots.length > 0
+      ? realScreenshots[realScreenshots.length - 1].url
+      : 'http://localhost:5173/onboarding',
+  );
   const [isAutomating, setIsAutomating] = useState(false);
   const { say, setMood } = useMascotStore();
 
@@ -23,7 +33,7 @@ export function BrowserHarness() {
       id: 'a1',
       step: 1,
       type: 'navigate',
-      target: 'https://github.com/trending',
+      target: 'http://localhost:5173/onboarding',
       status: 'completed',
       time: '17:04:10',
     },
@@ -31,7 +41,7 @@ export function BrowserHarness() {
       id: 'a2',
       step: 2,
       type: 'evaluate',
-      target: 'document.querySelectorAll("article.Box-row h2 a")',
+      target: 'document.querySelector("form.onboarding-form")',
       status: 'completed',
       time: '17:04:12',
     },
@@ -39,7 +49,7 @@ export function BrowserHarness() {
       id: 'a3',
       step: 3,
       type: 'screenshot',
-      target: 'viewport.png (1280x800)',
+      target: 'onboarding_step_1.png (1280x800)',
       status: 'completed',
       time: '17:04:14',
     },
@@ -131,36 +141,67 @@ export function BrowserHarness() {
 
           {/* Web Viewport Body */}
           <div className="flex-1 bg-[var(--color-surface-sunken)] relative p-6 flex flex-col justify-center items-center text-center overflow-auto">
-            {/* Viewport content mockup */}
-            <div className="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 shadow-xl text-left">
-              <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
-                <div className="flex items-center gap-2">
+            {realScreenshots.length > 0 ? (
+              <div className="w-full max-w-xl rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3 shadow-xl text-left">
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border)]">
                   <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                    Sample page
+                    {realScreenshots[realScreenshots.length - 1].name}
+                  </span>
+                  <span className="text-xs font-mono text-[var(--color-text-muted)]">
+                    {realScreenshots[realScreenshots.length - 1].width} × {realScreenshots[realScreenshots.length - 1].height}
                   </span>
                 </div>
-                <span className="text-xs font-mono text-[var(--color-text-muted)]">1280 × 800</span>
-              </div>
-
-              <div className="space-y-2 text-xs text-[var(--color-text-secondary)]">
-                <div className="p-3 rounded-lg bg-[var(--color-surface-sunken)] font-mono text-xs text-[var(--color-text-primary)]">
-                  &lt;html&gt; ... loaded 42 interactive elements &lt;/html&gt;
+                <div className="p-4 rounded-lg bg-[var(--color-surface-sunken)] flex items-center justify-center min-h-[180px]">
+                  <div className="text-center space-y-1">
+                    <Camera size={32} className="mx-auto text-[var(--color-accent)]" />
+                    <p className="text-xs font-mono text-[var(--color-text-primary)]">
+                      {realScreenshots[realScreenshots.length - 1].name}
+                    </p>
+                    <p className="text-[10px] text-[var(--color-text-muted)]">
+                      {realScreenshots[realScreenshots.length - 1].filePath}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs leading-relaxed">
-                  The agent possesses full Playwright capabilities: clicking buttons, filling forms,
-                  solving simple auth challenges, and extracting structured JSON.
-                </p>
+                {realSteps.length > 0 && (
+                  <div className="text-[11px] text-[var(--color-text-secondary)] space-y-1 pt-1">
+                    <span className="font-semibold">Recent verified step:</span>
+                    <p className="text-[var(--color-text-primary)]">
+                      {realSteps[realSteps.length - 1].step} ({realSteps[realSteps.length - 1].status})
+                    </p>
+                  </div>
+                )}
               </div>
+            ) : (
+              <div className="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 shadow-xl text-left">
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+                      Sample page
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-[var(--color-text-muted)]">1280 × 800</span>
+                </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <Badge variant="accent" className="font-mono text-xs">
-                  Playwright v1.49 (Permissive MIT)
-                </Badge>
-                <Badge variant="outline" className="font-mono text-xs">
-                  CDP Socket Connected
-                </Badge>
+                <div className="space-y-2 text-xs text-[var(--color-text-secondary)]">
+                  <div className="p-3 rounded-lg bg-[var(--color-surface-sunken)] font-mono text-xs text-[var(--color-text-primary)]">
+                    &lt;html&gt; ... loaded 42 interactive elements &lt;/html&gt;
+                  </div>
+                  <p className="text-xs leading-relaxed">
+                    The agent possesses full browser automation capabilities: navigating URLs, capturing real
+                    screenshots, clicking elements, verifying form inputs, and extracting structured DOM state.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <Badge variant="accent" className="font-mono text-xs">
+                    In-App Browser Harness
+                  </Badge>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    Headless Edge / WebView Connected
+                  </Badge>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 

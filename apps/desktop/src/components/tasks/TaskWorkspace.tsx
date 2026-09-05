@@ -11,13 +11,18 @@ import {
   GitBranch,
   ListTodo,
   Plus,
+  ShieldAlert,
   Square,
   Wand2,
   Workflow,
+  Zap,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { orchestrator } from '../../lib/orchestration/orchestrator';
+import { determineBestRoute } from '../../lib/orchestration/router';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog.ts';
 import { assemblePrompt } from '../../lib/skills/context-assembler.ts';
+import { CodebaseMemoryBar } from './CodebaseMemoryBar';
 import {
   isActive,
   nativeTask,
@@ -177,6 +182,25 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
         <span>·</span>
         <span>{run.model || 'Agent-configured model'}</span>
       </div>
+      {(() => {
+        const failover = orchestrator.getFailoverForTask(run.taskId);
+        if (!failover) return null;
+        return (
+          <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs">
+            <ShieldAlert size={16} className="text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-amber-600 dark:text-amber-400 block">
+                Proactive Self-Healing Failover
+              </span>
+              <p className="text-[var(--color-text-muted)] mt-0.5">
+                Previous attempt encountered {failover.reason.replace('_', ' ')} on{' '}
+                {failover.failedAgent.toUpperCase()}. Proactively re-routed to{' '}
+                {failover.fallbackAgent.toUpperCase()} with preserved context.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
       {run.workspace && <p className="task-path">{run.workspace}</p>}
       {attempts.length > 1 && (
         <label htmlFor="taskworkspace-field-1" className="task-attempt-picker">

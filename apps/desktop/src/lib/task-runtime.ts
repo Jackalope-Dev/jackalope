@@ -48,6 +48,38 @@ export interface TaskRun {
   persistenceError: string | null;
   exitCode: number | null;
   usage: RunUsage;
+  prompts?: PendingUserPrompt[];
+  validationSteps?: ValidationStep[];
+  screenshots?: ScreenshotArtifact[];
+}
+export interface PendingUserPrompt {
+  id: string;
+  runId: string;
+  question: string;
+  inputType: 'text' | 'choice' | 'confirmation';
+  options: string[];
+  defaultValue?: string | null;
+  status: 'pending' | 'answered';
+  answer?: string | null;
+  createdAt: string;
+  answeredAt?: string | null;
+}
+export interface ValidationStep {
+  id: string;
+  step: string;
+  status: 'pending' | 'in_progress' | 'passed' | 'failed';
+  notes?: string | null;
+  evidence: string[];
+  timestamp: string;
+}
+export interface ScreenshotArtifact {
+  id: string;
+  name: string;
+  url: string;
+  filePath: string;
+  width: number;
+  height: number;
+  timestamp: string;
 }
 export interface RunRequest {
   id: string;
@@ -58,6 +90,7 @@ export interface RunRequest {
   prompt: string;
   isolated: boolean;
   previousRunId?: string;
+  taskId?: string;
 }
 export interface Review {
   files: string[];
@@ -83,4 +116,12 @@ export async function nativeTask<T>(command: string, args?: Record<string, unkno
     );
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<T>(command, args);
+}
+
+export async function respondToPrompt(
+  runId: string,
+  promptId: string,
+  answer: string,
+): Promise<boolean> {
+  return nativeTask<boolean>('task_respond_prompt', { runId, promptId, answer });
 }

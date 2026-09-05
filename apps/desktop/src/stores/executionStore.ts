@@ -70,6 +70,15 @@ export const useExecutionStore = create<ExecutionState>()(
             set({ runs, loading: false, error: null });
             if (working !== wasWorking)
               useMascotStore.getState().setMood(working ? 'working' : 'idle');
+
+            // Proactively check for failovers and quota issues
+            for (const r of runs) {
+              if (r.status === 'failed' || r.status === 'interrupted') {
+                import('../lib/orchestration/orchestrator').then(({ orchestrator }) => {
+                  void orchestrator.checkFailover(r);
+                }).catch(() => {});
+              }
+            }
           } catch (error) {
             set({ error: String(error), loading: false });
           } finally {

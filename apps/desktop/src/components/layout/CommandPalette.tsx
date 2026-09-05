@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Search } from 'lucide-react';
+import { Search, Settings2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { PRESET_THEMES } from '../../lib/theme-engine';
 import { useThemeStore } from '../../stores/themeStore';
@@ -9,15 +9,21 @@ export function CommandPalette({
   isOpen,
   onClose,
   onNavigate,
+  onOpenSettings,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: ActiveTab) => void;
+  onOpenSettings?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const previousFocus = useRef<HTMLElement | null>(null);
   const setTheme = useThemeStore((state) => state.setTheme);
   const search = query.trim().toLowerCase();
+  const showSettings =
+    Boolean(onOpenSettings) &&
+    ('settings preferences options configuration project'.split(' ').some((kw) => kw.includes(search)) ||
+      'settings & preferences'.includes(search));
   const views = WORKSPACE_VIEWS.filter((item) =>
     `${item.label} ${item.description}`.toLowerCase().includes(search),
   );
@@ -83,6 +89,20 @@ export function CommandPalette({
             </Dialog.Close>
           </div>
           <div className="max-h-[50vh] overflow-y-auto">
+            {showSettings && (
+              <button
+                data-command
+                type="button"
+                className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
+                onClick={() => {
+                  onOpenSettings?.();
+                  onClose();
+                }}
+              >
+                <Settings2 className="size-4 text-[var(--color-accent-ink)]" />
+                <span>Settings & Preferences</span>
+              </button>
+            )}
             {views.map((item) => (
               <button
                 data-command

@@ -58,8 +58,11 @@ export interface SettingsState {
   exportSettings: () => string;
 }
 
-export const DEFAULT_SETTINGS = {
-  experienceMode: 'simple' as const,
+export const DEFAULT_SETTINGS: Omit<
+  SettingsState,
+  'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
+> = {
+  experienceMode: 'essential',
   mascotReactions: true,
   soundAlerts: true,
   notifications: 'all' as const,

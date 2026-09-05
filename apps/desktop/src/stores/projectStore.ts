@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-bridge';
+import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+
+export interface ProjectPreferences {
+  preferredRunner?: 'inherit' | 'codex' | 'claude' | 'grok';
+  customInstructions?: string;
+  baseBranch?: string;
+  branchPrefix?: string;
+  worktreeDir?: string;
+  verifyCommand?: string;
+  autoVerify?: boolean;
+  isolatedByDefault?: boolean;
+}
 
 export interface Project {
   id: string;
@@ -9,6 +20,7 @@ export interface Project {
   gitBranch: string;
   worktrees: WorktreeEntry[];
   description?: string;
+  preferences?: ProjectPreferences;
   agentProvider:
     | 'codex'
     | 'grok'
@@ -24,6 +36,9 @@ interface ProjectState {
   activeProjectId: string | null;
   loading: boolean;
   addProject: (project: Omit<Project, 'worktrees'>) => Promise<void>;
+  updateProject: (id: string, partial: Partial<Omit<Project, 'id' | 'worktrees'>>) => void;
+  updateProjectPreferences: (id: string, prefs: Partial<ProjectPreferences>) => void;
+  removeProject: (id: string) => void;
   selectProject: (id: string) => void;
   loadWorktreesForActiveProject: () => Promise<void>;
   spawnTaskWorktree: (
@@ -45,6 +60,32 @@ export const useProjectStore = create<ProjectState>()(
           projects: [...state.projects, newProject],
           activeProjectId: newProject.id,
         }));
+      },
+
+      updateProject: (id, partial) => {
+        set((state) => ({
+          projects: state.projects.map((p) => (p.id === id ? { ...p, ...partial } : p)),
+        }));
+      },
+
+      updateProjectPreferences: (id, prefs) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id
+              ? { ...p, preferences: { ...(p.preferences ?? {}), ...prefs } }
+              : p,
+          ),
+        }));
+      },
+
+      removeProject: (id) => {
+        set((state) => {
+          const nextProjects = state.projects.filter((p) => p.id !== id);
+          const nextActive = state.activeProjectId === id
+            ? (nextProjects[0]?.id ?? null)
+            : state.activeProjectId;
+          return { projects: nextProjects, activeProjectId: nextActive };
+        });
       },
 
       selectProject: (id: string) => {

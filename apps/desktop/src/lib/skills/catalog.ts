@@ -15,7 +15,8 @@ export type SkillCategory =
   | 'testing'
   | 'security'
   | 'performance'
-  | 'git';
+  | 'git'
+  | 'browser';
 
 export interface SkillDefinition {
   id: string;
@@ -163,6 +164,44 @@ export const VETTED_SKILLS: SkillDefinition[] = [
       'Ensure the combined workspace builds and passes all checks before requesting integration.',
     ],
     suggestedTools: ['git'],
+  },
+  {
+    id: 'ui-validation',
+    name: 'UI Change & Visual Validation',
+    shortLabel: 'Validate UI',
+    iconName: 'Eye',
+    description:
+      'Headless browser automation, viewport screenshots, and DOM inspection for verifying UI changes.',
+    category: 'browser',
+    triggers: [
+      /\b(validate ui|verify ui|visual test|screenshot|check component|ui change|appearance|layout|styling)\b/i,
+    ],
+    guidelines: [
+      'Use browser_navigate to load the UI at http://localhost:5173 or the designated route.',
+      'Capture visual screenshot evidence before and after changes using browser_screenshot.',
+      'Record structured validation checkpoints using record_validation_step.',
+      'Prompt the user proactively via ask_user if layout decisions or visual choices need review.',
+    ],
+    suggestedTools: ['browser', 'filesystem'],
+  },
+  {
+    id: 'onboarding-flow',
+    name: 'Onboarding Flow & User Journey Test',
+    shortLabel: 'Test Onboarding',
+    iconName: 'Workflow',
+    description:
+      'End-to-end user onboarding flow walkthrough, form inputs, step transitions, and interactive user prompts.',
+    category: 'testing',
+    triggers: [
+      /\b(onboarding|signup flow|sign up|registration flow|welcome flow|user journey|walkthrough)\b/i,
+    ],
+    guidelines: [
+      'Navigate step-by-step through the onboarding registration or welcome flow.',
+      'Prompt the user proactively via ask_user for test credentials, bypass keys, or environment settings.',
+      'Verify form error validation on invalid inputs and successful transition to the next step.',
+      'Record each verified step via record_validation_step and capture screenshot evidence.',
+    ],
+    suggestedTools: ['browser', 'filesystem'],
   },
 ];
 

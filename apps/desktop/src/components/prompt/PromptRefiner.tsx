@@ -4,6 +4,7 @@ import {
   Check,
   CheckCircle2,
   GitBranch,
+  Globe,
   RefreshCw,
   ShieldAlert,
   Sparkles,
@@ -41,6 +42,7 @@ const CATEGORY_ICONS: Record<SkillCategory, React.ComponentType<{ className?: st
   security: ShieldAlert,
   performance: Zap,
   git: GitBranch,
+  browser: Globe,
 };
 
 export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: PromptRefinerProps) {

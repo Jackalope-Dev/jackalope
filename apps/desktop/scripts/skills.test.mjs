@@ -4,8 +4,8 @@ import { detectSkillsFromPrompt, getSkillById, VETTED_SKILLS } from '../src/lib/
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { getToolById, VETTED_TOOLS } from '../src/lib/skills/tool-registry.ts';
 
-test('vetted skills catalog contains all 7 core development domains', () => {
-  assert.equal(VETTED_SKILLS.length, 7);
+test('vetted skills catalog contains all core development domains and harness skills', () => {
+  assert.equal(VETTED_SKILLS.length, 9);
   const categories = new Set(VETTED_SKILLS.map((s) => s.category));
   assert.ok(categories.has('debugging'));
   assert.ok(categories.has('feature'));
@@ -14,6 +14,7 @@ test('vetted skills catalog contains all 7 core development domains', () => {
   assert.ok(categories.has('security'));
   assert.ok(categories.has('performance'));
   assert.ok(categories.has('git'));
+  assert.ok(categories.has('browser'));
 });
 
 test('detectSkillsFromPrompt classifies real-world developer intents accurately', () => {
@@ -41,6 +42,12 @@ test('detectSkillsFromPrompt classifies real-world developer intents accurately'
 
   const gitMatch = detectSkillsFromPrompt('Resolve merge conflict in feature branch worktree');
   assert.ok(gitMatch.some((s) => s.id === 'git-coordination'));
+
+  const uiMatch = detectSkillsFromPrompt('Validate UI change and verify component appearance');
+  assert.ok(uiMatch.some((s) => s.id === 'ui-validation'));
+
+  const onboardingMatch = detectSkillsFromPrompt('Test onboarding signup flow and registration form');
+  assert.ok(onboardingMatch.some((s) => s.id === 'onboarding-flow'));
 });
 
 test('detectSkillsFromPrompt handles empty or irrelevant strings gracefully', () => {
