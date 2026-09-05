@@ -479,6 +479,11 @@ select option {
   padding: 35px;
   z-index: 81;
 }
+.task-dialog.appearance-panel {
+  max-width: calc(100vw - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
 .task-close {
   position: absolute;
   top: 18px;

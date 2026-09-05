@@ -107,6 +107,7 @@ export function applyThemeTokens(theme: ThemePalette) {
   root.style.setProperty('--color-surface-hover', tone(dark ? 13 : 93, atmosphere + 2));
   root.style.setProperty('--color-surface-elevated', tone(dark ? 15 : 100, atmosphere + 4));
   root.style.setProperty('--color-surface-sunken', tone(dark ? 5 : 94));
+  root.style.setProperty('--color-header-search', tone(dark ? 5 : 86, atmosphere + 8));
   root.style.setProperty('--color-border', tone(dark ? 19 : 80));
   root.style.setProperty('--color-border-subtle', tone(dark ? 14 : 88));
   root.style.setProperty('--color-text-primary', tone(dark ? 96 : 13, 10));

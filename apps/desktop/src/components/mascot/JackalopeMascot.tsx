@@ -1,5 +1,4 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useId } from 'react';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { characterPaths as paths } from './character-paths';
 
@@ -13,24 +12,24 @@ interface JackalopeMascotProps {
   reduceMotion?: boolean;
 }
 
-const bodyMotion = {
+const mascotMotion = {
   idle: {
-    y: [0, -0.8, 0],
-    scaleY: [1, 1.012, 1],
+    y: 0,
+    scaleY: 1,
     rotate: 0,
     opacity: 1,
-    transition: { duration: 4, repeat: Infinity },
+    transition: { duration: 0.4 },
   },
   thinking: {
     y: 0,
     scaleY: 1,
-    rotate: [0, -3, -3, 0],
+    rotate: [0, -5, -5, 0],
     opacity: 1,
     transition: { duration: 3.5, repeat: Infinity, repeatDelay: 1.5 },
   },
   working: {
-    y: [0, -2, 0],
-    scaleY: [1, 1.02, 1],
+    y: [0, -1.5, 0],
+    scaleY: 1,
     rotate: 0,
     opacity: 1,
     transition: { duration: 1.6, repeat: Infinity },
@@ -64,7 +63,6 @@ export function JackalopeMascot({
   const currentMood = overrideMood ?? mood;
   const systemReducedMotion = useReducedMotion();
   const reduceMotion = forceReducedMotion || systemReducedMotion;
-  const gradientId = useId();
   const dim = size === 'sm' ? 40 : size === 'md' ? 88 : 152;
   const resting = currentMood === 'sleep';
   const staticPose = { y: 0, scaleY: 1, rotate: 0, opacity: resting ? 0.7 : 1 };
@@ -99,89 +97,42 @@ export function JackalopeMascot({
         style={{ width: dim, height: dim }}
       >
         <svg
-          viewBox="0 0 160 160"
-          fill="none"
+          viewBox="25 -8 128 128"
+          fill="var(--color-text-primary)"
           aria-hidden="true"
           className="w-full h-full overflow-visible"
         >
-          <defs>
-            <linearGradient
-              id={gradientId}
-              x1="55"
-              y1="30"
-              x2="114"
-              y2="149"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop stopColor="var(--color-text-primary)" />
-              <stop offset="1" stopColor="var(--color-accent)" />
-            </linearGradient>
-          </defs>
-          <ellipse cx="78" cy="152" rx="40" ry="3" fill="var(--color-accent-subtle)" />
           <motion.g
-            variants={bodyMotion}
+            variants={mascotMotion}
             animate={reduceMotion ? staticPose : currentMood}
-            style={{ originX: 0.5, originY: 0.9375, transformBox: 'view-box' }}
+            style={{ transformOrigin: '89px 100px' }}
           >
-            <path d={paths.tail} fill="var(--color-accent-hover)" />
-            <path d={paths.body} fill={`url(#${gradientId})`} />
-            <path d={paths.haunch} fill="var(--color-accent)" opacity="0.38" />
-            <motion.g
-              animate={{ rotate: resting ? 7 : currentMood === 'thinking' ? -6 : 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.6 }}
-              style={{ originX: 0.55625, originY: 0.61875, transformBox: 'view-box' }}
-            >
-              <path d={paths.antler} fill="var(--color-accent-hover)" />
-              <motion.path
-                d={paths.farEar}
-                fill="var(--color-accent-hover)"
-                animate={{ rotate: resting ? 12 : 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.6 }}
-                style={{ originX: 0.55625, originY: 0.3875, transformBox: 'view-box' }}
-              />
-              <motion.g
-                animate={{
-                  rotate: reduceMotion
-                    ? resting
-                      ? -12
-                      : 0
-                    : resting
-                      ? -12
-                      : currentMood === 'working'
-                        ? [0, -5, 0]
-                        : [0, -3, 0, 0],
-                }}
-                transition={
-                  reduceMotion || resting
-                    ? { duration: 0 }
-                    : { duration: 2.8, repeat: Infinity, repeatDelay: 2 }
-                }
-                style={{ originX: 0.51875, originY: 0.39375, transformBox: 'view-box' }}
-              >
-                <path d={paths.nearEar} fill={`url(#${gradientId})`} />
-                <path d={paths.earInset} fill="var(--color-accent-hover)" opacity="0.45" />
-              </motion.g>
-              <path d={paths.head} fill={`url(#${gradientId})`} />
-              {resting || currentMood === 'success' ? (
-                <path
-                  d={resting ? 'M108 77 Q112 81 116 77' : 'M108 79 Q112 74 116 79'}
-                  stroke="var(--color-surface-sunken)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              ) : (
-                <motion.ellipse
-                  cx="112"
-                  cy="77"
-                  rx="2.7"
-                  ry="3"
-                  fill="var(--color-surface-sunken)"
-                  animate={reduceMotion ? { scaleY: 1 } : { scaleY: [1, 1, 0.1, 1, 1] }}
-                  transition={{ duration: 5.2, times: [0, 0.88, 0.9, 0.93, 1], repeat: Infinity }}
-                  style={{ originX: 0.7, originY: 0.48125, transformBox: 'view-box' }}
-                />
-              )}
-            </motion.g>
+            <path d={paths.antler} />
+            <motion.path
+              d={paths.farEar}
+              animate={{ rotate: resting ? 10 : 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.5 }}
+              style={{ transformOrigin: '89px 62px' }}
+            />
+            <motion.path
+              d={paths.nearEar}
+              animate={{
+                rotate: resting
+                  ? -10
+                  : !reduceMotion && currentMood === 'working'
+                    ? [0, -4, 0]
+                    : currentMood === 'thinking'
+                      ? -5
+                      : 0,
+              }}
+              transition={
+                !reduceMotion && currentMood === 'working'
+                  ? { duration: 2.8, repeat: Infinity, repeatDelay: 1 }
+                  : { duration: reduceMotion ? 0 : 0.5 }
+              }
+              style={{ transformOrigin: '83px 63px' }}
+            />
+            <path d={paths.head} />
           </motion.g>
         </svg>
       </motion.button>

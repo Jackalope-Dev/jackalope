@@ -335,7 +335,7 @@ export function SettingsDialog({
                       {/* Mascot Interactive Box */}
                       <div className="settings-companion-box">
                         <div className="settings-companion-avatar">
-                          <JackalopeMascot size="lg" />
+                          <JackalopeMascot size="md" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">

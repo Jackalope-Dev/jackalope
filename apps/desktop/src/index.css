@@ -228,7 +228,25 @@ body {
   font-size: var(--text-xs);
   padding: 8px 10px;
   border-radius: 10px;
+  background: var(--color-header-search, var(--color-surface-sunken));
   cursor: pointer;
+}
+.command-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+}
+.command-search:focus-within {
+  border-color: var(--color-accent-ink);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+.command-search input:focus-visible {
+  outline: none;
 }
 .command-trigger kbd {
   font-size: var(--text-xs);
@@ -251,7 +269,7 @@ body {
   background: var(--color-surface-hover);
 }
 .appearance-trigger {
-  background: var(--color-accent-subtle);
+  background: transparent;
   border-radius: 50%;
   transition: transform 160ms;
 }

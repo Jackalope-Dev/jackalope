@@ -75,7 +75,7 @@ export function CommandPalette({
           <Dialog.Description className="sr-only">
             Search, then use arrow keys and Enter to choose. Escape closes this dialog.
           </Dialog.Description>
-          <div className="flex items-center gap-3 px-3 py-3 mb-2 border-b border-[var(--color-border-subtle)]">
+          <div className="command-search">
             <Search className="size-4 text-[var(--color-text-muted)]" />
             <input
               aria-label="Search commands"
