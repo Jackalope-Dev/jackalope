@@ -325,6 +325,17 @@ pub async fn ask_user_async(
         }
     }
 
+    // Timed out (or wait_duration was zero) without an answer: `rx` was
+    // just dropped, so nothing is listening on `tx` anymore. Leaving the
+    // sender registered only leaks memory for any prompt nobody answers in
+    // time, and makes a later resolve_user_prompt call for this ID return
+    // `true` (a stale entry found and removed) even though the send it
+    // performs silently fails - a false "delivered" signal. The real
+    // answer, whenever it arrives, is still recorded correctly via the
+    // persisted TaskRun.prompts entry (task_respond_prompt), independent
+    // of this channel, so removing it here changes no observable behavior
+    // besides making that later return value honest.
+    harness().pending_prompt_senders.lock().unwrap().remove(&prompt_id);
     prompt
 }
 
@@ -361,6 +372,44 @@ mod tests {
         assert!(browser_interact(BrowserInteractRequest {
             action: "click".into(), selector: "button".into(), text: None,
         }).await.is_err());
+    }
+
+    // Both scenarios share one test function rather than running as separate
+    // #[tokio::test]s: `harness()` is a process-wide global static, and Rust
+    // runs tests in parallel by default, so two tests independently reading
+    // `pending_prompt_senders` (a shared map with no per-test isolation)
+    // could race and pick up each other's entries. Sequential steps in one
+    // test sidestep that entirely.
+    #[tokio::test]
+    async fn pending_prompt_lifecycle_is_cleaned_up_on_timeout_and_delivered_on_answer() {
+        let question = || AskUserInput {
+            question: "Continue?".into(),
+            input_type: default_input_type(),
+            options: vec![],
+            default_value: None,
+        };
+
+        // Times out with no answer: cleaned up, so a later resolve for the
+        // same ID is honest (finds nothing, doesn't falsely report success).
+        let timed_out = ask_user_async("run-a", question(), Duration::from_millis(20)).await;
+        assert_eq!(timed_out.status, "pending");
+        assert!(!resolve_user_prompt(&timed_out.id, "too late"));
+
+        // Answered within the wait window: delivered through the channel.
+        let wait = tokio::spawn(ask_user_async("run-b", question(), Duration::from_secs(5)));
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let pending_ids: Vec<_> = harness()
+            .pending_prompt_senders
+            .lock()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        assert_eq!(pending_ids.len(), 1, "only run-b's prompt should still be pending");
+        assert!(resolve_user_prompt(&pending_ids[0], "yes"));
+        let answered = wait.await.unwrap();
+        assert_eq!(answered.status, "answered");
+        assert_eq!(answered.answer.as_deref(), Some("yes"));
     }
 
     #[test]
