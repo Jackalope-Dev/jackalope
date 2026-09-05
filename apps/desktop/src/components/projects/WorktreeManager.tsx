@@ -14,6 +14,8 @@ export function WorktreeManager() {
   const [newWorktreeSlug, setNewWorktreeSlug] = useState('');
   const [newBranch, setNewBranch] = useState('');
   const [isSpawning, setIsSpawning] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
@@ -24,17 +26,36 @@ export function WorktreeManager() {
   const handleCreate = async () => {
     if (!newWorktreeSlug.trim()) return;
     setIsSpawning(true);
+    setCreateError(null);
     setMood('working');
     say(`Spawning worktree "${newWorktreeSlug}"...`, 3000);
 
     const branch = newBranch.trim() || `feat/${newWorktreeSlug}`;
-    await spawnTaskWorktree(newWorktreeSlug, branch);
-
-    setNewWorktreeSlug('');
-    setNewBranch('');
+    const res = await spawnTaskWorktree(newWorktreeSlug, branch);
     setIsSpawning(false);
-    setMood('success');
-    say('Worktree created! Agents can now execute in isolation without branch conflicts.', 4000);
+
+    if (res.ok) {
+      setNewWorktreeSlug('');
+      setNewBranch('');
+      setMood('success');
+      say('Worktree created! Agents can now execute in isolation without branch conflicts.', 4000);
+    } else {
+      setCreateError(res.error);
+      setMood('idle');
+      say(`Couldn't create the worktree.`, 4000);
+    }
+  };
+
+  const handleCopyPath = async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopiedPath(path);
+      say(`Worktree path copied: ${path}`, 2500);
+      setTimeout(() => setCopiedPath((current) => (current === path ? null : current)), 2000);
+    } catch (e) {
+      say(`Couldn't copy the path — copy it manually: ${path}`, 4000);
+      console.error('Clipboard write failed', e);
+    }
   };
 
   return (
@@ -99,6 +120,11 @@ export function WorktreeManager() {
             <span>{isSpawning ? 'Spawning...' : 'Create Worktree'}</span>
           </Button>
         </div>
+        {createError && (
+          <p className="text-[11px] text-red-400" role="alert">
+            Couldn't create the worktree: {createError}
+          </p>
+        )}
       </div>
 
       {/* Worktrees Table / List */}
@@ -137,10 +163,14 @@ export function WorktreeManager() {
                     variant="outline"
                     size="sm"
                     className="gap-1.5 text-xs font-mono"
-                    onClick={() => say(`Worktree path copied: ${wt.path}`, 2500)}
+                    onClick={() => handleCopyPath(wt.path)}
                   >
-                    <ExternalLink className="w-3 h-3" />
-                    <span>Copy Path</span>
+                    {copiedPath === wt.path ? (
+                      <CheckCircle2 className="w-3 h-3" />
+                    ) : (
+                      <ExternalLink className="w-3 h-3" />
+                    )}
+                    <span>{copiedPath === wt.path ? 'Copied' : 'Copy Path'}</span>
                   </Button>
                 </div>
               </div>

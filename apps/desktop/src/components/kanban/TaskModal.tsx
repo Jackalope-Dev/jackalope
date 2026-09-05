@@ -77,13 +77,16 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
     const res = await spawnTaskWorktree(slug, branch);
     setIsSpawningWorktree(false);
 
-    if (res) {
+    if (res.ok) {
       updateTask(existingTask.id, {
-        worktreePath: res.path,
+        worktreePath: res.entry.path,
         status: 'in_progress',
       });
       setMood('success');
-      say(`Worktree created at ${res.path}! Agent can operate safely.`, 4500);
+      say(`Worktree created at ${res.entry.path}! Agent can operate safely.`, 4500);
+    } else {
+      setMood('idle');
+      say(`Couldn't create the worktree: ${res.error}`, 5000);
     }
   };
 

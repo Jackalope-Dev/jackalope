@@ -26,7 +26,10 @@ interface ProjectState {
   addProject: (project: Omit<Project, 'worktrees'>) => Promise<void>;
   selectProject: (id: string) => void;
   loadWorktreesForActiveProject: () => Promise<void>;
-  spawnTaskWorktree: (taskSlug: string, branchName: string) => Promise<WorktreeEntry | null>;
+  spawnTaskWorktree: (
+    taskSlug: string,
+    branchName: string,
+  ) => Promise<{ ok: true; entry: WorktreeEntry } | { ok: false; error: string }>;
 }
 
 export const useProjectStore = create<ProjectState>()(
@@ -68,16 +71,17 @@ export const useProjectStore = create<ProjectState>()(
 
       spawnTaskWorktree: async (taskSlug: string, branchName: string) => {
         const active = get().projects.find((p) => p.id === get().activeProjectId);
-        if (!active) return null;
+        if (!active) return { ok: false, error: 'No active project selected.' };
 
         try {
           const wtPath = `.worktrees/${taskSlug}`;
           const entry = await createWorktree(active.path, wtPath, branchName);
           await get().loadWorktreesForActiveProject();
-          return entry;
+          return { ok: true, entry };
         } catch (e) {
+          const error = e instanceof Error ? e.message : String(e);
           console.error('Failed to spawn worktree', e);
-          return null;
+          return { ok: false, error };
         }
       },
     }),
