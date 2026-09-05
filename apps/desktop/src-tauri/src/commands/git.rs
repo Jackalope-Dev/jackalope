@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::process::Command;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -94,11 +95,99 @@ pub async fn git_create_worktree(
         return Err(format!("Worktree creation failed: {}", err));
     }
 
+    // `base_commit` (when given) is whatever ref the caller asked to branch
+    // from — a branch name, a tag, "HEAD", a short hash — not necessarily the
+    // worktree's actual resulting commit. Resolve the real HEAD of the new
+    // worktree directly instead of echoing that input back.
+    let full_worktree_path = Path::new(&repo_path).join(&worktree_path);
+    let head_output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(&full_worktree_path)
+        .output()
+        .map_err(|e| format!("Worktree created, but failed to resolve its HEAD: {}", e))?;
+
+    if !head_output.status.success() {
+        let err = String::from_utf8_lossy(&head_output.stderr);
+        return Err(format!("Worktree created, but `git rev-parse HEAD` failed: {}", err));
+    }
+
+    let head = String::from_utf8_lossy(&head_output.stdout).trim().to_string();
+
     Ok(WorktreeEntry {
         path: worktree_path,
-        head: base_commit.unwrap_or_else(|| "HEAD".to_string()),
+        head,
         branch: branch_name,
         is_bare: false,
         is_locked: false,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    //! Exercises `git_create_worktree` against a real, disposable git repo —
+    //! proves the returned `head` is the worktree's actual resolved commit,
+    //! not an echo of whatever `base_commit` string was passed in (the bug
+    //! this module used to have: `head: base_commit.unwrap_or("HEAD")`).
+    use super::*;
+    use std::fs;
+
+    fn run(dir: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .status()
+            .expect("failed to run git");
+        assert!(status.success(), "git {:?} failed in {:?}", args, dir);
+    }
+
+    #[tokio::test]
+    async fn worktree_head_is_the_real_resolved_commit_not_the_base_commit_string() {
+        let repo = std::env::temp_dir().join(format!(
+            "jackalope-git-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&repo).unwrap();
+
+        run(&repo, &["init", "-q"]);
+        run(&repo, &["config", "user.email", "test@example.com"]);
+        run(&repo, &["config", "user.name", "Test"]);
+        fs::write(repo.join("README.md"), "hello").unwrap();
+        run(&repo, &["add", "."]);
+        run(&repo, &["commit", "-q", "-m", "initial"]);
+
+        let repo_path = repo.to_string_lossy().to_string();
+
+        let result = git_create_worktree(
+            repo_path.clone(),
+            ".worktrees/test-branch".to_string(),
+            "feat/test-branch".to_string(),
+            // Deliberately pass a non-hash ref as base_commit: the exact old
+            // bug (`head: base_commit.unwrap_or_else(|| "HEAD".to_string())`)
+            // would return the literal string "HEAD" here instead of a real hash.
+            Some("HEAD".to_string()),
+        )
+        .await
+        .expect("git_create_worktree should succeed");
+
+        assert_ne!(
+            result.head, "HEAD",
+            "head must be the resolved commit, not the base_commit string echoed back"
+        );
+        assert_eq!(
+            result.head.len(),
+            40,
+            "head should be a full git SHA-1 hex hash, got {:?}",
+            result.head
+        );
+        assert!(
+            result.head.chars().all(|c| c.is_ascii_hexdigit()),
+            "head should be hex, got {:?}",
+            result.head
+        );
+
+        let _ = fs::remove_dir_all(&repo);
+    }
 }

@@ -3,12 +3,15 @@ import { Check, ChevronDown, GitBranch, Search, SlidersHorizontal } from 'lucide
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { BrowserHarness } from '../browser/BrowserHarness';
-import { AgentFleet } from '../fleet/AgentFleet';
 import { KanbanBoard } from '../kanban/KanbanBoard';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { DeviceMesh } from '../mesh/DeviceMesh';
 import { WorktreeManager } from '../projects/WorktreeManager';
 import { ScheduleManager } from '../schedules/ScheduleManager';
+import { ProjectSetup } from '../tasks/ProjectSetup';
+import { RunnerConnections } from '../tasks/RunnerConnections';
+import { TaskWorkspace } from '../tasks/TaskWorkspace';
+import { UsageDashboard } from '../tasks/UsageDashboard';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { CodebaseMap } from '../visualizer/CodebaseMap';
 import { CommandPalette } from './CommandPalette';
@@ -16,7 +19,8 @@ import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 
 export type { ActiveTab } from './navigation';
 
-export function Shell({ onRestartOnboarding }: { onRestartOnboarding: () => void }) {
+export function Shell() {
+  const [setupOpen, setSetupOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const [commandsOpen, setCommandsOpen] = useState(false);
   const { projects, activeProjectId, selectProject } = useProjectStore();
@@ -66,8 +70,8 @@ export function Shell({ onRestartOnboarding }: { onRestartOnboarding: () => void
                   </Menu.Item>
                 ))}
                 <Menu.Separator className="menu-separator" />
-                <Menu.Item className="workspace-menu-item" onSelect={onRestartOnboarding}>
-                  Workspace setup
+                <Menu.Item className="workspace-menu-item" onSelect={() => setSetupOpen(true)}>
+                  Add a project…
                 </Menu.Item>
               </Menu.Content>
             </Menu.Portal>
@@ -150,14 +154,22 @@ export function Shell({ onRestartOnboarding }: { onRestartOnboarding: () => void
         </div>
       </div>
       <main className="workspace-canvas" aria-label={view.label}>
-        {activeTab === 'kanban' && <KanbanBoard />}
+        {['schedules', 'browser', 'topology', 'mesh', 'board'].includes(activeTab) && (
+          <p className="task-notice px-8">
+            Prototype preview · these records and controls are not connected to task execution.
+          </p>
+        )}
+        {activeTab === 'kanban' && <TaskWorkspace />}
+        {activeTab === 'board' && <KanbanBoard />}
         {activeTab === 'worktrees' && <WorktreeManager />}
-        {activeTab === 'agents' && <AgentFleet />}
+        {activeTab === 'agents' && <RunnerConnections />}
+        {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
         {activeTab === 'schedules' && <ScheduleManager />}
         {activeTab === 'browser' && <BrowserHarness />}
         {activeTab === 'topology' && <CodebaseMap />}
         {activeTab === 'mesh' && <DeviceMesh />}
       </main>
+      <ProjectSetup open={setupOpen} onClose={() => setSetupOpen(false)} />
       <CommandPalette
         isOpen={commandsOpen}
         onClose={() => setCommandsOpen(false)}

@@ -1,4 +1,13 @@
-import { Bot, CalendarClock, GitBranch, Globe, Layers3, Network, Share2 } from 'lucide-react';
+import {
+  Bot,
+  CalendarClock,
+  ChartNoAxesColumn,
+  GitBranch,
+  Globe,
+  Layers3,
+  Network,
+  Share2,
+} from 'lucide-react';
 
 export const WORKSPACE_VIEWS = [
   {
@@ -21,6 +30,20 @@ export const WORKSPACE_VIEWS = [
     description: 'Follow a session and steer its next step.',
     icon: Bot,
     primary: true,
+  },
+  {
+    id: 'usage',
+    label: 'Usage',
+    description: 'Understand consumption across your projects.',
+    icon: ChartNoAxesColumn,
+    primary: true,
+  },
+  {
+    id: 'board',
+    label: 'Planning board',
+    description: 'Existing planning records and prototype task details.',
+    icon: Layers3,
+    primary: false,
   },
   {
     id: 'schedules',

@@ -9,7 +9,14 @@ export interface Project {
   gitBranch: string;
   worktrees: WorktreeEntry[];
   description?: string;
-  agentProvider: 'claude-code' | 'aider' | 'openhands' | 'ollama' | 'antigravity';
+  agentProvider:
+    | 'codex'
+    | 'grok'
+    | 'claude-code'
+    | 'aider'
+    | 'openhands'
+    | 'ollama'
+    | 'antigravity';
 }
 
 interface ProjectState {
@@ -25,18 +32,8 @@ interface ProjectState {
 export const useProjectStore = create<ProjectState>()(
   persist(
     (set, get) => ({
-      projects: [
-        {
-          id: 'jackalope-core',
-          name: 'jackalope',
-          path: 'c:/Users/developer/Desktop/jackalope',
-          gitBranch: 'main',
-          agentProvider: 'claude-code',
-          description: 'Ultra-performant desktop shell and multi-agent harness',
-          worktrees: [],
-        },
-      ],
-      activeProjectId: 'jackalope-core',
+      projects: [],
+      activeProjectId: null,
       loading: false,
 
       addProject: async (proj) => {

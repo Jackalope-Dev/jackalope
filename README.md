@@ -4,23 +4,26 @@ Jackalope is a desktop operator for projects and tasks across user-selected
 agents, accounts and machines. It is being built with Tauri/Rust and React,
 with a focused workspace, personal color themes and an animated jackalope companion.
 
-**Current stage: early desktop prototype.** The interface and some native
-primitives work; the complete agent orchestration journey is still under
-development. The [product audit](docs/PRODUCT-AUDIT.md) documents known gaps.
+**Current stage: early native task workflow.** Real Codex, Claude Code and Grok
+tasks now run with isolated workspaces, persistent history, review and reported
+usage. Broader orchestration is still under development. The [product audit](docs/PRODUCT-AUDIT.md) documents known gaps.
 The [vision](docs/VISION.md) and [roadmap](docs/ROADMAP.md) describe intended scope.
 
 ## Available today
 
 - Shared vector branding, animated companion, theme color field and atmosphere.
 - Live theme preview with cancel/save, keyboard controls and component lab.
-- Workspace navigation, task-board/dialog UI and locally persisted records.
+- Real project setup, intent-first task entry and persistent task attempts.
+- Codex/Claude Code/Grok launch, stop and supported session continuation.
+- Overall/project Usage with reported tokens, coverage and JSON export.
+- Workspace navigation and preserved planning-board records.
 - Native Git worktree list/create and basic process/PTY commands.
 
-Agent accounts, prompt refinement, schedules, browser automation, codebase maps
-and devices still contain demonstration behavior. In particular, the fleet
-input currently writes to a shell, not a configured agent; do not treat it as a
-natural-language agent dispatcher. Real authentication, central MCP connections,
-task execution/review, scheduling and remote operation remain to be implemented.
+The active Agents view discovers local runners and existing sign-ins. Legacy
+planning/refinement, schedules, browser, maps and devices remain explicit
+prototype previews. Central connections, account-wide quotas, multi-account
+switching, scheduling, proactive routing and remote operation remain planned.
+See [the task journey](docs/TASK-JOURNEY.md) for tested behavior and limitations.
 
 ## Product direction
 

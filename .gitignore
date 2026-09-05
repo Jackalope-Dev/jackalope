@@ -41,6 +41,7 @@ Thumbs.db
 scratch/
 tmp/
 .playwright-cli/
+/output/
 
 # Linked git worktrees (agent task isolation, see AGENTS.md) — each is its
 # own working tree on its own branch, never nested content of this one
