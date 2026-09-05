@@ -21,6 +21,7 @@ import { RunnerConnections } from '../tasks/RunnerConnections';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { UsageDashboard } from '../tasks/UsageDashboard';
 import { McpWorkspace } from '../mcp/McpWorkspace';
+import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { CodebaseMap } from '../visualizer/CodebaseMap';
 import { CommandPalette } from './CommandPalette';
@@ -218,6 +219,7 @@ export function Shell() {
           />
         )}
         {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
+        {activeTab === 'audit' && <AuditLogWorkspace />}
         {activeTab === 'mcps' && <McpWorkspace />}
         {activeTab === 'schedules' && <ScheduleManager />}
         {activeTab === 'browser' && <BrowserHarness />}

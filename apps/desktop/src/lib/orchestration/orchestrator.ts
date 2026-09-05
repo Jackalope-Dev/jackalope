@@ -3,16 +3,16 @@ import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { assemblePrompt } from '../skills/context-assembler';
+import { assemblePrompt } from '../skills/context-assembler.ts';
 import type { RunRequest, TaskRun } from '../task-runtime';
-import { FALLBACK_CHAINS, getDefaultModelForRunner, getModelById } from './model-catalog';
-import { determineBestRoute } from './router';
+import { FALLBACK_CHAINS, getDefaultModelForRunner, getModelById } from './model-catalog.ts';
+import { determineBestRoute } from './router.ts';
 import type {
   AgentRunnerId,
   FailoverEvent,
   FailoverReason,
   RoutingDecision,
-} from './types';
+} from './types.ts';
 
 export interface OrchestrateTaskOptions {
   projectId: string;

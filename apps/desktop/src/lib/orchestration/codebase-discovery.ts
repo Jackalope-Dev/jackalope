@@ -1,4 +1,5 @@
-import type { DiscoveredCodebaseMemory, OpenTaskItem } from './types';
+import { useAgentConfigStore } from '../../stores/agentConfigStore.ts';
+import type { DiscoveredCodebaseMemory, OpenTaskItem } from './types.ts';
 
 export interface DiscoveryOptions {
   projectId: string;
@@ -91,17 +92,28 @@ export function parseRoadmapItems(content: string): string[] {
 export function parseConventions(content: string): string[] {
   const lines = content.split('\n');
   const conventions: string[] = [];
+  let inConventionsSection = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Look for bullet points with emojis or directive words (e.g. Invariant, Rule, Must, Never)
-    if (
-      /^[-*]\s+/.test(trimmed) &&
-      /(rule|invariant|must|never|always|guideline|convention|standard)/i.test(trimmed)
-    ) {
-      const clean = trimmed.replace(/^[-*]\s+/, '').replace(/\*\*/g, '').trim();
-      if (clean && conventions.length < 12) {
-        conventions.push(clean);
+
+    if (/^#+\s+.*(invariant|convention|rule|guideline|standard)/i.test(trimmed)) {
+      inConventionsSection = true;
+      continue;
+    }
+    if (inConventionsSection && /^#+\s+/.test(trimmed)) {
+      inConventionsSection = false;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      const isDirective = /(rule|invariant|must|never|always|guideline|convention|standard)/i.test(
+        trimmed,
+      );
+      if (inConventionsSection || isDirective) {
+        const clean = trimmed.replace(/^[-*]\s+/, '').replace(/\*\*/g, '').trim();
+        if (clean && conventions.length < 15 && !conventions.includes(clean)) {
+          conventions.push(clean);
+        }
       }
     }
   }
@@ -227,6 +239,7 @@ export async function discoverCodebaseContext(
   }
 
   const duration = Date.now() - startTime;
+  const metaAgent = useAgentConfigStore.getState().defaultMetaAgent;
 
   return {
     projectId,
@@ -243,5 +256,6 @@ export async function discoverCodebaseContext(
     tokenUsageEstimate: 0, // Deterministic extraction costs 0 LLM tokens!
     scanDurationMs: duration,
     sourceFilesDetected,
+    metaAgent,
   };
 }

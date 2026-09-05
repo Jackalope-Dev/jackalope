@@ -13,6 +13,7 @@
     "test:skills": "node --test scripts/skills.test.mjs",
     "test:settings": "node --test scripts/settings.test.mjs",
     "test:mcp": "node --test scripts/mcp.test.mjs",
+    "test:orchestration": "node scripts/orchestration.test.mjs",
     "brand:generate": "node scripts/generate-brand.mjs && tauri icon src-tauri/icons/source-icon.svg --ios-color \"#1d1a18\" && node scripts/generate-brand.mjs --copy-icon"
   },
   "dependencies": {

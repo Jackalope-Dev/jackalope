@@ -4,6 +4,7 @@ import {
   ChartNoAxesColumn,
   GitBranch,
   Globe,
+  History,
   Layers3,
   Network,
   Plug,
@@ -37,6 +38,13 @@ export const WORKSPACE_VIEWS = [
     label: 'Usage',
     description: 'Understand consumption across your projects.',
     icon: ChartNoAxesColumn,
+    primary: true,
+  },
+  {
+    id: 'audit',
+    label: 'Audit Log',
+    description: 'Inspect routing decisions, failovers, and discovery history.',
+    icon: History,
     primary: true,
   },
   {

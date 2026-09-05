@@ -1,5 +1,6 @@
 import type { Runner } from '../task-runtime';
-import { AGENT_MODELS, getDefaultModelForRunner, getModelById } from './model-catalog';
+import { useAgentConfigStore } from '../../stores/agentConfigStore.ts';
+import { AGENT_MODELS, getDefaultModelForRunner, getModelById } from './model-catalog.ts';
 import type {
   AgentModel,
   AgentRunnerId,
@@ -8,7 +9,7 @@ import type {
   RoutingPreference,
   TaskComplexity,
   TaskIntent,
-} from './types';
+} from './types.ts';
 
 export interface RouteRequest {
   prompt: string;
@@ -207,8 +208,31 @@ export function determineBestRoute(request: RouteRequest): RoutingDecision {
 
   // Score all candidate models
   const candidateScores: CandidateScore[] = [];
+  const agentConfig = useAgentConfigStore.getState();
 
-  for (const model of AGENT_MODELS) {
+  const customModels: AgentModel[] = agentConfig.customAgents.flatMap((ca) =>
+    ca.models.map((m) => ({
+      id: m.id,
+      name: m.name,
+      runnerId: ca.id as any,
+      description: m.description || ca.description,
+      contextWindow: 128000,
+      capabilities: { coding: 8.5, reasoning: 8.5, speed: 8.5, multiFile: 8.0 },
+      relativeCost: 'medium' as const,
+    })),
+  );
+
+  const allModels = [...AGENT_MODELS, ...customModels];
+
+  for (const model of allModels) {
+    // Respect user agent and model restrictions
+    if (!agentConfig.isAgentEnabled(model.runnerId)) {
+      continue;
+    }
+    if (!agentConfig.isModelAllowed(model.id)) {
+      continue;
+    }
+
     const runner = runnerMap.get(model.runnerId);
     const notes: string[] = [];
 

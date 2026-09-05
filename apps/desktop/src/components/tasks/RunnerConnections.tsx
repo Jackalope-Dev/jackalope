@@ -1,8 +1,8 @@
-import { ArrowRight, Bot, Check, CircleHelp, Download, Monitor, Plug, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowRight, Plug, RefreshCw, Sparkles } from 'lucide-react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
+import { AgentManager } from '../agents/AgentManager';
 import { Button } from '../ui/button';
-import { EmptyState } from '../ui/EmptyState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
 export function RunnerConnections({
@@ -15,10 +15,10 @@ export function RunnerConnections({
   const { runners, discovering, discover, error } = useExecutionStore();
   const desktop = isTauriEnvironment();
   return (
-    <section className="task-page max-w-4xl mx-auto">
+    <section className="task-page max-w-4xl mx-auto space-y-6">
       <WorkspaceHeading
-        title="Agents"
-        description="Your installed agents, with the sign-ins you already use."
+        title="Agent Command Center"
+        description="Select authorized agents, restrict models, configure custom runners, and set your default meta-agent."
         action={
           <Button
             variant="outline"
@@ -40,54 +40,10 @@ export function RunnerConnections({
           Checking installed agents…
         </p>
       )}
-      {!desktop ? (
-        <EmptyState
-          icon={Monitor}
-          title="Connect from your desktop"
-          description="Open the desktop app to discover Codex, Claude Code and Grok on this machine."
-        />
-      ) : (
-        !runners.length &&
-        !discovering && (
-          <EmptyState
-            icon={Bot}
-            title="Find your first agent"
-            description="Refresh to check this machine for supported agent tools."
-          />
-        )
-      )}
-      {runners.map((runner) => {
-        const StatusIcon = runner.signedIn ? Check : runner.available ? CircleHelp : Download;
-        return (
-          <article key={runner.id} className="runner-row">
-            <span className="empty-state-icon">
-              <Bot size={24} aria-hidden="true" />
-            </span>
-            <div className="runner-identity">
-              <div className="workspace-section-heading">
-                <h2>{runner.name}</h2>
-                <span className="task-status">
-                  <StatusIcon size={16} aria-hidden="true" />
-                  {runner.signedIn
-                    ? 'Signed in'
-                    : runner.available
-                      ? 'Check sign-in'
-                      : 'Not installed'}
-                </span>
-              </div>
-              {runner.signedIn && <p className="task-muted mt-2">{runner.account}</p>}
-              {!runner.signedIn ? (
-                <p className="task-muted mt-2">{runner.detail}</p>
-              ) : (
-                <details className="supporting-details">
-                  <summary>Connection details</summary>
-                  <p>{runner.detail}</p>
-                </details>
-              )}
-            </div>
-          </article>
-        );
-      })}
+
+      {/* Main Agent & Model Control Center */}
+      <AgentManager />
+
       <article className="runner-row">
         <span className="empty-state-icon">
           <Plug size={24} aria-hidden="true" />
@@ -113,11 +69,14 @@ export function RunnerConnections({
           )}
         </div>
       </article>
+
       {runners.some((runner) => runner.available) && (
-        <Button onClick={onTasks}>
-          Create a task
-          <ArrowRight size={18} />
-        </Button>
+        <div className="flex justify-start">
+          <Button onClick={onTasks}>
+            Create a task
+            <ArrowRight size={18} />
+          </Button>
+        </div>
       )}
       <details className="supporting-details">
         <summary>Sign-ins and account access</summary>

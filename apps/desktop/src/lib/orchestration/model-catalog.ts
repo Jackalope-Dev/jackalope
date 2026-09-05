@@ -1,4 +1,4 @@
-import type { AgentModel, AgentRunnerId } from './types';
+import type { AgentModel, AgentRunnerId } from './types.ts';
 
 export const AGENT_MODELS: AgentModel[] = [
   // Claude Code Models

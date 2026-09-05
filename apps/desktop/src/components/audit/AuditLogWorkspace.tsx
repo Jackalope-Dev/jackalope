@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowRight,
   Bot,
   CheckCircle2,
   ChevronDown,
@@ -11,21 +10,20 @@ import {
   History,
   Info,
   Layers,
-  RefreshCw,
   Search,
   ShieldAlert,
   Sparkles,
   Trash2,
   Zap,
 } from 'lucide-react';
-import type { AuditCategory, AuditLogEntry, AuditSeverity } from '../../lib/orchestration/types';
+import type { AuditCategory, AuditSeverity } from '../../lib/orchestration/types';
 import { useAuditStore } from '../../stores/auditStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { button } from '../ui/button';
+import { Button } from '../ui/button';
 
 export function AuditLogWorkspace() {
   const { entries, clearEntries, clearProjectEntries } = useAuditStore();
-  const { activeProjectId } = useProjectStore();
+  const { projects, activeProjectId } = useProjectStore();
 
   const [selectedCategory, setSelectedCategory] = useState<AuditCategory | 'all'>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<AuditSeverity | 'all'>('all');

@@ -62,7 +62,7 @@ export const DEFAULT_SETTINGS: Omit<
   SettingsState,
   'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
 > = {
-  experienceMode: 'essential',
+  experienceMode: 'simple',
   mascotReactions: true,
   soundAlerts: true,
   notifications: 'all' as const,

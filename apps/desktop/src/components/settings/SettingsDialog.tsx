@@ -562,6 +562,91 @@ export function SettingsDialog({
 
                         <div className="settings-row">
                           <div className="settings-row-info">
+                            <span className="settings-row-label">Intelligent Routing Mode</span>
+                            <span className="settings-row-description">
+                              How the central orchestrator selects the best agent and model for tasks.
+                            </span>
+                          </div>
+                          <div className="settings-control-wrapper">
+                            <Select
+                              value={settings.routingPreference}
+                              onValueChange={(val) =>
+                                settings.updateSettings({
+                                  routingPreference: val as any,
+                                })
+                              }
+                            >
+                              <SelectItem value="auto">Auto (Balanced Best Fit)</SelectItem>
+                              <SelectItem value="quality">Maximum Capability & Reasoning</SelectItem>
+                              <SelectItem value="speed">Lowest Latency & Speed</SelectItem>
+                              <SelectItem value="cost">Economic Token Budget</SelectItem>
+                              <SelectItem value="manual">Manual Selection Always</SelectItem>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="settings-row">
+                          <div className="settings-row-info">
+                            <span className="settings-row-label">Proactive Self-Healing Failover</span>
+                            <span className="settings-row-description">
+                              Automatically detect quota exhaustion (429) or crashes and re-route tasks to the next best fallback agent.
+                            </span>
+                          </div>
+                          <div className="settings-control-wrapper">
+                            <Switch
+                              checked={settings.autoFailoverEnabled}
+                              onCheckedChange={(checked) =>
+                                settings.updateSettings({ autoFailoverEnabled: checked })
+                              }
+                              label="Proactive Failover"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="settings-row">
+                          <div className="settings-row-info">
+                            <span className="settings-row-label">Codebase Context Discovery</span>
+                            <span className="settings-row-description">
+                              Extract tech stack, open tasks from TODO.md, and conventions on onboarding and periodic refresh.
+                            </span>
+                          </div>
+                          <div className="settings-control-wrapper">
+                            <Switch
+                              checked={settings.codebaseDiscoveryEnabled}
+                              onCheckedChange={(checked) =>
+                                settings.updateSettings({ codebaseDiscoveryEnabled: checked })
+                              }
+                              label="Codebase Discovery"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="settings-row">
+                          <div className="settings-row-info">
+                            <span className="settings-row-label">Context Refresh Cadence</span>
+                            <span className="settings-row-description">
+                              How frequently Jackalope refreshes repository roadmap and task memory in the background.
+                            </span>
+                          </div>
+                          <div className="settings-control-wrapper">
+                            <Select
+                              value={settings.discoveryRefreshCadence}
+                              onValueChange={(val) =>
+                                settings.updateSettings({
+                                  discoveryRefreshCadence: val as any,
+                                })
+                              }
+                            >
+                              <SelectItem value="startup">On Project Open & Startup</SelectItem>
+                              <SelectItem value="hourly">Hourly in Background</SelectItem>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="manual">Manual Only</SelectItem>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="settings-row">
+                          <div className="settings-row-info">
                             <span className="settings-row-label">Parallel Concurrency Limit</span>
                             <span className="settings-row-description">
                               Maximum concurrent agent execution slots (1 to 6).

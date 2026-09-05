@@ -15,14 +15,11 @@ import {
   Square,
   Wand2,
   Workflow,
-  Zap,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { orchestrator } from '../../lib/orchestration/orchestrator';
-import { determineBestRoute } from '../../lib/orchestration/router';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog.ts';
 import { assemblePrompt } from '../../lib/skills/context-assembler.ts';
-import { CodebaseMemoryBar } from './CodebaseMemoryBar';
 import {
   isActive,
   nativeTask,

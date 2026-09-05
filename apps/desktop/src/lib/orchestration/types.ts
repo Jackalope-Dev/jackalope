@@ -128,4 +128,5 @@ export interface DiscoveredCodebaseMemory {
   tokenUsageEstimate: number;
   scanDurationMs: number;
   sourceFilesDetected: string[];
+  metaAgent?: string;
 }
