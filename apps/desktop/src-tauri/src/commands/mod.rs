@@ -11,3 +11,5 @@ pub mod mcp;
 pub mod harness;
 
 pub mod agent_policy;
+
+pub mod reset;

@@ -184,9 +184,9 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
         if (!failover) return null;
         return (
           <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs">
-            <ShieldAlert size={16} className="text-amber-500 shrink-0 mt-0.5" />
+            <ShieldAlert size={16} className="text-[var(--color-warning)] shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold text-amber-600 dark:text-amber-400 block">
+              <span className="font-semibold text-[var(--color-warning)] block">
                 Proactive Self-Healing Failover
               </span>
               <p className="text-[var(--color-text-muted)] mt-0.5">

@@ -63,7 +63,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
               {memory.techStack.slice(0, 4).map((tech) => (
                 <span
                   key={tech}
-                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border-subtle)]"
+                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-surface)] text-[var(--color-text-primary)] border border-[var(--color-border-subtle)]"
                 >
                   {tech}
                 </span>
@@ -82,7 +82,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
 
           {/* Open Tasks Count */}
           {openTasks.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-[var(--color-warning)] border border-amber-500/30">
               <ListTodo size={11} />
               {openTasks.length} open {openTasks.length === 1 ? 'task' : 'tasks'}
             </span>
@@ -90,7 +90,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
 
           {/* Invariants / Conventions Count */}
           {memory?.conventions && memory.conventions.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-[var(--color-success)] border border-emerald-500/30">
               <Shield size={11} />
               {memory.conventions.length} invariants
             </span>
@@ -120,7 +120,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
 
           <button
             type="button"
-            className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+            className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             aria-label={expanded ? 'Collapse context memory' : 'Expand context memory'}
           >
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -133,7 +133,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
         <div className="p-4 border-t border-[var(--color-border-subtle)] bg-[var(--color-surface)] space-y-4 text-xs">
           {/* Summary & Manifests */}
           <div>
-            <span className="font-semibold text-[var(--color-text)] block mb-1">
+            <span className="font-semibold text-[var(--color-text-primary)] block mb-1">
               Discovered Architecture & Manifests
             </span>
             <p className="text-[var(--color-text-muted)] leading-relaxed">
@@ -156,17 +156,17 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
           {/* Open Tasks List */}
           {openTasks.length > 0 && (
             <div>
-              <span className="font-semibold text-[var(--color-text)] flex items-center gap-1.5 mb-2">
-                <ListTodo size={13} className="text-amber-500" />
+              <span className="font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5 mb-2">
+                <ListTodo size={13} className="text-[var(--color-warning)]" />
                 Detected Open Tasks (from TODO.md / STATUS.md)
               </span>
               <ul className="space-y-1.5 pl-1 max-h-40 overflow-y-auto pr-2">
                 {openTasks.slice(0, 8).map((task) => (
                   <li
                     key={task.id}
-                    className="flex items-start gap-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+                    className="flex items-start gap-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
                   >
-                    <CircleDot size={12} className="text-amber-500/70 shrink-0 mt-0.5" />
+                    <CircleDot size={12} className="text-[var(--color-warning)] shrink-0 mt-0.5" />
                     <span>{task.title}</span>
                   </li>
                 ))}
@@ -177,14 +177,14 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
           {/* Conventions & Invariants */}
           {memory?.conventions && memory.conventions.length > 0 && (
             <div>
-              <span className="font-semibold text-[var(--color-text)] flex items-center gap-1.5 mb-2">
-                <Shield size={13} className="text-emerald-500" />
+              <span className="font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5 mb-2">
+                <Shield size={13} className="text-[var(--color-success)]" />
                 Project Invariants & Conventions (Injected into tasks)
               </span>
               <ul className="space-y-1 pl-1 max-h-36 overflow-y-auto pr-2">
                 {memory.conventions.slice(0, 6).map((conv, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-[var(--color-text-muted)]">
-                    <CheckCircle2 size={12} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <CheckCircle2 size={12} className="text-[var(--color-success)] shrink-0 mt-0.5" />
                     <span>{conv}</span>
                   </li>
                 ))}

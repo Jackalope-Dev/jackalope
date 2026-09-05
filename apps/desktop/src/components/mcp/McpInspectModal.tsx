@@ -48,7 +48,7 @@ export function McpInspectModal({ server, open, onClose, onInstall }: McpInspect
               )}
               {server.githubStars > 0 && (
                 <span className="mcp-pill flex items-center gap-1">
-                  <Star size={11} className="text-amber-400" />{' '}
+                  <Star size={11} className="text-[var(--color-warning)]" />{' '}
                   {server.githubStars.toLocaleString()}
                 </span>
               )}
@@ -57,7 +57,7 @@ export function McpInspectModal({ server, open, onClose, onInstall }: McpInspect
               )}
             </div>
 
-            <Dialog.Title className="text-2xl font-bold tracking-tight text-[var(--color-text)]">
+            <Dialog.Title className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
               {server.name}
             </Dialog.Title>
             <Dialog.Description className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-2">
@@ -72,7 +72,7 @@ export function McpInspectModal({ server, open, onClose, onInstall }: McpInspect
               <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
                 Configuration
               </h4>
-              <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] font-mono text-xs text-[var(--color-text)] overflow-x-auto">
+              <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] font-mono text-xs text-[var(--color-text-primary)] overflow-x-auto">
                 {JSON.stringify(
                   server.claudeConfigSnippet || {
                     mcpServers: {

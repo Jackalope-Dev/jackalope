@@ -185,7 +185,7 @@ export function McpInstallModal({
                     className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                       scope === item.id
                         ? 'bg-[var(--color-accent-subtle)] border-[var(--color-accent)] text-[var(--color-accent-ink)] font-semibold'
-                        : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                        : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
                     }`}
                   >
                     {item.label}
@@ -207,7 +207,7 @@ export function McpInstallModal({
                 <p className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
                   Command & Arguments
                 </p>
-                <div className="p-2.5 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] font-mono text-xs text-[var(--color-text)]">
+                <div className="p-2.5 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] font-mono text-xs text-[var(--color-text-primary)]">
                   <span>{command} </span>
                   <span className="text-[var(--color-text-muted)]">{args.join(' ')}</span>
                 </div>
@@ -242,7 +242,7 @@ export function McpInstallModal({
                 <div className="space-y-2">
                   {Object.entries(envValues).map(([key, val]) => (
                     <div key={key}>
-                      <div className="text-xs font-mono text-[var(--color-text)] mb-1">{key}</div>
+                      <div className="text-xs font-mono text-[var(--color-text-primary)] mb-1">{key}</div>
                       <input
                         aria-label={key}
                         type={

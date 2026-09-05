@@ -7,6 +7,7 @@ use commands::coordination::*;
 use commands::integration::*;
 use commands::mcp::*;
 use commands::tasks::*;
+use commands::reset::*;
 use commands::{agent::*, git::*, pty::*, system::*};
 use state::AppState;
 use tauri::Manager;
@@ -16,6 +17,7 @@ pub fn run() {
     context.config_mut().app.windows[0].user_agent =
         Some(format!("Jackalope/{}", env!("CARGO_PKG_VERSION")));
     let profile = std::env::var_os("JACKALOPE_PROFILE_DIR").map(std::path::PathBuf::from);
+    context.config_mut().app.windows[0].create = false;
     if let Some(path) = &profile {
         assert!(path.is_absolute(), "JACKALOPE_PROFILE_DIR must be absolute");
         context.config_mut().app.windows[0].create = false;
@@ -34,19 +36,25 @@ pub fn run() {
             let directory = std::env::var_os("JACKALOPE_TEST_DATA_DIR")
                 .map(std::path::PathBuf::from)
                 .unwrap_or(directory);
+            let resetting = reset_on_startup(&directory)?;
             let runtime = TaskRuntime::new(directory.clone())?;
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
             app.manage(runtime);
             app.manage(coordinator);
-            if let Some(profile) = &profile {
-                tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?
-                    .data_directory(profile.join("webview"))
-                    .build()?;
+            let mut window = tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?;
+            if let Some(profile) = &profile { window = window.data_directory(profile.join("webview")); }
+            if resetting {
+                let token = std::fs::read_to_string(directory.join(RESET_MARKER))?;
+                let token = serde_json::to_string(&token)?;
+                window = window.initialization_script(format!("if (localStorage.getItem('jackalope-reset-receipt') !== {token}) {{ for (const key of Object.keys(localStorage)) {{ if (key.startsWith('jackalope-')) localStorage.removeItem(key); }} sessionStorage.clear(); localStorage.setItem('jackalope-reset-receipt', {token}); }} window.__JACKALOPE_RESET__ = true;"));
             }
+            window.build()?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            app_reset,
+            app_finish_reset,
             git_list_worktrees,
             git_create_worktree,
             agent_spawn_process,

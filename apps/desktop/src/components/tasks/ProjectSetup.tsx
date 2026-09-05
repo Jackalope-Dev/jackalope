@@ -15,7 +15,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const { useMcpMarketplace, setUseMcpMarketplace, telemetryEnabled, updateSettings } =
+  const { useMcpMarketplace, setUseMcpMarketplace } =
     useSettingsStore();
   const desktop = isTauriEnvironment();
   const browse = async () => {
@@ -157,23 +157,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
                 </div>
               </label>
             </div>
-            <label className="flex gap-2.5 items-start mt-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={telemetryEnabled}
-                onChange={(e) => updateSettings({ telemetryEnabled: e.target.checked })}
-                className="mt-0.5 rounded border-[var(--color-border)] text-[var(--color-accent-ink)]"
-              />
-              <div>
-                <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                  Allow anonymous usage telemetry
-                </span>
-                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                  Your preference is saved for the planned telemetry service. This build does not
-                  send telemetry.
-                </p>
-              </div>
-            </label>
+            <p className="task-muted text-xs mt-4">This build does not send usage telemetry or crash reports.</p>
             <div className="flex justify-end mt-7">
               <Button type="submit" disabled={!desktop || !path.trim() || busy}>
                 {busy ? 'Checking repository…' : 'Open project'}

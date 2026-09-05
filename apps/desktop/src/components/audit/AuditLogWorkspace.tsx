@@ -83,16 +83,16 @@ export function AuditLogWorkspace() {
   const getCategoryIcon = (category: AuditCategory) => {
     switch (category) {
       case 'routing':
-        return <Zap size={14} className="text-amber-500" />;
+        return <Zap size={14} className="text-[var(--color-warning)]" />;
       case 'failover':
-        return <ShieldAlert size={14} className="text-rose-500" />;
+        return <ShieldAlert size={14} className="text-[var(--color-danger)]" />;
       case 'quota':
-        return <AlertTriangle size={14} className="text-amber-500" />;
+        return <AlertTriangle size={14} className="text-[var(--color-warning)]" />;
       case 'discovery':
         return <Sparkles size={14} className="text-sky-500" />;
       case 'execution':
       default:
-        return <Cpu size={14} className="text-emerald-500" />;
+        return <Cpu size={14} className="text-[var(--color-success)]" />;
     }
   };
 
@@ -100,19 +100,19 @@ export function AuditLogWorkspace() {
     switch (severity) {
       case 'error':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-500/15 text-[var(--color-danger)] dark:text-[var(--color-danger)] border border-rose-500/30">
             <AlertTriangle size={10} /> Error
           </span>
         );
       case 'warning':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-[var(--color-warning)] border border-amber-500/30">
             <AlertTriangle size={10} /> Warning
           </span>
         );
       case 'success':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-[var(--color-success)] border border-emerald-500/30">
             <CheckCircle2 size={10} /> Success
           </span>
         );
@@ -136,7 +136,7 @@ export function AuditLogWorkspace() {
               <span className="p-1.5 rounded-lg bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
                 <History size={18} />
               </span>
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text)]">
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
                 Audit Log & Orchestration History
               </h1>
             </div>
@@ -152,7 +152,7 @@ export function AuditLogWorkspace() {
                 variant="outline"
                 size="sm"
                 onClick={() => clearProjectEntries(selectedProjectFilter)}
-                className="text-xs text-rose-500 hover:text-rose-600 border-rose-500/30"
+                className="text-xs text-[var(--color-danger)] hover:text-[var(--color-danger)] border-rose-500/30"
               >
                 <Trash2 size={13} />
                 Clear this project
@@ -162,7 +162,7 @@ export function AuditLogWorkspace() {
                 variant="outline"
                 size="sm"
                 onClick={clearEntries}
-                className="text-xs text-[var(--color-text-muted)] hover:text-rose-500"
+                className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
               >
                 <Trash2 size={13} />
                 Clear all logs
@@ -178,7 +178,7 @@ export function AuditLogWorkspace() {
               Total Events
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-text)]">{stats.total}</span>
+              <span className="text-xl font-semibold text-[var(--color-text-primary)]">{stats.total}</span>
               <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
             </div>
           </div>
@@ -188,7 +188,7 @@ export function AuditLogWorkspace() {
               Auto-Routed Tasks
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-amber-500">{stats.routingCount}</span>
+              <span className="text-xl font-semibold text-[var(--color-warning)]">{stats.routingCount}</span>
               <span className="text-xs text-[var(--color-text-muted)]">optimized</span>
             </div>
           </div>
@@ -198,7 +198,7 @@ export function AuditLogWorkspace() {
               Failovers Resolved
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-rose-500">{stats.failoverCount}</span>
+              <span className="text-xl font-semibold text-[var(--color-danger)]">{stats.failoverCount}</span>
               <span className="text-xs text-[var(--color-text-muted)]">self-healed</span>
             </div>
           </div>
@@ -223,7 +223,7 @@ export function AuditLogWorkspace() {
               <select
                 value={selectedProjectFilter}
                 onChange={(e) => setSelectedProjectFilter(e.target.value)}
-                className="bg-transparent text-xs text-[var(--color-text)] outline-none cursor-pointer"
+                className="bg-transparent text-xs text-[var(--color-text-primary)] outline-none cursor-pointer"
               >
                 <option value="all">All Projects</option>
                 <option value="global">Global / Jackalope Workspace</option>
@@ -252,7 +252,7 @@ export function AuditLogWorkspace() {
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     selectedCategory === cat.id
                       ? 'bg-[var(--color-accent)] text-white'
-                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >
                   {cat.label}
@@ -266,7 +266,7 @@ export function AuditLogWorkspace() {
               <select
                 value={selectedSeverity}
                 onChange={(e) => setSelectedSeverity(e.target.value as AuditSeverity | 'all')}
-                className="bg-transparent text-xs text-[var(--color-text)] outline-none cursor-pointer"
+                className="bg-transparent text-xs text-[var(--color-text-primary)] outline-none cursor-pointer"
               >
                 <option value="all">All Severities</option>
                 <option value="info">Info only</option>
@@ -288,7 +288,7 @@ export function AuditLogWorkspace() {
               placeholder="Search audit events..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
             />
           </div>
         </div>
@@ -299,7 +299,7 @@ export function AuditLogWorkspace() {
         {filteredEntries.length === 0 ? (
           <div className="text-center py-16">
             <History size={36} className="mx-auto text-[var(--color-text-muted)] opacity-40 mb-3" />
-            <h3 className="text-sm font-medium text-[var(--color-text)]">No audit events match</h3>
+            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">No audit events match</h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-1 max-w-sm mx-auto">
               {searchQuery || selectedCategory !== 'all' || selectedProjectFilter !== 'all'
                 ? 'Try adjusting your filters or search query.'
@@ -335,7 +335,7 @@ export function AuditLogWorkspace() {
                     </span>
                     <div>
                       <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-[var(--color-text)]">
+                        <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                           {entry.title}
                         </span>
                         {getSeverityBadge(entry.severity)}
@@ -363,7 +363,7 @@ export function AuditLogWorkspace() {
                     </div>
                     <button
                       type="button"
-                      className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text)] rounded"
+                      className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] rounded"
                     >
                       {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </button>
@@ -380,7 +380,7 @@ export function AuditLogWorkspace() {
                       )}
                     </div>
                     {entry.details ? (
-                      <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border-subtle)] text-xs font-mono text-[var(--color-text)] overflow-x-auto">
+                      <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border-subtle)] text-xs font-mono text-[var(--color-text-primary)] overflow-x-auto">
                         {JSON.stringify(entry.details, null, 2)}
                       </pre>
                     ) : (

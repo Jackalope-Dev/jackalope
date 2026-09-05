@@ -136,26 +136,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       exportSettings: () => {
         const state = get();
-        const exportData = {
-          experienceMode: state.experienceMode,
-          mascotReactions: state.mascotReactions,
-          soundAlerts: state.soundAlerts,
-          notifications: state.notifications,
-          defaultRunner: state.defaultRunner,
-          concurrencyLimit: state.concurrencyLimit,
-          autoScrollLogs: state.autoScrollLogs,
-          maxLogLines: state.maxLogLines,
-          taskTimeoutMinutes: state.taskTimeoutMinutes,
-          branchPrefix: state.branchPrefix,
-          baseBranch: state.baseBranch,
-          worktreeParentDir: state.worktreeParentDir,
-          pruneWorktreeOnMerge: state.pruneWorktreeOnMerge,
-          useMcpMarketplace: state.useMcpMarketplace,
-          telemetryEnabled: state.telemetryEnabled,
-          crashReportingEnabled: state.crashReportingEnabled,
-          debugLogging: state.debugLogging,
-          customRunnerPaths: { ...state.customRunnerPaths },
-        };
+        const exportData = Object.fromEntries(Object.entries(state).filter(([, value]) => typeof value !== 'function'));
         return JSON.stringify(exportData, null, 2);
       },
     }),

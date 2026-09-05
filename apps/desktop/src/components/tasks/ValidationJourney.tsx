@@ -81,9 +81,9 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
               >
                 <div className="mt-0.5 shrink-0">
                   {isPassed ? (
-                    <CheckCircle2 size={16} className="text-emerald-500" />
+                    <CheckCircle2 size={16} className="text-[var(--color-success)]" />
                   ) : isFailed ? (
-                    <AlertCircle size={16} className="text-rose-500" />
+                    <AlertCircle size={16} className="text-[var(--color-danger)]" />
                   ) : isInProgress ? (
                     <Loader2 size={16} className="text-[var(--color-accent)] animate-spin" />
                   ) : (

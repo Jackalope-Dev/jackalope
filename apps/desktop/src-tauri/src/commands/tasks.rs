@@ -302,6 +302,14 @@ impl TaskRuntime {
         });
     }
 
+    pub(super) fn request_reset(&self) -> Result<(), String> {
+        let inner = self.inner.lock().map_err(|e| e.to_string())?;
+        if inner.runs.values().any(|run| ["starting", "running", "stopping"].contains(&run.status.as_str())) {
+            return Err("Stop active tasks before resetting Jackalope.".into());
+        }
+        std::fs::write(self.directory.join(super::reset::RESET_MARKER), uuid::Uuid::new_v4().to_string()).map_err(|e| e.to_string())
+    }
+
     pub fn stop_all(&self) {
         let ids: Vec<_> = self
             .inner
@@ -896,6 +904,7 @@ impl TaskRuntime {
         self.start_locked(request)
     }
     pub(super) fn start_locked(&self, mut request: RunRequest) -> Result<String, String> {
+        if self.directory.join(super::reset::RESET_MARKER).exists() { return Err("Jackalope is resetting.".into()); }
         if let Some(previous) = &request.previous_run_id {
             if super::integration::applied_run_ids(self)?.contains(previous) {
                 return Err("This task has already been integrated. Add a new task to start from the updated master.".into());

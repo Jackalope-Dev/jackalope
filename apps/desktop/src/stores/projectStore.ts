@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-bridge.ts';
 
 export interface ProjectPreferences {
-  preferredRunner?: 'inherit' | 'codex' | 'claude' | 'grok';
+  preferredRunner?: string;
   customInstructions?: string;
   baseBranch?: string;
   branchPrefix?: string;

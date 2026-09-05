@@ -570,6 +570,18 @@ impl Coordinator {
         self.runtime.start(request)
     }
 
+    pub(super) fn prepare_reset(&self) -> Result<(), String> {
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        if !inner.enabled.is_empty() {
+            return Err("Pause task queues before resetting Jackalope.".into());
+        }
+        let _integration_guard = super::integration::execution_guard()?;
+        self.runtime.request_reset()?;
+        self.alive.store(false, Ordering::Relaxed);
+        inner.enabled.clear();
+        Ok(())
+    }
+
     pub fn shutdown(&self) {
         self.alive.store(false, Ordering::Relaxed);
         self.inner.lock().unwrap().enabled.clear();

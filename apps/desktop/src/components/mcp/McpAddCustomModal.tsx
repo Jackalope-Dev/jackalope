@@ -145,7 +145,7 @@ export function McpAddCustomModal({
                     className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                       scope === item.id
                         ? 'bg-[var(--color-accent-subtle)] border-[var(--color-accent)] text-[var(--color-accent-ink)] font-semibold'
-                        : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                        : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
                     }`}
                   >
                     {item.label}
@@ -349,7 +349,7 @@ export function McpAddCustomModal({
                     <button
                       type="button"
                       onClick={() => handleRemoveEnv(idx)}
-                      className="p-1.5 text-[var(--color-text-muted)] hover:text-red-400"
+                      className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
                     >
                       <Trash2 size={14} />
                     </button>

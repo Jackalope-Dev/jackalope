@@ -182,7 +182,7 @@ export function McpWorkspace() {
           <Globe size={17} />
           <span>Marketplace (allmcps.com)</span>
           {useMcpMarketplace && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-[var(--color-success)] border border-emerald-500/20">
               Live
             </span>
           )}
@@ -319,13 +319,13 @@ export function McpWorkspace() {
                       {probe && (
                         <div className="mb-2">
                           {probe.ok ? (
-                            <div className="text-xs text-emerald-400 flex items-center gap-1.5 font-medium">
+                            <div className="text-xs text-[var(--color-success)] flex items-center gap-1.5 font-medium">
                               <CheckCircle size={13} />
                               Active ({probe.latencyMs ?? 0}ms) · {probe.tools.length} tool
                               {probe.tools.length === 1 ? '' : 's'} available
                             </div>
                           ) : (
-                            <div className="text-xs text-red-400 flex items-center gap-1.5 font-medium">
+                            <div className="text-xs text-[var(--color-danger)] flex items-center gap-1.5 font-medium">
                               <X size={13} />
                               Probe failed: {probe.error || 'Connection error'}
                             </div>
@@ -384,7 +384,7 @@ export function McpWorkspace() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:text-red-400"
+                          className="hover:text-[var(--color-danger)]"
                           onClick={() => {
                             if (
                               confirm(`Remove MCP server '${server.name}' from ${server.scope}?`)
@@ -412,7 +412,7 @@ export function McpWorkspace() {
           {!useMcpMarketplace ? (
             <div className="mcp-privacy-banner">
               <div>
-                <h3 className="text-base font-semibold text-[var(--color-text)] mb-1">
+                <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">
                   MCP Marketplace is currently disabled
                 </h3>
                 <p className="text-xs text-[var(--color-text-muted)] max-w-xl">
@@ -448,7 +448,7 @@ export function McpWorkspace() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                    className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                   >
                     <X size={16} />
                   </button>
@@ -520,7 +520,7 @@ export function McpWorkspace() {
                               )}
                               {item.githubStars > 0 && (
                                 <span className="mcp-pill flex items-center gap-0.5">
-                                  <Star size={10} className="text-amber-400" />{' '}
+                                  <Star size={10} className="text-[var(--color-warning)]" />{' '}
                                   {item.githubStars.toLocaleString()}
                                 </span>
                               )}
@@ -538,14 +538,14 @@ export function McpWorkspace() {
                           </div>
 
                           {requiresEnv && (
-                            <p className="text-xs text-amber-400/90 mb-2">
+                            <p className="text-xs text-[var(--color-warning)] mb-2">
                               🔑 Requires {item.envVars.join(', ')}
                             </p>
                           )}
 
                           {installedScope && (
                             <div className="mb-2">
-                              <span className="text-xs font-medium text-emerald-400 flex items-center gap-1">
+                              <span className="text-xs font-medium text-[var(--color-success)] flex items-center gap-1">
                                 <Check size={13} /> Installed ({installedScope})
                               </span>
                             </div>

@@ -76,7 +76,7 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
       </p>
 
       {error && (
-        <p role="alert" className="text-xs text-red-500 mb-2 pl-9">
+        <p role="alert" className="text-xs text-[var(--color-danger)] mb-2 pl-9">
           {error}
         </p>
       )}
