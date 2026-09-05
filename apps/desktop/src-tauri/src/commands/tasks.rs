@@ -163,7 +163,10 @@ fn valid_id(id: &str) -> bool {
     (8..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
 
-fn probe_auth(path: PathBuf, args: Vec<&str>) -> Result<std::process::Output, std::io::Error> {
+pub(super) fn probe_auth(
+    path: PathBuf,
+    args: Vec<&str>,
+) -> Result<std::process::Output, std::io::Error> {
     let mut child = command(path)
         .args(args)
         .stdout(Stdio::piped())

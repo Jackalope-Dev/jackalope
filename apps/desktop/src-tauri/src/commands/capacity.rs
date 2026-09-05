@@ -46,11 +46,11 @@ struct Cache {
 #[derive(Default)]
 pub struct CapacityService(Mutex<Cache>);
 
-fn unavailable(agent: &str, status: &str, detail: &str) -> CapacityRecord {
+fn unavailable(agent: &str, status: &str, detail: &str, account: Option<String>) -> CapacityRecord {
     CapacityRecord {
         agent: agent.into(),
         status: status.into(),
-        account: "Current CLI account".into(),
+        account: account.unwrap_or_else(|| "Account identity not available for this agent".into()),
         source: if agent == "codex" {
             "Codex account/rateLimits/read"
         } else {
@@ -61,6 +61,21 @@ fn unavailable(agent: &str, status: &str, detail: &str) -> CapacityRecord {
         detail: detail.into(),
         windows: vec![],
     }
+}
+
+/// Reuses the same `claude auth status` probe `task_runners` already performs
+/// to discover the signed-in account's email, so users see the same real
+/// identity here even though quota itself isn't readable for Claude yet.
+async fn claude_account() -> Option<String> {
+    let path = super::tasks::executable("claude").ok()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let output = super::tasks::probe_auth(path, vec!["auth", "status"]).ok()?;
+        let auth: Value = serde_json::from_slice(&output.stdout).ok()?;
+        auth["email"].as_str().map(str::to_string)
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 fn parse_codex(value: &Value) -> Result<CapacityRecord, String> {
@@ -109,7 +124,8 @@ fn parse_codex(value: &Value) -> Result<CapacityRecord, String> {
         return Err("Codex returned no subscription quota windows for this account.".into());
     }
     Ok(CapacityRecord {
-        agent: "codex".into(), status: "reported".into(), account: "Current Codex CLI account".into(),
+        agent: "codex".into(), status: "reported".into(),
+        account: account_id.map(|id| format!("Codex account {id}")).unwrap_or_else(|| "Current Codex CLI account (identity not exposed)".into()),
         source: "Codex account/rateLimits/read".into(), observed_at: Some(Utc::now().to_rfc3339()),
         detail: if account_id.is_some() {
             "Shared across this account, including work outside Jackalope. Credit balances are not included."
@@ -189,7 +205,7 @@ fn failed_refresh(previous: Option<&CapacityRecord>, message: &str) -> CapacityR
         record.detail = format!("{message} Values below are the last successful snapshot.");
         record
     } else {
-        unavailable("codex", "unavailable", message)
+        unavailable("codex", "unavailable", message, None)
     }
 }
 
@@ -233,15 +249,19 @@ pub async fn capacity_snapshot(
         cache
             .codex
             .clone()
-            .unwrap_or_else(|| unavailable("codex", "unavailable", "No quota snapshot yet")),
+            .unwrap_or_else(|| unavailable("codex", "unavailable", "No quota snapshot yet", None)),
         Utc::now().timestamp(),
     )];
     for (agent, detail) in [
         ("claude", "Quota refresh is not connected. Claude exposes subscription windows through its interactive status line after a response; Jackalope's headless runner does not collect that yet."),
-        ("grok", "Quota refresh is not connected. This Grok CLI adapter has no verified standalone subscription balance interface."),
+        ("grok", "Quota refresh is not connected. This Grok CLI adapter has no verified standalone subscription balance interface. Account identity is not exposed either — Grok has no separate login-status command."),
     ] {
-        records.push(if super::tasks::executable(agent).is_ok() { unavailable(agent, "unsupported", detail) }
-            else { unavailable(agent, "notInstalled", "Install this agent to connect it. Remaining capacity is unknown.") });
+        // Even though quota itself isn't readable, surface the real signed-in
+        // account where we can (Claude exposes it via `auth status`) rather
+        // than a generic placeholder — same identity RunnerConnections shows.
+        let account = if agent == "claude" { claude_account().await } else { None };
+        records.push(if super::tasks::executable(agent).is_ok() { unavailable(agent, "unsupported", detail, account) }
+            else { unavailable(agent, "notInstalled", "Install this agent to connect it. Remaining capacity is unknown.", None) });
     }
     Ok(records)
 }
