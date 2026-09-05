@@ -61,6 +61,9 @@ export function AgentFleet() {
         stream: 'stdout',
         message: trimmed,
       });
+      // Real signal that the shell actually produced something — this is
+      // the honest replacement for the old "success on write" behavior.
+      useMascotStore.getState().setMood('success');
     }).then((unlisten) => {
       unlistenOutput = unlisten;
     });
@@ -78,6 +81,7 @@ export function AgentFleet() {
         stream: 'system',
         message: `Process session ended (${payload.session_id}).`,
       });
+      useMascotStore.getState().setMood('idle');
     }).then((unlisten) => {
       unlistenExit = unlisten;
     });
@@ -93,12 +97,19 @@ export function AgentFleet() {
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
   const activeProjectPath = projects.find((p) => p.id === activeProjectId)?.path;
 
+  // NOTE (tracked as audit item F1, see docs/TODO.md): this sends raw text to
+  // a plain OS shell (cmd.exe/bash) in the project directory, not to the
+  // account's configured agent CLI — no adapter is detected, launched, or
+  // even known to be installed. Copy and mood below are written to reflect
+  // that honestly: "success" means the shell accepted the input, nothing
+  // more, and mood only advances on a real signal (output/exit), never on
+  // the write call alone.
   const handleSendPromptToAgent = async () => {
     if (!inputCommand.trim()) return;
     const cmd = inputCommand;
     setInputCommand('');
     setMood('working');
-    say(`Dispatched instruction to ${activeAccount.accountName}...`, 3000);
+    say(`Running shell command in ${activeAccount.accountName}'s session...`, 3000);
 
     appendLog({
       processId: 0,
@@ -110,16 +121,16 @@ export function AgentFleet() {
 
     if (!isTauriEnvironment()) {
       // Browser dev-preview: no real process to talk to, so keep the UI
-      // feeling alive with a short simulated response.
+      // feeling alive with a short simulated response. Explicitly labeled
+      // as a simulation so it can't be mistaken for a real result.
       setTimeout(() => {
         appendLog({
           processId: 0,
           taskId: 'live-pty',
           agentId: activeAccount.id,
           stream: 'stdout',
-          message: `(browser preview — no real pty) Analyzing instruction: "${cmd}"...`,
+          message: `(browser preview — simulated, no real shell) received: "${cmd}"`,
         });
-        setMood('success');
       }, 700);
       return;
     }
@@ -135,15 +146,18 @@ export function AgentFleet() {
         });
         accountSessionsRef.current[activeAccount.id] = sessionId;
       }
+      // Do not claim success here: a successful write only means the shell
+      // accepted the bytes, not that the command ran, succeeded, or that
+      // this was ever a real agent instruction. Mood stays 'working' until
+      // the pty-output/pty-exit listeners above observe an actual signal.
       await ptyWrite(sessionId, cmd + (osName === 'windows' ? '\r\n' : '\n'));
-      setMood('success');
     } catch (err) {
       appendLog({
         processId: 0,
         taskId: 'live-pty',
         agentId: activeAccount.id,
         stream: 'stderr',
-        message: `Failed to dispatch to pty: ${err}`,
+        message: `Failed to write to shell session: ${err}`,
       });
       setMood('idle');
     }
