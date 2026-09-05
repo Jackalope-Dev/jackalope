@@ -2,6 +2,10 @@ import { create } from 'zustand';
 
 export type MascotMood = 'idle' | 'thinking' | 'working' | 'success' | 'sleep';
 
+let petTimer: ReturnType<typeof setTimeout> | undefined;
+let messageTimer: ReturnType<typeof setTimeout> | undefined;
+let resumeMood: MascotMood = 'idle';
+
 interface MascotState {
   mood: MascotMood;
   message: string | null;
@@ -14,29 +18,37 @@ interface MascotState {
 
 export const useMascotStore = create<MascotState>((set, get) => ({
   mood: 'idle',
-  message: "Hi! I'm Jackalope. I'll watch over your agent fleet and workspaces.",
+  message: null,
   petCount: 0,
-  setMood: (mood: MascotMood) => set({ mood }),
+  setMood: (mood: MascotMood) => {
+    clearTimeout(petTimer);
+    petTimer = undefined;
+    set({ mood });
+  },
   say: (message: string, durationMs: number = 6000) => {
+    clearTimeout(messageTimer);
     set({ message });
     if (durationMs > 0) {
-      setTimeout(() => {
+      messageTimer = setTimeout(() => {
         if (get().message === message) {
           set({ message: null });
         }
       }, durationMs);
     }
   },
-  clearMessage: () => set({ message: null }),
+  clearMessage: () => { clearTimeout(messageTimer); set({ message: null }); },
   pet: () => {
+    if (!petTimer) resumeMood = get().mood;
+    clearTimeout(petTimer);
     const nextCount = get().petCount + 1;
     set({
       petCount: nextCount,
       mood: 'success',
-      message: nextCount === 1 ? "*happy ear wiggle*" : nextCount > 5 ? "*zooming across the plains!*" : "*nuzzle! Ready to build.*",
     });
-    setTimeout(() => {
-      set({ mood: 'idle' });
+    get().say(nextCount === 1 ? 'A little encouragement goes a long way.' : 'Right here with you.', 2500);
+    petTimer = setTimeout(() => {
+      petTimer = undefined;
+      set({ mood: resumeMood });
     }, 2500);
   },
 }));

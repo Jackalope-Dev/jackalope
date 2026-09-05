@@ -6,6 +6,7 @@ export interface ThemePalette {
   accentLight: number;
   accentHex: string;
   isDark: boolean;
+  atmosphere?: number;
 }
 
 export const PRESET_THEMES: ThemePalette[] = [
@@ -68,6 +69,7 @@ export const PRESET_THEMES: ThemePalette[] = [
 export function applyThemeTokens(theme: ThemePalette) {
   const root = document.documentElement;
   const { accentHue, accentSat, accentLight } = theme;
+  const atmosphere = theme.atmosphere ?? 12;
 
   root.style.setProperty('--accent-h', `${accentHue}`);
   root.style.setProperty('--accent-s', `${accentSat}%`);
@@ -77,16 +79,25 @@ export function applyThemeTokens(theme: ThemePalette) {
   root.style.setProperty('--color-accent-hover', `hsl(${accentHue} ${accentSat}% ${Math.max(10, accentLight - 6)}%)`);
   root.style.setProperty('--color-accent-subtle', `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.12)`);
   root.style.setProperty('--color-accent-glow', `hsl(${accentHue} ${accentSat}% ${accentLight}% / 0.28)`);
+  const rgb = hslToHex(accentHue, accentSat, accentLight).slice(1).match(/.{2}/g)!.map((channel) => {
+    const value = parseInt(channel, 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  root.style.setProperty('--color-on-accent', luminance > 0.179 ? '#000000' : '#ffffff');
+  root.style.setProperty('--color-shell', `hsl(${accentHue} ${atmosphere + 8}% 10%)`);
+  root.style.setProperty('--color-shell-end', `hsl(${accentHue} ${atmosphere}% 6%)`);
+  root.style.setProperty('--color-spectrum', 'linear-gradient(90deg, hsl(0 75% 62%), hsl(60 75% 62%), hsl(120 75% 62%), hsl(180 75% 62%), hsl(240 75% 62%), hsl(300 75% 62%), hsl(360 75% 62%))');
 
   // Arc/Zen style surface tint: subtly mix the accent hue into dark surfaces
   const tintHue = accentHue;
-  root.style.setProperty('--color-bg', `hsl(${tintHue} 10% 5%)`);
-  root.style.setProperty('--color-surface', `hsl(${tintHue} 12% 8.5%)`);
-  root.style.setProperty('--color-surface-hover', `hsl(${tintHue} 14% 11.5%)`);
-  root.style.setProperty('--color-surface-elevated', `hsl(${tintHue} 16% 14%)`);
-  root.style.setProperty('--color-surface-sunken', `hsl(${tintHue} 8% 4%)`);
-  root.style.setProperty('--color-border', `hsl(${tintHue} 12% 16%)`);
-  root.style.setProperty('--color-border-subtle', `hsl(${tintHue} 10% 12%)`);
+  root.style.setProperty('--color-bg', `hsl(${tintHue} ${atmosphere}% 6%)`);
+  root.style.setProperty('--color-surface', `hsl(${tintHue} ${atmosphere}% 9%)`);
+  root.style.setProperty('--color-surface-hover', `hsl(${tintHue} ${atmosphere + 2}% 13%)`);
+  root.style.setProperty('--color-surface-elevated', `hsl(${tintHue} ${atmosphere + 4}% 15%)`);
+  root.style.setProperty('--color-surface-sunken', `hsl(${tintHue} ${atmosphere}% 5%)`);
+  root.style.setProperty('--color-border', `hsl(${tintHue} ${atmosphere}% 19%)`);
+  root.style.setProperty('--color-border-subtle', `hsl(${tintHue} ${atmosphere}% 14%)`);
 }
 
 export function hslToHex(h: number, s: number, l: number): string {

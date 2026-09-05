@@ -1,247 +1,100 @@
-import { motion, AnimatePresence } from 'motion/react';
-import { useMascotStore, MascotMood } from '../../stores/mascotStore';
+import { useId } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { useMascotStore, type MascotMood } from '../../stores/mascotStore';
+import { characterPaths as paths } from './character-paths';
 
 interface JackalopeMascotProps {
   size?: 'sm' | 'md' | 'lg';
   showBubble?: boolean;
   className?: string;
   overrideMood?: MascotMood;
+  bubbleAlign?: 'center' | 'end';
+  bubbleSide?: 'above' | 'below';
+  reduceMotion?: boolean;
 }
 
-export function JackalopeMascot({
-  size = 'md',
-  showBubble = true,
-  className = '',
-  overrideMood,
-}: JackalopeMascotProps) {
-  const { mood: storeMood, message, pet } = useMascotStore();
-  const currentMood = overrideMood || storeMood;
+const bodyMotion = {
+  idle: { y: [0, -0.8, 0], scaleY: [1, 1.012, 1], rotate: 0, opacity: 1,
+    transition: { duration: 4, repeat: Infinity } },
+  thinking: { y: 0, scaleY: 1, rotate: [0, -3, -3, 0], opacity: 1,
+    transition: { duration: 3.5, repeat: Infinity, repeatDelay: 1.5 } },
+  working: { y: [0, -2, 0], scaleY: [1, 1.02, 1], rotate: 0, opacity: 1,
+    transition: { duration: 1.6, repeat: Infinity } },
+  success: { y: [0, -9, 0, -3, 0], scaleY: [1, 1.04, 0.97, 1.02, 1], rotate: [0, -3, 0], opacity: 1,
+    transition: { duration: 0.9 } },
+  sleep: { y: 1, scaleY: [0.97, 0.985, 0.97], rotate: 0, opacity: 0.7,
+    transition: { duration: 5, repeat: Infinity } },
+};
 
-  // Pixel dimensions based on size
-  const dim = size === 'sm' ? 42 : size === 'md' ? 68 : 110;
-
-  // Determine animation variants based on mood
-  const bodyVariants = {
-    idle: {
-      y: [0, -2, 0],
-      scale: [1, 1.015, 1],
-      transition: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' as const },
-    },
-    thinking: {
-      rotate: [-3, 3, -3],
-      y: [0, -4, 0],
-      transition: { duration: 1.8, repeat: Infinity, ease: 'easeInOut' as const },
-    },
-    working: {
-      y: [0, -3, 0, -2, 0],
-      scale: [1, 1.03, 0.99, 1.02, 1],
-      transition: { duration: 0.9, repeat: Infinity, ease: 'easeInOut' as const },
-    },
-    success: {
-      y: [0, -14, 0, -6, 0],
-      scale: [1, 1.1, 0.96, 1.05, 1],
-      rotate: [0, -8, 8, -4, 0],
-      transition: { duration: 0.8, repeat: 1, ease: 'easeOut' as const },
-    },
-    sleep: {
-      opacity: 0.7,
-      scale: [1, 0.98, 1],
-      transition: { duration: 4.5, repeat: Infinity, ease: 'easeInOut' as const },
-    },
-  };
-
-  const earVariants = {
-    idle: {
-      rotate: [0, -3, 0, 4, 0],
-      transition: { duration: 4.2, repeat: Infinity, ease: 'easeInOut' as const },
-    },
-    thinking: {
-      rotate: [-8, 6, -8],
-      transition: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' as const },
-    },
-    working: {
-      rotate: [2, -4, 3, -2, 2],
-      transition: { duration: 0.6, repeat: Infinity },
-    },
-    success: {
-      rotate: [0, -12, 12, 0],
-      transition: { duration: 0.5, repeat: 2 },
-    },
-    sleep: {
-      rotate: -12,
-      transition: { duration: 1 },
-    },
-  };
+export function JackalopeMascot({ size = 'md', showBubble = true, className = '', overrideMood, bubbleAlign = 'center', bubbleSide = 'above', reduceMotion: forceReducedMotion = false }: JackalopeMascotProps) {
+  const { mood, message, pet } = useMascotStore();
+  const currentMood = overrideMood ?? mood;
+  const systemReducedMotion = useReducedMotion();
+  const reduceMotion = forceReducedMotion || systemReducedMotion;
+  const gradientId = useId();
+  const dim = size === 'sm' ? 40 : size === 'md' ? 88 : 152;
+  const resting = currentMood === 'sleep';
+  const staticPose = { y: 0, scaleY: 1, rotate: 0, opacity: resting ? 0.7 : 1 };
 
   return (
     <div className={`relative flex items-center select-none ${className}`}>
-      {/* Speech Bubble */}
       <AnimatePresence>
         {showBubble && message && (
           <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-            className="absolute -top-12 left-1/2 -translate-x-1/2 z-30 pointer-events-none whitespace-nowrap bg-[var(--color-surface-elevated)] border border-[var(--color-border)] px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium text-[var(--color-text-primary)]"
+            role="status"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className={`absolute ${bubbleSide === 'above' ? 'bottom-full mb-3' : 'top-full mt-3'} z-30 pointer-events-none w-max max-w-[min(17rem,calc(100vw-2rem))] bg-[var(--color-surface-elevated)] px-3 py-2 rounded-xl shadow-lg text-xs leading-relaxed text-[var(--color-text-primary)] ${bubbleAlign === 'end' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}
           >
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
-              <span>{message}</span>
-            </div>
-            {/* Tiny pointer triangle */}
-            <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 bg-[var(--color-surface-elevated)] border-r border-b border-[var(--color-border)] rotate-45" />
+            {message}
+            <span className={`absolute ${bubbleSide === 'above' ? '-bottom-1' : '-top-1'} w-2 h-2 bg-[var(--color-surface-elevated)] rotate-45 ${bubbleAlign === 'end' ? 'right-4' : 'left-1/2 -translate-x-1/2'}`} />
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Interactive Mascot Canvas */}
       <motion.button
-        type="button"
-        onClick={pet}
-        title="Jackalope (Click to pet)"
-        variants={bodyVariants}
-        animate={currentMood}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        className="relative cursor-pointer bg-transparent border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] rounded-full"
+        type="button" onClick={pet}
+        aria-label={`Pet Jackalope, currently ${currentMood}`} data-mood={currentMood}
+        title="Pet Jackalope"
+        whileHover={reduceMotion ? undefined : { scale: 1.04 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+        className="relative cursor-pointer bg-transparent border-0 p-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-accent)]"
         style={{ width: dim, height: dim }}
       >
-        <svg
-          viewBox="0 0 100 100"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full drop-shadow-md overflow-visible"
-        >
-          {/* Subtle Ambient Glow behind mascot */}
-          <circle
-            cx="50"
-            cy="56"
-            r="38"
-            fill="var(--color-accent)"
-            fillOpacity={currentMood === 'working' ? 0.22 : 0.12}
-            className="transition-all duration-300"
-          />
-
-          {/* Antlers Group */}
-          <motion.g
-            animate={{
-              filter:
-                currentMood === 'thinking'
-                  ? 'drop-shadow(0 0 4px var(--color-accent))'
-                  : 'none',
-            }}
-          >
-            {/* Left Antler */}
-            <path
-              d="M38 34 C36 24 26 18 20 12 C24 16 28 22 28 26 M23 15 C20 18 16 20 13 22 M27 21 C24 23 20 25 17 28"
-              stroke="var(--color-accent)"
-              strokeWidth="2.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            {/* Right Antler */}
-            <path
-              d="M62 34 C64 24 74 18 80 12 C76 16 72 22 72 26 M77 15 C80 18 84 20 87 22 M73 21 C76 23 80 25 83 28"
-              stroke="var(--color-accent)"
-              strokeWidth="2.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+        <svg viewBox="0 0 160 160" fill="none" aria-hidden="true" className="w-full h-full overflow-visible">
+          <defs>
+            <linearGradient id={gradientId} x1="55" y1="30" x2="114" y2="149" gradientUnits="userSpaceOnUse">
+              <stop stopColor="var(--color-text-primary)" />
+              <stop offset="1" stopColor="var(--color-accent)" />
+            </linearGradient>
+          </defs>
+          <ellipse cx="78" cy="152" rx="40" ry="3" fill="var(--color-accent-subtle)" />
+          <motion.g variants={bodyMotion} animate={reduceMotion ? staticPose : currentMood} style={{ originX: 0.5, originY: 0.9375, transformBox: 'view-box' }}>
+            <path d={paths.tail} fill="var(--color-accent-hover)" />
+            <path d={paths.body} fill={`url(#${gradientId})`} />
+            <path d={paths.haunch} fill="var(--color-accent)" opacity="0.38" />
+            <motion.g animate={{ rotate: resting ? 7 : currentMood === 'thinking' ? -6 : 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.6 }} style={{ originX: 0.55625, originY: 0.61875, transformBox: 'view-box' }}>
+              <path d={paths.antler} fill="var(--color-accent-hover)" />
+              <motion.path d={paths.farEar} fill="var(--color-accent-hover)"
+                animate={{ rotate: resting ? 12 : 0 }} transition={{ duration: reduceMotion ? 0 : 0.6 }}
+                style={{ originX: 0.55625, originY: 0.3875, transformBox: 'view-box' }} />
+              <motion.g
+                animate={{ rotate: reduceMotion ? (resting ? -12 : 0) : resting ? -12 : currentMood === 'working' ? [0, -5, 0] : [0, -3, 0, 0] }}
+                transition={reduceMotion || resting ? { duration: 0 } : { duration: 2.8, repeat: Infinity, repeatDelay: 2 }}
+                style={{ originX: 0.51875, originY: 0.39375, transformBox: 'view-box' }}>
+                <path d={paths.nearEar} fill={`url(#${gradientId})`} />
+                <path d={paths.earInset} fill="var(--color-accent-hover)" opacity="0.45" />
+              </motion.g>
+              <path d={paths.head} fill={`url(#${gradientId})`} />
+              {resting || currentMood === 'success' ? (
+                <path d={resting ? 'M108 77 Q112 81 116 77' : 'M108 79 Q112 74 116 79'} stroke="var(--color-surface-sunken)" strokeWidth="2.5" strokeLinecap="round" />
+              ) : (
+                <motion.ellipse cx="112" cy="77" rx="2.7" ry="3" fill="var(--color-surface-sunken)"
+                  animate={reduceMotion ? { scaleY: 1 } : { scaleY: [1, 1, 0.1, 1, 1] }}
+                  transition={{ duration: 5.2, times: [0, 0.88, 0.9, 0.93, 1], repeat: Infinity }}
+                  style={{ originX: 0.7, originY: 0.48125, transformBox: 'view-box' }} />
+              )}
+            </motion.g>
           </motion.g>
-
-          {/* Ears with interactive twitches */}
-          <motion.g variants={earVariants} animate={currentMood}>
-            {/* Left Ear */}
-            <ellipse
-              cx="38"
-              cy="28"
-              rx="5"
-              ry="16"
-              transform="rotate(-15 38 28)"
-              fill="var(--color-text-primary)"
-            />
-            <ellipse
-              cx="38"
-              cy="28"
-              rx="2.5"
-              ry="11"
-              transform="rotate(-15 38 28)"
-              fill="var(--color-accent)"
-              fillOpacity="0.45"
-            />
-
-            {/* Right Ear */}
-            <ellipse
-              cx="62"
-              cy="28"
-              rx="5"
-              ry="16"
-              transform="rotate(15 62 28)"
-              fill="var(--color-text-primary)"
-            />
-            <ellipse
-              cx="62"
-              cy="28"
-              rx="2.5"
-              ry="11"
-              transform="rotate(15 62 28)"
-              fill="var(--color-accent)"
-              fillOpacity="0.45"
-            />
-          </motion.g>
-
-          {/* Silhouette Head & Body */}
-          <ellipse
-            cx="50"
-            cy="70"
-            rx="24"
-            ry="20"
-            fill="var(--color-text-primary)"
-          />
-          <circle
-            cx="50"
-            cy="46"
-            r="17"
-            fill="var(--color-text-primary)"
-          />
-
-          {/* Cheeks / Muzzle */}
-          <circle cx="45" cy="50" r="6" fill="var(--color-text-primary)" />
-          <circle cx="55" cy="50" r="6" fill="var(--color-text-primary)" />
-
-          {/* Nose */}
-          <polygon
-            points="50,49 47,46 53,46"
-            fill="var(--color-accent)"
-          />
-
-          {/* Eyes (Reflective / Reactive) */}
-          <motion.g>
-            {currentMood === 'sleep' ? (
-              <>
-                <path d="M42 43 Q44 46 46 43" stroke="#111827" strokeWidth="2" strokeLinecap="round" fill="none" />
-                <path d="M54 43 Q56 46 58 43" stroke="#111827" strokeWidth="2" strokeLinecap="round" fill="none" />
-              </>
-            ) : (
-              <>
-                <circle cx="43" cy="43" r="2.8" fill="#111827" />
-                <circle cx="42" cy="42" r="1" fill="#ffffff" />
-                <circle cx="57" cy="43" r="2.8" fill="#111827" />
-                <circle cx="56" cy="42" r="1" fill="#ffffff" />
-              </>
-            )}
-          </motion.g>
-
-          {/* Whiskers */}
-          <line x1="36" y1="49" x2="26" y2="47" stroke="var(--color-text-muted)" strokeWidth="1.2" strokeLinecap="round" />
-          <line x1="36" y1="52" x2="27" y2="54" stroke="var(--color-text-muted)" strokeWidth="1.2" strokeLinecap="round" />
-          <line x1="64" y1="49" x2="74" y2="47" stroke="var(--color-text-muted)" strokeWidth="1.2" strokeLinecap="round" />
-          <line x1="64" y1="52" x2="73" y2="54" stroke="var(--color-text-muted)" strokeWidth="1.2" strokeLinecap="round" />
-
-          {/* Paws */}
-          <ellipse cx="40" cy="84" rx="6" ry="4" fill="var(--color-text-secondary)" />
-          <ellipse cx="60" cy="84" rx="6" ry="4" fill="var(--color-text-secondary)" />
         </svg>
       </motion.button>
     </div>

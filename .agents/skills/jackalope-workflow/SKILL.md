@@ -31,7 +31,7 @@ Before declaring any task or iteration complete:
 
 - Dynamic tokens live in `apps/desktop/src/lib/theme-engine.ts`.
 - All colors must map to CSS custom properties (`--color-accent`, `--color-surface`, `--color-surface-hover`, etc.).
-- Ensure that dynamic surface tinting (2% hue-cast of the accent into dark surfaces) remains intact.
+- Preserve the user-selected atmosphere intensity and derive all surfaces through the theme engine.
 - Keep the UI flat, with tactile surface gradients and subtle, tinted drop shadows.
 
 ---
@@ -41,3 +41,34 @@ Before declaring any task or iteration complete:
 - Always spawn new task worktrees under `.worktrees/<task-slug>`.
 - Use the Tauri IPC bridge (`tauri-bridge.ts`) for both native and mock browser development.
 - Keep the main working tree clean so the human user can test, review, and commit cleanly.
+
+## 5. Experience decisions
+
+Read `docs/DESIGN.md` before changing a screen. The reference implementation is
+`ThemeEditor.tsx`: direct manipulation, immediate feedback, keyboard parity,
+and a small, deliberate surface. Use `/design-lab.html` in the running Vite app
+to inspect shared components, the mascot, and icon sizes.
+
+- Start with the user's next action. Use `WorkspaceHeading` for its heading and
+  primary action. Do not add a dashboard of implementation details above it.
+- Treat Jackalope as the operator across agents and machines. Read
+  `docs/OPERATOR.md` when changing dispatch, context selection, connector/MCP
+  setup, or project/workspace navigation. Ask which user intent the screen
+  serves and which project/host/capabilities it needs. Keep that context visible
+  and correctable; do not infer execution from a UI transition.
+- Keep Tasks, Worktrees, and Agents in the main navigation. Add secondary views
+  to `layout/navigation.ts`; both navigation and command search consume it.
+- Motion must explain a transition, acknowledge an action, or express the
+  mascot's personality. Never add a breathing dot or activity badge without a
+  real state behind it. A manual task move does not prove an agent started.
+- Reuse `ThemeEditor` for appearance selection. Preview through tokens; save
+  only on Keep theme in the shell picker. Escape/outside dismissal cancels.
+  Preserve exact-color input validation and the atmosphere slider.
+- Use Radix for popovers, menus, and dialogs. Verify Escape, focus return,
+  keyboard selection, and narrow-window positioning in the rendered UI.
+- Character geometry lives in `mascot/character-paths.ts`. The icon uses its
+  head silhouette; the companion uses a small theme-derived gradient palette.
+  Run `pnpm --filter @jackalope/desktop brand:generate` after shape changes.
+- Before handoff, verify 1280×840 and 960×640, theme persistence and preview
+  rollback, all five mascot moods, and `pnpm --filter @jackalope/desktop
+  test:visual-state`. Finish with `pnpm build`.

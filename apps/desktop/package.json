@@ -8,11 +8,14 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:visual-state": "node --test scripts/visual-state.test.mjs",
+    "brand:generate": "node scripts/generate-brand.mjs && tauri icon src-tauri/icons/source-icon.svg --ios-color \"#1d1a18\" && node scripts/generate-brand.mjs --copy-icon"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
+    "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-slider": "^1.2.3",
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-tabs": "^1.1.3",

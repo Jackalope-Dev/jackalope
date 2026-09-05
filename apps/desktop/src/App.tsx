@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MotionConfig } from 'motion/react';
 import { Shell } from './components/layout/Shell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 
@@ -17,11 +18,8 @@ export default function App() {
   };
 
   return (
-    <>
-      <Shell onRestartOnboarding={handleRestartOnboarding} />
-      {!isOnboardingComplete && (
-        <OnboardingFlow onComplete={handleFinishOnboarding} />
-      )}
-    </>
+    <MotionConfig reducedMotion="user">
+      {isOnboardingComplete ? <Shell onRestartOnboarding={handleRestartOnboarding} /> : <OnboardingFlow onComplete={handleFinishOnboarding} />}
+    </MotionConfig>
   );
 }

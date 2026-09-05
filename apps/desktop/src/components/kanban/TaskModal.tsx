@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { useTaskStore } from '../../stores/taskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useMascotStore } from '../../stores/mascotStore';
@@ -23,6 +24,7 @@ interface TaskModalProps {
 }
 
 export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
+  const previousFocus = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
   const { tasks, addTask, updateTask, deleteTask } = useTaskStore();
   const { spawnTaskWorktree, activeProjectId } = useProjectStore();
   const { say, setMood } = useMascotStore();
@@ -87,20 +89,25 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="w-full max-w-2xl rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--color-surface-sunken)]/70 backdrop-blur-sm" />
+      <Dialog.Content onCloseAutoFocus={(event) => { event.preventDefault(); if (previousFocus.current?.isConnected) previousFocus.current.focus(); }}
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100vw-2rem)] max-w-2xl rounded-2xl bg-[var(--color-surface)] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+        <Dialog.Description className="sr-only">Describe the task and choose how you want to work on it.</Dialog.Description>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-[var(--color-text-primary)]">
-              {isNew ? 'Create New Task Ticket' : 'Task Details & Agent Harness'}
-            </span>
+            <Dialog.Title className="text-sm font-semibold text-[var(--color-text-primary)]">
+              {isNew ? 'New task' : 'Task details'}
+            </Dialog.Title>
             {existingTask && (
               <Badge variant="accent">{existingTask.status.toUpperCase()}</Badge>
             )}
           </div>
           <button
             onClick={onClose}
+            aria-label="Close task"
             className="p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -111,10 +118,11 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
         <div className="p-6 overflow-y-auto space-y-4">
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+            <label htmlFor="task-title" className="text-xs font-semibold text-[var(--color-text-secondary)]">
               Task Title
             </label>
             <Input
+              id="task-title"
               placeholder="e.g. Implement browser tool integration with Playwright"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -247,7 +255,8 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

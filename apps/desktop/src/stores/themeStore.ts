@@ -21,6 +21,7 @@ export const useThemeStore = create<ThemeState>()(
         set({ currentTheme: theme });
       },
       setCustomAccentHex: (hex: string) => {
+        if (!/^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(hex)) return;
         const { h, s, l } = hexToHsl(hex);
         const updated: ThemePalette = {
           ...get().currentTheme,

@@ -5,10 +5,15 @@ import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: { app: path.resolve(import.meta.dirname, 'index.html'), design: path.resolve(import.meta.dirname, 'design-lab.html') },
+    },
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

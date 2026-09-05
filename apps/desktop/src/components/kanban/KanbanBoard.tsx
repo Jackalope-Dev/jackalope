@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { TaskModal } from './TaskModal';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import {
   Plus,
   GitBranch,
@@ -18,22 +18,21 @@ import {
 import { formatTimeAgo } from '../../lib/utils';
 
 const COLUMNS: { id: TaskStatus; title: string; hint: string }[] = [
-  { id: 'backlog', title: 'Backlog', hint: 'Raw feature requests' },
-  { id: 'refinement', title: 'Refinement', hint: 'Intent analysis & clarifications' },
-  { id: 'in_progress', title: 'In Progress', hint: 'Agents building in worktree' },
-  { id: 'verification', title: 'Verification', hint: 'Tests & human sign-off' },
-  { id: 'done', title: 'Done', hint: 'Merged & verified' },
+  { id: 'backlog', title: 'Ideas', hint: 'Start with a possibility' },
+  { id: 'refinement', title: 'Ready to shape', hint: 'Make the next step clear' },
+  { id: 'in_progress', title: 'In motion', hint: 'Work taking shape' },
+  { id: 'verification', title: 'For your review', hint: 'Take a closer look' },
+  { id: 'done', title: 'Done', hint: 'Room for what comes next' },
 ];
 
 export function KanbanBoard() {
   const { tasks, moveTaskStatus } = useTaskStore();
-  const { activeProjectId, projects } = useProjectStore();
+  const projectId = useProjectStore((state) => state.activeProjectId);
   const { say, setMood } = useMascotStore();
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const activeProject = projects.find((p) => p.id === activeProjectId);
 
   const handleOpenNew = () => {
     setSelectedTaskId(null);
@@ -60,58 +59,39 @@ export function KanbanBoard() {
 
       if (nextStatus === 'done') {
         setMood('success');
-        say(`Task "${task.title}" verified and complete! Great work.`, 4000);
+        say(`“${task.title}” moved to Done.`, 4000);
       } else if (nextStatus === 'in_progress') {
         setMood('working');
-        say(`Agent active on "${task.title}".`, 3000);
+        say(`“${task.title}” moved to In motion.`, 3000);
       }
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden p-6 space-y-4">
+    <div className="flex-1 flex flex-col h-full overflow-hidden p-8 space-y-4">
       {/* Top Header & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[var(--color-border)]">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
-              Agent Task Board
-            </h2>
-            <Badge variant="outline" className="font-mono text-[10px]">
-              {activeProject?.name || 'jackalope'}
-            </Badge>
-          </div>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Spin out isolated git worktrees, auto-refine prompts, and assign tasks to agent runners.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button onClick={handleOpenNew} size="sm" className="gap-1.5 shadow-sm">
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Task Ticket</span>
-          </Button>
-        </div>
-      </div>
+      <WorkspaceHeading title="What will you build next?"
+        description="Give an idea a little direction. Follow the work, then make it yours."
+        action={<Button onClick={handleOpenNew} size="sm"><Plus className="size-3.5" />New task</Button>} />
 
       {/* Kanban Columns */}
       <div className="flex-1 flex gap-3.5 overflow-x-auto pb-4">
         {COLUMNS.map((col) => {
-          const colTasks = tasks.filter((t) => t.status === col.id);
+          const colTasks = tasks.filter((t) => t.projectId === projectId && t.status === col.id);
 
           return (
             <div
               key={col.id}
-              className="w-72 shrink-0 flex flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]/60 shadow-sm"
+              className="min-w-[208px] flex-1 flex flex-col"
             >
               {/* Column Header */}
-              <div className="px-3.5 py-3 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-surface-elevated)]/40 rounded-t-2xl">
+              <div className="px-1 py-3 mb-3 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-[var(--color-text-primary)]">
                       {col.title}
                     </span>
-                    <span className="px-1.5 py-0.2 rounded-full bg-[var(--color-surface-sunken)] text-[10px] font-mono font-semibold text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+                    <span className="text-[10px] font-mono text-[var(--color-text-muted)]">
                       {colTasks.length}
                     </span>
                   </div>
@@ -122,17 +102,16 @@ export function KanbanBoard() {
               </div>
 
               {/* Column Cards */}
-              <div className="flex-1 p-2.5 overflow-y-auto space-y-2.5">
+              <div className="flex-1 px-1 py-1 overflow-y-auto space-y-3">
                 {colTasks.map((task) => (
                   <motion.div
                     key={task.id}
                     layoutId={task.id}
-                    onClick={() => handleOpenExisting(task.id)}
-                    className="p-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] hover:border-[var(--color-border-focus)] transition-all duration-150 cursor-pointer shadow-sm group relative space-y-2"
+                    className="p-4 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] transition-colors duration-150 group relative space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="text-xs font-semibold text-[var(--color-text-primary)] line-clamp-2 leading-snug">
-                        {task.title}
+                        <button type="button" onClick={() => handleOpenExisting(task.id)} className="text-left cursor-pointer hover:text-[var(--color-accent)]">{task.title}</button>
                       </h4>
                       {task.refinedPrompt && (
                         <span title="Refined with Intent Engine" className="text-[var(--color-accent)] shrink-0">
@@ -195,8 +174,8 @@ export function KanbanBoard() {
                 ))}
 
                 {colTasks.length === 0 && (
-                  <div className="h-24 flex items-center justify-center border border-dashed border-[var(--color-border)] rounded-xl text-[11px] text-[var(--color-text-muted)]">
-                    No tickets in {col.title}
+                  <div className="h-24 flex items-center justify-center rounded-xl text-[11px] text-[var(--color-text-muted)]">
+                    Nothing here yet
                   </div>
                 )}
               </div>
@@ -206,14 +185,14 @@ export function KanbanBoard() {
       </div>
 
       {/* Task Modal */}
-      <TaskModal
+      {isModalOpen && <TaskModal
         taskId={selectedTaskId}
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedTaskId(null);
         }}
-      />
+      />}
     </div>
   );
 }
