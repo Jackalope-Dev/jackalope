@@ -216,29 +216,52 @@ impl TaskRuntime {
             .map_err(|e| e.to_string())?
             .flatten()
         {
-            if entry.path().extension().is_some_and(|ext| ext == "json") {
-                let data = std::fs::read(entry.path()).map_err(|e| e.to_string())?;
-                let mut run: TaskRun = serde_json::from_slice(&data).map_err(|e| {
-                    format!("Cannot read task history {}: {e}", entry.path().display())
-                })?;
-                if !valid_id(&run.id) {
-                    return Err(format!(
-                        "Invalid task history identifier in {}",
-                        entry.path().display()
-                    ));
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "json") {
+                let parsed = std::fs::read(&path)
+                    .map_err(|e| e.to_string())
+                    .and_then(|data| {
+                        serde_json::from_slice::<TaskRun>(&data).map_err(|e| e.to_string())
+                    })
+                    .and_then(|run| {
+                        if valid_id(&run.id) {
+                            Ok(run)
+                        } else {
+                            Err("invalid task identifier".to_string())
+                        }
+                    });
+                match parsed {
+                    // A single unreadable entry (crash mid-write outside the
+                    // atomic tmp-then-rename `save()` path, disk error, a
+                    // stray file) must not stop the whole app from launching
+                    // — that would strand every other task's history behind
+                    // one bad file with no way for a user to recover.
+                    // Quarantine it (rename, don't delete, so it survives
+                    // for inspection) and keep loading everything else.
+                    Err(reason) => {
+                        let quarantined = path.with_extension("json.corrupt");
+                        let _ = std::fs::rename(&path, &quarantined);
+                        eprintln!(
+                            "Jackalope: quarantined unreadable task history {} ({reason}); see {}",
+                            path.display(),
+                            quarantined.display()
+                        );
+                    }
+                    Ok(mut run) => {
+                        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                            run.status = "interrupted".into();
+                            run.error = Some("Jackalope closed before this attempt finished. Review its workspace before continuing; work was not automatically rerun.".into());
+                            run.ended_at = Some(Utc::now().to_rfc3339());
+                            runtime.save(&run)?;
+                        }
+                        runtime
+                            .inner
+                            .lock()
+                            .unwrap()
+                            .runs
+                            .insert(run.id.clone(), run);
+                    }
                 }
-                if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
-                    run.status = "interrupted".into();
-                    run.error = Some("Jackalope closed before this attempt finished. Review its workspace before continuing; work was not automatically rerun.".into());
-                    run.ended_at = Some(Utc::now().to_rfc3339());
-                    runtime.save(&run)?;
-                }
-                runtime
-                    .inner
-                    .lock()
-                    .unwrap()
-                    .runs
-                    .insert(run.id.clone(), run);
             }
         }
         Ok(runtime)
@@ -1043,5 +1066,46 @@ mod tests {
             assert!(!valid_id(id));
         }
         assert!(valid_id("f22457f4-32ca-421c-9782-075f244004a9"));
+    }
+
+    #[test]
+    fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
+        let folder = std::env::temp_dir().join(format!(
+            "jackalope-corrupt-test-{}-{}",
+            std::process::id(),
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        std::fs::create_dir_all(&folder).unwrap();
+
+        let good = sample("codex");
+        std::fs::write(
+            folder.join(format!("{}.json", good.id)),
+            serde_json::to_vec(&good).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(folder.join("garbled-not-json.json"), b"{not json").unwrap();
+        let mut bad_id_run = sample("codex");
+        bad_id_run.id = "bad".into();
+        std::fs::write(
+            folder.join("bad-id-file.json"),
+            serde_json::to_vec(&bad_id_run).unwrap(),
+        )
+        .unwrap();
+
+        let runtime = TaskRuntime::new(folder.clone())
+            .expect("a corrupted or invalid history entry must not prevent app startup");
+        let inner = runtime.inner.lock().unwrap();
+        assert_eq!(inner.runs.len(), 1, "only the valid entry should load");
+        assert!(inner.runs.contains_key(&good.id));
+        drop(inner);
+        drop(runtime);
+
+        assert!(folder.join("garbled-not-json.json.corrupt").exists());
+        assert!(!folder.join("garbled-not-json.json").exists());
+        assert!(folder.join("bad-id-file.json.corrupt").exists());
+        assert!(!folder.join("bad-id-file.json").exists());
+
+        assert!(folder.starts_with(std::env::temp_dir()));
+        std::fs::remove_dir_all(folder).unwrap();
     }
 }
