@@ -345,7 +345,9 @@ export function AgentFleet() {
                   [{log.timestamp}]
                 </span>
                 {log.stream === 'system' ? (
-                  <span className="text-[var(--color-accent-ink)] font-semibold">{log.message}</span>
+                  <span className="text-[var(--color-accent-ink)] font-semibold">
+                    {log.message}
+                  </span>
                 ) : log.stream === 'stderr' ? (
                   <span className="text-[var(--color-danger)]">{log.message}</span>
                 ) : (

@@ -236,7 +236,9 @@ export function CodebaseMap() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">License</span>
-                  <span className="font-mono text-[var(--color-success)]">Apache-2.0 / Permissive</span>
+                  <span className="font-mono text-[var(--color-success)]">
+                    Apache-2.0 / Permissive
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">IPC Channel</span>

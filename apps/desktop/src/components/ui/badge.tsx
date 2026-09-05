@@ -16,8 +16,10 @@ export function Badge({ className, variant = 'default', ...props }: BadgeProps) 
           'bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] border border-[var(--color-accent)]/20',
         variant === 'outline' &&
           'text-[var(--color-text-primary)] border border-[var(--color-border)]',
-        variant === 'success' && 'bg-emerald-500/15 text-[var(--color-success)] border border-emerald-500/30',
-        variant === 'warning' && 'bg-amber-500/15 text-[var(--color-warning)] border border-amber-500/30',
+        variant === 'success' &&
+          'bg-emerald-500/15 text-[var(--color-success)] border border-emerald-500/30',
+        variant === 'warning' &&
+          'bg-amber-500/15 text-[var(--color-warning)] border border-amber-500/30',
         className,
       )}
       {...props}
