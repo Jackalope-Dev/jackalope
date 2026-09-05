@@ -11,7 +11,6 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     path::PathBuf,
-    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -890,10 +889,24 @@ pub(super) async fn bridge_computer_verify(
     Json(input): Json<super::harness::ComputerVerifyInput>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let run = service.authorized_run(&headers)?;
-    let mut cmd = Command::new(&input.command);
-    cmd.args(&input.args).current_dir(&run.workspace);
-    let output = cmd
-        .output()
+    let mut cmd = tokio::process::Command::new(&input.command);
+    // Without kill_on_drop, a command that times out would keep running as
+    // an orphaned background process instead of actually stopping when we
+    // give up waiting on it.
+    cmd.args(&input.args).current_dir(&run.workspace).kill_on_drop(true);
+    // Unlike every other subprocess call in this codebase (mcp_probe_server,
+    // probe_auth), this one had no bound at all, and used std::process::
+    // Command's blocking output() directly inside an async handler - a
+    // command that hangs (waits on stdin, starts a long-lived server) would
+    // permanently occupy a tokio worker thread with no recovery short of
+    // restarting the app. tokio::process::Command lets the wait be async
+    // instead of blocking the runtime; the timeout still bounds a command
+    // that never exits. Five minutes accommodates a real build/test command
+    // (this is a verification step, e.g. `pnpm build` or `cargo test`)
+    // without leaving a hang unbounded.
+    let output = tokio::time::timeout(Duration::from_secs(300), cmd.output())
+        .await
+        .map_err(|_| StatusCode::REQUEST_TIMEOUT)?
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -1171,5 +1184,85 @@ mod tests {
         drop(service);
         assert!(dir.starts_with(std::env::temp_dir()));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(windows)]
+    fn process_is_alive(pid: u32) -> bool {
+        let output = std::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+            .output()
+            .expect("failed to run tasklist");
+        String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
+    }
+    #[cfg(not(windows))]
+    fn process_is_alive(pid: u32) -> bool {
+        std::process::Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .status()
+            .is_ok_and(|status| status.success())
+    }
+
+    #[tokio::test]
+    async fn computer_verify_command_execution_is_bounded_and_non_blocking() {
+        // Exercises the exact mechanism bridge_computer_verify uses (tokio::
+        // process::Command wrapped in tokio::time::timeout, kill_on_drop),
+        // the fix for a real bug: it used to run std::process::Command's
+        // blocking output() directly inside an async handler with no
+        // timeout at all, so a command that hangs (waits on stdin, starts a
+        // long-lived server) would permanently occupy a tokio worker thread
+        // - and even with a timeout, without kill_on_drop the process would
+        // keep running as an undetected orphan instead of actually stopping.
+        // Testing through the full authorized HTTP path would need a
+        // running agent process to produce an "active" TaskRun; this
+        // isolates the part that actually changed.
+        #[cfg(windows)]
+        let (quick_program, quick_args, hang_program, hang_args): (_, Vec<&str>, _, Vec<&str>) =
+            ("cmd.exe", vec!["/C", "exit", "0"], "ping", vec!["-n", "30", "127.0.0.1"]);
+        #[cfg(not(windows))]
+        let (quick_program, quick_args, hang_program, hang_args): (_, Vec<&str>, _, Vec<&str>) =
+            ("sh", vec!["-c", "exit 0"], "sleep", vec!["30"]);
+
+        let mut quick = tokio::process::Command::new(quick_program);
+        quick.args(&quick_args);
+        let result = tokio::time::timeout(Duration::from_millis(2000), quick.output()).await;
+        assert!(result.is_ok(), "a quick command must not be affected by the bound");
+
+        // Spawned directly (not through a shell) so kill_on_drop's
+        // direct-child termination actually stops the real long-running
+        // process being measured, not an intermediate shell wrapper.
+        let mut hang = tokio::process::Command::new(hang_program);
+        hang.args(&hang_args)
+            .kill_on_drop(true)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        let mut child = hang.spawn().expect("failed to spawn hang command");
+        let pid = child.id().expect("spawned child has no pid");
+        assert!(process_is_alive(pid), "process should be running before the timeout");
+
+        let started = std::time::Instant::now();
+        // Moved into the awaited future (mirroring cmd.output()'s own
+        // internal Child ownership) so dropping it on timeout drops the
+        // Child too, which is what actually triggers kill_on_drop.
+        let result = tokio::time::timeout(Duration::from_millis(200), async move {
+            child.wait().await
+        })
+        .await;
+        assert!(
+            result.is_err(),
+            "a command that never exits must time out rather than hang forever"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the timeout must actually bound wall-clock time, not just the return type"
+        );
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while process_is_alive(pid) && std::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert!(
+            !process_is_alive(pid),
+            "kill_on_drop should terminate the process once we give up waiting on it, not leave it orphaned"
+        );
     }
 }
