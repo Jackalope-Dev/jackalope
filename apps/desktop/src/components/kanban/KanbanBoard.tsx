@@ -62,8 +62,8 @@ export function KanbanBoard() {
     <div className="flex-1 flex flex-col h-full overflow-hidden p-8 space-y-4">
       {/* Top Header & Actions */}
       <WorkspaceHeading
-        title="What will you build next?"
-        description="Give an idea a little direction. Follow the work, then make it yours."
+        title="Planning board"
+        description="Organize ideas by stage. Moving a card does not run an agent."
         action={
           <Button onClick={handleOpenNew} size="sm">
             <Plus className="size-3.5" />
@@ -73,7 +73,12 @@ export function KanbanBoard() {
       />
 
       {/* Kanban Columns */}
-      <div className="flex-1 flex gap-3.5 overflow-x-auto pb-4">
+      <section
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Empty boards need a keyboard scroll target.
+        tabIndex={0}
+        aria-label="Planning stages"
+        className="flex-1 flex gap-3.5 overflow-x-auto pb-4"
+      >
         {COLUMNS.map((col) => {
           const colTasks = tasks.filter((t) => t.projectId === projectId && t.status === col.id);
 
@@ -86,11 +91,11 @@ export function KanbanBoard() {
                     <span className="text-xs font-bold text-[var(--color-text-primary)]">
                       {col.title}
                     </span>
-                    <span className="text-[10px] font-mono text-[var(--color-text-muted)]">
+                    <span className="text-xs font-mono text-[var(--color-text-muted)]">
                       {colTasks.length}
                     </span>
                   </div>
-                  <span className="text-[10px] text-[var(--color-text-muted)] block truncate">
+                  <span className="text-xs text-[var(--color-text-muted)] block truncate">
                     {col.hint}
                   </span>
                 </div>
@@ -105,7 +110,7 @@ export function KanbanBoard() {
                     className="p-4 rounded-xl bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] transition-colors duration-150 group relative space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-xs font-semibold text-[var(--color-text-primary)] line-clamp-2 leading-snug">
+                      <h4 className="text-sm font-semibold text-[var(--color-text-primary)] leading-snug">
                         <button
                           type="button"
                           onClick={() => handleOpenExisting(task.id)}
@@ -124,14 +129,14 @@ export function KanbanBoard() {
                       )}
                     </div>
 
-                    <p className="text-[11px] text-[var(--color-text-secondary)] line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2 leading-relaxed">
                       {task.refinedPrompt || task.rawPrompt}
                     </p>
 
                     {/* Metadata chips */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       {task.worktreePath && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] font-mono text-[9px]">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] font-mono text-xs">
                           <GitBranch className="w-2.5 h-2.5" />
                           <span className="truncate max-w-[90px]">
                             {task.worktreePath.replace('.worktrees/', '')}
@@ -139,7 +144,7 @@ export function KanbanBoard() {
                         </span>
                       )}
                       {task.assignedAgent && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] text-[9px] border border-[var(--color-border-subtle)]">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] text-xs border border-[var(--color-border-subtle)]">
                           <Bot className="w-2.5 h-2.5 text-[var(--color-accent-ink)]" />
                           <span className="truncate max-w-[80px]">{task.assignedAgent}</span>
                         </span>
@@ -147,7 +152,7 @@ export function KanbanBoard() {
                     </div>
 
                     {/* Card Footer with Quick Move Arrows */}
-                    <div className="flex items-center justify-between pt-1 border-t border-[var(--color-border-subtle)] text-[10px] text-[var(--color-text-muted)]">
+                    <div className="flex items-center justify-between pt-1 border-t border-[var(--color-border-subtle)] text-xs text-[var(--color-text-muted)]">
                       <span className="flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5" />
                         {formatTimeAgo(task.createdAt)}
@@ -158,7 +163,8 @@ export function KanbanBoard() {
                           <button
                             type="button"
                             onClick={(e) => handleMove(e, task.id, 'prev')}
-                            title="Move to previous status"
+                            title="Move to previous stage"
+                            aria-label={`Move ${task.title} to previous stage`}
                             className="p-1 rounded hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] cursor-pointer"
                           >
                             <ArrowLeft className="w-3 h-3" />
@@ -168,7 +174,8 @@ export function KanbanBoard() {
                           <button
                             type="button"
                             onClick={(e) => handleMove(e, task.id, 'next')}
-                            title="Advance to next status"
+                            title="Move to next stage"
+                            aria-label={`Move ${task.title} to next stage`}
                             className="p-1 rounded hover:bg-[var(--color-surface-elevated)] text-[var(--color-accent-ink)] cursor-pointer"
                           >
                             <ArrowRight className="w-3 h-3" />
@@ -180,7 +187,7 @@ export function KanbanBoard() {
                 ))}
 
                 {colTasks.length === 0 && (
-                  <div className="h-24 flex items-center justify-center rounded-xl text-[11px] text-[var(--color-text-muted)]">
+                  <div className="h-24 flex items-center justify-center rounded-xl text-xs text-[var(--color-text-muted)]">
                     Nothing here yet
                   </div>
                 )}
@@ -188,7 +195,7 @@ export function KanbanBoard() {
             </div>
           );
         })}
-      </div>
+      </section>
 
       {/* Task Modal */}
       {isModalOpen && (

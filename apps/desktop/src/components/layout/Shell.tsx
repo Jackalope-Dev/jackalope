@@ -1,10 +1,16 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, GitBranch, Search, SlidersHorizontal } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  FlaskConical,
+  GitBranch,
+  Search,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { BrowserHarness } from '../browser/BrowserHarness';
 import { KanbanBoard } from '../kanban/KanbanBoard';
-import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { DeviceMesh } from '../mesh/DeviceMesh';
 import { WorktreeManager } from '../projects/WorktreeManager';
 import { ScheduleManager } from '../schedules/ScheduleManager';
@@ -43,6 +49,9 @@ export function Shell() {
 
   return (
     <div className="workspace-shell">
+      <a className="skip-link" href="#workspace-content">
+        Skip to workspace
+      </a>
       <ResizeHandles />
       <TitleBar />
       <header className="workspace-chrome">
@@ -80,10 +89,12 @@ export function Shell() {
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
-          <span className="hidden lg:flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
-            <GitBranch className="size-3" />
-            {project?.gitBranch}
-          </span>
+          {project && (
+            <span className="hidden lg:flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+              <GitBranch className="size-3" />
+              {project.gitBranch}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -143,7 +154,7 @@ export function Shell() {
                     <item.icon className="size-4 shrink-0 text-[var(--color-accent-ink)]" />
                     <span>
                       <span className="block">{item.label}</span>
-                      <span className="block text-[11px] text-[var(--color-text-muted)] mt-1">
+                      <span className="block text-xs text-[var(--color-text-muted)] mt-1">
                         {item.description}
                       </span>
                     </span>
@@ -153,20 +164,25 @@ export function Shell() {
             </Menu.Portal>
           </Menu.Root>
         </nav>
-        <div className="flex items-center gap-2">
-          <JackalopeMascot size="sm" bubbleAlign="end" bubbleSide="below" />
-        </div>
       </div>
-      <main className="workspace-canvas" aria-label={view.label}>
+      <main
+        id="workspace-content"
+        tabIndex={-1}
+        className="workspace-canvas"
+        aria-label={view.label}
+      >
         {['schedules', 'browser', 'topology', 'mesh', 'board'].includes(activeTab) && (
-          <p className="task-notice px-8">
-            Prototype preview · these records and controls are not connected to task execution.
+          <p className="prototype-notice">
+            <FlaskConical size={16} aria-hidden="true" />
+            Preview · changes here do not run agents.
           </p>
         )}
         {activeTab === 'kanban' && <TaskWorkspace />}
         {activeTab === 'board' && <KanbanBoard />}
-        {activeTab === 'worktrees' && <WorktreeManager />}
-        {activeTab === 'agents' && <RunnerConnections />}
+        {activeTab === 'worktrees' && (
+          <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
+        )}
+        {activeTab === 'agents' && <RunnerConnections onTasks={() => setActiveTab('kanban')} />}
         {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
         {activeTab === 'schedules' && <ScheduleManager />}
         {activeTab === 'browser' && <BrowserHarness />}

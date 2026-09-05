@@ -1,5 +1,10 @@
+import { useDialogFocus } from '../ui/useDialogFocus';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
+  CircleAlert,
+  Clock3,
+  Layers3,
+  LoaderCircle,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -85,6 +90,7 @@ function AddWork({
   onAdded: () => Promise<void>;
   onClose: () => void;
 }) {
+  const dialogFocus = useDialogFocus();
   const { runners } = useExecutionStore();
   const key = `jackalope-plan-draft:${project.id}`;
   const [draft, setDraft] = useState(() => {
@@ -143,7 +149,7 @@ function AddWork({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content className="task-dialog queue-dialog glass-panel">
+        <Dialog.Content {...dialogFocus} className="task-dialog queue-dialog glass-panel">
           <Dialog.Title className="task-title">A clear piece of work</Dialog.Title>
           <Dialog.Description className="task-muted mt-3">
             Give one agent a focused scope. Add dependencies when it needs another task’s changes
@@ -667,28 +673,16 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
     <section className="task-page queue-page">
       <button type="button" className="task-back" onClick={onBack}>
         <ArrowLeft size={15} />
-        Single task
+        All tasks
       </button>
       <div className={`queue-heading ${items.length ? 'queue-heading-active' : ''}`}>
         <div>
-          <p className="task-eyebrow">{project.name} · parallel work</p>
           <h1 className="task-hero-title">
-            {items.length ? (
-              tab === 'review' ? (
-                'Review the work.'
-              ) : (
-                'Build together.'
-              )
-            ) : (
-              <>
-                One plan.
-                <br />A few good agents.
-              </>
-            )}
+            {tab === 'review' ? 'Review & merge' : 'Parallel work'}
           </h1>
-          <p className="task-muted mt-4">
-            Split the scope. Keep everyone in sync. Bring the work home.
-          </p>
+          {!items.length && (
+            <p className="task-muted mt-3">Independent tasks. Shared progress. One review.</p>
+          )}
         </div>
         <div className="flex flex-col items-end gap-3">
           <Button variant="outline" disabled={!desktop} onClick={() => setAdding(true)}>
@@ -775,29 +769,29 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           </div>
           <p className="task-muted text-xs">
             {enabled
-              ? 'Dispatch is on. Eligible tasks start automatically, including after dependencies merge. Pausing leaves current work running.'
-              : 'Dispatch is paused. Review your plan, then start the ready tasks together. Restarting Jackalope always pauses dispatch.'}
+              ? 'Dispatch is on. Ready tasks start automatically as dependencies merge.'
+              : 'Dispatch is paused. Start ready tasks when your plan is set.'}
           </p>
-          <p className="task-muted text-xs mt-2">
-            Each task starts from committed master. Commit local changes first if the agents need
-            them.
-          </p>
+
           <fieldset className="queue-flow">
             <legend className="sr-only">Filter by progress</legend>
-            {[
-              ['all', 'All work'],
-              ['queued', 'Queued'],
-              ['active', 'Working'],
-              ['review', 'Review'],
-              ['merged', 'Merged'],
-              ['attention', 'Attention'],
-            ].map(([value, label]) => (
+            {(
+              [
+                ['all', 'All work', Layers3],
+                ['queued', 'Queued', Clock3],
+                ['active', 'Working', LoaderCircle],
+                ['review', 'Review', GitPullRequest],
+                ['merged', 'Merged', GitMerge],
+                ['attention', 'Attention', CircleAlert],
+              ] as const
+            ).map(([value, label, Icon]) => (
               <button
                 type="button"
                 key={value}
                 aria-pressed={filter === value}
                 onClick={() => setFilter(value)}
               >
+                <Icon size={16} aria-hidden="true" />
                 <span>{label}</span>
                 <strong>
                   {value === 'all' ? items.length : items.filter((i) => state(i) === value).length}
@@ -917,6 +911,13 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 );
               })
           )}
+          <details className="supporting-details">
+            <summary>Workspace and dispatch rules</summary>
+            <p>
+              Tasks start from committed master. Commit any local changes the agents need.
+              Restarting Jackalope pauses dispatch. Pausing leaves current work running.
+            </p>
+          </details>
           <details className="queue-coordination">
             <summary className="task-summary">
               Coordination & handoffs

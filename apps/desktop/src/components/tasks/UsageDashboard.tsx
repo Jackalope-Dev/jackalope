@@ -1,8 +1,10 @@
-import { Download } from 'lucide-react';
+import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useState } from 'react';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { EmptyState } from '../ui/EmptyState';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { CapacityPanel } from './CapacityPanel';
 
 export function UsageDashboard({ onTask }: { onTask: () => void }) {
@@ -82,17 +84,16 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
   };
   return (
     <section className="task-page usage-page">
-      <div className="flex justify-between items-start gap-5">
-        <div>
-          <p className="task-eyebrow">Understand the work</p>
-          <h1 className="task-title">Usage</h1>
-          <p className="task-muted mt-3">What your agents used, and where it went.</p>
-        </div>
-        <Button variant="outline" onClick={exportUsage} disabled={!filtered.length}>
-          <Download size={14} />
-          Export
-        </Button>
-      </div>
+      <WorkspaceHeading
+        title="Usage"
+        description="Tokens used by your tasks, and capacity across your accounts."
+        action={
+          <Button variant="outline" onClick={exportUsage} disabled={!filtered.length}>
+            <Download size={18} />
+            Export
+          </Button>
+        }
+      />
       <div className="usage-filters">
         <label>
           Project
@@ -123,27 +124,61 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
           </select>
         </label>
       </div>
-      <div className="usage-overview">
-        <div>
-          <p className="task-label">Reported tokens</p>
-          <p className="usage-total">{reported.length ? (input + output).toLocaleString() : '—'}</p>
-        </div>
-        <div className="task-muted text-sm">
-          <p>
-            {reported.length
-              ? `${input.toLocaleString()} input · ${output.toLocaleString()} output`
-              : 'No reported measurements yet'}
-          </p>
-          <p className="mt-2">
-            {reported.length} of {filtered.length} attempts have a usage report
-          </p>
-        </div>
-      </div>
-      <p className="task-muted text-xs mb-7">
-        Totals include reported attempts, including retries and follow-ups. Cached input is included
-        once. Missing or in-progress reports are excluded, not counted as zero. CLI account identity
-        and separate subagent attribution are not yet available.
-      </p>
+      {filtered.length > 0 && (
+        <>
+          <div className="usage-overview">
+            <div>
+              <p className="task-label">Reported tokens</p>
+              <p className="usage-total">
+                {reported.length ? (input + output).toLocaleString() : '—'}
+              </p>
+            </div>
+            <div className="usage-breakdown">
+              {reported.length > 0 && (
+                <>
+                  <div className="usage-key">
+                    <span>
+                      <i className="usage-bar-input" aria-hidden="true" />
+                      Input {input.toLocaleString()}
+                    </span>
+                    <span>
+                      <i className="usage-bar-output" aria-hidden="true" />
+                      Output {output.toLocaleString()}
+                    </span>
+                  </div>
+                  <div
+                    className="usage-bar"
+                    role="img"
+                    aria-label={`${input.toLocaleString()} input tokens; ${output.toLocaleString()} output tokens`}
+                  >
+                    <span
+                      className="usage-bar-input"
+                      style={{ width: `${input + output ? (input / (input + output)) * 100 : 0}%` }}
+                    />
+                    <span
+                      className="usage-bar-output"
+                      style={{
+                        width: `${input + output ? (output / (input + output)) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+              <p className="task-muted">
+                {reported.length} of {filtered.length} attempts reported usage
+              </p>
+            </div>
+          </div>
+          <details className="supporting-details">
+            <summary>What’s included</summary>
+            <p>
+              Reported attempts, including retries and follow-ups. Cached input is counted once.
+              Missing and in-progress reports are excluded, not counted as zero. CLI account
+              identity and separate subagent attribution are not yet available.
+            </p>
+          </details>
+        </>
+      )}
       {error && (
         <p role="alert" className="task-error">
           {error}
@@ -152,13 +187,16 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
       {loading ? (
         <p role="status">Loading usage…</p>
       ) : !sorted.length ? (
-        <div className="task-usage-empty">
-          <h2 className="font-medium">Your first task starts the picture.</h2>
-          <p className="task-muted mt-2">
-            Reported usage will appear here when an agent returns it. No estimates or sample
-            balances are filled in.
-          </p>
-        </div>
+        <EmptyState
+          icon={ChartNoAxesColumn}
+          title="No attempts in this view"
+          description="Usage appears when agents report it. Try another project or period, or start a task."
+          action={
+            <Button variant="outline" onClick={onTask}>
+              Go to tasks
+            </Button>
+          }
+        />
       ) : (
         <div className="usage-table-scroll">
           <table className="usage-table">

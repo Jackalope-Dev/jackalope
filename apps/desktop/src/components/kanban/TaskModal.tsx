@@ -135,7 +135,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                 htmlFor="task-title"
                 className="text-xs font-semibold text-[var(--color-text-secondary)]"
               >
-                Task Title
+                Title
               </label>
               <Input
                 id="task-title"
@@ -153,7 +153,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   htmlFor="task-raw-prompt"
                   className="text-xs font-semibold text-[var(--color-text-secondary)]"
                 >
-                  Raw Intent & Instructions
+                  Instructions
                 </label>
                 <Button
                   variant="ghost"
@@ -162,9 +162,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   className="gap-1.5 text-[var(--color-accent-ink)] hover:text-[var(--color-accent-hover)]"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>
-                    {showRefiner ? 'Hide Proactive Refiner' : 'Refine with Intent Engine'}
-                  </span>
+                  <span>{showRefiner ? 'Hide questions' : 'Refine idea'}</span>
                 </Button>
               </div>
               <textarea
@@ -199,7 +197,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   </div>
                   <Badge variant="accent">Optimized</Badge>
                 </div>
-                <pre className="text-[11px] font-mono whitespace-pre-wrap text-[var(--color-text-primary)] leading-relaxed max-h-40 overflow-y-auto">
+                <pre className="text-xs font-mono whitespace-pre-wrap text-[var(--color-text-primary)] leading-relaxed max-h-40 overflow-y-auto">
                   {refinedPrompt}
                 </pre>
               </div>
@@ -234,7 +232,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   <span>Isolated Git Worktree</span>
                 </span>
                 {existingTask?.worktreePath ? (
-                  <div className="h-9 flex items-center px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] font-mono text-[11px] text-[var(--color-text-secondary)] truncate">
+                  <div className="h-9 flex items-center px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] font-mono text-xs text-[var(--color-text-secondary)] truncate">
                     {existingTask.worktreePath}
                   </div>
                 ) : (

@@ -1,3 +1,5 @@
+import * as Dialog from '@radix-ui/react-dialog';
+import { useDialogFocus } from '../ui/useDialogFocus';
 import { AlertCircle, Bot, CalendarClock, CheckCircle2, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useMascotStore } from '../../stores/mascotStore';
@@ -7,6 +9,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 export function ScheduleManager() {
+  const dialogFocus = useDialogFocus();
   const { schedules, toggleSchedule, addSchedule, deleteSchedule, runNow } = useScheduleStore();
   const { say, setMood } = useMascotStore();
 
@@ -48,15 +51,9 @@ export function ScheduleManager() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
-              Automated Tasks & Schedules
-            </h2>
-            <Badge variant="accent">Autonomous Cron Engine</Badge>
-          </div>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Configure periodic background workflows for dependency auditing, worktree hygiene, and
-            continuous verification.
+          <h1 className="task-title">Schedules</h1>
+          <p className="task-muted mt-2">
+            Plan recurring work. Automatic execution is not connected yet.
           </p>
         </div>
 
@@ -66,14 +63,14 @@ export function ScheduleManager() {
           className="gap-1.5 text-xs shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>New Scheduled Routine</span>
+          <span>New schedule</span>
         </Button>
       </div>
 
       {/* Schedules List */}
       <div className="space-y-3">
         <div className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-          Active Scheduled Automations ({schedules.length})
+          Saved schedules ({schedules.length})
         </div>
 
         <div className="grid grid-cols-1 gap-3">
@@ -83,7 +80,7 @@ export function ScheduleManager() {
               className={`p-4 rounded-2xl border transition-all shadow-sm flex flex-col justify-between space-y-3 ${
                 sch.enabled
                   ? 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-focus)]'
-                  : 'border-[var(--color-border)]/60 bg-[var(--color-surface-sunken)]/50 opacity-70'
+                  : 'border-[var(--color-border)]/60 bg-[var(--color-surface-sunken)]/50'
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -92,15 +89,15 @@ export function ScheduleManager() {
                     <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
                       {sch.name}
                     </h3>
-                    <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] text-[var(--color-accent-ink)] border border-[var(--color-border)]">
+                    <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] text-[var(--color-accent-ink)] border border-[var(--color-border)]">
                       {sch.cronExpression}
                     </span>
                     {sch.enabled ? (
-                      <Badge variant="success" className="text-[9px]">
+                      <Badge variant="success" className="text-xs">
                         Active
                       </Badge>
                     ) : (
-                      <Badge variant="default" className="text-[9px]">
+                      <Badge variant="default" className="text-xs">
                         Paused
                       </Badge>
                     )}
@@ -116,7 +113,7 @@ export function ScheduleManager() {
                     className="gap-1.5 text-xs"
                   >
                     <Play className="w-3 h-3 text-[var(--color-accent-ink)]" />
-                    <span>Trigger Now</span>
+                    <span>Create planned task</span>
                   </Button>
 
                   <Button
@@ -132,7 +129,8 @@ export function ScheduleManager() {
                     type="button"
                     onClick={() => deleteSchedule(sch.id)}
                     className="p-2 rounded-lg hover:bg-red-500/20 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors cursor-pointer"
-                    title="Delete routine"
+                    title="Delete schedule"
+                    aria-label={`Delete ${sch.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -140,7 +138,7 @@ export function ScheduleManager() {
               </div>
 
               {/* Execution Status & Agent Details */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-muted)] font-mono">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--color-border-subtle)] text-xs text-[var(--color-text-muted)] font-mono">
                 <div className="flex items-center gap-2">
                   <Bot className="w-3 h-3 text-[var(--color-accent-ink)]" />
                   <span>{sch.assignedAgentProvider}</span>
@@ -167,23 +165,25 @@ export function ScheduleManager() {
       </div>
 
       {/* Add Schedule Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 shadow-2xl">
+      <Dialog.Root open={showAddModal} onOpenChange={setShowAddModal}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="task-dialog-overlay" />
+          <Dialog.Content {...dialogFocus} className="task-dialog appearance-panel space-y-4">
             <div className="flex items-center gap-2">
               <CalendarClock className="w-5 h-5 text-[var(--color-accent-ink)]" />
-              <h3 className="text-base font-bold text-[var(--color-text-primary)]">
-                Create Scheduled Routine
-              </h3>
+              <Dialog.Title className="text-xl font-medium">New schedule</Dialog.Title>
             </div>
 
+            <Dialog.Description className="task-muted">
+              Save a recurring task plan. Automatic runs are not connected yet.
+            </Dialog.Description>
             <div className="space-y-3 text-left">
               <div>
                 <label
                   htmlFor="schedule-name"
                   className="text-xs font-semibold text-[var(--color-text-secondary)]"
                 >
-                  Routine Name
+                  Name
                 </label>
                 <Input
                   id="schedule-name"
@@ -208,7 +208,7 @@ export function ScheduleManager() {
                   onChange={(e) => setCronExpression(e.target.value)}
                   className="mt-1 text-xs font-mono"
                 />
-                <span className="text-[10px] text-[var(--color-text-muted)] mt-1 block">
+                <span className="text-xs text-[var(--color-text-muted)] mt-1 block">
                   Example: <code>0 2 * * *</code> (Every day at 2am) or <code>0 * * * *</code>{' '}
                   (Hourly)
                 </span>
@@ -239,7 +239,7 @@ export function ScheduleManager() {
                   htmlFor="schedule-prompt"
                   className="text-xs font-semibold text-[var(--color-text-secondary)]"
                 >
-                  Automated Instruction Prompt
+                  Instructions
                 </label>
                 <textarea
                   id="schedule-prompt"
@@ -257,12 +257,12 @@ export function ScheduleManager() {
                 Cancel
               </Button>
               <Button onClick={handleCreateSchedule} disabled={!name.trim()}>
-                Save Schedule
+                Save schedule
               </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

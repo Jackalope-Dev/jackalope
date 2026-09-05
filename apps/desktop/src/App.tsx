@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Shell } from './components/layout/Shell';
 import { observeExecution } from './stores/executionStore';
 import './components/tasks/task-workspace.css';
+import './components/ui/experience.css';
 
 export default function App() {
   useEffect(observeExecution, []);

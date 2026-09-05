@@ -25,10 +25,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           variant === 'danger' &&
             'bg-red-500/15 text-[var(--color-danger)] border border-red-500/30 hover:bg-red-500/25',
           // Sizes
-          size === 'sm' && 'h-8 px-2.5 text-xs gap-1.5',
-          size === 'md' && 'h-9 px-3.5 text-sm gap-2',
+          size === 'sm' && 'h-11 px-3 text-sm gap-2',
+          size === 'md' && 'h-11 px-4 text-sm gap-2',
           size === 'lg' && 'h-11 px-5 text-base gap-2.5',
-          size === 'icon' && 'h-9 w-9 p-0',
+          size === 'icon' && 'h-11 w-11 p-0',
           className,
         )}
         {...props}

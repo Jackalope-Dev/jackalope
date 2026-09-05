@@ -63,22 +63,20 @@ export function DeviceMesh() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
-              Multi-Device Mesh & Remote Dispatch
-            </h2>
-            <Badge variant="accent">Cross-Device Mesh</Badge>
-          </div>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Synchronize tasks, monitor agent progress, and dispatch work across your workstation,
-            laptop, and headless servers.
-          </p>
+          <h1 className="task-title">Devices</h1>
+          <p className="task-muted mt-2">Preview how work could move between your machines.</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            disabled
+            title="Device pairing is not available yet"
+          >
             <Plus className="w-3.5 h-3.5" />
-            <span>Pair New Device</span>
+            <span>Pair device</span>
           </Button>
         </div>
       </div>
@@ -89,19 +87,20 @@ export function DeviceMesh() {
           <div className="flex items-center gap-2">
             <Cloud className="w-4 h-4 text-[var(--color-accent-ink)]" />
             <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-              Mesh Relay & Sync Provider
+              Connection preview
             </span>
           </div>
           <div className="flex rounded-lg border border-[var(--color-border)] p-0.5 bg-[var(--color-surface-sunken)]">
             <button
               type="button"
+              aria-pressed={backendType === 'cloud'}
               onClick={() => {
                 setBackendType('cloud');
                 setEndpoint('https://mesh.jackalope.dev/v1');
               }}
               className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
                 backendType === 'cloud'
-                  ? 'bg-[var(--color-accent)] text-black font-semibold'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold'
                   : 'text-[var(--color-text-secondary)]'
               }`}
             >
@@ -109,13 +108,14 @@ export function DeviceMesh() {
             </button>
             <button
               type="button"
+              aria-pressed={backendType === 'self-hosted'}
               onClick={() => {
                 setBackendType('self-hosted');
                 setEndpoint('ws://127.0.0.1:8080/sync');
               }}
               className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
                 backendType === 'self-hosted'
-                  ? 'bg-[var(--color-accent)] text-black font-semibold'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold'
                   : 'text-[var(--color-text-secondary)]'
               }`}
             >
@@ -175,19 +175,19 @@ export function DeviceMesh() {
                           {dev.name}
                         </span>
                         {dev.isCurrent && (
-                          <Badge variant="accent" className="text-[9px] px-1.5 py-0">
+                          <Badge variant="accent" className="text-xs px-1.5 py-0">
                             This Host
                           </Badge>
                         )}
                       </div>
-                      <span className="text-[11px] text-[var(--color-text-secondary)] block mt-0.5">
+                      <span className="text-xs text-[var(--color-text-secondary)] block mt-0.5">
                         {dev.os}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-[var(--color-border-subtle)] text-[11px]">
+                <div className="flex items-center justify-between pt-2 border-t border-[var(--color-border-subtle)] text-xs">
                   <span className="flex items-center gap-1.5 text-[var(--color-success)] font-medium">
                     <CheckCircle2 className="w-3 h-3" />
                     <span>{dev.status}</span>

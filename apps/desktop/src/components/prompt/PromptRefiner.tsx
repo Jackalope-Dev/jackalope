@@ -105,7 +105,7 @@ ${detectedClarifications
             <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
               Proactive Meta-Prompt Refiner
             </h4>
-            <p className="text-[11px] text-[var(--color-text-secondary)]">
+            <p className="text-xs text-[var(--color-text-secondary)]">
               Clarifying questions detected to ensure high agent accuracy & zero wasted tokens.
             </p>
           </div>
@@ -143,7 +143,7 @@ ${detectedClarifications
                       key={opt}
                       type="button"
                       onClick={() => handleSelectOption(item.id, opt)}
-                      className={`text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all border cursor-pointer ${
+                      className={`text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border cursor-pointer ${
                         isOptSelected
                           ? 'border-[var(--color-accent)] bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)] font-semibold'
                           : 'border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]'

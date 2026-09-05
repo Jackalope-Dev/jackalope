@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../ui/useDialogFocus';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, FolderOpen, X } from 'lucide-react';
 import { useState } from 'react';
@@ -7,6 +8,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 
 export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const dialogFocus = useDialogFocus();
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,7 +63,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
     >
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content className="task-dialog appearance-panel">
+        <Dialog.Content {...dialogFocus} className="task-dialog appearance-panel">
           <Dialog.Close className="task-close" aria-label="Close project setup" disabled={busy}>
             <X size={18} />
           </Dialog.Close>

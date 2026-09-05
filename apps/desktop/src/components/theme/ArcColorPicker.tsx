@@ -47,7 +47,7 @@ export function ArcColorPicker() {
           sideOffset={12}
           collisionPadding={16}
           aria-label="Workspace appearance"
-          className="appearance-panel w-[340px] max-w-[calc(100vw-2rem)] p-5 z-[70]"
+          className="workspace-appearance appearance-panel w-[340px] max-w-[calc(100vw-2rem)] p-5 z-[70]"
         >
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-base tracking-tight font-semibold">A space of your own</h2>

@@ -246,7 +246,7 @@ export function AgentFleet() {
                         <div className="text-xs font-bold text-[var(--color-text-primary)]">
                           {acc.accountName}
                         </div>
-                        <span className="text-[10px] text-[var(--color-text-secondary)] font-mono uppercase">
+                        <span className="text-xs text-[var(--color-text-secondary)] font-mono uppercase">
                           {acc.provider} • {acc.authType}
                         </span>
                       </div>
@@ -254,7 +254,7 @@ export function AgentFleet() {
 
                     <div className="flex items-center gap-1">
                       {acc.activeProcesses > 0 && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-[var(--color-success)] font-mono text-[9px] border border-emerald-500/20">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-[var(--color-success)] font-mono text-xs border border-emerald-500/20">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           {acc.activeProcesses} running
                         </span>
@@ -275,7 +275,7 @@ export function AgentFleet() {
 
                   {/* Token Quota Progress */}
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--color-text-muted)] font-mono">
+                    <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)] font-mono">
                       <span>Daily Tokens</span>
                       <span>
                         {(acc.tokensUsedToday / 1000).toFixed(0)}k /{' '}
@@ -309,7 +309,7 @@ export function AgentFleet() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-[var(--color-surface-sunken)] p-0.5 rounded-lg border border-[var(--color-border)] text-[10px]">
+              <div className="flex items-center gap-1 bg-[var(--color-surface-sunken)] p-0.5 rounded-lg border border-[var(--color-border)] text-xs">
                 {(['all', 'stdout', 'system'] as const).map((filter) => (
                   <button
                     type="button"
@@ -341,7 +341,7 @@ export function AgentFleet() {
           <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1.5 text-[var(--color-text-secondary)] select-text">
             {filteredLogs.map((log) => (
               <div key={log.id} className="flex items-start gap-2 leading-relaxed">
-                <span className="text-[var(--color-text-muted)] select-none shrink-0 text-[10px]">
+                <span className="text-[var(--color-text-muted)] select-none shrink-0 text-xs">
                   [{log.timestamp}]
                 </span>
                 {log.stream === 'system' ? (
@@ -450,7 +450,7 @@ export function AgentFleet() {
                   onChange={(e) => setNewAccApiKey(e.target.value)}
                   className="mt-1 text-xs font-mono"
                 />
-                <span className="text-[10px] text-[var(--color-text-muted)] mt-1 block">
+                <span className="text-xs text-[var(--color-text-muted)] mt-1 block">
                   Encrypted locally in OS keyring. Never transmitted to unapproved hosts.
                 </span>
               </div>

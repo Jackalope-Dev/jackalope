@@ -69,20 +69,12 @@ export function BrowserHarness() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden p-6 space-y-4">
+    <div className="tool-page flex-1 flex flex-col h-full overflow-y-auto p-6 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
-              Browser & Computer Use Automation
-            </h2>
-            <Badge variant="accent">Playwright Sandbox</Badge>
-          </div>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Headless browser orchestration harness for web scraping, visual verification, and
-            end-to-end agent pairing.
-          </p>
+          <h1 className="task-title">Browser</h1>
+          <p className="task-muted mt-2">Explore a sample browser session and its action log.</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -93,72 +85,78 @@ export function BrowserHarness() {
             className="gap-1.5 text-xs shadow-sm"
           >
             <Play className="w-3.5 h-3.5" />
-            <span>{isAutomating ? 'Executing Web Agent...' : 'Dispatch Web Agent'}</span>
+            <span>{isAutomating ? 'Previewing…' : 'Preview actions'}</span>
           </Button>
         </div>
       </div>
 
       {/* Main Sandbox Layout */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden">
+      <div className="tool-layout browser-layout">
         {/* Left 2 Cols: Browser Viewport Simulation */}
-        <div className="lg:col-span-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col overflow-hidden shadow-sm">
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col overflow-hidden shadow-sm">
           {/* Browser Navigation Bar */}
           <div className="p-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 flex items-center gap-2">
-            <div className="flex gap-1 px-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-            </div>
-
             <div className="flex-1 flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] text-xs font-mono">
               <Globe className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <input
                 type="text"
+                aria-label="Preview URL"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="w-full bg-transparent border-0 text-[var(--color-text-primary)] focus:outline-none"
               />
             </div>
 
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Reload page">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Reload page (not available in preview)"
+              title="Not available in preview"
+              disabled
+            >
               <RotateCcw className="w-3.5 h-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Capture screenshot">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Capture screenshot (not available in preview)"
+              title="Not available in preview"
+              disabled
+            >
               <Camera className="w-3.5 h-3.5" />
             </Button>
           </div>
 
           {/* Web Viewport Body */}
-          <div className="flex-1 bg-[#0f1115] relative p-6 flex flex-col justify-center items-center text-center overflow-auto">
+          <div className="flex-1 bg-[var(--color-surface-sunken)] relative p-6 flex flex-col justify-center items-center text-center overflow-auto">
             {/* Viewport content mockup */}
             <div className="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 shadow-xl text-left">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
                   <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                    DOM Sandbox Viewport (Headless Chromium)
+                    Sample page
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-[var(--color-text-muted)]">
-                  1280 × 800
-                </span>
+                <span className="text-xs font-mono text-[var(--color-text-muted)]">1280 × 800</span>
               </div>
 
               <div className="space-y-2 text-xs text-[var(--color-text-secondary)]">
-                <div className="p-3 rounded-lg bg-[var(--color-surface-sunken)] font-mono text-[11px] text-[var(--color-text-primary)]">
+                <div className="p-3 rounded-lg bg-[var(--color-surface-sunken)] font-mono text-xs text-[var(--color-text-primary)]">
                   &lt;html&gt; ... loaded 42 interactive elements &lt;/html&gt;
                 </div>
-                <p className="text-[11px] leading-relaxed">
+                <p className="text-xs leading-relaxed">
                   The agent possesses full Playwright capabilities: clicking buttons, filling forms,
                   solving simple auth challenges, and extracting structured JSON.
                 </p>
               </div>
 
               <div className="flex items-center gap-2 pt-2">
-                <Badge variant="accent" className="font-mono text-[10px]">
+                <Badge variant="accent" className="font-mono text-xs">
                   Playwright v1.49 (Permissive MIT)
                 </Badge>
-                <Badge variant="outline" className="font-mono text-[10px]">
+                <Badge variant="outline" className="font-mono text-xs">
                   CDP Socket Connected
                 </Badge>
               </div>
@@ -173,7 +171,7 @@ export function BrowserHarness() {
               <MousePointer className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <span>Agent Action Log</span>
             </div>
-            <span className="font-mono text-[10px] text-[var(--color-text-muted)]">
+            <span className="font-mono text-xs text-[var(--color-text-muted)]">
               {actions.length} events
             </span>
           </div>
@@ -185,7 +183,7 @@ export function BrowserHarness() {
                 className="p-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] space-y-1 text-xs"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                  <div className="flex items-center gap-1.5 font-mono text-xs">
                     <span className="px-1.5 py-0.2 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] font-semibold">
                       Step {act.step}
                     </span>
@@ -193,16 +191,16 @@ export function BrowserHarness() {
                       {act.type}
                     </span>
                   </div>
-                  <span className="text-[10px] text-[var(--color-text-muted)] font-mono">
+                  <span className="text-xs text-[var(--color-text-muted)] font-mono">
                     {act.time}
                   </span>
                 </div>
 
-                <div className="font-mono text-[11px] text-[var(--color-text-secondary)] break-all">
+                <div className="font-mono text-xs text-[var(--color-text-secondary)] break-all">
                   {act.target}
                 </div>
 
-                <div className="flex items-center gap-1 text-[10px] text-[var(--color-success)] font-medium pt-0.5">
+                <div className="flex items-center gap-1 text-xs text-[var(--color-success)] font-medium pt-0.5">
                   <CheckCircle2 className="w-2.5 h-2.5" />
                   <span>Success</span>
                 </div>

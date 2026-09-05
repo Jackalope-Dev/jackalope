@@ -15,7 +15,7 @@ export function WorkspaceHeading({
     <header className="flex flex-wrap items-end justify-between gap-5 pb-6">
       <div className="max-w-xl">
         {eyebrow && (
-          <p className="mb-3 text-[11px] tracking-[0.16em] uppercase text-[var(--color-text-muted)]">
+          <p className="mb-3 text-xs tracking-[0.16em] uppercase text-[var(--color-text-muted)]">
             {eyebrow}
           </p>
         )}

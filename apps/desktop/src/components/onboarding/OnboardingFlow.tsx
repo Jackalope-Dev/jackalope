@@ -173,9 +173,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                           <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
                         )}
                       </div>
-                      <span className="text-[11px] text-[var(--color-text-secondary)]">
-                        {ag.desc}
-                      </span>
+                      <span className="text-xs text-[var(--color-text-secondary)]">{ag.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -217,7 +215,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                       <FolderGit2 className="w-4 h-4" />
                     </Button>
                   </div>
-                  <span className="text-[11px] text-[var(--color-text-muted)] block">
+                  <span className="text-xs text-[var(--color-text-muted)] block">
                     Use the path to a local Git repository.
                   </span>
                 </div>

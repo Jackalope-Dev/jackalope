@@ -105,19 +105,12 @@ export function CodebaseMap() {
   const filteredNodes = NODES.filter((n) => filter === 'all' || n.category === filter);
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden p-6 space-y-4">
+    <div className="tool-page flex-1 flex flex-col h-full overflow-y-auto p-6 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
-              Codebase & Agent Topology Visualizer
-            </h2>
-            <Badge variant="accent">Live Architecture Map</Badge>
-          </div>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Interactive visual mapping of modules, active worktree branches, and agent processes.
-          </p>
+          <h1 className="task-title">Codebase</h1>
+          <p className="task-muted mt-2">Explore sample modules and their relationships.</p>
         </div>
 
         {/* Filter Pills */}
@@ -127,9 +120,10 @@ export function CodebaseMap() {
               type="button"
               key={cat}
               onClick={() => setFilter(cat)}
+              aria-pressed={filter === cat}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all capitalize cursor-pointer ${
                 filter === cat
-                  ? 'bg-[var(--color-accent)] text-black font-semibold shadow-sm'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold shadow-sm'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
               }`}
             >
@@ -140,14 +134,15 @@ export function CodebaseMap() {
       </div>
 
       {/* Visual Canvas & Details Split */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 overflow-hidden">
+      <div className="tool-layout map-layout">
         {/* Graph Canvas */}
-        <div className="lg:col-span-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-6 relative overflow-auto flex items-center justify-center min-h-[460px]">
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-6 relative overflow-auto min-h-[460px]">
           {/* Subtle Grid Background */}
           <div
             className="absolute inset-0 opacity-[0.03] pointer-events-none"
             style={{
-              backgroundImage: 'radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)',
+              backgroundImage:
+                'radial-gradient(circle at 1px 1px, var(--color-text-primary) 1px, transparent 0)',
               backgroundSize: '24px 24px',
             }}
           />
@@ -168,17 +163,19 @@ export function CodebaseMap() {
           </svg>
 
           {/* Nodes */}
-          <div className="relative w-[1100px] h-[520px]">
+          <div className="relative w-[1100px] min-w-[1100px] h-[520px]">
             {filteredNodes.map((node) => {
               const isSelected = selectedNode?.id === node.id;
               return (
-                <motion.div
+                <motion.button
+                  type="button"
+                  aria-pressed={isSelected}
                   key={node.id}
                   onClick={() => setSelectedNode(node)}
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   whileHover={{ scale: 1.05 }}
-                  className={`absolute p-3 rounded-xl border transition-all cursor-pointer shadow-md select-none w-52 ${
+                  className={`absolute p-3 text-left rounded-xl border transition-all cursor-pointer shadow-md select-none w-52 ${
                     isSelected
                       ? 'border-[var(--color-accent)] bg-[var(--color-surface-elevated)] ring-2 ring-[var(--color-accent)]/30'
                       : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-focus)]'
@@ -186,13 +183,13 @@ export function CodebaseMap() {
                   style={{ left: node.x, top: node.y }}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] uppercase font-mono font-semibold text-[var(--color-text-muted)]">
+                    <span className="text-xs uppercase font-mono font-semibold text-[var(--color-text-muted)]">
                       {node.category}
                     </span>
                     <span
                       className={`w-2 h-2 rounded-full ${
                         node.status === 'active'
-                          ? 'bg-[var(--color-accent)] animate-pulse'
+                          ? 'bg-[var(--color-accent)]'
                           : node.status === 'synced'
                             ? 'bg-emerald-400'
                             : 'bg-amber-400'
@@ -202,10 +199,10 @@ export function CodebaseMap() {
                   <div className="text-xs font-bold text-[var(--color-text-primary)] truncate">
                     {node.label}
                   </div>
-                  <div className="text-[10px] text-[var(--color-text-secondary)] truncate mt-0.5">
+                  <div className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">
                     {node.detail}
                   </div>
-                </motion.div>
+                </motion.button>
               );
             })}
           </div>
@@ -216,7 +213,7 @@ export function CodebaseMap() {
           {selectedNode ? (
             <div className="space-y-4">
               <div className="space-y-1">
-                <Badge variant="accent" className="uppercase font-mono text-[10px]">
+                <Badge variant="accent" className="uppercase font-mono text-xs">
                   {selectedNode.category}
                 </Badge>
                 <h3 className="text-base font-bold text-[var(--color-text-primary)]">
@@ -242,7 +239,7 @@ export function CodebaseMap() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">IPC Channel</span>
-                  <span className="font-mono text-[10px] text-[var(--color-accent-ink)]">
+                  <span className="font-mono text-xs text-[var(--color-accent-ink)]">
                     tauri://ipc/{selectedNode.id}
                   </span>
                 </div>

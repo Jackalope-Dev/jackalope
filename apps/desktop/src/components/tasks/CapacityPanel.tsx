@@ -1,5 +1,6 @@
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { nativeTask } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
 import './capacity-panel.css';
@@ -60,9 +61,13 @@ export function CapacityPanel() {
       <div className="capacity-heading">
         <div>
           <h2 id="capacity-title">Connected capacity</h2>
-          <p className="task-muted">Account-wide allowances, including work outside Jackalope.</p>
+          <p className="task-muted">Remaining account limits · independent of the filters above.</p>
         </div>
-        <Button variant="outline" onClick={refresh} disabled={loading || now < nextRefresh}>
+        <Button
+          variant="outline"
+          onClick={refresh}
+          disabled={loading || now < nextRefresh || !isTauriEnvironment()}
+        >
           <RefreshCw size={14} />
           {loading ? 'Checking…' : 'Refresh capacity'}
         </Button>
@@ -79,8 +84,9 @@ export function CapacityPanel() {
       )}
       {!records.length && !loading && (
         <p className="task-muted text-sm mt-4">
-          Refresh to read supported limits from your signed-in agents. Missing balances remain
-          unknown.
+          {isTauriEnvironment()
+            ? 'Refresh to check limits from your signed-in agents.'
+            : 'Account limits are available in the desktop app.'}
         </p>
       )}
       <div className="capacity-connections">
@@ -152,10 +158,13 @@ export function CapacityPanel() {
           Refresh available in {Math.ceil((nextRefresh - now) / 1000)}s.
         </p>
       )}
-      <p className="task-muted text-xs mt-4">
-        Capacity is separate from the project and period filters above. Unknown or old snapshots
-        cannot establish available budget.
-      </p>
+      <details className="supporting-details">
+        <summary>About account limits</summary>
+        <p>
+          Includes work outside Jackalope. Missing or stale snapshots cannot establish available
+          budget.
+        </p>
+      </details>
     </section>
   );
 }

@@ -42,7 +42,7 @@ export function CommandPalette({
             event.preventDefault();
             if (previousFocus.current?.isConnected) previousFocus.current.focus();
           }}
-          className="fixed top-[18vh] left-1/2 -translate-x-1/2 w-[480px] max-w-[calc(100vw-2rem)] appearance-panel z-[81] p-3"
+          className="command-dialog fixed top-[18vh] left-1/2 -translate-x-1/2 w-[480px] max-w-[calc(100vw-2rem)] appearance-panel z-[81] p-3"
           onKeyDown={(event) => {
             const buttons = Array.from(
               event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-command]'),
@@ -78,10 +78,7 @@ export function CommandPalette({
               onChange={(event) => setQuery(event.target.value)}
               className="w-full bg-transparent text-sm py-1 outline-none"
             />
-            <Dialog.Close
-              className="text-[10px] text-[var(--color-text-muted)] p-1"
-              aria-label="Close commands"
-            >
+            <Dialog.Close className="quiet-icon text-xs" aria-label="Close commands">
               Esc
             </Dialog.Close>
           </div>
@@ -109,7 +106,8 @@ export function CommandPalette({
                 key={theme.id}
                 className="workspace-menu-item w-full hover:bg-[var(--color-surface-hover)]"
                 onClick={() => {
-                  setTheme(theme);
+                  const current = useThemeStore.getState().currentTheme;
+                  setTheme({ ...theme, isDark: current.isDark, atmosphere: current.atmosphere });
                   onClose();
                 }}
               >

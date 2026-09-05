@@ -1,4 +1,9 @@
 import {
+  Plus,
+  Bot,
+  CircleCheck,
+  ListTodo,
+  Workflow,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -6,10 +11,9 @@ import {
   FileDiff,
   FolderOpen,
   GitBranch,
-  Plus,
   Square,
 } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   isActive,
   nativeTask,
@@ -18,6 +22,8 @@ import {
   type TaskRun,
 } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { EmptyState } from '../ui/EmptyState';
+import { RunStatus } from './RunStatus';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -137,9 +143,9 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
             {runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt}
           </h1>
         </div>
-        <span className="task-status" role="status">
-          {statusLabel[run.status]}
-        </span>
+        <div role="status">
+          <RunStatus status={run.status} />
+        </div>
       </div>
       <div className="task-context-line">
         <GitBranch size={13} />
@@ -190,10 +196,7 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
                     ? 'Stopping this attempt'
                     : 'Your task is underway.'}
               </h2>
-              <p className="task-muted mt-2">
-                You can move between projects and come back here. Activity and results stay with
-                this task.
-              </p>
+              <p className="task-muted mt-2">Work continues while you use the rest of Jackalope.</p>
             </div>
             <Button
               variant="outline"
@@ -351,6 +354,10 @@ export function TaskWorkspace() {
   const [submitError, setSubmitError] = useState('');
   const [filter, setFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
+  const [composing, setComposing] = useState(false);
+  useEffect(() => {
+    if (composing) document.getElementById('task-intent')?.focus();
+  }, [composing]);
   const key = project?.id ?? 'projectless';
   const current = drafts[key] ?? emptyDraft;
   const selected = runs.find((run) => run.id === selectedId && run.projectId === project?.id);
@@ -385,122 +392,153 @@ export function TaskWorkspace() {
     return <ProjectQueue key={project.id} project={project} onBack={() => setParallel(false)} />;
   return (
     <section className="task-page task-home">
-      {project && (
-        <button type="button" className="task-link float-right" onClick={() => setParallel(true)}>
-          Plan parallel work
-          <ArrowRight size={15} />
-        </button>
-      )}
-      <div className="task-introduction">
-        <p className="task-eyebrow">
-          {project ? `A little momentum for ${project.name}` : 'A place for your next idea'}
-        </p>
-        <h1 className="task-hero-title">
-          What do you want
-          <br />
-          to accomplish?
-        </h1>
-        <p className="task-muted mt-4">Bring the intent. Keep the context. Follow the work.</p>
+      <div className="task-introduction workspace-section-heading">
+        <div>
+          <h1 className="task-hero-title">
+            {project ? (latest.length ? 'Tasks' : 'What’s next?') : 'A place to get things done.'}
+          </h1>
+          <p className="task-muted mt-3">
+            {project
+              ? latest.length
+                ? 'Follow the work. Review what’s ready.'
+                : 'Give an agent a clear next step.'
+              : 'Your projects and agents, in one place.'}
+          </p>
+        </div>
+        {project && (
+          <div className="workspace-actions">
+            <Button variant="outline" onClick={() => setParallel(true)}>
+              <Workflow size={18} />
+              Parallel work
+            </Button>
+            {latest.length > 0 && (
+              <Button
+                aria-expanded={composing}
+                aria-controls="task-composer"
+                onClick={() => setComposing(!composing)}
+              >
+                <Plus size={18} />
+                {composing ? 'Close composer' : 'New task'}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       {!project ? (
-        <div className="task-first-project">
-          <FolderOpen size={24} className="text-[var(--color-accent-ink)]" />
-          <div>
-            <h2 className="font-medium">Start with a project</h2>
-            <p className="task-muted mt-1">
-              Open a repository, then give your agent something useful to do.
-            </p>
-          </div>
-          <Button onClick={() => setSetup(true)}>
-            Choose a folder
-            <ArrowRight size={15} />
-          </Button>
+        <div>
+          <EmptyState
+            icon={FolderOpen}
+            title="Start with a project"
+            description="Choose the repository you want to work on."
+            action={
+              <Button onClick={() => setSetup(true)}>
+                <FolderOpen size={18} />
+                Open project
+              </Button>
+            }
+          />
+          <ol className="journey-strip" aria-label="How tasks work">
+            <li>
+              <FolderOpen size={20} aria-hidden="true" />
+              Project
+            </li>
+            <li>
+              <Bot size={20} aria-hidden="true" />
+              Agent
+            </li>
+            <li>
+              <CircleCheck size={20} aria-hidden="true" />
+              Review
+            </li>
+          </ol>
         </div>
       ) : (
-        <form
-          className="task-composer"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void launch();
-          }}
-        >
-          <label htmlFor="task-intent" className="sr-only">
-            What do you want to accomplish?
-          </label>
-          <textarea
-            id="task-intent"
-            value={current.prompt}
-            onChange={(event) => draft(key, { prompt: event.target.value })}
-            placeholder="Describe a change, investigate a problem, or explore an idea…"
-            rows={4}
-            maxLength={24000}
-            onKeyDown={(event) => {
-              if (
-                (event.ctrlKey || event.metaKey) &&
-                event.key === 'Enter' &&
-                !event.nativeEvent.isComposing &&
-                runner?.available &&
-                !submitting &&
-                current.prompt.trim() &&
-                desktop
-              ) {
-                event.preventDefault();
-                void launch();
-              }
+        (!latest.length || composing) && (
+          <form
+            id="task-composer"
+            className="task-composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void launch();
             }}
-          />
-          <div className="task-composer-footer">
-            <div className="task-context-controls">
-              <span className="task-context-chip">
-                <FolderOpen size={13} />
-                {project.name}
-              </span>
-              <label className="task-context-chip">
-                <span className="sr-only">Agent</span>
-                <select
-                  value={current.agent}
-                  onChange={(event) => draft(key, { agent: event.target.value })}
-                >
-                  <option value="codex">Codex</option>
-                  <option value="claude">Claude Code</option>
-                  <option value="grok">Grok</option>
-                </select>
-              </label>
-              <label className="task-context-chip">
-                <span className="sr-only">Execution location</span>
-                <GitBranch size={13} />
-                <select
-                  value={current.isolated ? 'isolated' : 'current'}
-                  onChange={(event) => draft(key, { isolated: event.target.value === 'isolated' })}
-                >
-                  <option value="isolated">New worktree</option>
-                  <option value="current">Current checkout</option>
-                </select>
-              </label>
+          >
+            <label htmlFor="task-intent" className="sr-only">
+              What do you want to accomplish?
+            </label>
+            <textarea
+              id="task-intent"
+              value={current.prompt}
+              onChange={(event) => draft(key, { prompt: event.target.value })}
+              placeholder="Describe a change, investigate a problem, or explore an idea…"
+              rows={4}
+              maxLength={24000}
+              onKeyDown={(event) => {
+                if (
+                  (event.ctrlKey || event.metaKey) &&
+                  event.key === 'Enter' &&
+                  !event.nativeEvent.isComposing &&
+                  runner?.available &&
+                  !submitting &&
+                  current.prompt.trim() &&
+                  desktop
+                ) {
+                  event.preventDefault();
+                  void launch();
+                }
+              }}
+            />
+            <div className="task-composer-footer">
+              <div className="task-context-controls">
+                <label className="task-context-chip">
+                  <Bot size={18} aria-hidden="true" />
+                  <span className="sr-only">Agent</span>
+                  <select
+                    value={current.agent}
+                    onChange={(event) => draft(key, { agent: event.target.value })}
+                  >
+                    <option value="codex">Codex</option>
+                    <option value="claude">Claude Code</option>
+                    <option value="grok">Grok</option>
+                  </select>
+                </label>
+                <label className="task-context-chip">
+                  <span className="sr-only">Execution location</span>
+                  <GitBranch size={13} />
+                  <select
+                    value={current.isolated ? 'isolated' : 'current'}
+                    onChange={(event) =>
+                      draft(key, { isolated: event.target.value === 'isolated' })
+                    }
+                  >
+                    <option value="isolated">New worktree</option>
+                    <option value="current">Current checkout</option>
+                  </select>
+                </label>
+              </div>
+              <Button
+                type="submit"
+                disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
+              >
+                {submitting ? 'Starting…' : 'Start task'}
+                <ArrowRight size={15} />
+              </Button>
             </div>
-            <Button
-              type="submit"
-              disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
-            >
-              {submitting ? 'Starting…' : 'Start task'}
-              <ArrowRight size={15} />
-            </Button>
-          </div>
-          <p className="task-composer-note">
-            {current.isolated
-              ? 'Starts from the latest local commit; uncommitted changes stay in your checkout.'
-              : 'Works directly in this checkout, including existing changes.'}{' '}
-            {runner?.available
-              ? runner.signedIn
-                ? 'Uses your existing sign-in.'
-                : 'Sign-in will be checked by the agent when it starts.'
-              : 'This agent is not available yet.'}
-          </p>
-        </form>
+            <p className="task-composer-note">
+              {current.isolated
+                ? 'New branch from your latest commit. Uncommitted changes stay here.'
+                : 'Edits this checkout, including existing changes.'}{' '}
+              {runner?.available
+                ? runner.signedIn
+                  ? 'Uses your existing sign-in.'
+                  : 'Sign-in will be checked by the agent when it starts.'
+                : 'This agent is not available yet.'}
+            </p>
+          </form>
+        )
       )}
       {!desktop && (
         <p className="task-notice mt-5">
-          Browser preview · open the desktop app to select a real repository and execute tasks.
+          Browser preview · connect projects and run agents in the desktop app.
         </p>
       )}
       {desktop && project && !runner?.available && (
@@ -525,65 +563,67 @@ export function TaskWorkspace() {
           {submitError || error}
         </p>
       )}
-      <div className="task-list-header">
-        <h2 className="font-medium">Your work</h2>
-        <div className="flex items-center gap-4">
-          <label className="task-filter">
-            <span className="sr-only">Filter tasks</span>
-            <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-              <option value="all">All tasks</option>
-              <option value="active">In progress</option>
-              <option value="review">Ready for review</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            className="task-link"
-            onClick={() => {
-              select(null);
-              document.getElementById('task-intent')?.focus();
-            }}
-          >
-            <Plus size={14} />
-            New task
-          </button>
+      {project && (
+        <div className="task-list-header">
+          <h2 className="font-medium">Your work</h2>
+          <fieldset className="task-filter-group" aria-label="Filter tasks">
+            {[
+              ['all', 'All', latest.length],
+              ['active', 'Working', latest.filter(isActive).length],
+              ['review', 'Review', latest.filter((r) => r.status === 'review').length],
+            ].map(([value, label, count]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filter === value}
+                onClick={() => setFilter(String(value))}
+              >
+                {label}
+                <span>{count}</span>
+              </button>
+            ))}
+          </fieldset>
         </div>
-      </div>
-      {loading ? (
-        <p role="status" className="task-muted py-5">
-          Loading task history…
-        </p>
-      ) : filtered.length ? (
-        <div className="task-list">
-          {filtered.map((run) => (
-            <button
-              type="button"
-              className="task-list-row"
-              key={run.id}
-              onClick={() => select(run.id)}
-            >
-              <div className="min-w-0">
-                <span className="block truncate font-medium">
-                  {runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt}
-                </span>
-                <span className="task-muted text-xs mt-2 block">
-                  {run.agent} · {new Date(run.startedAt).toLocaleDateString()} ·{' '}
-                  {run.usage.reported
-                    ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens this attempt`
-                    : 'Usage not reported'}
-                </span>
-              </div>
-              <span className="task-status">{statusLabel[run.status]}</span>
-              <ChevronRight size={15} className="text-[var(--color-text-muted)]" />
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="task-muted py-7">
-          {filter === 'all'
-            ? 'Your tasks will stay here, from the first instruction to the final review.'
-            : 'No tasks in this state.'}
-        </p>
+      )}
+      {project && (
+        loading ? (
+            <p role="status" className="task-muted py-5">
+              Loading task history…
+            </p>
+          ) : filtered.length ? (
+            <div className="task-list">
+              {filtered.map((run) => (
+                <button
+                  type="button"
+                  className="task-list-row"
+                  key={run.id}
+                  onClick={() => select(run.id)}
+                >
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt}
+                    </span>
+                    <span className="task-muted text-xs mt-2 block">
+                      {runners.find((runner) => runner.id === run.agent)?.name ?? run.agent} ·{' '}
+                      {new Date(run.startedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <RunStatus status={run.status} />
+                  <ChevronRight size={15} className="text-[var(--color-text-muted)]" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={ListTodo}
+              title={filter === 'all' ? 'Ready for your first task' : 'Nothing here yet'}
+              description={
+                filter === 'all'
+                  ? 'Describe the work above. Results and review will stay with the task.'
+                  : 'Tasks will appear here as their status changes.'
+              }
+            />
+          )
       )}
       <ProjectSetup open={setup} onClose={() => setSetup(false)} />
     </section>

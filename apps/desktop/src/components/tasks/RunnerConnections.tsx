@@ -1,57 +1,101 @@
-import { RefreshCw } from 'lucide-react';
+import { ArrowRight, Bot, Check, CircleHelp, Download, Monitor, RefreshCw } from 'lucide-react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
+import { EmptyState } from '../ui/EmptyState';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
-export function RunnerConnections() {
+export function RunnerConnections({ onTasks }: { onTasks: () => void }) {
   const { runners, discovering, discover, error } = useExecutionStore();
+  const desktop = isTauriEnvironment();
   return (
     <section className="task-page max-w-4xl mx-auto">
-      <div className="flex items-start justify-between gap-5 mb-10">
-        <div>
-          <p className="task-eyebrow">Your tools, connected</p>
-          <h1 className="task-title">Agents</h1>
-          <p className="task-muted mt-3">
-            Use the agents already on this machine, with their existing sign-ins.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => void discover()}
-          disabled={discovering || !isTauriEnvironment()}
-        >
-          <RefreshCw size={14} />
-          {discovering ? 'Checking…' : 'Refresh'}
-        </Button>
-      </div>
+      <WorkspaceHeading
+        title="Agents"
+        description="Your installed agents, with the sign-ins you already use."
+        action={
+          <Button
+            variant="outline"
+            onClick={() => void discover()}
+            disabled={discovering || !desktop}
+          >
+            <RefreshCw size={18} aria-hidden="true" />
+            {discovering ? 'Checking…' : 'Refresh'}
+          </Button>
+        }
+      />
       {error && (
         <p role="alert" className="task-error">
           {error}
         </p>
       )}
-      {!isTauriEnvironment() && (
-        <p className="task-notice">
-          Open Jackalope on your desktop to discover installed agents. No accounts are simulated
-          here.
+      {discovering && (
+        <p role="status" className="task-notice">
+          Checking installed agents…
         </p>
       )}
-      {runners.map((runner) => (
-        <article key={runner.id} className="runner-row">
-          <div className="flex justify-between gap-5">
-            <h2 className="font-medium">{runner.name}</h2>
-            <span className="task-status">
-              {runner.signedIn ? 'Signed in' : runner.available ? 'Installed' : 'Not found'}
+      {!desktop ? (
+        <EmptyState
+          icon={Monitor}
+          title="Connect from your desktop"
+          description="Open the desktop app to discover Codex, Claude Code and Grok on this machine."
+        />
+      ) : (
+        !runners.length &&
+        !discovering && (
+          <EmptyState
+            icon={Bot}
+            title="Find your first agent"
+            description="Refresh to check this machine for supported agent tools."
+          />
+        )
+      )}
+      {runners.map((runner) => {
+        const StatusIcon = runner.signedIn ? Check : runner.available ? CircleHelp : Download;
+        return (
+          <article key={runner.id} className="runner-row">
+            <span className="empty-state-icon">
+              <Bot size={24} aria-hidden="true" />
             </span>
-          </div>
-          <p className="task-muted mt-2">{runner.signedIn ? runner.account : runner.detail}</p>
-          {runner.signedIn && <p className="task-muted text-xs mt-3">{runner.detail}</p>}
-        </article>
-      ))}
-      <p className="task-muted mt-8 text-xs leading-relaxed">
-        Start work from Tasks. Each attempt records its runner and reported model. Sign-in belongs
-        to the CLI; Jackalope does not copy your credentials. Switching between multiple accounts
-        and remaining subscription quotas are not yet supported.
-      </p>
+            <div className="runner-identity">
+              <div className="workspace-section-heading">
+                <h2>{runner.name}</h2>
+                <span className="task-status">
+                  <StatusIcon size={16} aria-hidden="true" />
+                  {runner.signedIn
+                    ? 'Signed in'
+                    : runner.available
+                      ? 'Check sign-in'
+                      : 'Not installed'}
+                </span>
+              </div>
+              {runner.signedIn && <p className="task-muted mt-2">{runner.account}</p>}
+              {!runner.signedIn ? (
+                <p className="task-muted mt-2">{runner.detail}</p>
+              ) : (
+                <details className="supporting-details">
+                  <summary>Connection details</summary>
+                  <p>{runner.detail}</p>
+                </details>
+              )}
+            </div>
+          </article>
+        );
+      })}
+      {runners.some((runner) => runner.available) && (
+        <Button onClick={onTasks}>
+          Create a task
+          <ArrowRight size={18} />
+        </Button>
+      )}
+      <details className="supporting-details">
+        <summary>Sign-ins and account access</summary>
+        <p>
+          Sign in through each agent’s CLI. Jackalope uses that session without copying credentials.
+          Account switching is not yet available. Reported usage and supported account limits are in
+          Usage.
+        </p>
+      </details>
     </section>
   );
 }

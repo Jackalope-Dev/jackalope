@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../ui/useDialogFocus';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, X } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -130,6 +131,7 @@ function parsePlan(text: string): PlanEntry[] {
 }
 
 function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
+  const dialogFocus = useDialogFocus();
   const storageKey = `jackalope-plan-draft:${project.id}`;
   const [text, setText] = useState(() => {
     try {
@@ -218,6 +220,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
         <Dialog.Content
+          {...dialogFocus}
           className="task-dialog appearance-panel"
           style={{
             width: 'min(720px, calc(100vw - 40px))',
