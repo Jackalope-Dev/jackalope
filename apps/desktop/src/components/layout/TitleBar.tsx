@@ -36,10 +36,7 @@ export function TitleBar() {
   };
 
   return (
-    <div
-      data-tauri-drag-region
-      className="app-titlebar"
-    >
+    <div data-tauri-drag-region className="app-titlebar">
       <div className="app-titlebar-label" data-tauri-drag-region>
         <img src="/mascot.svg" alt="" aria-hidden="true" className="size-3.5" />
         <span>Jackalope</span>
