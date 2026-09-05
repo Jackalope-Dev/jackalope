@@ -1,4 +1,12 @@
-import { CheckCircle2, ExternalLink, FolderGit2, GitBranch, Plus, RefreshCw } from 'lucide-react';
+import {
+  CheckCircle2,
+  ExternalLink,
+  FolderGit2,
+  GitBranch,
+  Lock,
+  Plus,
+  RefreshCw,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -150,11 +158,21 @@ export function WorktreeManager() {
                     </Badge>
                   </div>
                   <div className="flex items-center gap-3 text-[11px] text-[var(--color-text-muted)] font-mono">
-                    <span>HEAD: {wt.head?.slice(0, 7) || 'HEAD'}</span>
+                    <span>HEAD: {wt.head ? wt.head.slice(0, 7) : 'unresolved (bare repo?)'}</span>
                     <span>•</span>
-                    <span className="text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Ready for Agent Dispatch
-                    </span>
+                    {wt.is_locked ? (
+                      <span className="text-amber-400 flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> Locked
+                      </span>
+                    ) : wt.is_bare ? (
+                      <span className="text-[var(--color-text-muted)] flex items-center gap-1">
+                        Bare repository
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Unlocked
+                      </span>
+                    )}
                   </div>
                 </div>
 
