@@ -254,7 +254,7 @@ export function AgentFleet() {
 
                     <div className="flex items-center gap-1">
                       {acc.activeProcesses > 0 && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-mono text-[9px] border border-emerald-500/20">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-[var(--color-success)] font-mono text-[9px] border border-emerald-500/20">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           {acc.activeProcesses} running
                         </span>
@@ -265,7 +265,7 @@ export function AgentFleet() {
                           e.stopPropagation();
                           removeAccount(acc.id);
                         }}
-                        className="p-1 rounded hover:bg-red-500/20 text-[var(--color-text-muted)] hover:text-red-400 transition-colors cursor-pointer"
+                        className="p-1 rounded hover:bg-red-500/20 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors cursor-pointer"
                         title="Remove account"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -302,7 +302,7 @@ export function AgentFleet() {
           {/* Terminal Titlebar */}
           <div className="px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-text-primary)]">
-              <Terminal className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              <Terminal className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <span>
                 Process Harness — <b>{activeAccount.accountName}</b> (PID 4892)
               </span>
@@ -338,18 +338,18 @@ export function AgentFleet() {
           </div>
 
           {/* Terminal Screen with ANSI-like look */}
-          <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1.5 text-gray-300 select-text">
+          <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1.5 text-[var(--color-text-secondary)] select-text">
             {filteredLogs.map((log) => (
               <div key={log.id} className="flex items-start gap-2 leading-relaxed">
                 <span className="text-[var(--color-text-muted)] select-none shrink-0 text-[10px]">
                   [{log.timestamp}]
                 </span>
                 {log.stream === 'system' ? (
-                  <span className="text-[var(--color-accent)] font-semibold">{log.message}</span>
+                  <span className="text-[var(--color-accent-ink)] font-semibold">{log.message}</span>
                 ) : log.stream === 'stderr' ? (
-                  <span className="text-red-400">{log.message}</span>
+                  <span className="text-[var(--color-danger)]">{log.message}</span>
                 ) : (
-                  <span className="text-gray-200">{log.message}</span>
+                  <span className="text-[var(--color-text-primary)]">{log.message}</span>
                 )}
               </div>
             ))}
@@ -358,7 +358,7 @@ export function AgentFleet() {
 
           {/* Terminal Input Dispatcher */}
           <div className="p-3 border-t border-[var(--color-border)] bg-[var(--color-surface)] flex items-center gap-2 shrink-0">
-            <span className="font-mono text-xs text-[var(--color-accent)] font-bold pl-1">
+            <span className="font-mono text-xs text-[var(--color-accent-ink)] font-bold pl-1">
               &gt;
             </span>
             <input
@@ -389,7 +389,7 @@ export function AgentFleet() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-[var(--color-accent)]" />
+              <Bot className="w-5 h-5 text-[var(--color-accent-ink)]" />
               <h3 className="text-base font-bold text-[var(--color-text-primary)]">
                 Connect New Agent Account
               </h3>

@@ -98,7 +98,7 @@ ${detectedClarifications
     >
       <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
+          <div className="p-1.5 rounded-lg bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)]">
             <Wand2 className="w-4 h-4" />
           </div>
           <div>
@@ -121,7 +121,7 @@ ${detectedClarifications
       {/* Detected Clarifying Questions */}
       <div className="space-y-3">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-primary)]">
-          <HelpCircle className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+          <HelpCircle className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
           <span>Proactive Clarifications Detected:</span>
         </div>
 
@@ -151,7 +151,7 @@ ${detectedClarifications
                     >
                       <div className="flex items-center gap-1.5">
                         {isOptSelected ? (
-                          <CheckCircle2 className="w-3 h-3 text-[var(--color-accent)] shrink-0" />
+                          <CheckCircle2 className="w-3 h-3 text-[var(--color-accent-ink)] shrink-0" />
                         ) : (
                           <span className="w-3 h-3 rounded-full border border-[var(--color-border)] shrink-0" />
                         )}

@@ -404,7 +404,7 @@ export function TaskWorkspace() {
       </div>
       {!project ? (
         <div className="task-first-project">
-          <FolderOpen size={24} className="text-[var(--color-accent)]" />
+          <FolderOpen size={24} className="text-[var(--color-accent-ink)]" />
           <div>
             <h2 className="font-medium">Start with a project</h2>
             <p className="task-muted mt-1">

@@ -92,7 +92,7 @@ export function ScheduleManager() {
                     <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
                       {sch.name}
                     </h3>
-                    <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] text-[var(--color-accent)] border border-[var(--color-border)]">
+                    <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] text-[var(--color-accent-ink)] border border-[var(--color-border)]">
                       {sch.cronExpression}
                     </span>
                     {sch.enabled ? (
@@ -115,7 +115,7 @@ export function ScheduleManager() {
                     onClick={() => handleManualRun(sch.id, sch.name)}
                     className="gap-1.5 text-xs"
                   >
-                    <Play className="w-3 h-3 text-[var(--color-accent)]" />
+                    <Play className="w-3 h-3 text-[var(--color-accent-ink)]" />
                     <span>Trigger Now</span>
                   </Button>
 
@@ -131,7 +131,7 @@ export function ScheduleManager() {
                   <button
                     type="button"
                     onClick={() => deleteSchedule(sch.id)}
-                    className="p-2 rounded-lg hover:bg-red-500/20 text-[var(--color-text-muted)] hover:text-red-400 transition-colors cursor-pointer"
+                    className="p-2 rounded-lg hover:bg-red-500/20 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors cursor-pointer"
                     title="Delete routine"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -142,7 +142,7 @@ export function ScheduleManager() {
               {/* Execution Status & Agent Details */}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-muted)] font-mono">
                 <div className="flex items-center gap-2">
-                  <Bot className="w-3 h-3 text-[var(--color-accent)]" />
+                  <Bot className="w-3 h-3 text-[var(--color-accent-ink)]" />
                   <span>{sch.assignedAgentProvider}</span>
                   <span>•</span>
                   <span>Next Run: {sch.nextRun}</span>
@@ -151,9 +151,9 @@ export function ScheduleManager() {
                 {sch.lastRun && (
                   <div className="flex items-center gap-1.5">
                     {sch.lastRun.status === 'success' ? (
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <CheckCircle2 className="w-3 h-3 text-[var(--color-success)]" />
                     ) : (
-                      <AlertCircle className="w-3 h-3 text-red-400" />
+                      <AlertCircle className="w-3 h-3 text-[var(--color-danger)]" />
                     )}
                     <span className="text-[var(--color-text-secondary)]">
                       Last: {sch.lastRun.summary} ({sch.lastRun.durationSeconds}s)
@@ -171,7 +171,7 @@ export function ScheduleManager() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2">
-              <CalendarClock className="w-5 h-5 text-[var(--color-accent)]" />
+              <CalendarClock className="w-5 h-5 text-[var(--color-accent-ink)]" />
               <h3 className="text-base font-bold text-[var(--color-text-primary)]">
                 Create Scheduled Routine
               </h3>

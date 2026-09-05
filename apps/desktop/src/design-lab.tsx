@@ -23,7 +23,7 @@ function DesignLab() {
           title="A workspace with a little life."
           description="The same character, colors, and controls used in the app. Explore the details here."
           action={
-            <a href="/" className="text-sm text-[var(--color-accent)]">
+            <a href="/" className="text-sm text-[var(--color-accent-ink)]">
               Open workspace →
             </a>
           }

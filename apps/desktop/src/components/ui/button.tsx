@@ -23,7 +23,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           variant === 'ghost' &&
             'bg-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]',
           variant === 'danger' &&
-            'bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25',
+            'bg-red-500/15 text-[var(--color-danger)] border border-red-500/30 hover:bg-red-500/25',
           // Sizes
           size === 'sm' && 'h-8 px-2.5 text-xs gap-1.5',
           size === 'md' && 'h-9 px-3.5 text-sm gap-2',

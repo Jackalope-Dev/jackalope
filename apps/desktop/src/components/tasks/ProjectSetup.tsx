@@ -65,7 +65,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
           <Dialog.Close className="task-close" aria-label="Close project setup" disabled={busy}>
             <X size={18} />
           </Dialog.Close>
-          <FolderOpen className="text-[var(--color-accent)] mb-5" size={26} />
+          <FolderOpen className="text-[var(--color-accent-ink)] mb-5" size={26} />
           <Dialog.Title className="text-2xl font-medium tracking-tight">
             Bring your project.
           </Dialog.Title>

@@ -374,7 +374,7 @@ function MergeReview({
             Review the combined changes before updating master. Your source worktrees stay intact.
           </p>
         </div>
-        <GitPullRequest size={26} className="text-[var(--color-accent)]" />
+        <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />
       </div>
       {candidates.length > 0 ? (
         <>

@@ -170,7 +170,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                           {ag.name}
                         </span>
                         {selectedAgent === ag.id && (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
                         )}
                       </div>
                       <span className="text-[11px] text-[var(--color-text-secondary)]">
@@ -231,7 +231,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 className="space-y-3 max-w-md"
               >
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-[var(--color-success)] text-xs font-semibold border border-emerald-500/20">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Setup complete</span>
                 </div>

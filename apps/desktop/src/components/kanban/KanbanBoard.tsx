@@ -109,7 +109,7 @@ export function KanbanBoard() {
                         <button
                           type="button"
                           onClick={() => handleOpenExisting(task.id)}
-                          className="text-left cursor-pointer hover:text-[var(--color-accent)]"
+                          className="text-left cursor-pointer hover:text-[var(--color-accent-ink)]"
                         >
                           {task.title}
                         </button>
@@ -117,7 +117,7 @@ export function KanbanBoard() {
                       {task.refinedPrompt && (
                         <span
                           title="Refined with Intent Engine"
-                          className="text-[var(--color-accent)] shrink-0"
+                          className="text-[var(--color-accent-ink)] shrink-0"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                         </span>
@@ -131,7 +131,7 @@ export function KanbanBoard() {
                     {/* Metadata chips */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       {task.worktreePath && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent)] font-mono text-[9px]">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] font-mono text-[9px]">
                           <GitBranch className="w-2.5 h-2.5" />
                           <span className="truncate max-w-[90px]">
                             {task.worktreePath.replace('.worktrees/', '')}
@@ -140,7 +140,7 @@ export function KanbanBoard() {
                       )}
                       {task.assignedAgent && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] text-[9px] border border-[var(--color-border-subtle)]">
-                          <Bot className="w-2.5 h-2.5 text-[var(--color-accent)]" />
+                          <Bot className="w-2.5 h-2.5 text-[var(--color-accent-ink)]" />
                           <span className="truncate max-w-[80px]">{task.assignedAgent}</span>
                         </span>
                       )}
@@ -169,7 +169,7 @@ export function KanbanBoard() {
                             type="button"
                             onClick={(e) => handleMove(e, task.id, 'next')}
                             title="Advance to next status"
-                            className="p-1 rounded hover:bg-[var(--color-surface-elevated)] text-[var(--color-accent)] cursor-pointer"
+                            className="p-1 rounded hover:bg-[var(--color-surface-elevated)] text-[var(--color-accent-ink)] cursor-pointer"
                           >
                             <ArrowRight className="w-3 h-3" />
                           </button>

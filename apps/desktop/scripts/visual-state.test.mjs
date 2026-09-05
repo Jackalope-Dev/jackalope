@@ -3,6 +3,80 @@ import { test } from 'node:test';
 import { applyThemeTokens, hslToHex, PRESET_THEMES } from '../src/lib/theme-engine.ts';
 import { useMascotStore } from '../src/stores/mascotStore.ts';
 
+function luminance(color) {
+  const hsl = color.match(/^hsl\(([\d.]+) ([\d.]+)% ([\d.]+)%\)$/);
+  const hex = hsl ? hslToHex(...hsl.slice(1).map(Number)) : color;
+  const [r, g, b] = hex
+    .slice(1)
+    .match(/.{2}/g)
+    .map((channel) => {
+      const value = parseInt(channel, 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
+}
+
+test('both appearances keep text readable across tinted surfaces and custom accents', () => {
+  const tokens = new Map();
+  globalThis.document = {
+    documentElement: { style: { setProperty: (key, value) => tokens.set(key, value) } },
+  };
+  for (const isDark of [true, false]) {
+    for (const atmosphere of [0, 12, 32]) {
+      for (let accentHue = 0; accentHue < 360; accentHue += 30) {
+        for (const accentLight of [0, 25, 50, 75, 100]) {
+          const theme = { ...PRESET_THEMES[0], isDark, atmosphere, accentHue, accentLight };
+          applyThemeTokens(theme);
+          for (const foreground of [
+            'text-primary',
+            'text-secondary',
+            'text-muted',
+            'accent-ink',
+            'success',
+            'warning',
+            'danger',
+          ]) {
+            for (const surface of [
+              'bg',
+              'surface',
+              'surface-elevated',
+              'surface-sunken',
+              'surface-hover',
+              'shell',
+              'shell-end',
+            ]) {
+              const a = luminance(tokens.get(`--color-${foreground}`));
+              const b = luminance(tokens.get(`--color-${surface}`));
+              const contrast = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+              assert.ok(
+                contrast >= 4.5,
+                `${foreground}/${surface}: ${contrast} (${JSON.stringify(theme)})`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+test('switching appearance back restores every token without changing the selected color', () => {
+  const tokens = new Map();
+  globalThis.document = {
+    documentElement: { style: { setProperty: (key, value) => tokens.set(key, value) } },
+  };
+  for (const theme of PRESET_THEMES) {
+    applyThemeTokens(theme);
+    const dark = new Map(tokens);
+    applyThemeTokens({ ...theme, isDark: false });
+    assert.equal(tokens.get('color-scheme'), 'light');
+    assert.notEqual(tokens.get('--color-bg'), dark.get('--color-bg'));
+    assert.equal(tokens.get('--color-accent'), dark.get('--color-accent'));
+    applyThemeTokens(theme);
+    assert.deepEqual(tokens, dark);
+  }
+});
+
 test('pet feedback returns to work and cannot overwrite a newer activity', (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const mascot = useMascotStore.getState;

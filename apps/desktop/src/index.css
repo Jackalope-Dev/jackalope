@@ -45,11 +45,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2a313e;
+    background: var(--color-border);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #394254;
+    background: var(--color-text-muted);
   }
 }
 
@@ -63,7 +63,7 @@ body {
 }
 
 :where(button, input, select, [tabindex]):focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-ink);
   outline-offset: 4px;
 }
 
@@ -287,9 +287,7 @@ body {
 .appearance-panel {
   border-radius: 20px;
   background: linear-gradient(160deg, var(--color-surface-elevated), var(--color-surface));
-  box-shadow:
-    0 16px 60px var(--color-surface-sunken),
-    0 0 0 1px var(--color-border-subtle);
+  box-shadow: var(--shadow-pop);
   color: var(--color-text-primary);
 }
 .workspace-menu {
@@ -328,6 +326,39 @@ body {
   background: linear-gradient(90deg, var(--color-border), var(--color-accent));
   cursor: pointer;
 }
+.appearance-mode {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+}
+.appearance-mode-option {
+  flex: 1;
+  cursor: pointer;
+}
+.appearance-mode-option span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  transition:
+    background-color 140ms,
+    color 140ms;
+}
+.appearance-mode-option input:checked + span {
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-flat);
+}
+.appearance-mode-option input:focus-visible + span {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
 .theme-range::-webkit-slider-thumb {
   appearance: none;
   width: 16px;
@@ -342,8 +373,11 @@ body {
   outline-offset: 4px;
 }
 .appearance-panel {
-  max-height: calc(100dvh - 40px);
+  max-height: min(calc(100dvh - 40px), var(--radix-popover-content-available-height));
   overflow-y: auto;
+}
+.appearance-panel .color-field {
+  height: clamp(7rem, calc(100dvh - 520px), 11rem);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -376,4 +410,8 @@ pre,
 
 .accent-glow {
   box-shadow: 0 0 15px -2px var(--color-accent-glow);
+}
+
+img[src="/mascot.svg"] {
+  filter: brightness(var(--brand-brightness));
 }

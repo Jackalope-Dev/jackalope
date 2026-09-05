@@ -111,7 +111,7 @@ export function BrowserHarness() {
             </div>
 
             <div className="flex-1 flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] text-xs font-mono">
-              <Globe className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              <Globe className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <input
                 type="text"
                 value={url}
@@ -170,7 +170,7 @@ export function BrowserHarness() {
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col overflow-hidden shadow-sm">
           <div className="px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-text-primary)]">
-              <MousePointer className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              <MousePointer className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <span>Agent Action Log</span>
             </div>
             <span className="font-mono text-[10px] text-[var(--color-text-muted)]">
@@ -186,7 +186,7 @@ export function BrowserHarness() {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 font-mono text-[10px]">
-                    <span className="px-1.5 py-0.2 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent)] font-semibold">
+                    <span className="px-1.5 py-0.2 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] font-semibold">
                       Step {act.step}
                     </span>
                     <span className="text-[var(--color-text-primary)] uppercase font-semibold">
@@ -202,7 +202,7 @@ export function BrowserHarness() {
                   {act.target}
                 </div>
 
-                <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium pt-0.5">
+                <div className="flex items-center gap-1 text-[10px] text-[var(--color-success)] font-medium pt-0.5">
                   <CheckCircle2 className="w-2.5 h-2.5" />
                   <span>Success</span>
                 </div>

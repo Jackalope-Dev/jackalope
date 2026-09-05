@@ -12,7 +12,7 @@
   margin: 0 auto;
 }
 .task-eyebrow {
-  color: var(--color-accent);
+  color: var(--color-accent-ink);
   font-size: 11px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -50,7 +50,7 @@
   transition: border-color 0.18s;
 }
 .task-composer:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-ink);
 }
 .task-composer textarea {
   display: block;
@@ -138,7 +138,7 @@ select option {
   color: var(--color-text-secondary);
 }
 .task-link {
-  color: var(--color-accent);
+  color: var(--color-accent-ink);
   display: inline-flex;
   align-items: center;
   gap: 6px;

@@ -236,11 +236,11 @@ export function CodebaseMap() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">License</span>
-                  <span className="font-mono text-emerald-400">Apache-2.0 / Permissive</span>
+                  <span className="font-mono text-[var(--color-success)]">Apache-2.0 / Permissive</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[var(--color-text-muted)]">IPC Channel</span>
-                  <span className="font-mono text-[10px] text-[var(--color-accent)]">
+                  <span className="font-mono text-[10px] text-[var(--color-accent-ink)]">
                     tauri://ipc/{selectedNode.id}
                   </span>
                 </div>
@@ -254,7 +254,7 @@ export function CodebaseMap() {
 
           <div className="pt-4 border-t border-[var(--color-border)]">
             <Button variant="secondary" size="sm" className="w-full gap-2 text-xs">
-              <Sparkles className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              <Sparkles className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <span>Expand Module Sub-Graph</span>
             </Button>
           </div>

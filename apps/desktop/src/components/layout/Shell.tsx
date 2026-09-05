@@ -140,7 +140,7 @@ export function Shell() {
                     className="workspace-menu-item"
                     onSelect={() => setActiveTab(item.id)}
                   >
-                    <item.icon className="size-4 shrink-0 text-[var(--color-accent)]" />
+                    <item.icon className="size-4 shrink-0 text-[var(--color-accent-ink)]" />
                     <span>
                       <span className="block">{item.label}</span>
                       <span className="block text-[11px] text-[var(--color-text-muted)] mt-1">

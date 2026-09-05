@@ -159,7 +159,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowRefiner(!showRefiner)}
-                  className="gap-1.5 text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+                  className="gap-1.5 text-[var(--color-accent-ink)] hover:text-[var(--color-accent-hover)]"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>
@@ -193,7 +193,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
             {refinedPrompt && (
               <div className="p-4 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent-subtle)]/40 space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-accent)]">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-accent-ink)]">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>Synthesized Meta-Prompt (Agent Ready)</span>
                   </div>
@@ -212,7 +212,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                   htmlFor="task-assigned-agent"
                   className="text-xs font-semibold text-[var(--color-text-secondary)] flex items-center gap-1.5"
                 >
-                  <Bot className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                  <Bot className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
                   <span>Assigned Agent Runner</span>
                 </label>
                 <select
@@ -230,7 +230,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
 
               <div className="space-y-1.5">
                 <span className="text-xs font-semibold text-[var(--color-text-secondary)] flex items-center gap-1.5">
-                  <GitBranch className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                  <GitBranch className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
                   <span>Isolated Git Worktree</span>
                 </span>
                 {existingTask?.worktreePath ? (
@@ -245,7 +245,7 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
                     disabled={!existingTask || isSpawningWorktree}
                     className="w-full h-9 gap-1.5 justify-center text-xs"
                   >
-                    <Play className="w-3 h-3 text-[var(--color-accent)]" />
+                    <Play className="w-3 h-3 text-[var(--color-accent-ink)]" />
                     <span>{isSpawningWorktree ? 'Spawning...' : 'Spin Out Worktree'}</span>
                   </Button>
                 )}

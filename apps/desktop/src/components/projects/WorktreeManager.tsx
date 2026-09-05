@@ -97,7 +97,7 @@ export function WorktreeManager() {
       {/* Quick Spawn Card */}
       <div className="p-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm space-y-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-primary)]">
-          <Plus className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+          <Plus className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
           <span>Spin Out New Isolated Worktree</span>
         </div>
 
@@ -129,7 +129,7 @@ export function WorktreeManager() {
           </Button>
         </div>
         {createError && (
-          <p className="text-[11px] text-red-400" role="alert">
+          <p className="text-[11px] text-[var(--color-danger)]" role="alert">
             Couldn't create the worktree: {createError}
           </p>
         )}
@@ -161,7 +161,7 @@ export function WorktreeManager() {
                     <span>HEAD: {wt.head ? wt.head.slice(0, 7) : 'unresolved (bare repo?)'}</span>
                     <span>•</span>
                     {wt.is_locked ? (
-                      <span className="text-amber-400 flex items-center gap-1">
+                      <span className="text-[var(--color-warning)] flex items-center gap-1">
                         <Lock className="w-3 h-3" /> Locked
                       </span>
                     ) : wt.is_bare ? (
@@ -169,7 +169,7 @@ export function WorktreeManager() {
                         Bare repository
                       </span>
                     ) : (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-[var(--color-success)] flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Unlocked
                       </span>
                     )}

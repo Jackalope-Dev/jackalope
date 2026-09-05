@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check, Moon, Sun } from 'lucide-react';
 import { type PointerEvent, useEffect, useId, useState } from 'react';
 import { hexToHsl, hslToHex, PRESET_THEMES, type ThemePalette } from '../../lib/theme-engine';
 
@@ -38,6 +38,27 @@ export function ThemeEditor({
 
   return (
     <div className="space-y-5">
+      <fieldset className="appearance-mode" aria-label="Appearance">
+        {[
+          { dark: false, label: 'Light', Icon: Sun },
+          { dark: true, label: 'Dark', Icon: Moon },
+        ].map(({ dark, label, Icon }) => (
+          <label key={label} className="appearance-mode-option">
+            <input
+              type="radio"
+              name={`${inputId}-appearance`}
+              value={label}
+              checked={(value.isDark !== false) === dark}
+              onChange={() => onChange({ ...value, isDark: dark })}
+              className="sr-only"
+            />
+            <span>
+              <Icon className="size-3.5" aria-hidden="true" />
+              {label}
+            </span>
+          </label>
+        ))}
+      </fieldset>
       <div>
         <div className="flex items-center justify-between text-xs mb-3">
           <span className="font-medium">{value.name}</span>
@@ -115,14 +136,16 @@ export function ThemeEditor({
         </p>
       </div>
       <fieldset
-        className="flex items-center justify-between gap-2 border-0 p-0 m-0"
+        className="flex items-center justify-between gap-2 border-0 p-0"
         aria-label="Theme presets"
       >
         {PRESET_THEMES.map((theme) => (
           <button
             key={theme.id}
             type="button"
-            onClick={() => onChange({ ...theme, atmosphere: value.atmosphere })}
+            onClick={() =>
+              onChange({ ...theme, isDark: value.isDark, atmosphere: value.atmosphere })
+            }
             aria-label={theme.name}
             aria-pressed={value.id === theme.id}
             title={theme.name}
@@ -132,7 +155,11 @@ export function ThemeEditor({
             }}
           >
             {value.id === theme.id && (
-              <Check aria-hidden="true" className="size-4 text-[var(--color-surface-sunken)]" />
+              <Check
+                aria-hidden="true"
+                className="size-4"
+                style={{ color: `hsl(${theme.accentHue} 70% 15%)` }}
+              />
             )}
           </button>
         ))}

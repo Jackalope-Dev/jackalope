@@ -97,7 +97,7 @@ export function CommandPalette({
                   onClose();
                 }}
               >
-                <item.icon className="size-4 text-[var(--color-accent)]" />
+                <item.icon className="size-4 text-[var(--color-accent-ink)]" />
                 <span>{item.label}</span>
               </button>
             ))}
