@@ -1,3 +1,4 @@
+import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlertCircle,
   Camera,
@@ -109,9 +110,9 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
 
                   {step.evidence && step.evidence.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {step.evidence.map((item, eIdx) => (
+                      {[...new Set(step.evidence)].map((item) => (
                         <span
-                          key={eIdx}
+                          key={item}
                           className="px-2 py-0.5 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] font-mono"
                         >
                           {item}
@@ -166,50 +167,51 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
       )}
 
       {/* Image Lightbox Modal */}
-      {activeImage && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setActiveImage(null)}
-        >
-          <div
-            className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl max-w-3xl w-full p-4 space-y-3 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  {activeImage.name}
-                </h4>
-                <p className="text-xs text-[var(--color-text-muted)] font-mono">
-                  {activeImage.url} · {activeImage.filePath}
-                </p>
+      <Dialog.Root
+        open={!!activeImage}
+        onOpenChange={(open) => {
+          if (!open) setActiveImage(null);
+        }}
+      >
+        {activeImage && (
+          <Dialog.Portal>
+            <Dialog.Overlay className="task-dialog-overlay" />
+            <Dialog.Content className="task-dialog appearance-panel max-w-3xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Dialog.Title className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    {activeImage.name}
+                  </Dialog.Title>
+                  <Dialog.Description className="text-xs text-[var(--color-text-muted)] font-mono">
+                    {activeImage.url} · {activeImage.filePath}
+                  </Dialog.Description>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="Close screenshot details"
+                  onClick={() => setActiveImage(null)}
+                >
+                  <X size={16} />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setActiveImage(null)}
-              >
-                <X size={16} />
-              </Button>
-            </div>
 
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-6 min-h-[260px] flex items-center justify-center text-center">
-              <div className="space-y-2">
-                <Camera size={40} className="mx-auto text-[var(--color-accent)]" />
-                <p className="text-xs text-[var(--color-text-secondary)] font-medium">
-                  {activeImage.name}
-                </p>
-                <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
-                  Path: {activeImage.filePath}
-                </p>
+              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-6 min-h-[260px] flex items-center justify-center text-center">
+                <div className="space-y-2">
+                  <Camera size={40} className="mx-auto text-[var(--color-accent)]" />
+                  <p className="text-xs text-[var(--color-text-secondary)] font-medium">
+                    {activeImage.name}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
+                    Path: {activeImage.filePath}
+                  </p>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </Dialog.Content>
+          </Dialog.Portal>
+        )}
+      </Dialog.Root>
     </div>
   );
 }

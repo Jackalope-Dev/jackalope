@@ -1,11 +1,11 @@
-use std::path::Path;
-use tauri::{Manager, State};
 use super::{coordination::Coordinator, tasks::TaskRuntime};
 use crate::state::AppState;
+use std::path::Path;
+use tauri::{Manager, State};
 
 pub const RESET_MARKER: &str = "reset-requested";
 
-fn reject_links(path: &Path) -> Result<(), String> {
+pub(super) fn reject_links(path: &Path) -> Result<(), String> {
     let metadata = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     #[cfg(windows)]
     {
@@ -26,25 +26,46 @@ fn reject_links(path: &Path) -> Result<(), String> {
 }
 
 pub fn reset_on_startup(directory: &Path) -> Result<bool, String> {
-    if !directory.join(RESET_MARKER).exists() { return Ok(false); }
+    if !directory.join(RESET_MARKER).exists() {
+        return Ok(false);
+    }
     reject_links(directory)?;
-    let lock = std::fs::OpenOptions::new().read(true).write(true).open(directory.join("runtime.lock")).map_err(|e| e.to_string())?;
-    lock.try_lock().map_err(|_| "Close the other Jackalope instance before resetting.".to_string())?;
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(directory.join("runtime.lock"))
+        .map_err(|e| e.to_string())?;
+    lock.try_lock()
+        .map_err(|_| "Close the other Jackalope instance before resetting.".to_string())?;
     let coordinator_lock = if directory.join("coordination/owner.lock").exists() {
-        let owner = std::fs::OpenOptions::new().read(true).write(true).open(directory.join("coordination/owner.lock")).map_err(|e| e.to_string())?;
-        owner.try_lock().map_err(|_| "The task coordinator is still running.".to_string())?;
+        let owner = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(directory.join("coordination/owner.lock"))
+            .map_err(|e| e.to_string())?;
+        owner
+            .try_lock()
+            .map_err(|_| "The task coordinator is still running.".to_string())?;
         Some(owner)
-    } else { None };
+    } else {
+        None
+    };
     for child in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
         let child = child.map_err(|e| e.to_string())?;
-        if ["runtime.lock", RESET_MARKER, "coordination"].contains(&child.file_name().to_string_lossy().as_ref()) { continue; }
+        if ["runtime.lock", RESET_MARKER, "coordination"]
+            .contains(&child.file_name().to_string_lossy().as_ref())
+        {
+            continue;
+        }
         remove_entry(&child.path())?;
     }
     let coordination = directory.join("coordination");
     if coordination.exists() {
         for child in std::fs::read_dir(&coordination).map_err(|e| e.to_string())? {
             let child = child.map_err(|e| e.to_string())?;
-            if child.file_name() != "owner.lock" { remove_entry(&child.path())?; }
+            if child.file_name() != "owner.lock" {
+                remove_entry(&child.path())?;
+            }
         }
     }
     drop(coordinator_lock);
@@ -52,13 +73,33 @@ pub fn reset_on_startup(directory: &Path) -> Result<bool, String> {
 }
 
 fn remove_entry(path: &Path) -> Result<(), String> {
-    if path.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) }.map_err(|e| e.to_string())
+    if path.is_dir() {
+        std::fs::remove_dir_all(path)
+    } else {
+        std::fs::remove_file(path)
+    }
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn app_reset(confirmation: String, app: tauri::AppHandle, coordinator: State<'_, Coordinator>, runtime: State<'_, TaskRuntime>, state: State<'_, AppState>) -> Result<(), String> {
-    if confirmation != "RESET" { return Err("Type RESET to confirm.".into()); }
-    if !state.pty_sessions.lock().map_err(|e| e.to_string())?.is_empty() { return Err("Stop terminal agent sessions before resetting.".into()); }
+pub async fn app_reset(
+    confirmation: String,
+    app: tauri::AppHandle,
+    coordinator: State<'_, Coordinator>,
+    runtime: State<'_, TaskRuntime>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if confirmation != "RESET" {
+        return Err("Type RESET to confirm.".into());
+    }
+    if !state
+        .pty_sessions
+        .lock()
+        .map_err(|e| e.to_string())?
+        .is_empty()
+    {
+        return Err("Stop terminal agent sessions before resetting.".into());
+    }
     coordinator.prepare_reset()?;
     runtime.stop_all();
     app.restart();
@@ -66,9 +107,16 @@ pub async fn app_reset(confirmation: String, app: tauri::AppHandle, coordinator:
 
 #[tauri::command]
 pub fn app_finish_reset(app: tauri::AppHandle) -> Result<(), String> {
-    let directory = app.state::<TaskRuntime>().integration_directory().parent().unwrap().to_path_buf();
+    let directory = app
+        .state::<TaskRuntime>()
+        .integration_directory()
+        .parent()
+        .unwrap()
+        .to_path_buf();
     let marker = directory.join(RESET_MARKER);
-    if marker.exists() { std::fs::remove_file(marker).map_err(|e| e.to_string())?; }
+    if marker.exists() {
+        std::fs::remove_file(marker).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 

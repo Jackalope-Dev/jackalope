@@ -1,11 +1,12 @@
-import { useState } from 'react';
 import { Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
-import { Select, SelectItem } from '../ui/Select';
+import { AddAgentForm } from './AddAgentForm';
+import './agent-manager.css';
 
 export function AgentManager() {
   const config = useAgentConfigStore();
@@ -14,9 +15,6 @@ export function AgentManager() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState('');
-  const [path, setPath] = useState('');
-  const [adapter, setAdapter] = useState<'codex' | 'claude' | 'grok'>('codex');
   const desktop = isTauriEnvironment();
   const agents = [
     { id: 'codex', name: 'Codex' },
@@ -38,34 +36,13 @@ export function AgentManager() {
       setBusy(false);
     }
   };
-  const add = () => {
-    if (!name.trim() || !path.trim()) return;
-    config.addCustomAgent({
-      id: `custom-${crypto.randomUUID()}`,
-      name: name.trim(),
-      command: path.trim(),
-      adapter,
-      models: [],
-      description: `Uses the ${adapter} CLI interface.`,
-      enabled: true,
-    });
-    setName('');
-    setPath('');
-    setAdding(false);
-    setSaved(false);
-  };
   return (
-    <div className="space-y-6">
+    <div className="agent-manager">
       <div>
-        <h2 className="text-base font-medium">Choose the agents Jackalope can use</h2>
+        <h2 className="text-base font-medium">Available agents</h2>
         <p className="task-muted mt-2">
-          Enable your agents, choose their models, and set a default. The default handles internal
-          agent work and is the starting choice for new tasks. Repository file scanning runs locally
-          without an LLM.
-        </p>
-        <p className="task-muted mt-2">
-          Model restrictions apply to launches from Jackalope, including the queue and
-          continuations. They do not change use of the CLI outside Jackalope.
+          Enable the agents you want to use. Your default handles internal agent work and is the
+          starting choice for new tasks.
         </p>
       </div>
       <div className="flex flex-wrap gap-3">
@@ -94,45 +71,12 @@ export function AgentManager() {
         </p>
       )}
       {adding && (
-        <div className="space-y-3 p-4 bg-[var(--color-surface-elevated)] rounded-xl">
-          <h3 className="font-medium">Connect an installed CLI</h3>
-          <p className="task-muted">
-            Choose the interface this executable supports. Jackalope currently supports Codex,
-            Claude Code and Grok; arbitrary command-line programs need an adapter.
-          </p>
-          <label className="task-label">
-            Name
-            <input
-              className="task-input mt-1"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <label htmlFor="manual-agent-adapter" className="task-label">
-            CLI interface
-            <Select
-              id="manual-agent-adapter"
-              value={adapter}
-              onValueChange={(value) => setAdapter(value as typeof adapter)}
-            >
-              <SelectItem value="codex">Codex</SelectItem>
-              <SelectItem value="claude">Claude Code</SelectItem>
-              <SelectItem value="grok">Grok</SelectItem>
-            </Select>
-          </label>
-          <label className="task-label">
-            Absolute executable path
-            <input
-              className="task-input mt-1"
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder="C:\Tools\agent.exe"
-            />
-          </label>
-          <Button type="button" onClick={add} disabled={!name.trim() || !path.trim()}>
-            Add agent
-          </Button>
-        </div>
+        <AddAgentForm
+          onAdded={() => {
+            setAdding(false);
+            setSaved(false);
+          }}
+        />
       )}
       {agents.map((agent) => {
         const runner = runners.find((r) => r.id === agent.id);
@@ -147,9 +91,9 @@ export function AgentManager() {
         };
         const enabled = config.isAgentEnabled(agent.id);
         return (
-          <section key={agent.id} className="py-4 border-b border-[var(--color-border)] space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
+          <section key={agent.id} className="agent-config-row">
+            <div className="agent-config-heading">
+              <div className="agent-config-identity">
                 <h3 className="font-medium">
                   {agent.name}
                   {config.defaultMetaAgent === agent.id && (
@@ -164,7 +108,7 @@ export function AgentManager() {
                     : runner?.detail || 'Not checked yet'}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="agent-config-actions">
                 <Button
                   type="button"
                   variant="ghost"
@@ -202,17 +146,17 @@ export function AgentManager() {
             </div>
             <details>
               <summary className="task-summary">Models & executable</summary>
-              <div className="mt-3 space-y-3">
+              <div className="agent-config-fields">
                 <label className="task-label">
                   Executable override
                   <input
-                    className="task-input mt-1"
+                    className="task-input"
                     value={options.command ?? ('command' in agent ? agent.command : '')}
                     onChange={(e) => update({ command: e.target.value })}
                     placeholder="Leave empty to auto-detect"
                   />
                 </label>
-                <div className="flex gap-3 items-center">
+                <div className="agent-model-restriction">
                   <span>Allow only the listed models</span>
                   <Switch
                     checked={options.restrictModels}
@@ -220,27 +164,30 @@ export function AgentManager() {
                     label={`Allow only listed models for ${agent.name}`}
                   />
                 </div>
-                <label className="task-label">
-                  Allowed model IDs (one per line)
-                  <textarea
-                    className="task-input mt-1"
-                    rows={3}
-                    value={options.models.join('\n')}
-                    onChange={(e) => update({ models: e.target.value.split('\n') })}
-                  />
-                </label>
-                <label className="task-label">
-                  Default model ID
-                  <input
-                    className="task-input mt-1"
-                    value={options.defaultModel}
-                    onChange={(e) => update({ defaultModel: e.target.value })}
-                    placeholder="CLI default, or first allowed model when restricted"
-                  />
-                </label>
+                <div className="agent-model-fields">
+                  <label className="task-label">
+                    Allowed model IDs (one per line)
+                    <textarea
+                      className="task-input"
+                      rows={3}
+                      value={options.models.join('\n')}
+                      onChange={(e) => update({ models: e.target.value.split('\n') })}
+                    />
+                  </label>
+                  <label className="task-label">
+                    Default model ID
+                    <input
+                      className="task-input"
+                      value={options.defaultModel}
+                      onChange={(e) => update({ defaultModel: e.target.value })}
+                      placeholder="CLI default or first allowed model"
+                    />
+                  </label>
+                </div>
                 <p className="task-muted">
                   Use exact IDs supported by this CLI and account. An empty restricted list blocks
-                  launches. Jackalope passes the selected model to the executable.
+                  launches. Restrictions apply to Jackalope tasks, queues and continuations; they do
+                  not change CLI use outside Jackalope.
                 </p>
               </div>
             </details>

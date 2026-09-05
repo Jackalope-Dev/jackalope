@@ -307,6 +307,7 @@ impl TaskRuntime {
         if inner.runs.values().any(|run| ["starting", "running", "stopping"].contains(&run.status.as_str())) {
             return Err("Stop active tasks before resetting Jackalope.".into());
         }
+        super::reset::reject_links(&self.directory)?;
         std::fs::write(self.directory.join(super::reset::RESET_MARKER), uuid::Uuid::new_v4().to_string()).map_err(|e| e.to_string())
     }
 

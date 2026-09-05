@@ -1,91 +1,263 @@
-import { ArrowRight, Plug, RefreshCw, Sparkles } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { ArrowRight, Check, CircleAlert, Plus, RefreshCw, Settings2, X } from 'lucide-react';
+import { useState } from 'react';
+import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { AgentManager } from '../agents/AgentManager';
+import { AddAgentForm } from '../agents/AddAgentForm';
+import { AgentAvatar } from '../agents/AgentAvatar';
+import { SettingsDialog } from '../settings/SettingsDialog';
 import { Button } from '../ui/button';
+import { EmptyState } from '../ui/EmptyState';
+import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import '../agents/agents-workspace.css';
 
 export function RunnerConnections({
-  onTasks,
-  onMcp,
+  onNewTask,
+  onRun,
 }: {
-  onTasks: () => void;
-  onMcp?: () => void;
+  onNewTask: (agent: string) => void;
+  onRun: (run: TaskRun) => void;
 }) {
-  const { runners, discovering, discover, error } = useExecutionStore();
+  const { runners, runs, discovering, discover, error } = useExecutionStore();
+  const config = useAgentConfigStore();
+  const [adding, setAdding] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState('');
+  const dialogFocus = useDialogFocus();
   const desktop = isTauriEnvironment();
+  const checkAgents = async () => {
+    setChecking(true);
+    setCheckError('');
+    try {
+      await syncAgentConfig();
+      await discover();
+    } catch (error) {
+      setCheckError(String(error));
+    } finally {
+      setChecking(false);
+    }
+  };
+  const identified: Runner[] = runners.filter(
+    (runner) =>
+      runner.available ||
+      !config.isAgentEnabled(runner.id) ||
+      config.customAgents.some((agent) => agent.id === runner.id) ||
+      runs.some((run) => run.agent === runner.id && isActive(run)),
+  );
+  for (const agent of config.customAgents) {
+    if (!identified.some((runner) => runner.id === agent.id)) {
+      identified.push({
+        id: agent.id,
+        name: agent.name,
+        available: false,
+        signedIn: false,
+        account: '',
+        detail: 'Added manually · check this agent to confirm availability.',
+      });
+    }
+  }
+  const missing = runners.filter((runner) => !identified.some((agent) => agent.id === runner.id));
   return (
-    <section className="task-page max-w-4xl mx-auto space-y-6">
-      <WorkspaceHeading
-        title="Agent Command Center"
-        description="Select authorized agents, restrict models, configure custom runners, and set your default meta-agent."
-        action={
-          <Button
-            variant="outline"
-            onClick={() => void discover()}
-            disabled={discovering || !desktop}
-          >
-            <RefreshCw size={18} aria-hidden="true" />
-            {discovering ? 'Checking…' : 'Refresh'}
-          </Button>
-        }
-      />
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
-      {discovering && (
-        <p role="status" className="task-notice">
-          Checking installed agents…
-        </p>
-      )}
-
-      {/* Main Agent & Model Control Center */}
-      <AgentManager />
-
-      <article className="runner-row">
-        <span className="empty-state-icon">
-          <Plug size={24} aria-hidden="true" />
-        </span>
-        <div className="runner-identity">
-          <div className="workspace-section-heading">
-            <h2>MCP Tools & Marketplace</h2>
-            <span className="task-status">
-              <Sparkles size={16} aria-hidden="true" />
-              AllMCPs.com
-            </span>
-          </div>
-          <p className="task-muted mt-2">
-            Configure Model Context Protocol servers across installed agents or browse the community marketplace.
-          </p>
-          {onMcp && (
-            <div className="mt-3">
-              <Button variant="outline" size="sm" onClick={onMcp}>
-                Manage MCPs & Marketplace
-                <ArrowRight size={15} />
+    <section className="task-page agents-page">
+      <div className="agents-page-content">
+        <WorkspaceHeading
+          title="Your agents"
+          description="Choose a partner for your next task."
+          action={
+            <div className="agent-workspace-actions">
+              <Button
+                variant="ghost"
+                aria-label="Agent settings"
+                title="Agent settings"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Settings2 size={18} />
+              </Button>
+              <Button variant="outline" onClick={() => setAdding(true)}>
+                <Plus size={18} />
+                Add agent
               </Button>
             </div>
-          )}
-        </div>
-      </article>
-
-      {runners.some((runner) => runner.available) && (
-        <div className="flex justify-start">
-          <Button onClick={onTasks}>
-            Create a task
-            <ArrowRight size={18} />
+          }
+        />
+        <div className="agent-roster-heading">
+          <span>On this computer</span>
+          <Button
+            variant="ghost"
+            disabled={!desktop || checking || discovering}
+            onClick={() => void checkAgents()}
+          >
+            <RefreshCw size={15} />
+            {checking || discovering ? 'Checking…' : 'Check agents'}
           </Button>
         </div>
-      )}
-      <details className="supporting-details">
-        <summary>Sign-ins and account access</summary>
-        <p>
-          Sign in through each agent’s CLI. Jackalope uses that session without copying credentials.
-          Account switching is not yet available. Reported usage and supported account limits are in
-          Usage.
+        {(checkError || error) && (
+          <p role="alert" className="task-error">
+            {checkError || error}
+          </p>
+        )}
+        {!desktop && (
+          <p className="task-muted">
+            Open the desktop app to discover installed agents. Manually added agents stay unverified
+            until checked there.
+          </p>
+        )}
+        {identified.length === 0 ? (
+          <EmptyState
+            icon={Plus}
+            title={
+              discovering || checking ? 'Looking for your agents…' : 'No agents identified yet'
+            }
+            description="Jackalope looks for Codex, Claude Code and Grok. Add an installed agent manually if it lives somewhere else."
+            action={
+              <Button variant="outline" onClick={() => setAdding(true)}>
+                <Plus size={18} />
+                Add an agent
+              </Button>
+            }
+          />
+        ) : (
+          <div className="agent-roster">
+            {identified.map((runner) => {
+              const custom = config.customAgents.find((agent) => agent.id === runner.id);
+              const provider = custom?.adapter ?? runner.id;
+              const agentRuns = runs.filter((run) => run.agent === runner.id);
+              const activeRuns = agentRuns.filter(isActive);
+              const waitingRun = activeRuns.find((run) =>
+                run.prompts?.some((prompt) => prompt.status === 'pending'),
+              );
+              const reviewRun = agentRuns.find((run) => run.status === 'review');
+              const enabled = config.isAgentEnabled(runner.id);
+              const options = config.runnerOptions[runner.id];
+              const blockedModels =
+                options?.restrictModels && !options.models.some((model) => model.trim());
+              const canStart = runner.available && enabled && !blockedModels;
+              const working = activeRuns.length > 0;
+              const status = waitingRun
+                ? 'Needs your input'
+                : working
+                  ? activeRuns.every((run) => run.status === 'stopping')
+                    ? 'Stopping'
+                    : activeRuns.every((run) => run.status === 'starting')
+                      ? 'Starting'
+                      : 'Working'
+                  : !enabled
+                    ? 'Disabled'
+                    : blockedModels
+                      ? 'Choose allowed models'
+                      : !runner.available
+                        ? 'Not available'
+                        : runner.signedIn
+                          ? 'Ready'
+                          : 'Installed';
+              const detail = working
+                ? `${activeRuns.length} active ${activeRuns.length === 1 ? 'task' : 'tasks'}`
+                : !enabled
+                  ? 'Enable this agent in Settings.'
+                  : blockedModels
+                    ? 'The allowed model list is empty.'
+                    : !runner.available
+                      ? runner.detail
+                      : runner.signedIn
+                        ? 'Using your existing CLI sign-in.'
+                        : 'Sign-in is checked by the CLI when a task starts.';
+              const attention = !!waitingRun || (!working && !canStart);
+              const taskToOpen = waitingRun ?? activeRuns[0] ?? reviewRun;
+              return (
+                <article key={runner.id} className="agent-roster-row" data-provider={provider}>
+                  <AgentAvatar
+                    provider={provider}
+                    working={working && !waitingRun}
+                    waiting={!!waitingRun}
+                  />
+                  <div className="agent-roster-identity">
+                    <div className="agent-roster-name">
+                      <h2>{custom?.name ?? runner.name}</h2>
+                      {config.defaultMetaAgent === runner.id && enabled && (
+                        <span className="agent-default">Default</span>
+                      )}
+                      {custom && <span className="agent-custom">Manual</span>}
+                    </div>
+                    <p className="agent-presence" data-attention={attention || undefined}>
+                      {attention ? <CircleAlert size={15} /> : <Check size={15} />}
+                      {status}
+                    </p>
+                    <p className="task-muted">{detail}</p>
+                    {taskToOpen && (
+                      <button
+                        className="agent-task-link"
+                        type="button"
+                        onClick={() => onRun(taskToOpen)}
+                      >
+                        {waitingRun ? 'Respond to task' : working ? 'View task' : 'Review task'}
+                        <ArrowRight size={14} />
+                        <span>{taskToOpen.projectName}</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="agent-roster-action">
+                    {canStart ? (
+                      <Button
+                        variant="outline"
+                        aria-label={`New task with ${custom?.name ?? runner.name}`}
+                        onClick={() => onNewTask(runner.id)}
+                      >
+                        New task
+                        <ArrowRight size={16} />
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" onClick={() => setSettingsOpen(true)}>
+                        Configure
+                        <Settings2 size={16} />
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        {missing.length > 0 && (
+          <p className="task-muted">
+            Not detected: {missing.map((runner) => runner.name).join(', ')}. Install and sign in
+            through the CLI, then check again.
+          </p>
+        )}
+        <p className="agent-workspace-note">
+          Model choices, executable paths and defaults live in{' '}
+          <button type="button" className="task-link" onClick={() => setSettingsOpen(true)}>
+            Agent settings
+            <ArrowRight size={14} />
+          </button>
         </p>
-      </details>
+      </div>
+      <Dialog.Root open={adding} onOpenChange={setAdding}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="task-dialog-overlay" />
+          <Dialog.Content {...dialogFocus} className="task-dialog appearance-panel">
+            <Dialog.Close className="task-close" aria-label="Close add agent">
+              <X size={18} />
+            </Dialog.Close>
+            <Dialog.Title className="text-2xl font-medium mb-3">Add an agent</Dialog.Title>
+            <Dialog.Description className="task-muted mb-6">
+              Give your installed agent a name and tell Jackalope where to find it.
+            </Dialog.Description>
+            <AddAgentForm
+              onAdded={() => {
+                setAdding(false);
+                if (desktop) void checkAgents();
+              }}
+            />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      {settingsOpen && (
+        <SettingsDialog open onClose={() => setSettingsOpen(false)} initialCategory="Agents" />
+      )}
     </section>
   );
 }

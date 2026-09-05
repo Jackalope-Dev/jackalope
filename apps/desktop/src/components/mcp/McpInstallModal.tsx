@@ -242,7 +242,9 @@ export function McpInstallModal({
                 <div className="space-y-2">
                   {Object.entries(envValues).map(([key, val]) => (
                     <div key={key}>
-                      <div className="text-xs font-mono text-[var(--color-text-primary)] mb-1">{key}</div>
+                      <div className="text-xs font-mono text-[var(--color-text-primary)] mb-1">
+                        {key}
+                      </div>
                       <input
                         aria-label={key}
                         type={

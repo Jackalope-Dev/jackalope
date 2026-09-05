@@ -71,9 +71,7 @@ export const useProjectStore = create<ProjectState>()(
       updateProjectPreferences: (id, prefs) => {
         set((state) => ({
           projects: state.projects.map((p) =>
-            p.id === id
-              ? { ...p, preferences: { ...(p.preferences ?? {}), ...prefs } }
-              : p,
+            p.id === id ? { ...p, preferences: { ...(p.preferences ?? {}), ...prefs } } : p,
           ),
         }));
       },
@@ -81,9 +79,8 @@ export const useProjectStore = create<ProjectState>()(
       removeProject: (id) => {
         set((state) => {
           const nextProjects = state.projects.filter((p) => p.id !== id);
-          const nextActive = state.activeProjectId === id
-            ? (nextProjects[0]?.id ?? null)
-            : state.activeProjectId;
+          const nextActive =
+            state.activeProjectId === id ? (nextProjects[0]?.id ?? null) : state.activeProjectId;
           return { projects: nextProjects, activeProjectId: nextActive };
         });
       },

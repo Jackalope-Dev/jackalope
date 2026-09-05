@@ -1,7 +1,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertCircle, Bot, CalendarClock, CheckCircle2, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useMascotStore } from '../../stores/mascotStore';
+import { useTaskStore } from '../../stores/taskStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -11,8 +12,9 @@ import { useDialogFocus } from '../ui/useDialogFocus';
 
 export function ScheduleManager() {
   const dialogFocus = useDialogFocus();
-  const { schedules, toggleSchedule, addSchedule, deleteSchedule, runNow } = useScheduleStore();
-  const { say, setMood } = useMascotStore();
+  const { schedules, toggleSchedule, addSchedule, deleteSchedule } = useScheduleStore();
+  const projectId = useProjectStore((state) => state.activeProjectId);
+  const [feedback, setFeedback] = useState('');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [name, setName] = useState('');
@@ -21,12 +23,17 @@ export function ScheduleManager() {
   const [prompt, setPrompt] = useState('');
   const [assignedAgentProvider, setAssignedAgentProvider] = useState('Agent Antigravity');
 
-  const handleManualRun = async (id: string, taskName: string) => {
-    setMood('working');
-    say(`Running scheduled routine "${taskName}" now...`, 2500);
-    await runNow(id);
-    setMood('success');
-    say(`Scheduled run for "${taskName}" completed without errors!`, 3500);
+  const handleManualRun = (id: string) => {
+    const schedule = schedules.find((item) => item.id === id);
+    if (!schedule || !projectId) return;
+    useTaskStore.getState().addTask({
+      projectId,
+      title: schedule.name,
+      rawPrompt: schedule.prompt,
+      status: 'backlog',
+      assignedAgent: schedule.assignedAgentProvider,
+    });
+    setFeedback('Task added to this project’s Planning board. It has not been dispatched.');
   };
 
   const handleCreateSchedule = () => {
@@ -35,7 +42,7 @@ export function ScheduleManager() {
       name,
       description: description || 'Autonomous recurring agent job',
       cronExpression,
-      targetProjectId: 'jackalope-core',
+      targetProjectId: projectId ?? '',
       assignedAgentProvider,
       prompt: prompt || 'Execute automated verification',
       enabled: true,
@@ -44,7 +51,6 @@ export function ScheduleManager() {
     setDescription('');
     setPrompt('');
     setShowAddModal(false);
-    say('Automated routine created and scheduled!', 3000);
   };
 
   return (
@@ -95,7 +101,7 @@ export function ScheduleManager() {
                     </span>
                     {sch.enabled ? (
                       <Badge variant="success" className="text-xs">
-                        Active
+                        Planned
                       </Badge>
                     ) : (
                       <Badge variant="default" className="text-xs">
@@ -110,7 +116,8 @@ export function ScheduleManager() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleManualRun(sch.id, sch.name)}
+                    onClick={() => handleManualRun(sch.id)}
+                    disabled={!projectId}
                     className="gap-1.5 text-xs"
                   >
                     <Play className="w-3 h-3 text-[var(--color-accent-ink)]" />
@@ -144,7 +151,7 @@ export function ScheduleManager() {
                   <Bot className="w-3 h-3 text-[var(--color-accent-ink)]" />
                   <span>{sch.assignedAgentProvider}</span>
                   <span>•</span>
-                  <span>Next Run: {sch.nextRun}</span>
+                  <span>Automatic execution unavailable</span>
                 </div>
 
                 {sch.lastRun && (
@@ -165,6 +172,20 @@ export function ScheduleManager() {
         </div>
       </div>
 
+      {feedback && (
+        <p role="status" className="task-notice">
+          {feedback}
+        </p>
+      )}
+      {!schedules.length && (
+        <p className="task-muted">
+          No schedules saved. Create a plan for recurring work; automatic execution is not connected
+          yet.
+        </p>
+      )}
+      {!projectId && (
+        <p className="task-muted">Open a project to turn a schedule into a planning task.</p>
+      )}
       {/* Add Schedule Modal */}
       <Dialog.Root open={showAddModal} onOpenChange={setShowAddModal}>
         <Dialog.Portal>

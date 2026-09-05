@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import {
-  type McpProbeResult,
-  type McpServerConfig,
   deleteMcpServer,
   listMcpServers,
+  type McpProbeResult,
+  type McpServerConfig,
   probeMcpServer,
   saveMcpServer,
 } from '../lib/tauri-bridge.ts';
@@ -50,6 +50,26 @@ export interface AllMcpsSearchResponse {
   servers: AllMcpsServer[];
 }
 
+export interface AllMcpsDetails {
+  description?: string;
+  aiOverview?: string | null;
+  aiFeatures?: string[];
+  aiUseCases?: string[];
+  readme?: string | null;
+  tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
+  toolsSource?: string | null;
+  license?: string | null;
+  pricingModel?: string | null;
+  pricingNotes?: string | null;
+  authType?: string | null;
+  compatibleClients?: string[];
+  maintenanceStatus?: string | null;
+  lastCommitAt?: string | null;
+  lastCheckedAt?: string | null;
+  supportUrl?: string | null;
+  websiteUrl?: string | null;
+}
+
 let searchController: AbortController | undefined;
 let inspectController: AbortController | undefined;
 
@@ -68,6 +88,8 @@ interface McpState {
 
   inspectingServer: AllMcpsServer | null;
   inspectingMarkdown: string | null;
+  inspectingDetails: AllMcpsDetails | null;
+  inspectError: string | null;
   loadingMarkdown: boolean;
 
   loadServers: () => Promise<void>;
@@ -97,6 +119,8 @@ export const useMcpStore = create<McpState>((set, get) => ({
 
   inspectingServer: null,
   inspectingMarkdown: null,
+  inspectingDetails: null,
+  inspectError: null,
   loadingMarkdown: false,
 
   loadServers: async () => {
@@ -200,7 +224,13 @@ export const useMcpStore = create<McpState>((set, get) => ({
     if (!useSettingsStore.getState().useMcpMarketplace) return;
     const controller = new AbortController();
     inspectController = controller;
-    set({ inspectingServer: server, inspectingMarkdown: null, loadingMarkdown: true });
+    set({
+      inspectingServer: server,
+      inspectingMarkdown: null,
+      inspectingDetails: null,
+      inspectError: null,
+      loadingMarkdown: true,
+    });
     try {
       const res = await fetch(
         `https://allmcps.com/api/v1/servers/${encodeURIComponent(server.id)}`,
@@ -208,7 +238,9 @@ export const useMcpStore = create<McpState>((set, get) => ({
       );
       if (res.ok) {
         const data = await res.json();
-        const detail = data.server;
+        const detail: AllMcpsDetails = data.server;
+        if (!detail || typeof detail !== 'object')
+          throw new Error('The marketplace returned no server details.');
         const text =
           [
             detail?.description,
@@ -218,17 +250,15 @@ export const useMcpStore = create<McpState>((set, get) => ({
             .filter(Boolean)
             .join('\n\n') || server.description;
         if (controller.signal.aborted || !useSettingsStore.getState().useMcpMarketplace) return;
-        set({ inspectingMarkdown: text, loadingMarkdown: false });
+        set({ inspectingDetails: detail, inspectingMarkdown: text, loadingMarkdown: false });
       } else {
-        set({
-          inspectingMarkdown: server.description || 'No additional documentation available.',
-          loadingMarkdown: false,
-        });
+        throw new Error(`Could not load server details (HTTP ${res.status}).`);
       }
-    } catch {
+    } catch (error) {
       if (controller.signal.aborted) return;
       set({
         inspectingMarkdown: server.description || 'No additional documentation available.',
+        inspectError: error instanceof Error ? error.message : String(error),
         loadingMarkdown: false,
       });
     }
@@ -236,7 +266,13 @@ export const useMcpStore = create<McpState>((set, get) => ({
 
   clearInspecting: () => {
     inspectController?.abort();
-    set({ inspectingServer: null, inspectingMarkdown: null, loadingMarkdown: false });
+    set({
+      inspectingServer: null,
+      inspectingMarkdown: null,
+      inspectingDetails: null,
+      inspectError: null,
+      loadingMarkdown: false,
+    });
   },
 }));
 
@@ -249,6 +285,8 @@ useSettingsStore.subscribe((state, previous) => {
       loadingMarketplace: false,
       inspectingServer: null,
       inspectingMarkdown: null,
+      inspectingDetails: null,
+      inspectError: null,
       loadingMarkdown: false,
     });
   }

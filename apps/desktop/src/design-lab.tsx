@@ -6,12 +6,13 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Select, SelectItem } from './components/ui/Select';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
-import { applyThemeTokens, PRESET_THEMES } from './lib/theme-engine';
+import { applyThemeTokens, PRESET_THEMES, startThemeClock } from './lib/theme-engine';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
 import './components/ui/experience.css';
 
 function DesignLab() {
+  useEffect(startThemeClock, []);
   const [theme, setTheme] = useState(PRESET_THEMES[0]);
   const [replay, setReplay] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);

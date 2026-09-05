@@ -22,7 +22,9 @@ export function CommandPalette({
   const search = query.trim().toLowerCase();
   const showSettings =
     Boolean(onOpenSettings) &&
-    ('settings preferences options configuration project'.split(' ').some((kw) => kw.includes(search)) ||
+    ('settings preferences options configuration project'
+      .split(' ')
+      .some((kw) => kw.includes(search)) ||
       'settings & preferences'.includes(search));
   const views = WORKSPACE_VIEWS.filter((item) =>
     `${item.label} ${item.description}`.toLowerCase().includes(search),
@@ -127,7 +129,12 @@ export function CommandPalette({
                 className="workspace-menu-item w-full hover:bg-[var(--color-surface-hover)]"
                 onClick={() => {
                   const current = useThemeStore.getState().currentTheme;
-                  setTheme({ ...theme, isDark: current.isDark, atmosphere: current.atmosphere });
+                  setTheme({
+                    ...theme,
+                    isDark: current.isDark,
+                    appearance: current.appearance,
+                    atmosphere: current.atmosphere,
+                  });
                   onClose();
                 }}
               >

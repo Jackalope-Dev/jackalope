@@ -365,18 +365,63 @@
   }
 }
 
-.settings-search { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 12px; border-radius: 10px; background: var(--color-surface-sunken); }
-.settings-search input { width: 100%; min-width: 0; background: transparent; outline: none; }
-.settings-search:focus-within { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
-.settings-section + .settings-section { margin-top: 40px; }
-.settings-content { container-type: inline-size; overscroll-behavior: contain; overflow-wrap: anywhere; }
-.settings-row-description { display: block; }
-.settings-row-label { flex-wrap: wrap; }
-.settings-control-wrapper { min-width: 0; max-width: 100%; }
-.settings-input { min-width: 0; width: 220px; max-width: 100%; }
-.settings-reset-box { border: 1px solid var(--color-danger); border-radius: 12px; padding: 20px; }
+.settings-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+}
+.settings-search input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  outline: none;
+}
+.settings-search:focus-within {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.settings-section + .settings-section {
+  margin-top: 40px;
+}
+.settings-content {
+  container-type: inline-size;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+.settings-row-description {
+  display: block;
+}
+.settings-row-label {
+  flex-wrap: wrap;
+}
+.settings-control-wrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+.settings-input {
+  min-width: 0;
+  width: 220px;
+  max-width: 100%;
+}
+.settings-reset-box {
+  border: 1px solid var(--color-danger);
+  border-radius: 12px;
+  padding: 20px;
+}
 @container (max-width: 520px) {
-  .settings-row { flex-direction: column; align-items: stretch; gap: 12px; }
-  .settings-control-wrapper { flex-wrap: wrap; }
-  .settings-input { width: 100%; }
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .settings-control-wrapper {
+    flex-wrap: wrap;
+  }
+  .settings-input {
+    width: 100%;
+  }
 }

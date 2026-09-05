@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyThemeTokens, hslToHex, PRESET_THEMES } from '../src/lib/theme-engine.ts';
+import {
+  applyThemeTokens,
+  hslToHex,
+  isDarkAtTime,
+  PRESET_THEMES,
+  startThemeClock,
+} from '../src/lib/theme-engine.ts';
 import { useMascotStore } from '../src/stores/mascotStore.ts';
 
 function luminance(color) {
@@ -15,6 +21,69 @@ function luminance(color) {
     });
   return r * 0.2126 + g * 0.7152 + b * 0.0722;
 }
+
+test('automatic appearance uses local day boundaries and preserves manual preferences', () => {
+  const theme = { ...PRESET_THEMES[0], appearance: 'automatic' };
+  for (const [hour, minute, dark] of [
+    [0, 0, true],
+    [6, 59, true],
+    [7, 0, false],
+    [18, 59, false],
+    [19, 0, true],
+    [23, 59, true],
+  ]) {
+    assert.equal(isDarkAtTime(theme, new Date(2026, 8, 4, hour, minute)), dark);
+  }
+  for (const isDark of [false, true]) {
+    assert.equal(isDarkAtTime({ ...PRESET_THEMES[0], isDark }, new Date(2026, 8, 4, 12)), isDark);
+  }
+});
+
+test('theme clock switches at the boundary, respects previews, catches wake-up and cleans up', (context) => {
+  context.mock.timers.enable({
+    apis: ['Date', 'setTimeout'],
+    now: new Date(2026, 8, 4, 18, 59, 30).getTime(),
+  });
+  const tokens = new Map();
+  const events = new Map();
+  const oldWindow = globalThis.window;
+  const oldDocument = globalThis.document;
+  const listeners = {
+    addEventListener: (name, callback) => events.set(name, callback),
+    removeEventListener: (name) => events.delete(name),
+  };
+  globalThis.window = { ...listeners, setTimeout, clearTimeout };
+  globalThis.document = {
+    ...listeners,
+    documentElement: { style: { setProperty: (key, value) => tokens.set(key, value) } },
+  };
+  const theme = { ...PRESET_THEMES[0], appearance: 'automatic', atmosphere: 24 };
+  applyThemeTokens(theme);
+  const stop = startThemeClock();
+  try {
+    const accent = tokens.get('--color-accent');
+    assert.equal(tokens.get('color-scheme'), 'light');
+    context.mock.timers.tick(30_000);
+    assert.equal(tokens.get('color-scheme'), 'dark');
+    assert.equal(tokens.get('--color-accent'), accent);
+    applyThemeTokens({ ...theme, appearance: 'manual', isDark: false });
+    context.mock.timers.tick(60_000);
+    assert.equal(tokens.get('color-scheme'), 'light');
+    applyThemeTokens(theme);
+    assert.equal(tokens.get('color-scheme'), 'dark');
+    context.mock.timers.setTime(new Date(2026, 8, 5, 8).getTime());
+    events.get('focus')();
+    assert.equal(tokens.get('color-scheme'), 'light');
+    context.mock.timers.setTime(new Date(2026, 8, 5, 20).getTime());
+    events.get('visibilitychange')();
+    assert.equal(tokens.get('color-scheme'), 'dark');
+  } finally {
+    stop();
+    assert.equal(events.size, 0);
+    globalThis.window = oldWindow;
+    globalThis.document = oldDocument;
+  }
+});
 
 test('both appearances keep text readable across tinted surfaces and custom accents', () => {
   const tokens = new Map();

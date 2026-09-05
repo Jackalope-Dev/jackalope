@@ -136,7 +136,9 @@ export const useSettingsStore = create<SettingsState>()(
 
       exportSettings: () => {
         const state = get();
-        const exportData = Object.fromEntries(Object.entries(state).filter(([, value]) => typeof value !== 'function'));
+        const exportData = Object.fromEntries(
+          Object.entries(state).filter(([, value]) => typeof value !== 'function'),
+        );
         return JSON.stringify(exportData, null, 2);
       },
     }),

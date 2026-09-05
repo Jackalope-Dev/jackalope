@@ -196,10 +196,10 @@ export function CodebaseMap() {
                       }`}
                     />
                   </div>
-                  <div className="text-xs font-bold text-[var(--color-text-primary)] truncate">
+                  <div className="text-xs font-bold text-[var(--color-text-primary)] break-words">
                     {node.label}
                   </div>
-                  <div className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">
+                  <div className="text-xs text-[var(--color-text-secondary)] break-words mt-0.5">
                     {node.detail}
                   </div>
                 </motion.button>
@@ -225,19 +225,19 @@ export function CodebaseMap() {
               </div>
 
               <div className="space-y-2 pt-2 border-t border-[var(--color-border)] text-xs">
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-3">
                   <span className="text-[var(--color-text-muted)]">Status</span>
                   <span className="capitalize font-medium text-[var(--color-text-primary)]">
                     {selectedNode.status}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-3">
                   <span className="text-[var(--color-text-muted)]">License</span>
                   <span className="font-mono text-[var(--color-success)]">
                     Apache-2.0 / Permissive
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-3">
                   <span className="text-[var(--color-text-muted)]">IPC Channel</span>
                   <span className="font-mono text-xs text-[var(--color-accent-ink)]">
                     tauri://ipc/{selectedNode.id}
@@ -252,7 +252,13 @@ export function CodebaseMap() {
           )}
 
           <div className="pt-4 border-t border-[var(--color-border)]">
-            <Button variant="secondary" size="sm" className="w-full gap-2 text-xs">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full gap-2 text-xs"
+              disabled
+              title="Live module expansion is not available yet"
+            >
               <Sparkles className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <span>Expand Module Sub-Graph</span>
             </Button>

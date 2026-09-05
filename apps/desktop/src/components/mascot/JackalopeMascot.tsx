@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useId, useState } from 'react';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { characterPaths as paths } from './character-paths';
 
@@ -60,11 +61,21 @@ export function JackalopeMascot({
   reduceMotion: forceReducedMotion = false,
 }: JackalopeMascotProps) {
   const { mood, message, pet } = useMascotStore();
+  const faceMask = useId();
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const currentMood = overrideMood ?? mood;
   const systemReducedMotion = useReducedMotion();
   const reduceMotion = forceReducedMotion || systemReducedMotion;
   const dim = size === 'sm' ? 40 : size === 'md' ? 88 : 152;
   const resting = currentMood === 'sleep';
+  const attentive = (hovered || focused) && !resting;
+  const delighted = currentMood === 'success';
+  const mouth = delighted
+    ? 'M117 88 Q122 94 128 88'
+    : attentive
+      ? 'M118 89 Q123 93 127 88'
+      : 'M120 90 Q123 91 126 89';
   const staticPose = { y: 0, scaleY: 1, rotate: 0, opacity: resting ? 0.7 : 1 };
 
   return (
@@ -88,6 +99,10 @@ export function JackalopeMascot({
       <motion.button
         type="button"
         onClick={pet}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         aria-label={`Pet Jackalope, currently ${currentMood}`}
         data-mood={currentMood}
         title="Pet Jackalope"
@@ -102,6 +117,46 @@ export function JackalopeMascot({
           aria-hidden="true"
           className="w-full h-full overflow-visible"
         >
+          <defs>
+            <mask id={faceMask} maskUnits="userSpaceOnUse" x="25" y="-8" width="128" height="128">
+              <rect x="25" y="-8" width="128" height="128" fill="white" />
+              <motion.g
+                animate={{ x: attentive ? 0.8 : 0, y: attentive ? -0.5 : 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.2 }}
+              >
+                {resting || delighted ? (
+                  <path
+                    d={resting ? 'M100 73 Q103 76 106 73' : 'M100 73 Q103 69 106 73'}
+                    fill="none"
+                    stroke="black"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <motion.ellipse
+                    cx="103"
+                    cy="73"
+                    rx="2.5"
+                    ry="3.3"
+                    fill="black"
+                    animate={{ scaleY: attentive && !reduceMotion ? [1, 0.12, 1] : 1 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.24, times: [0, 0.45, 1] }}
+                    style={{ transformOrigin: '103px 73px' }}
+                  />
+                )}
+              </motion.g>
+              <motion.path
+                d={mouth}
+                initial={{ d: mouth, opacity: resting ? 0 : 1 }}
+                animate={{ d: mouth, opacity: resting ? 0 : 1 }}
+                transition={{ duration: reduceMotion ? 0 : 0.2 }}
+                fill="none"
+                stroke="black"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </mask>
+          </defs>
           <motion.g
             variants={mascotMotion}
             animate={reduceMotion ? staticPose : currentMood}
@@ -132,7 +187,7 @@ export function JackalopeMascot({
               }
               style={{ transformOrigin: '83px 63px' }}
             />
-            <path d={paths.head} />
+            <path d={paths.head} mask={`url(#${faceMask})`} />
           </motion.g>
         </svg>
       </motion.button>

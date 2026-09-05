@@ -557,3 +557,24 @@ button:disabled {
     padding: 28px 20px;
   }
 }
+
+.prototype-notice {
+  flex-shrink: 0;
+}
+.workspace-canvas > * {
+  min-width: 0;
+}
+.task-input.with-search-icon {
+  padding-left: 36px;
+}
+.task-page,
+.tool-page,
+.mcp-workspace {
+  overflow-wrap: anywhere;
+}
+.workspace-menu {
+  max-height: var(--radix-dropdown-menu-content-available-height);
+  max-width: calc(100vw - 48px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}

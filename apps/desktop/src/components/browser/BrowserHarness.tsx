@@ -143,7 +143,7 @@ export function BrowserHarness() {
           <div className="flex-1 bg-[var(--color-surface-sunken)] relative p-6 flex flex-col justify-center items-center text-center overflow-auto">
             {realScreenshots.length > 0 ? (
               <div className="w-full max-w-xl rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3 shadow-xl text-left">
-                <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border)]">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[var(--color-border)]">
                   <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                     {realScreenshots[realScreenshots.length - 1].name}
                   </span>
@@ -175,7 +175,7 @@ export function BrowserHarness() {
               </div>
             ) : (
               <div className="w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 shadow-xl text-left">
-                <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--color-border)]">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                       Sample page
@@ -191,9 +191,8 @@ export function BrowserHarness() {
                     &lt;html&gt; ... loaded 42 interactive elements &lt;/html&gt;
                   </div>
                   <p className="text-xs leading-relaxed">
-                    The agent possesses full browser automation capabilities: navigating URLs,
-                    capturing real screenshots, clicking elements, verifying form inputs, and
-                    extracting structured DOM state.
+                    This is a sample page, not a live browser. Reliable navigation, interaction and
+                    verification are still in development.
                   </p>
                 </div>
 
@@ -202,7 +201,7 @@ export function BrowserHarness() {
                     In-App Browser Harness
                   </Badge>
                   <Badge variant="outline" className="font-mono text-xs">
-                    Headless Edge / WebView Connected
+                    Sample browser data
                   </Badge>
                 </div>
               </div>
@@ -212,7 +211,7 @@ export function BrowserHarness() {
 
         {/* Right Col: Action Stream / DOM Timeline */}
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col overflow-hidden shadow-sm">
-          <div className="px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-text-primary)]">
               <MousePointer className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
               <span>Agent Action Log</span>
@@ -228,7 +227,7 @@ export function BrowserHarness() {
                 key={act.id}
                 className="p-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] space-y-1 text-xs"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-mono text-xs">
                     <span className="px-1.5 py-0.2 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] font-semibold">
                       Step {act.step}

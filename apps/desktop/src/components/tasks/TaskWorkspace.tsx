@@ -28,9 +28,9 @@ import {
   type TaskRun,
 } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -391,7 +391,13 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
   );
 }
 
-export function TaskWorkspace() {
+export function TaskWorkspace({
+  newTaskAgent,
+  onNewTaskHandled,
+}: {
+  newTaskAgent?: string | null;
+  onNewTaskHandled?: () => void;
+}) {
   const { projects, activeProjectId } = useProjectStore();
   const {
     runs,
@@ -408,11 +414,17 @@ export function TaskWorkspace() {
     discovering,
   } = useExecutionStore();
   const project = projects.find((p) => p.id === activeProjectId);
-  const [setup, setSetup] = useState(false);
+  const [setup, setSetup] = useState(!!newTaskAgent && !project);
   const [submitError, setSubmitError] = useState('');
   const [filter, setFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(!!newTaskAgent);
+  useEffect(() => {
+    if (newTaskAgent && project) {
+      draft(project.id, { agent: newTaskAgent });
+      onNewTaskHandled?.();
+    }
+  }, [newTaskAgent, project, draft, onNewTaskHandled]);
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   useEffect(() => {
     if (composing) document.getElementById('task-intent')?.focus();
@@ -434,7 +446,7 @@ export function TaskWorkspace() {
       ? project.preferences.preferredRunner
       : appDefaultRunner;
 
-  const currentAgent = current.agent || preferredAgent;
+  const currentAgent = newTaskAgent || current.agent || preferredAgent;
   const runner = runners.find((r) => r.id === currentAgent);
   const desktop = isTauriEnvironment();
 
@@ -776,7 +788,13 @@ export function TaskWorkspace() {
             }
           />
         ))}
-      <ProjectSetup open={setup} onClose={() => setSetup(false)} />
+      <ProjectSetup
+        open={setup}
+        onClose={() => {
+          setSetup(false);
+          if (!useProjectStore.getState().activeProjectId) onNewTaskHandled?.();
+        }}
+      />
     </section>
   );
 }

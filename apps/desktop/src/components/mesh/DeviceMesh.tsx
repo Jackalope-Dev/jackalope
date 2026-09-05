@@ -133,7 +133,7 @@ export function DeviceMesh() {
           />
           <Button variant="secondary" size="sm" className="gap-1.5 shrink-0 text-xs">
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Test Connection</span>
+            <span>Preview connection</span>
           </Button>
         </div>
       </div>
@@ -141,7 +141,7 @@ export function DeviceMesh() {
       {/* Connected Devices Grid */}
       <div className="space-y-3">
         <div className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-          Known Active Devices ({devices.length})
+          Sample Devices ({devices.length})
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">

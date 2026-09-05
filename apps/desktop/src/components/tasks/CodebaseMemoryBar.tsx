@@ -47,10 +47,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
   return (
     <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] overflow-hidden transition-all">
       {/* Summary Bar */}
-      <div
-        onClick={() => setExpanded(!expanded)}
-        className="p-3 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-[var(--color-surface-hover)] transition-colors"
-      >
+      <div className="p-3 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-[var(--color-surface-hover)] transition-colors">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="p-1 rounded-md bg-[var(--color-accent-subtle)] text-[var(--color-accent)] flex items-center gap-1 font-medium">
             <Sparkles size={13} />
@@ -121,6 +118,8 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
           <button
             type="button"
             className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+            onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
             aria-label={expanded ? 'Collapse context memory' : 'Expand context memory'}
           >
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -182,9 +181,12 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
                 Project Invariants & Conventions (Injected into tasks)
               </span>
               <ul className="space-y-1 pl-1 max-h-36 overflow-y-auto pr-2">
-                {memory.conventions.slice(0, 6).map((conv, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-[var(--color-text-muted)]">
-                    <CheckCircle2 size={12} className="text-[var(--color-success)] shrink-0 mt-0.5" />
+                {[...new Set(memory.conventions)].slice(0, 6).map((conv) => (
+                  <li key={conv} className="flex items-start gap-2 text-[var(--color-text-muted)]">
+                    <CheckCircle2
+                      size={12}
+                      className="text-[var(--color-success)] shrink-0 mt-0.5"
+                    />
                     <span>{conv}</span>
                   </li>
                 ))}

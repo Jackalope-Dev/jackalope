@@ -6,6 +6,7 @@ export interface ThemePalette {
   accentLight: number;
   accentHex: string;
   isDark: boolean;
+  appearance?: 'manual' | 'automatic';
   atmosphere?: number;
 }
 
@@ -66,11 +67,40 @@ export const PRESET_THEMES: ThemePalette[] = [
   },
 ];
 
+let activeTheme: ThemePalette | undefined;
+let activeDark: boolean | undefined;
+
+export function isDarkAtTime(theme: ThemePalette, now = new Date()) {
+  if (theme.appearance !== 'automatic') return theme.isDark !== false;
+  return now.getHours() < 7 || now.getHours() >= 19;
+}
+
+export function startThemeClock() {
+  const refresh = () => {
+    if (activeTheme && isDarkAtTime(activeTheme) !== activeDark) applyThemeTokens(activeTheme);
+  };
+  let timer: number;
+  const tick = () => {
+    refresh();
+    timer = window.setTimeout(tick, 60_000 - (Date.now() % 60_000));
+  };
+  window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', refresh);
+  tick();
+  return () => {
+    window.clearTimeout(timer);
+    window.removeEventListener('focus', refresh);
+    document.removeEventListener('visibilitychange', refresh);
+  };
+}
+
 export function applyThemeTokens(theme: ThemePalette) {
+  activeTheme = theme;
   const root = document.documentElement;
   const { accentHue, accentSat, accentLight } = theme;
   const atmosphere = theme.atmosphere ?? 12;
-  const dark = theme.isDark !== false;
+  const dark = isDarkAtTime(theme);
+  activeDark = dark;
   const tone = (light: number, saturation = atmosphere) =>
     `hsl(${accentHue} ${saturation}% ${light}%)`;
   root.style.setProperty('color-scheme', dark ? 'dark' : 'light');
@@ -126,6 +156,9 @@ export function applyThemeTokens(theme: ThemePalette) {
   root.style.setProperty('--color-accent-ink', tone(inkLight, accentSat));
   root.style.setProperty('--color-border-focus', 'var(--color-accent-ink)');
   root.style.setProperty('--color-success', dark ? 'hsl(160 64% 65%)' : 'hsl(160 75% 23%)');
+  root.style.setProperty('--color-agent-codex', dark ? 'hsl(160 55% 70%)' : 'hsl(160 65% 28%)');
+  root.style.setProperty('--color-agent-claude', dark ? 'hsl(22 75% 72%)' : 'hsl(22 65% 35%)');
+  root.style.setProperty('--color-agent-grok', dark ? 'hsl(255 65% 80%)' : 'hsl(255 45% 40%)');
   root.style.setProperty('--color-warning', dark ? 'hsl(40 95% 65%)' : 'hsl(35 90% 27%)');
   root.style.setProperty('--color-danger', dark ? 'hsl(0 90% 75%)' : 'hsl(0 72% 38%)');
   const shadow = `hsl(${accentHue} ${atmosphere}% 10% / ${dark ? 0.6 : 0.14})`;

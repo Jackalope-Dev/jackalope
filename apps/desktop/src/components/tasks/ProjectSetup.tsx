@@ -15,8 +15,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const { useMcpMarketplace, setUseMcpMarketplace } =
-    useSettingsStore();
+  const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore();
   const desktop = isTauriEnvironment();
   const browse = async () => {
     setError('');
@@ -157,7 +156,9 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
                 </div>
               </label>
             </div>
-            <p className="task-muted text-xs mt-4">This build does not send usage telemetry or crash reports.</p>
+            <p className="task-muted text-xs mt-4">
+              This build does not send usage telemetry or crash reports.
+            </p>
             <div className="flex justify-end mt-7">
               <Button type="submit" disabled={!desktop || !path.trim() || busy}>
                 {busy ? 'Checking repository…' : 'Open project'}

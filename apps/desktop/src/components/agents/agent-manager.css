@@ -1,0 +1,95 @@
+.agents-page-content {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.agent-manager {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.agent-config-row {
+  min-width: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.agent-config-heading,
+.agent-config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-config-heading {
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 8px;
+}
+
+.agent-config-identity {
+  flex: 1 1 240px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-config-fields,
+.agent-manual-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.agent-config-fields {
+  padding-block: 12px 4px;
+}
+
+.agent-manager .task-label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  align-content: start;
+}
+
+.agent-manager .task-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.agent-manager textarea {
+  resize: vertical;
+  min-height: 104px;
+}
+
+.agent-manual-form > button {
+  justify-self: start;
+}
+
+.agent-model-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px 24px;
+}
+
+.agent-model-restriction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+@container (max-width: 600px) {
+  .agent-model-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

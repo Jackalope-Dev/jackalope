@@ -1,4 +1,4 @@
-import { Check, Moon, Sun } from 'lucide-react';
+import { Check, Clock3, Moon, Sun } from 'lucide-react';
 import { type PointerEvent, useEffect, useId, useState } from 'react';
 import { hexToHsl, hslToHex, PRESET_THEMES, type ThemePalette } from '../../lib/theme-engine';
 
@@ -13,6 +13,8 @@ export function ThemeEditor({
   const inputId = useId();
   useEffect(() => setHex(value.accentHex), [value.accentHex]);
   const validHex = /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(hex);
+  const appearance =
+    value.appearance === 'automatic' ? 'Auto' : value.isDark === false ? 'Light' : 'Dark';
 
   const custom = (hue: number, saturation: number, light = value.accentLight) => {
     onChange({
@@ -42,14 +44,24 @@ export function ThemeEditor({
         {[
           { dark: false, label: 'Light', Icon: Sun },
           { dark: true, label: 'Dark', Icon: Moon },
+          { dark: value.isDark, label: 'Auto', Icon: Clock3 },
         ].map(({ dark, label, Icon }) => (
           <label key={label} className="appearance-mode-option">
             <input
               type="radio"
               name={`${inputId}-appearance`}
               value={label}
-              checked={(value.isDark !== false) === dark}
-              onChange={() => onChange({ ...value, isDark: dark })}
+              checked={appearance === label}
+              aria-describedby={
+                label === 'Auto' && appearance === 'Auto' ? `${inputId}-schedule` : undefined
+              }
+              onChange={() =>
+                onChange({
+                  ...value,
+                  isDark: dark,
+                  appearance: label === 'Auto' ? 'automatic' : 'manual',
+                })
+              }
               className="sr-only"
             />
             <span>
@@ -59,6 +71,14 @@ export function ThemeEditor({
           </label>
         ))}
       </fieldset>
+      {appearance === 'Auto' && (
+        <p
+          id={`${inputId}-schedule`}
+          className="text-xs leading-relaxed text-[var(--color-text-secondary)]"
+        >
+          Light from 7 AM to 7 PM, dark overnight. Uses your device’s local time.
+        </p>
+      )}
       <div>
         <div className="flex items-center justify-between text-xs mb-3">
           <span className="font-medium">{value.name}</span>
@@ -144,7 +164,12 @@ export function ThemeEditor({
             key={theme.id}
             type="button"
             onClick={() =>
-              onChange({ ...theme, isDark: value.isDark, atmosphere: value.atmosphere })
+              onChange({
+                ...theme,
+                isDark: value.isDark,
+                appearance: value.appearance,
+                atmosphere: value.atmosphere,
+              })
             }
             aria-label={theme.name}
             aria-pressed={value.id === theme.id}

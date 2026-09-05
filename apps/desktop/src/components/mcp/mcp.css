@@ -66,7 +66,7 @@
 
 .mcp-scope-chip:hover {
   color: var(--color-text-primary);
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-focus);
 }
 
 .mcp-scope-chip.active {
@@ -90,12 +90,14 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
   min-height: 220px;
 }
 
 .mcp-card:hover {
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-focus);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
 }
 
@@ -135,33 +137,33 @@
 }
 
 .mcp-pill.official {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.3);
-  color: #10b981;
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border);
+  color: var(--color-accent-ink);
 }
 
 .mcp-pill.verified {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.3);
-  color: #38bdf8;
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border);
+  color: var(--color-accent-ink);
 }
 
 .mcp-pill.scope-global {
-  background: rgba(168, 85, 247, 0.12);
-  border-color: rgba(168, 85, 247, 0.3);
-  color: #a855f7;
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border);
+  color: var(--color-accent-ink);
 }
 
 .mcp-pill.scope-claude {
-  background: rgba(234, 88, 12, 0.12);
-  border-color: rgba(234, 88, 12, 0.3);
-  color: #ea580c;
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border);
+  color: var(--color-accent-ink);
 }
 
 .mcp-pill.scope-codex {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(14, 165, 233, 0.3);
-  color: #0ea5e9;
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border);
+  color: var(--color-accent-ink);
 }
 
 .mcp-card-description {
@@ -169,10 +171,7 @@
   color: var(--color-text-muted);
   line-height: 1.45;
   margin-bottom: 1rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   flex-grow: 1;
 }
 
@@ -184,8 +183,8 @@
   padding: 0.4rem 0.6rem;
   color: var(--color-text-muted);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
   margin-bottom: 0.75rem;
 }
 
@@ -244,7 +243,7 @@
 
 .mcp-category-btn:hover {
   color: var(--color-text-primary);
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-focus);
 }
 
 .mcp-category-btn.active {
@@ -281,7 +280,7 @@
   display: flex;
   flex-direction: column;
   padding: 0.25rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .mcp-tool-item:last-child {
@@ -297,4 +296,340 @@
 .mcp-tool-desc {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+}
+.mcp-market-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 18px;
+  background: linear-gradient(to bottom, var(--color-surface), var(--color-surface-sunken));
+  box-shadow: var(--shadow-flat);
+  border: 1px solid var(--color-border-subtle);
+}
+.mcp-market-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.mcp-market-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.mcp-market-card .mcp-card-title button {
+  padding: 0;
+  min-height: 44px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.mcp-market-source {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.mcp-market-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.mcp-market-labels span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.mcp-market-description {
+  flex: 1;
+  min-height: 4.5em;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.mcp-market-facts,
+.mcp-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.mcp-market-facts dt,
+.mcp-detail-facts dt {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: 5px;
+}
+.mcp-market-facts dd,
+.mcp-detail-facts dd {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+.mcp-market-status {
+  min-height: 20px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.mcp-market-status span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.mcp-market-status svg {
+  flex-shrink: 0;
+}
+.mcp-market-card .mcp-card-footer {
+  padding-top: 12px;
+}
+.mcp-market-card:focus-within {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.task-dialog.appearance-panel.mcp-detail-dialog {
+  width: 820px;
+  height: min(760px, calc(100dvh - 48px));
+  max-width: calc(100vw - 48px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.mcp-detail-header {
+  flex-shrink: 0;
+  padding: 24px 68px 20px 24px;
+}
+.mcp-detail-eyebrow {
+  font-size: var(--text-xs);
+  color: var(--color-accent-ink);
+  margin-bottom: 8px;
+}
+.mcp-detail-title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  margin-bottom: 6px;
+}
+.mcp-detail-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mcp-detail-tab-list {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+.mcp-detail-tab-list button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.mcp-detail-tab-list button[data-state="active"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.mcp-detail-tab-list button:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.mcp-detail-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+  padding: 24px;
+  scroll-padding: 24px;
+}
+.mcp-detail-content {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.mcp-detail-content[data-state="active"] {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.mcp-detail-content h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+.mcp-detail-description {
+  color: var(--color-text-primary);
+}
+.mcp-detail-note {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+.mcp-detail-scroll > .mcp-detail-note,
+.mcp-detail-scroll > .mcp-detail-notice {
+  margin-bottom: 20px;
+}
+.mcp-detail-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  font-size: var(--text-xs);
+}
+.mcp-detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.mcp-detail-dialog a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.mcp-detail-dialog a svg {
+  flex-shrink: 0;
+}
+.mcp-detail-content ul {
+  padding-left: 20px;
+  list-style: disc;
+}
+.mcp-detail-content li + li {
+  margin-top: 8px;
+}
+.mcp-detail-content pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-primary);
+}
+.mcp-detail-notice {
+  border-left: 3px solid var(--color-warning);
+  padding: 12px 16px;
+  background: var(--color-surface-sunken);
+  border-radius: 0 10px 10px 0;
+}
+.mcp-detail-notice > * + * {
+  margin-top: 10px;
+}
+.mcp-detail-notice h3 {
+  color: var(--color-text-primary);
+}
+.mcp-detail-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--text-sm);
+}
+.mcp-tool-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+}
+.mcp-tool-search input {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  background: transparent;
+  color: var(--color-text-primary);
+}
+.mcp-tool-search:focus-within {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.mcp-tool-search input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.mcp-detail-content .mcp-detail-tool-list {
+  padding: 0;
+  list-style: none;
+}
+.mcp-detail-tool-list > li {
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.mcp-detail-content code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.mcp-detail-content summary {
+  cursor: pointer;
+  padding: 10px 0;
+  color: var(--color-accent-ink);
+  min-height: 44px;
+}
+.mcp-readme > * + * {
+  margin-top: 16px;
+}
+.mcp-readme h1,
+.mcp-readme h2,
+.mcp-readme h3,
+.mcp-readme h4 {
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.mcp-readme h1 {
+  font-size: var(--text-xl);
+}
+.mcp-readme blockquote {
+  padding-left: 16px;
+  border-left: 2px solid var(--color-border);
+}
+.mcp-readme ol {
+  list-style: decimal;
+  padding-left: 20px;
+}
+@media (max-width: 700px) {
+  .mcp-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mcp-detail-tab-list {
+    padding-inline: 16px;
+    gap: 2px;
+  }
+  .mcp-detail-tab-list button {
+    padding-inline: 9px;
+    font-size: var(--text-xs);
+  }
+  .mcp-detail-scroll {
+    padding: 20px;
+  }
 }

@@ -140,7 +140,7 @@ function parsePlan(text: string): PlanEntry[] {
 
 function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
   const dialogFocus = useDialogFocus();
-  const storageKey = `jackalope-plan-draft:${project.id}`;
+  const storageKey = `jackalope-plan-import-draft:${project.id}`;
   const [text, setText] = useState(() => {
     try {
       return localStorage.getItem(storageKey) ?? '';

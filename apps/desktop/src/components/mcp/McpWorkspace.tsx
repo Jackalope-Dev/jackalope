@@ -3,16 +3,12 @@ import {
   Check,
   CheckCircle,
   Copy,
-  Download,
-  Eye,
   Globe,
   Pencil,
   Plus,
   RefreshCw,
   Search,
   Server,
-  Shield,
-  Star,
   Trash2,
   X,
 } from 'lucide-react';
@@ -24,8 +20,9 @@ import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { McpAddCustomModal } from './McpAddCustomModal';
-import { McpInstallModal } from './McpInstallModal';
 import { McpInspectModal } from './McpInspectModal';
+import { McpInstallModal } from './McpInstallModal';
+import { McpMarketplaceCard } from './McpMarketplaceCard';
 import './mcp.css';
 
 const CATEGORIES = [
@@ -77,12 +74,6 @@ export function McpWorkspace() {
     void loadServers();
   }, [loadServers]);
 
-  useEffect(() => {
-    if (activeTab === 'marketplace' && useMcpMarketplace && marketplaceServers.length === 0) {
-      void searchMarketplace();
-    }
-  }, [activeTab, useMcpMarketplace, marketplaceServers.length, searchMarketplace]);
-
   // Debounced search for marketplace
   useEffect(() => {
     if (activeTab !== 'marketplace' || !useMcpMarketplace) return;
@@ -117,22 +108,17 @@ export function McpWorkspace() {
       return (
         s.name.toLowerCase().includes(q) ||
         s.id.toLowerCase().includes(q) ||
-        (s.description && s.description.toLowerCase().includes(q))
+        s.description?.toLowerCase().includes(q)
       );
     }
     return true;
   });
 
-  const getInstalledScope = (allMcpsId: string): string | null => {
-    const found = servers.find((s) => s.id.toLowerCase() === allMcpsId.toLowerCase());
-    return found ? found.scope : null;
-  };
-
   return (
     <div className="mcp-workspace">
       <WorkspaceHeading
         title="MCP Tools & Marketplace"
-        description="Configure Model Context Protocol servers across installed agents or 1-click install from allmcps.com."
+        description="Manage MCP connections for your agents, or browse AllMCPs to discover and configure new tools."
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -237,7 +223,7 @@ export function McpWorkspace() {
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
               />
               <input
-                className="task-input w-full pl-8 py-1.5 text-xs"
+                className="task-input with-search-icon w-full py-1.5 text-xs"
                 placeholder="Filter configured MCPs…"
                 value={configuredSearch}
                 onChange={(e) => setConfiguredSearch(e.target.value)}
@@ -252,7 +238,7 @@ export function McpWorkspace() {
               title={servers.length === 0 ? 'No MCP servers configured' : 'No matching MCP servers'}
               description={
                 servers.length === 0
-                  ? 'Add a custom MCP server or browse the AllMCPs marketplace to 1-click install tools.'
+                  ? 'Add a custom MCP server or browse the AllMCPs marketplace to discover new tools.'
                   : 'Try selecting a different scope or clearing your search query.'
               }
               action={
@@ -440,7 +426,8 @@ export function McpWorkspace() {
                 />
                 <input
                   className="mcp-search-input"
-                  placeholder="Search 10,000+ MCP servers (e.g. postgres, github, playwright, docker)…"
+                  aria-label="Search MCP marketplace"
+                  placeholder="Search MCP servers…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -448,6 +435,7 @@ export function McpWorkspace() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
+                    aria-label="Clear marketplace search"
                     className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                   >
                     <X size={16} />
@@ -462,6 +450,7 @@ export function McpWorkspace() {
                     key={cat.id}
                     type="button"
                     onClick={() => setSelectedCategory(cat.id)}
+                    aria-pressed={selectedCategory === cat.id}
                     className={`mcp-category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
                   >
                     {cat.label}
@@ -491,88 +480,24 @@ export function McpWorkspace() {
                 />
               ) : (
                 <div className="mcp-grid">
-                  {marketplaceServers.map((item) => {
-                    const installedScope = getInstalledScope(item.id);
-                    const requiresEnv = item.envVars && item.envVars.length > 0;
-
-                    return (
-                      <article key={item.id} className="mcp-card">
-                        <div>
-                          <div className="mcp-card-header">
-                            <div>
-                              <h3 className="mcp-card-title">{item.name}</h3>
-                              {item.category && (
-                                <span className="text-xs text-[var(--color-text-muted)]">
-                                  {item.category}
-                                </span>
-                              )}
-                            </div>
-                            <div className="mcp-card-badges">
-                              {item.isOfficial && (
-                                <span className="mcp-pill official flex items-center gap-0.5">
-                                  <Shield size={10} /> Official
-                                </span>
-                              )}
-                              {item.isVerifiedActive && (
-                                <span className="mcp-pill verified flex items-center gap-0.5">
-                                  <CheckCircle size={10} /> Verified
-                                </span>
-                              )}
-                              {item.githubStars > 0 && (
-                                <span className="mcp-pill flex items-center gap-0.5">
-                                  <Star size={10} className="text-[var(--color-warning)]" />{' '}
-                                  {item.githubStars.toLocaleString()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <p className="mcp-card-description">{item.description}</p>
-
-                          <div className="mcp-card-meta">
-                            <span>
-                              {item.installKind === 'remote'
-                                ? 'remote url'
-                                : item.installName || item.id}
-                            </span>
-                          </div>
-
-                          {requiresEnv && (
-                            <p className="text-xs text-[var(--color-warning)] mb-2">
-                              🔑 Requires {item.envVars.join(', ')}
-                            </p>
-                          )}
-
-                          {installedScope && (
-                            <div className="mb-2">
-                              <span className="text-xs font-medium text-[var(--color-success)] flex items-center gap-1">
-                                <Check size={13} /> Installed ({installedScope})
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mcp-card-footer">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              void inspectServer(item);
-                              setInspectingServer(item);
-                            }}
-                          >
-                            <Eye size={14} />
-                            Inspect
-                          </Button>
-
-                          <Button size="sm" onClick={() => setInstallServer(item)}>
-                            <Download size={14} />
-                            {installedScope ? 'Reconfigure' : '1-Click Install'}
-                          </Button>
-                        </div>
-                      </article>
-                    );
-                  })}
+                  {marketplaceServers.map((item) => (
+                    <McpMarketplaceCard
+                      key={item.id}
+                      server={item}
+                      scopes={[
+                        ...new Set(
+                          servers
+                            .filter((s) => s.id.toLowerCase() === item.id.toLowerCase())
+                            .map((s) => s.scope),
+                        ),
+                      ]}
+                      onInspect={() => {
+                        void inspectServer(item);
+                        setInspectingServer(item);
+                      }}
+                      onConfigure={() => setInstallServer(item)}
+                    />
+                  ))}
                 </div>
               )}
             </>
@@ -588,9 +513,13 @@ export function McpWorkspace() {
       />
 
       <McpInspectModal
+        key={inspectingServer?.id ?? 'closed'}
         server={inspectingServer}
         open={!!inspectingServer}
-        onClose={() => setInspectingServer(null)}
+        onClose={() => {
+          setInspectingServer(null);
+          useMcpStore.getState().clearInspecting();
+        }}
         onInstall={(srv) => setInstallServer(srv)}
       />
 

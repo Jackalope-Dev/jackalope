@@ -6,10 +6,8 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
-  Filter,
   History,
   Info,
-  Layers,
   Search,
   ShieldAlert,
   Sparkles,
@@ -20,6 +18,7 @@ import type { AuditCategory, AuditSeverity } from '../../lib/orchestration/types
 import { useAuditStore } from '../../stores/auditStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { Select, SelectItem } from '../ui/Select';
 
 export function AuditLogWorkspace() {
   const { entries, clearEntries, clearProjectEntries } = useAuditStore();
@@ -32,6 +31,7 @@ export function AuditLogWorkspace() {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -89,7 +89,7 @@ export function AuditLogWorkspace() {
       case 'quota':
         return <AlertTriangle size={14} className="text-[var(--color-warning)]" />;
       case 'discovery':
-        return <Sparkles size={14} className="text-sky-500" />;
+        return <Sparkles size={14} className="text-[var(--color-accent-ink)]" />;
       case 'execution':
       default:
         return <Cpu size={14} className="text-[var(--color-success)]" />;
@@ -119,7 +119,7 @@ export function AuditLogWorkspace() {
       case 'info':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-500/15 text-[var(--color-accent-ink)] dark:text-[var(--color-accent-ink)] border border-sky-500/30">
             <Info size={10} /> Info
           </span>
         );
@@ -127,13 +127,13 @@ export function AuditLogWorkspace() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[var(--color-surface)]">
+    <div className="flex flex-col min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface)]">
       {/* Workspace Header */}
       <div className="p-6 border-b border-[var(--color-border)] bg-gradient-to-b from-[var(--color-surface)] to-[var(--color-surface-sunken)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="p-1.5 rounded-lg bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
+              <span className="p-1.5 rounded-lg bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)]">
                 <History size={18} />
               </span>
               <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
@@ -141,33 +141,42 @@ export function AuditLogWorkspace() {
               </h1>
             </div>
             <p className="text-xs text-[var(--color-text-muted)]">
-              App-wide transparency into intelligent routing decisions, quota failovers, and
-              codebase scans.
+              Recorded routing decisions, task events, and codebase scans.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {selectedProjectFilter !== 'all' ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => clearProjectEntries(selectedProjectFilter)}
-                className="text-xs text-[var(--color-danger)] hover:text-[var(--color-danger)] border-rose-500/30"
-              >
-                <Trash2 size={13} />
-                Clear this project
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearEntries}
-                className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
-              >
-                <Trash2 size={13} />
-                Clear all logs
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!confirmClear) {
+                  setConfirmClear(true);
+                  return;
+                }
+                if (selectedProjectFilter === 'all') clearEntries();
+                else clearProjectEntries(selectedProjectFilter);
+                setConfirmClear(false);
+              }}
+              onBlur={() => setConfirmClear(false)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setConfirmClear(false);
+              }}
+              className={`text-xs hover:text-[var(--color-danger)] ${
+                confirmClear || selectedProjectFilter !== 'all'
+                  ? 'text-[var(--color-danger)]'
+                  : 'text-[var(--color-text-muted)]'
+              }`}
+            >
+              <Trash2 size={13} />
+              <span aria-live="polite">
+                {confirmClear
+                  ? 'Click again to confirm'
+                  : selectedProjectFilter === 'all'
+                    ? 'Clear all logs'
+                    : 'Clear this project'}
+              </span>
+            </Button>
           </div>
         </div>
 
@@ -178,7 +187,9 @@ export function AuditLogWorkspace() {
               Total Events
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-text-primary)]">{stats.total}</span>
+              <span className="text-xl font-semibold text-[var(--color-text-primary)]">
+                {stats.total}
+              </span>
               <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
             </div>
           </div>
@@ -188,18 +199,22 @@ export function AuditLogWorkspace() {
               Auto-Routed Tasks
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-warning)]">{stats.routingCount}</span>
-              <span className="text-xs text-[var(--color-text-muted)]">optimized</span>
+              <span className="text-xl font-semibold text-[var(--color-warning)]">
+                {stats.routingCount}
+              </span>
+              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
             <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
-              Failovers Resolved
+              Failover Events
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-danger)]">{stats.failoverCount}</span>
-              <span className="text-xs text-[var(--color-text-muted)]">self-healed</span>
+              <span className="text-xl font-semibold text-[var(--color-danger)]">
+                {stats.failoverCount}
+              </span>
+              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
             </div>
           </div>
 
@@ -208,8 +223,10 @@ export function AuditLogWorkspace() {
               Codebase Scans
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-sky-500">{stats.discoveryCount}</span>
-              <span className="text-xs text-[var(--color-text-muted)]">synced</span>
+              <span className="text-xl font-semibold text-[var(--color-accent-ink)]">
+                {stats.discoveryCount}
+              </span>
+              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
             </div>
           </div>
         </div>
@@ -218,25 +235,29 @@ export function AuditLogWorkspace() {
         <div className="flex flex-wrap items-center justify-between gap-3 mt-5 pt-4 border-t border-[var(--color-border-subtle)]">
           <div className="flex flex-wrap items-center gap-2">
             {/* Project Filter */}
-            <div className="flex items-center gap-1.5 text-xs bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg px-2.5 py-1.5">
-              <Layers size={13} className="text-[var(--color-text-muted)]" />
-              <select
-                value={selectedProjectFilter}
-                onChange={(e) => setSelectedProjectFilter(e.target.value)}
-                className="bg-transparent text-xs text-[var(--color-text-primary)] outline-none cursor-pointer"
-              >
-                <option value="all">All Projects</option>
-                <option value="global">Global / Jackalope Workspace</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              aria-label="Filter by project"
+              value={selectedProjectFilter}
+              onValueChange={(value) => {
+                setConfirmClear(false);
+                setSelectedProjectFilter(value);
+              }}
+              className="h-[50px] max-w-full"
+            >
+              <SelectItem value="all">All Projects</SelectItem>
+              <SelectItem value="global">Global / Jackalope Workspace</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </Select>
 
             {/* Category Chips */}
-            <div className="flex items-center gap-1 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-0.5">
+            <fieldset
+              aria-label="Filter by category"
+              className="flex h-[50px] min-w-0 max-w-full items-center gap-1 overflow-x-auto bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-0.5"
+            >
               {(
                 [
                   { id: 'all', label: 'All' },
@@ -247,34 +268,34 @@ export function AuditLogWorkspace() {
                 ] as const
               ).map((cat) => (
                 <button
+                  type="button"
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  aria-pressed={selectedCategory === cat.id}
+                  className={`h-full shrink-0 px-2.5 py-1 rounded-md text-sm font-medium transition-colors ${
                     selectedCategory === cat.id
-                      ? 'bg-[var(--color-accent)] text-white'
+                      ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
                       : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >
                   {cat.label}
                 </button>
               ))}
-            </div>
+            </fieldset>
 
             {/* Severity Filter */}
-            <div className="flex items-center gap-1 text-xs bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg px-2.5 py-1.5">
-              <Filter size={12} className="text-[var(--color-text-muted)]" />
-              <select
-                value={selectedSeverity}
-                onChange={(e) => setSelectedSeverity(e.target.value as AuditSeverity | 'all')}
-                className="bg-transparent text-xs text-[var(--color-text-primary)] outline-none cursor-pointer"
-              >
-                <option value="all">All Severities</option>
-                <option value="info">Info only</option>
-                <option value="success">Success only</option>
-                <option value="warning">Warnings only</option>
-                <option value="error">Errors only</option>
-              </select>
-            </div>
+            <Select
+              aria-label="Filter by severity"
+              value={selectedSeverity}
+              onValueChange={(value) => setSelectedSeverity(value as AuditSeverity | 'all')}
+              className="h-[50px]"
+            >
+              <SelectItem value="all">All Severities</SelectItem>
+              <SelectItem value="info">Info only</SelectItem>
+              <SelectItem value="success">Success only</SelectItem>
+              <SelectItem value="warning">Warnings only</SelectItem>
+              <SelectItem value="error">Errors only</SelectItem>
+            </Select>
           </div>
 
           {/* Search Query Input */}
@@ -286,20 +307,23 @@ export function AuditLogWorkspace() {
             <input
               type="text"
               placeholder="Search audit events..."
+              aria-label="Search audit events"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+              className="h-[50px] w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
             />
           </div>
         </div>
       </div>
 
       {/* Events List */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-3">
+      <div className="p-6 space-y-3">
         {filteredEntries.length === 0 ? (
           <div className="text-center py-16">
             <History size={36} className="mx-auto text-[var(--color-text-muted)] opacity-40 mb-3" />
-            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">No audit events match</h3>
+            <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
+              No audit events match
+            </h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-1 max-w-sm mx-auto">
               {searchQuery || selectedCategory !== 'all' || selectedProjectFilter !== 'all'
                 ? 'Try adjusting your filters or search query.'
@@ -325,10 +349,7 @@ export function AuditLogWorkspace() {
                 className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:border-[var(--color-accent-subtle)] transition-all overflow-hidden"
               >
                 {/* Header Row */}
-                <div
-                  onClick={() => toggleExpand(entry.id)}
-                  className="p-3.5 flex items-start justify-between gap-3 cursor-pointer select-none"
-                >
+                <div className="p-3.5 flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <span className="p-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border-subtle)] shrink-0 mt-0.5">
                       {getCategoryIcon(entry.category)}
@@ -343,7 +364,7 @@ export function AuditLogWorkspace() {
                           {entry.projectName}
                         </span>
                         {entry.agent && (
-                          <span className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
+                          <span className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)]">
                             <Bot size={11} />
                             {entry.agent.toUpperCase()}
                             {entry.model ? ` · ${entry.model}` : ''}
@@ -363,6 +384,9 @@ export function AuditLogWorkspace() {
                     </div>
                     <button
                       type="button"
+                      onClick={() => toggleExpand(entry.id)}
+                      aria-expanded={isExpanded}
+                      aria-label={`Inspect ${entry.title}`}
                       className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] rounded"
                     >
                       {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}

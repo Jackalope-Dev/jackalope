@@ -1,16 +1,18 @@
 pub mod commands;
 pub mod state;
+mod window_behavior;
 
 use commands::agent_policy::*;
 use commands::capacity::*;
 use commands::coordination::*;
 use commands::integration::*;
 use commands::mcp::*;
-use commands::tasks::*;
 use commands::reset::*;
+use commands::tasks::*;
 use commands::{agent::*, git::*, pty::*, system::*};
 use state::AppState;
 use tauri::Manager;
+use window_behavior::{desktop_set_close_to_tray, desktop_settings, setup_tray, WindowBehavior};
 
 pub fn run() {
     let mut context = tauri::generate_context!();
@@ -38,6 +40,9 @@ pub fn run() {
                 .unwrap_or(directory);
             let resetting = reset_on_startup(&directory)?;
             let runtime = TaskRuntime::new(directory.clone())?;
+            let preferences = directory.join("preferences");
+            std::fs::create_dir_all(&preferences)?;
+            app.manage(WindowBehavior::load(preferences.join("desktop.json")));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
             app.manage(runtime);
@@ -50,9 +55,24 @@ pub fn run() {
                 window = window.initialization_script(format!("if (localStorage.getItem('jackalope-reset-receipt') !== {token}) {{ for (const key of Object.keys(localStorage)) {{ if (key.startsWith('jackalope-')) localStorage.removeItem(key); }} sessionStorage.clear(); localStorage.setItem('jackalope-reset-receipt', {token}); }} window.__JACKALOPE_RESET__ = true;"));
             }
             window.build()?;
+            if let Err(error) = setup_tray(app) {
+                eprintln!("System tray unavailable; closing will quit Jackalope: {error}");
+            }
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main"
+                    && window.state::<WindowBehavior>().should_hide()
+                    && window.hide().is_ok()
+                {
+                    api.prevent_close();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
+            desktop_settings,
+            desktop_set_close_to_tray,
             app_reset,
             app_finish_reset,
             git_list_worktrees,

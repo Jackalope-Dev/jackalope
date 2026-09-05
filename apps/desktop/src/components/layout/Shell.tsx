@@ -9,9 +9,12 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { BrowserHarness } from '../browser/BrowserHarness';
 import { KanbanBoard } from '../kanban/KanbanBoard';
+import { McpWorkspace } from '../mcp/McpWorkspace';
 import { DeviceMesh } from '../mesh/DeviceMesh';
 import { WorktreeManager } from '../projects/WorktreeManager';
 import { ScheduleManager } from '../schedules/ScheduleManager';
@@ -20,8 +23,6 @@ import { ProjectSetup } from '../tasks/ProjectSetup';
 import { RunnerConnections } from '../tasks/RunnerConnections';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { UsageDashboard } from '../tasks/UsageDashboard';
-import { McpWorkspace } from '../mcp/McpWorkspace';
-import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { CodebaseMap } from '../visualizer/CodebaseMap';
 import { CommandPalette } from './CommandPalette';
@@ -36,6 +37,7 @@ export function Shell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [newTaskAgent, setNewTaskAgent] = useState<string | null>(null);
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
@@ -178,10 +180,7 @@ export function Shell() {
                   </Menu.Item>
                 ))}
                 <Menu.Separator className="menu-separator" />
-                <Menu.Item
-                  className="workspace-menu-item"
-                  onSelect={() => setSettingsOpen(true)}
-                >
+                <Menu.Item className="workspace-menu-item" onSelect={() => setSettingsOpen(true)}>
                   <Settings2 className="size-4 shrink-0 text-[var(--color-accent-ink)]" />
                   <span>
                     <span className="block">Settings & Preferences</span>
@@ -207,15 +206,28 @@ export function Shell() {
             Preview · changes here do not run agents.
           </p>
         )}
-        {activeTab === 'kanban' && <TaskWorkspace />}
+        {activeTab === 'kanban' && (
+          <TaskWorkspace
+            newTaskAgent={newTaskAgent}
+            onNewTaskHandled={() => setNewTaskAgent(null)}
+          />
+        )}
         {activeTab === 'board' && <KanbanBoard />}
         {activeTab === 'worktrees' && (
           <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
         )}
         {activeTab === 'agents' && (
           <RunnerConnections
-            onTasks={() => setActiveTab('kanban')}
-            onMcp={() => setActiveTab('mcps')}
+            onNewTask={(agent) => {
+              useExecutionStore.getState().select(null);
+              setNewTaskAgent(agent);
+              setActiveTab('kanban');
+            }}
+            onRun={(run) => {
+              selectProject(run.projectId);
+              useExecutionStore.getState().select(run.id);
+              setActiveTab('kanban');
+            }}
           />
         )}
         {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
