@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
@@ -12,6 +13,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore();
   const desktop = isTauriEnvironment();
   const browse = async () => {
     setError('');
@@ -37,15 +39,24 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
           p.path.replaceAll('\\', '/').toLowerCase() ===
           info.path.replaceAll('\\', '/').toLowerCase(),
       );
-      if (existing) store.selectProject(existing.id);
-      else
-        await store.addProject({
+      if (existing) {
+        store.selectProject(existing.id);
+        import('../../stores/contextMemoryStore').then(({ useContextMemoryStore }) => {
+          void useContextMemoryStore.getState().refreshMemory(existing);
+        }).catch(() => {});
+      } else {
+        const newProj = {
           id: crypto.randomUUID(),
           name: info.name,
           path: info.path,
           gitBranch: info.branch || 'Detached HEAD',
-          agentProvider: 'codex',
-        });
+          agentProvider: 'codex' as const,
+        };
+        await store.addProject(newProj);
+        import('../../stores/contextMemoryStore').then(({ useContextMemoryStore }) => {
+          void useContextMemoryStore.getState().refreshMemory(newProj);
+        }).catch(() => {});
+      }
       setPath('');
       onClose();
     } catch (error) {
@@ -113,6 +124,24 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
                 {error}
               </p>
             )}
+            <div className="mt-5 pt-4 border-t border-[var(--color-border)]">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useMcpMarketplace}
+                  onChange={(e) => setUseMcpMarketplace(e.target.checked)}
+                  className="mt-0.5 rounded border-[var(--color-border)] text-[var(--color-accent-ink)]"
+                />
+                <div>
+                  <span className="text-xs font-medium text-[var(--color-text)]">
+                    Use MCP marketplace (allmcps.com)
+                  </span>
+                  <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                    Allow Jackalope to search and 1-click install community MCP tools. Jackalope does not transmit your source code or prompts.
+                  </p>
+                </div>
+              </label>
+            </div>
             <div className="flex justify-end mt-7">
               <Button type="submit" disabled={!desktop || !path.trim() || busy}>
                 {busy ? 'Checking repository…' : 'Open project'}

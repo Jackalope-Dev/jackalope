@@ -1,0 +1,296 @@
+.mcp-workspace {
+  padding: 1.5rem 1.75rem 3rem;
+  max-width: 76rem;
+  margin: 0 auto;
+}
+
+.mcp-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.mcp-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.125rem;
+  min-height: 44px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mcp-tab-btn:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.mcp-tab-btn.active {
+  color: var(--color-accent-ink);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-subtle);
+}
+
+.mcp-scope-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.mcp-scope-chip {
+  min-height: 36px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mcp-scope-chip:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+}
+
+.mcp-scope-chip.active {
+  background: var(--color-surface-elevated);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 500;
+}
+
+.mcp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.mcp-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-height: 220px;
+}
+
+.mcp-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.mcp-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.mcp-card-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  word-break: break-word;
+}
+
+.mcp-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.mcp-pill {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.mcp-pill.official {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.mcp-pill.verified {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+.mcp-pill.scope-global {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #a855f7;
+}
+
+.mcp-pill.scope-claude {
+  background: rgba(234, 88, 12, 0.12);
+  border-color: rgba(234, 88, 12, 0.3);
+  color: #ea580c;
+}
+
+.mcp-pill.scope-codex {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.3);
+  color: #0ea5e9;
+}
+
+.mcp-card-description {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex-grow: 1;
+}
+
+.mcp-card-meta {
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+  background: var(--color-surface-sunken);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 0.75rem;
+}
+
+.mcp-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.mcp-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.mcp-search-input {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 1rem 0 2.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.mcp-search-input:focus {
+  border-color: var(--color-accent);
+}
+
+.mcp-category-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.mcp-category-btn {
+  padding: 0.35rem 0.85rem;
+  min-height: 36px;
+  font-size: 0.8125rem;
+  border-radius: 9999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mcp-category-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+}
+
+.mcp-category-btn.active {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 500;
+}
+
+.mcp-privacy-banner {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.mcp-tools-list {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: var(--color-surface-sunken);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.mcp-tool-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mcp-tool-item:last-child {
+  border-bottom: none;
+}
+
+.mcp-tool-name {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--color-accent-ink);
+}
+
+.mcp-tool-desc {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+}

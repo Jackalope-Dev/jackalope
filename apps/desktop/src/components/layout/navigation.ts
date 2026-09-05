@@ -6,6 +6,7 @@ import {
   Globe,
   Layers3,
   Network,
+  Plug,
   Share2,
 } from 'lucide-react';
 
@@ -36,6 +37,13 @@ export const WORKSPACE_VIEWS = [
     label: 'Usage',
     description: 'Understand consumption across your projects.',
     icon: ChartNoAxesColumn,
+    primary: true,
+  },
+  {
+    id: 'mcps',
+    label: 'MCPs',
+    description: 'Manage agent MCP servers and browse marketplace.',
+    icon: Plug,
     primary: true,
   },
   {

@@ -5,6 +5,7 @@ import {
   FlaskConical,
   GitBranch,
   Search,
+  Settings2,
   SlidersHorizontal,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -14,10 +15,12 @@ import { KanbanBoard } from '../kanban/KanbanBoard';
 import { DeviceMesh } from '../mesh/DeviceMesh';
 import { WorktreeManager } from '../projects/WorktreeManager';
 import { ScheduleManager } from '../schedules/ScheduleManager';
+import { SettingsDialog } from '../settings/SettingsDialog';
 import { ProjectSetup } from '../tasks/ProjectSetup';
 import { RunnerConnections } from '../tasks/RunnerConnections';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { UsageDashboard } from '../tasks/UsageDashboard';
+import { McpWorkspace } from '../mcp/McpWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { CodebaseMap } from '../visualizer/CodebaseMap';
 import { CommandPalette } from './CommandPalette';
@@ -29,6 +32,7 @@ export type { ActiveTab } from './navigation';
 
 export function Shell() {
   const [setupOpen, setSetupOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const [commandsOpen, setCommandsOpen] = useState(false);
   const { projects, activeProjectId, selectProject } = useProjectStore();
@@ -37,14 +41,17 @@ export function Shell() {
   const shortcut = navigator.platform.includes('Mac') ? '⌘ K' : 'Ctrl K';
 
   useEffect(() => {
-    const openCommands = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setCommandsOpen((open) => !open);
+      } else if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+        event.preventDefault();
+        setSettingsOpen((open) => !open);
       }
     };
-    window.addEventListener('keydown', openCommands);
-    return () => window.removeEventListener('keydown', openCommands);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   return (
@@ -108,6 +115,15 @@ export function Shell() {
             <kbd>{shortcut}</kbd>
           </button>
           <ArcColorPicker />
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="quiet-icon"
+            aria-label="Settings and preferences"
+            title="Settings (Ctrl+,)"
+          >
+            <Settings2 className="size-4" />
+          </button>
         </div>
       </header>
       <div className="workspace-navigation">
@@ -160,6 +176,19 @@ export function Shell() {
                     </span>
                   </Menu.Item>
                 ))}
+                <Menu.Separator className="menu-separator" />
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => setSettingsOpen(true)}
+                >
+                  <Settings2 className="size-4 shrink-0 text-[var(--color-accent-ink)]" />
+                  <span>
+                    <span className="block">Settings & Preferences</span>
+                    <span className="block text-xs text-[var(--color-text-muted)] mt-1">
+                      Configure application behavior and project options.
+                    </span>
+                  </span>
+                </Menu.Item>
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
@@ -182,8 +211,14 @@ export function Shell() {
         {activeTab === 'worktrees' && (
           <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
         )}
-        {activeTab === 'agents' && <RunnerConnections onTasks={() => setActiveTab('kanban')} />}
+        {activeTab === 'agents' && (
+          <RunnerConnections
+            onTasks={() => setActiveTab('kanban')}
+            onMcp={() => setActiveTab('mcps')}
+          />
+        )}
         {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
+        {activeTab === 'mcps' && <McpWorkspace />}
         {activeTab === 'schedules' && <ScheduleManager />}
         {activeTab === 'browser' && <BrowserHarness />}
         {activeTab === 'topology' && <CodebaseMap />}
@@ -194,7 +229,9 @@ export function Shell() {
         isOpen={commandsOpen}
         onClose={() => setCommandsOpen(false)}
         onNavigate={setActiveTab}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

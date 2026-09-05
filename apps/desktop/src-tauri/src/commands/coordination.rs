@@ -11,6 +11,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     path::PathBuf,
+    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -154,7 +155,7 @@ struct Inner {
 pub struct Coordinator {
     inner: Arc<Mutex<Inner>>,
     directory: PathBuf,
-    runtime: TaskRuntime,
+    pub(super) runtime: TaskRuntime,
     alive: Arc<AtomicBool>,
     _lock: Arc<std::fs::File>,
 }
@@ -462,7 +463,16 @@ impl Coordinator {
                     let router = Router::new()
                         .route("/v1/project", get(bridge_project))
                         .route("/v1/messages", post(bridge_message))
-                        .layer(DefaultBodyLimit::max(16_384))
+                        .route("/v1/browser/navigate", post(bridge_browser_navigate))
+                        .route("/v1/browser/screenshot", post(bridge_browser_screenshot))
+                        .route("/v1/browser/snapshot", post(bridge_browser_snapshot))
+                        .route("/v1/browser/interact", post(bridge_browser_interact))
+                        .route("/v1/user-prompt", post(bridge_user_prompt))
+                        .route("/v1/user-prompt/poll", get(bridge_get_user_prompt))
+                        .route("/v1/user-prompt/respond", post(bridge_respond_user_prompt))
+                        .route("/v1/validation-step", post(bridge_validation_step))
+                        .route("/v1/computer/verify", post(bridge_computer_verify))
+                        .layer(DefaultBodyLimit::max(65_536))
                         .with_state(service.clone());
                     let router = router.merge(super::coordination_mcp::router(service.clone()));
                     let alive = service.alive.clone();
@@ -531,6 +541,25 @@ impl Coordinator {
                 }
             }
         }
+        if request.coordination.is_none() {
+            if let Some(endpoint) = inner.url.clone() {
+                let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+                inner
+                    .grants
+                    .insert(token.clone(), (request.id.clone(), request.id.clone()));
+                let harness_instructions = format!(
+                    "\nJackalope native harness bridge: URL: $env:JACKALOPE_BRIDGE_URL, Token: Bearer $env:JACKALOPE_BRIDGE_TOKEN.
+- Browser automation: POST $env:JACKALOPE_BRIDGE_URL/v1/browser/navigate (JSON {{\"url\":\"...\"}}), POST $env:JACKALOPE_BRIDGE_URL/v1/browser/screenshot (JSON {{\"name\":\"...\"}}), POST $env:JACKALOPE_BRIDGE_URL/v1/browser/snapshot.
+- Ask user for data/choices: POST $env:JACKALOPE_BRIDGE_URL/v1/user-prompt (JSON {{\"question\":\"...\",\"input_type\":\"text\"|\"choice\",\"options\":[...]}}).
+- Record validation steps: POST $env:JACKALOPE_BRIDGE_URL/v1/validation-step (JSON {{\"step\":\"...\",\"status\":\"passed\"|\"failed\"|\"in_progress\",\"notes\":\"...\"}}).\n"
+                );
+                request.coordination = Some(CoordinationContext {
+                    endpoint,
+                    token,
+                    instructions: harness_instructions,
+                });
+            }
+        }
         self.runtime.start(request)
     }
 
@@ -559,8 +588,7 @@ impl Coordinator {
             .items
             .iter()
             .find(|i| i.id == id && !i.canceled)
-            .cloned()
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+            .cloned();
         drop(inner);
         if !self
             .runtime
@@ -571,7 +599,62 @@ impl Coordinator {
         {
             return Err(StatusCode::UNAUTHORIZED);
         }
+        let item = match item {
+            Some(item) => item,
+            None => {
+                let runs = self
+                    .runtime
+                    .integration_runs()
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let run = runs
+                    .into_iter()
+                    .find(|r| r.id == run_id)
+                    .ok_or(StatusCode::UNAUTHORIZED)?;
+                QueueItem {
+                    id: run.id.clone(),
+                    project_id: run.project_id.clone(),
+                    project_name: run.project_name.clone(),
+                    project_path: run.project_path.clone(),
+                    title: run.prompt.chars().take(50).collect(),
+                    prompt: run.prompt.clone(),
+                    agent: run.agent.clone(),
+                    scopes: vec![".".into()],
+                    dependencies: vec![],
+                    created_at: run.started_at.clone(),
+                    run_id: Some(run.id.clone()),
+                    canceled: false,
+                    error: None,
+                }
+            }
+        };
         Ok(item)
+    }
+
+    pub(super) fn authorized_run(&self, headers: &HeaderMap) -> Result<super::tasks::TaskRun, StatusCode> {
+        if headers.contains_key("origin") {
+            return Err(StatusCode::FORBIDDEN);
+        }
+        let token = headers
+            .get("authorization")
+            .and_then(|h| h.to_str().ok())
+            .and_then(|h| h.strip_prefix("Bearer "))
+            .ok_or(StatusCode::UNAUTHORIZED)?;
+        let inner = self.inner.lock().unwrap();
+        let (_id, run_id) = inner
+            .grants
+            .get(token)
+            .cloned()
+            .ok_or(StatusCode::UNAUTHORIZED)?;
+        drop(inner);
+        let runs = self
+            .runtime
+            .integration_runs()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let run = runs
+            .into_iter()
+            .find(|r| r.id == run_id && active(&r.status))
+            .ok_or(StatusCode::UNAUTHORIZED)?;
+        Ok(run)
     }
 }
 
@@ -634,6 +717,172 @@ pub(super) async fn bridge_message(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     inner.ledger = ledger;
     Ok(Json(message))
+}
+
+#[derive(Deserialize)]
+pub(super) struct PromptPollQuery {
+    pub id: String,
+}
+
+#[derive(Deserialize)]
+pub(super) struct PromptRespondBody {
+    pub id: String,
+    pub answer: String,
+}
+
+pub(super) async fn bridge_browser_navigate(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(req): Json<super::harness::BrowserNavigateRequest>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let _run = service.authorized_run(&headers)?;
+    let result = super::harness::browser_navigate(&req.url)
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    Ok(Json(result))
+}
+
+pub(super) async fn bridge_browser_screenshot(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(req): Json<super::harness::BrowserScreenshotRequest>,
+) -> Result<Json<super::harness::ScreenshotArtifact>, StatusCode> {
+    let run = service.authorized_run(&headers)?;
+    let workspace = PathBuf::from(&run.workspace);
+    let screenshot = super::harness::browser_screenshot(&workspace, req.name, req.url)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    service.runtime.update(&run.id, |r| {
+        r.screenshots.push(screenshot.clone());
+        r.activity.push(format!("Captured browser screenshot: {}", screenshot.name));
+    });
+    Ok(Json(screenshot))
+}
+
+pub(super) async fn bridge_browser_snapshot(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(req): Json<super::harness::BrowserScreenshotRequest>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let _run = service.authorized_run(&headers)?;
+    let result = super::harness::browser_snapshot(req.url)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(result))
+}
+
+pub(super) async fn bridge_browser_interact(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(req): Json<super::harness::BrowserInteractRequest>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let run = service.authorized_run(&headers)?;
+    let action_desc = format!("{} on {}", req.action, req.selector);
+    let result = super::harness::browser_interact(req)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    service.runtime.update(&run.id, |r| {
+        r.activity.push(format!("Browser action: {action_desc}"));
+    });
+    Ok(Json(result))
+}
+
+pub(super) async fn bridge_user_prompt(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::harness::AskUserInput>,
+) -> Result<Json<super::harness::PendingUserPrompt>, StatusCode> {
+    let run = service.authorized_run(&headers)?;
+    let question_text = input.question.clone();
+    let prompt = super::harness::ask_user_async(&run.id, input, Duration::from_millis(50)).await;
+    service.runtime.update(&run.id, |r| {
+        r.prompts.push(prompt.clone());
+        r.activity.push(format!("Waiting for user input: {question_text}"));
+    });
+    Ok(Json(prompt))
+}
+
+pub(super) async fn bridge_get_user_prompt(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    axum::extract::Query(query): axum::extract::Query<PromptPollQuery>,
+) -> Result<Json<super::harness::PendingUserPrompt>, StatusCode> {
+    let run = service.authorized_run(&headers)?;
+    let prompt = run
+        .prompts
+        .into_iter()
+        .find(|p| p.id == query.id)
+        .ok_or(StatusCode::NOT_FOUND)?;
+    Ok(Json(prompt))
+}
+
+pub(super) async fn bridge_respond_user_prompt(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(body): Json<PromptRespondBody>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let run = service.authorized_run(&headers)?;
+    let resolved = super::harness::resolve_user_prompt(&body.id, &body.answer);
+    service.runtime.update(&run.id, |r| {
+        if let Some(p) = r.prompts.iter_mut().find(|p| p.id == body.id) {
+            p.status = "answered".into();
+            p.answer = Some(body.answer.clone());
+            p.answered_at = Some(Utc::now().to_rfc3339());
+        }
+        r.activity.push(format!("User answered prompt: {}", body.answer));
+    });
+    Ok(Json(serde_json::json!({ "resolved": resolved })))
+}
+
+pub(super) async fn bridge_validation_step(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::harness::RecordValidationInput>,
+) -> Result<Json<super::harness::ValidationStep>, StatusCode> {
+    let run = service.authorized_run(&headers)?;
+    let step = super::harness::ValidationStep {
+        id: Uuid::new_v4().to_string(),
+        step: input.step,
+        status: input.status,
+        notes: input.notes,
+        evidence: input.evidence,
+        timestamp: Utc::now().to_rfc3339(),
+    };
+    service.runtime.update(&run.id, |r| {
+        r.activity.push(format!(
+            "[Checkpoint: {}] {}",
+            step.status.to_uppercase(),
+            step.step
+        ));
+        r.validation_steps.push(step.clone());
+    });
+    Ok(Json(step))
+}
+
+pub(super) async fn bridge_computer_verify(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::harness::ComputerVerifyInput>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let run = service.authorized_run(&headers)?;
+    let mut cmd = Command::new(&input.command);
+    cmd.args(&input.args).current_dir(&run.workspace);
+    let output = cmd.output().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let exit_code = output.status.code();
+    service.runtime.update(&run.id, |r| {
+        r.activity.push(format!(
+            "Verification check: {} {:?} -> exit {:?}",
+            input.command, input.args, exit_code
+        ));
+    });
+    Ok(Json(serde_json::json!({
+        "exit_code": exit_code,
+        "stdout": stdout,
+        "stderr": stderr,
+        "success": output.status.success(),
+    })))
 }
 
 #[tauri::command]

@@ -7,3 +7,5 @@ pub mod coordination;
 pub mod integration;
 pub mod capacity;
 pub mod coordination_mcp;
+pub mod mcp;
+pub mod harness;

@@ -193,3 +193,137 @@ export async function listenPtyExit(
   }
   return () => {};
 }
+
+export interface McpServerConfig {
+  id: string;
+  name: string;
+  scope: 'global' | 'claude' | 'codex' | 'grok' | string;
+  transport: 'stdio' | 'http' | 'sse' | string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  description?: string;
+  enabled?: boolean;
+}
+
+export interface McpToolInfo {
+  name: string;
+  description?: string;
+  inputSchema?: unknown;
+}
+
+export interface McpProbeResult {
+  ok: boolean;
+  tools: McpToolInfo[];
+  latencyMs?: number;
+  error?: string;
+}
+
+const mockMcpServers: McpServerConfig[] = [
+  {
+    id: 'github',
+    name: 'GitHub MCP',
+    scope: 'global',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-github'],
+    env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_••••••••••••' },
+    description: 'Repository management, issues, PRs, and commit inspection.',
+    enabled: true,
+  },
+  {
+    id: 'postgres',
+    name: 'PostgreSQL Server',
+    scope: 'claude',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-postgres'],
+    env: { POSTGRES_URL: 'postgresql://localhost:5432/jackalope' },
+    description: 'Query and inspect relational PostgreSQL databases.',
+    enabled: true,
+  },
+  {
+    id: 'memory-service',
+    name: 'Local Vector Memory',
+    scope: 'codex',
+    transport: 'http',
+    url: 'http://localhost:8765/mcp',
+    description: 'Local embeddings and semantic task recall memory.',
+    enabled: true,
+  },
+];
+
+export async function listMcpServers(): Promise<McpServerConfig[]> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke<McpServerConfig[]>('mcp_list_servers');
+  }
+  await new Promise((res) => setTimeout(res, 150));
+  return [...mockMcpServers];
+}
+
+export async function saveMcpServer(server: McpServerConfig): Promise<void> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('mcp_save_server', { server });
+  }
+  await new Promise((res) => setTimeout(res, 150));
+  const idx = mockMcpServers.findIndex((s) => s.id === server.id && s.scope === server.scope);
+  if (idx >= 0) {
+    mockMcpServers[idx] = server;
+  } else {
+    mockMcpServers.push(server);
+  }
+}
+
+export async function deleteMcpServer(id: string, scope: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('mcp_delete_server', { id, scope });
+  }
+  await new Promise((res) => setTimeout(res, 150));
+  const idx = mockMcpServers.findIndex((s) => s.id === id && s.scope === scope);
+  if (idx >= 0) {
+    mockMcpServers.splice(idx, 1);
+  }
+}
+
+export async function probeMcpServer(server: McpServerConfig): Promise<McpProbeResult> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke<McpProbeResult>('mcp_probe_server', { server });
+  }
+  await new Promise((res) => setTimeout(res, 450));
+  if (server.id.includes('postgres')) {
+    return {
+      ok: true,
+      latencyMs: 84,
+      tools: [
+        { name: 'query_sql', description: 'Execute read-only SQL query against the database' },
+        { name: 'describe_table', description: 'Inspect schema and columns of a table' },
+        { name: 'list_tables', description: 'List all public tables in the connected schema' },
+      ],
+    };
+  }
+  if (server.id.includes('github')) {
+    return {
+      ok: true,
+      latencyMs: 120,
+      tools: [
+        { name: 'get_file_contents', description: 'Read file contents from a repository branch' },
+        { name: 'create_or_update_file', description: 'Commit file updates directly to GitHub' },
+        { name: 'list_pull_requests', description: 'List open pull requests with reviews' },
+        { name: 'create_issue', description: 'Open a new issue on GitHub' },
+      ],
+    };
+  }
+  return {
+    ok: true,
+    latencyMs: 65,
+    tools: [
+      { name: `${server.id}_status`, description: `Health check and tools for ${server.name}` },
+      { name: `${server.id}_exec`, description: `Execute action on ${server.name}` },
+    ],
+  };
+}

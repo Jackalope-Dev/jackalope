@@ -7,6 +7,7 @@ use commands::tasks::*;
 use commands::coordination::*;
 use commands::integration::*;
 use commands::capacity::*;
+use commands::mcp::*;
 use tauri::Manager;
 
 pub fn run() {
@@ -43,6 +44,7 @@ pub fn run() {
             task_stop,
             task_mark_reviewed,
             task_review,
+            task_respond_prompt,
             queue_snapshot,
             queue_add,
             queue_import,
@@ -53,6 +55,10 @@ pub fn run() {
             integration_apply,
             integration_plans,
             capacity_snapshot,
+            mcp_list_servers,
+            mcp_save_server,
+            mcp_delete_server,
+            mcp_probe_server,
         ])
         .build(tauri::generate_context!())
         .expect("error while building jackalope application")

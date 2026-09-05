@@ -28,12 +28,15 @@ import {
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
 import { RunStatus } from './RunStatus';
+import { UserPromptCard } from './UserPromptCard';
+import { ValidationJourney } from './ValidationJourney';
 
 const Markdown = lazy(() => import('react-markdown'));
 
@@ -41,6 +44,9 @@ function ResultReview({ run }: { run: TaskRun }) {
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { projects } = useProjectStore();
+  const project = projects.find((p) => p.id === run.projectId);
+
   const load = async () => {
     setLoading(true);
     setError('');
@@ -82,6 +88,19 @@ function ResultReview({ run }: { run: TaskRun }) {
             </ul>
           ) : (
             <p className="task-muted">No changed files found.</p>
+          )}
+          {project?.preferences?.verifyCommand && (
+            <div className="mt-4 p-3 rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-medium block">Verification Command</span>
+                <code className="text-xs text-[var(--color-accent-ink)] font-mono">
+                  {project.preferences.verifyCommand}
+                </code>
+              </div>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                Configured in Project Settings
+              </span>
+            </div>
           )}
           {review.diff && (
             <details className="mt-4">
@@ -192,6 +211,13 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
           {run.error}
         </p>
       )}
+      {run.prompts && run.prompts.length > 0 && (
+        <div className="space-y-3 mb-5">
+          {run.prompts.map((p) => (
+            <UserPromptCard key={p.id} runId={run.id} prompt={p} />
+          ))}
+        </div>
+      )}
       <div className="task-result">
         {active && (
           <div className="flex items-start justify-between gap-5 mb-5">
@@ -248,6 +274,13 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
         )}
       </div>
       {!active && run.workspace && <ResultReview key={run.id} run={run} />}
+      {((run.validationSteps && run.validationSteps.length > 0) ||
+        (run.screenshots && run.screenshots.length > 0)) && (
+        <ValidationJourney
+          steps={run.validationSteps ?? []}
+          screenshots={run.screenshots ?? []}
+        />
+      )}
       <div className="task-usage-line">
         <span>Reported usage</span>
         <span>
@@ -376,7 +409,14 @@ export function TaskWorkspace() {
   const filtered = latest.filter(
     (run) => filter === 'all' || (filter === 'active' ? isActive(run) : run.status === 'review'),
   );
-  const runner = runners.find((r) => r.id === current.agent);
+  const appDefaultRunner = useSettingsStore((s) => s.defaultRunner);
+  const preferredAgent =
+    project?.preferences?.preferredRunner && project.preferences.preferredRunner !== 'inherit'
+      ? project.preferences.preferredRunner
+      : appDefaultRunner;
+
+  const currentAgent = current.agent || preferredAgent;
+  const runner = runners.find((r) => r.id === currentAgent);
   const desktop = isTauriEnvironment();
 
   const detectedSkills = useMemo(() => detectSkillsFromPrompt(current.prompt), [current.prompt]);
@@ -399,15 +439,20 @@ export function TaskWorkspace() {
   const launch = async () => {
     if (!project || !current.prompt.trim()) return;
     setSubmitError('');
-    const finalPrompt = assembled.hasSupplementation
+    let finalPrompt = assembled.hasSupplementation
       ? assembled.assembledPrompt
       : current.prompt.trim();
+
+    if (project.preferences?.customInstructions?.trim()) {
+      finalPrompt = `${finalPrompt}\n\n[Project Guidelines]:\n${project.preferences.customInstructions.trim()}`;
+    }
+
     try {
       await start({
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
-        agent: current.agent,
+        agent: currentAgent,
         prompt: finalPrompt,
         isolated: current.isolated,
       });
@@ -577,7 +622,7 @@ export function TaskWorkspace() {
                   <Select
                     id="taskworkspace-field-2"
                     aria-label="Agent"
-                    value={current.agent}
+                    value={currentAgent}
                     onValueChange={(value) => draft(key, { agent: value })}
                   >
                     <SelectItem value="codex">Codex</SelectItem>
