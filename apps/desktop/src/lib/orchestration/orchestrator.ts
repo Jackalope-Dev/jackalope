@@ -7,12 +7,7 @@ import { assemblePrompt } from '../skills/context-assembler.ts';
 import type { RunRequest, TaskRun } from '../task-runtime';
 import { FALLBACK_CHAINS, getDefaultModelForRunner, getModelById } from './model-catalog.ts';
 import { determineBestRoute } from './router.ts';
-import type {
-  AgentRunnerId,
-  FailoverEvent,
-  FailoverReason,
-  RoutingDecision,
-} from './types.ts';
+import type { AgentRunnerId, FailoverEvent, FailoverReason, RoutingDecision } from './types.ts';
 
 export interface OrchestrateTaskOptions {
   projectId: string;
@@ -41,6 +36,15 @@ class CentralOrchestrator {
    * Dispatches a centrally orchestrated task with intelligent best-agent & best-model routing
    * and automatic codebase context injection.
    */
+  async dispatchInternal(
+    options: Omit<OrchestrateTaskOptions, 'forcedAgent'>,
+  ): Promise<OrchestrationResult> {
+    const { useAgentConfigStore } = await import('../../stores/agentConfigStore');
+    const agent = useAgentConfigStore.getState().defaultMetaAgent;
+    if (!agent) throw new Error('Choose a default agent in Agents first.');
+    return this.dispatch({ ...options, forcedAgent: agent as AgentRunnerId });
+  }
+
   async dispatch(options: OrchestrateTaskOptions): Promise<OrchestrationResult> {
     const {
       projectId,
@@ -121,6 +125,7 @@ class CentralOrchestrator {
       projectName,
       projectPath,
       agent: routingDecision.chosenAgent,
+      model: routingDecision.chosenModel || undefined,
       prompt: finalPrompt,
       isolated,
     };
@@ -147,11 +152,7 @@ class CentralOrchestrator {
     if (run.status !== 'failed' && run.status !== 'interrupted') return null;
     if (this.handledRuns.has(`failover:${run.id}`)) return null;
 
-    const errorText = [
-      run.error ?? '',
-      ...(run.diagnostics ?? []),
-      ...(run.activity ?? []),
-    ]
+    const errorText = [run.error ?? '', ...(run.diagnostics ?? []), ...(run.activity ?? [])]
       .join(' ')
       .toLowerCase();
 

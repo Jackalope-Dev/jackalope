@@ -1,13 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import {
-  ArrowUpRight,
-  CheckCircle,
-  Download,
-  ExternalLink,
-  Shield,
-  Star,
-  X,
-} from 'lucide-react';
+import { ArrowUpRight, CheckCircle, Download, ExternalLink, Shield, Star, X } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
@@ -56,7 +48,8 @@ export function McpInspectModal({ server, open, onClose, onInstall }: McpInspect
               )}
               {server.githubStars > 0 && (
                 <span className="mcp-pill flex items-center gap-1">
-                  <Star size={11} className="text-amber-400" /> {server.githubStars.toLocaleString()}
+                  <Star size={11} className="text-amber-400" />{' '}
+                  {server.githubStars.toLocaleString()}
                 </span>
               )}
               {server.qualityScore > 0 && (
@@ -79,7 +72,7 @@ export function McpInspectModal({ server, open, onClose, onInstall }: McpInspect
               <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
                 Configuration
               </h4>
-              <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] font-mono text-[11px] text-[var(--color-text)] overflow-x-auto">
+              <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] font-mono text-xs text-[var(--color-text)] overflow-x-auto">
                 {JSON.stringify(
                   server.claudeConfigSnippet || {
                     mcpServers: {

@@ -5,6 +5,8 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { AgentManager } from '../agents/AgentManager';
+import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
@@ -13,7 +15,8 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore();
+  const { useMcpMarketplace, setUseMcpMarketplace, telemetryEnabled, updateSettings } =
+    useSettingsStore();
   const desktop = isTauriEnvironment();
   const browse = async () => {
     setError('');
@@ -29,6 +32,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true);
     setError('');
     try {
+      await syncAgentConfig();
       const info = await nativeTask<{ path: string; name: string; branch: string }>(
         'task_validate_project',
         { path: path.trim() },
@@ -41,9 +45,11 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
       );
       if (existing) {
         store.selectProject(existing.id);
-        import('../../stores/contextMemoryStore').then(({ useContextMemoryStore }) => {
-          void useContextMemoryStore.getState().refreshMemory(existing);
-        }).catch(() => {});
+        import('../../stores/contextMemoryStore')
+          .then(({ useContextMemoryStore }) => {
+            void useContextMemoryStore.getState().refreshMemory(existing);
+          })
+          .catch(() => {});
       } else {
         const newProj = {
           id: crypto.randomUUID(),
@@ -53,9 +59,11 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
           agentProvider: 'codex' as const,
         };
         await store.addProject(newProj);
-        import('../../stores/contextMemoryStore').then(({ useContextMemoryStore }) => {
-          void useContextMemoryStore.getState().refreshMemory(newProj);
-        }).catch(() => {});
+        import('../../stores/contextMemoryStore')
+          .then(({ useContextMemoryStore }) => {
+            void useContextMemoryStore.getState().refreshMemory(newProj);
+          })
+          .catch(() => {});
       }
       setPath('');
       onClose();
@@ -92,6 +100,12 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
               files.
             </p>
           )}
+          <details className="mb-5">
+            <summary className="task-summary">Set up agents & models</summary>
+            <div className="mt-4">
+              <AgentManager />
+            </div>
+          </details>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -133,15 +147,33 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
                   className="mt-0.5 rounded border-[var(--color-border)] text-[var(--color-accent-ink)]"
                 />
                 <div>
-                  <span className="text-xs font-medium text-[var(--color-text)]">
+                  <span className="text-sm font-medium text-[var(--color-text-primary)]">
                     Use MCP marketplace (allmcps.com)
                   </span>
-                  <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
-                    Allow Jackalope to search and 1-click install community MCP tools. Jackalope does not transmit your source code or prompts.
+                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                    Allow Jackalope to search and 1-click install community MCP tools. Jackalope
+                    does not transmit your source code or prompts.
                   </p>
                 </div>
               </label>
             </div>
+            <label className="flex gap-2.5 items-start mt-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={telemetryEnabled}
+                onChange={(e) => updateSettings({ telemetryEnabled: e.target.checked })}
+                className="mt-0.5 rounded border-[var(--color-border)] text-[var(--color-accent-ink)]"
+              />
+              <div>
+                <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                  Allow anonymous usage telemetry
+                </span>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                  Your preference is saved for the planned telemetry service. This build does not
+                  send telemetry.
+                </p>
+              </div>
+            </label>
             <div className="flex justify-end mt-7">
               <Button type="submit" disabled={!desktop || !path.trim() || busy}>
                 {busy ? 'Checking repository…' : 'Open project'}

@@ -148,7 +148,8 @@ export function BrowserHarness() {
                     {realScreenshots[realScreenshots.length - 1].name}
                   </span>
                   <span className="text-xs font-mono text-[var(--color-text-muted)]">
-                    {realScreenshots[realScreenshots.length - 1].width} × {realScreenshots[realScreenshots.length - 1].height}
+                    {realScreenshots[realScreenshots.length - 1].width} ×{' '}
+                    {realScreenshots[realScreenshots.length - 1].height}
                   </span>
                 </div>
                 <div className="p-4 rounded-lg bg-[var(--color-surface-sunken)] flex items-center justify-center min-h-[180px]">
@@ -157,16 +158,17 @@ export function BrowserHarness() {
                     <p className="text-xs font-mono text-[var(--color-text-primary)]">
                       {realScreenshots[realScreenshots.length - 1].name}
                     </p>
-                    <p className="text-[10px] text-[var(--color-text-muted)]">
+                    <p className="text-xs text-[var(--color-text-muted)]">
                       {realScreenshots[realScreenshots.length - 1].filePath}
                     </p>
                   </div>
                 </div>
                 {realSteps.length > 0 && (
-                  <div className="text-[11px] text-[var(--color-text-secondary)] space-y-1 pt-1">
+                  <div className="text-xs text-[var(--color-text-secondary)] space-y-1 pt-1">
                     <span className="font-semibold">Recent verified step:</span>
                     <p className="text-[var(--color-text-primary)]">
-                      {realSteps[realSteps.length - 1].step} ({realSteps[realSteps.length - 1].status})
+                      {realSteps[realSteps.length - 1].step} (
+                      {realSteps[realSteps.length - 1].status})
                     </p>
                   </div>
                 )}
@@ -179,7 +181,9 @@ export function BrowserHarness() {
                       Sample page
                     </span>
                   </div>
-                  <span className="text-xs font-mono text-[var(--color-text-muted)]">1280 × 800</span>
+                  <span className="text-xs font-mono text-[var(--color-text-muted)]">
+                    1280 × 800
+                  </span>
                 </div>
 
                 <div className="space-y-2 text-xs text-[var(--color-text-secondary)]">
@@ -187,8 +191,9 @@ export function BrowserHarness() {
                     &lt;html&gt; ... loaded 42 interactive elements &lt;/html&gt;
                   </div>
                   <p className="text-xs leading-relaxed">
-                    The agent possesses full browser automation capabilities: navigating URLs, capturing real
-                    screenshots, clicking elements, verifying form inputs, and extracting structured DOM state.
+                    The agent possesses full browser automation capabilities: navigating URLs,
+                    capturing real screenshots, clicking elements, verifying form inputs, and
+                    extracting structured DOM state.
                   </p>
                 </div>
 

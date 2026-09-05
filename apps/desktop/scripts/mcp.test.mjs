@@ -7,6 +7,55 @@ import {
   probeMcpServer,
 } from '../src/lib/tauri-bridge.ts';
 import { useSettingsStore } from '../src/stores/settingsStore.ts';
+import { useMcpStore } from '../src/stores/mcpStore.ts';
+
+test('marketplace opt-out blocks search and detail fetches and discards in-flight results', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  let release;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Promise((resolve) => {
+      release = resolve;
+    });
+  };
+  try {
+    useSettingsStore.getState().setUseMcpMarketplace(false);
+    await useMcpStore.getState().searchMarketplace('private query');
+    await useMcpStore.getState().inspectServer({ id: 'test', description: 'test' });
+    assert.equal(calls, 0);
+    useSettingsStore.getState().setUseMcpMarketplace(true);
+    const request = useMcpStore.getState().searchMarketplace('test');
+    assert.equal(calls, 1);
+    useSettingsStore.getState().setUseMcpMarketplace(false);
+    release({ ok: true, json: async () => ({ servers: [{ id: 'stale' }] }) });
+    await request;
+    assert.deepEqual(useMcpStore.getState().marketplaceServers, []);
+    assert.equal(useMcpStore.getState().loadingMarketplace, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    useSettingsStore.getState().setUseMcpMarketplace(true);
+  }
+});
+
+test('marketplace detail renders the API server fields, not raw JSON', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      server: { description: 'Description', aiOverview: 'Overview', aiFeatures: ['One feature'] },
+    }),
+  });
+  try {
+    await useMcpStore.getState().inspectServer({ id: 'test', description: 'Fallback' });
+    assert.equal(
+      useMcpStore.getState().inspectingMarkdown,
+      'Description\n\nOverview\n\n- One feature',
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('settingsStore defaults useMcpMarketplace to true (opt-out)', () => {
   const store = useSettingsStore.getState();

@@ -63,13 +63,13 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
               {memory.techStack.slice(0, 4).map((tech) => (
                 <span
                   key={tech}
-                  className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border-subtle)]"
+                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border-subtle)]"
                 >
                   {tech}
                 </span>
               ))}
               {memory.techStack.length > 4 && (
-                <span className="text-[11px] text-[var(--color-text-muted)]">
+                <span className="text-xs text-[var(--color-text-muted)]">
                   +{memory.techStack.length - 4}
                 </span>
               )}
@@ -82,7 +82,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
 
           {/* Open Tasks Count */}
           {openTasks.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
               <ListTodo size={11} />
               {openTasks.length} open {openTasks.length === 1 ? 'task' : 'tasks'}
             </span>
@@ -90,7 +90,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
 
           {/* Invariants / Conventions Count */}
           {memory?.conventions && memory.conventions.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
               <Shield size={11} />
               {memory.conventions.length} invariants
             </span>
@@ -98,7 +98,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] text-[var(--color-text-muted)] flex items-center gap-1">
+          <span className="text-xs text-[var(--color-text-muted)] flex items-center gap-1">
             <Clock size={11} />
             {relativeTime}
           </span>
@@ -111,7 +111,10 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
             disabled={isScanning}
             className="h-7 px-2.5 text-xs gap-1.5"
           >
-            <RefreshCw size={12} className={isScanning ? 'animate-spin text-[var(--color-accent)]' : ''} />
+            <RefreshCw
+              size={12}
+              className={isScanning ? 'animate-spin text-[var(--color-accent)]' : ''}
+            />
             {isScanning ? 'Scanning…' : 'Refresh Context'}
           </Button>
 
@@ -141,7 +144,7 @@ export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
                 {memory.sourceFilesDetected.map((file) => (
                   <span
                     key={file}
-                    className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-muted)]"
+                    className="font-mono text-xs px-1.5 py-0.5 rounded bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-muted)]"
                   >
                     {file}
                   </span>

@@ -6,8 +6,8 @@ import {
   listMcpServers,
   probeMcpServer,
   saveMcpServer,
-} from '../lib/tauri-bridge';
-import { useSettingsStore } from './settingsStore';
+} from '../lib/tauri-bridge.ts';
+import { useSettingsStore } from './settingsStore.ts';
 
 export interface AllMcpsServer {
   id: string;
@@ -34,6 +34,8 @@ export interface AllMcpsServer {
         args?: string[];
         url?: string;
         env?: Record<string, string>;
+        type?: string;
+        [key: string]: unknown;
       }
     >;
   };
@@ -47,6 +49,9 @@ export interface AllMcpsSearchResponse {
   category: string | null;
   servers: AllMcpsServer[];
 }
+
+let searchController: AbortController | undefined;
+let inspectController: AbortController | undefined;
 
 interface McpState {
   servers: McpServerConfig[];
@@ -109,11 +114,13 @@ export const useMcpStore = create<McpState>((set, get) => ({
 
   saveServer: async (server: McpServerConfig) => {
     await saveMcpServer(server);
+    set({ probeResults: {} });
     await get().loadServers();
   },
 
   deleteServer: async (id: string, scope: string) => {
     await deleteMcpServer(id, scope);
+    set({ probeResults: {} });
     await get().loadServers();
   },
 
@@ -145,6 +152,9 @@ export const useMcpStore = create<McpState>((set, get) => ({
   setSelectedCategory: (selectedCategory: string) => set({ selectedCategory }),
 
   searchMarketplace: async (query?: string, category?: string) => {
+    searchController?.abort();
+    const controller = new AbortController();
+    searchController = controller;
     const enabled = useSettingsStore.getState().useMcpMarketplace;
     if (!enabled) {
       set({
@@ -166,16 +176,18 @@ export const useMcpStore = create<McpState>((set, get) => ({
       params.set('limit', '24');
 
       const url = `https://allmcps.com/api/v1/search?${params.toString()}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) {
         throw new Error(`Marketplace request failed: HTTP ${res.status}`);
       }
       const data: AllMcpsSearchResponse = await res.json();
+      if (controller.signal.aborted || !useSettingsStore.getState().useMcpMarketplace) return;
       set({
         marketplaceServers: data.servers || [],
         loadingMarketplace: false,
       });
     } catch (e) {
+      if (controller.signal.aborted) return;
       set({
         marketplaceError: e instanceof Error ? e.message : String(e),
         loadingMarketplace: false,
@@ -184,11 +196,28 @@ export const useMcpStore = create<McpState>((set, get) => ({
   },
 
   inspectServer: async (server: AllMcpsServer) => {
+    inspectController?.abort();
+    if (!useSettingsStore.getState().useMcpMarketplace) return;
+    const controller = new AbortController();
+    inspectController = controller;
     set({ inspectingServer: server, inspectingMarkdown: null, loadingMarkdown: true });
     try {
-      const res = await fetch(`https://allmcps.com/api/v1/servers/${server.id}`);
+      const res = await fetch(
+        `https://allmcps.com/api/v1/servers/${encodeURIComponent(server.id)}`,
+        { signal: controller.signal },
+      );
       if (res.ok) {
-        const text = await res.text();
+        const data = await res.json();
+        const detail = data.server;
+        const text =
+          [
+            detail?.description,
+            detail?.aiOverview,
+            ...(detail?.aiFeatures ?? []).map((feature: string) => `- ${feature}`),
+          ]
+            .filter(Boolean)
+            .join('\n\n') || server.description;
+        if (controller.signal.aborted || !useSettingsStore.getState().useMcpMarketplace) return;
         set({ inspectingMarkdown: text, loadingMarkdown: false });
       } else {
         set({
@@ -197,6 +226,7 @@ export const useMcpStore = create<McpState>((set, get) => ({
         });
       }
     } catch {
+      if (controller.signal.aborted) return;
       set({
         inspectingMarkdown: server.description || 'No additional documentation available.',
         loadingMarkdown: false,
@@ -204,5 +234,22 @@ export const useMcpStore = create<McpState>((set, get) => ({
     }
   },
 
-  clearInspecting: () => set({ inspectingServer: null, inspectingMarkdown: null }),
+  clearInspecting: () => {
+    inspectController?.abort();
+    set({ inspectingServer: null, inspectingMarkdown: null, loadingMarkdown: false });
+  },
 }));
+
+useSettingsStore.subscribe((state, previous) => {
+  if (previous.useMcpMarketplace && !state.useMcpMarketplace) {
+    searchController?.abort();
+    inspectController?.abort();
+    useMcpStore.setState({
+      marketplaceServers: [],
+      loadingMarketplace: false,
+      inspectingServer: null,
+      inspectingMarkdown: null,
+      loadingMarkdown: false,
+    });
+  }
+});

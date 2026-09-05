@@ -99,8 +99,10 @@ export function detectTaskIntent(prompt: string): TaskIntent {
 
 export function estimateComplexity(prompt: string): TaskComplexity {
   const words = prompt.trim().split(/\s+/).length;
-  const multiFileKeywords = /(across|multiple files|monorepo|components|stores|backend and frontend|full stack|all files)/i;
-  const deepKeywords = /(algorithm|optimization|concurrency|deadlock|memory leak|performance|security)/i;
+  const multiFileKeywords =
+    /(across|multiple files|monorepo|components|stores|backend and frontend|full stack|all files)/i;
+  const deepKeywords =
+    /(algorithm|optimization|concurrency|deadlock|memory leak|performance|security)/i;
 
   if (words > 120 || multiFileKeywords.test(prompt) || deepKeywords.test(prompt)) {
     return 'complex';
@@ -111,7 +113,11 @@ export function estimateComplexity(prompt: string): TaskComplexity {
   return 'standard';
 }
 
-function computeCapabilityScore(model: AgentModel, intent: TaskIntent, complexity: TaskComplexity): number {
+function computeCapabilityScore(
+  model: AgentModel,
+  intent: TaskIntent,
+  complexity: TaskComplexity,
+): number {
   let score = 0;
   const caps = model.capabilities;
 
@@ -153,7 +159,7 @@ function computeCapabilityScore(model: AgentModel, intent: TaskIntent, complexit
 function computePreferenceScore(model: AgentModel, pref: RoutingPreference): number {
   switch (pref) {
     case 'quality':
-      return (model.capabilities.coding * 0.5 + model.capabilities.reasoning * 0.5);
+      return model.capabilities.coding * 0.5 + model.capabilities.reasoning * 0.5;
     case 'speed':
       return model.capabilities.speed;
     case 'cost':
@@ -187,9 +193,21 @@ export function determineBestRoute(request: RouteRequest): RoutingDecision {
 
   // If forced override is specified
   if (forcedAgent && forcedAgent !== ('auto' as unknown)) {
-    const model = forcedModel
-      ? getModelById(forcedModel) ?? getDefaultModelForRunner(forcedAgent)
-      : getDefaultModelForRunner(forcedAgent);
+    const policy = useAgentConfigStore.getState();
+    if (!policy.isAgentEnabled(forcedAgent)) throw new Error('This agent is disabled in Agents.');
+    if (!runnerMap.get(forcedAgent)?.available)
+      throw new Error('This agent is not available. Check its executable in Agents.');
+    const options = policy.runnerOptions[forcedAgent];
+    const modelId =
+      forcedModel ||
+      options?.defaultModel ||
+      (options?.restrictModels ? options.models.find((m) => m.trim()) : '') ||
+      '';
+    if (options?.restrictModels && (!modelId || !options.models.includes(modelId)))
+      throw new Error('Choose an allowed model in Agents.');
+    if (modelId && !policy.isModelAllowed(modelId))
+      throw new Error('This model is restricted in Agents.');
+    const model = { id: modelId, name: modelId || 'CLI-configured model' };
 
     return {
       id: crypto.randomUUID(),
@@ -229,6 +247,8 @@ export function determineBestRoute(request: RouteRequest): RoutingDecision {
     if (!agentConfig.isAgentEnabled(model.runnerId)) {
       continue;
     }
+    const options = agentConfig.runnerOptions[model.runnerId];
+    if (options?.restrictModels && !options.models.includes(model.id)) continue;
     if (!agentConfig.isModelAllowed(model.id)) {
       continue;
     }
@@ -264,10 +284,7 @@ export function determineBestRoute(request: RouteRequest): RoutingDecision {
     const availabilityMultiplier = isAvailable ? (isSignedIn ? 1.0 : 0.85) : 0.1;
 
     const rawScore =
-      capabilityScore * 0.40 +
-      capacityScore * 0.25 +
-      preferenceScore * 0.20 +
-      affinityScore * 0.15;
+      capabilityScore * 0.4 + capacityScore * 0.25 + preferenceScore * 0.2 + affinityScore * 0.15;
 
     const totalScore = Math.round(rawScore * availabilityMultiplier * 10) / 10;
 
@@ -287,13 +304,12 @@ export function determineBestRoute(request: RouteRequest): RoutingDecision {
   // Sort descending by totalScore
   candidateScores.sort((a, b) => b.totalScore - a.totalScore);
 
-  const topCandidate = candidateScores[0] ?? {
-    agent: 'codex',
-    model: 'o3-mini',
-    totalScore: 5.0,
-  };
+  const topCandidate = candidateScores.find((candidate) => candidate.available);
+  if (!topCandidate)
+    throw new Error('No enabled agent and allowed model is available. Check Agents.');
 
-  const chosenModel = getModelById(topCandidate.model) ?? getDefaultModelForRunner(topCandidate.agent);
+  const chosenModel =
+    getModelById(topCandidate.model) ?? getDefaultModelForRunner(topCandidate.agent);
 
   // Generate clear user-facing explanation
   let explanation = '';

@@ -124,11 +124,7 @@ export function McpWorkspace() {
   });
 
   const getInstalledScope = (allMcpsId: string): string | null => {
-    const found = servers.find(
-      (s) =>
-        s.id.toLowerCase() === allMcpsId.toLowerCase() ||
-        s.id.toLowerCase().includes(allMcpsId.toLowerCase()),
-    );
+    const found = servers.find((s) => s.id.toLowerCase() === allMcpsId.toLowerCase());
     return found ? found.scope : null;
   };
 
@@ -253,9 +249,7 @@ export function McpWorkspace() {
           {filteredServers.length === 0 ? (
             <EmptyState
               icon={Server}
-              title={
-                servers.length === 0 ? 'No MCP servers configured' : 'No matching MCP servers'
-              }
+              title={servers.length === 0 ? 'No MCP servers configured' : 'No matching MCP servers'}
               description={
                 servers.length === 0
                   ? 'Add a custom MCP server or browse the AllMCPs marketplace to 1-click install tools.'
@@ -316,7 +310,7 @@ export function McpWorkspace() {
                       </div>
 
                       {envCount > 0 && (
-                        <p className="text-[11px] text-[var(--color-text-muted)] mb-2">
+                        <p className="text-xs text-[var(--color-text-muted)] mb-2">
                           🔒 {envCount} environment variable{envCount > 1 ? 's' : ''} configured
                         </p>
                       )}
@@ -325,13 +319,13 @@ export function McpWorkspace() {
                       {probe && (
                         <div className="mb-2">
                           {probe.ok ? (
-                            <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-medium">
+                            <div className="text-xs text-emerald-400 flex items-center gap-1.5 font-medium">
                               <CheckCircle size={13} />
                               Active ({probe.latencyMs ?? 0}ms) · {probe.tools.length} tool
                               {probe.tools.length === 1 ? '' : 's'} available
                             </div>
                           ) : (
-                            <div className="text-[11px] text-red-400 flex items-center gap-1.5 font-medium">
+                            <div className="text-xs text-red-400 flex items-center gap-1.5 font-medium">
                               <X size={13} />
                               Probe failed: {probe.error || 'Connection error'}
                             </div>
@@ -392,7 +386,9 @@ export function McpWorkspace() {
                           size="sm"
                           className="hover:text-red-400"
                           onClick={() => {
-                            if (confirm(`Remove MCP server '${server.name}' from ${server.scope}?`)) {
+                            if (
+                              confirm(`Remove MCP server '${server.name}' from ${server.scope}?`)
+                            ) {
                               void deleteServer(server.id, server.scope);
                             }
                           }}
@@ -481,7 +477,10 @@ export function McpWorkspace() {
 
               {loadingMarketplace ? (
                 <div className="p-16 text-center text-[var(--color-text-muted)]">
-                  <RefreshCw size={24} className="animate-spin mx-auto mb-3 text-[var(--color-accent-ink)]" />
+                  <RefreshCw
+                    size={24}
+                    className="animate-spin mx-auto mb-3 text-[var(--color-accent-ink)]"
+                  />
                   Searching allmcps.com registry…
                 </div>
               ) : marketplaceServers.length === 0 ? (
@@ -494,7 +493,7 @@ export function McpWorkspace() {
                 <div className="mcp-grid">
                   {marketplaceServers.map((item) => {
                     const installedScope = getInstalledScope(item.id);
-                    const requiresEnv = (item.envVars && item.envVars.length > 0);
+                    const requiresEnv = item.envVars && item.envVars.length > 0;
 
                     return (
                       <article key={item.id} className="mcp-card">
@@ -503,7 +502,7 @@ export function McpWorkspace() {
                             <div>
                               <h3 className="mcp-card-title">{item.name}</h3>
                               {item.category && (
-                                <span className="text-[11px] text-[var(--color-text-muted)]">
+                                <span className="text-xs text-[var(--color-text-muted)]">
                                   {item.category}
                                 </span>
                               )}
@@ -532,19 +531,21 @@ export function McpWorkspace() {
 
                           <div className="mcp-card-meta">
                             <span>
-                              {item.installKind === 'remote' ? 'remote url' : item.installName || item.id}
+                              {item.installKind === 'remote'
+                                ? 'remote url'
+                                : item.installName || item.id}
                             </span>
                           </div>
 
                           {requiresEnv && (
-                            <p className="text-[11px] text-amber-400/90 mb-2">
+                            <p className="text-xs text-amber-400/90 mb-2">
                               🔑 Requires {item.envVars.join(', ')}
                             </p>
                           )}
 
                           {installedScope && (
                             <div className="mb-2">
-                              <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1">
+                              <span className="text-xs font-medium text-emerald-400 flex items-center gap-1">
                                 <Check size={13} /> Installed ({installedScope})
                               </span>
                             </div>
@@ -564,10 +565,7 @@ export function McpWorkspace() {
                             Inspect
                           </Button>
 
-                          <Button
-                            size="sm"
-                            onClick={() => setInstallServer(item)}
-                          >
+                          <Button size="sm" onClick={() => setInstallServer(item)}>
                             <Download size={14} />
                             {installedScope ? 'Reconfigure' : '1-Click Install'}
                           </Button>
@@ -596,14 +594,17 @@ export function McpWorkspace() {
         onInstall={(srv) => setInstallServer(srv)}
       />
 
-      <McpAddCustomModal
-        open={customModalOpen}
-        onClose={() => {
-          setCustomModalOpen(false);
-          setEditingServer(null);
-        }}
-        existingServer={editingServer}
-      />
+      {customModalOpen && (
+        <McpAddCustomModal
+          key={editingServer ? `${editingServer.scope}:${editingServer.id}` : 'new'}
+          open={customModalOpen}
+          onClose={() => {
+            setCustomModalOpen(false);
+            setEditingServer(null);
+          }}
+          existingServer={editingServer}
+        />
+      )}
     </div>
   );
 }

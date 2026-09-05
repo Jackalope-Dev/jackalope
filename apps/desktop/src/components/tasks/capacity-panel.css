@@ -15,7 +15,7 @@
 }
 .capacity-heading p {
   margin-top: 0.4rem;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
 }
 .capacity-connection {
   display: grid;
@@ -39,7 +39,7 @@
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
   margin-bottom: 0.5rem;
 }
 .capacity-remaining {
@@ -74,7 +74,7 @@
   margin-top: 0.4rem;
 }
 .capacity-unavailable {
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 @media (max-width: 700px) {
   .capacity-heading {

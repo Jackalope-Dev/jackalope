@@ -1,3 +1,4 @@
+import { nativeTask } from '../task-runtime.ts';
 import { useAgentConfigStore } from '../../stores/agentConfigStore.ts';
 import type { DiscoveredCodebaseMemory, OpenTaskItem } from './types.ts';
 
@@ -65,7 +66,10 @@ export function parseRoadmapItems(content: string): string[] {
       inRoadmapSection = false;
     }
     if (inRoadmapSection && /^[-*]\s+/.test(trimmed)) {
-      const clean = trimmed.replace(/^[-*]\s+/, '').replace(/\*\*/g, '').trim();
+      const clean = trimmed
+        .replace(/^[-*]\s+/, '')
+        .replace(/\*\*/g, '')
+        .trim();
       if (clean && items.length < 15) {
         items.push(clean);
       }
@@ -110,7 +114,10 @@ export function parseConventions(content: string): string[] {
         trimmed,
       );
       if (inConventionsSection || isDirective) {
-        const clean = trimmed.replace(/^[-*]\s+/, '').replace(/\*\*/g, '').trim();
+        const clean = trimmed
+          .replace(/^[-*]\s+/, '')
+          .replace(/\*\*/g, '')
+          .trim();
         if (clean && conventions.length < 15 && !conventions.includes(clean)) {
           conventions.push(clean);
         }
@@ -140,33 +147,10 @@ export async function discoverCodebaseContext(
   const sourceFilesDetected: string[] = [];
   let summary = `${projectName} repository workspace`;
 
-  // Default mock files for browser preview / testing when fileReader not provided
   const read =
     fileReader ??
-    (async (relPath: string) => {
-      // In web mock environment or fallback:
-      if (relPath === 'package.json') {
-        return JSON.stringify({
-          name: projectName,
-          scripts: { build: 'tsc -b && vite build', dev: 'vite', test: 'vitest run' },
-          dependencies: { react: '^19.0.0', 'lucide-react': '^0.470.0', '@tauri-apps/api': '^2.0.0' },
-          devDependencies: { tailwindcss: '^3.4.0', typescript: '^5.7.0', vite: '^6.0.0' },
-        });
-      }
-      if (relPath === 'Cargo.toml') {
-        return `[package]\nname = "${projectName}-desktop"\nversion = "0.1.0"\n[dependencies]\ntauri = "2.0"\ntokio = "1.0"\nserde = "1.0"`;
-      }
-      if (relPath === 'AGENTS.md') {
-        return `# Invariants\n- Active Working User Only for commits\n- Dynamic theming via CSS variables (--color-accent)\n- Flat surface hierarchy with subtle gradients\n- Run pnpm build before concluding turn`;
-      }
-      if (relPath === 'TODO.md') {
-        return `# Implementation backlog\n- [ ] Central connection catalog and quota routing\n- [ ] Richer verification presentation\n- [x] Shared themed selects across forms\n- [ ] Clean visual audit log with per-project filter`;
-      }
-      if (relPath === 'STATUS.md') {
-        return `# Status\n## Next delivery\n1. Real-time failover monitoring and automatic re-routing\n2. Bounded proactive codebase memory discovery\n3. Visual audit log`;
-      }
-      return null;
-    });
+    ((relativePath: string) =>
+      nativeTask<string | null>('task_read_context', { projectPath, relativePath }));
 
   // 1. Inspect package.json
   const pkgContent = await read('package.json');
@@ -215,14 +199,14 @@ export async function discoverCodebaseContext(
   }
 
   // 4. Inspect TODO.md / STATUS.md
-  const todoContent = await read('TODO.md');
+  const todoContent = (await read('docs/TODO.md')) ?? (await read('TODO.md'));
   if (todoContent) {
     sourceFilesDetected.push('TODO.md');
     const parsed = parseMarkdownTasks(todoContent, 'TODO.md');
     openTasks.push(...parsed);
   }
 
-  const statusContent = await read('STATUS.md');
+  const statusContent = (await read('docs/STATUS.md')) ?? (await read('STATUS.md'));
   if (statusContent) {
     sourceFilesDetected.push('STATUS.md');
     const roadmap = parseRoadmapItems(statusContent);

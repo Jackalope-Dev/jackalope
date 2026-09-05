@@ -19,10 +19,10 @@ export function WorkspaceHeading({
             {eyebrow}
           </p>
         )}
-        <h1 className="text-[28px] font-semibold tracking-[-0.045em] leading-tight text-[var(--color-text-primary)]">
+        <h1 className="text-2xl font-semibold tracking-[-0.045em] leading-tight text-[var(--color-text-primary)]">
           {title}
         </h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
           {description}
         </p>
       </div>

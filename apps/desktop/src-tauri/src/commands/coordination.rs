@@ -314,8 +314,14 @@ impl Coordinator {
         {
             return Err("Give the task a short title and a concrete instruction.".into());
         }
-        if !["codex", "claude", "grok"].contains(&req.agent.as_str()) {
-            return Err("Choose Codex, Claude Code or Grok.".into());
+        if req.agent.is_empty()
+            || req.agent.len() > 80
+            || !req
+                .agent
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        {
+            return Err("Choose a configured agent.".into());
         }
         let scopes = scopes(req.scopes)?;
         let root = std::fs::canonicalize(&req.project_path).map_err(|e| e.to_string())?;
@@ -423,6 +429,7 @@ impl Coordinator {
                 .insert(token.clone(), (item.id.clone(), run_id.clone()));
             let instructions = instructions(&item);
             let result = self.runtime.start_locked(RunRequest {
+                model: None,
                 id: run_id,
                 project_id: item.project_id.clone(),
                 project_name: item.project_name,
@@ -630,7 +637,10 @@ impl Coordinator {
         Ok(item)
     }
 
-    pub(super) fn authorized_run(&self, headers: &HeaderMap) -> Result<super::tasks::TaskRun, StatusCode> {
+    pub(super) fn authorized_run(
+        &self,
+        headers: &HeaderMap,
+    ) -> Result<super::tasks::TaskRun, StatusCode> {
         if headers.contains_key("origin") {
             return Err(StatusCode::FORBIDDEN);
         }
@@ -754,7 +764,8 @@ pub(super) async fn bridge_browser_screenshot(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     service.runtime.update(&run.id, |r| {
         r.screenshots.push(screenshot.clone());
-        r.activity.push(format!("Captured browser screenshot: {}", screenshot.name));
+        r.activity
+            .push(format!("Captured browser screenshot: {}", screenshot.name));
     });
     Ok(Json(screenshot))
 }
@@ -797,7 +808,8 @@ pub(super) async fn bridge_user_prompt(
     let prompt = super::harness::ask_user_async(&run.id, input, Duration::from_millis(50)).await;
     service.runtime.update(&run.id, |r| {
         r.prompts.push(prompt.clone());
-        r.activity.push(format!("Waiting for user input: {question_text}"));
+        r.activity
+            .push(format!("Waiting for user input: {question_text}"));
     });
     Ok(Json(prompt))
 }
@@ -829,7 +841,8 @@ pub(super) async fn bridge_respond_user_prompt(
             p.answer = Some(body.answer.clone());
             p.answered_at = Some(Utc::now().to_rfc3339());
         }
-        r.activity.push(format!("User answered prompt: {}", body.answer));
+        r.activity
+            .push(format!("User answered prompt: {}", body.answer));
     });
     Ok(Json(serde_json::json!({ "resolved": resolved })))
 }
@@ -867,7 +880,9 @@ pub(super) async fn bridge_computer_verify(
     let run = service.authorized_run(&headers)?;
     let mut cmd = Command::new(&input.command);
     cmd.args(&input.args).current_dir(&run.workspace);
-    let output = cmd.output().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let output = cmd
+        .output()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     let exit_code = output.status.code();

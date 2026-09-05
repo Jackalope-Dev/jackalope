@@ -24,11 +24,8 @@ import { useState } from 'react';
 import { PRESET_THEMES } from '../../lib/theme-engine';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { useProjectStore } from '../../stores/projectStore';
-import {
-  type DefaultRunnerId,
-  type NotificationLevel,
-  useSettingsStore,
-} from '../../stores/settingsStore';
+import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { Button } from '../ui/button';
@@ -52,10 +49,10 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const dialogFocus = useDialogFocus();
   const settings = useSettingsStore();
+  const agentConfig = useAgentConfigStore();
   const { currentTheme, setTheme } = useThemeStore();
   const { mood, setMood, pet } = useMascotStore();
-  const { projects, activeProjectId, updateProject, updateProjectPreferences } =
-    useProjectStore();
+  const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
 
   const [scope, setScope] = useState<'app' | 'project'>(initialScope);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -93,7 +90,11 @@ export function SettingsDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="settings-dialog-overlay" />
-        <Dialog.Content {...dialogFocus} className="settings-dialog appearance-panel" aria-label="Settings and Preferences">
+        <Dialog.Content
+          {...dialogFocus}
+          className="settings-dialog appearance-panel"
+          aria-label="Settings and Preferences"
+        >
           {/* Top Bar */}
           <header className="settings-header">
             <div className="flex items-center gap-3 min-w-0">
@@ -333,11 +334,7 @@ export function SettingsDialog({
 
                       {/* Mascot Interactive Box */}
                       <div className="settings-companion-box">
-                        <div
-                          className="settings-companion-avatar cursor-pointer"
-                          onClick={pet}
-                          title="Click to pet!"
-                        >
+                        <div className="settings-companion-avatar">
                           <JackalopeMascot size="lg" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -546,16 +543,27 @@ export function SettingsDialog({
                           </div>
                           <div className="settings-control-wrapper">
                             <Select
-                              value={settings.defaultRunner}
-                              onValueChange={(val) =>
-                                settings.updateSettings({
-                                  defaultRunner: val as DefaultRunnerId,
-                                })
-                              }
+                              value={agentConfig.defaultMetaAgent}
+                              onValueChange={(val) => agentConfig.setDefaultMetaAgent(val)}
                             >
-                              <SelectItem value="codex">Codex (CLI)</SelectItem>
-                              <SelectItem value="claude">Claude Code (CLI)</SelectItem>
-                              <SelectItem value="grok">Grok (CLI)</SelectItem>
+                              <SelectItem
+                                value="codex"
+                                disabled={!agentConfig.isAgentEnabled('codex')}
+                              >
+                                Codex (CLI)
+                              </SelectItem>
+                              <SelectItem
+                                value="claude"
+                                disabled={!agentConfig.isAgentEnabled('claude')}
+                              >
+                                Claude Code (CLI)
+                              </SelectItem>
+                              <SelectItem
+                                value="grok"
+                                disabled={!agentConfig.isAgentEnabled('grok')}
+                              >
+                                Grok (CLI)
+                              </SelectItem>
                             </Select>
                           </div>
                         </div>
@@ -564,7 +572,8 @@ export function SettingsDialog({
                           <div className="settings-row-info">
                             <span className="settings-row-label">Intelligent Routing Mode</span>
                             <span className="settings-row-description">
-                              How the central orchestrator selects the best agent and model for tasks.
+                              How the central orchestrator selects the best agent and model for
+                              tasks.
                             </span>
                           </div>
                           <div className="settings-control-wrapper">
@@ -577,7 +586,9 @@ export function SettingsDialog({
                               }
                             >
                               <SelectItem value="auto">Auto (Balanced Best Fit)</SelectItem>
-                              <SelectItem value="quality">Maximum Capability & Reasoning</SelectItem>
+                              <SelectItem value="quality">
+                                Maximum Capability & Reasoning
+                              </SelectItem>
                               <SelectItem value="speed">Lowest Latency & Speed</SelectItem>
                               <SelectItem value="cost">Economic Token Budget</SelectItem>
                               <SelectItem value="manual">Manual Selection Always</SelectItem>
@@ -587,14 +598,18 @@ export function SettingsDialog({
 
                         <div className="settings-row">
                           <div className="settings-row-info">
-                            <span className="settings-row-label">Proactive Self-Healing Failover</span>
+                            <span className="settings-row-label">
+                              Proactive Self-Healing Failover
+                            </span>
                             <span className="settings-row-description">
-                              Automatically detect quota exhaustion (429) or crashes and re-route tasks to the next best fallback agent.
+                              Not available in this build. Failed or interrupted work stays visible
+                              for review and an explicit retry.
                             </span>
                           </div>
                           <div className="settings-control-wrapper">
                             <Switch
-                              checked={settings.autoFailoverEnabled}
+                              disabled
+                              checked={false}
                               onCheckedChange={(checked) =>
                                 settings.updateSettings({ autoFailoverEnabled: checked })
                               }
@@ -607,7 +622,8 @@ export function SettingsDialog({
                           <div className="settings-row-info">
                             <span className="settings-row-label">Codebase Context Discovery</span>
                             <span className="settings-row-description">
-                              Extract tech stack, open tasks from TODO.md, and conventions on onboarding and periodic refresh.
+                              Extract tech stack, open tasks from TODO.md, and conventions on
+                              onboarding and periodic refresh.
                             </span>
                           </div>
                           <div className="settings-control-wrapper">
@@ -625,7 +641,8 @@ export function SettingsDialog({
                           <div className="settings-row-info">
                             <span className="settings-row-label">Context Refresh Cadence</span>
                             <span className="settings-row-description">
-                              How frequently Jackalope refreshes repository roadmap and task memory in the background.
+                              How frequently Jackalope refreshes repository roadmap and task memory
+                              in the background.
                             </span>
                           </div>
                           <div className="settings-control-wrapper">
@@ -667,7 +684,8 @@ export function SettingsDialog({
                               aria-label="Parallel Concurrency Limit"
                             />
                             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--color-surface-sunken)] border border-[var(--color-border)]">
-                              {settings.concurrencyLimit} {settings.concurrencyLimit === 1 ? 'task' : 'tasks'}
+                              {settings.concurrencyLimit}{' '}
+                              {settings.concurrencyLimit === 1 ? 'task' : 'tasks'}
                             </span>
                           </div>
                         </div>
@@ -754,7 +772,8 @@ export function SettingsDialog({
                       <div className="settings-section-header">
                         <h2 className="settings-section-title">Git & Worktrees</h2>
                         <p className="settings-section-subtitle">
-                          Manage repository branch naming, default base branch, and worktree isolation.
+                          Manage repository branch naming, default base branch, and worktree
+                          isolation.
                         </p>
                       </div>
 
@@ -803,7 +822,8 @@ export function SettingsDialog({
                           <div className="settings-row-info">
                             <span className="settings-row-label">Worktree Folder Name</span>
                             <span className="settings-row-description">
-                              Relative subfolder inside repository where task worktrees are checked out.
+                              Relative subfolder inside repository where task worktrees are checked
+                              out.
                             </span>
                           </div>
                           <div className="settings-control-wrapper">
@@ -829,7 +849,8 @@ export function SettingsDialog({
                                 <span className="settings-badge-advanced">Advanced</span>
                               </span>
                               <span className="settings-row-description">
-                                Delete worktree folder and branch immediately after successful merge.
+                                Delete worktree folder and branch immediately after successful
+                                merge.
                               </span>
                             </div>
                             <div className="settings-control-wrapper">
@@ -861,8 +882,8 @@ export function SettingsDialog({
                           <div className="settings-row-info">
                             <span className="settings-row-label">Anonymous Usage Telemetry</span>
                             <span className="settings-row-description">
-                              Sends coarse engagement events and coarse timing metrics to help improve
-                              Jackalope.
+                              Sends coarse engagement events and coarse timing metrics to help
+                              improve Jackalope.
                             </span>
                           </div>
                           <div className="settings-control-wrapper">
@@ -900,8 +921,8 @@ export function SettingsDialog({
                       <div className="settings-disclosure-box">
                         <strong>Strict Data Boundary Invariant:</strong>
                         <p className="mt-1">
-                          Jackalope runs against private source repositories. Telemetry never captures,
-                          stores, or transmits:
+                          Jackalope runs against private source repositories. Telemetry never
+                          captures, stores, or transmits:
                         </p>
                         <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
                           <li>Task prompts or intent instructions</li>
@@ -918,7 +939,8 @@ export function SettingsDialog({
                       <div className="settings-section-header">
                         <h2 className="settings-section-title">Advanced & Diagnostics</h2>
                         <p className="settings-section-subtitle">
-                          Developer overrides, custom CLI executable paths, and configuration export.
+                          Developer overrides, custom CLI executable paths, and configuration
+                          export.
                         </p>
                       </div>
 
@@ -943,7 +965,9 @@ export function SettingsDialog({
 
                         <div className="settings-row">
                           <div className="settings-row-info">
-                            <span className="settings-row-label">Codex Executable Path Override</span>
+                            <span className="settings-row-label">
+                              Codex Executable Path Override
+                            </span>
                             <span className="settings-row-description">
                               Custom binary path if not present in system PATH.
                             </span>
@@ -951,13 +975,15 @@ export function SettingsDialog({
                           <div className="settings-control-wrapper">
                             <input
                               type="text"
-                              value={settings.customRunnerPaths.codex ?? ''}
+                              value={agentConfig.runnerOptions.codex?.command ?? ''}
                               onChange={(e) =>
-                                settings.updateSettings({
-                                  customRunnerPaths: {
-                                    ...settings.customRunnerPaths,
-                                    codex: e.target.value,
-                                  },
+                                agentConfig.setRunnerOptions('codex', {
+                                  ...(agentConfig.runnerOptions.codex ?? {
+                                    models: [],
+                                    restrictModels: false,
+                                    defaultModel: '',
+                                  }),
+                                  command: e.target.value,
                                 })
                               }
                               placeholder="e.g. /usr/local/bin/codex"
@@ -968,7 +994,9 @@ export function SettingsDialog({
 
                         <div className="settings-row">
                           <div className="settings-row-info">
-                            <span className="settings-row-label">Claude Code Executable Override</span>
+                            <span className="settings-row-label">
+                              Claude Code Executable Override
+                            </span>
                             <span className="settings-row-description">
                               Custom binary path for claude CLI.
                             </span>
@@ -976,13 +1004,15 @@ export function SettingsDialog({
                           <div className="settings-control-wrapper">
                             <input
                               type="text"
-                              value={settings.customRunnerPaths.claude ?? ''}
+                              value={agentConfig.runnerOptions.claude?.command ?? ''}
                               onChange={(e) =>
-                                settings.updateSettings({
-                                  customRunnerPaths: {
-                                    ...settings.customRunnerPaths,
-                                    claude: e.target.value,
-                                  },
+                                agentConfig.setRunnerOptions('claude', {
+                                  ...(agentConfig.runnerOptions.claude ?? {
+                                    models: [],
+                                    restrictModels: false,
+                                    defaultModel: '',
+                                  }),
+                                  command: e.target.value,
                                 })
                               }
                               placeholder="e.g. /opt/homebrew/bin/claude"
@@ -1001,13 +1031,15 @@ export function SettingsDialog({
                           <div className="settings-control-wrapper">
                             <input
                               type="text"
-                              value={settings.customRunnerPaths.grok ?? ''}
+                              value={agentConfig.runnerOptions.grok?.command ?? ''}
                               onChange={(e) =>
-                                settings.updateSettings({
-                                  customRunnerPaths: {
-                                    ...settings.customRunnerPaths,
-                                    grok: e.target.value,
-                                  },
+                                agentConfig.setRunnerOptions('grok', {
+                                  ...(agentConfig.runnerOptions.grok ?? {
+                                    models: [],
+                                    restrictModels: false,
+                                    defaultModel: '',
+                                  }),
+                                  command: e.target.value,
                                 })
                               }
                               placeholder="e.g. /usr/bin/grok"
@@ -1119,7 +1151,8 @@ export function SettingsDialog({
                           <div className="settings-section-header">
                             <h2 className="settings-section-title">Preferred Agent Runner</h2>
                             <p className="settings-section-subtitle">
-                              Choose which agent Jackalope uses by default for tasks in this project.
+                              Choose which agent Jackalope uses by default for tasks in this
+                              project.
                             </p>
                           </div>
 
@@ -1128,7 +1161,8 @@ export function SettingsDialog({
                               <div className="settings-row-info">
                                 <span className="settings-row-label">Project Agent Runner</span>
                                 <span className="settings-row-description">
-                                  Overrides the app-wide runner when starting tasks in {activeProject.name}.
+                                  Overrides the app-wide runner when starting tasks in{' '}
+                                  {activeProject.name}.
                                 </span>
                               </div>
                               <div className="settings-control-wrapper">
@@ -1145,7 +1179,7 @@ export function SettingsDialog({
                                   }
                                 >
                                   <SelectItem value="inherit">
-                                    Inherit App Default ({settings.defaultRunner})
+                                    Inherit App Default ({agentConfig.defaultMetaAgent})
                                   </SelectItem>
                                   <SelectItem value="codex">Codex</SelectItem>
                                   <SelectItem value="claude">Claude Code</SelectItem>
@@ -1156,19 +1190,15 @@ export function SettingsDialog({
 
                             <div className="settings-row">
                               <div className="settings-row-info">
-                                <span className="settings-row-label">
-                                  Isolate Tasks by Default
-                                </span>
+                                <span className="settings-row-label">Isolate Tasks by Default</span>
                                 <span className="settings-row-description">
-                                  Start new tasks in their own isolated Git worktree branch instead of
-                                  editing current checkout.
+                                  Start new tasks in their own isolated Git worktree branch instead
+                                  of editing current checkout.
                                 </span>
                               </div>
                               <div className="settings-control-wrapper">
                                 <Switch
-                                  checked={
-                                    activeProject.preferences?.isolatedByDefault ?? true
-                                  }
+                                  checked={activeProject.preferences?.isolatedByDefault ?? true}
                                   onCheckedChange={(checked) =>
                                     updateProjectPreferences(activeProject.id, {
                                       isolatedByDefault: checked,
@@ -1187,8 +1217,8 @@ export function SettingsDialog({
                           <div className="settings-section-header">
                             <h2 className="settings-section-title">Task Custom Instructions</h2>
                             <p className="settings-section-subtitle">
-                              Persistent guidelines and repository context automatically injected into
-                              prompts for this project.
+                              Persistent guidelines and repository context automatically injected
+                              into prompts for this project.
                             </p>
                           </div>
 
@@ -1233,7 +1263,8 @@ export function SettingsDialog({
                               <div className="settings-row-info">
                                 <span className="settings-row-label">Verification Command</span>
                                 <span className="settings-row-description">
-                                  Shell command executed to verify task results (e.g. tests or build).
+                                  Shell command executed to verify task results (e.g. tests or
+                                  build).
                                 </span>
                               </div>
                               <div className="settings-control-wrapper">
@@ -1253,9 +1284,12 @@ export function SettingsDialog({
 
                             <div className="settings-row">
                               <div className="settings-row-info">
-                                <span className="settings-row-label">Auto-suggest Verification</span>
+                                <span className="settings-row-label">
+                                  Auto-suggest Verification
+                                </span>
                                 <span className="settings-row-description">
-                                  Prominently prompt to run verification command when an agent finishes.
+                                  Prominently prompt to run verification command when an agent
+                                  finishes.
                                 </span>
                               </div>
                               <div className="settings-control-wrapper">
@@ -1288,7 +1322,8 @@ export function SettingsDialog({
                               <div className="settings-row-info">
                                 <span className="settings-row-label">Custom Worktree Folder</span>
                                 <span className="settings-row-description">
-                                  Override the default worktree parent folder (.worktrees) for this project.
+                                  Override the default worktree parent folder (.worktrees) for this
+                                  project.
                                 </span>
                               </div>
                               <div className="settings-control-wrapper">

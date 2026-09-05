@@ -9,6 +9,7 @@ import {
 } from '../lib/task-runtime';
 import { isTauriEnvironment } from '../lib/tauri-bridge';
 import { useMascotStore } from './mascotStore';
+import { syncAgentConfig } from './agentConfigStore';
 
 export interface TaskDraft {
   prompt: string;
@@ -16,7 +17,7 @@ export interface TaskDraft {
   isolated: boolean;
   skills?: string[];
 }
-export const emptyDraft: TaskDraft = { prompt: '', agent: 'codex', isolated: true, skills: [] };
+export const emptyDraft: TaskDraft = { prompt: '', agent: '', isolated: true, skills: [] };
 interface ExecutionState {
   runs: TaskRun[];
   runners: Runner[];
@@ -70,15 +71,6 @@ export const useExecutionStore = create<ExecutionState>()(
             set({ runs, loading: false, error: null });
             if (working !== wasWorking)
               useMascotStore.getState().setMood(working ? 'working' : 'idle');
-
-            // Proactively check for failovers and quota issues
-            for (const r of runs) {
-              if (r.status === 'failed' || r.status === 'interrupted') {
-                import('../lib/orchestration/orchestrator').then(({ orchestrator }) => {
-                  void orchestrator.checkFailover(r);
-                }).catch(() => {});
-              }
-            }
           } catch (error) {
             set({ error: String(error), loading: false });
           } finally {
@@ -91,6 +83,7 @@ export const useExecutionStore = create<ExecutionState>()(
         if (get().submitting) throw new Error('A task is already being submitted.');
         set({ submitting: true });
         try {
+          await syncAgentConfig();
           const id = await nativeTask<string>('task_start', {
             request: { ...request, id: crypto.randomUUID() },
           });

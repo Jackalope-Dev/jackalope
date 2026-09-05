@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { nativeTask } from '../../lib/task-runtime';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -10,7 +11,7 @@ interface PlanEntry {
   key: string;
   title: string;
   prompt: string;
-  agent: 'codex' | 'claude' | 'grok';
+  agent: string;
   scopes: string[];
   dependsOn: string[];
 }
@@ -73,7 +74,14 @@ function parsePlan(text: string): PlanEntry[] {
       throw new Error(`${label} needs a title of 1–160 characters.`);
     if (typeof item.prompt !== 'string' || !item.prompt.trim() || item.prompt.length > 20_000)
       throw new Error(`${label} needs instructions of 1–20,000 characters.`);
-    if (!['codex', 'claude', 'grok'].includes(String(item.agent)))
+    if (
+      ![
+        'codex',
+        'claude',
+        'grok',
+        ...useAgentConfigStore.getState().customAgents.map((a) => a.id),
+      ].includes(String(item.agent))
+    )
       throw new Error(`${label} must choose codex, claude or grok as its agent.`);
     if (
       !Array.isArray(item.scopes) ||

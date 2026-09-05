@@ -1,4 +1,4 @@
-import { isTauriEnvironment } from './tauri-bridge';
+import { isTauriEnvironment } from './tauri-bridge.ts';
 
 export interface Runner {
   id: string;
@@ -82,6 +82,7 @@ export interface ScreenshotArtifact {
   timestamp: string;
 }
 export interface RunRequest {
+  model?: string;
   id: string;
   projectId: string;
   projectName: string;
@@ -114,6 +115,10 @@ export async function nativeTask<T>(command: string, args?: Record<string, unkno
     throw new Error(
       'Open the desktop app to connect projects and run agents. This browser preview does not execute work.',
     );
+  if (command === 'queue_dispatch' || command === 'queue_add' || command === 'queue_import') {
+    const { syncAgentConfig } = await import('../stores/agentConfigStore');
+    await syncAgentConfig();
+  }
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<T>(command, args);
 }

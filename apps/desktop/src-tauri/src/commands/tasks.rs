@@ -61,6 +61,7 @@ pub struct TaskRun {
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRequest {
+    pub model: Option<String>,
     pub id: String,
     pub project_id: String,
     pub project_name: String,
@@ -417,8 +418,11 @@ impl TaskRuntime {
             r.branch = branch;
             r.base_head = base_head;
         });
-        let mut cmd = command(executable(&req.agent)?);
-        if req.agent == "codex" {
+        let policy = self.policy()?;
+        let (adapter, executable) = policy.resolve(&req.agent)?;
+        let selected_model = policy.model(&req.agent, req.model.as_deref())?;
+        let mut cmd = command(executable);
+        if adapter == "codex" {
             cmd.args([
                 "exec",
                 "-c",
@@ -430,7 +434,7 @@ impl TaskRuntime {
                 cmd.args(["resume", old.session_id.as_deref().unwrap()]);
             }
             cmd.args(["--json", "-"]);
-        } else if req.agent == "claude" {
+        } else if adapter == "claude" {
             cmd.args([
                 "--print",
                 "--verbose",
@@ -455,12 +459,15 @@ impl TaskRuntime {
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
         }
+        if let Some(model) = &selected_model {
+            cmd.args(["--model", model]);
+        }
         let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. If you need clarification or a denied permission, explain what is needed and stop so the user can reply.\n", req.prompt);
         if let Some(context) = &req.coordination {
             cmd.env("JACKALOPE_BRIDGE_URL", &context.endpoint)
                 .env("JACKALOPE_BRIDGE_TOKEN", &context.token);
             input.push_str(&context.instructions);
-            if req.agent == "claude" {
+            if adapter == "claude" {
                 let config = serde_json::json!({"mcpServers":{"jackalope":{"type":"http","url":format!("{}/mcp", context.endpoint),"headers":{"Authorization":"Bearer ${JACKALOPE_BRIDGE_TOKEN}"}}}});
                 cmd.args([
                     "--mcp-config",
@@ -471,7 +478,7 @@ impl TaskRuntime {
                 input.push_str("\nClaude harness tools: You have access to in-app browser automation, interactive user questions, and structured verification via provided mcp__jackalope__* tools (browser_navigate, browser_screenshot, browser_snapshot, browser_interact, ask_user, record_validation_step, computer_verify). If testing UI changes or onboarding flows, proactively use browser_screenshot and record_validation_step to provide verifiable evidence, and ask_user if you need test data or confirmation.\n");
             }
         }
-        if req.agent == "grok" {
+        if adapter == "grok" {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;
         }
@@ -512,7 +519,7 @@ impl TaskRuntime {
                 r.status = "running".into();
             }
         });
-        let input_result = if req.agent == "grok" {
+        let input_result = if adapter == "grok" {
             Ok(())
         } else {
             stdin.write_all(input.as_bytes())
@@ -524,10 +531,13 @@ impl TaskRuntime {
         }
         let runtime = self.clone();
         let event_id = id.to_string();
+        let output_adapter = adapter.clone();
         let reader = std::thread::spawn(move || {
             for line in BufReader::new(stdout).lines() {
                 match line {
-                    Ok(line) => runtime.update(&event_id, |r| consume_event(r, &line)),
+                    Ok(line) => runtime.update(&event_id, |r| {
+                        consume_adapter_event(r, &line, &output_adapter)
+                    }),
                     Err(error) => {
                         runtime.update(&event_id, |r| {
                             r.error = Some(format!("Agent output could not be read: {error}"))
@@ -562,7 +572,7 @@ impl TaskRuntime {
         };
         let _ = reader.join();
         let _ = diagnostics.join();
-        if req.agent == "grok" {
+        if adapter == "grok" {
             let _ = std::fs::remove_file(self.directory.join(format!("{id}.prompt")));
         }
         let canceled = {
@@ -594,7 +604,13 @@ fn num(value: &Value, key: &str) -> u64 {
     value[key].as_u64().unwrap_or(0)
 }
 
+#[cfg(test)]
 fn consume_event(run: &mut TaskRun, line: &str) {
+    let adapter = run.agent.clone();
+    consume_adapter_event(run, line, &adapter);
+}
+
+fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str) {
     let Ok(event) = serde_json::from_str::<Value>(line) else {
         activity(run, line);
         return;
@@ -609,7 +625,7 @@ fn consume_event(run: &mut TaskRun, line: &str) {
     {
         run.model = Some(model.into());
     }
-    match (run.agent.as_str(), kind) {
+    match (adapter, kind) {
         ("codex", "item.completed") => {
             let item = &event["item"];
             if item["type"] == "agent_message" {
@@ -708,18 +724,21 @@ fn consume_event(run: &mut TaskRun, line: &str) {
 }
 
 #[tauri::command]
-pub async fn task_runners() -> Vec<Runner> {
-    tauri::async_runtime::spawn_blocking(|| ["codex", "claude", "grok"].iter().map(|id| {
-        let mut runner = Runner { id: id.to_string(), name: match *id { "codex" => "Codex", "claude" => "Claude Code", _ => "Grok" }.into(), available: false, signed_in: false, account: "Current CLI account".into(), detail: String::new() };
-        match executable(id) {
+pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
+    let policy = runtime.policy()?;
+    let mut ids: Vec<String> = vec!["codex".into(), "claude".into(), "grok".into()];
+    ids.extend(policy.custom_agents.iter().map(|a| a.id.clone()));
+    tauri::async_runtime::spawn_blocking(move || ids.iter().map(|id| {
+        let mut runner = Runner { id: id.to_string(), name: match id.as_str() { "codex" => "Codex", "claude" => "Claude Code", _ => "Grok" }.into(), available: false, signed_in: false, account: "Current CLI account".into(), detail: String::new() };
+        match { let mut discovery = policy.clone(); discovery.enabled_agents.clear(); discovery.resolve(id) } {
             Err(error) => runner.detail = error,
-            Ok(path) => {
+            Ok((adapter, path)) => {
                 runner.available = true;
-                if *id == "grok" { runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into(); return runner; }
-                let args = if *id == "codex" { vec!["login", "status"] } else { vec!["auth", "status"] };
+                if adapter == "grok" { runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into(); return runner; }
+                let args = if adapter == "codex" { vec!["login", "status"] } else { vec!["auth", "status"] };
                 match probe_auth(path, args) {
                     Ok(out) => {
-                        if *id == "claude" {
+                        if adapter == "claude" {
                             if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {
                                 runner.signed_in = auth["loggedIn"] == true;
                                 runner.account = auth["email"].as_str().unwrap_or("Current CLI account").into();
@@ -731,8 +750,9 @@ pub async fn task_runners() -> Vec<Runner> {
                 }
             }
         }
+        if let Some(custom) = policy.custom_agents.iter().find(|a| a.id == *id) { runner.name = custom.name.clone(); }
         runner
-    }).collect()).await.unwrap_or_default()
+    }).collect()).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -750,6 +770,48 @@ pub async fn task_pick_project(app: AppHandle) -> Result<Option<String>, String>
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn task_read_context(
+    project_path: String,
+    relative_path: String,
+) -> Result<Option<String>, String> {
+    let allowed = [
+        "package.json",
+        "Cargo.toml",
+        "AGENTS.md",
+        "TODO.md",
+        "STATUS.md",
+        "docs/TODO.md",
+        "docs/STATUS.md",
+        "apps/desktop/package.json",
+        "apps/desktop/src-tauri/Cargo.toml",
+    ];
+    if !allowed.contains(&relative_path.as_str()) {
+        return Err("Unsupported context file.".into());
+    }
+    let root = std::fs::canonicalize(project_path).map_err(|e| e.to_string())?;
+    let path = match std::fs::canonicalize(root.join(relative_path)) {
+        Ok(path) => path,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+    if !path.starts_with(&root) {
+        return Err("Context file resolves outside the project.".into());
+    }
+    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    if file.metadata().map_err(|e| e.to_string())?.len() > 262144 {
+        return Err("Context file exceeds 256 KiB.".into());
+    }
+    let mut text = String::new();
+    file.take(262145)
+        .read_to_string(&mut text)
+        .map_err(|e| e.to_string())?;
+    if text.len() > 262144 {
+        return Err("Context file exceeds 256 KiB.".into());
+    }
+    Ok(Some(text))
 }
 
 #[derive(Serialize)]
@@ -833,7 +895,7 @@ impl TaskRuntime {
         let _integration_guard = super::integration::execution_guard()?;
         self.start_locked(request)
     }
-    pub(super) fn start_locked(&self, request: RunRequest) -> Result<String, String> {
+    pub(super) fn start_locked(&self, mut request: RunRequest) -> Result<String, String> {
         if let Some(previous) = &request.previous_run_id {
             if super::integration::applied_run_ids(self)?.contains(previous) {
                 return Err("This task has already been integrated. Add a new task to start from the updated master.".into());
@@ -845,7 +907,7 @@ impl TaskRuntime {
         {
             return Err("Provide a task between 1 and 100,000 bytes.".into());
         }
-        executable(&request.agent)?;
+        self.apply_policy(&mut request)?;
         let previous;
         {
             let mut inner = self.inner.lock().unwrap();
@@ -902,7 +964,7 @@ impl TaskRuntime {
                 base_head: String::new(),
                 agent: request.agent.clone(),
                 account: "Current CLI account (identity not tracked)".into(),
-                model: None,
+                model: request.model.clone(),
                 prompt: request.prompt.clone(),
                 status: "starting".into(),
                 started_at: Utc::now().to_rfc3339(),
@@ -1046,6 +1108,103 @@ mod tests {
             assert_eq!(run.usage.input + run.usage.output, 135);
             assert_eq!(run.usage.estimated_cost_usd, Some(0.012));
         }
+    }
+
+    #[test]
+    fn custom_adapter_decodes_events_without_losing_agent_identity() {
+        let mut run = sample("custom-codex");
+        consume_adapter_event(
+            &mut run,
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"Completed"}}"#,
+            "codex",
+        );
+        assert_eq!(run.result, "Completed");
+        assert_eq!(run.agent, "custom-codex");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn configured_default_agent_launches_with_allowed_model_and_records_output() {
+        use super::super::agent_policy::{AgentPolicy, CustomAgent, RunnerOptions};
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-policy-run-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let root = folder.to_str().unwrap();
+        git(root, &["init", "-b", "master"]).unwrap();
+        git(
+            root,
+            &[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "Fixture",
+            ],
+        )
+        .unwrap();
+        let executable = folder.join("fixture.cmd");
+        std::fs::write(&executable, "@echo off\r\nset /p TASK_INPUT=\r\necho %*>args.txt\r\necho {\"type\":\"thread.started\",\"thread_id\":\"fixture-session\"}\r\necho {\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Fixture complete\"}}\r\n").unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
+        let mut policy = AgentPolicy::default();
+        policy.default_meta_agent = "custom-fixture".into();
+        policy.custom_agents.push(CustomAgent {
+            id: "custom-fixture".into(),
+            name: "Fixture".into(),
+            command: executable.to_string_lossy().into(),
+            adapter: Some("codex".into()),
+        });
+        policy.runner_options.insert(
+            "custom-fixture".into(),
+            RunnerOptions {
+                models: vec!["test-model".into()],
+                restrict_models: true,
+                ..Default::default()
+            },
+        );
+        std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
+        std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+        let request = RunRequest {
+            id: "fixture-run-123".into(),
+            project_id: "fixture".into(),
+            project_name: "Fixture".into(),
+            project_path: root.into(),
+            agent: "default".into(),
+            model: None,
+            prompt: "Fixture only".into(),
+            isolated: false,
+            previous_run_id: None,
+            coordination: None,
+        };
+        runtime.start(request.clone()).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
+            let run = runtime.integration_runs().unwrap().pop().unwrap();
+            if !["starting", "running"].contains(&run.status.as_str()) {
+                assert_eq!(run.status, "review", "{:?}", run.error);
+                assert_eq!(run.agent, "custom-fixture");
+                assert_eq!(run.model.as_deref(), Some("test-model"));
+                assert_eq!(run.result, "Fixture complete");
+                break;
+            }
+            if std::time::Instant::now() > deadline {
+                runtime.stop_all();
+                panic!("Fixture did not exit");
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        assert!(std::fs::read_to_string(folder.join("args.txt"))
+            .unwrap()
+            .contains("--model test-model"));
+        policy.enabled_agents.insert("custom-fixture".into(), false);
+        std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+        let mut blocked = request;
+        blocked.id = "fixture-run-456".into();
+        assert!(runtime.start(blocked).unwrap_err().contains("disabled"));
+        drop(runtime);
+        std::fs::remove_dir_all(folder).unwrap();
     }
 
     #[test]

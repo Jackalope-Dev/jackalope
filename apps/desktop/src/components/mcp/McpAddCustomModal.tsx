@@ -23,23 +23,32 @@ export function McpAddCustomModal({
   const [id, setId] = useState(existingServer?.id || '');
   const [name, setName] = useState(existingServer?.name || '');
   const [scope, setScope] = useState(existingServer?.scope || 'global');
-  const [transport, setTransport] = useState<'stdio' | 'http'>(
-    existingServer?.transport === 'http' ? 'http' : 'stdio',
+  const [transport, setTransport] = useState<'stdio' | 'http' | 'sse'>(
+    existingServer?.transport === 'sse'
+      ? 'sse'
+      : existingServer?.transport === 'http'
+        ? 'http'
+        : 'stdio',
   );
   const [command, setCommand] = useState(existingServer?.command || '');
-  const [argsStr, setArgsStr] = useState(existingServer?.args?.join(' ') || '');
+  const [argsStr, setArgsStr] = useState(JSON.stringify(existingServer?.args ?? []));
   const [url, setUrl] = useState(existingServer?.url || '');
   const [description, setDescription] = useState(existingServer?.description || '');
-  const [envList, setEnvList] = useState<Array<{ key: string; value: string }>>(
+  const [envList, setEnvList] = useState<Array<{ id: string; key: string; value: string }>>(
     existingServer?.env
-      ? Object.entries(existingServer.env).map(([key, value]) => ({ key, value }))
+      ? Object.entries(existingServer.env).map(([key, value]) => ({
+          id: crypto.randomUUID(),
+          key,
+          value,
+        }))
       : [],
   );
+  const [extraJson, setExtraJson] = useState(JSON.stringify(existingServer?.extra ?? {}, null, 2));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleAddEnv = () => {
-    setEnvList([...envList, { key: '', value: '' }]);
+    setEnvList([...envList, { id: crypto.randomUUID(), key: '', value: '' }]);
   };
 
   const handleRemoveEnv = (index: number) => {
@@ -47,9 +56,7 @@ export function McpAddCustomModal({
   };
 
   const handleEnvChange = (index: number, field: 'key' | 'value', val: string) => {
-    setEnvList(
-      envList.map((item, i) => (i === index ? { ...item, [field]: val } : item)),
-    );
+    setEnvList(envList.map((item, i) => (i === index ? { ...item, [field]: val } : item)));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,16 +76,19 @@ export function McpAddCustomModal({
         }
       }
 
-      const parsedArgs = argsStr.trim() ? argsStr.trim().split(/\s+/) : [];
+      const parsedArgs: unknown = JSON.parse(argsStr.trim() || '[]');
+      if (!Array.isArray(parsedArgs) || parsedArgs.some((arg) => typeof arg !== 'string'))
+        throw new Error('Arguments must be a JSON array of strings.');
 
       const config: McpServerConfig = {
-        id: id.trim().toLowerCase().replaceAll(/[^a-z0-9_-]/g, '-'),
+        id: existingServer?.id ?? id.trim(),
+        extra: JSON.parse(extraJson),
         name: name.trim(),
         scope,
         transport,
         command: transport === 'stdio' ? command.trim() : undefined,
         args: transport === 'stdio' ? parsedArgs : [],
-        url: transport === 'http' ? url.trim() : undefined,
+        url: transport !== 'stdio' ? url.trim() : undefined,
         env: envRecord,
         description: description.trim() || undefined,
         enabled: true,
@@ -106,15 +116,20 @@ export function McpAddCustomModal({
             {existingServer ? 'Edit MCP Server' : 'Add Custom MCP Server'}
           </Dialog.Title>
           <Dialog.Description className="text-xs text-[var(--color-text-muted)] mb-4">
-            Connect any local stdio executable or remote HTTP/SSE Model Context Protocol server.
+            Connect any local stdio executable or remote Streamable HTTP Model Context Protocol
+            server.
           </Dialog.Description>
 
+          <p className="task-muted mb-3">
+            Global writes to Codex, Claude Code and Grok user configurations. Per-agent edits affect
+            only the selected client. Existing sessions need a restart.
+          </p>
           <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             {/* Scope */}
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+              <p className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
                 Target Scope
-              </label>
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { id: 'global', label: 'Global' },
@@ -125,6 +140,7 @@ export function McpAddCustomModal({
                   <button
                     key={item.id}
                     type="button"
+                    disabled={!!existingServer}
                     onClick={() => setScope(item.id)}
                     className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                       scope === item.id
@@ -141,10 +157,14 @@ export function McpAddCustomModal({
             {/* Basic Info */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+                <label
+                  className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                  htmlFor="McpAddCustomModal-field-1"
+                >
                   Server Name
                 </label>
                 <input
+                  id="McpAddCustomModal-field-1"
                   className="task-input w-full text-xs"
                   placeholder="e.g. Postgres DB"
                   value={name}
@@ -158,10 +178,14 @@ export function McpAddCustomModal({
                 />
               </div>
               <div>
-                <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+                <label
+                  className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                  htmlFor="McpAddCustomModal-field-2"
+                >
                   Identifier
                 </label>
                 <input
+                  id="McpAddCustomModal-field-2"
                   className="task-input w-full font-mono text-xs"
                   placeholder="e.g. postgres-db"
                   value={id}
@@ -172,12 +196,29 @@ export function McpAddCustomModal({
               </div>
             </div>
 
+            <details>
+              <summary className="task-summary">Advanced connection fields</summary>
+              <label className="task-label">
+                Headers and client options (JSON object)
+                <textarea
+                  className="task-input"
+                  rows={4}
+                  value={extraJson}
+                  onChange={(e) => setExtraJson(e.target.value)}
+                />
+              </label>
+              <p className="task-muted">
+                Preserves existing authentication and tool options. Use headers for HTTP
+                authentication; credentials remain in the agent configuration file.
+              </p>
+            </details>
             {/* Transport type */}
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+              <p className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
                 Transport
-              </label>
+              </p>
               <div className="flex gap-2">
+                {transport === 'sse' && <span>Existing legacy SSE connection</span>}
                 <button
                   type="button"
                   onClick={() => setTransport('stdio')}
@@ -198,7 +239,7 @@ export function McpAddCustomModal({
                       : 'border-[var(--color-border)] text-[var(--color-text-muted)]'
                   }`}
                 >
-                  http / sse (Remote URL)
+                  Streamable HTTP
                 </button>
               </div>
             </div>
@@ -207,10 +248,14 @@ export function McpAddCustomModal({
               <>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-1">
-                    <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+                    <label
+                      className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                      htmlFor="McpAddCustomModal-field-3"
+                    >
                       Command
                     </label>
                     <input
+                      id="McpAddCustomModal-field-3"
                       className="task-input w-full font-mono text-xs"
                       placeholder="e.g. npx, uvx, node"
                       value={command}
@@ -219,10 +264,14 @@ export function McpAddCustomModal({
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
-                      Arguments (space-separated)
+                    <label
+                      className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                      htmlFor="McpAddCustomModal-field-4"
+                    >
+                      Arguments (JSON array)
                     </label>
                     <input
+                      id="McpAddCustomModal-field-4"
                       className="task-input w-full font-mono text-xs"
                       placeholder="-y @modelcontextprotocol/server-postgres"
                       value={argsStr}
@@ -233,10 +282,14 @@ export function McpAddCustomModal({
               </>
             ) : (
               <div>
-                <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+                <label
+                  className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                  htmlFor="McpAddCustomModal-field-5"
+                >
                   Remote Endpoint URL
                 </label>
                 <input
+                  id="McpAddCustomModal-field-5"
                   className="task-input w-full font-mono text-xs"
                   placeholder="https://example.com/mcp"
                   value={url}
@@ -248,10 +301,14 @@ export function McpAddCustomModal({
 
             {/* Description */}
             <div>
-              <label className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
+              <label
+                className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                htmlFor="McpAddCustomModal-field-6"
+              >
                 Description (Optional)
               </label>
               <input
+                id="McpAddCustomModal-field-6"
                 className="task-input w-full text-xs"
                 placeholder="What capabilities does this MCP provide?"
                 value={description}
@@ -262,9 +319,9 @@ export function McpAddCustomModal({
             {/* Env vars */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                <p className="font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                   Environment Variables
-                </label>
+                </p>
                 <button
                   type="button"
                   onClick={handleAddEnv}
@@ -275,7 +332,7 @@ export function McpAddCustomModal({
               </div>
               <div className="space-y-1.5 max-h-36 overflow-y-auto">
                 {envList.map((item, idx) => (
-                  <div key={idx} className="flex gap-1.5 items-center">
+                  <div key={item.id} className="flex gap-1.5 items-center">
                     <input
                       className="task-input flex-1 font-mono text-xs"
                       placeholder="KEY (e.g. API_TOKEN)"

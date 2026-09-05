@@ -9,3 +9,5 @@ pub mod capacity;
 pub mod coordination_mcp;
 pub mod mcp;
 pub mod harness;
+
+pub mod agent_policy;

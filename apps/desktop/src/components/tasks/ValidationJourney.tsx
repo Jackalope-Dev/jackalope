@@ -42,7 +42,7 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
               Verification & Validation Journey
             </h3>
-            <p className="text-[11px] text-[var(--color-text-muted)]">
+            <p className="text-xs text-[var(--color-text-muted)]">
               Structured checkpoints and visual evidence verified by the agent
             </p>
           </div>
@@ -96,13 +96,13 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
                     <span className="text-xs font-semibold text-[var(--color-text-primary)] truncate">
                       {step.step}
                     </span>
-                    <span className="text-[10px] text-[var(--color-text-muted)] shrink-0">
+                    <span className="text-xs text-[var(--color-text-muted)] shrink-0">
                       {new Date(step.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
 
                   {step.notes && (
-                    <p className="text-[11px] text-[var(--color-text-secondary)] mt-1 leading-relaxed">
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed">
                       {step.notes}
                     </p>
                   )}
@@ -112,7 +112,7 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
                       {step.evidence.map((item, eIdx) => (
                         <span
                           key={eIdx}
-                          className="px-2 py-0.5 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] text-[10px] text-[var(--color-text-muted)] font-mono"
+                          className="px-2 py-0.5 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] font-mono"
                         >
                           {item}
                         </span>
@@ -143,11 +143,14 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
               >
                 <div className="w-full h-full flex items-center justify-center p-2 text-center text-[var(--color-text-muted)] bg-[var(--color-surface-elevated)]/40 group-hover:bg-[var(--color-accent-subtle)]/20">
                   <div className="space-y-1">
-                    <Camera size={20} className="mx-auto text-[var(--color-text-muted)] group-hover:text-[var(--color-accent)]" />
-                    <p className="text-[10px] font-mono text-[var(--color-text-primary)] truncate max-w-[120px]">
+                    <Camera
+                      size={20}
+                      className="mx-auto text-[var(--color-text-muted)] group-hover:text-[var(--color-accent)]"
+                    />
+                    <p className="text-xs font-mono text-[var(--color-text-primary)] truncate max-w-[120px]">
                       {s.name}
                     </p>
-                    <p className="text-[9px] text-[var(--color-text-muted)]">
+                    <p className="text-xs text-[var(--color-text-muted)]">
                       {s.width}×{s.height}
                     </p>
                   </div>
@@ -199,7 +202,7 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
                 <p className="text-xs text-[var(--color-text-secondary)] font-medium">
                   {activeImage.name}
                 </p>
-                <p className="text-[11px] text-[var(--color-text-muted)] max-w-md mx-auto">
+                <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
                   Path: {activeImage.filePath}
                 </p>
               </div>

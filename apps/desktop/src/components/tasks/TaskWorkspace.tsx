@@ -30,7 +30,7 @@ import {
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -243,7 +243,7 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
         {active && (
           <div className="flex items-start justify-between gap-5 mb-5">
             <div>
-              <h2 className="text-lg font-medium">
+              <h2 className="text-base font-medium">
                 {run.status === 'starting'
                   ? 'Preparing your workspace'
                   : run.status === 'stopping'
@@ -297,10 +297,7 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
       {!active && run.workspace && <ResultReview key={run.id} run={run} />}
       {((run.validationSteps && run.validationSteps.length > 0) ||
         (run.screenshots && run.screenshots.length > 0)) && (
-        <ValidationJourney
-          steps={run.validationSteps ?? []}
-          screenshots={run.screenshots ?? []}
-        />
+        <ValidationJourney steps={run.validationSteps ?? []} screenshots={run.screenshots ?? []} />
       )}
       <div className="task-usage-line">
         <span>Reported usage</span>
@@ -321,7 +318,7 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
       {!active && (
         <div className="task-next">
           <div className="flex items-center justify-between gap-4 mb-5">
-            <h2 className="text-lg font-medium">What comes next?</h2>
+            <h2 className="text-base font-medium">What comes next?</h2>
             {run.status === 'review' && (
               <Button
                 variant="outline"
@@ -430,7 +427,8 @@ export function TaskWorkspace() {
   const filtered = latest.filter(
     (run) => filter === 'all' || (filter === 'active' ? isActive(run) : run.status === 'review'),
   );
-  const appDefaultRunner = useSettingsStore((s) => s.defaultRunner);
+  const agentConfig = useAgentConfigStore();
+  const appDefaultRunner = agentConfig.defaultMetaAgent;
   const preferredAgent =
     project?.preferences?.preferredRunner && project.preferences.preferredRunner !== 'inherit'
       ? project.preferences.preferredRunner
@@ -646,9 +644,13 @@ export function TaskWorkspace() {
                     value={currentAgent}
                     onValueChange={(value) => draft(key, { agent: value })}
                   >
-                    <SelectItem value="codex">Codex</SelectItem>
-                    <SelectItem value="claude">Claude Code</SelectItem>
-                    <SelectItem value="grok">Grok</SelectItem>
+                    {runners
+                      .filter((r) => agentConfig.isAgentEnabled(r.id))
+                      .map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                        </SelectItem>
+                      ))}
                   </Select>
                 </label>
                 <label htmlFor="taskworkspace-field-3" className="task-context-chip">

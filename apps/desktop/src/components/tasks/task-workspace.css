@@ -13,19 +13,19 @@
 }
 .task-eyebrow {
   color: var(--color-accent-ink);
-  font-size: 12px;
+  font-size: var(--text-xs);
   letter-spacing: 0.13em;
   text-transform: uppercase;
   margin-bottom: 14px;
 }
 .task-hero-title {
-  font-size: clamp(32px, 3.6vw, 48px);
+  font-size: var(--text-4xl);
   line-height: 1.14;
   letter-spacing: -0.045em;
   font-weight: 500;
 }
 .task-title {
-  font-size: 30px;
+  font-size: var(--text-2xl);
   line-height: 1.25;
   letter-spacing: -0.035em;
   font-weight: 500;
@@ -33,10 +33,10 @@
 .task-muted {
   color: var(--color-text-secondary);
   line-height: 1.7;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .task-label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 .task-introduction {
@@ -58,7 +58,7 @@
   width: 100%;
   background: transparent;
   outline: none;
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.65;
   resize: vertical;
   min-height: 144px;
@@ -74,7 +74,7 @@
   gap: 6px;
   padding: 8px 24px;
   border-top: 1px solid var(--color-border-subtle);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .task-skill-label {
   display: inline-flex;
@@ -94,7 +94,7 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -129,7 +129,7 @@
   border: none;
   background: transparent;
   color: var(--color-accent-ink);
-  font-size: 11px;
+  font-size: var(--text-xs);
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
@@ -147,7 +147,7 @@
   border-radius: 12px;
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .task-preview-header {
   display: flex;
@@ -162,13 +162,13 @@
   border: none;
   color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .task-preview-close:hover {
   color: var(--color-text-primary);
 }
 .task-prompt-preview pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   white-space: pre-wrap;
   color: var(--color-text-primary);
   max-height: 180px;
@@ -197,7 +197,7 @@
   border-radius: 7px;
   background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   max-width: 210px;
   overflow: hidden;
 }
@@ -219,7 +219,7 @@ select option {
 }
 .task-composer-note {
   padding: 0 24px 17px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
   color: var(--color-text-muted);
 }
@@ -242,7 +242,7 @@ select option {
   margin: 42px 0 13px;
 }
 .task-filter {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 .task-link {
@@ -250,7 +250,7 @@ select option {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-align: left;
 }
 .task-link:hover {
@@ -265,7 +265,7 @@ select option {
   text-align: left;
   border-top: 1px solid var(--color-border-subtle);
   border-radius: 7px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .task-list-row > div {
   flex: 1;
@@ -275,7 +275,7 @@ select option {
 }
 .task-status {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   white-space: nowrap;
   padding: 5px 9px;
   border-radius: 6px;
@@ -286,7 +286,7 @@ select option {
   align-items: center;
   gap: 8px;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin-bottom: 28px;
 }
 .task-detail-heading {
@@ -298,7 +298,7 @@ select option {
 .task-prompt-title {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 26px;
+  font-size: var(--text-2xl);
   max-height: 220px;
   overflow-y: auto;
 }
@@ -307,12 +307,12 @@ select option {
   gap: 8px;
   align-items: center;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin-top: 18px;
   overflow-wrap: anywhere;
 }
 .task-path {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
   margin-top: 8px;
   overflow-wrap: anywhere;
@@ -325,7 +325,7 @@ select option {
 .task-result-text {
   overflow-wrap: anywhere;
   line-height: 1.8;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .task-result-text p,
 .task-result-text ul,
@@ -343,12 +343,12 @@ select option {
 .task-result-text h1,
 .task-result-text h2,
 .task-result-text h3 {
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: 500;
   margin: 22px 0 10px;
 }
 .task-result-text code {
-  font-size: 12px;
+  font-size: var(--text-xs);
   background: var(--color-surface-elevated);
   border-radius: 4px;
   padding: 2px 5px;
@@ -367,7 +367,7 @@ select option {
 .task-output {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.65;
   max-height: 340px;
   overflow: auto;
@@ -376,7 +376,7 @@ select option {
   border-radius: 9px;
 }
 .task-summary {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   cursor: pointer;
 }
@@ -390,13 +390,13 @@ select option {
   align-items: center;
   gap: 8px;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding: 6px 0;
 }
 .task-usage-line {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   border-top: 1px solid var(--color-border-subtle);
   padding-top: 20px;
@@ -416,7 +416,7 @@ select option {
   margin: 10px 0 14px;
   background: var(--color-surface-elevated);
   resize: vertical;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 .task-reply:focus {
@@ -426,7 +426,7 @@ select option {
   display: flex;
   gap: 12px;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin-top: 20px;
   color: var(--color-text-secondary);
 }
@@ -437,7 +437,7 @@ select option {
 }
 .task-request {
   padding-top: 20px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   white-space: pre-wrap;
 }
 .task-error {
@@ -445,14 +445,14 @@ select option {
   border-left: 2px solid var(--color-accent);
   border-radius: 3px;
   background: var(--color-accent-subtle);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.7;
   overflow-wrap: anywhere;
   margin-top: 15px;
 }
 .task-notice {
   padding: 14px 0;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.7;
   color: var(--color-text-secondary);
   display: flex;
@@ -473,7 +473,9 @@ select option {
   left: 50%;
   transform: translate(-50%, -50%);
   width: 540px;
-  max-width: calc(100vw - 40px);
+  max-width: calc(100vw - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
   padding: 35px;
   z-index: 81;
 }
@@ -489,7 +491,7 @@ select option {
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .task-input:focus {
   outline: 1px solid var(--color-accent);
@@ -505,7 +507,7 @@ select option {
   margin: 35px 0;
 }
 .usage-filters label {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
   display: flex;
   gap: 9px;
@@ -524,7 +526,7 @@ select option {
   padding-bottom: 24px;
 }
 .usage-total {
-  font-size: 48px;
+  font-size: var(--text-4xl);
   font-weight: 500;
   letter-spacing: -0.05em;
   font-variant-numeric: tabular-nums;
@@ -535,13 +537,13 @@ select option {
 .usage-table {
   width: 100%;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 .usage-table th {
   font-weight: 400;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding: 12px 16px 12px 0;
   white-space: nowrap;
 }
@@ -570,7 +572,7 @@ select option {
     padding: 30px 26px 44px;
   }
   .task-hero-title {
-    font-size: 36px;
+    font-size: var(--text-4xl);
   }
   .task-composer-footer {
     align-items: flex-end;

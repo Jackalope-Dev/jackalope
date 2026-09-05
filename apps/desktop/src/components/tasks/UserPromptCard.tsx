@@ -60,14 +60,11 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
               <span className="text-xs font-semibold text-[var(--color-text-primary)]">
                 Agent Requesting Input
               </span>
-              <Badge
-                variant={isAnswered ? 'outline' : 'default'}
-                className="text-[10px] px-1.5 py-0"
-              >
+              <Badge variant={isAnswered ? 'outline' : 'default'} className="text-xs px-1.5 py-0">
                 {isAnswered ? 'Answered' : 'Action Needed'}
               </Badge>
             </div>
-            <span className="text-[11px] text-[var(--color-text-muted)]">
+            <span className="text-xs text-[var(--color-text-muted)]">
               {new Date(prompt.createdAt).toLocaleTimeString()}
             </span>
           </div>

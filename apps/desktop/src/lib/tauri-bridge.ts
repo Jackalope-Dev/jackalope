@@ -195,6 +195,7 @@ export async function listenPtyExit(
 }
 
 export interface McpServerConfig {
+  extra?: Record<string, unknown>;
   id: string;
   name: string;
   scope: 'global' | 'claude' | 'codex' | 'grok' | string;

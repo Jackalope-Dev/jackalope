@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { AgentRunnerId } from '../lib/orchestration/types.ts';
+import { nativeTask } from '../lib/task-runtime.ts';
 
 const memoryStore: Record<string, string> = {};
 const safeStorage = createJSONStorage(() => ({
@@ -30,6 +30,7 @@ export interface CustomAgentConfig {
   id: string;
   name: string;
   command: string;
+  adapter?: 'codex' | 'claude' | 'grok';
   args?: string[];
   models: {
     id: string;
@@ -42,6 +43,11 @@ export interface CustomAgentConfig {
 }
 
 interface AgentConfigState {
+  runnerOptions: Record<
+    string,
+    { command?: string; models: string[]; restrictModels: boolean; defaultModel: string }
+  >;
+  setRunnerOptions: (id: string, options: AgentConfigState['runnerOptions'][string]) => void;
   enabledAgents: Record<string, boolean>;
   allowedModels: Record<string, boolean>;
   defaultMetaAgent: string;
@@ -63,6 +69,9 @@ interface AgentConfigState {
 export const useAgentConfigStore = create<AgentConfigState>()(
   persist(
     (set, get) => ({
+      runnerOptions: {},
+      setRunnerOptions: (id, options) =>
+        set((state) => ({ runnerOptions: { ...state.runnerOptions, [id]: options } })),
       enabledAgents: {
         codex: true,
         claude: true,
@@ -74,12 +83,12 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         'claude-3-5-sonnet': true,
         'claude-3-5-haiku': true,
         'o3-mini': true,
-        'o1': true,
+        o1: true,
         'gpt-4o': true,
         'grok-3': true,
         'grok-beta': true,
       },
-      defaultMetaAgent: 'claude',
+      defaultMetaAgent: 'codex',
       customAgents: [],
 
       toggleAgent: (agentId, enabled) => {
@@ -88,6 +97,8 @@ export const useAgentConfigStore = create<AgentConfigState>()(
           const next = enabled !== undefined ? enabled : !current;
           return {
             enabledAgents: { ...state.enabledAgents, [agentId]: next },
+            defaultMetaAgent:
+              !next && state.defaultMetaAgent === agentId ? '' : state.defaultMetaAgent,
           };
         });
       },
@@ -103,6 +114,8 @@ export const useAgentConfigStore = create<AgentConfigState>()(
       },
 
       setDefaultMetaAgent: (agentId) => {
+        if (!get().isAgentEnabled(agentId))
+          throw new Error('Enable this agent before making it the default.');
         set({ defaultMetaAgent: agentId });
       },
 
@@ -130,8 +143,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
           return {
             customAgents: state.customAgents.filter((a) => a.id !== id),
             enabledAgents: nextEnabled,
-            defaultMetaAgent:
-              state.defaultMetaAgent === id ? 'claude' : state.defaultMetaAgent,
+            defaultMetaAgent: state.defaultMetaAgent === id ? '' : state.defaultMetaAgent,
           };
         });
       },
@@ -150,3 +162,28 @@ export const useAgentConfigStore = create<AgentConfigState>()(
     },
   ),
 );
+
+export async function syncAgentConfig() {
+  const { enabledAgents, allowedModels, defaultMetaAgent, customAgents, runnerOptions } =
+    useAgentConfigStore.getState();
+  const normalizedOptions = Object.fromEntries(
+    Object.entries(runnerOptions).map(([id, options]) => [
+      id,
+      {
+        ...options,
+        models: [...new Set(options.models.map((m) => m.trim()).filter(Boolean))],
+        defaultModel: options.defaultModel.trim(),
+        command: options.command?.trim(),
+      },
+    ]),
+  );
+  await nativeTask('agent_save_policy', {
+    policy: {
+      enabledAgents,
+      allowedModels,
+      defaultMetaAgent,
+      customAgents,
+      runnerOptions: normalizedOptions,
+    },
+  });
+}

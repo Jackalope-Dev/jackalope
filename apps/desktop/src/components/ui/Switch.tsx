@@ -26,21 +26,27 @@ export function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-200 ease-in-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent-ink)] focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked
-          ? 'bg-[var(--color-accent)] border-transparent'
-          : 'bg-[var(--color-surface-elevated)] border-[var(--color-border)]'
-      } ${className}`}
+      className={`relative inline-flex h-11 w-11 shrink-0 cursor-pointer items-center rounded-full bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent-ink)] focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       {...rest}
     >
       <span
-        className={`pointer-events-none inline-block size-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
-          checked ? 'translate-x-6' : 'translate-x-1'
+        className={`inline-flex h-6 w-11 items-center rounded-full border transition-colors duration-200 ease-in-out ${
+          checked
+            ? 'bg-[var(--color-accent)] border-transparent'
+            : 'bg-[var(--color-surface-elevated)] border-[var(--color-border)]'
         }`}
-        style={{
-          backgroundColor: checked ? 'var(--color-on-accent, #101010)' : 'var(--color-text-secondary)',
-        }}
-      />
+      >
+        <span
+          className={`pointer-events-none inline-block size-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
+            checked ? 'translate-x-6' : 'translate-x-1'
+          }`}
+          style={{
+            backgroundColor: checked
+              ? 'var(--color-on-accent, #101010)'
+              : 'var(--color-text-secondary)',
+          }}
+        />
+      </span>
     </button>
   );
 }

@@ -48,10 +48,7 @@ export interface SettingsState {
   setUseMcpMarketplace: (enabled: boolean) => void;
   updateSettings: (
     partial: Partial<
-      Omit<
-        SettingsState,
-        'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
-      >
+      Omit<SettingsState, 'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'>
     >,
   ) => void;
   resetAll: () => void;
@@ -90,7 +87,7 @@ export const DEFAULT_SETTINGS: Omit<
   },
 
   routingPreference: 'auto' as const,
-  autoFailoverEnabled: true,
+  autoFailoverEnabled: false,
   maxFailoverRetries: 2,
 
   codebaseDiscoveryEnabled: true,

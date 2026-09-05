@@ -100,26 +100,26 @@ export function AuditLogWorkspace() {
     switch (severity) {
       case 'error':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
             <AlertTriangle size={10} /> Error
           </span>
         );
       case 'warning':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
             <AlertTriangle size={10} /> Warning
           </span>
         );
       case 'success':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
             <CheckCircle2 size={10} /> Success
           </span>
         );
       case 'info':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30">
             <Info size={10} /> Info
           </span>
         );
@@ -141,7 +141,8 @@ export function AuditLogWorkspace() {
               </h1>
             </div>
             <p className="text-xs text-[var(--color-text-muted)]">
-              App-wide transparency into intelligent routing decisions, quota failovers, and codebase scans.
+              App-wide transparency into intelligent routing decisions, quota failovers, and
+              codebase scans.
             </p>
           </div>
 
@@ -173,42 +174,42 @@ export function AuditLogWorkspace() {
         {/* Stats Pill Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
           <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-[11px] font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
+            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
               Total Events
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-xl font-semibold text-[var(--color-text)]">{stats.total}</span>
-              <span className="text-[11px] text-[var(--color-text-muted)]">recorded</span>
+              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-[11px] font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
+            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
               Auto-Routed Tasks
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-xl font-semibold text-amber-500">{stats.routingCount}</span>
-              <span className="text-[11px] text-[var(--color-text-muted)]">optimized</span>
+              <span className="text-xs text-[var(--color-text-muted)]">optimized</span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-[11px] font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
+            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
               Failovers Resolved
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-xl font-semibold text-rose-500">{stats.failoverCount}</span>
-              <span className="text-[11px] text-[var(--color-text-muted)]">self-healed</span>
+              <span className="text-xs text-[var(--color-text-muted)]">self-healed</span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-[11px] font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
+            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
               Codebase Scans
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-xl font-semibold text-sky-500">{stats.discoveryCount}</span>
-              <span className="text-[11px] text-[var(--color-text-muted)]">synced</span>
+              <span className="text-xs text-[var(--color-text-muted)]">synced</span>
             </div>
           </div>
         </div>
@@ -338,11 +339,11 @@ export function AuditLogWorkspace() {
                           {entry.title}
                         </span>
                         {getSeverityBadge(entry.severity)}
-                        <span className="text-[11px] px-2 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)]">
+                        <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)]">
                           {entry.projectName}
                         </span>
                         {entry.agent && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
+                          <span className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded bg-[var(--color-accent-subtle)] text-[var(--color-accent)]">
                             <Bot size={11} />
                             {entry.agent.toUpperCase()}
                             {entry.model ? ` · ${entry.model}` : ''}
@@ -356,9 +357,9 @@ export function AuditLogWorkspace() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 text-right">
-                    <div className="text-[11px] text-[var(--color-text-muted)]">
+                    <div className="text-xs text-[var(--color-text-muted)]">
                       <div>{timeStr}</div>
-                      <div className="text-[10px] opacity-75">{dateStr}</div>
+                      <div className="text-xs opacity-75">{dateStr}</div>
                     </div>
                     <button
                       type="button"
@@ -375,11 +376,11 @@ export function AuditLogWorkspace() {
                     <div className="text-xs font-medium text-[var(--color-text-muted)] mb-2 flex items-center justify-between">
                       <span>Inspection & Telemetry Payload</span>
                       {entry.taskId && (
-                        <span className="font-mono text-[11px]">Task ID: {entry.taskId}</span>
+                        <span className="font-mono text-xs">Task ID: {entry.taskId}</span>
                       )}
                     </div>
                     {entry.details ? (
-                      <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border-subtle)] text-[11px] font-mono text-[var(--color-text)] overflow-x-auto">
+                      <pre className="p-3 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border-subtle)] text-xs font-mono text-[var(--color-text)] overflow-x-auto">
                         {JSON.stringify(entry.details, null, 2)}
                       </pre>
                     ) : (

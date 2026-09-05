@@ -18,6 +18,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -93,6 +94,7 @@ function AddWork({
 }) {
   const dialogFocus = useDialogFocus();
   const { runners } = useExecutionStore();
+  const agentConfig = useAgentConfigStore();
   const key = `jackalope-plan-draft:${project.id}`;
   const [draft, setDraft] = useState(() => {
     try {
@@ -100,7 +102,7 @@ function AddWork({
         JSON.parse(localStorage.getItem(key) || 'null') ?? {
           title: '',
           prompt: '',
-          agent: 'codex',
+          agent: agentConfig.defaultMetaAgent,
           scopes: '',
           dependencies: [],
         }

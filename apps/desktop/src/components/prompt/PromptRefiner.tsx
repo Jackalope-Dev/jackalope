@@ -133,7 +133,7 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs font-semibold text-[var(--color-text-primary)]">
           <span>Applicable Vetted Skills ({activeSkillCount} active):</span>
-          <span className="text-[11px] font-normal text-[var(--color-text-muted)]">
+          <span className="text-xs font-normal text-[var(--color-text-muted)]">
             Click to toggle
           </span>
         </div>
@@ -183,7 +183,7 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
                     {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                   </div>
                 </div>
-                <p className="text-[11px] text-[var(--color-text-muted)] line-clamp-2 leading-tight">
+                <p className="text-xs text-[var(--color-text-muted)] line-clamp-2 leading-tight">
                   {skill.description}
                 </p>
               </button>
@@ -231,11 +231,11 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
             <span className="font-semibold text-[var(--color-text-primary)]">
               Assembled Prompt Preview:
             </span>
-            <span className="text-[11px] font-mono text-[var(--color-text-muted)]">
+            <span className="text-xs font-mono text-[var(--color-text-muted)]">
               {assembledPrompt.length} chars
             </span>
           </div>
-          <pre className="p-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] text-[11px] font-mono whitespace-pre-wrap text-[var(--color-text-primary)] leading-relaxed max-h-40 overflow-y-auto">
+          <pre className="p-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] text-xs font-mono whitespace-pre-wrap text-[var(--color-text-primary)] leading-relaxed max-h-40 overflow-y-auto">
             {assembledPrompt || rawPrompt || '(No prompt provided)'}
           </pre>
         </div>

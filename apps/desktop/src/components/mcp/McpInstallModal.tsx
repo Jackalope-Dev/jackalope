@@ -27,6 +27,8 @@ export function McpInstallModal({
   const [command, setCommand] = useState('');
   const [args, setArgs] = useState<string[]>([]);
   const [url, setUrl] = useState('');
+  const [extraJson, setExtraJson] = useState('{}');
+  const [remoteTransport, setRemoteTransport] = useState<'http' | 'sse'>('http');
   const [submitting, setSubmitting] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,15 +40,23 @@ export function McpInstallModal({
       setInstalled(false);
 
       // Extract config from snippet if available
-      let detectedCmd = 'npx';
-      let detectedArgs = ['-y', server.installName || server.id];
+      let detectedCmd = '';
+      let detectedArgs: string[] = [];
       let detectedUrl = '';
       const initialEnv: Record<string, string> = {};
+      let initialExtra: Record<string, unknown> = {};
+      let initialTransport: 'http' | 'sse' = 'http';
 
       if (server.claudeConfigSnippet?.mcpServers) {
         const firstKey = Object.keys(server.claudeConfigSnippet.mcpServers)[0];
         const cfg = server.claudeConfigSnippet.mcpServers[firstKey];
         if (cfg) {
+          initialTransport = cfg.type === 'sse' ? 'sse' : 'http';
+          initialExtra = Object.fromEntries(
+            Object.entries(cfg).filter(
+              ([key]) => !['command', 'args', 'url', 'env', 'type'].includes(key),
+            ),
+          );
           if (cfg.command) detectedCmd = cfg.command;
           if (cfg.args) detectedArgs = cfg.args;
           if (cfg.url) detectedUrl = cfg.url;
@@ -71,6 +81,8 @@ export function McpInstallModal({
       setArgs(detectedArgs);
       setUrl(detectedUrl);
       setEnvValues(initialEnv);
+      setExtraJson(JSON.stringify(initialExtra, null, 2));
+      setRemoteTransport(initialTransport);
     }
   }, [server, defaultScope]);
 
@@ -82,17 +94,22 @@ export function McpInstallModal({
     setSubmitting(true);
     setError(null);
     try {
+      const extra: unknown = JSON.parse(extraJson);
+      if (!extra || typeof extra !== 'object' || Array.isArray(extra)) {
+        throw new Error('Advanced connection fields must be a JSON object.');
+      }
       const config: McpServerConfig = {
         id: server.id,
         name: server.name,
         scope,
-        transport: isRemote ? 'http' : 'stdio',
+        transport: isRemote ? remoteTransport : 'stdio',
         command: isRemote ? undefined : command,
         args: isRemote ? [] : args,
         url: isRemote ? url : undefined,
         env: envValues,
         description: server.description,
         enabled: true,
+        extra: extra as Record<string, unknown>,
       };
 
       await saveServer(config);
@@ -130,12 +147,30 @@ export function McpInstallModal({
             </div>
           </div>
 
+          <p className="task-notice mb-4">
+            Review the publisher and exact command below. Marketplace listings can contain incorrect
+            install hints. Configuration is saved locally; packages may download when the agent or
+            connection test starts them.
+          </p>
           <div className="space-y-4 text-sm">
+            <details>
+              <summary className="task-summary">Advanced connection fields</summary>
+              <label className="task-label" htmlFor="marketplace-connection-fields">
+                Authentication headers and additional client options (JSON)
+              </label>
+              <textarea
+                id="marketplace-connection-fields"
+                className="task-input w-full font-mono"
+                rows={4}
+                value={extraJson}
+                onChange={(event) => setExtraJson(event.target.value)}
+              />
+            </details>
             {/* Target Scope */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
+              <p className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
                 Target Scope
-              </label>
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { id: 'global', label: 'Global' },
@@ -157,20 +192,21 @@ export function McpInstallModal({
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-[var(--color-text-muted)] mt-1.5">
-                {scope === 'global' && 'Available across Jackalope and any agent dispatched by it.'}
-                {scope === 'claude' && 'Saved to Claude Code (~/.claude.json & desktop config).'}
-                {scope === 'codex' && 'Saved to Codex configuration (~/.codex/config.json).'}
-                {scope === 'grok' && 'Configured for Grok task execution.'}
+              <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
+                {scope === 'global' &&
+                  'Writes to the user configurations for Codex, Claude Code and Grok. Restart existing agent sessions to use changes.'}
+                {scope === 'claude' && 'Saved to Claude Code (~/.claude.json).'}
+                {scope === 'codex' && 'Saved to Codex configuration (~/.codex/config.toml).'}
+                {scope === 'grok' && 'Saved to Grok (~/.grok/config.toml).'}
               </p>
             </div>
 
             {/* Execution / Command Details */}
             {!isRemote ? (
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
+                <p className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
                   Command & Arguments
-                </label>
+                </p>
                 <div className="p-2.5 rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] font-mono text-xs text-[var(--color-text)]">
                   <span>{command} </span>
                   <span className="text-[var(--color-text-muted)]">{args.join(' ')}</span>
@@ -178,10 +214,14 @@ export function McpInstallModal({
               </div>
             ) : (
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5"
+                  htmlFor="McpInstallModal-field-1"
+                >
                   Remote MCP Endpoint URL
                 </label>
                 <input
+                  id="McpInstallModal-field-1"
                   className="task-input w-full font-mono text-xs"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -195,16 +235,24 @@ export function McpInstallModal({
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Key size={14} className="text-[var(--color-accent-ink)]" />
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+                  <p className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                     Required Environment Variables
-                  </label>
+                  </p>
                 </div>
                 <div className="space-y-2">
                   {Object.entries(envValues).map(([key, val]) => (
                     <div key={key}>
                       <div className="text-xs font-mono text-[var(--color-text)] mb-1">{key}</div>
                       <input
-                        type={key.toLowerCase().includes('token') || key.toLowerCase().includes('pat') || key.toLowerCase().includes('secret') || key.toLowerCase().includes('key') ? 'password' : 'text'}
+                        aria-label={key}
+                        type={
+                          key.toLowerCase().includes('token') ||
+                          key.toLowerCase().includes('pat') ||
+                          key.toLowerCase().includes('secret') ||
+                          key.toLowerCase().includes('key')
+                            ? 'password'
+                            : 'text'
+                        }
                         className="task-input w-full font-mono text-xs"
                         placeholder={`Enter ${key}`}
                         value={val}
