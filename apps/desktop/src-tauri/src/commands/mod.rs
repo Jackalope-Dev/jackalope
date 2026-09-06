@@ -1,4 +1,5 @@
 pub mod capacity;
+pub mod codebase;
 pub mod coordination;
 pub mod coordination_mcp;
 pub mod git;

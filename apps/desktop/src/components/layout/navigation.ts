@@ -71,7 +71,7 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'topology',
     label: 'Codebase',
-    description: 'Repository mapping is not available yet.',
+    description: 'Explore local files, dependencies and codebase checks.',
     icon: Network,
     primary: false,
   },

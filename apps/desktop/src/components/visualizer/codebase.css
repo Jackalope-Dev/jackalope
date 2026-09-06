@@ -1,0 +1,382 @@
+.codebase-root {
+  margin-top: -12px;
+  margin-bottom: 24px;
+  overflow-wrap: anywhere;
+}
+.codebase-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: 20px;
+}
+.codebase-summary :where(p) span {
+  padding: 0 8px;
+  color: var(--color-text-muted);
+}
+.codebase-summary > span {
+  color: var(--color-text-muted);
+}
+.codebase-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.codebase-switch {
+  display: flex;
+  gap: 4px;
+}
+.codebase-count {
+  border-radius: 6px;
+  background: var(--color-accent-subtle);
+  padding: 1px 6px;
+  color: var(--color-accent-ink);
+}
+.codebase-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+  color: var(--color-text-muted);
+}
+.codebase-search input {
+  min-height: 44px;
+  background: var(--color-surface);
+}
+.codebase-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.codebase-breadcrumb p {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.codebase-explorer {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  height: clamp(300px, calc(100dvh - 480px), 600px);
+  overflow: hidden;
+  border-radius: 16px;
+  background: linear-gradient(to bottom, var(--color-surface), var(--color-surface-sunken));
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--color-accent) 6%, transparent);
+  border: 1px solid var(--color-border);
+}
+.codebase-files {
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.codebase-list-heading {
+  padding: 14px 16px;
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  z-index: 1;
+}
+.codebase-list-heading span {
+  float: right;
+}
+.codebase-files > button {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  align-items: center;
+  padding: 10px 14px;
+  min-height: 54px;
+  color: var(--color-text-secondary);
+}
+.codebase-files > :where(button) > svg {
+  flex-shrink: 0;
+}
+.codebase-files > button > span:not(.codebase-cycle-label) {
+  min-width: 0;
+  flex: 1;
+}
+.codebase-files strong,
+.codebase-files small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.codebase-files strong {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+.codebase-files small {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.codebase-files > button:hover,
+.codebase-reference-list button:hover {
+  background: var(--color-surface-hover);
+}
+.codebase-files > button[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+  box-shadow: inset 3px 0 var(--color-accent);
+}
+.codebase-cycle-label {
+  color: var(--color-warning);
+}
+.codebase-canvas {
+  position: relative;
+  min-width: 0;
+}
+.codebase-map-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 12px;
+  font-size: var(--text-xs);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+.codebase-flow {
+  height: calc(100% - 34px);
+}
+.codebase-canvas .react-flow__node-default {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-accent) 8%, transparent);
+  padding: 12px;
+}
+.codebase-canvas .react-flow__node.selected,
+.codebase-canvas .react-flow__node:focus-visible {
+  border-color: var(--color-accent-ink);
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.codebase-node {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 100%;
+  text-align: left;
+}
+.codebase-node > svg {
+  color: var(--color-accent-ink);
+  flex-shrink: 0;
+}
+.codebase-node > span {
+  min-width: 0;
+}
+.codebase-node strong,
+.codebase-node small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.codebase-node strong {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.codebase-node small {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.codebase-canvas .react-flow__handle {
+  background: var(--color-text-muted);
+  border-color: var(--color-surface-elevated);
+}
+.codebase-canvas .react-flow__controls {
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.codebase-canvas .react-flow__controls-button {
+  width: 44px;
+  height: 44px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+.codebase-canvas .react-flow__controls-button:hover {
+  background: var(--color-surface-hover);
+}
+.codebase-canvas .react-flow__edge-textbg {
+  fill: var(--color-surface);
+}
+.codebase-canvas .react-flow__edge-text {
+  fill: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.codebase-canvas .react-flow__attribution {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+.codebase-canvas .codebase-cycle-node {
+  border-style: dashed;
+  border-color: var(--color-warning);
+}
+.codebase-detail {
+  margin-top: 24px;
+}
+.codebase-detail-heading h2 {
+  font-size: var(--text-base);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.codebase-detail-heading p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 6px;
+}
+.codebase-relations {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 20px;
+}
+.codebase-relations > div {
+  min-width: 0;
+}
+.codebase-relations h3 {
+  font-size: var(--text-sm);
+  margin-bottom: 10px;
+}
+.codebase-relations :where(h3) span,
+.codebase-checks :where(h2) span {
+  margin-left: 6px;
+  color: var(--color-text-muted);
+}
+.codebase-reference-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.codebase-reference-list button,
+.codebase-reference {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border-radius: 8px;
+  min-height: 44px;
+}
+.codebase-reference-list span {
+  display: block;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.codebase-reference-list small {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.codebase-coverage {
+  padding: 20px 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.codebase-coverage summary {
+  display: list-item;
+  cursor: pointer;
+  min-height: 44px;
+  padding-top: 12px;
+}
+.codebase-coverage p {
+  max-width: 90ch;
+  margin-top: 12px;
+  line-height: 1.7;
+}
+.codebase-checks {
+  padding: 24px 0;
+}
+.codebase-checks h2 {
+  font-size: var(--text-base);
+  font-weight: 500;
+  margin: 28px 0 12px;
+}
+.codebase-cycle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 12px 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.codebase-cycle > span {
+  width: 100%;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.codebase-cycle button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  color: var(--color-accent-ink);
+  text-align: left;
+}
+.codebase-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  text-align: left;
+  width: 100%;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.codebase-check-row span {
+  flex: 1;
+  min-width: 240px;
+}
+.codebase-check-row small {
+  color: var(--color-text-muted);
+}
+.codebase-note {
+  font-size: var(--text-sm);
+  padding: 10px 0;
+  overflow-wrap: anywhere;
+}
+.codebase-page button:focus-visible,
+.codebase-page summary:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+@media (max-width: 1000px) {
+  .codebase-explorer {
+    grid-template-columns: 205px minmax(0, 1fr);
+  }
+  .codebase-relations {
+    gap: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .codebase-explorer {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .codebase-files {
+    max-height: 220px;
+    border-right: 0;
+  }
+  .codebase-canvas {
+    height: 400px;
+  }
+  .codebase-relations {
+    grid-template-columns: 1fr;
+  }
+}

@@ -74,6 +74,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_settings,
+            commands::codebase::codebase_scan,
             desktop_set_close_to_tray,
             app_reset,
             app_finish_reset,

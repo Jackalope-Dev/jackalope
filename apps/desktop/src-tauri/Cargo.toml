@@ -31,6 +31,12 @@ rmcp = { version = "=3.2.0", default-features = false, features = ["server", "ma
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
 reqwest = { version = "0.13", default-features = false }
+ignore = "0.4"
+tree-sitter = "0.25"
+tree-sitter-typescript = "0.23"
+tree-sitter-javascript = "0.25"
+tree-sitter-rust = "0.24"
+petgraph = "0.8"
 
 [features]
 default = ["custom-protocol"]
