@@ -21,6 +21,10 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @jackalope/server types
+      - run: pnpm --filter @jackalope/server typecheck
+      - run: pnpm --filter @jackalope/server test
+      - run: pnpm --filter @jackalope/server build
       - run: pnpm build
       - run: pnpm --filter @jackalope/desktop test
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features
