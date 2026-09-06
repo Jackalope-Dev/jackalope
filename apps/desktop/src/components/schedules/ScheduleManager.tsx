@@ -1,324 +1,408 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { CalendarClock, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
-import { isCronExpression, scheduleProject } from '../../lib/planning';
+import { Plus, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { nativeTask, type RunRequest } from '../../lib/task-runtime';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
-import { useTaskStore } from '../../stores/taskStore';
+import {
+  agentAccountFor,
+  isAgentAllowedForProject,
+  useProjectStore,
+} from '../../stores/projectStore';
+import { useScheduleStore } from '../../stores/scheduleStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
-import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
 import { Select, SelectItem } from '../ui/Select';
+import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { SchedulePlans } from './SchedulePlans';
 
-const TIMING = [
-  { value: '0 9 * * *', label: 'Daily at 9:00' },
-  { value: '0 9 * * 1-5', label: 'Weekdays at 9:00' },
-  { value: '0 * * * *', label: 'Every hour' },
-];
-export function ScheduleManager({
-  onOpenProject,
-  onPlanning,
-}: {
-  onOpenProject: () => void;
-  onPlanning: () => void;
-}) {
+interface Definition {
+  id: string;
+  name: string;
+  expression: string;
+  timezone: string;
+  rawPrompt?: string;
+  missed: 'skip' | 'once';
+  enabled: boolean;
+  request: RunRequest;
+}
+interface SavedSchedule {
+  definition: Definition;
+  nextAt: string;
+  history: { dueAt: string; runId: string | null; outcome: string }[];
+}
+interface Ledger {
+  schedules: SavedSchedule[];
+  error: string | null;
+}
+
+export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: () => void }) {
   const { projects, activeProjectId, selectProject } = useProjectStore();
-  const { schedules, addSchedule, updateSchedule, deleteSchedule, toggleSchedule } =
-    useScheduleStore();
-  const runners = useExecutionStore((state) => state.runners);
-  const focus = useDialogFocus();
-  const [filter, setFilter] = useState(activeProjectId ?? 'all');
-  const [editing, setEditing] = useState<ScheduledTask | null | undefined>(undefined);
-  const [name, setName] = useState('');
+  const runners = useExecutionStore((s) => s.runners);
+  const runs = useExecutionStore((s) => s.runs);
+  const legacy = useScheduleStore((s) => s.schedules);
+  const [ledger, setLedger] = useState<Ledger | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<Definition | null>(null);
+  const [projectId, setProjectId] = useState(activeProjectId ?? '');
+  const [agent, setAgent] = useState('');
   const [prompt, setPrompt] = useState('');
-  const [targetProjectId, setTargetProjectId] = useState(activeProjectId ?? '');
-  const [agent, setAgent] = useState('Unassigned');
-  const [timing, setTiming] = useState(TIMING[0].value);
-  const [custom, setCustom] = useState(false);
-  const [feedback, setFeedback] = useState<{ message: string; projectId: string } | null>(null);
-  const open = (schedule: ScheduledTask | null) => {
-    setEditing(schedule);
-    setName(schedule?.name ?? '');
-    setPrompt(schedule?.prompt ?? '');
-    setTargetProjectId(schedule?.targetProjectId ?? activeProjectId ?? projects[0]?.id ?? '');
-    setAgent(schedule?.assignedAgentProvider ?? 'Unassigned');
-    setTiming(schedule?.cronExpression ?? TIMING[0].value);
-    setCustom(!!schedule && !TIMING.some((item) => item.value === schedule.cronExpression));
-  };
-  const target = projects.find((project) => project.id === targetProjectId);
-  const valid = !!target && !!name.trim() && !!prompt.trim() && isCronExpression(timing);
-  const save = () => {
-    if (!valid) return;
-    const value = {
-      name: name.trim(),
-      prompt: prompt.trim(),
-      targetProjectId,
-      assignedAgentProvider: agent,
-      cronExpression: timing.trim(),
-      description: editing?.description ?? '',
-      enabled: editing?.enabled ?? true,
+  const focus = useDialogFocus();
+  const desktop = isTauriEnvironment();
+  const refresh = async () => setLedger(await nativeTask<Ledger>('schedule_list'));
+  useEffect(() => {
+    if (!desktop) return;
+    let alive = true;
+    const read = () =>
+      nativeTask<Ledger>('schedule_list')
+        .then((data) => {
+          if (alive) setLedger(data);
+        })
+        .catch((cause) => {
+          if (alive) setError(String(cause));
+        });
+    void read();
+    const timer = window.setInterval(read, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
     };
-    if (editing) updateSchedule(editing.id, value);
-    else addSchedule(value);
-    setEditing(undefined);
+  }, [desktop]);
+  const act = async (work: () => Promise<unknown>) => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await work();
+      await refresh();
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      setBusy(false);
+    }
   };
-  const createTask = (schedule: ScheduledTask) => {
-    const project = scheduleProject(schedule, projects);
-    if (!project) return;
-    useTaskStore.getState().addTask({
-      projectId: project.id,
-      title: schedule.name,
-      rawPrompt: schedule.prompt,
-      assignedAgent: schedule.assignedAgentProvider,
-      status: 'backlog',
-    });
-    setFeedback({
-      message: `Added “${schedule.name}” to ${project.name}'s Tasks.`,
-      projectId: project.id,
-    });
+  const open = (value?: Definition) => {
+    const project = projects.find((p) => p.id === (value?.request.projectId ?? activeProjectId));
+    setProjectId(project?.id ?? '');
+    setAgent(value?.request.agent ?? '');
+    setPrompt(value?.rawPrompt ?? value?.request.prompt ?? '');
+    setEditing(
+      value ?? {
+        id: crypto.randomUUID(),
+        name: '',
+        expression: '0 9 * * 1-5',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        missed: 'skip',
+        enabled: false,
+        request: {} as RunRequest,
+      },
+    );
   };
-  const visible = schedules.filter(
-    (schedule) => filter === 'all' || schedule.targetProjectId === filter,
-  );
+  const project = projects.find((p) => p.id === projectId);
+  const save = () =>
+    act(async () => {
+      if (!editing || !project) return;
+      if (!isAgentAllowedForProject(project, agent))
+        throw new Error('This agent is not allowed for the selected project.');
+      await syncAgentConfig();
+      const adapter =
+        useAgentConfigStore.getState().customAgents.find((a) => a.id === agent)?.adapter ?? agent;
+      const instructions = project.preferences?.customInstructions?.trim();
+      const finalPrompt = instructions
+        ? `${prompt.trim()}\n\n[Project Guidelines]:\n${instructions}`
+        : prompt.trim();
+      await nativeTask('schedule_save', {
+        definition: {
+          ...editing,
+          rawPrompt: prompt.trim(),
+          request: {
+            id: editing.id,
+            projectId: project.id,
+            projectName: project.name,
+            projectPath: project.path,
+            agent,
+            prompt: finalPrompt,
+            isolated: true,
+            agentProfileId: agentAccountFor(project, adapter),
+            targetBranch: project.preferences?.baseBranch || project.gitBranch,
+            verifyCommand: project.preferences?.verifyCommand,
+          },
+        },
+      });
+      setEditing(null);
+    });
+  const visible =
+    ledger?.schedules.filter(
+      (s) => !activeProjectId || s.definition.request.projectId === activeProjectId,
+    ) ?? [];
   return (
     <section className="task-page">
       <WorkspaceHeading
-        title="Schedules"
-        description="Keep plans for recurring work together. Automatic runs are not available yet."
+        title="Recurring tasks"
+        description="Run saved instructions on this computer while Jackalope is open, including in the system tray."
         action={
-          <Button onClick={() => (projects.length ? open(null) : onOpenProject())}>
+          <Button
+            disabled={!desktop || busy}
+            onClick={() => (projects.length ? open() : props.onOpenProject())}
+          >
             <Plus size={18} />
-            {projects.length ? 'New schedule plan' : 'Open project'}
+            New schedule
           </Button>
         }
       />
-      {projects.length > 0 && (
-        <div className="mb-6 max-w-sm">
-          <Select aria-label="Schedule project" value={filter} onValueChange={setFilter}>
-            <SelectItem value="all">All projects</SelectItem>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </Select>
-        </div>
+      {!desktop && <p className="task-notice">Open the desktop app to schedule execution.</p>}
+      {(error || ledger?.error) && (
+        <p role="alert" className="task-error">
+          {error || ledger?.error}
+        </p>
       )}
-      {feedback && (
-        <div className="task-notice flex flex-wrap items-center justify-between gap-3">
-          <p role="status">{feedback.message}</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              selectProject(feedback.projectId);
-              onPlanning();
-            }}
-          >
-            View tasks
-          </Button>
-        </div>
+      {desktop && !ledger && !error && <p role="status">Loading schedules…</p>}
+      {ledger && !visible.length && (
+        <p className="task-muted">
+          No schedules for this project. Choose New schedule to save instructions and timing.
+        </p>
       )}
-      {!visible.length ? (
-        <EmptyState
-          icon={CalendarClock}
-          title={schedules.length ? 'No plans for this project' : 'Plan work you want to repeat'}
-          description="Save the instructions and intended timing. You can create a planning task manually from each plan."
-        />
-      ) : (
-        <div className="schedule-list">
-          {visible.map((schedule) => {
-            const project = scheduleProject(schedule, projects);
-            return (
-              <article key={schedule.id} className="schedule-row">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-base font-medium break-words">{schedule.name}</h2>
-                  <p className="task-muted mt-1">
-                    {project?.name ?? 'Project unavailable'} ·{' '}
-                    {TIMING.find((item) => item.value === schedule.cronExpression)?.label ??
-                      schedule.cronExpression}{' '}
-                    · {schedule.enabled ? 'Saved plan' : 'Paused plan'}
-                  </p>
-                  <p className="task-muted mt-2 whitespace-pre-wrap">{schedule.prompt}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={!project}
-                    onClick={() => createTask(schedule)}
-                  >
-                    Create planned task
+      <div className="schedule-list">
+        {visible.map(({ definition: d, nextAt, history }) => (
+          <article className="schedule-row" key={d.id}>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-medium">{d.name}</h2>
+              <p className="task-muted">
+                {d.request.projectName} · {d.request.agent} · {d.timezone}
+              </p>
+              <p className="task-muted">
+                {d.enabled ? `Next: ${new Date(nextAt).toLocaleString()}` : 'Paused'} ·{' '}
+                {d.expression}
+              </p>
+              <details className="mt-3">
+                <summary>Instructions and run history ({history.length})</summary>
+                <p className="whitespace-pre-wrap my-3">{d.request.prompt}</p>
+                {[...history].reverse().map((event) => {
+                  const run = runs.find((r) => r.id === event.runId);
+                  return (
+                    <div key={event.dueAt} className="flex flex-wrap items-center gap-3 py-2">
+                      <span>
+                        {new Date(event.dueAt).toLocaleString()} · {run?.status ?? event.outcome}
+                      </span>
+                      {run && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            selectProject(run.projectId);
+                            props.onPlanning();
+                            useExecutionStore.getState().select(run.id);
+                          }}
+                        >
+                          View run
+                        </Button>
+                      )}
+                      {run && ['starting', 'running'].includes(run.status) && (
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => void act(() => nativeTask('task_stop', { id: run.id }))}
+                        >
+                          Stop run
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+                {!history.length && <p className="task-muted">No occurrences yet.</p>}
+              </details>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={busy} onClick={() => open(d)}>
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() =>
+                  void act(() =>
+                    nativeTask('schedule_set_enabled', { id: d.id, enabled: !d.enabled }),
+                  )
+                }
+              >
+                {d.enabled ? 'Pause' : 'Enable'}
+              </Button>
+              <ConfirmAction
+                title="Delete schedule?"
+                description="Future occurrences stop. Existing tasks and worktrees are kept."
+                onConfirm={() => act(() => nativeTask('schedule_remove', { id: d.id }))}
+                trigger={
+                  <Button variant="ghost" disabled={busy}>
+                    Delete
                   </Button>
-                  <Button variant="ghost" onClick={() => toggleSchedule(schedule.id)}>
-                    {schedule.enabled ? 'Pause plan' : 'Resume plan'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Edit ${schedule.name}`}
-                    onClick={() => open(schedule)}
-                  >
-                    <Pencil size={16} />
-                  </Button>
-                  <ConfirmAction
-                    title="Delete schedule plan?"
-                    description={`Remove “${schedule.name}”? Tasks already created from it are kept.`}
-                    onConfirm={() => deleteSchedule(schedule.id)}
-                    trigger={
-                      <Button variant="ghost" size="icon" aria-label={`Delete ${schedule.name}`}>
-                        <Trash2 size={16} />
-                      </Button>
-                    }
-                  />
-                </div>
-                {!project && (
-                  <p className="task-error">
-                    Edit this plan to choose a project before creating a task.
-                  </p>
-                )}
-              </article>
-            );
-          })}
-        </div>
+                }
+              />
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="task-muted mt-5">
+        Overlapping or interrupted runs are skipped. Pausing keeps existing work; use Stop run to
+        cancel execution. Failed starts are recorded without automatic retries.
+      </p>
+      {legacy.length > 0 && (
+        <details className="mt-6">
+          <summary>Saved plans from earlier versions ({legacy.length})</summary>
+          <SchedulePlans {...props} />
+        </details>
       )}
       <Dialog.Root
-        open={editing !== undefined}
+        open={!!editing}
         onOpenChange={(value) => {
-          if (!value) setEditing(undefined);
+          if (!value && !busy) setEditing(null);
         }}
       >
         <Dialog.Portal>
           <Dialog.Overlay className="task-dialog-overlay" />
           <Dialog.Content {...focus} className="task-dialog appearance-panel">
-            <Dialog.Close className="task-close" aria-label="Close schedule plan">
+            <Dialog.Close className="task-close" disabled={busy} aria-label="Close schedule">
               <X size={18} />
             </Dialog.Close>
-            <Dialog.Title className="text-xl font-medium pr-10">
-              {editing ? 'Edit schedule plan' : 'New schedule plan'}
-            </Dialog.Title>
+            <Dialog.Title className="text-xl">Schedule recurring work</Dialog.Title>
             <Dialog.Description className="task-muted mt-3">
-              Save a reusable plan. This does not schedule automatic execution.
+              Enabling authorizes automatic agent execution with these saved instructions. Runs use
+              isolated worktrees and require review before integration. The timezone follows
+              daylight saving time.
             </Dialog.Description>
-            <form
-              className="space-y-4 mt-5"
-              onSubmit={(event) => {
-                event.preventDefault();
-                save();
-              }}
-            >
-              <label htmlFor="schedule-name" className="block space-y-2">
-                <span className="block text-sm">Name</span>
-                <Input
-                  id="schedule-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  required
-                  maxLength={160}
-                  placeholder="Weekly dependency review"
-                />
-              </label>
-              <label htmlFor="schedule-project" className="block space-y-2">
-                <span className="block text-sm">Project</span>
-                <Select
-                  id="schedule-project"
-                  aria-label="Project for this plan"
-                  value={targetProjectId}
-                  onValueChange={setTargetProjectId}
-                >
-                  {!target && (
-                    <SelectItem value={targetProjectId || 'missing'} disabled>
-                      Choose a project
-                    </SelectItem>
-                  )}
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </label>
-              <label htmlFor="schedule-intended-timing" className="block space-y-2">
-                <span className="block text-sm">Intended timing</span>
-                <Select
-                  id="schedule-intended-timing"
-                  aria-label="Intended timing"
-                  value={custom ? 'custom' : timing}
-                  onValueChange={(value) => {
-                    setCustom(value === 'custom');
-                    if (value !== 'custom') setTiming(value);
-                  }}
-                >
-                  {TIMING.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom">Custom timing</SelectItem>
-                </Select>
-              </label>
-              {custom && (
-                <label htmlFor="schedule-cron-expression" className="block space-y-2">
-                  <span className="block text-sm">Cron expression</span>
+            {editing && (
+              <form
+                className="space-y-4 mt-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save();
+                }}
+              >
+                <label className="block" htmlFor="schedule-name">
+                  Name
                   <Input
-                    id="schedule-cron-expression"
-                    value={timing}
-                    onChange={(event) => setTiming(event.target.value)}
-                    aria-invalid={!isCronExpression(timing)}
-                    aria-describedby="schedule-format"
+                    id="schedule-name"
+                    required
+                    maxLength={160}
+                    value={editing.name}
+                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                   />
-                  <span id="schedule-format" className="task-muted text-xs">
-                    Five numeric fields: minute, hour, day, month, weekday. Example: 0 9 * * 1-5.
-                  </span>
-                  {!isCronExpression(timing) && (
-                    <span role="alert" className="task-error block">
-                      Enter a valid five-part expression.
-                    </span>
-                  )}
                 </label>
-              )}
-              <label htmlFor="schedule-preferred-agent" className="block space-y-2">
-                <span className="block text-sm">Preferred agent</span>
-                <Select
-                  id="schedule-preferred-agent"
-                  aria-label="Preferred agent"
-                  value={agent}
-                  onValueChange={setAgent}
-                >
-                  <SelectItem value="Unassigned">Choose later</SelectItem>
-                  {agent !== 'Unassigned' && !runners.some((r) => r.id === agent) && (
-                    <SelectItem value={agent}>{agent} (saved preference)</SelectItem>
-                  )}
-                  {runners.map((runner) => (
-                    <SelectItem key={runner.id} value={runner.id} disabled={!runner.available}>
-                      {runner.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </label>
-              <label htmlFor="schedule-instructions" className="block space-y-2">
-                <span className="block text-sm">Instructions</span>
-                <textarea
-                  id="schedule-instructions"
-                  className="task-input w-full"
-                  rows={4}
-                  value={prompt}
-                  onChange={(event) => setPrompt(event.target.value)}
-                  required
-                  maxLength={24000}
-                />
-              </label>
-              <div className="flex justify-end gap-2 pt-3">
-                <Button variant="ghost" type="button" onClick={() => setEditing(undefined)}>
-                  Cancel
+                <label className="block" htmlFor="schedule-project">
+                  Project
+                  <Select
+                    id="schedule-project"
+                    value={projectId}
+                    onValueChange={setProjectId}
+                    aria-label="Schedule project"
+                  >
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </label>
+                <label className="block" htmlFor="schedule-agent">
+                  Agent
+                  <Select
+                    id="schedule-agent"
+                    value={agent}
+                    onValueChange={setAgent}
+                    aria-label="Schedule agent"
+                  >
+                    {runners.map((r) => (
+                      <SelectItem
+                        key={r.id}
+                        value={r.id}
+                        disabled={
+                          !r.available || !project || !isAgentAllowedForProject(project, r.id)
+                        }
+                      >
+                        {r.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </label>
+                <label className="block" htmlFor="schedule-timing">
+                  Timing
+                  <Input
+                    id="schedule-timing"
+                    required
+                    value={editing.expression}
+                    onChange={(e) => setEditing({ ...editing, expression: e.target.value })}
+                  />
+                  <span className="task-muted">
+                    Minute, hour, day, month, weekday. Weekdays at 9:00: 0 9 * * 1-5.
+                  </span>
+                </label>
+                <label className="block" htmlFor="schedule-timezone">
+                  Timezone
+                  <Input
+                    id="schedule-timezone"
+                    required
+                    value={editing.timezone}
+                    onChange={(e) => setEditing({ ...editing, timezone: e.target.value })}
+                    placeholder="America/Denver"
+                  />
+                </label>
+                <label className="block" htmlFor="schedule-missed">
+                  After missed runs
+                  <Select
+                    id="schedule-missed"
+                    value={editing.missed}
+                    onValueChange={(missed) =>
+                      setEditing({ ...editing, missed: missed as 'skip' | 'once' })
+                    }
+                    aria-label="Missed runs"
+                  >
+                    <SelectItem value="skip">Skip to the next occurrence</SelectItem>
+                    <SelectItem value="once">Catch up once when available</SelectItem>
+                  </Select>
+                </label>
+                <label className="block" htmlFor="schedule-instructions">
+                  Instructions
+                  <textarea
+                    id="schedule-instructions"
+                    className="task-input w-full"
+                    required
+                    maxLength={24000}
+                    rows={4}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                  />
+                </label>
+                <p className="task-muted">
+                  Target:{' '}
+                  {project?.preferences?.baseBranch || project?.gitBranch || 'Choose a project'}.
+                  Account and verification use the selected project's preferences when saved.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="schedule-enabled"
+                    label="Enable automatic runs"
+                    checked={editing.enabled}
+                    onCheckedChange={(enabled) => setEditing({ ...editing, enabled })}
+                  />
+                  <label htmlFor="schedule-enabled">Enable automatic runs</label>
+                </div>
+                <p className="task-muted">
+                  Leave this off to save a paused schedule. Enabled project connections are
+                  available to each run.
+                </p>
+                {error && (
+                  <p role="alert" className="task-error">
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" disabled={busy || !project || !agent}>
+                  {busy ? 'Saving…' : 'Save schedule'}
                 </Button>
-                <Button type="submit" disabled={!valid}>
-                  Save plan
-                </Button>
-              </div>
-            </form>
+              </form>
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

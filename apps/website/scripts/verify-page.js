@@ -2,7 +2,7 @@ async function _verifyPage(page) {
   const assert = (condition, message) => {
     if (!condition) throw new Error(message);
   };
-  await page.goto('http://localhost:5180');
+  await page.goto(await page.evaluate(() => location.origin));
   await page.getByRole('heading', { level: 1 }).waitFor();
   await page.evaluate(() => document.fonts.ready);
   const errors = [];
@@ -22,7 +22,7 @@ async function _verifyPage(page) {
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await page.getByRole('menuitem', { name: 'The workspace' }).waitFor();
+  await page.getByRole('menuitem', { name: 'How it works' }).waitFor();
   await page.keyboard.press('Escape');
   assert(
     await page
@@ -30,11 +30,11 @@ async function _verifyPage(page) {
       .evaluate((el) => el === document.activeElement),
     'Menu focus return',
   );
-  await page.getByRole('tab', { name: '01 Make room for ideas' }).focus();
+  await page.getByRole('tab', { name: 'Tasks & ideas' }).focus();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: '02 Stay in the loop' }).waitFor();
+  await page.getByRole('tabpanel', { name: 'Review & checks' }).waitFor();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: '03 Bring your agents' }).waitFor();
+  await page.getByRole('tabpanel', { name: 'Coding agents' }).waitFor();
   await page.getByRole('button', { name: 'Electric Indigo', exact: true }).click();
   assert(
     (await page

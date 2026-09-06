@@ -172,6 +172,27 @@ fn extract(
                     .find_map(|n| literal(n, text)),
                 "require",
             ));
+        } else if rust && node.kind() == "use_declaration" {
+            if let Some(argument) = node.child_by_field_name("argument") {
+                let mut parent = node.parent();
+                let mut inline = false;
+                while let Some(p) = parent {
+                    inline |= p.kind() == "mod_item";
+                    parent = p.parent();
+                }
+                let mut uses = Vec::new();
+                rust_uses(argument, text, "", &mut uses);
+                for specifier in uses {
+                    refs.push(CodebaseReference {
+                        source: path.into(),
+                        target: None,
+                        specifier,
+                        line: node.start_position().row + 1,
+                        kind: "use module".into(),
+                        status: if inline { "unsupported" } else { "pending" }.into(),
+                    });
+                }
+            }
         } else if rust && node.kind() == "mod_item" && node.child_by_field_name("body").is_none() {
             let name = node
                 .child_by_field_name("name")
@@ -243,6 +264,103 @@ fn extract(
     (refs, tree.root_node().has_error())
 }
 
+fn rust_uses(node: Node<'_>, text: &str, prefix: &str, output: &mut Vec<String>) {
+    if output.len() >= 500 {
+        return;
+    }
+    match node.kind() {
+        "scoped_use_list" => {
+            let path = node
+                .child_by_field_name("path")
+                .and_then(|n| n.utf8_text(text.as_bytes()).ok())
+                .unwrap_or("");
+            if let Some(list) = node.child_by_field_name("list") {
+                rust_uses(list, text, &format!("{prefix}{path}::"), output);
+            }
+        }
+        "use_list" => {
+            let mut cursor = node.walk();
+            for child in node.named_children(&mut cursor) {
+                rust_uses(child, text, prefix, output);
+            }
+        }
+        "use_as_clause" => {
+            if let Some(path) = node.child_by_field_name("path") {
+                rust_uses(path, text, prefix, output);
+            }
+        }
+        "identifier" | "scoped_identifier" | "crate" | "self" | "super" | "use_wildcard" => {
+            if let Ok(path) = node.utf8_text(text.as_bytes()) {
+                output.push(format!("{prefix}{path}"));
+            }
+        }
+        _ => {}
+    }
+}
+
+fn resolve_rust_use(reference: &mut CodebaseReference, paths: &BTreeSet<String>) {
+    let source = Path::new(&reference.source);
+    let parent = source.parent().unwrap_or(Path::new(""));
+    let stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    let mut tokens: Vec<_> = reference.specifier.split("::").collect();
+    let mut base = if tokens.first() == Some(&"crate") {
+        tokens.remove(0);
+        let root = parent.ancestors().find(|p| {
+            ["lib.rs", "main.rs"]
+                .iter()
+                .any(|name| normalized(&p.join(name)).is_some_and(|path| paths.contains(&path)))
+        });
+        let Some(root) = root else {
+            reference.status = "unresolved".into();
+            return;
+        };
+        root.to_path_buf()
+    } else {
+        if !matches!(tokens.first(), Some(&"self" | &"super")) {
+            reference.status = "package or alias".into();
+            return;
+        }
+        let mut base = if ["lib", "main", "mod"].contains(&stem) {
+            parent.to_path_buf()
+        } else {
+            parent.join(stem)
+        };
+        if tokens.first() == Some(&"self") {
+            tokens.remove(0);
+        }
+        while tokens.first() == Some(&"super") {
+            tokens.remove(0);
+            if !base.pop() {
+                reference.status = "outside root".into();
+                return;
+            }
+        }
+        base
+    };
+    let mut target = None;
+    for token in tokens {
+        if token == "self" || token == "*" {
+            break;
+        }
+        if !token.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            break;
+        }
+        base.push(token);
+        for candidate in [base.with_extension("rs"), base.join("mod.rs")] {
+            if let Some(path) = normalized(&candidate).filter(|p| paths.contains(p)) {
+                target = Some(path);
+            }
+        }
+    }
+    reference.target = target;
+    reference.status = if reference.target.is_some() {
+        "resolved"
+    } else {
+        "unresolved"
+    }
+    .into();
+}
+
 fn resolve(reference: &mut CodebaseReference, paths: &BTreeSet<String>) {
     if reference.status != "pending" {
         return;
@@ -251,6 +369,10 @@ fn resolve(reference: &mut CodebaseReference, paths: &BTreeSet<String>) {
         .parent()
         .unwrap_or(Path::new(""));
     let mut candidates = Vec::new();
+    if reference.kind == "use module" {
+        resolve_rust_use(reference, paths);
+        return;
+    }
     if reference.kind == "module" {
         let file = Path::new(&reference.source);
         let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("");
@@ -409,6 +531,22 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
         parser.set_timeout_micros(100_000);
         parsers.insert(key, parser);
     }
+    let resolver_limited = std::sync::Arc::new(AtomicBool::new(false));
+    let js_resolver = oxc_resolver::ResolverGeneric::new_with_file_system(
+        super::resolver_fs::ResolverFs::for_root(root.clone(), resolver_limited.clone()),
+        oxc_resolver::ResolveOptions {
+            cwd: Some(root.clone()),
+            tsconfig: Some(oxc_resolver::TsconfigDiscovery::Auto),
+            extensions: [
+                ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".json",
+            ]
+            .map(str::to_string)
+            .to_vec(),
+            condition_names: vec!["import".into(), "default".into()],
+            main_fields: vec!["module".into(), "main".into()],
+            ..Default::default()
+        },
+    );
     let mut total_bytes = 0;
     for file in &mut result.files {
         let key = match file.language.as_str() {
@@ -455,6 +593,22 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
                 }
                 for reference in &mut refs {
                     resolve(reference, &paths);
+                    if key != "rs" && reference.status == "package or alias" {
+                        let resolution_result = js_resolver
+                            .resolve_file(dunce::simplified(&full), &reference.specifier);
+                        if let Ok(resolution) = resolution_result {
+                            if let Ok(canonical) = resolution.path().canonicalize() {
+                                if let Ok(relative) = canonical.strip_prefix(&root) {
+                                    if let Some(path) =
+                                        normalized(relative).filter(|p| paths.contains(p))
+                                    {
+                                        reference.target = Some(path);
+                                        reference.status = "resolved".into();
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 result.references.extend(refs);
             }
@@ -462,6 +616,24 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
                 path: file.path.clone(),
                 message,
             }),
+        }
+    }
+    result.truncated |= resolver_limited.load(Ordering::Relaxed);
+    let declared: BTreeSet<_> = result
+        .references
+        .iter()
+        .filter(|r| r.kind == "module")
+        .filter_map(|r| r.target.clone())
+        .collect();
+    for reference in &mut result.references {
+        if reference.kind == "use module"
+            && reference
+                .target
+                .as_ref()
+                .is_some_and(|target| !declared.contains(target))
+        {
+            reference.target = None;
+            reference.status = "unresolved".into();
         }
     }
     result.references.sort();
@@ -625,6 +797,42 @@ mod tests {
                 .filter(|r| r.status == "unsupported")
                 .count(),
             2
+        );
+    }
+
+    #[test]
+    fn aliases_and_rust_grouped_uses_resolve_to_local_declared_modules() {
+        let f = Fixture::new();
+        f.write(
+            "tsconfig.json",
+            r#"{"compilerOptions":{"baseUrl":".","paths":{"@/*":["src/*"]}}}"#,
+        );
+        f.write("src/app.ts", "import {x} from '@/shared';");
+        f.write("src/shared.ts", "export const x=1;");
+        f.write(
+            "rust/src/lib.rs",
+            "mod one; mod two; use crate::{one::A, two::B};",
+        );
+        f.write("rust/src/one.rs", "pub struct A; use super::two::B;");
+        f.write("rust/src/two.rs", "pub struct B;");
+        let snapshot = scan(&f.0).unwrap();
+        assert!(
+            snapshot
+                .references
+                .iter()
+                .any(|r| r.specifier == "@/shared" && r.target.as_deref() == Some("src/shared.ts")),
+            "{:?}",
+            snapshot.references
+        );
+        assert_eq!(
+            snapshot
+                .references
+                .iter()
+                .filter(|r| r.kind == "use module" && r.status == "resolved")
+                .count(),
+            3,
+            "{:?}",
+            snapshot.references
         );
     }
 

@@ -13,8 +13,10 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { nativeTask } from '../../lib/task-runtime';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
+import { agentAccountFor, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
@@ -38,6 +40,8 @@ const CATEGORIES = [
 ];
 
 export function McpWorkspace() {
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
   const {
     servers,
     loadingServers,
@@ -73,8 +77,8 @@ export function McpWorkspace() {
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null);
 
   useEffect(() => {
-    void loadServers();
-  }, [loadServers]);
+    void loadServers(activeProjectId);
+  }, [loadServers, activeProjectId]);
 
   // Debounced search for marketplace
   useEffect(() => {
@@ -202,6 +206,14 @@ export function McpWorkspace() {
             <div className="mcp-scope-filters">
               {[
                 { id: 'all', label: `All (${servers.length})` },
+                ...(activeProjectId
+                  ? [
+                      {
+                        id: `project:${activeProjectId}`,
+                        label: `This project (${servers.filter((s) => s.scope === `project:${activeProjectId}`).length})`,
+                      },
+                    ]
+                  : []),
                 {
                   id: 'global',
                   label: `Global (${servers.filter((s) => s.scope === 'global').length})`,
@@ -293,8 +305,44 @@ export function McpWorkspace() {
                       <div className="mcp-card-header">
                         <h3 className="mcp-card-title">{server.name}</h3>
                         <div className="mcp-card-badges">
+                          {server.transport === 'http' &&
+                            (server.scope === 'codex' ||
+                              server.scope === 'claude' ||
+                              server.scope.startsWith('project:') ||
+                              server.scope === 'global') &&
+                            (server.scope === 'codex' || server.scope === 'claude'
+                              ? [server.scope]
+                              : ['codex', 'claude']
+                            ).map((agent) => (
+                              <Button
+                                key={agent}
+                                variant="ghost"
+                                onClick={() =>
+                                  void nativeTask('mcp_authenticate', {
+                                    id: server.id,
+                                    scope: server.scope,
+                                    agent,
+                                    profileId: server.scope.startsWith('project:')
+                                      ? agentAccountFor(project, agent)
+                                      : undefined,
+                                  })
+                                    .then(() =>
+                                      setCopyError(
+                                        'Sign-in opened in your CLI. Complete authorization and check access there. Connection probes use configured headers or environment tokens.',
+                                      ),
+                                    )
+                                    .catch((error) => setCopyError(String(error)))
+                                }
+                              >
+                                Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
+                              </Button>
+                            ))}
                           <span className={`mcp-pill scope-${server.scope}`}>
-                            {server.scope === 'global' ? 'Global' : server.scope}
+                            {server.scope.startsWith('project:')
+                              ? 'This project'
+                              : server.scope === 'global'
+                                ? 'Global'
+                                : server.scope}
                           </span>
                           <span className="mcp-pill">{server.transport}</span>
                         </div>

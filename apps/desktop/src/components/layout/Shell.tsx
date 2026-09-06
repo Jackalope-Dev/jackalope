@@ -1,14 +1,15 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, GitBranch, Search, Settings2, SlidersHorizontal } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Check, ChevronDown, GitBranch, Search, Settings2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
+import { AgentManager } from '../agents/AgentManager';
 import { BrowserHarness } from '../browser/BrowserHarness';
 import { McpWorkspace } from '../mcp/McpWorkspace';
-import { DeviceMesh } from '../mesh/DeviceMesh';
+import { ProjectPreferences } from '../projects/ProjectPreferences';
 import { WorktreeManager } from '../projects/WorktreeManager';
 import { ScheduleManager } from '../schedules/ScheduleManager';
+import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
@@ -29,12 +30,26 @@ export type { ActiveTab } from './navigation';
 export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) {
   const [setupOpen, setSetupOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsCategory, setSettingsCategory] = useState<'General' | 'System' | 'Diagnostics'>(
+    'General',
+  );
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [newTaskAgent, setNewTaskAgent] = useState<string | null>(initialTaskAgent ?? null);
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
+  const navigate = useCallback((tab: ActiveTab) => {
+    if (tab === 'audit' || tab === 'mesh') {
+      setSettingsCategory(tab === 'audit' ? 'Diagnostics' : 'System');
+      setSettingsOpen(true);
+    } else setActiveTab(tab);
+  }, []);
+  useEffect(() => {
+    const handle = (event: Event) => navigate((event as CustomEvent<ActiveTab>).detail);
+    window.addEventListener('jackalope:navigate', handle);
+    return () => window.removeEventListener('jackalope:navigate', handle);
+  }, [navigate]);
   const shortcut = navigator.platform.includes('Mac') ? '⌘ K' : 'Ctrl K';
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -129,62 +144,13 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
               type="button"
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              aria-current={activeTab === item.id ? 'page' : undefined}
+              aria-current={view.group === item.group ? 'page' : undefined}
               className="workspace-nav-item"
             >
               <item.icon className="size-3.5" />
               <span>{item.label}</span>
             </button>
           ))}
-          <span className="mx-2 h-4 w-px bg-[var(--color-border)]" />
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <button
-                type="button"
-                className="workspace-nav-item"
-                data-active={!view.primary || undefined}
-                aria-label="Workspace tools"
-              >
-                <SlidersHorizontal className="size-3.5" />
-                <span>{view.primary ? 'Tools' : view.label}</span>
-                <ChevronDown className="size-3" />
-              </button>
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content
-                className="workspace-menu w-72"
-                align="start"
-                sideOffset={10}
-                collisionPadding={12}
-              >
-                {WORKSPACE_VIEWS.filter((item) => !item.primary).map((item) => (
-                  <Menu.Item
-                    key={item.id}
-                    className="workspace-menu-item"
-                    onSelect={() => setActiveTab(item.id)}
-                  >
-                    <item.icon className="size-4 shrink-0 text-[var(--color-accent-ink)]" />
-                    <span>
-                      <span className="block">{item.label}</span>
-                      <span className="block text-xs text-[var(--color-text-muted)] mt-1">
-                        {item.description}
-                      </span>
-                    </span>
-                  </Menu.Item>
-                ))}
-                <Menu.Separator className="menu-separator" />
-                <Menu.Item className="workspace-menu-item" onSelect={() => setSettingsOpen(true)}>
-                  <Settings2 className="size-4 shrink-0 text-[var(--color-accent-ink)]" />
-                  <span>
-                    <span className="block">Settings & Preferences</span>
-                    <span className="block text-xs text-[var(--color-text-muted)] mt-1">
-                      Configure application behavior and project options.
-                    </span>
-                  </span>
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
         </nav>
       </div>
       <main
@@ -193,7 +159,33 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         className="workspace-canvas"
         aria-label={view.label}
       >
+        {WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
+          <div>
+            <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
+              {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  aria-current={activeTab === item.id ? 'page' : undefined}
+                  onClick={() => navigate(item.id)}
+                  className="workspace-nav-item"
+                >
+                  {item.id === 'kanban'
+                    ? 'Work'
+                    : item.id === 'topology'
+                      ? 'Codebase'
+                      : item.id === 'agents'
+                        ? 'Runners'
+                        : item.id === 'agent-settings'
+                          ? 'Configuration'
+                          : item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
         <UpdateNotice />
+        <ScheduleNotice />
         <HistoryRecoveryNotice />
         <UnsavedTasksNotice />
         {activeTab === 'kanban' && (
@@ -221,7 +213,12 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
           />
         )}
         {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
-        {activeTab === 'audit' && <AuditLogWorkspace />}
+        {activeTab === 'agent-settings' && (
+          <section className="workspace-page">
+            <AgentManager />
+          </section>
+        )}
+        {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
         {activeTab === 'mcps' && <McpWorkspace />}
         {activeTab === 'schedules' && (
           <ScheduleManager
@@ -243,16 +240,20 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
           />
         )}
         {activeTab === 'topology' && <CodebaseMap onOpenProject={() => setSetupOpen(true)} />}
-        {activeTab === 'mesh' && <DeviceMesh />}
       </main>
       <ProjectSetup open={setupOpen} onClose={() => setSetupOpen(false)} />
       <CommandPalette
         isOpen={commandsOpen}
         onClose={() => setCommandsOpen(false)}
-        onNavigate={setActiveTab}
+        onNavigate={navigate}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog
+        key={settingsCategory + String(settingsOpen)}
+        initialCategory={settingsCategory}
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 }

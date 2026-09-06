@@ -503,6 +503,7 @@ impl Coordinator {
                 prompt: item.prompt,
                 isolated: true,
                 previous_run_id: None,
+                connection_ids: None,
                 coordination: Some(CoordinationContext {
                     endpoint: url.clone(),
                     token: token.clone(),
@@ -816,8 +817,8 @@ pub(super) async fn bridge_browser_navigate(
     headers: HeaderMap,
     Json(req): Json<super::harness::BrowserNavigateRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let _run = service.authorized_run(&headers)?;
-    let result = super::harness::browser_navigate(&req.url)
+    let run = service.authorized_run(&headers)?;
+    let result = super::browser::browser_navigate(&run.id, &req.url)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     Ok(Json(result))
@@ -830,7 +831,7 @@ pub(super) async fn bridge_browser_screenshot(
 ) -> Result<Json<super::harness::ScreenshotArtifact>, StatusCode> {
     let run = service.authorized_run(&headers)?;
     let workspace = PathBuf::from(&run.workspace);
-    let screenshot = super::harness::browser_screenshot(&workspace, req.name, req.url)
+    let screenshot = super::browser::browser_screenshot(&run.id, &workspace, req.name, req.url)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     service.runtime.update(&run.id, |r| {
@@ -846,8 +847,8 @@ pub(super) async fn bridge_browser_snapshot(
     headers: HeaderMap,
     Json(req): Json<super::harness::BrowserScreenshotRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let _run = service.authorized_run(&headers)?;
-    let result = super::harness::browser_snapshot(req.url)
+    let run = service.authorized_run(&headers)?;
+    let result = super::browser::browser_snapshot(&run.id, req.url)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(result))
@@ -860,7 +861,7 @@ pub(super) async fn bridge_browser_interact(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let run = service.authorized_run(&headers)?;
     let action_desc = format!("{} on {}", req.action, req.selector);
-    let result = super::harness::browser_interact(req)
+    let result = super::browser::browser_interact(&run.id, req)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     service.runtime.update(&run.id, |r| {

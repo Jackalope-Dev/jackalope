@@ -14,6 +14,10 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
   const { projects, selectProject } = useProjectStore();
   const [project, setProject] = useState('all');
   const [period, setPeriod] = useState('30');
+  const [account, setAccount] = useState('all');
+  const accountKey = (r: (typeof runs)[number]) =>
+    `${r.accountBinding?.adapter ?? r.agent}:${r.accountBinding?.profileId ?? 'cli-default'}`;
+  const accounts = new Map(runs.map((r) => [accountKey(r), `${r.agent} · ${r.account}`]));
   const [sort, setSort] = useState('tokens');
   const projectNames = new Map([
     ...projects.map((p) => [p.id, p.name] as const),
@@ -22,19 +26,23 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
   const cutoff = period === 'all' ? 0 : Date.now() - Number(period) * 86400000;
   const filtered = runs.filter(
     (r) =>
-      (project === 'all' || r.projectId === project) && new Date(r.startedAt).getTime() >= cutoff,
+      (project === 'all' || r.projectId === project) &&
+      (account === 'all' || accountKey(r) === account) &&
+      new Date(r.startedAt).getTime() >= cutoff,
   );
   const reported = filtered.filter((r) => r.usage.reported);
   const input = reported.reduce((sum, r) => sum + r.usage.input, 0);
   const output = reported.reduce((sum, r) => sum + r.usage.output, 0);
   const sorted = [...filtered].sort((a, b) =>
-    sort === 'project'
-      ? a.projectName.localeCompare(b.projectName)
-      : sort === 'agent'
-        ? a.agent.localeCompare(b.agent)
-        : sort === 'model'
-          ? (a.model ?? '').localeCompare(b.model ?? '')
-          : b.usage.input + b.usage.output - (a.usage.input + a.usage.output),
+    sort === 'account'
+      ? accountKey(a).localeCompare(accountKey(b))
+      : sort === 'project'
+        ? a.projectName.localeCompare(b.projectName)
+        : sort === 'agent'
+          ? a.agent.localeCompare(b.agent)
+          : sort === 'model'
+            ? (a.model ?? '').localeCompare(b.model ?? '')
+            : b.usage.input + b.usage.output - (a.usage.input + a.usage.output),
   );
   const exportUsage = () => {
     const data = filtered.map(
@@ -45,6 +53,8 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         projectName,
         agent,
         account,
+        accountBinding,
+        usageObservations,
         model,
         startedAt,
         status,
@@ -56,6 +66,14 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         projectName,
         agent,
         account,
+        accountBinding: accountBinding
+          ? {
+              adapter: accountBinding.adapter,
+              profileId: accountBinding.profileId,
+              label: accountBinding.label,
+            }
+          : undefined,
+        usageObservations,
         model,
         startedAt,
         status,
@@ -97,6 +115,22 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         }
       />
       <div className="usage-filters">
+        <label htmlFor="usage-account">
+          Account
+          <Select
+            id="usage-account"
+            aria-label="Usage account"
+            value={account}
+            onValueChange={setAccount}
+          >
+            <SelectItem value="all">All accounts</SelectItem>
+            {[...accounts].map(([id, label]) => (
+              <SelectItem key={id} value={id}>
+                {label}
+              </SelectItem>
+            ))}
+          </Select>
+        </label>
         <label htmlFor="usagedashboard-field-1">
           Project
           <Select
@@ -138,6 +172,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
             <SelectItem value="project">Project</SelectItem>
             <SelectItem value="agent">Agent</SelectItem>
             <SelectItem value="model">Model</SelectItem>
+            <SelectItem value="account">Account</SelectItem>
           </Select>
         </label>
       </div>
@@ -190,8 +225,9 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
             <summary>What’s included</summary>
             <p>
               Reported attempts, including retries and follow-ups. Cached input is counted once.
-              Missing and in-progress reports are excluded, not counted as zero. CLI account
-              identity and separate subagent attribution are not yet available.
+              Missing and in-progress reports are excluded, not counted as zero. Account profiles
+              identify the configured CLI, not a verified person. Child message observations are
+              partial and never added to attempt totals.
             </p>
           </details>
         </>
@@ -264,6 +300,31 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
             </tbody>
           </table>
         </div>
+      )}
+      {filtered.some((r) => r.usageObservations?.length) && (
+        <details className="my-6">
+          <summary>Message and subagent observations</summary>
+          <p className="task-muted">
+            Partial provider observations, deduplicated by message ID. These are a breakdown only
+            and are never added to the reported totals above.
+          </p>
+          {filtered
+            .filter((r) => r.usageObservations?.length)
+            .map((r) => (
+              <details key={r.id} className="mt-4">
+                <summary>
+                  {taskTitle(r.prompt)} · {r.usageObservations?.length} messages
+                </summary>
+                {r.usageObservations?.map((o) => (
+                  <p className="task-muted py-1" key={o.messageId}>
+                    {o.parentToolUseId ? `Child ${o.parentToolUseId}` : 'Main agent'} ·{' '}
+                    {o.model ?? 'Model unknown'} · {o.input.toLocaleString()} input /{' '}
+                    {o.output.toLocaleString()} output
+                  </p>
+                ))}
+              </details>
+            ))}
+        </details>
       )}
       <CapacityPanel />
     </section>

@@ -138,22 +138,27 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Select a target URL for later headless captures. This does not navigate a live browser or check reachability.",
+        description = "Navigate the task-owned isolated browser to a URL. Later interactions and evidence share this session.",
         annotations(read_only_hint = false, open_world_hint = true)
     )]
     async fn browser_navigate(
         &self,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
         Parameters(input): Parameters<super::harness::BrowserNavigateRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let result = super::harness::browser_navigate(&input.url)
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        let result = super::browser::browser_navigate(&run.id, &input.url)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
         Ok(CallToolResult::structured(result))
     }
 
     #[tool(
-        description = "Capture a real rendered screenshot of the target URL in a fresh headless browser. Saves the image into the task workspace artifacts and returns the artifact file path.",
+        description = "Capture the current task browser, or navigate to an explicit URL first. Saves the image into the task workspace artifacts and returns the artifact file path.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn browser_screenshot(
@@ -167,9 +172,10 @@ impl CoordinationTools {
             .authorized_run(&headers)
             .map_err(bridge_error)?;
         let workspace = std::path::PathBuf::from(&run.workspace);
-        let artifact = super::harness::browser_screenshot(&workspace, input.name, input.url)
-            .await
-            .map_err(|e| ErrorData::internal_error(e, None))?;
+        let artifact =
+            super::browser::browser_screenshot(&run.id, &workspace, input.name, input.url)
+                .await
+                .map_err(|e| ErrorData::internal_error(e, None))?;
         self.service.runtime.update(&run.id, |r| {
             r.screenshots.push(artifact.clone());
             r.activity
@@ -181,22 +187,27 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Capture rendered HTML for the target URL in a fresh headless browser. This does not share interactive session state.",
+        description = "Capture bounded rendered HTML from the current task browser. An explicit URL navigates first.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn browser_snapshot(
         &self,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
         Parameters(input): Parameters<super::harness::BrowserScreenshotRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let snapshot = super::harness::browser_snapshot(input.url)
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        let snapshot = super::browser::browser_snapshot(&run.id, input.url)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
         Ok(CallToolResult::structured(snapshot))
     }
 
     #[tool(
-        description = "Browser interaction is currently unavailable. This tool returns an error without performing an action.",
+        description = "Click, type, scroll to or select a CSS-targeted element in the task browser.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn browser_interact(
@@ -210,7 +221,7 @@ impl CoordinationTools {
             .authorized_run(&headers)
             .map_err(bridge_error)?;
         let action_desc = format!("{} on {}", input.action, input.selector);
-        let res = super::harness::browser_interact(input)
+        let res = super::browser::browser_interact(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
         self.service.runtime.update(&run.id, |r| {

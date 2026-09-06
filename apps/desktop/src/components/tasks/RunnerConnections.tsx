@@ -8,7 +8,7 @@ import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import { SettingsDialog } from '../settings/SettingsDialog';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { useDialogFocus } from '../ui/useDialogFocus';
@@ -26,7 +26,6 @@ export function RunnerConnections({
   const config = useAgentConfigStore();
   const capacity = useCapacityStore();
   const [adding, setAdding] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState('');
   const dialogFocus = useDialogFocus();
@@ -73,9 +72,9 @@ export function RunnerConnections({
             <div className="agent-workspace-actions">
               <Button
                 variant="ghost"
-                aria-label="Agent settings"
-                title="Agent settings"
-                onClick={() => setSettingsOpen(true)}
+                aria-label="Configuration"
+                title="Configuration"
+                onClick={() => navigateWorkspace('agent-settings')}
               >
                 <Settings2 size={18} />
               </Button>
@@ -227,7 +226,7 @@ export function RunnerConnections({
                         <ArrowRight size={16} />
                       </Button>
                     ) : (
-                      <Button variant="ghost" onClick={() => setSettingsOpen(true)}>
+                      <Button variant="ghost" onClick={() => navigateWorkspace('agent-settings')}>
                         Configure
                         <Settings2 size={16} />
                       </Button>
@@ -245,9 +244,13 @@ export function RunnerConnections({
           </p>
         )}
         <p className="agent-workspace-note">
-          Model choices, executable paths and defaults live in{' '}
-          <button type="button" className="task-link" onClick={() => setSettingsOpen(true)}>
-            Agent settings
+          Manage model choices, executable paths and defaults in{' '}
+          <button
+            type="button"
+            className="task-link"
+            onClick={() => navigateWorkspace('agent-settings')}
+          >
+            Configuration
             <ArrowRight size={14} />
           </button>
         </p>
@@ -272,9 +275,6 @@ export function RunnerConnections({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      {settingsOpen && (
-        <SettingsDialog open onClose={() => setSettingsOpen(false)} initialCategory="Agents" />
-      )}
     </section>
   );
 }

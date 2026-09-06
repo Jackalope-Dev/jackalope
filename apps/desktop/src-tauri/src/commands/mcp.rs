@@ -74,6 +74,21 @@ fn config_path(scope: &str) -> Result<PathBuf, String> {
             .unwrap_or(home.join(".codex"))
             .join("config.toml")),
         "grok" => Ok(home.join(".grok/config.toml")),
+        scope if scope.starts_with("project:") => {
+            let id = &scope[8..];
+            if id.is_empty()
+                || id.len() > 120
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+            {
+                return Err("Invalid project scope.".into());
+            }
+            Ok(home
+                .join(".jackalope/projects")
+                .join(id)
+                .join("mcp_servers.json"))
+        }
         _ => Err("Unsupported MCP configuration scope.".into()),
     }
 }
@@ -162,6 +177,19 @@ fn spec(server: &McpServerConfig, scope: &str) -> Value {
             "headers"
         }] = headers;
     }
+    if scope == "claude" {
+        if let Some(variable) = value
+            .as_object_mut()
+            .unwrap()
+            .remove("bearer_token_env_var")
+            .and_then(|v| v.as_str().map(str::to_string))
+        {
+            if !value["headers"].is_object() {
+                value["headers"] = json!({});
+            }
+            value["headers"]["Authorization"] = json!(format!("Bearer ${{{variable}}}"));
+        }
+    }
     if server.transport == "stdio" {
         value["command"] = json!(server.command);
         value["args"] = json!(server.args);
@@ -172,13 +200,13 @@ fn spec(server: &McpServerConfig, scope: &str) -> Value {
             value["type"] = json!(server.transport);
         }
     }
-    if scope == "global" {
+    if scope == "global" || scope.starts_with("project:") {
         value["name"] = json!(server.name);
         if let Some(desc) = &server.description {
             value["description"] = json!(desc);
         }
     }
-    if ["global", "codex", "grok"].contains(&scope) {
+    if ["global", "codex", "grok"].contains(&scope) || scope.starts_with("project:") {
         value["enabled"] = json!(server.enabled.unwrap_or(true));
     }
     value
@@ -237,6 +265,20 @@ fn write_config(path: &Path, text: &str) -> Result<(), String> {
 }
 
 fn validate(server: &McpServerConfig) -> Result<(), String> {
+    if let Some(value) = server.extra.get("bearer_token_env_var") {
+        let variable = value
+            .as_str()
+            .ok_or("The bearer token must reference an environment variable name.")?;
+        if variable.is_empty()
+            || variable.len() > 256
+            || !variable
+                .bytes()
+                .enumerate()
+                .all(|(i, b)| b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit()))
+        {
+            return Err("Provide a valid bearer-token environment variable name.".into());
+        }
+    }
     if server.id.trim().is_empty() || server.id.len() > 160 {
         return Err("Provide a server ID.".into());
     }
@@ -261,10 +303,20 @@ fn validate(server: &McpServerConfig) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn mcp_list_servers() -> Result<Vec<McpServerConfig>, String> {
+pub async fn mcp_list_servers(project_id: Option<String>) -> Result<Vec<McpServerConfig>, String> {
     let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
     let mut results = Vec::new();
-    for scope in ["global", "claude", "claude-desktop", "codex", "grok"] {
+    let mut scopes = vec![
+        "global".to_string(),
+        "claude".into(),
+        "claude-desktop".into(),
+        "codex".into(),
+        "grok".into(),
+    ];
+    if let Some(id) = project_id {
+        scopes.push(format!("project:{id}"));
+    }
+    for scope in scopes.iter().map(String::as_str) {
         let path = config_path(scope)?;
         let (_, root) = read_config(&path)?;
         if let Some(servers) = root[servers_key(&path)].as_object() {
@@ -477,6 +529,43 @@ pub async fn mcp_probe_server(server: McpServerConfig) -> Result<McpProbeResult,
 mod tests {
     use super::*;
     #[test]
+    fn project_delivery_preserves_selection_and_adapter_authentication() {
+        let id = uuid::Uuid::new_v4().to_string();
+        let path = config_path(&format!("project:{id}")).unwrap();
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, serde_json::to_vec(&json!({"mcpServers": {
+            "test.server": {"url":"https://example.invalid/mcp", "bearer_token_env_var":"TEST_TOKEN"},
+            "off": {"command":"unused", "enabled":false}
+        }})).unwrap()).unwrap();
+        let selected = vec!["test.server".to_string()];
+        let codex = project_servers(&id, Some(&selected), "codex").unwrap();
+        assert_eq!(codex["test.server"]["bearer_token_env_var"], "TEST_TOKEN");
+        let overrides = codex_overrides(&codex).unwrap();
+        let parsed: toml::Value = toml::from_str(&overrides.join("\n")).unwrap();
+        assert_eq!(
+            parsed["mcp_servers"]["test.server"]["url"].as_str(),
+            Some("https://example.invalid/mcp")
+        );
+        let claude = project_servers(&id, Some(&selected), "claude").unwrap();
+        assert_eq!(
+            claude["test.server"]["headers"]["Authorization"],
+            "Bearer ${TEST_TOKEN}"
+        );
+        assert!(project_servers(&id, Some(&[]), "grok").unwrap().is_empty());
+        assert!(project_servers(&id, Some(&selected), "grok").is_err());
+        assert!(project_servers(&id, Some(&["off".into()]), "codex").is_err());
+        assert!(config_path("project:../escape").is_err());
+        let invalid = parse_server_spec(
+            "x",
+            &json!({"url":"https://example.invalid", "bearer_token_env_var":"BAD}TOKEN"}),
+            "codex",
+        );
+        assert!(validate(&invalid).is_err());
+        fs::remove_file(&path).unwrap();
+        fs::remove_dir(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
     fn preserves_toml_settings_and_exact_ids() {
         let dir = std::env::temp_dir().join(format!("jackalope-mcp-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
@@ -525,5 +614,117 @@ mod tests {
     async fn unreachable_http_is_not_connected() {
         let server = parse_server_spec("test", &json!({"url":"http://127.0.0.1:1/mcp"}), "global");
         assert!(!mcp_probe_server(server).await.unwrap().ok);
+    }
+}
+
+pub(super) fn project_servers(
+    project_id: &str,
+    selection: Option<&[String]>,
+    adapter: &str,
+) -> Result<serde_json::Map<String, Value>, String> {
+    let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
+    let scope = format!("project:{project_id}");
+    let path = config_path(&scope)?;
+    let (_, root) = read_config(&path)?;
+    let mut result = serde_json::Map::new();
+    if let Some(servers) = root["mcpServers"].as_object() {
+        for (id, value) in servers {
+            if selection.is_some_and(|ids| !ids.contains(id)) || value["enabled"] == false {
+                continue;
+            }
+            if id == "jackalope" {
+                return Err("The jackalope server name is reserved for task coordination.".into());
+            }
+            let server = parse_server_spec(id, value, &scope);
+            validate(&server)?;
+            if adapter == "grok" || (adapter == "codex" && server.transport == "sse") {
+                return Err("This agent does not support the selected project MCP transport. Choose Claude or a compatible Codex connection.".into());
+            }
+            result.insert(id.clone(), spec(&server, adapter));
+        }
+    }
+    if selection.is_some_and(|ids| ids.iter().any(|id| !result.contains_key(id))) {
+        return Err("A selected project connection is disabled or missing. Review the task's tools before starting.".into());
+    }
+    Ok(result)
+}
+
+pub(super) fn codex_overrides(
+    servers: &serde_json::Map<String, Value>,
+) -> Result<Vec<String>, String> {
+    servers
+        .iter()
+        .map(|(id, value)| {
+            let value = toml::Value::try_from(value).map_err(|e| e.to_string())?;
+            Ok(format!(
+                "mcp_servers.{}={value}",
+                serde_json::to_string(id).map_err(|e| e.to_string())?
+            ))
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub async fn mcp_authenticate(
+    id: String,
+    scope: String,
+    agent: String,
+    profile_id: Option<String>,
+    runtime: tauri::State<'_, super::tasks::TaskRuntime>,
+) -> Result<(), String> {
+    if !["codex", "claude"].contains(&agent.as_str()) {
+        return Err("Choose Codex or Claude for connection sign-in.".into());
+    }
+    let server = {
+        let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
+        let path = config_path(&scope)?;
+        let (_, root) = read_config(&path)?;
+        let value = &root[servers_key(&path)][&id];
+        if !value.is_object() {
+            return Err("Save this connection before signing in.".into());
+        }
+        parse_server_spec(&id, value, &scope)
+    };
+    validate(&server)?;
+    if server.transport != "http" {
+        return Err("Interactive authorization requires a Streamable HTTP connection.".into());
+    }
+    let binding = super::agent_profiles::bind_account(
+        &runtime.profiles_root(),
+        &agent,
+        profile_id.as_deref(),
+    )?;
+    let (_, executable) = runtime.policy()?.resolve(&agent)?;
+    let mut command = std::process::Command::new(executable);
+    command.env(
+        super::agent_profiles::env_var_for(&agent).ok_or("Unsupported account profile")?,
+        binding.directory,
+    );
+    let mut servers = serde_json::Map::new();
+    servers.insert(id.clone(), spec(&server, &agent));
+    if agent == "codex" {
+        for value in codex_overrides(&servers)? {
+            command.args(["-c", &value]);
+        }
+        command.args(["mcp", "login", &id]);
+    } else {
+        command.args([
+            "--mcp-config",
+            &json!({"mcpServers":servers}).to_string(),
+            "/mcp",
+        ]);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x00000010);
+        command
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("Could not open connection sign-in: {e}"))
+    }
+    #[cfg(not(windows))]
+    {
+        Err("Open your agent CLI's MCP sign-in flow in a terminal on this platform.".into())
     }
 }

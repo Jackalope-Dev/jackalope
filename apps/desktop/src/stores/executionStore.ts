@@ -16,6 +16,7 @@ export interface TaskDraft {
   agent: string;
   isolated: boolean;
   skills?: string[];
+  connectionIds?: string[];
 }
 export const emptyDraft: TaskDraft = { prompt: '', agent: '', isolated: true, skills: [] };
 interface ExecutionState {

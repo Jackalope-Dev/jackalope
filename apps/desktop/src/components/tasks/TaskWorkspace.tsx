@@ -31,6 +31,7 @@ import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
+import { useMcpStore } from '../../stores/mcpStore';
 import {
   agentAccountFor,
   isAgentAllowedForProject,
@@ -47,6 +48,7 @@ import { ProjectSetup } from './ProjectSetup';
 import { ProjectVerification } from './ProjectVerification';
 import { RunStatus } from './RunStatus';
 import { TaskCollection, type TaskCollectionView } from './TaskCollection';
+import { TaskImpact } from './TaskImpact';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
@@ -103,6 +105,11 @@ function ResultReview({ run }: { run: TaskRun }) {
           ) : (
             <p className="task-muted">No changed files found.</p>
           )}
+          <TaskImpact
+            key={`${run.id}:${JSON.stringify(review.files)}`}
+            run={run}
+            files={review.files}
+          />
           {review.diff && (
             <details className="mt-4">
               <summary className="task-summary">Read patch</summary>
@@ -489,6 +496,12 @@ export function TaskWorkspace({
   const runner = runners.find((r) => r.id === currentAgent);
   const desktop = isTauriEnvironment();
 
+  const projectConnections = useMcpStore((s) => s.servers).filter(
+    (s) => s.scope === `project:${project?.id}` && s.enabled !== false,
+  );
+  useEffect(() => {
+    if (project?.id) void useMcpStore.getState().loadServers(project.id);
+  }, [project?.id]);
   const detectedSkills = useMemo(() => detectSkillsFromPrompt(current.prompt), [current.prompt]);
   const activeSkills = current.skills ?? [];
   const assembled = useMemo(() => {
@@ -529,6 +542,7 @@ export function TaskWorkspace({
         agent: currentAgent,
         agentProfileId: agentAccountFor(project, currentAdapter),
         prompt: finalPrompt,
+        connectionIds: current.connectionIds,
         isolated: current.isolated,
       });
       draft(key, { prompt: '', skills: [] });
@@ -810,6 +824,38 @@ export function TaskWorkspace({
                 </Button>
               </div>
             </div>
+            {projectConnections.length > 0 && (
+              <details className="my-3">
+                <summary>
+                  Project tools for this task (
+                  {current.connectionIds?.length ?? projectConnections.length})
+                </summary>
+                <p className="task-muted">
+                  Applies to project connections only. Your agent's own configured tools remain
+                  available.
+                </p>
+                {projectConnections.map((server) => (
+                  <label key={server.id} className="flex items-center gap-3 min-h-11">
+                    <input
+                      type="checkbox"
+                      checked={(
+                        current.connectionIds ?? projectConnections.map((s) => s.id)
+                      ).includes(server.id)}
+                      onChange={(event) => {
+                        const selected =
+                          current.connectionIds ?? projectConnections.map((s) => s.id);
+                        draft(key, {
+                          connectionIds: event.target.checked
+                            ? [...selected, server.id]
+                            : selected.filter((id) => id !== server.id),
+                        });
+                      }}
+                    />
+                    {server.name}
+                  </label>
+                ))}
+              </details>
+            )}
             <p className="task-composer-note">
               {current.isolated
                 ? 'New branch from your latest commit. Uncommitted changes stay here.'

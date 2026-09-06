@@ -530,13 +530,15 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
             <p>
               {snapshot.files.filter((file) => file.analyzed).length} files syntax-analyzed.
               JavaScript / TypeScript: static imports, re-exports, literal import() and require().
-              Rust: file module declarations. Other languages appear in the file inventory.
+              Rust: file module declarations and crate/self/super use paths. Other languages appear
+              in the file inventory.
             </p>
             <p>
-              Relative imports use common source extensions and directory indexes. Package imports,
-              aliases, computed paths, Rust use statements, macros and custom module paths are not
-              resolved. A require() call may be shadowed. Conditional and type-only references are
-              included; this is a source map, not a runtime call graph.
+              Relative imports use common source extensions and directory indexes. Tsconfig aliases
+              and packages resolve when they point to scanned local files. Computed paths, inline
+              Rust modules, macros and custom module paths are not resolved. A require() call may be
+              shadowed. Conditional and type-only references are included; this is a source map, not
+              a runtime call graph.
             </p>
             <p>
               {snapshot.references.filter((ref) => ref.status === 'package or alias').length}{' '}

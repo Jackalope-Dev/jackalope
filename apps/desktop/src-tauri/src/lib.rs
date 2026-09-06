@@ -9,6 +9,7 @@ use commands::coordination::*;
 use commands::integration::*;
 use commands::mcp::*;
 use commands::reset::*;
+use commands::schedules::*;
 use commands::tasks::*;
 use commands::{git::*, pty::*, system::*};
 use state::AppState;
@@ -47,6 +48,9 @@ pub fn run() {
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
+            let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator.clone());
+            scheduler.launch();
+            app.manage(scheduler);
             app.manage(runtime);
             app.manage(coordinator);
             let mut window = tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?;
@@ -89,6 +93,10 @@ pub fn run() {
             pty_write,
             pty_resize,
             pty_kill,
+            schedule_list,
+            schedule_save,
+            schedule_remove,
+            schedule_set_enabled,
             task_runners,
             agent_save_policy,
             task_read_context,
@@ -115,6 +123,7 @@ pub fn run() {
             integration_apply,
             integration_plans,
             capacity_snapshot,
+            mcp_authenticate,
             mcp_list_servers,
             mcp_save_server,
             mcp_delete_server,
@@ -130,6 +139,8 @@ pub fn run() {
         .expect("error while building jackalope application")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+                app.state::<Scheduler>().shutdown();
+                commands::browser::close_all();
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
                 app.state::<AppState>().kill_all_pty_sessions();

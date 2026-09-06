@@ -58,6 +58,13 @@ export interface TaskRun {
   persistenceError: string | null;
   exitCode: number | null;
   usage: RunUsage;
+  usageObservations?: {
+    messageId: string;
+    parentToolUseId: string | null;
+    model: string | null;
+    input: number;
+    output: number;
+  }[];
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
   screenshots?: ScreenshotArtifact[];
@@ -92,6 +99,7 @@ export interface ScreenshotArtifact {
   timestamp: string;
 }
 export interface RunRequest {
+  connectionIds?: string[];
   model?: string;
   id: string;
   projectId: string;

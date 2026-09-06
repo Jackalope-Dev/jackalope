@@ -3,6 +3,7 @@ import { Check, Download, Key, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
@@ -19,6 +20,7 @@ export function McpInstallModal({
   onClose,
   defaultScope = 'global',
 }: McpInstallModalProps) {
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const dialogFocus = useDialogFocus();
   const { saveServer } = useMcpStore();
 
@@ -173,6 +175,9 @@ export function McpInstallModal({
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
+                  ...(activeProjectId
+                    ? [{ id: `project:${activeProjectId}`, label: 'This project' }]
+                    : []),
                   { id: 'global', label: 'Global' },
                   { id: 'claude', label: 'Claude Code' },
                   { id: 'codex', label: 'Codex' },

@@ -41,3 +41,15 @@ test('bounded graph always includes the selected file and handles unusual paths'
   assert.ok(unusual.nodes.every((node) => Number.isFinite(node.position.x)));
   assert.deepEqual(mapGraph({ references: [] }, [], true).nodes, []);
 });
+
+test('impact follows reverse dependencies transitively and stops at cycles', async () => {
+  const { affectedFiles } = await import('../src/lib/codebase-impact.ts');
+  const references = [
+    { source: 'b', target: 'a', status: 'resolved' },
+    { source: 'c', target: 'b', status: 'resolved' },
+    { source: 'b', target: 'c', status: 'resolved' },
+    { source: 'd', target: 'a', status: 'unsupported' },
+  ];
+  assert.deepEqual(affectedFiles({ references }, ['a']), ['b', 'c']);
+  assert.deepEqual(affectedFiles({ references }, ['missing']), []);
+});

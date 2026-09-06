@@ -64,32 +64,32 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
 const scenes = [
   {
     id: 'tasks',
-    label: 'Make room for ideas',
-    number: '01',
+    label: 'Tasks & ideas',
     image: 'tasks.png',
-    title: 'From a passing thought to a finished task.',
+    title: 'Keep ideas and active work together.',
     description:
-      'Capture an idea now. Start an agent when you’re ready. Keep the whole story together.',
+      'Save a thought for later or start an agent now. Switch between a list and a board as your project takes shape.',
+    features: ['Save ideas for later', 'List and board views', 'Follow each attempt'],
     alt: 'Jackalope Tasks board with ideas, an agent at work, a task ready for review, and finished work in the Atlas sample project.',
   },
   {
     id: 'review',
-    label: 'Stay in the loop',
-    number: '02',
+    label: 'Review & checks',
     image: 'review.png',
-    title: 'The work comes back to you.',
+    title: 'See the change before you accept it.',
     description:
       'Read the result, inspect the patch, and see the checks before deciding what comes next.',
+    features: ['Inspect the code patch', 'Run your project checks', 'Ask for another iteration'],
     alt: 'Jackalope task review showing the search code patch, changed file, and passed project verification in the Atlas sample project.',
   },
   {
     id: 'agents',
-    label: 'Bring your agents',
-    number: '03',
+    label: 'Coding agents',
     image: 'agents.png',
-    title: 'Familiar agents. A shared place to work.',
+    title: 'Choose who takes the next task.',
     description:
       'Choose Codex or Claude Code, keep your existing accounts, and give each task the right context.',
+    features: ['Use your existing sign-in', 'Choose an agent per task', 'See work in progress'],
     alt: 'The Jackalope Agents screen with locally configured Codex and Claude Code agents in the Atlas sample project.',
   },
 ];
@@ -129,6 +129,7 @@ export function App() {
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [scene, setScene] = useState('tasks');
+  const screenshot = (name: string) => asset(dark ? name : name.replace('.png', '-light.png'));
   const videoTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
     applyThemeTokens({ ...PRESET_THEMES[palette], isDark: dark, atmosphere: 18 });
@@ -146,7 +147,7 @@ export function App() {
             Jackalope
           </a>
           <nav className="desktop-nav" aria-label="Main navigation">
-            <a href="#workflow">The workspace</a>
+            <a href="#workflow">How it works</a>
             <a href="#atmosphere">Make it yours</a>
             <a href="#questions">Questions</a>
           </nav>
@@ -178,7 +179,7 @@ export function App() {
                   collisionPadding={16}
                 >
                   {[
-                    ['The workspace', '#workflow'],
+                    ['How it works', '#workflow'],
                     ['Make it yours', '#atmosphere'],
                     ['Questions', '#questions'],
                   ].map(([label, href]) => (
@@ -195,9 +196,6 @@ export function App() {
 
       <main id="main">
         <section className="hero page-width" aria-labelledby="hero-title">
-          <div className="eyebrow">
-            <span className="eyebrow-line" /> A LITTLE LESS JUGGLING. A LOT MORE MAKING.
-          </div>
           <h1 id="hero-title">
             Big ideas.
             <br />
@@ -246,7 +244,7 @@ export function App() {
                 aria-label="Play the Jackalope product walkthrough"
               >
                 <img
-                  src={asset('tasks.png')}
+                  src={screenshot('tasks.png')}
                   alt={scenes[0].alt}
                   width="1440"
                   height="840"
@@ -301,15 +299,43 @@ export function App() {
               </h2>
             </div>
             <p>
-              Good work needs space. Give every idea, agent, and change a place to land — without
-              losing sight of the bigger picture.
+              Start with your local Git project and a signed-in coding agent. Here’s how an idea
+              becomes work you can review.
             </p>
           </Reveal>
+          <ol className="getting-started" aria-label="How to use Jackalope">
+            <li>
+              <span className="step-number" aria-hidden="true">
+                01
+              </span>
+              <h3>Open your project.</h3>
+              <p>Choose a local Git repository. Keep its branch, guidelines, and context close.</p>
+            </li>
+            <li>
+              <span className="step-number" aria-hidden="true">
+                02
+              </span>
+              <h3>Give an agent a task.</h3>
+              <p>
+                Open <strong>New task</strong>, choose your agent, and describe the outcome. Use an
+                isolated worktree for room to experiment.
+              </p>
+            </li>
+            <li>
+              <span className="step-number" aria-hidden="true">
+                03
+              </span>
+              <h3>Review what comes back.</h3>
+              <p>
+                Read the result, inspect the patch, and run your checks. Ask for changes or decide
+                what to integrate.
+              </p>
+            </li>
+          </ol>
           <Tabs.Root value={scene} onValueChange={setScene} className="product-tour">
             <Tabs.List className="tour-tabs" aria-label="Explore the workspace">
               {scenes.map((item) => (
                 <Tabs.Trigger key={item.id} value={item.id}>
-                  <span>{item.number}</span>
                   {item.label}
                   <ArrowRight size={18} />
                 </Tabs.Trigger>
@@ -321,8 +347,16 @@ export function App() {
                   <h3>{item.title}</h3>
                   <p>{item.description}</p>
                 </div>
+                <ul className="feature-callouts" aria-label={`${item.label} features`}>
+                  {item.features.map((feature) => (
+                    <li key={feature}>
+                      <Check size={14} aria-hidden="true" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
                 <img
-                  src={asset(item.image)}
+                  src={screenshot(item.image)}
                   alt={item.alt}
                   width="1440"
                   height="840"
@@ -453,22 +487,21 @@ export function App() {
         <section className="details-row page-width" aria-label="Thoughtful by design">
           <div>
             <Layers3 size={22} />
-            <h3>Context stays close.</h3>
+            <h3>Your project instructions.</h3>
             <p>
-              Keep task intent, project guidelines, and connected tools near the work that needs
-              them.
+              Keep the original brief and repository guidelines beside the task that needs them.
             </p>
           </div>
           <div>
             <Monitor size={22} />
-            <h3>At home on your machine.</h3>
+            <h3>Your local repositories.</h3>
             <p>
               Work with your local repositories and coding agents, in a dedicated desktop workspace.
             </p>
           </div>
           <div>
             <GitBranch size={22} />
-            <h3>Every change has a story.</h3>
+            <h3>A history you can follow.</h3>
             <p>
               Follow an idea through its attempts, results, and review. Pick up with the context
               intact.
@@ -609,7 +642,7 @@ export function App() {
                 controls
                 playsInline
                 preload="metadata"
-                poster={asset('tasks.png')}
+                poster={screenshot('tasks.png')}
                 onError={() => setVideoError(true)}
               >
                 <source
@@ -622,13 +655,13 @@ export function App() {
                   src={asset('walkthrough.vtt')}
                   srcLang="en"
                   label="English descriptions"
-                  default
                 />
               </video>
             )}
             <p className="video-transcript">
-              The tour: explore the Tasks board, open a task to read its result and changes, then
-              meet the available coding agents. You stay in control of what happens next.
+              The tour: switch views, draft a task, inspect a code patch and its checks, meet your
+              agents, then try a different palette and appearance. Sample data illustrates the
+              workflow; no task is launched in this recording.
             </p>
           </Dialog.Content>
         </Dialog.Portal>

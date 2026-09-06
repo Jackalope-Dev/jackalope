@@ -3,6 +3,7 @@ import { Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { useMcpStore } from '../../stores/mcpStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
@@ -17,13 +18,16 @@ export function McpAddCustomModal({
   onClose,
   existingServer = null,
 }: McpAddCustomModalProps) {
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const dialogFocus = useDialogFocus();
   const { saveServer } = useMcpStore();
 
   const [id, setId] = useState(existingServer?.id || '');
   const [idEdited, setIdEdited] = useState(!!existingServer);
   const [name, setName] = useState(existingServer?.name || '');
-  const [scope, setScope] = useState(existingServer?.scope || 'global');
+  const [scope, setScope] = useState(
+    existingServer?.scope || (activeProjectId ? `project:${activeProjectId}` : 'global'),
+  );
   const [transport, setTransport] = useState<'stdio' | 'http' | 'sse'>(
     existingServer?.transport === 'sse'
       ? 'sse'
@@ -43,6 +47,9 @@ export function McpAddCustomModal({
           value,
         }))
       : [],
+  );
+  const [tokenVariable, setTokenVariable] = useState(
+    String(existingServer?.extra?.bearer_token_env_var ?? ''),
   );
   const [extraJson, setExtraJson] = useState(JSON.stringify(existingServer?.extra ?? {}, null, 2));
   const [busy, setBusy] = useState(false);
@@ -84,9 +91,13 @@ export function McpAddCustomModal({
       if (!extra || typeof extra !== 'object' || Array.isArray(extra))
         throw new Error('Advanced connection fields must be a JSON object.');
 
+      delete (extra as Record<string, unknown>).bearer_token_env_var;
       const config: McpServerConfig = {
         id: existingServer?.id ?? id.trim(),
-        extra: extra as Record<string, unknown>,
+        extra: {
+          ...(extra as Record<string, unknown>),
+          ...(tokenVariable.trim() ? { bearer_token_env_var: tokenVariable.trim() } : {}),
+        },
         name: name.trim(),
         scope,
         transport,
@@ -126,7 +137,8 @@ export function McpAddCustomModal({
 
           <p className="task-muted mb-3">
             Global writes to Codex, Claude Code and Grok user configurations. Per-agent edits affect
-            only the selected client. Existing sessions need a restart.
+            only the selected client. Project scope is passed to new tasks without changing agent
+            settings. Existing sessions need a restart.
           </p>
           <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             {/* Scope */}
@@ -136,6 +148,9 @@ export function McpAddCustomModal({
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
+                  ...(activeProjectId
+                    ? [{ id: `project:${activeProjectId}`, label: 'This project' }]
+                    : []),
                   { id: 'global', label: 'Global' },
                   { id: 'claude', label: 'Claude Code' },
                   { id: 'codex', label: 'Codex' },
@@ -254,42 +269,56 @@ export function McpAddCustomModal({
               </div>
             </div>
 
+            {transport !== 'stdio' && (
+              <label className="block">
+                Bearer token environment variable
+                <input
+                  className="task-input w-full"
+                  value={tokenVariable}
+                  onChange={(event) => setTokenVariable(event.target.value)}
+                  placeholder="MY_SERVICE_TOKEN"
+                  pattern="[A-Za-z_][A-Za-z0-9_]*"
+                />
+                <span className="task-muted">
+                  Store the token in the desktop process environment. Only its variable name is
+                  saved here. For OAuth, save the connection and choose Sign in.
+                </span>
+              </label>
+            )}
             {transport === 'stdio' ? (
-              <>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-1">
-                    <label
-                      className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
-                      htmlFor="McpAddCustomModal-field-3"
-                    >
-                      Command
-                    </label>
-                    <input
-                      id="McpAddCustomModal-field-3"
-                      className="task-input w-full font-mono text-xs"
-                      placeholder="e.g. npx, uvx, node"
-                      value={command}
-                      onChange={(e) => setCommand(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label
-                      className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
-                      htmlFor="McpAddCustomModal-field-4"
-                    >
-                      Arguments (JSON array)
-                    </label>
-                    <input
-                      id="McpAddCustomModal-field-4"
-                      className="task-input w-full font-mono text-xs"
-                      placeholder="-y @modelcontextprotocol/server-postgres"
-                      value={argsStr}
-                      onChange={(e) => setArgsStr(e.target.value)}
-                    />
-                  </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-1">
+                  <label
+                    className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                    htmlFor="McpAddCustomModal-field-3"
+                  >
+                    Command
+                  </label>
+                  <input
+                    id="McpAddCustomModal-field-3"
+                    className="task-input w-full font-mono text-xs"
+                    placeholder="e.g. npx, uvx, node"
+                    value={command}
+                    onChange={(e) => setCommand(e.target.value)}
+                    required
+                  />
                 </div>
-              </>
+                <div className="col-span-2">
+                  <label
+                    className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1"
+                    htmlFor="McpAddCustomModal-field-4"
+                  >
+                    Arguments (JSON array)
+                  </label>
+                  <input
+                    id="McpAddCustomModal-field-4"
+                    className="task-input w-full font-mono text-xs"
+                    placeholder="-y @modelcontextprotocol/server-postgres"
+                    value={argsStr}
+                    onChange={(e) => setArgsStr(e.target.value)}
+                  />
+                </div>
+              </div>
             ) : (
               <div>
                 <label

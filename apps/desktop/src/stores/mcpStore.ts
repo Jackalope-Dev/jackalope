@@ -7,6 +7,7 @@ import {
   probeMcpServer,
   saveMcpServer,
 } from '../lib/tauri-bridge.ts';
+import { useProjectStore } from './projectStore.ts';
 import { useSettingsStore } from './settingsStore.ts';
 
 export interface AllMcpsServer {
@@ -92,7 +93,7 @@ interface McpState {
   inspectError: string | null;
   loadingMarkdown: boolean;
 
-  loadServers: () => Promise<void>;
+  loadServers: (projectId?: string | null) => Promise<void>;
   saveServer: (server: McpServerConfig) => Promise<void>;
   deleteServer: (id: string, scope: string) => Promise<void>;
   probeServer: (server: McpServerConfig) => Promise<void>;
@@ -123,10 +124,11 @@ export const useMcpStore = create<McpState>((set, get) => ({
   inspectError: null,
   loadingMarkdown: false,
 
-  loadServers: async () => {
+  loadServers: async (projectId = useProjectStore.getState().activeProjectId) => {
     set({ loadingServers: true, serversError: null });
     try {
-      const servers = await listMcpServers();
+      const servers = await listMcpServers(projectId ?? undefined);
+      if (projectId !== useProjectStore.getState().activeProjectId) return;
       set({ servers, loadingServers: false });
     } catch (e) {
       set({

@@ -26,6 +26,16 @@ pub struct Usage {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct UsageObservation {
+    pub message_id: String,
+    pub parent_tool_use_id: Option<String>,
+    pub model: Option<String>,
+    pub input: u64,
+    pub output: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     pub id: String,
     pub task_id: String,
@@ -37,6 +47,8 @@ pub struct TaskRun {
     pub base_head: String,
     pub agent: String,
     pub account: String,
+    #[serde(default)]
+    pub connection_ids: Option<Vec<String>>,
     #[serde(default)]
     pub account_binding: Option<super::agent_profiles::AccountBinding>,
     #[serde(default)]
@@ -64,6 +76,8 @@ pub struct TaskRun {
     pub exit_code: Option<i32>,
     pub usage: Usage,
     #[serde(default)]
+    pub usage_observations: Vec<UsageObservation>,
+    #[serde(default)]
     pub prompts: Vec<super::harness::PendingUserPrompt>,
     #[serde(default)]
     pub validation_steps: Vec<super::harness::ValidationStep>,
@@ -71,7 +85,7 @@ pub struct TaskRun {
     pub screenshots: Vec<super::harness::ScreenshotArtifact>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRequest {
     pub model: Option<String>,
@@ -94,6 +108,8 @@ pub struct RunRequest {
     pub prompt: String,
     pub isolated: bool,
     pub previous_run_id: Option<String>,
+    #[serde(default)]
+    pub connection_ids: Option<Vec<String>>,
     #[serde(skip)]
     pub coordination: Option<CoordinationContext>,
 }
@@ -635,13 +651,27 @@ impl TaskRuntime {
         if let Some(model) = &selected_model {
             cmd.args(["--model", model]);
         }
+        let mut project_mcp =
+            super::mcp::project_servers(&req.project_id, req.connection_ids.as_deref(), &adapter)?;
+        if adapter == "codex" {
+            for value in super::mcp::codex_overrides(&project_mcp)? {
+                cmd.args(["-c", &value]);
+            }
+        }
+        if adapter == "claude" && req.coordination.is_none() && !project_mcp.is_empty() {
+            cmd.args([
+                "--mcp-config",
+                &serde_json::json!({"mcpServers":project_mcp}).to_string(),
+            ]);
+        }
         let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. If you need clarification or a denied permission, explain what is needed and stop so the user can reply.\n", req.prompt);
         if let Some(context) = &req.coordination {
             cmd.env("JACKALOPE_BRIDGE_URL", &context.endpoint)
                 .env("JACKALOPE_BRIDGE_TOKEN", &context.token);
             input.push_str(&context.instructions);
             if adapter == "claude" {
-                let config = serde_json::json!({"mcpServers":{"jackalope":{"type":"http","url":format!("{}/mcp", context.endpoint),"headers":{"Authorization":"Bearer ${JACKALOPE_BRIDGE_TOKEN}"}}}});
+                project_mcp.insert("jackalope".into(), serde_json::json!({"type":"http","url":format!("{}/mcp", context.endpoint),"headers":{"Authorization":"Bearer ${JACKALOPE_BRIDGE_TOKEN}"}}));
+                let config = serde_json::json!({"mcpServers":project_mcp});
                 cmd.args([
                     "--mcp-config",
                     &config.to_string(),
@@ -802,6 +832,37 @@ fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str) {
         return;
     };
     let kind = event["type"].as_str().unwrap_or("");
+    let child = event["parent_tool_use_id"].as_str();
+    if adapter == "claude" && event["type"] == "assistant" {
+        let message = &event["message"];
+        let usage = &message["usage"];
+        if let Some(id) = message["id"].as_str().filter(|id| id.len() <= 200) {
+            if usage["input_tokens"].is_u64() && usage["output_tokens"].is_u64() {
+                let observation = UsageObservation {
+                    message_id: id.to_string(),
+                    parent_tool_use_id: child.map(str::to_string),
+                    model: message["model"].as_str().map(str::to_string),
+                    input: num(usage, "input_tokens")
+                        .saturating_add(num(usage, "cache_read_input_tokens"))
+                        .saturating_add(num(usage, "cache_creation_input_tokens")),
+                    output: num(usage, "output_tokens"),
+                };
+                if let Some(old) = run
+                    .usage_observations
+                    .iter_mut()
+                    .find(|o| o.message_id == id)
+                {
+                    *old = observation;
+                } else if run.usage_observations.len() < 2000 {
+                    run.usage_observations.push(observation);
+                }
+            }
+        }
+    }
+    if child.is_some() {
+        return;
+    }
+
     if let Some(id) = event["thread_id"].as_str().or(event["session_id"].as_str()) {
         run.session_id = Some(id.into());
     }
@@ -1394,6 +1455,7 @@ impl TaskRuntime {
             request.account_binding = Some(binding.clone());
             if let Some(old) = &previous {
                 request.verify_command = old.verify_command.clone();
+                request.connection_ids = old.connection_ids.clone();
             }
             let run = TaskRun {
                 id: request.id.clone(),
@@ -1408,6 +1470,7 @@ impl TaskRuntime {
                 base_head: String::new(),
                 agent: request.agent.clone(),
                 account: binding.label.clone(),
+                connection_ids: request.connection_ids.clone(),
                 account_binding: Some(binding),
                 target_branch: request.target_branch.clone(),
                 process_contained: false,
@@ -1427,6 +1490,7 @@ impl TaskRuntime {
                 persistence_error: None,
                 exit_code: None,
                 usage: Usage::default(),
+                usage_observations: vec![],
                 prompts: vec![],
                 validation_steps: vec![],
                 screenshots: vec![],
@@ -1445,6 +1509,7 @@ impl TaskRuntime {
                 }
                 runtime.fail(&request.id, error);
             }
+            super::browser::close(&request.id);
         });
         Ok(id)
     }
@@ -1534,6 +1599,7 @@ mod tests {
             verify_command: None,
             verification: None,
             account: "test".into(),
+            connection_ids: None,
             model: None,
             prompt: "Example".into(),
             status: "running".into(),
@@ -1548,6 +1614,7 @@ mod tests {
             persistence_error: None,
             exit_code: None,
             usage: Usage::default(),
+            usage_observations: vec![],
             prompts: vec![],
             validation_steps: vec![],
             screenshots: vec![],
@@ -1593,6 +1660,25 @@ mod tests {
         assert_eq!(stored.prompts[0].status, "answered");
         drop(runtime);
         let _ = std::fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn child_usage_is_deduplicated_without_overwriting_parent_result_or_totals() {
+        let mut run = sample("claude");
+        run.result = "Parent result".into();
+        run.model = Some("parent-model".into());
+        let event = r#"{"type":"assistant","parent_tool_use_id":"child-1","message":{"id":"message-1","model":"child-model","usage":{"input_tokens":10,"cache_read_input_tokens":5,"output_tokens":3}}}"#;
+        consume_event(&mut run, event);
+        consume_event(&mut run, event);
+        consume_event(
+            &mut run,
+            r#"{"type":"result","parent_tool_use_id":"child-1","result":"Child result","usage":{"input_tokens":10,"output_tokens":3}}"#,
+        );
+        assert_eq!(run.usage_observations.len(), 1);
+        assert_eq!(run.usage_observations[0].input, 15);
+        assert_eq!(run.result, "Parent result");
+        assert_eq!(run.model.as_deref(), Some("parent-model"));
+        assert!(!run.usage.reported);
     }
 
     #[test]
@@ -1684,6 +1770,7 @@ mod tests {
             isolated: false,
             previous_run_id: None,
             coordination: None,
+            connection_ids: None,
         };
         runtime.start(request.clone()).unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(10);

@@ -85,10 +85,12 @@ fn remove_entry(path: &Path) -> Result<(), String> {
 pub async fn app_reset(
     confirmation: String,
     app: tauri::AppHandle,
+    scheduler: State<'_, super::schedules::Scheduler>,
     coordinator: State<'_, Coordinator>,
     runtime: State<'_, TaskRuntime>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    scheduler.ensure_paused()?;
     if confirmation != "RESET" {
         return Err("Type RESET to confirm.".into());
     }

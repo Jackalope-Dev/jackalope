@@ -668,3 +668,20 @@ button:disabled {
     animation: none;
   }
 }
+
+.workspace-subnavigation {
+  display: flex;
+  gap: 4px;
+  padding: 8px 24px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+.workspace-subnavigation [aria-current="page"] {
+  color: var(--color-accent-ink);
+  background: var(--color-accent-subtle);
+}
+.workspace-page {
+  padding: 32px;
+  max-width: 1200px;
+  margin-inline: auto;
+}

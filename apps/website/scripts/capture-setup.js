@@ -324,7 +324,4 @@ async function _captureSetup(page) {
   });
   await page.setViewportSize({ width: 1440, height: 840 });
   await page.reload();
-  await page.addStyleTag({
-    content: '*,*::before,*::after {transition:none !important;animation:none !important;}',
-  });
 }

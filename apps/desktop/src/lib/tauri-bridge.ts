@@ -184,10 +184,10 @@ export interface McpProbeResult {
   error?: string;
 }
 
-export async function listMcpServers(): Promise<McpServerConfig[]> {
+export async function listMcpServers(projectId?: string): Promise<McpServerConfig[]> {
   if (isTauriEnvironment()) {
     const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<McpServerConfig[]>('mcp_list_servers');
+    return invoke<McpServerConfig[]>('mcp_list_servers', { projectId });
   }
   throw new Error('Open the desktop app to read MCP connections.');
 }
