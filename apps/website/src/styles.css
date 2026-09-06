@@ -179,6 +179,59 @@ h3 {
   background: var(--color-accent-hover);
   box-shadow: 0 6px 20px var(--color-accent-subtle);
 }
+.button-download {
+  --download-fill: color-mix(in srgb, var(--color-text-primary) 96%, var(--color-accent));
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid transparent;
+  color: var(--color-surface-elevated);
+  background:
+    linear-gradient(var(--download-fill), var(--download-fill)) padding-box,
+    var(--color-spectrum) border-box;
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--color-text-primary) 12%, transparent),
+    0 8px 24px -8px var(--color-accent-glow),
+    inset 0 1px 0 color-mix(in srgb, var(--color-surface-elevated) 16%, transparent);
+}
+.button-download > * {
+  position: relative;
+  z-index: 1;
+}
+.button-download::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    110deg,
+    transparent 25%,
+    color-mix(in srgb, var(--color-surface-elevated) 14%, transparent) 48%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+}
+.button-download:hover,
+.button-download:focus-visible {
+  background:
+    linear-gradient(var(--download-fill), var(--download-fill)) padding-box,
+    var(--color-spectrum) border-box;
+  box-shadow:
+    0 3px 6px color-mix(in srgb, var(--color-text-primary) 16%, transparent),
+    0 12px 30px -7px var(--color-accent-glow),
+    inset 0 1px 0 color-mix(in srgb, var(--color-surface-elevated) 24%, transparent);
+}
+.button-download:is(:hover, :focus-visible)::before {
+  animation: download-sheen 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.button-download:active {
+  transform: translateY(0);
+}
+@keyframes download-sheen {
+  to {
+    transform: translateX(120%);
+  }
+}
 .button-compact {
   min-height: 44px;
   padding: 11px 17px;
@@ -855,6 +908,15 @@ h1 span {
   font-size: 11px;
   color: var(--color-text-muted);
 }
+.site-footer > p a {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 3px;
+}
+.site-footer > p a:hover {
+  text-decoration-color: currentColor;
+}
 .site-footer .text-link {
   font-size: 10px;
 }
@@ -1251,6 +1313,12 @@ h1 span {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .button-download:is(:hover, :focus-visible)::before {
+    animation: none;
+  }
+  .button-download:hover {
+    transform: none;
+  }
   html {
     scroll-behavior: auto;
   }

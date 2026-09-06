@@ -532,21 +532,27 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
         parsers.insert(key, parser);
     }
     let resolver_limited = std::sync::Arc::new(AtomicBool::new(false));
+    let resolver_options = oxc_resolver::ResolveOptions {
+        cwd: Some(root.clone()),
+        tsconfig: Some(oxc_resolver::TsconfigDiscovery::Auto),
+        extensions: [
+            ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".json",
+        ]
+        .map(str::to_string)
+        .to_vec(),
+        condition_names: vec!["import".into(), "default".into()],
+        main_fields: vec!["module".into(), "main".into()],
+        ..Default::default()
+    };
     let js_resolver = oxc_resolver::ResolverGeneric::new_with_file_system(
         super::resolver_fs::ResolverFs::for_root(root.clone(), resolver_limited.clone()),
-        oxc_resolver::ResolveOptions {
-            cwd: Some(root.clone()),
-            tsconfig: Some(oxc_resolver::TsconfigDiscovery::Auto),
-            extensions: [
-                ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".json",
-            ]
-            .map(str::to_string)
-            .to_vec(),
-            condition_names: vec!["import".into(), "default".into()],
-            main_fields: vec!["module".into(), "main".into()],
-            ..Default::default()
-        },
+        resolver_options.clone(),
     );
+    let require_resolver = js_resolver.clone_with_options(oxc_resolver::ResolveOptions {
+        condition_names: vec!["require".into(), "default".into()],
+        main_fields: vec!["main".into()],
+        ..resolver_options
+    });
     let mut total_bytes = 0;
     for file in &mut result.files {
         let key = match file.language.as_str() {
@@ -594,8 +600,13 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
                 for reference in &mut refs {
                     resolve(reference, &paths);
                     if key != "rs" && reference.status == "package or alias" {
-                        let resolution_result = js_resolver
-                            .resolve_file(dunce::simplified(&full), &reference.specifier);
+                        let resolver = if reference.kind == "require" {
+                            &require_resolver
+                        } else {
+                            &js_resolver
+                        };
+                        let resolution_result =
+                            resolver.resolve_file(dunce::simplified(&full), &reference.specifier);
                         if let Ok(resolution) = resolution_result {
                             if let Ok(canonical) = resolution.path().canonicalize() {
                                 if let Ok(relative) = canonical.strip_prefix(&root) {
@@ -831,6 +842,38 @@ mod tests {
                 .filter(|r| r.kind == "use module" && r.status == "resolved")
                 .count(),
             3,
+            "{:?}",
+            snapshot.references
+        );
+    }
+
+    #[test]
+    fn package_exports_follow_import_and_require_conditions() {
+        let f = Fixture::new();
+        f.write(
+            "package.json",
+            r#"{"name":"fixture","exports":{".":{"import":"./esm.ts","require":"./cjs.ts"}}}"#,
+        );
+        f.write(
+            "entry.ts",
+            "import x from 'fixture'; const y = require('fixture');",
+        );
+        f.write("esm.ts", "export default 1;");
+        f.write("cjs.ts", "module.exports = 1;");
+        let snapshot = scan(&f.0).unwrap();
+        assert!(
+            snapshot
+                .references
+                .iter()
+                .any(|r| r.kind == "import" && r.target.as_deref() == Some("esm.ts")),
+            "{:?}",
+            snapshot.references
+        );
+        assert!(
+            snapshot
+                .references
+                .iter()
+                .any(|r| r.kind == "require" && r.target.as_deref() == Some("cjs.ts")),
             "{:?}",
             snapshot.references
         );

@@ -54,8 +54,11 @@ function Reveal({ children, className = '' }: { children: ReactNode; className?:
 
 function DownloadButton({ compact = false }: { compact?: boolean }) {
   return (
-    <a className={`button button-primary ${compact ? 'button-compact' : ''}`} href="#download">
-      {compact ? 'Get Jackalope' : 'Get Jackalope for Windows'}
+    <a
+      className={`button button-primary button-download ${compact ? 'button-compact' : ''}`}
+      href="#download"
+    >
+      <span>{compact ? 'Get Jackalope' : 'Get Jackalope for Windows'}</span>
       <ArrowDownToLine size={16} />
     </a>
   );
@@ -544,14 +547,14 @@ export function App() {
             </h2>
             <p>A little structure. A lot of possibility. That’s Jackalope.</p>
             {downloadUrl ? (
-              <a className="button button-primary" href={downloadUrl}>
+              <a className="button button-primary button-download" href={downloadUrl}>
                 <ArrowDownToLine size={18} />
-                Download for Windows
+                <span>Download for Windows</span>
               </a>
             ) : (
               <Dialog.Root>
-                <Dialog.Trigger className="button button-primary">
-                  Windows download status
+                <Dialog.Trigger className="button button-primary button-download">
+                  <span>Windows download status</span>
                   <ArrowRight size={17} />
                 </Dialog.Trigger>
                 <Dialog.Portal>
@@ -595,7 +598,9 @@ export function App() {
           <BrandMark />
           Jackalope
         </a>
-        <p>A thoughtful place to make things.</p>
+        <p>
+          A product of <a href="https://jackalope.digital">Jackalope Digital LLC</a>.
+        </p>
         <a className="text-link" href="#main">
           Back to the top <ArrowRight size={15} className="back-arrow" />
         </a>
