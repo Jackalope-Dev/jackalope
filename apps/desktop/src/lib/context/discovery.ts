@@ -23,7 +23,7 @@ export function parseMarkdownTasks(content: string, filename: string): OpenTaskI
 
     // Matches `- [ ] Task title` or `* [ ] Task title`
     const openMatch = line.match(/^[-*]\s+\[\s\]\s+(.+)$/);
-    if (openMatch && openMatch[1]) {
+    if (openMatch?.[1]) {
       tasks.push({
         id: `${filename}-${i}`,
         title: openMatch[1].replace(/\*\*/g, '').trim(),
@@ -35,7 +35,7 @@ export function parseMarkdownTasks(content: string, filename: string): OpenTaskI
 
     // Matches `- [x] Task title` or `* [x] Task title`
     const doneMatch = line.match(/^[-*]\s+\[[xX]\]\s+(.+)$/);
-    if (doneMatch && doneMatch[1]) {
+    if (doneMatch?.[1]) {
       tasks.push({
         id: `${filename}-${i}`,
         title: doneMatch[1].replace(/\*\*/g, '').trim(),
@@ -81,7 +81,7 @@ export function parseRoadmapItems(content: string): string[] {
     for (const line of lines) {
       const trimmed = line.trim();
       const numMatch = trimmed.match(/^\d+\.\s+(.+)$/);
-      if (numMatch && numMatch[1] && items.length < 8) {
+      if (numMatch?.[1] && items.length < 8) {
         items.push(numMatch[1].replace(/\*\*/g, '').trim());
       }
     }

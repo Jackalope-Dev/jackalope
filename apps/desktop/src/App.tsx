@@ -1,9 +1,9 @@
+import { startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Shell } from './components/layout/Shell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { nativeTask } from './lib/task-runtime';
-import { startThemeClock } from './lib/theme-engine';
 import { observeExecution } from './stores/executionStore';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { useProjectStore } from './stores/projectStore';

@@ -14,7 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { AuditCategory, AuditSeverity } from '../../lib/orchestration/types';
+import type { AuditCategory, AuditSeverity } from '../../lib/audit';
 import { useAuditStore } from '../../stores/auditStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -81,7 +81,6 @@ export function AuditLogWorkspace() {
         return <AlertTriangle size={14} className="text-[var(--color-warning)]" />;
       case 'discovery':
         return <Sparkles size={14} className="text-[var(--color-accent-ink)]" />;
-      case 'execution':
       default:
         return <Cpu size={14} className="text-[var(--color-success)]" />;
     }
@@ -107,7 +106,6 @@ export function AuditLogWorkspace() {
             <CheckCircle2 size={10} /> Success
           </span>
         );
-      case 'info':
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-500/15 text-[var(--color-accent-ink)] dark:text-[var(--color-accent-ink)] border border-sky-500/30">

@@ -1,7 +1,9 @@
 # Jackalope service
 
 Cloudflare Worker with D1 telemetry/feedback storage and a private R2 release
-bucket. Local implementation only; the owner handles deployment. Follow
+bucket. Public defaults run locally; deployment uses an explicit private
+`wrangler.deploy.jsonc` copied from `wrangler.jsonc`, with your account and resource
+identifiers. Pass `--config wrangler.deploy.jsonc` for remote operations. Follow
 [SERVER-LAUNCH.md](../../docs/SERVER-LAUNCH.md) for infrastructure, publication,
 monitoring, retention, recovery and the remaining desktop integration gates.
 

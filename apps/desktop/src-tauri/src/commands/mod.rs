@@ -28,3 +28,5 @@ pub mod schedules;
 pub mod browser;
 
 mod resolver_fs;
+
+mod git_command;

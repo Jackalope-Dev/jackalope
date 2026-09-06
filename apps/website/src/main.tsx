@@ -1,10 +1,10 @@
+import { applyThemeTokens, PRESET_THEMES } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { StrictMode } from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
-import { applyThemeTokens, PRESET_THEMES } from '../../desktop/src/lib/theme-engine';
 import { App } from './App';
 import { normalizePath } from './content';
-import '@fontsource-variable/plus-jakarta-sans/wght.css';
+import '@jackalope/brand/fonts.css';
 import './styles.css';
 
 applyThemeTokens({ ...PRESET_THEMES[0], isDark: false, atmosphere: 18 });

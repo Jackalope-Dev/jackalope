@@ -28,7 +28,9 @@ impl Client {
             .stderr(Stdio::null())
             .kill_on_drop(true);
         if let Some(env_name) = super::super::agent_profiles::env_var_for(agent) {
-            if let Some(dir) = super::super::agent_profiles::active_profile_dir(profiles_root, agent) {
+            if let Some(dir) =
+                super::super::agent_profiles::active_profile_dir(profiles_root, agent)
+            {
                 command.env(env_name, dir);
             }
         }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { discoverCodebaseContext } from '../lib/orchestration/codebase-discovery';
-import type { DiscoveredCodebaseMemory } from '../lib/orchestration/types';
+import { discoverCodebaseContext } from '../lib/context/discovery';
+import type { DiscoveredCodebaseMemory } from '../lib/context/types';
 import { useAuditStore } from './auditStore';
 import { useMascotStore } from './mascotStore';
 

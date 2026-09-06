@@ -1,7 +1,7 @@
+import { characterPaths as paths } from '@jackalope/brand/character';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useId, useState } from 'react';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
-import { characterPaths as paths } from './character-paths';
 
 interface JackalopeMascotProps {
   size?: 'sm' | 'md' | 'lg';

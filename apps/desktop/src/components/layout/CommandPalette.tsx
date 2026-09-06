@@ -1,7 +1,7 @@
+import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Search, Settings2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { PRESET_THEMES } from '../../lib/theme-engine';
 import { useThemeStore } from '../../stores/themeStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 

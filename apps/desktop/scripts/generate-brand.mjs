@@ -1,5 +1,5 @@
 import { copyFileSync, writeFileSync } from 'node:fs';
-import { characterPaths as paths } from '../src/components/mascot/character-paths.ts';
+import { characterPaths as paths } from '@jackalope/brand/character';
 
 if (process.argv.includes('--copy-icon')) {
   copyFileSync(

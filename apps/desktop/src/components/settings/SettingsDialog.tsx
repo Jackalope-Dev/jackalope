@@ -13,13 +13,13 @@ import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { navigateWorkspace } from '../layout/navigation';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
-import { DeviceMesh } from '../mesh/DeviceMesh';
 import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ReleaseSupport } from './ReleaseSupport';
 import { Setting } from './Setting';
+import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 
@@ -296,7 +296,7 @@ export function SettingsDialog({
                       Open project context
                     </Button>
                   )}
-                  {c === 'System' && <DeviceMesh />}
+                  {c === 'System' && <SystemInfoView />}
                   {c === 'Diagnostics' && <AuditLogWorkspace />}
                   {c === 'Updates & support' && <ReleaseSupport />}
                   {c === 'Data & reset' && (

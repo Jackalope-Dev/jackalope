@@ -92,9 +92,29 @@ async function limit(request: Request, env: Env, feedback: boolean) {
 }
 async function release(request: Request, env: Env, path: string): Promise<Response> {
   if (!['GET', 'HEAD'].includes(request.method)) throw new ApiError(405, 'method_not_allowed');
-  const key = path.slice('/updates/'.length);
+  let key = path.slice('/updates/'.length);
+  const mutable = !key.startsWith('releases/');
+  const alias = /^(stable|beta)\/(releases\.json|feed\.xml)$/.exec(key);
+  if (alias) {
+    const pointer = await env.RELEASES.get(`${alias[1]}/latest.json`);
+    if (!pointer) throw new ApiError(404, 'not_found');
+    if (pointer.size > 65536) {
+      await pointer.body.cancel();
+      throw new ApiError(503, 'invalid_release');
+    }
+    const metadata = await pointer.json<{ catalog?: string }>();
+    const match = /^releases\/(beta\/)?v(\d+\.\d+\.\d+)\/catalog\.json$/.exec(
+      metadata.catalog ?? '',
+    );
+    if (!match || Boolean(match[1]) !== (alias[1] === 'beta'))
+      throw new ApiError(503, 'invalid_release');
+    key =
+      alias[2] === 'releases.json'
+        ? (metadata.catalog as string)
+        : (metadata.catalog as string).replace('catalog.json', 'feed.xml');
+  }
   if (
-    !/^(?:stable\/latest\.json|releases\/v\d+\.\d+\.\d+\/(?:Jackalope_\d+\.\d+\.\d+_x64(?:-setup\.exe|_en-US\.msi)(?:\.sig)?|checksums\.json))$/.test(
+    !/^(?:(?:stable|beta)\/latest\.json|releases\/(?:beta\/)?v(\d+\.\d+\.\d+)\/(?:Jackalope_\1_x64(?:-setup\.exe|_en-US\.msi)(?:\.sig)?|checksums\.json|latest\.json|catalog\.json|feed\.xml))$/.test(
       key,
     )
   )
@@ -103,17 +123,19 @@ async function release(request: Request, env: Env, path: string): Promise<Respon
   if (!object) throw new ApiError(404, 'not_found');
   const headers = new Headers({
     etag: object.httpEtag,
+    'access-control-allow-origin': '*',
     'x-content-type-options': 'nosniff',
-    'cache-control':
-      key === 'stable/latest.json'
-        ? 'public, max-age=60, must-revalidate'
-        : 'public, max-age=31536000, immutable',
+    'cache-control': mutable
+      ? 'public, max-age=60, must-revalidate'
+      : 'public, max-age=31536000, immutable',
     'content-length': String(object.size),
-    'content-type': key.endsWith('.json')
-      ? 'application/json'
-      : key.endsWith('.sig')
-        ? 'text/plain'
-        : 'application/octet-stream',
+    'content-type': key.endsWith('.xml')
+      ? 'application/rss+xml; charset=utf-8'
+      : key.endsWith('.json')
+        ? 'application/json'
+        : key.endsWith('.sig')
+          ? 'text/plain'
+          : 'application/octet-stream',
   });
   if (request.headers.get('if-none-match') === object.httpEtag) {
     await object.body.cancel();
@@ -174,6 +196,11 @@ export default {
       if (status >= 500 && !(error instanceof ApiError))
         console.log(JSON.stringify({ event: 'service_error', code }));
       const response = json({ error: code }, status);
+      if (
+        new URL(request.url).pathname.startsWith('/updates/') &&
+        ['GET', 'HEAD'].includes(request.method)
+      )
+        response.headers.set('access-control-allow-origin', '*');
       if (status === 429 || status === 503)
         response.headers.set('retry-after', status === 429 ? '60' : '300');
       return response;

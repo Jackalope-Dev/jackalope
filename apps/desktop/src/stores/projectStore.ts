@@ -5,9 +5,8 @@ import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-
 export interface ProjectPreferences {
   preferredRunner?: string;
   /**
-   * Restricts which agents this project's tasks may use. Undefined or empty
-   * means every app-enabled agent is allowed (unrestricted, the default).
-   * When set, only listed agent ids may be selected for this project.
+   * Undefined allows every app-enabled agent. An explicit list restricts tasks
+   * to those agent IDs; an empty list blocks launches.
    */
   allowedAgents?: string[];
   /**

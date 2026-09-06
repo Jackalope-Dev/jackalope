@@ -1,81 +1,72 @@
 # Jackalope
 
-Jackalope is a desktop operator for projects and tasks across user-selected
-agents, accounts and machines. It is being built with Tauri/Rust and React,
-with a focused workspace, personal color themes and an animated jackalope companion.
+Jackalope brings coding agents, tasks, Git worktrees and review into one desktop
+workspace. Use your installed agent CLIs and existing sign-ins, keep changes
+isolated, and review the result before integrating it.
 
-**Current stage: early native task workflow.** Real Codex, Claude Code and Grok
-tasks now run with isolated workspaces, persistent history, review and reported
-usage. Broader orchestration is still under development. The [product audit](docs/PRODUCT-AUDIT.md) documents known gaps.
-The [vision](docs/VISION.md) and [roadmap](docs/ROADMAP.md) describe intended scope.
+**Prerelease.** Windows is the current native release target. Signed update,
+clean-profile and external beta acceptance remain in progress; see the
+[current status](docs/STATUS.md) and [release gates](docs/RELEASE.md).
 
-## Available today
+## What works today
 
-- Shared vector branding, animated companion, theme color field and atmosphere.
-- Live theme preview with cancel/save, keyboard controls and component lab.
-- Real project setup, intent-first task entry and persistent task attempts.
-- Codex/Claude Code/Grok launch, stop and supported session continuation.
-- Overall/project Usage with reported tokens, coverage and JSON export.
-- Workspace navigation and preserved planning-board records.
-- Native Git worktree list/create and basic process/PTY commands.
+- Project setup and saved ideas, with list and board views over the same tasks.
+- Codex, Claude Code and Grok execution, account profiles, questions, stop and supported continuation.
+- Parallel queues, isolated worktrees, saved checks, patch review and guarded Git integration.
+- Recurring tasks with timezones, missed-run policy and pause controls while the app runs.
+- Project-scoped MCP connections and per-task selection for supported adapters.
+- Task-owned Chromium sessions and a local codebase map with bounded import resolution.
+- Reported usage, connected capacity, persistent history and recovery notices.
+- Light/dark/automatic appearance, shared theme controls and local fonts.
 
-The active Agents view discovers local runners and existing sign-ins. Legacy
-planning/refinement, schedules, browser, maps and devices remain explicit
-prototype previews. Central connections, account-wide quotas, multi-account
-switching, scheduling, proactive routing and remote operation remain planned.
-See [the task journey](docs/TASK-JOURNEY.md) for tested behavior and limitations.
+Remote execution, automatic failover and budget-aware routing remain planned.
+The desktop does not send telemetry or feedback; support reports are previewed
+and copied locally. The separate optional service supports ingestion and update
+hosting. Read [feature coverage](docs/FEATURE-COMPLETION.md) for adapter limits.
+Worktrees isolate Git changes, not the privileges of an agent or its tools.
 
-## Product direction
+## Run from source
 
-The goal is a complete path from intent to reviewed result: real project setup,
-multiple agents and existing accounts, useful automatic prompt/context
-supplementation, isolated work, central connections and tools, schedules,
-project/codebase understanding, and grounded usage guidance. The eventual
-remote companion will support multiple devices through self-hosted or managed
-infrastructure. These are commitments, not claims about the current prototype.
+Use Node 24.18+ within Node 24 and the pnpm version pinned in package.json.
+Native builds additionally need Rust 1.98.1, MSVC C++ build tools and WebView2 on
+Windows. Install and sign in to the agent CLI you want to use.
 
-See [DESIGN.md](docs/DESIGN.md) for the refined, intentional experience standard
-and [OPERATOR.md](docs/OPERATOR.md) for ownership of context, tools and continuity.
-
-## Develop locally
-
-Use Node 24 (tested with 24.18.0), the pnpm version pinned in `package.json`,
-and Rust/Cargo plus platform build prerequisites for native desktop work.
-
-```powershell
+~~~powershell
 pnpm install --frozen-lockfile
-pnpm dev
-```
-
-The browser preview runs at `http://localhost:5173`; `/design-lab.html` renders
-the shared character and theme controls. Browser IPC is mocked. Several current
-feature demos also use fixtures in the native app; see [STATUS.md](docs/STATUS.md).
-
-```powershell
-pnpm build
-pnpm --filter @jackalope/desktop test:visual-state
-pnpm lint
 pnpm tauri dev
-```
+~~~
 
-A successful frontend build is not native feature verification. See
-[the native runbook](.claude/skills/run-jackalope-desktop/SKILL.md) for Windows
-launch/inspection guidance and [the workflow skill](.agents/skills/jackalope-workflow/SKILL.md)
-for project checks.
+For UI development, pnpm dev starts the desktop browser preview on port 5173;
+it cannot execute native tasks. /design-lab.html contains component fixtures.
+pnpm dev:website starts the marketing site on port 5180.
 
-## Repository and handoff
+Run pnpm verify for formatting/lint, documentation links, frontend builds,
+server checks and native unit tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+prerequisites, secret checks and rendered/native verification. Builds do not
+substitute for installed-app acceptance.
 
-- `apps/desktop/src`: UI, stores, theme engine and IPC bridge.
-- `apps/desktop/src-tauri`: native Git/process/system/PTY commands.
-- [STATUS.md](docs/STATUS.md): verified behavior and immediate priorities.
-- [TODO.md](docs/TODO.md): open work and acceptance checks.
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md): actual interfaces and proposed boundaries.
-- [USAGE-AND-ROUTING.md](docs/USAGE-AND-ROUTING.md): usage, connected capacity,
-  best-fit routing and proactive proposal plans.
-- [AGENTS.md](AGENTS.md): collaboration and commit rules.
+## Repository map
 
-Native startup, memory and responsiveness budgets still need measured baselines.
-Dependency reuse, accessibility, commercially permissive licensing and clear
-extension contracts are delivery requirements.
+| Location | Responsibility |
+| --- | --- |
+| apps/desktop/src | React UI, state and typed native clients |
+| apps/desktop/src-tauri | Native task runtime, coordination, Git, browser and filesystem access |
+| apps/website | Marketing site, screenshots and walkthrough |
+| apps/server | Optional Cloudflare ingestion and R2 update service |
+| packages/brand | Shared theme tokens, vector geometry and fonts |
+| scripts | Verification, notices and release preparation |
 
-Licensed under [Apache-2.0](LICENSE).
+Start with [Getting started](docs/GETTING-STARTED.md),
+[Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md) or
+[the backlog](docs/TODO.md). Operators can read the
+[server setup](apps/server/README.md) and [release guide](docs/RELEASE.md).
+
+## Participate
+
+[Report a bug or request a feature](https://github.com/Jackalope-Dev/jackalope/issues/new/choose),
+or read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Review and redact diagnostics before attaching them. Report vulnerabilities to
+**security@jackalope.dev**; see [SECURITY.md](SECURITY.md).
+
+Licensed under [Apache-2.0](LICENSE). See the [dependency inventory](docs/DEPENDENCIES.md)
+for third-party packages and bundled font notices.

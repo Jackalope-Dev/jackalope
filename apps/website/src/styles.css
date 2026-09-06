@@ -1648,7 +1648,7 @@ fieldset {
   width: 100%;
   padding-block: 0;
 }
-.journal-page .journal-section-heading {
+.journal-page > .journal-teaser .journal-section-heading {
   display: none;
 }
 .release-status {
@@ -1738,6 +1738,25 @@ fieldset {
 .article-body {
   max-width: 680px;
   margin: 56px auto 0;
+}
+.article-breadcrumbs {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.article-breadcrumbs a:hover {
+  color: var(--color-text-primary);
+}
+.tour-player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 12 / 7;
+  margin-top: 36px;
+  border-radius: 16px;
+  background: var(--color-surface-sunken);
+  box-shadow: var(--shadow-pop);
 }
 .article-body section {
   margin-bottom: 44px;

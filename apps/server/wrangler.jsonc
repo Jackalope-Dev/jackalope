@@ -1,6 +1,5 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "account_id": "00000000000000000000000000000000",
   "name": "jackalope-service-local",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-06",
@@ -82,7 +81,7 @@
         {
           "binding": "DB",
           "database_name": "jackalope-service-staging",
-          "database_id": "00000000-0000-0000-0000-000000000001",
+          "database_id": "00000000-0000-0000-0000-000000000002",
           "migrations_dir": "migrations"
         }
       ],
@@ -123,7 +122,13 @@
       },
       "secrets": {
         "required": ["RATE_SECRET"]
-      }
+      },
+      "routes": [
+        {
+          "pattern": "staging-api.jackalope.dev",
+          "custom_domain": true
+        }
+      ]
     },
     "production": {
       "name": "jackalope-service-production",
@@ -180,7 +185,13 @@
       },
       "secrets": {
         "required": ["RATE_SECRET"]
-      }
+      },
+      "routes": [
+        {
+          "pattern": "api.jackalope.dev",
+          "custom_domain": true
+        }
+      ]
     }
   },
   "secrets": {

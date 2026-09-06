@@ -1,6 +1,6 @@
+import { hexToHsl, hslToHex, PRESET_THEMES, type ThemePalette } from '@jackalope/brand/theme';
 import { Check, Clock3, Moon, Sun } from 'lucide-react';
 import { type PointerEvent, useEffect, useId, useState } from 'react';
-import { hexToHsl, hslToHex, PRESET_THEMES, type ThemePalette } from '../../lib/theme-engine';
 
 export function ThemeEditor({
   value,

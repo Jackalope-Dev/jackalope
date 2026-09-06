@@ -6,7 +6,7 @@ import {
   isDarkAtTime,
   PRESET_THEMES,
   startThemeClock,
-} from '../src/lib/theme-engine.ts';
+} from '@jackalope/brand/theme';
 import { useMascotStore } from '../src/stores/mascotStore.ts';
 
 function luminance(color) {

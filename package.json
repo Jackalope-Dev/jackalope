@@ -9,11 +9,15 @@
     "tauri": "pnpm --filter @jackalope/desktop tauri",
     "lint": "biome lint .",
     "format": "biome format --write .",
-    "check": "biome check .",
+    "check": "biome check . --error-on-warnings",
     "check:write": "biome check --write .",
     "typecheck": "pnpm --filter @jackalope/desktop --filter @jackalope/website typecheck",
     "dev:website": "pnpm --filter @jackalope/website dev",
-    "build:website": "pnpm --filter @jackalope/website build"
+    "build:website": "pnpm --filter @jackalope/website build",
+    "verify": "node scripts/verify.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "licenses:generate": "node scripts/licenses.mjs"
   },
   "keywords": [
     "tauri",
@@ -29,5 +33,8 @@
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
     "@biomejs/biome": "^2.5.12"
+  },
+  "engines": {
+    "node": ">=24.18.0 <25"
   }
 }

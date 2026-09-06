@@ -1,13 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  createWorktree,
-  getSystemInfo,
-  listWorktrees,
-  ptyKill,
-  ptySpawn,
-  ptyWrite,
-} from '../src/lib/tauri-bridge.ts';
+import { nativeTask } from '../src/lib/task-runtime.ts';
+import { createWorktree, getSystemInfo, listWorktrees } from '../src/lib/tauri-bridge.ts';
 
 const storage = new Map();
 globalThis.localStorage = {
@@ -79,9 +73,9 @@ test('native operations cannot fabricate worktrees, device details or processes'
     () => listWorktrees('/repo'),
     () => createWorktree('/repo', '.worktrees/test', 'test'),
     () => getSystemInfo(),
-    () => ptySpawn({ program: 'node', args: [], workingDir: '/repo' }),
-    () => ptyWrite('missing', 'test'),
-    () => ptyKill('missing'),
+    () => nativeTask('pty_spawn', { program: 'node', args: [], workingDir: '/repo' }),
+    () => nativeTask('pty_write', { sessionId: 'missing', data: 'test' }),
+    () => nativeTask('pty_kill', { sessionId: 'missing' }),
   ])
     await assert.rejects(operation, /desktop app/);
 });

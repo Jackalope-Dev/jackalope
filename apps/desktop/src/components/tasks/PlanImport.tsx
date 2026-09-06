@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, X } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -194,7 +194,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
     setError('');
     try {
       if (!added) {
-        await nativeTask('queue_import', {
+        await queueCommand('queue_import', {
           request: {
             projectId: project.id,
             projectName: project.name,

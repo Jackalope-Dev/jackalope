@@ -1,62 +1,26 @@
-# 🐇 Jackalope Agent Invariants & Guidelines
+# Agent guidance
 
-This document governs the operational rules and behavioral constraints for any AI agent working within the Jackalope repository.
+- Do not commit code. Leave changes for the maintainer to review and commit.
+- Read docs/STATUS.md, docs/TODO.md and docs/DESIGN.md before changes. Check git
+  status and worktree list; preserve existing work.
+- Start isolated concurrent work from current master under .worktrees/<task>.
+  Older worktrees are snapshots, not the current baseline.
+- Confirm the baseline with pnpm build. Use targeted checks while working, finish
+  with pnpm verify, and update the short current status/backlog. Do not claim
+  native or installed-app acceptance from a frontend build.
+- Keep comments for non-obvious behavior and contracts, not narration or task history.
+- Follow CONTRIBUTING.md for checks and docs/ARCHITECTURE.md for ownership. Native
+  changes preserve coordinator → execution guard → runtime lock order, reservation,
+  process ownership, history recovery and Git safeguards.
+- Preserve saved-data compatibility. Fixtures never prove real execution. Do not
+  remove legacy data paths solely because the UI moved.
+- Derive styling from packages/brand tokens and shared controls. Verify keyboard,
+  focus, light/dark appearance, reduced motion and narrow layouts for UI changes.
+  Keep theme persistence and preview rollback intact. Mascot moods reflect activity;
+  do not introduce synthetic or persistent decorative status indicators.
+- Keep credentials and live deployment state out of source. Use explicit private
+  server configuration and isolated native test profiles. Do not stop another
+  user's working app to run a test.
 
----
-
-## 1. ✍️ Commit Guidelines: Active Working User Only
-- Commits are **permitted**, but must always be authored under the **working / active user** (`git config user.name` / `git config user.email`).
-- **NEVER** add `Co-authored-by:` agent tags, bot trailers, or agent-only authorship.
-- Write clean, descriptive, conventional commit messages matching the working user's style.
-- Ensure `pnpm build` passes before committing.
-
----
-
-## 2. 🔄 In-Project Continuity Loop
-To guarantee seamless context hand-offs between any agent:
-1. **On Startup**: Read `docs/STATUS.md` and `docs/TODO.md` to orient to the current active milestone.
-2. **Before Changes**: Confirm clean build status with `pnpm build` (`tsc -b && vite build`).
-3. **Upon Completion**: Update `docs/STATUS.md` (completed deliverables & next immediate steps) and `docs/TODO.md` (checking off completed tasks).
-4. **Clean Verification**: Ensure `pnpm build` finishes with exit code 0 before concluding any turn.
-
----
-
-## 3. 🎨 UI & Theming Standards
-- **Read [`docs/DESIGN.md`](docs/DESIGN.md) first.** The standing mandate: nothing cookie-cutter, nothing generic-SaaS-template, nothing standard-desktop-app. Refined, focused, and 100% driven by the user's actions/goals — not a data dashboard. Check every new or revisited screen against it.
-- **Flat Surface Hierarchy**: Use subtle directional gradients (`bg-gradient-to-b from-surface to-surface-sunken`) and soft tinted drop shadows. Avoid harsh skeuomorphic borders.
-- **Dynamic Theming (Arc / Zen Style)**: Never hardcode arbitrary hex values in component styling. Always reference CSS variables derived via `theme-engine.ts`:
-  - `--color-accent`
-  - `--color-accent-hover`
-  - `--color-accent-subtle`
-  - `--color-surface`
-  - `--color-surface-elevated`
-  - `--color-border`
-- **Jackalope Mascot Pet**: Trigger appropriate mascot moods:
-  - `idle`: normal viewing
-  - `thinking`: when analyzing user prompts or generating project recommendations
-  - `working`: when worktrees or agent tasks are executing
-  - `success`: when a build passes or task completes
-  - `sleep`: low activity or resting mode
-
----
-
-## 4. 🌿 Git Worktree Isolation
-- Concurrent agent tasks must execute inside `.worktrees/<task-slug>`.
-- Never pollute the primary branch with unfinished multi-file drafts.
-
----
-
-## 5. 🤝 Concurrent Work Coordination
-
-The art/experience foundation was integrated into `master` on 2026-09-04 at
-the owner's request, preserving the native PTY backend and AgentFleet wiring.
-The owner authorized commits using the configured working user's identity,
-without co-author trailers. Integrate finished work at natural checkpoints to
-avoid drift between concurrent tasks; run the combined build before committing.
-
-- Start new work from current `master`. `.worktrees/art-direction` is the old
-  source snapshot, not the current baseline.
-- Check `git status` and `git worktree list` before changes. Preserve other
-  agents' in-progress work and keep unrelated changes out of your commits.
-- Continue isolating concurrent tasks in `.worktrees/<task-slug>`. Consult
-  `docs/STATUS.md`, `docs/TODO.md`, and `docs/DESIGN.md` for the current scope.
+Read docs/PARALLEL-MVP.md for integration rules and docs/SELF-DEVELOPMENT.md for
+native testing. Repository skills point to these shared guides.

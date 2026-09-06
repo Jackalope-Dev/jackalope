@@ -34,11 +34,6 @@ export interface SettingsState {
   // Custom runner paths
   customRunnerPaths: Record<string, string>;
 
-  // Central Orchestration & Routing
-  routingPreference: 'auto' | 'quality' | 'speed' | 'cost' | 'manual';
-  autoFailoverEnabled: boolean;
-  maxFailoverRetries: number;
-
   // Codebase Context Discovery & Memory
   codebaseDiscoveryEnabled: boolean;
   discoveryRefreshCadence: 'manual' | 'startup' | 'hourly' | 'daily';
@@ -85,10 +80,6 @@ export const DEFAULT_SETTINGS: Omit<
     claude: '',
     grok: '',
   },
-
-  routingPreference: 'auto' as const,
-  autoFailoverEnabled: false,
-  maxFailoverRetries: 2,
 
   codebaseDiscoveryEnabled: true,
   discoveryRefreshCadence: 'startup' as const,
@@ -145,6 +136,17 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'jackalope-settings',
       storage: safeStorage,
+      merge: (saved, current) => {
+        const values = saved && typeof saved === 'object' ? (saved as Record<string, unknown>) : {};
+        return {
+          ...current,
+          ...Object.fromEntries(
+            Object.keys(DEFAULT_SETTINGS)
+              .filter((key) => key in values)
+              .map((key) => [key, values[key]]),
+          ),
+        };
+      },
     },
   ),
 );

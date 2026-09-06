@@ -4,6 +4,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useUpdateStore } from '../../stores/updateStore';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
+import { ReleaseNotes } from './ReleaseNotes';
 
 export function UpdateSettings() {
   const update = useUpdateStore();
@@ -71,7 +72,7 @@ export function UpdateSettings() {
           {release.notes && (
             <details>
               <summary className="task-summary">Release notes</summary>
-              <p className="whitespace-pre-wrap break-words text-sm mt-2">{release.notes}</p>
+              <ReleaseNotes notes={release.notes} />
             </details>
           )}
           {blocked && (

@@ -1,6 +1,5 @@
 @import "tailwindcss";
-@import "@fontsource-variable/plus-jakarta-sans";
-@import "@fontsource-variable/jetbrains-mono";
+@import "@jackalope/brand/fonts.css";
 
 @theme {
   --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", system-ui, sans-serif;

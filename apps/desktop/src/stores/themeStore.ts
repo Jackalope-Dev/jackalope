@@ -1,12 +1,12 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import {
   applyThemeTokens,
   hexToHsl,
   hslToHex,
   PRESET_THEMES,
   type ThemePalette,
-} from '../lib/theme-engine';
+} from '@jackalope/brand/theme';
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface ThemeState {
   currentTheme: ThemePalette;

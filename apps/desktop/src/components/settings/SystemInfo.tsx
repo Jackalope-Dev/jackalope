@@ -4,7 +4,7 @@ import { getSystemInfo, isTauriEnvironment, type SystemInfo } from '../../lib/ta
 import { Button } from '../ui/button';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
-export function DeviceMesh() {
+export function SystemInfoView() {
   const [host, setHost] = useState<SystemInfo | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

@@ -1,3 +1,5 @@
+import { characterPaths } from '@jackalope/brand/character';
+import { applyThemeTokens, PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -19,8 +21,6 @@ import {
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
-import { characterPaths } from '../../desktop/src/components/mascot/character-paths';
-import { applyThemeTokens, PRESET_THEMES } from '../../desktop/src/lib/theme-engine';
 import { JournalPage, JournalTeaser } from './Journal';
 import { Newsletter, WaitlistButton } from './Signup';
 
@@ -606,7 +606,7 @@ export function App({ path = '/' }: { path?: string }) {
           <JournalTeaser />
         </main>
       ) : (
-        <JournalPage path={path} />
+        <JournalPage path={path} dark={dark} />
       )}
 
       {path !== '/privacy/' && <Newsletter />}
@@ -620,6 +620,7 @@ export function App({ path = '/' }: { path?: string }) {
           A product of <a href="https://jackalope.digital">Jackalope Digital LLC</a>.
         </p>
         <nav className="footer-links" aria-label="Footer navigation">
+          <a href="/tour/">App tour</a>
           <a href="/changelog/">Changelog</a>
           <a href="/blog/">Field notes</a>
           <a href="/privacy/">Privacy</a>

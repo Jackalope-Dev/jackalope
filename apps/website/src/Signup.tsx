@@ -161,7 +161,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
 
 export function Newsletter() {
   return (
-    <section className="newsletter page-width" aria-labelledby="newsletter-title">
+    <section id="newsletter" className="newsletter page-width" aria-labelledby="newsletter-title">
       <div>
         <p className="eyebrow">LET’S KEEP IN TOUCH</p>
         <h2 id="newsletter-title">

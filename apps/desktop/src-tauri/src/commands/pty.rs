@@ -72,7 +72,10 @@ pub async fn pty_spawn(
         .map_err(|e| format!("Failed to take pty writer: {e}"))?;
 
     {
-        let mut sessions = state.pty_sessions.lock().map_err(|_| "pty session lock poisoned")?;
+        let mut sessions = state
+            .pty_sessions
+            .lock()
+            .map_err(|_| "pty session lock poisoned")?;
         sessions.insert(
             session_id.clone(),
             PtySession {
@@ -130,14 +133,17 @@ pub async fn pty_spawn(
         // status. The child handle lives in the shared session map (moved
         // there by `pty_spawn` above), so reach it via the app handle
         // instead of trying to smuggle it into this closure directly.
-        let exit_code = app.state::<AppState>().pty_sessions.lock().ok().and_then(
-            |mut sessions| {
-                sessions
-                    .get_mut(&event_session_id)
-                    .and_then(|session| session.child.wait().ok())
-                    .map(|status| status.exit_code())
-            },
-        );
+        let exit_code =
+            app.state::<AppState>()
+                .pty_sessions
+                .lock()
+                .ok()
+                .and_then(|mut sessions| {
+                    sessions
+                        .get_mut(&event_session_id)
+                        .and_then(|session| session.child.wait().ok())
+                        .map(|status| status.exit_code())
+                });
         app.state::<AppState>()
             .pty_sessions
             .lock()
@@ -189,7 +195,10 @@ pub async fn pty_write(
     data: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut sessions = state.pty_sessions.lock().map_err(|_| "pty session lock poisoned")?;
+    let mut sessions = state
+        .pty_sessions
+        .lock()
+        .map_err(|_| "pty session lock poisoned")?;
     let session = sessions
         .get_mut(&session_id)
         .ok_or_else(|| format!("No active pty session '{session_id}'"))?;
@@ -208,7 +217,10 @@ pub async fn pty_resize(
     rows: u16,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let sessions = state.pty_sessions.lock().map_err(|_| "pty session lock poisoned")?;
+    let sessions = state
+        .pty_sessions
+        .lock()
+        .map_err(|_| "pty session lock poisoned")?;
     let session = sessions
         .get(&session_id)
         .ok_or_else(|| format!("No active pty session '{session_id}'"))?;
@@ -226,7 +238,10 @@ pub async fn pty_resize(
 /// Kills a running pty session's child process and drops its session state.
 #[tauri::command]
 pub async fn pty_kill(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut sessions = state.pty_sessions.lock().map_err(|_| "pty session lock poisoned")?;
+    let mut sessions = state
+        .pty_sessions
+        .lock()
+        .map_err(|_| "pty session lock poisoned")?;
     let mut session = sessions
         .remove(&session_id)
         .ok_or_else(|| format!("No active pty session '{session_id}'"))?;
@@ -270,10 +285,16 @@ mod tests {
         #[cfg(not(windows))]
         cmd.args(["-c", "echo hello-from-pty"]);
 
-        let mut child = pair.slave.spawn_command(cmd).expect("failed to spawn command in pty");
+        let mut child = pair
+            .slave
+            .spawn_command(cmd)
+            .expect("failed to spawn command in pty");
         drop(pair.slave);
 
-        let mut reader = pair.master.try_clone_reader().expect("failed to clone pty reader");
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .expect("failed to clone pty reader");
 
         // Read with a bounded wait instead of blocking forever, so a
         // regression here fails the test instead of hanging CI/an agent.
@@ -313,7 +334,10 @@ mod tests {
             let mut combined = Vec::from(carry);
             combined.extend_from_slice(second);
             let (chunk2, carry2) = split_valid_utf8_prefix(&combined);
-            assert!(carry2.is_empty(), "split_at={split_at} left a dangling carry");
+            assert!(
+                carry2.is_empty(),
+                "split_at={split_at} left a dangling carry"
+            );
             assert_eq!(
                 format!("{chunk1}{chunk2}"),
                 "hi 🦊 fox",

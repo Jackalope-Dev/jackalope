@@ -14,6 +14,7 @@ async function _verifyLaunch(page) {
   });
   const paths = [
     '/',
+    '/tour/',
     '/blog/',
     '/changelog/',
     '/privacy/',
@@ -43,7 +44,17 @@ async function _verifyLaunch(page) {
     const graph = JSON.parse(
       await page.locator('script[type="application/ld+json"]').textContent(),
     );
-    assert(graph['@graph'].length === 3, `Structured data: ${path}`);
+    assert(
+      graph['@graph'].some((entry) => entry['@type'] === 'WebSite'),
+      `Structured data: ${path}`,
+    );
+    if (path === '/tour/') {
+      assert(
+        graph['@graph'].some((entry) => entry['@type'] === 'VideoObject'),
+        'Video metadata',
+      );
+      assert((await page.locator('video[controls]').count()) === 1, 'Visible tour video');
+    }
     for (const width of [1280, 960, 390, 320]) {
       await page.setViewportSize({ width, height: 840 });
       assert(

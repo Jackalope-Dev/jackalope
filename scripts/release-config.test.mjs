@@ -1,25 +1,37 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const script = fileURLToPath(new URL('./release-config.mjs', import.meta.url));
 function trial(endpoint, overrides = {}) {
   const cwd = mkdtempSync(join(tmpdir(), 'jackalope-release-'));
   try {
-    const result = spawnSync(process.execPath, [script, endpoint, 'cHVibGlj', 'a'.repeat(40), 'https://example.com/timestamp'], {
-      cwd, encoding: 'utf8', env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY: 'test-private-value', ...overrides },
-    });
+    const result = spawnSync(
+      process.execPath,
+      [script, endpoint, 'cHVibGlj', 'a'.repeat(40), 'https://example.com/timestamp'],
+      {
+        cwd,
+        encoding: 'utf8',
+        env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY: 'test-private-value', ...overrides },
+      },
+    );
     const path = join(cwd, 'output/release/tauri.release.json');
     return { ...result, config: existsSync(path) ? readFileSync(path, 'utf8') : null };
-  } finally { rmSync(cwd, { recursive: true, force: true }); }
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 }
 
 test('release configuration requires HTTPS without credentials', () => {
-  for (const url of ['http://example.com/update', 'https://user:password@example.com/update', 'https://example.com/update#secret']) {
+  for (const url of [
+    'http://example.com/update',
+    'https://user:password@example.com/update',
+    'https://example.com/update#secret',
+  ]) {
     const result = trial(url);
     assert.notEqual(result.status, 0);
     assert.equal(result.config, null);

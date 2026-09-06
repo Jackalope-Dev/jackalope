@@ -12,7 +12,7 @@ pnpm --filter @jackalope/desktop brand:installer
 ```
 
 The full `brand:generate` command also regenerates these files. The generator
-reads `theme-engine.ts` and `character-paths.ts`, renders the artwork with
+reads `@jackalope/brand/theme` and `@jackalope/brand/character`, renders the artwork with
 `@resvg/resvg-js`, and writes opaque 24-bit BMPs using NSIS/WiX's documented
 layouts. NSIS artwork is rendered at 3x and fitted to its controls for sharper
 display scaling; WiX artwork uses its required pixel dimensions.

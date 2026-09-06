@@ -13,9 +13,7 @@ try {
   const { siteOrigin } = await server.ssrLoadModule('/src/content.ts');
   const origin = new URL(loadEnv('production', process.cwd(), 'VITE_').VITE_SITE_URL || siteOrigin)
     .origin;
-  const { applyThemeTokens, PRESET_THEMES } = await server.ssrLoadModule(
-    '../desktop/src/lib/theme-engine.ts',
-  );
+  const { applyThemeTokens, PRESET_THEMES } = await server.ssrLoadModule('@jackalope/brand/theme');
   const tokens = new Map();
   const previousDocument = globalThis.document;
   try {

@@ -1,7 +1,7 @@
+import { applyThemeTokens } from '@jackalope/brand/theme';
 import * as Popover from '@radix-ui/react-popover';
 import { RotateCcw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { applyThemeTokens } from '../../lib/theme-engine';
 import { useThemeStore } from '../../stores/themeStore';
 import { Button } from '../ui/button';
 import { ThemeEditor } from './ThemeEditor';

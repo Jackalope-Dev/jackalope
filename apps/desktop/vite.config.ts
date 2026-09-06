@@ -3,13 +3,12 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-// https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       input: {
         app: path.resolve(import.meta.dirname, 'index.html'),
-        design: path.resolve(import.meta.dirname, 'design-lab.html'),
+        ...(mode === 'lab' ? { design: path.resolve(import.meta.dirname, 'design-lab.html') } : {}),
       },
     },
   },
@@ -29,4 +28,4 @@ export default defineConfig({
     strictPort: true,
     host: true,
   },
-});
+}));

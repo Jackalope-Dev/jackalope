@@ -15,6 +15,8 @@ use tauri::State;
 static INTEGRATION_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
+/// Serializes launch, integration, cleanup and update installation.
+/// Lock order: coordinator state, execution guard, then runtime state.
 pub fn execution_guard() -> Result<std::sync::MutexGuard<'static, ()>, String> {
     let guard = INTEGRATION_LOCK.lock().map_err(|e| e.to_string())?;
     if super::release::installing() {
@@ -57,18 +59,7 @@ fn legacy_target_branch() -> String {
 }
 
 fn command(path: &Path, args: &[&str]) -> Command {
-    let mut command = Command::new("git");
-    command.current_dir(path).args(args);
-    command
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE");
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-    command
+    super::git_command::command(path, args, super::git_command::Policy::Isolated)
 }
 
 fn output_text(output: Output) -> Result<String, String> {

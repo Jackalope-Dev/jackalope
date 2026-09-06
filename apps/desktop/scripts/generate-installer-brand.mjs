@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { characterPaths } from '@jackalope/brand/character';
+import { applyThemeTokens, hslToHex, PRESET_THEMES } from '@jackalope/brand/theme';
 import { Resvg } from '@resvg/resvg-js';
-import { characterPaths } from '../src/components/mascot/character-paths.ts';
-import { applyThemeTokens, hslToHex, PRESET_THEMES } from '../src/lib/theme-engine.ts';
 
 const output = new URL('../src-tauri/installer/', import.meta.url);
 mkdirSync(output, { recursive: true });

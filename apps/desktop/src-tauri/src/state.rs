@@ -1,6 +1,6 @@
+use portable_pty::{Child, MasterPty};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use portable_pty::{Child, MasterPty};
 
 /// A single live PTY-backed agent process: the pieces needed to write
 /// stdin, resize the pty, or kill the process after `commands::pty::pty_spawn`
@@ -99,7 +99,10 @@ mod tests {
                 child,
             },
         );
-        assert!(process_is_alive(pid), "process should be running before kill");
+        assert!(
+            process_is_alive(pid),
+            "process should be running before kill"
+        );
 
         state.kill_all_pty_sessions();
         assert!(state.pty_sessions.lock().unwrap().is_empty());
@@ -108,6 +111,9 @@ mod tests {
         while process_is_alive(pid) && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(50));
         }
-        assert!(!process_is_alive(pid), "process should be killed, not orphaned");
+        assert!(
+            !process_is_alive(pid),
+            "process should be killed, not orphaned"
+        );
     }
 }

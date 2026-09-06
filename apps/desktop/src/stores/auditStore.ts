@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AuditLogEntry } from '../lib/orchestration/types';
+import type { AuditLogEntry } from '../lib/audit';
 
 interface AuditState {
   entries: AuditLogEntry[];

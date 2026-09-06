@@ -1,6 +1,15 @@
 export const siteOrigin = 'https://jackalope.dev';
 export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.digital' };
 
+export const tour = {
+  title: 'A little look around Jackalope.',
+  description:
+    'Watch the Jackalope desktop workspace: draft a task, inspect a patch, explore coding agents, and change the theme. A 33-second interface tour with fictional Atlas project data.',
+  published: '2026-09-06T23:18:00Z',
+  transcript:
+    'Switch between task views. Open a new task, type a brief, and choose an agent. Inspect a code patch and its checks. Explore the configured agents, then drag the color palette and switch between light and dark appearances. This recording uses fictional Atlas project data and does not launch an agent task. There is no audio.',
+};
+
 export const posts = [
   {
     slug: 'room-for-the-work',
@@ -117,9 +126,14 @@ export const updates = [
 export const pages = [
   {
     path: '/',
-    title: 'Jackalope — Big ideas. Room to run.',
+    title: 'Jackalope — A desktop workspace for coding agents',
     description:
       'A calmer desktop home for your coding agents, tasks, Git worktrees, and review. Join the Windows waitlist for Jackalope by Jackalope Digital LLC.',
+  },
+  {
+    path: '/tour/',
+    title: 'Jackalope app tour — Tasks, coding agents & code review',
+    description: tour.description,
   },
   {
     path: '/blog/',

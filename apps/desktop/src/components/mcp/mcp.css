@@ -323,6 +323,24 @@
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
 }
+.mcp-detail-tab-list button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.mcp-detail-tab-list button[data-state="active"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.mcp-detail-tab-list button:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
 .mcp-market-card .mcp-card-title button {
   padding: 0;
   min-height: 44px;
@@ -437,24 +455,6 @@
   border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
-.mcp-detail-tab-list button {
-  min-height: 44px;
-  padding: 8px 14px;
-  border: 0;
-  background: transparent;
-  border-radius: 10px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.mcp-detail-tab-list button[data-state="active"] {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-ink);
-}
-.mcp-detail-tab-list button:focus-visible {
-  outline: 2px solid var(--color-accent-ink);
-  outline-offset: 2px;
-}
 .mcp-detail-scroll {
   min-height: 0;
   overflow-y: auto;
@@ -487,8 +487,7 @@
   line-height: 1.6;
   color: var(--color-text-muted);
 }
-.mcp-detail-scroll > .mcp-detail-note,
-.mcp-detail-scroll > .mcp-detail-notice {
+.mcp-detail-notice {
   margin-bottom: 20px;
 }
 .mcp-detail-signals {
@@ -519,6 +518,10 @@
   padding-left: 20px;
   list-style: disc;
 }
+.mcp-detail-tool-list > li {
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
 .mcp-detail-content li + li {
   margin-top: 8px;
 }
@@ -544,7 +547,8 @@
 .mcp-detail-notice h3 {
   color: var(--color-text-primary);
 }
-.mcp-detail-footer {
+.mcp-detail-scroll > .mcp-detail-note,
+.mcp-detail-scroll > .mcp-detail-footer {
   flex-shrink: 0;
   display: flex;
   justify-content: space-between;
@@ -580,10 +584,6 @@
 .mcp-detail-content .mcp-detail-tool-list {
   padding: 0;
   list-style: none;
-}
-.mcp-detail-tool-list > li {
-  padding: 16px 0;
-  border-top: 1px solid var(--color-border-subtle);
 }
 .mcp-detail-content code {
   font-family: var(--font-mono);

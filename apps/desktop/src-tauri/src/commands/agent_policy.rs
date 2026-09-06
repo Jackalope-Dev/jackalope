@@ -202,9 +202,7 @@ mod tests {
     fn agent_scoped_model_restriction_does_not_leak_to_other_agents() {
         let mut policy = AgentPolicy::default();
         // Restrict a model only for codex; grok has no restrictions at all.
-        policy
-            .allowed_models
-            .insert("codex:gpt-3.5".into(), false);
+        policy.allowed_models.insert("codex:gpt-3.5".into(), false);
         assert!(policy.model("grok", None).unwrap().is_none());
         assert!(policy
             .model("codex", None)

@@ -1,3 +1,4 @@
+import { applyThemeTokens, PRESET_THEMES, startThemeClock } from '@jackalope/brand/theme';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
@@ -7,7 +8,6 @@ import { Input } from './components/ui/input';
 import { Select, SelectItem } from './components/ui/Select';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
 import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';
-import { applyThemeTokens, PRESET_THEMES, startThemeClock } from './lib/theme-engine';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
 import './components/ui/experience.css';

@@ -1,5 +1,10 @@
-import { ArrowLeft, ArrowRight, GitBranch } from 'lucide-react';
-import { posts, updates } from './content';
+import { ArrowRight, GitBranch } from 'lucide-react';
+import { posts, tour, updates } from './content';
+import { PublishedReleases } from './PublishedReleases';
+
+const publishedVersion = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL
+  ? import.meta.env.VITE_RELEASE_VERSION
+  : undefined;
 
 const dateLabel = (date: string) =>
   new Intl.DateTimeFormat('en', {
@@ -48,14 +53,82 @@ export function JournalTeaser() {
   );
 }
 
-export function JournalPage({ path }: { path: string }) {
+export function JournalPage({ path, dark = false }: { path: string; dark?: boolean }) {
+  if (path === '/tour/')
+    return (
+      <main id="main" className="article page-width">
+        <nav className="article-breadcrumbs" aria-label="Breadcrumb">
+          <a href="/">Jackalope</a>
+          <span aria-hidden="true">/</span>
+          <span>App tour</span>
+        </nav>
+        <header className="article-heading">
+          <h1>{tour.title}</h1>
+          <p className="article-deck">
+            From an idea to a patch you can review. See how the workspace feels.
+          </p>
+          <p className="article-byline">33 seconds · No audio · Illustrative Atlas project</p>
+        </header>
+        <video
+          className="tour-player"
+          controls
+          playsInline
+          preload="metadata"
+          poster={`/media/tasks${dark ? '' : '-light'}.png`}
+          aria-label="Jackalope desktop app tour"
+        >
+          <source src="/media/walkthrough.webm" type="video/webm" />
+          <track
+            kind="captions"
+            src="/media/walkthrough.vtt"
+            srcLang="en"
+            label="English descriptions"
+          />
+          <a href="/media/walkthrough.webm">Watch the tour recording</a>
+        </video>
+        <div className="article-body">
+          <section>
+            <h2>What happens in the tour</h2>
+            <p>{tour.transcript}</p>
+          </section>
+          <section>
+            <h2>Try this workflow with your own project</h2>
+            <p>
+              Start with a local Git repository and a configured coding agent, such as Codex or
+              Claude Code. Describe the outcome, follow the attempt, and inspect the result before
+              integrating changes. You bring your existing agent accounts and subscriptions.
+            </p>
+            <p>
+              <a href="/blog/from-brief-to-review/">Read the guide from brief to review</a> for the
+              full workflow.
+            </p>
+          </section>
+          <section>
+            <h2>When can I download Jackalope?</h2>
+            <p>
+              {publishedVersion ? (
+                <>
+                  <a href="/#download">Jackalope {publishedVersion} for Windows</a> is available.
+                </>
+              ) : (
+                'The first public Windows x64 installer is being prepared.'
+              )}{' '}
+              macOS and Linux are planned. <a href="/#newsletter">Join the waitlist</a> for launch
+              news, or <a href="/changelog/">follow the development changelog</a>.
+            </p>
+          </section>
+        </div>
+      </main>
+    );
   const post = posts.find((item) => path === `/blog/${item.slug}/`);
   if (post)
     return (
       <main id="main" className="article page-width">
-        <a className="text-link" href="/blog/">
-          <ArrowLeft size={16} /> All field notes
-        </a>
+        <nav className="article-breadcrumbs" aria-label="Breadcrumb">
+          <a href="/">Jackalope</a>
+          <span aria-hidden="true">/</span>
+          <a href="/blog/">Field notes</a>
+        </nav>
         <header className="article-heading">
           <p className="eyebrow">{post.category}</p>
           <h1>{post.title}</h1>
@@ -79,6 +152,10 @@ export function JournalPage({ path }: { path: string }) {
           <a className="text-link" href="/changelog/">
             Follow what’s taking shape <ArrowRight size={16} />
           </a>
+          <p>
+            <a href="/tour/">Watch the app tour</a> or{' '}
+            <a href="/#workflow">explore the task workspace</a>.
+          </p>
         </div>
       </main>
     );
@@ -94,11 +171,22 @@ export function JournalPage({ path }: { path: string }) {
             Development notes and, when they’re ready, public releases.
           </p>
         </header>
+        {publishedVersion && <PublishedReleases />}
         <div className="release-status">
           <GitBranch size={18} />
           <p>
-            <strong>Windows is on the way.</strong> The first public installer is being prepared.
-            These are development milestones, not downloadable releases.
+            {publishedVersion ? (
+              <>
+                <strong>Jackalope {publishedVersion} is available.</strong>{' '}
+                <a href="/#download">Download for Windows</a>. Earlier development milestones follow
+                below.
+              </>
+            ) : (
+              <>
+                <strong>Windows is on the way.</strong> The first public installer is being
+                prepared. These are development milestones, not downloadable releases.
+              </>
+            )}
           </p>
         </div>
         <div className="changelog-list">

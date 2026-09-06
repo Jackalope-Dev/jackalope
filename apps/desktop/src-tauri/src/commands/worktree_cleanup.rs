@@ -18,20 +18,7 @@ pub struct CleanupStatus {
 }
 
 pub(super) fn command(path: &Path, args: &[&str]) -> Command {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(path)
-        .args(args)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .env("GIT_OPTIONAL_LOCKS", "0")
-        .env("GIT_NO_REPLACE_OBJECTS", "1");
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    cmd
+    super::git_command::command(path, args, super::git_command::Policy::Inspection)
 }
 
 fn output(path: &Path, args: &[&str]) -> Result<Output, String> {

@@ -364,4 +364,47 @@ describe('HTTP boundary and release hosting', () => {
     expect((await request('/updates/releases/v9.9.9/checksums.json')).status).toBe(404);
     expect((await request('/updates/stable/latest.json', {})).status).toBe(405);
   });
+  it('resolves stable and beta history from the committed manifest pointer', async () => {
+    for (const channel of ['stable', 'beta']) {
+      const directory = `releases/${channel === 'beta' ? 'beta/' : ''}v0.2.0`;
+      await env.RELEASES.put(
+        `${channel}/latest.json`,
+        JSON.stringify({ version: '0.2.0', catalog: `${directory}/catalog.json` }),
+      );
+      await env.RELEASES.put(`${directory}/catalog.json`, '[{"version":"0.2.0"}]');
+      await env.RELEASES.put(`${directory}/feed.xml`, '<rss/>');
+      const history = await request(`/updates/${channel}/releases.json`);
+      expect(await history.json()).toEqual([{ version: '0.2.0' }]);
+      expect(history.headers.get('cache-control')).toContain('max-age=60');
+      expect(history.headers.get('access-control-allow-origin')).toBe('*');
+      const rss = await request(`/updates/${channel}/feed.xml`);
+      expect(await rss.text()).toBe('<rss/>');
+      expect(rss.headers.get('content-type')).toContain('application/rss+xml');
+      const immutable = await request(`/updates/${directory}/catalog.json`);
+      expect(immutable.headers.get('cache-control')).toContain('immutable');
+      await env.RELEASES.put(`${directory}/Jackalope_0.2.0_x64-setup.exe`, 'fixture');
+      expect((await request(`/updates/${directory}/Jackalope_0.2.0_x64-setup.exe`)).status).toBe(
+        200,
+      );
+      expect((await request(`/updates/${directory}/Jackalope_0.1.0_x64-setup.exe`)).status).toBe(
+        404,
+      );
+    }
+  });
+  it('rejects cross-channel, oversized, absent and non-release history pointers', async () => {
+    await env.RELEASES.delete('beta/latest.json');
+    expect((await request('/updates/beta/releases.json')).status).toBe(404);
+    for (const catalog of [
+      'private.txt',
+      'releases/v0.1.0/catalog.json',
+      '../stable/latest.json',
+    ]) {
+      await env.RELEASES.put('beta/latest.json', JSON.stringify({ catalog }));
+      expect((await request('/updates/beta/releases.json')).status).toBe(503);
+    }
+    await env.RELEASES.put('beta/latest.json', ' '.repeat(65537));
+    expect((await request('/updates/beta/feed.xml')).status).toBe(503);
+    expect((await request('/updates/stable/feed.xml', {})).status).toBe(405);
+    expect((await request('/v1/unknown')).headers.get('access-control-allow-origin')).toBeNull();
+  });
 });

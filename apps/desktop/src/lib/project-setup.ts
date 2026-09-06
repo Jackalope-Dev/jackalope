@@ -1,4 +1,5 @@
 import { syncAgentConfig } from '../stores/agentConfigStore';
+import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { useProjectStore } from '../stores/projectStore';
 import { nativeTask } from './task-runtime';
 
@@ -22,8 +23,9 @@ export async function openProject(path: string) {
   };
   if (existing) store.selectProject(existing.id);
   else await store.addProject(project);
-  void import('../stores/contextMemoryStore')
-    .then(({ useContextMemoryStore }) => useContextMemoryStore.getState().refreshMemory(project))
+  void useContextMemoryStore
+    .getState()
+    .refreshMemory(project)
     .catch(() => {});
   return project;
 }

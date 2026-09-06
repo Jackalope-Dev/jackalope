@@ -46,7 +46,9 @@ test('detectSkillsFromPrompt classifies real-world developer intents accurately'
   const uiMatch = detectSkillsFromPrompt('Validate UI change and verify component appearance');
   assert.ok(uiMatch.some((s) => s.id === 'ui-validation'));
 
-  const onboardingMatch = detectSkillsFromPrompt('Test onboarding signup flow and registration form');
+  const onboardingMatch = detectSkillsFromPrompt(
+    'Test onboarding signup flow and registration form',
+  );
   assert.ok(onboardingMatch.some((s) => s.id === 'onboarding-flow'));
 });
 
