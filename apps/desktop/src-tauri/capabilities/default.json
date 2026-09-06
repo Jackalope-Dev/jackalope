@@ -6,7 +6,6 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
-    "shell:allow-execute",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",

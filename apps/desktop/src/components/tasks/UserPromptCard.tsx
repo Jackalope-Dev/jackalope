@@ -10,9 +10,10 @@ import { Button } from '../ui/button';
 interface UserPromptCardProps {
   runId: string;
   prompt: PendingUserPrompt;
+  active: boolean;
 }
 
-export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
+export function UserPromptCard({ runId, prompt, active }: UserPromptCardProps) {
   const { refresh } = useExecutionStore();
   const { say, setMood } = useMascotStore();
   const [answerText, setAnswerText] = useState(prompt.defaultValue ?? '');
@@ -30,7 +31,7 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
           'This request is no longer waiting for a response. Refresh the task to see its current state.',
         );
       setMood('working');
-      say('Your response was delivered to the agent.', 3000);
+      say('Your response is saved for the agent.', 3000);
       await refresh();
     } catch (err) {
       setError(String(err));
@@ -62,10 +63,14 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                {isAnswered ? 'Your response' : 'The agent needs your input'}
+                {isAnswered
+                  ? 'Your response'
+                  : active
+                    ? 'The agent needs your input'
+                    : 'Unanswered question'}
               </span>
               <Badge variant={isAnswered ? 'outline' : 'default'} className="text-xs px-1.5 py-0">
-                {isAnswered ? 'Answered' : 'Action Needed'}
+                {isAnswered ? 'Answered' : active ? 'Action Needed' : 'Task ended'}
               </Badge>
             </div>
             <span className="text-xs text-[var(--color-text-muted)]">
@@ -91,6 +96,10 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
           <span className="text-[var(--color-text-muted)]">Your response:</span>
           <span className="font-semibold text-[var(--color-text-primary)]">{prompt.answer}</span>
         </div>
+      ) : !active ? (
+        <p className="ml-9 text-xs text-[var(--color-text-muted)]">
+          This attempt has ended. Include your answer when continuing the task.
+        </p>
       ) : (
         <div className="ml-9 space-y-2">
           {prompt.inputType === 'choice' && prompt.options.length > 0 ? (
@@ -138,6 +147,7 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
             >
               <input
                 type="text"
+                maxLength={4000}
                 aria-label="Your response to the agent"
                 value={answerText}
                 onChange={(e) => setAnswerText(e.target.value)}

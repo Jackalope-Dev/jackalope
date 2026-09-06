@@ -60,6 +60,7 @@ interface IntegrationPlan {
   id: string;
   projectPath: string;
   masterHead: string;
+  targetBranch: string;
   integrationHead: string | null;
   runIds: string[];
   files: string[];
@@ -128,6 +129,9 @@ function AddWork({
           projectId: project.id,
           projectName: project.name,
           projectPath: project.path,
+          targetBranch: project.preferences?.baseBranch || project.gitBranch,
+          verifyCommand: project.preferences?.verifyCommand,
+          agentProfileId: project.preferences?.agentAccounts?.[draft.agent],
           scopes: draft.scopes
             .split(',')
             .map((s: string) => s.trim())
@@ -382,7 +386,8 @@ function MergeReview({
         <div>
           <h2>Bring the work together</h2>
           <p className="task-muted mt-2">
-            Review the combined changes before updating master. Your source worktrees stay intact.
+            Review the combined changes before updating the target branch. Your source worktrees
+            stay intact.
           </p>
         </div>
         <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />
@@ -449,12 +454,14 @@ function MergeReview({
             <div>
               <p className="task-eyebrow">
                 {plan.status === 'applied'
-                  ? 'Integrated into master'
+                  ? `Integrated into ${plan.targetBranch}`
                   : plan.status === 'conflicted'
                     ? 'Conflicts need attention'
                     : 'Review this integration'}
               </p>
-              <h3>{plan.runIds.length} tasks → master</h3>
+              <h3>
+                {plan.runIds.length} tasks → {plan.targetBranch}
+              </h3>
               <p className="task-muted mt-2">
                 {plan.files.length} files · starting at {plan.masterHead.slice(0, 8)}
               </p>
@@ -538,14 +545,14 @@ function MergeReview({
           {planEligible && ['ready', 'applying'].includes(plan.status) && (
             <div className="merge-approval">
               <p className="task-muted">
-                Creates commits as your configured Git user and fast-forwards master. Master must be
-                clean, and the reviewed source files must still match. Build and test the changes
-                before merging.
+                Creates commits as your configured Git user and fast-forwards {plan.targetBranch}.
+                The target checkout must be clean, and the reviewed source files must still match.
+                Build and test the changes before merging.
               </p>
               <Button disabled={busy} onClick={() => void apply()}>
                 {busy
                   ? 'Integrating…'
-                  : `Merge ${plan.runIds.length} ${plan.runIds.length === 1 ? 'task' : 'tasks'} into master`}
+                  : `Merge ${plan.runIds.length} ${plan.runIds.length === 1 ? 'task' : 'tasks'} into ${plan.targetBranch}`}
                 <GitMerge size={15} />
               </Button>
             </div>
@@ -843,7 +850,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                         <h3>{item.title}</h3>
                         <span className="task-status">
                           {phase === 'merged'
-                            ? 'Merged into master'
+                            ? 'Integrated'
                             : item.error
                               ? 'Needs attention'
                               : run
@@ -921,8 +928,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           <details className="supporting-details">
             <summary>Workspace and dispatch rules</summary>
             <p>
-              Tasks start from committed master. Commit any local changes the agents need.
-              Restarting Jackalope pauses dispatch. Pausing leaves current work running.
+              Tasks start from committed {project.preferences?.baseBranch || project.gitBranch}.
+              Commit any local changes the agents need. Restarting Jackalope pauses dispatch.
+              Pausing leaves current work running.
             </p>
           </details>
           <details className="queue-coordination">

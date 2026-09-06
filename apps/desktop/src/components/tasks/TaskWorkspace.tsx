@@ -42,6 +42,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { CodebaseMemoryBar } from './CodebaseMemoryBar';
 import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
+import { ProjectVerification } from './ProjectVerification';
 import { RunStatus } from './RunStatus';
 import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
@@ -82,6 +83,7 @@ function ResultReview({ run }: { run: TaskRun }) {
           {error}
         </p>
       )}
+      <ProjectVerification run={run} command={project?.preferences?.verifyCommand} />
       {review && (
         <div className="mt-4">
           <p className="task-muted text-xs mb-4">{review.note}</p>
@@ -96,19 +98,6 @@ function ResultReview({ run }: { run: TaskRun }) {
             </ul>
           ) : (
             <p className="task-muted">No changed files found.</p>
-          )}
-          {project?.preferences?.verifyCommand && (
-            <div className="mt-4 p-3 rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] flex items-center justify-between gap-3">
-              <div>
-                <span className="text-xs font-medium block">Verification Command</span>
-                <code className="text-xs text-[var(--color-accent-ink)] font-mono">
-                  {project.preferences.verifyCommand}
-                </code>
-              </div>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                Configured in Project Settings
-              </span>
-            </div>
           )}
           {review.diff && (
             <details className="mt-4">
@@ -160,6 +149,15 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
       setError(String(error));
     }
   };
+  if (run.detailsOmitted)
+    return (
+      <section className="task-page" aria-busy="true">
+        <button type="button" className="task-back" onClick={onBack}>
+          All tasks
+        </button>
+        <p role="status">Loading this attempt…</p>
+      </section>
+    );
   return (
     <section className="task-page task-detail" key={run.id}>
       <button type="button" className="task-back" onClick={onBack}>
@@ -184,6 +182,8 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
         <span>{run.branch || 'Preparing a place to work'}</span>
         <span>·</span>
         <span>{run.model || 'Agent-configured model'}</span>
+        <span>· {run.account}</span>
+        {run.targetBranch && <span>· Target: {run.targetBranch}</span>}
       </div>
       {(() => {
         const failover = orchestrator.getFailoverForTask(run.taskId);
@@ -241,7 +241,12 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
       {run.prompts && run.prompts.length > 0 && (
         <div className="space-y-3 mb-5">
           {run.prompts.map((p) => (
-            <UserPromptCard key={p.id} runId={run.id} prompt={p} />
+            <UserPromptCard
+              key={p.id}
+              runId={run.id}
+              prompt={p}
+              active={['starting', 'running'].includes(run.status)}
+            />
           ))}
         </div>
       )}
@@ -510,6 +515,8 @@ export function TaskWorkspace({
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
+        targetBranch: project.preferences?.baseBranch || project.gitBranch,
+        verifyCommand: project.preferences?.verifyCommand,
         agent: currentAgent,
         agentProfileId: agentAccountFor(project, currentAdapter),
         prompt: finalPrompt,

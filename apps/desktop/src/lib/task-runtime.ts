@@ -27,6 +27,15 @@ export interface TaskRun {
   baseHead: string;
   agent: string;
   account: string;
+  targetBranch?: string | null;
+  verifyCommand?: string | null;
+  verification?: Verification | null;
+  accountBinding?: {
+    adapter: string;
+    profileId: string | null;
+    directory: string;
+    label: string;
+  } | null;
   model: string | null;
   prompt: string;
   status:
@@ -42,6 +51,7 @@ export interface TaskRun {
   endedAt: string | null;
   sessionId: string | null;
   result: string;
+  detailsOmitted?: boolean;
   activity: string[];
   diagnostics: string[];
   error: string | null;
@@ -90,10 +100,26 @@ export interface RunRequest {
   agent: string;
   /** Explicit account (agent-profile id) to run this agent as, if the project picked one. */
   agentProfileId?: string;
+  targetBranch?: string;
+  verifyCommand?: string;
   prompt: string;
   isolated: boolean;
   previousRunId?: string;
   taskId?: string;
+}
+export interface Verification {
+  command: string;
+  checkedAt: string;
+  tree: string | null;
+  result: {
+    exitCode: number | null;
+    success: boolean;
+    timedOut: boolean;
+    stdout: string;
+    stderr: string;
+    truncated: boolean;
+    durationMs: number;
+  };
 }
 export interface Review {
   files: string[];

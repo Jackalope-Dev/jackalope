@@ -17,6 +17,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ProjectAgentAccount } from './ProjectAgentAccount';
+import { ReleaseSupport } from './ReleaseSupport';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 
@@ -459,13 +460,32 @@ export function SettingsDialog({
                           />
                           <label
                             className="block text-sm font-medium mt-6"
-                            htmlFor="verification-command"
+                            htmlFor="project-base-branch"
                           >
-                            Verification command reminder
+                            Target branch
                           </label>
                           <p className="settings-row-description mb-3">
-                            Shown when reviewing workspace changes. This does not execute the
-                            command.
+                            New tasks start from this local branch. Their review keeps the same
+                            target even if you switch branches later.
+                          </p>
+                          <input
+                            id="project-base-branch"
+                            className="settings-input w-full"
+                            value={project.preferences?.baseBranch ?? ''}
+                            placeholder={project.gitBranch}
+                            onChange={(e) =>
+                              updateProjectPreferences(project.id, { baseBranch: e.target.value })
+                            }
+                          />
+                          <label
+                            className="block text-sm font-medium mt-6"
+                            htmlFor="verification-command"
+                          >
+                            Verification command
+                          </label>
+                          <p className="settings-row-description mb-3">
+                            Run from task review, or by an agent through the verification tool.
+                            Commands use your OS permissions and stop after five minutes.
                           </p>
                           <input
                             id="verification-command"
@@ -480,8 +500,8 @@ export function SettingsDialog({
                           />
                           <p className="settings-disclosure-box">
                             Choose isolation in the task composer. Isolated tasks use .worktrees and
-                            the current checkout; parallel tasks use master. Custom worktree
-                            locations, base branches and automatic cleanup are planned.
+                            the selected target branch. Custom worktree locations and automatic
+                            cleanup are planned.
                           </p>
                         </>
                       )}
@@ -489,6 +509,7 @@ export function SettingsDialog({
                   )}
                   {c === 'Data & reset' && (
                     <>
+                      <ReleaseSupport />
                       <p className="settings-section-subtitle mb-6">
                         Manage this Jackalope profile on this computer.
                       </p>

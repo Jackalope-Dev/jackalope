@@ -13,12 +13,6 @@ export interface SystemInfo {
   git_available: boolean;
 }
 
-export interface AgentProcessResult {
-  pid: number;
-  status: string;
-  message: string;
-}
-
 export const isTauriEnvironment = (): boolean => {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 };
@@ -57,23 +51,6 @@ export async function getSystemInfo(): Promise<SystemInfo> {
   }
 
   throw new Error('Device information is available in the desktop app.');
-}
-
-export async function spawnAgentProcess(
-  program: string,
-  args: string[],
-  workingDir: string,
-): Promise<AgentProcessResult> {
-  if (isTauriEnvironment()) {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<AgentProcessResult>('agent_spawn_process', {
-      program,
-      args,
-      workingDir,
-    });
-  }
-
-  throw new Error('Open the desktop app to start a process.');
 }
 
 // --- Native PTY terminal streaming (see src-tauri/src/commands/pty.rs) ---

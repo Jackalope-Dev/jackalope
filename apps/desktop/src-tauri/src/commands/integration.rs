@@ -16,7 +16,11 @@ static INTEGRATION_LOCK: Mutex<()> = Mutex::new(());
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
 pub fn execution_guard() -> Result<std::sync::MutexGuard<'static, ()>, String> {
-    INTEGRATION_LOCK.lock().map_err(|e| e.to_string())
+    let guard = INTEGRATION_LOCK.lock().map_err(|e| e.to_string())?;
+    if super::release::installing() {
+        return Err("Wait for the app update to finish before changing work.".into());
+    }
+    Ok(guard)
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -35,6 +39,8 @@ pub struct IntegrationPlan {
     pub id: String,
     pub project_path: String,
     pub master_head: String,
+    #[serde(default = "legacy_target_branch")]
+    pub target_branch: String,
     pub integration_head: Option<String>,
     pub run_ids: Vec<String>,
     pub sources: Vec<IntegrationSource>,
@@ -44,6 +50,10 @@ pub struct IntegrationPlan {
     pub status: String,
     pub created_at: String,
     pub applied_at: Option<String>,
+}
+
+fn legacy_target_branch() -> String {
+    "master".into()
 }
 
 fn command(path: &Path, args: &[&str]) -> Command {
@@ -154,6 +164,10 @@ fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSource, String
     })
 }
 
+pub(super) fn workspace_tree(run: &TaskRun, directory: &Path) -> Result<String, String> {
+    Ok(snapshot(run, directory)?.tree)
+}
+
 fn commit_tree(path: &Path, tree: &str, parents: &[&str], message: &str) -> Result<String, String> {
     let name = git(path, &["config", "user.name"])
         .map_err(|_| "Set Git user.name before preparing an integration.".to_string())?;
@@ -260,16 +274,58 @@ fn preview(path: &Path, base: &str, target: &str) -> Result<(Vec<String>, String
     Ok((files, clipped))
 }
 
+fn require_verification(run: &TaskRun, tree: &str) -> Result<(), String> {
+    if run
+        .verify_command
+        .as_ref()
+        .is_some_and(|s| !s.trim().is_empty())
+        || run.verification.is_some()
+    {
+        let check = run
+            .verification
+            .as_ref()
+            .ok_or("Run project verification before preparing integration.")?;
+        if !check.result.success
+            || check.tree.as_deref() != Some(tree)
+            || run
+                .verify_command
+                .as_ref()
+                .filter(|s| !s.trim().is_empty())
+                .is_some_and(|saved| saved != &check.command)
+        {
+            return Err("Project verification failed or the files changed after verification. Run checks again before integration.".into());
+        }
+    }
+    Ok(())
+}
+
 fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<IntegrationPlan, String> {
     fs::create_dir_all(directory).map_err(|e| e.to_string())?;
     let selected = selected_runs(runs, ids)?;
     let project = canonical(&selected[0].project_path)?;
-    let master = git(&project, &["rev-parse", "refs/heads/master"])
-        .map_err(|_| "This project needs a local master branch before integration.".to_string())?;
+    let target_branch = selected[0]
+        .target_branch
+        .clone()
+        .unwrap_or_else(legacy_target_branch);
+    if selected
+        .iter()
+        .any(|run| run.target_branch.as_deref().unwrap_or("master") != target_branch)
+    {
+        return Err("Select tasks with the same target branch.".into());
+    }
+    super::tasks::resolve_target_branch(
+        project.to_str().ok_or("Invalid project path")?,
+        Some(&target_branch),
+    )?;
+    let master = git(
+        &project,
+        &["rev-parse", &format!("refs/heads/{target_branch}")],
+    )?;
     let mut plan = IntegrationPlan {
         id: unique_id(),
         project_path: selected[0].project_path.clone(),
         master_head: master.clone(),
+        target_branch,
         integration_head: None,
         run_ids: ids.to_vec(),
         sources: vec![],
@@ -284,6 +340,7 @@ fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<Integra
     let mut preview_target = master;
     for run in &selected {
         let source = snapshot(run, directory)?;
+        require_verification(run, &source.tree)?;
         let base = git(
             &project,
             &[
@@ -381,7 +438,8 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
         .clone()
         .ok_or("Integration commit is missing.")?;
     let project = canonical(&plan.project_path)?;
-    let current = git(&project, &["rev-parse", "refs/heads/master"])?;
+    let reference = format!("refs/heads/{}", plan.target_branch);
+    let current = git(&project, &["rev-parse", &reference])?;
     if plan.status == "applying"
         && command(&project, &["merge-base", "--is-ancestor", &head, &current])
             .status()
@@ -394,12 +452,15 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
         return Ok(plan);
     }
     if current != plan.master_head {
-        return Err("Master changed since this review. Prepare a fresh integration.".into());
-    }
-    if git(&project, &["symbolic-ref", "--quiet", "HEAD"])? != "refs/heads/master" {
         return Err(
-            "Switch the project checkout to master before applying this integration.".into(),
+            "The target branch changed since this review. Prepare a fresh integration.".into(),
         );
+    }
+    if git(&project, &["symbolic-ref", "--quiet", "HEAD"])? != reference {
+        return Err(format!(
+            "Switch the project checkout to {} before applying this integration.",
+            plan.target_branch
+        ));
     }
     if !git(
         &project,
@@ -407,7 +468,7 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
     )?
     .is_empty()
     {
-        return Err("Master has local changes. Review and commit or move them before integration; Jackalope will not stash them.".into());
+        return Err("The target checkout has local changes. Review and commit or move them before integration; Jackalope will not stash them.".into());
     }
     let selected = selected_runs(runs, &plan.run_ids)?;
     if canonical(&selected[0].project_path)? != project {
@@ -420,6 +481,7 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
             .find(|source| source.run_id == run.id)
             .ok_or("A task snapshot is missing.")?;
         let now = snapshot(run, directory)?;
+        require_verification(run, &now.tree)?;
         if before.head != now.head
             || before.tree != now.tree
             || before.status != now.status
@@ -453,7 +515,7 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
     )?;
     plan.status = "applied".into();
     plan.applied_at = Some(Utc::now().to_rfc3339());
-    save(directory, &plan).map_err(|e| format!("Master was updated, but saving the receipt failed: {e}. Reload and apply this same plan to recover the receipt."))?;
+    save(directory, &plan).map_err(|e| format!("The target branch was updated, but saving the receipt failed: {e}. Reload and apply this same plan to recover the receipt."))?;
     Ok(plan)
 }
 
@@ -490,12 +552,17 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
             .ok_or("An applied integration is missing its Git reference.")?;
         let result = command(
             Path::new(&plan.project_path),
-            &["merge-base", "--is-ancestor", head, "refs/heads/master"],
+            &[
+                "merge-base",
+                "--is-ancestor",
+                head,
+                &format!("refs/heads/{}", plan.target_branch),
+            ],
         )
         .output()
         .map_err(|e| e.to_string())?;
         if !result.status.success() {
-            return Err(format!("Dispatch paused: master in {} no longer contains integration {}. Restore that integration before running dependent work.", plan.project_path, plan.id));
+            return Err(format!("Dispatch paused: the target branch in {} no longer contains integration {}. Restore that integration before running dependent work.", plan.project_path, plan.id));
         }
         for id in plan.run_ids {
             if let Some(source) = runs.iter().find(|run| run.id == id) {
@@ -646,6 +713,70 @@ mod tests {
     }
 
     #[test]
+    fn main_and_custom_targets_remain_bound_when_the_checkout_changes() {
+        for branch in ["main", "feature/release"] {
+            let fixture = Fixture::new();
+            git(&fixture.project, &["branch", "-m", branch]).unwrap();
+            let mut run = fixture.run(1, "first.txt", "first\n");
+            run.target_branch = Some(branch.into());
+            let runs = vec![run.clone()];
+            let plan = prepare(&fixture.plans, &runs, &[run.id]).unwrap();
+            assert_eq!(plan.target_branch, branch);
+            git(&fixture.project, &["checkout", "-b", "unrelated"]).unwrap();
+            assert!(apply(&fixture.plans, &runs, &plan.id)
+                .unwrap_err()
+                .contains("Switch the project checkout"));
+            git(&fixture.project, &["checkout", branch]).unwrap();
+            apply(&fixture.plans, &runs, &plan.id).unwrap();
+            assert_eq!(
+                fs::read_to_string(fixture.project.join("first.txt")).unwrap(),
+                "first\n"
+            );
+            assert!(
+                reachable_run_ids(vec![load(&fixture.plans, &plan.id).unwrap()], &runs)
+                    .unwrap()
+                    .contains(&runs[0].id)
+            );
+        }
+    }
+
+    #[test]
+    fn failed_missing_or_stale_verification_cannot_be_integrated() {
+        let fixture = Fixture::new();
+        let mut run = fixture.run(1, "first.txt", "first\n");
+        run.verify_command = Some("test".into());
+        assert!(prepare(&fixture.plans, &[run.clone()], &[run.id.clone()])
+            .unwrap_err()
+            .contains("Run project verification"));
+        let tree = workspace_tree(&run, &fixture.plans).unwrap();
+        run.verification = Some(super::super::verification::Verification {
+            command: "test".into(),
+            checked_at: Utc::now().to_rfc3339(),
+            tree: Some(tree),
+            result: super::super::process_control::CommandResult {
+                exit_code: Some(1),
+                success: false,
+                timed_out: false,
+                stdout: String::new(),
+                stderr: String::new(),
+                truncated: false,
+                duration_ms: 1,
+            },
+        });
+        assert!(prepare(&fixture.plans, &[run.clone()], &[run.id.clone()]).is_err());
+        run.verification.as_mut().unwrap().result.success = true;
+        assert!(prepare(&fixture.plans, &[run.clone()], &[run.id.clone()]).is_ok());
+        fs::write(
+            Path::new(&run.workspace).join("first.txt"),
+            "changed after checks",
+        )
+        .unwrap();
+        assert!(prepare(&fixture.plans, &[run.clone()], &[run.id.clone()])
+            .unwrap_err()
+            .contains("files changed"));
+    }
+
+    #[test]
     fn independent_tasks_prepare_without_source_changes_then_apply_together() {
         let fixture = Fixture::new();
         let a = fixture.run(1, "first.txt", "first\n");
@@ -755,7 +886,7 @@ mod tests {
         git(&fixture.project, &["commit", "-m", "user change"]).unwrap();
         assert!(apply(&fixture.plans, &runs, &plan.id)
             .unwrap_err()
-            .contains("Master changed"));
+            .contains("target branch changed"));
         assert!(!fixture.project.join("new.txt").exists());
     }
 

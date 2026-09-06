@@ -1,8 +1,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, X } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { nativeTask } from '../../lib/task-runtime';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
@@ -199,6 +199,9 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
             projectId: project.id,
             projectName: project.name,
             projectPath: project.path,
+            targetBranch: project.preferences?.baseBranch || project.gitBranch,
+            verifyCommand: project.preferences?.verifyCommand,
+            agentAccounts: project.preferences?.agentAccounts,
             items: preview,
           },
         });

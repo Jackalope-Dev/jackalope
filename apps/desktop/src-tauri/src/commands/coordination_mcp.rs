@@ -52,6 +52,11 @@ struct MessageInput {
     text: String,
 }
 
+#[derive(Deserialize, schemars::JsonSchema)]
+struct UserResponseInput {
+    id: String,
+}
+
 fn request_headers(context: &RequestContext<RoleServer>) -> Result<HeaderMap, ErrorData> {
     context
         .extensions
@@ -157,18 +162,21 @@ impl CoordinationTools {
         Parameters(input): Parameters<super::harness::BrowserScreenshotRequest>,
     ) -> Result<CallToolResult, ErrorData> {
         let headers = request_headers(&context)?;
-        let run = self.service.authorized_run(&headers).map_err(bridge_error)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
         let workspace = std::path::PathBuf::from(&run.workspace);
         let artifact = super::harness::browser_screenshot(&workspace, input.name, input.url)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
         self.service.runtime.update(&run.id, |r| {
             r.screenshots.push(artifact.clone());
-            r.activity.push(format!("Captured browser screenshot: {}", artifact.name));
+            r.activity
+                .push(format!("Captured browser screenshot: {}", artifact.name));
         });
-        let value = serde_json::to_value(artifact).map_err(|_| {
-            ErrorData::internal_error("Could not encode screenshot artifact", None)
-        })?;
+        let value = serde_json::to_value(artifact)
+            .map_err(|_| ErrorData::internal_error("Could not encode screenshot artifact", None))?;
         Ok(CallToolResult::structured(value))
     }
 
@@ -197,13 +205,17 @@ impl CoordinationTools {
         Parameters(input): Parameters<super::harness::BrowserInteractRequest>,
     ) -> Result<CallToolResult, ErrorData> {
         let headers = request_headers(&context)?;
-        let run = self.service.authorized_run(&headers).map_err(bridge_error)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
         let action_desc = format!("{} on {}", input.action, input.selector);
         let res = super::harness::browser_interact(input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
         self.service.runtime.update(&run.id, |r| {
-            r.activity.push(format!("Browser interaction: {action_desc}"));
+            r.activity
+                .push(format!("Browser interaction: {action_desc}"));
         });
         Ok(CallToolResult::structured(res))
     }
@@ -218,21 +230,54 @@ impl CoordinationTools {
         Parameters(input): Parameters<super::harness::AskUserInput>,
     ) -> Result<CallToolResult, ErrorData> {
         let headers = request_headers(&context)?;
-        let run = self.service.authorized_run(&headers).map_err(bridge_error)?;
-        let question_text = input.question.clone();
-        let prompt = super::harness::ask_user_async(&run.id, input, std::time::Duration::from_secs(60)).await;
-        self.service.runtime.update(&run.id, |r| {
-            if let Some(existing) = r.prompts.iter_mut().find(|p| p.id == prompt.id) {
-                *existing = prompt.clone();
-            } else {
-                r.prompts.push(prompt.clone());
-            }
-            r.activity.push(format!("Asked user: {question_text}"));
-        });
-        let value = serde_json::to_value(prompt).map_err(|_| {
-            ErrorData::internal_error("Could not encode user prompt", None)
-        })?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        if run.prompts.len() >= 100 {
+            return Err(ErrorData::invalid_request(
+                "This attempt has reached the question limit.",
+                None,
+            ));
+        }
+        let prompt = super::harness::ask_user_async(
+            &run.id,
+            input,
+            std::time::Duration::from_secs(60),
+            |prompt| self.service.runtime.record_prompt(prompt),
+        )
+        .await;
+        self.service.runtime.record_prompt(&prompt);
+        let value = serde_json::to_value(prompt)
+            .map_err(|_| ErrorData::internal_error("Could not encode user prompt", None))?;
         Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
+        description = "Read the user's saved answer to a question from this attempt. Poll this after ask_user returns pending. An unanswered question is not approval.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn user_response(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<UserResponseInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        let prompt = run
+            .prompts
+            .iter()
+            .find(|p| p.id == input.id)
+            .ok_or_else(|| {
+                ErrorData::invalid_request("Question not found in this attempt", None)
+            })?;
+        Ok(CallToolResult::structured(
+            serde_json::to_value(prompt)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?,
+        ))
     }
 
     #[tool(
@@ -245,7 +290,10 @@ impl CoordinationTools {
         Parameters(input): Parameters<super::harness::RecordValidationInput>,
     ) -> Result<CallToolResult, ErrorData> {
         let headers = request_headers(&context)?;
-        let run = self.service.authorized_run(&headers).map_err(bridge_error)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
         let step = super::harness::ValidationStep {
             id: uuid::Uuid::new_v4().to_string(),
             step: input.step,
@@ -255,17 +303,20 @@ impl CoordinationTools {
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
         self.service.runtime.update(&run.id, |r| {
-            r.activity.push(format!("[Checkpoint: {}] {}", step.status.to_uppercase(), step.step));
+            r.activity.push(format!(
+                "[Checkpoint: {}] {}",
+                step.status.to_uppercase(),
+                step.step
+            ));
             r.validation_steps.push(step.clone());
         });
-        let value = serde_json::to_value(step).map_err(|_| {
-            ErrorData::internal_error("Could not encode validation step", None)
-        })?;
+        let value = serde_json::to_value(step)
+            .map_err(|_| ErrorData::internal_error("Could not encode validation step", None))?;
         Ok(CallToolResult::structured(value))
     }
 
     #[tool(
-        description = "Execute a verification command bounded inside the task workspace directory (e.g. 'pnpm' with ['test'] or 'cargo' with ['test']). Returns exit code, stdout, and stderr.",
+        description = "Execute the saved project verification command with a five-minute timeout in the task working directory (e.g. 'pnpm' with ['test'] or 'cargo' with ['test']). Returns exit code, stdout, and stderr.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn computer_verify(
@@ -274,22 +325,14 @@ impl CoordinationTools {
         Parameters(input): Parameters<super::harness::ComputerVerifyInput>,
     ) -> Result<CallToolResult, ErrorData> {
         let headers = request_headers(&context)?;
-        let run = self.service.authorized_run(&headers).map_err(bridge_error)?;
-        let mut cmd = std::process::Command::new(&input.command);
-        cmd.args(&input.args).current_dir(&run.workspace);
-        let output = cmd.output().map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        let exit_code = output.status.code();
-        self.service.runtime.update(&run.id, |r| {
-            r.activity.push(format!("Verification: {} {:?} -> exit {:?}", input.command, input.args, exit_code));
-        });
-        Ok(CallToolResult::structured(serde_json::json!({
-            "exit_code": exit_code,
-            "stdout": stdout,
-            "stderr": stderr,
-            "success": output.status.success(),
-        })))
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        super::verification::agent_verify(self.service.runtime.clone(), run, input)
+            .await
+            .map(CallToolResult::structured)
+            .map_err(|e| ErrorData::invalid_request(e, None))
     }
 }
 
@@ -336,7 +379,7 @@ mod tests {
         let router = CoordinationTools::tool_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
-        assert_eq!(names.len(), 9);
+        assert_eq!(names.len(), 10);
         assert!(names.contains(&"project"));
         assert!(names.contains(&"message"));
         assert!(names.contains(&"browser_navigate"));
@@ -344,6 +387,7 @@ mod tests {
         assert!(names.contains(&"browser_snapshot"));
         assert!(names.contains(&"browser_interact"));
         assert!(names.contains(&"ask_user"));
+        assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
         assert!(names.contains(&"computer_verify"));
         assert!(serde_json::from_value::<MessageInput>(

@@ -38,7 +38,8 @@ or push. Do not claim browser interaction was tested.
 
 Worktree creation does not install dependencies. Each task that needs to build
 must install them in its assigned worktree. Project Settings' verification
-command is displayed as a reminder; put required commands in the task prompt.
+command is saved with each attempt. Use **Run checks** in the completed task to
+record its result; failed or outdated required checks block integration.
 
 ## Make and review a change
 
@@ -50,13 +51,13 @@ to request corrections in the same task/workspace.
 
 For multiple tasks, use **Tasks > Parallel work**, **Add work**, and
 explicit file scopes and dependencies. Start with concurrency one, then enable
-**Run ready tasks**. Tasks start from committed local `master`; uncommitted
+**Run ready tasks**. Tasks start from the committed local target branch in Project Settings; uncommitted
 changes in the main checkout are excluded. Shared scopes and dependent tasks
 wait until prerequisite changes are actually integrated.
 
 In **Review & merge**, inspect the prepared combined patch and the verification
-evidence before applying it. **Merge tasks into master** creates commits as the
-configured Git user and fast-forwards the clean master checkout. The owner must
+evidence before applying it. **Merge tasks into <target branch>** creates commits as the
+configured Git user and fast-forwards its clean checkout. The owner must
 perform this action; agents must not commit or merge. Alternatively, review and
 integrate through ordinary Git tools. Resolve conflicts externally, then prepare
 a fresh review. Source worktrees remain available.

@@ -1,19 +1,22 @@
+pub mod capacity;
+pub mod coordination;
+pub mod coordination_mcp;
 pub mod git;
-pub mod agent;
+pub mod harness;
+pub mod integration;
+pub mod mcp;
 pub mod pty;
 pub mod system;
 pub mod tasks;
-pub mod coordination;
-pub mod integration;
-pub mod capacity;
-pub mod coordination_mcp;
-pub mod mcp;
-pub mod harness;
 
 pub mod agent_policy;
 pub mod agent_profiles;
 
-pub mod reset;
 pub mod history;
+pub mod reset;
 
 pub mod artifacts;
+
+pub mod process_control;
+pub mod release;
+pub mod verification;

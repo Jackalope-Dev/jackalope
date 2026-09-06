@@ -10,7 +10,7 @@ use commands::integration::*;
 use commands::mcp::*;
 use commands::reset::*;
 use commands::tasks::*;
-use commands::{agent::*, git::*, pty::*, system::*};
+use commands::{git::*, pty::*, system::*};
 use state::AppState;
 use tauri::Manager;
 use window_behavior::{desktop_set_close_to_tray, desktop_settings, setup_tray, WindowBehavior};
@@ -28,6 +28,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .manage(CapacityService::default())
         .setup(move |app| {
@@ -78,7 +79,9 @@ pub fn run() {
             app_finish_reset,
             git_list_worktrees,
             git_create_worktree,
-            agent_spawn_process,
+            commands::release::app_diagnostics,
+            commands::release::app_release_status,
+            commands::release::app_install_update,
             system_get_info,
             pty_spawn,
             pty_write,
@@ -96,6 +99,7 @@ pub fn run() {
             task_stop,
             task_mark_reviewed,
             task_review,
+            commands::verification::task_verify,
             task_respond_prompt,
             queue_snapshot,
             queue_add,

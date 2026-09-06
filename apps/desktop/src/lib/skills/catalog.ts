@@ -152,13 +152,13 @@ export const VETTED_SKILLS: SkillDefinition[] = [
     shortLabel: 'Git Isolation',
     iconName: 'GitBranch',
     description:
-      'Worktree isolation, clean conventional commits, and conflict-free integration into master.',
+      'Worktree isolation, clean conventional commits, and conflict-free integration into the selected target branch.',
     category: 'git',
     triggers: [
       /\b(git|worktree|branch|merge|rebase|conflict|pr|pull request|commit|cherry-pick)\b/i,
     ],
     guidelines: [
-      'Execute agent tasks inside isolated git worktrees (.worktrees/<slug>) to keep master pristine.',
+      'Work in the assigned task worktree. Do not create another worktree or modify the project checkout.',
       'Author commits exclusively under the active working user (never add bot or co-authored trailers).',
       'Write clear, imperative conventional commit messages (feat:, fix:, docs:, refactor:).',
       'Ensure the combined workspace builds and passes all checks before requesting integration.',

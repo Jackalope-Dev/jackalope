@@ -8,8 +8,8 @@ import {
   type TaskRun,
 } from '../lib/task-runtime';
 import { isTauriEnvironment } from '../lib/tauri-bridge';
-import { useMascotStore } from './mascotStore';
 import { syncAgentConfig } from './agentConfigStore';
+import { useMascotStore } from './mascotStore';
 
 export interface TaskDraft {
   prompt: string;
@@ -45,7 +45,10 @@ export const useExecutionStore = create<ExecutionState>()(
       discovering: false,
       submitting: false,
       drafts: {},
-      select: (selectedId) => set({ selectedId }),
+      select: (selectedId) => {
+        set({ selectedId });
+        void get().refresh();
+      },
       draft: (key, value) =>
         set((state) => ({
           drafts: { ...state.drafts, [key]: { ...emptyDraft, ...state.drafts[key], ...value } },
@@ -63,9 +66,12 @@ export const useExecutionStore = create<ExecutionState>()(
       },
       refresh: () => {
         if (refreshing) return refreshing;
-        refreshing = (async () => {
+        const detailId = get().selectedId;
+        refreshing = Promise.resolve().then(async () => {
           try {
-            const runs = isTauriEnvironment() ? await nativeTask<TaskRun[]>('task_runs') : [];
+            const runs = isTauriEnvironment()
+              ? await nativeTask<TaskRun[]>('task_runs', { detailId })
+              : [];
             const working = runs.some(isActive);
             const wasWorking = get().runs.some(isActive);
             set({ runs, loading: false, error: null });
@@ -75,8 +81,9 @@ export const useExecutionStore = create<ExecutionState>()(
             set({ error: String(error), loading: false });
           } finally {
             refreshing = undefined;
+            if (get().selectedId !== detailId) queueMicrotask(() => void get().refresh());
           }
-        })();
+        });
         return refreshing;
       },
       start: async (request) => {

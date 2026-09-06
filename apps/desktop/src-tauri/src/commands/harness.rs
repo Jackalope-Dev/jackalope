@@ -9,19 +9,25 @@ use std::time::Duration;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PendingUserPrompt {
     pub id: String,
+    #[serde(alias = "run_id")]
     pub run_id: String,
     pub question: String,
     #[serde(default = "default_input_type")]
+    #[serde(alias = "input_type")]
     pub input_type: String, // "text" | "choice" | "confirmation"
     #[serde(default)]
     pub options: Vec<String>,
     #[serde(default)]
+    #[serde(alias = "default_value")]
     pub default_value: Option<String>,
     pub status: String, // "pending" | "answered"
     pub answer: Option<String>,
+    #[serde(alias = "created_at")]
     pub created_at: String,
+    #[serde(alias = "answered_at")]
     pub answered_at: Option<String>,
 }
 
@@ -42,10 +48,12 @@ pub struct ValidationStep {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ScreenshotArtifact {
     pub id: String,
     pub name: String,
     pub url: String,
+    #[serde(alias = "file_path")]
     pub file_path: String,
     pub width: u32,
     pub height: u32,
@@ -54,15 +62,21 @@ pub struct ScreenshotArtifact {
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BrowserNavigateRequest {
-    #[schemars(description = "The target URL to navigate to (e.g. http://localhost:5173/onboarding)")]
+    #[schemars(
+        description = "The target URL to navigate to (e.g. http://localhost:5173/onboarding)"
+    )]
     pub url: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BrowserScreenshotRequest {
-    #[schemars(description = "Optional label or filename for the screenshot, e.g. 'onboarding_step_1'")]
+    #[schemars(
+        description = "Optional label or filename for the screenshot, e.g. 'onboarding_step_1'"
+    )]
     pub name: Option<String>,
-    #[schemars(description = "The URL to capture. If omitted, uses the last selected URL; an explicit URL is required when none is selected")]
+    #[schemars(
+        description = "The URL to capture. If omitted, uses the last selected URL; an explicit URL is required when none is selected"
+    )]
     pub url: Option<String>,
 }
 
@@ -70,7 +84,9 @@ pub struct BrowserScreenshotRequest {
 pub struct BrowserInteractRequest {
     #[schemars(description = "Interaction type: 'click', 'type', 'scroll', or 'select'")]
     pub action: String,
-    #[schemars(description = "CSS selector or element text target, e.g. 'button[type=submit]' or '#email'")]
+    #[schemars(
+        description = "CSS selector or element text target, e.g. 'button[type=submit]' or '#email'"
+    )]
     pub selector: String,
     #[schemars(description = "Text to type if action is 'type'")]
     pub text: Option<String>,
@@ -93,7 +109,9 @@ pub struct AskUserInput {
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RecordValidationInput {
-    #[schemars(description = "Title or description of the validation checkpoint, e.g. 'Step 2: Submit profile form'")]
+    #[schemars(
+        description = "Title or description of the validation checkpoint, e.g. 'Step 2: Submit profile form'"
+    )]
     pub step: String,
     #[schemars(description = "Status: 'passed', 'failed', 'in_progress', or 'pending'")]
     pub status: String,
@@ -109,7 +127,9 @@ pub struct RecordValidationInput {
 pub struct ComputerVerifyInput {
     #[schemars(description = "Command executable to run for verification, e.g. 'pnpm' or 'cargo'")]
     pub command: String,
-    #[schemars(description = "Arguments to pass to the verification command, e.g. ['test'] or ['build']")]
+    #[schemars(
+        description = "Arguments to pass to the verification command, e.g. ['test'] or ['build']"
+    )]
     #[serde(default)]
     pub args: Vec<String>,
 }
@@ -152,7 +172,12 @@ pub fn find_browser_executable() -> Option<PathBuf> {
     }
     #[cfg(unix)]
     {
-        for binary in ["google-chrome", "chromium", "microsoft-edge", "chromium-browser"] {
+        for binary in [
+            "google-chrome",
+            "chromium",
+            "microsoft-edge",
+            "chromium-browser",
+        ] {
             if let Ok(output) = Command::new("which").arg(binary).output() {
                 if output.status.success() {
                     let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -201,7 +226,10 @@ pub async fn browser_screenshot(
         .or_else(|| harness().last_browser_url.lock().unwrap().clone())
         .ok_or("Choose a target URL before capturing browser evidence")?;
 
-    let artifact_dir = workspace_path.join(".jackalope").join("artifacts").join("screenshots");
+    let artifact_dir = workspace_path
+        .join(".jackalope")
+        .join("artifacts")
+        .join("screenshots");
     std::fs::create_dir_all(&artifact_dir).map_err(|e| e.to_string())?;
 
     let filename = format!(
@@ -209,7 +237,11 @@ pub async fn browser_screenshot(
         Uuid::new_v4(),
         name.unwrap_or_else(|| "viewport".into())
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+            .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            })
             .collect::<String>()
     );
     let output_path = artifact_dir.join(&filename);
@@ -225,16 +257,21 @@ pub async fn browser_screenshot(
             &format!("--screenshot={}", output_path.to_string_lossy()),
             &url,
         ]);
-        let output = cmd.output().map_err(|e| format!("Browser execution failed: {e}"))?;
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Browser execution failed: {e}"))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Headless browser failed to capture screenshot: {stderr}"));
+            return Err(format!(
+                "Headless browser failed to capture screenshot: {stderr}"
+            ));
         }
     } else {
         return Err("No supported browser is installed. Screenshot capture is unavailable.".into());
     }
 
-    let bytes = std::fs::read(&output_path).map_err(|e| format!("Could not read screenshot: {e}"))?;
+    let bytes =
+        std::fs::read(&output_path).map_err(|e| format!("Could not read screenshot: {e}"))?;
     let (width, height) = png_dimensions(&bytes)?;
 
     Ok(ScreenshotArtifact {
@@ -281,9 +318,7 @@ pub async fn browser_snapshot(target_url: Option<String>) -> Result<serde_json::
     Err("Browser DOM capture failed or no supported browser is installed.".into())
 }
 
-pub async fn browser_interact(
-    _req: BrowserInteractRequest,
-) -> Result<serde_json::Value, String> {
+pub async fn browser_interact(_req: BrowserInteractRequest) -> Result<serde_json::Value, String> {
     Err("Browser interaction is not implemented. No action was performed.".into())
 }
 
@@ -292,6 +327,7 @@ pub async fn ask_user_async(
     run_id: &str,
     input: AskUserInput,
     wait_duration: Duration,
+    registered: impl FnOnce(&PendingUserPrompt),
 ) -> PendingUserPrompt {
     let prompt_id = Uuid::new_v4().to_string();
     let prompt = PendingUserPrompt {
@@ -313,6 +349,7 @@ pub async fn ask_user_async(
         .lock()
         .unwrap()
         .insert(prompt_id.clone(), tx);
+    registered(&prompt);
 
     if wait_duration.as_millis() > 0 {
         if let Ok(Ok(answer)) = tokio::time::timeout(wait_duration, rx).await {
@@ -335,7 +372,11 @@ pub async fn ask_user_async(
     // persisted TaskRun.prompts entry (task_respond_prompt), independent
     // of this channel, so removing it here changes no observable behavior
     // besides making that later return value honest.
-    harness().pending_prompt_senders.lock().unwrap().remove(&prompt_id);
+    harness()
+        .pending_prompt_senders
+        .lock()
+        .unwrap()
+        .remove(&prompt_id);
     prompt
 }
 
@@ -348,8 +389,7 @@ pub fn resolve_user_prompt(prompt_id: &str, answer: &str) -> bool {
         .remove(prompt_id);
 
     if let Some(tx) = sender {
-        let _ = tx.send(answer.to_string());
-        true
+        tx.send(answer.to_string()).is_ok()
     } else {
         false
     }
@@ -358,6 +398,24 @@ pub fn resolve_user_prompt(prompt_id: &str, answer: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_prompt_and_screenshot_records_serialize_for_the_ui() {
+        let prompt: PendingUserPrompt = serde_json::from_value(serde_json::json!({
+            "id": "question", "run_id": "attempt", "question": "Choose", "input_type": "choice", "options": ["A", "B"],
+            "default_value": "A", "status": "pending", "answer": null, "created_at": "now", "answered_at": null
+        })).unwrap();
+        let value = serde_json::to_value(prompt).unwrap();
+        assert_eq!(value["inputType"], "choice");
+        assert_eq!(value["createdAt"], "now");
+        let screenshot: ScreenshotArtifact = serde_json::from_value(serde_json::json!({
+            "id": "image", "name": "Check", "url": "http://localhost", "file_path": "evidence.png", "width": 960, "height": 640, "timestamp": "now"
+        })).unwrap();
+        assert_eq!(
+            serde_json::to_value(screenshot).unwrap()["filePath"],
+            "evidence.png"
+        );
+    }
 
     #[tokio::test]
     async fn target_selection_does_not_claim_navigation() {
@@ -370,8 +428,12 @@ mod tests {
     #[tokio::test]
     async fn unsupported_interaction_fails() {
         assert!(browser_interact(BrowserInteractRequest {
-            action: "click".into(), selector: "button".into(), text: None,
-        }).await.is_err());
+            action: "click".into(),
+            selector: "button".into(),
+            text: None,
+        })
+        .await
+        .is_err());
     }
 
     // Both scenarios share one test function rather than running as separate
@@ -391,22 +453,24 @@ mod tests {
 
         // Times out with no answer: cleaned up, so a later resolve for the
         // same ID is honest (finds nothing, doesn't falsely report success).
-        let timed_out = ask_user_async("run-a", question(), Duration::from_millis(20)).await;
+        let timed_out =
+            ask_user_async("run-a", question(), Duration::from_millis(20), |_| {}).await;
         assert_eq!(timed_out.status, "pending");
         assert!(!resolve_user_prompt(&timed_out.id, "too late"));
 
         // Answered within the wait window: delivered through the channel.
-        let wait = tokio::spawn(ask_user_async("run-b", question(), Duration::from_secs(5)));
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        let pending_ids: Vec<_> = harness()
-            .pending_prompt_senders
-            .lock()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect();
-        assert_eq!(pending_ids.len(), 1, "only run-b's prompt should still be pending");
-        assert!(resolve_user_prompt(&pending_ids[0], "yes"));
+        let (registered, observed) = tokio::sync::oneshot::channel();
+        let wait = tokio::spawn(ask_user_async(
+            "run-b",
+            question(),
+            Duration::from_secs(5),
+            move |prompt| {
+                let _ = registered.send(prompt.clone());
+            },
+        ));
+        let visible = observed.await.unwrap();
+        assert_eq!(visible.status, "pending");
+        assert!(resolve_user_prompt(&visible.id, "yes"));
         let answered = wait.await.unwrap();
         assert_eq!(answered.status, "answered");
         assert_eq!(answered.answer.as_deref(), Some("yes"));

@@ -1,9 +1,10 @@
+use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     collections::HashMap,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{Arc, Mutex},
@@ -11,7 +12,6 @@ use std::{
 };
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
-use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +37,16 @@ pub struct TaskRun {
     pub base_head: String,
     pub agent: String,
     pub account: String,
+    #[serde(default)]
+    pub account_binding: Option<super::agent_profiles::AccountBinding>,
+    #[serde(default)]
+    pub target_branch: Option<String>,
+    #[serde(default)]
+    pub process_contained: bool,
+    #[serde(default)]
+    pub verify_command: Option<String>,
+    #[serde(default)]
+    pub verification: Option<super::verification::Verification>,
     pub model: Option<String>,
     pub prompt: String,
     pub status: String,
@@ -44,6 +54,8 @@ pub struct TaskRun {
     pub ended_at: Option<String>,
     pub session_id: Option<String>,
     pub result: String,
+    #[serde(default)]
+    pub details_omitted: bool,
     pub activity: Vec<String>,
     #[serde(default)]
     pub diagnostics: Vec<String>,
@@ -73,6 +85,12 @@ pub struct RunRequest {
     /// today's (and every existing caller's) unchanged behavior.
     #[serde(default)]
     pub agent_profile_id: Option<String>,
+    #[serde(default)]
+    pub verify_command: Option<String>,
+    #[serde(default)]
+    pub target_branch: Option<String>,
+    #[serde(skip)]
+    pub account_binding: Option<super::agent_profiles::AccountBinding>,
     pub prompt: String,
     pub isolated: bool,
     pub previous_run_id: Option<String>,
@@ -173,6 +191,24 @@ fn git(path: &str, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim_end().into())
 }
 
+pub(super) fn resolve_target_branch(path: &str, requested: Option<&str>) -> Result<String, String> {
+    let branch = match requested {
+        Some(branch) => branch.to_string(),
+        None => git(path, &["symbolic-ref", "--quiet", "--short", "HEAD"]).map_err(|_| {
+            "Choose a local target branch; this repository has a detached HEAD.".to_string()
+        })?,
+    };
+    let reference = format!("refs/heads/{branch}");
+    git(path, &["check-ref-format", &reference])
+        .map_err(|_| "Choose a valid local branch.".to_string())?;
+    git(
+        path,
+        &["rev-parse", "--verify", &format!("{reference}^{{commit}}")],
+    )
+    .map_err(|_| format!("The local branch {branch} does not exist or has no commits."))?;
+    Ok(branch)
+}
+
 fn valid_id(id: &str) -> bool {
     (8..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
@@ -187,10 +223,7 @@ pub(super) fn probe_auth(
     if let Some((name, dir)) = env {
         cmd.env(name, dir);
     }
-    let mut child = cmd
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()?;
+    let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
     let stdout = child.stdout.take().unwrap();
     let reader = std::thread::spawn(move || {
         let mut data = Vec::new();
@@ -245,7 +278,9 @@ impl TaskRuntime {
                 continue;
             }
             if path.extension().is_some_and(|ext| ext == "json") {
-                let parsed = std::fs::read(&path)
+                let parsed = std::fs::metadata(&path).map_err(|e| e.to_string())
+                    .and_then(|metadata| if metadata.len() > 8_000_000 { Err("History file exceeds the 8 MB load limit; preserved for manual recovery.".into()) } else { Ok(()) })
+                    .and_then(|_| std::fs::read(&path).map_err(|e| e.to_string()))
                     .map_err(|e| e.to_string())
                     .and_then(|data| {
                         serde_json::from_slice::<TaskRun>(&data).map_err(|e| e.to_string())
@@ -259,11 +294,21 @@ impl TaskRuntime {
                     });
                 match parsed {
                     Err(reason) => {
-                        runtime.inner.lock().unwrap().recovery.push(quarantine(&path, reason));
+                        runtime
+                            .inner
+                            .lock()
+                            .unwrap()
+                            .recovery
+                            .push(quarantine(&path, reason));
                     }
                     Ok(mut run) => {
                         if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
-                            run.status = "interrupted".into();
+                            run.status = if cfg!(windows) && run.process_contained {
+                                "stopped"
+                            } else {
+                                "interrupted"
+                            }
+                            .into();
                             run.error = Some("Jackalope closed before this attempt finished. Review its workspace before continuing; work was not automatically rerun.".into());
                             run.ended_at = Some(Utc::now().to_rfc3339());
                             runtime.save(&run)?;
@@ -278,7 +323,12 @@ impl TaskRuntime {
                 }
             }
         }
-        runtime.inner.lock().unwrap().recovery.sort_by(|a, b| a.path.cmp(&b.path));
+        runtime
+            .inner
+            .lock()
+            .unwrap()
+            .recovery
+            .sort_by(|a, b| a.path.cmp(&b.path));
         Ok(runtime)
     }
 
@@ -296,6 +346,29 @@ impl TaskRuntime {
         let mut inner = self.inner.lock().unwrap();
         if let Some(run) = inner.runs.get_mut(id) {
             update(run);
+            if run.result.len() > 128_000 {
+                let mut end = 128_000;
+                while !run.result.is_char_boundary(end) {
+                    end -= 1;
+                }
+                run.result.truncate(end);
+                run.result.push_str(
+                    "\n[Result truncated; inspect the agent session for complete output.]",
+                );
+            }
+            if run.validation_steps.len() > 200 {
+                run.validation_steps
+                    .drain(..run.validation_steps.len() - 200);
+            }
+            if run.screenshots.len() > 100 {
+                run.screenshots.drain(..run.screenshots.len() - 100);
+            }
+            if run.activity.len() > 150 {
+                run.activity.drain(..run.activity.len() - 150);
+            }
+            if run.diagnostics.len() > 150 {
+                run.diagnostics.drain(..run.diagnostics.len() - 150);
+            }
             if let Err(error) = self.save(run) {
                 run.persistence_error = Some(format!("History could not be saved: {error}"));
             }
@@ -312,11 +385,28 @@ impl TaskRuntime {
 
     pub(super) fn request_reset(&self) -> Result<(), String> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
-        if inner.runs.values().any(|run| ["starting", "running", "stopping"].contains(&run.status.as_str())) {
+        if inner
+            .runs
+            .values()
+            .any(|run| ["starting", "running", "stopping"].contains(&run.status.as_str()))
+        {
             return Err("Stop active tasks before resetting Jackalope.".into());
         }
         super::reset::reject_links(&self.directory)?;
-        std::fs::write(self.directory.join(super::reset::RESET_MARKER), uuid::Uuid::new_v4().to_string()).map_err(|e| e.to_string())
+        std::fs::write(
+            self.directory.join(super::reset::RESET_MARKER),
+            uuid::Uuid::new_v4().to_string(),
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    pub(super) fn is_running(&self, id: &str) -> bool {
+        self.inner
+            .lock()
+            .unwrap()
+            .runs
+            .get(id)
+            .is_some_and(|run| ["starting", "running"].contains(&run.status.as_str()))
     }
 
     pub fn stop_all(&self) {
@@ -369,12 +459,19 @@ impl TaskRuntime {
 
     fn execute(&self, id: &str, req: &RunRequest, previous: Option<TaskRun>) -> Result<(), String> {
         let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
-        let base_ref = if req.coordination.is_some() {
-            "refs/heads/master"
-        } else {
-            "HEAD"
-        };
-        let base = git(&root, &["rev-parse", base_ref])?;
+        let base_ref = format!(
+            "refs/heads/{}",
+            req.target_branch
+                .as_deref()
+                .ok_or("Choose a target branch before running work.")?
+        );
+        let base = git(&root, &["rev-parse", &base_ref])?;
+        if previous.is_none()
+            && !req.isolated
+            && git(&root, &["symbolic-ref", "--quiet", "HEAD"])? != base_ref
+        {
+            return Err("The checkout is on a different branch. Switch to the target branch or enable an isolated worktree.".into());
+        }
         let (workspace, branch, base_head) = if let Some(ref old) = previous {
             if old.session_id.is_none() {
                 return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
@@ -440,13 +537,12 @@ impl TaskRuntime {
         let selected_model = policy.model(&req.agent, req.model.as_deref())?;
         let mut cmd = command(executable);
         if let Some(env_name) = super::agent_profiles::env_var_for(&adapter) {
-            if let Some(dir) = super::agent_profiles::resolve_profile_dir(
-                &self.profiles_root(),
-                &adapter,
-                req.agent_profile_id.as_deref(),
-            ) {
-                cmd.env(env_name, dir);
-            }
+            let binding = req
+                .account_binding
+                .as_ref()
+                .ok_or("Account selection is missing. Start a new task.")?;
+            super::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
+            cmd.env(env_name, &binding.directory);
         }
         if adapter == "codex" {
             cmd.args([
@@ -499,9 +595,9 @@ impl TaskRuntime {
                     "--mcp-config",
                     &config.to_string(),
                     "--allowedTools",
-                    "mcp__jackalope__project,mcp__jackalope__message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__ask_user,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify",
+                    "mcp__jackalope__project,mcp__jackalope__message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify",
                 ]);
-                input.push_str("\nClaude harness tools: You have access to in-app browser automation, interactive user questions, and structured verification via provided mcp__jackalope__* tools (browser_navigate, browser_screenshot, browser_snapshot, browser_interact, ask_user, record_validation_step, computer_verify). If testing UI changes or onboarding flows, proactively use browser_screenshot and record_validation_step to provide verifiable evidence, and ask_user if you need test data or confirmation.\n");
+                input.push_str("\nClaude harness tools: You have access to in-app browser automation, interactive user questions, and structured verification via provided mcp__jackalope__* tools (browser_navigate, browser_screenshot, browser_snapshot, browser_interact, ask_user, record_validation_step, computer_verify). If testing UI changes or onboarding flows, proactively use browser_screenshot and record_validation_step to provide verifiable evidence, and ask_user if you need test data or confirmation. If a question returns pending, use user_response with its ID to read the saved answer.\n");
             }
         }
         if adapter == "grok" {
@@ -534,6 +630,14 @@ impl TaskRuntime {
         let mut child = cmd
             .spawn()
             .map_err(|e| format!("Could not launch {}: {e}", req.agent))?;
+        let tree = match super::process_control::ProcessTree::attach(&child) {
+            Ok(tree) => tree,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        };
         let mut stdin = child.stdin.take().ok_or("Missing agent input")?;
         let stdout = child.stdout.take().ok_or("Missing agent output")?;
         let stderr = child.stderr.take().ok_or("Missing agent diagnostics")?;
@@ -541,6 +645,7 @@ impl TaskRuntime {
         inner.processes.insert(id.into(), process.clone());
         drop(inner);
         self.update(id, |r| {
+            r.process_contained = cfg!(windows);
             if r.status == "starting" {
                 r.status = "running".into();
             }
@@ -559,31 +664,34 @@ impl TaskRuntime {
         let event_id = id.to_string();
         let output_adapter = adapter.clone();
         let reader = std::thread::spawn(move || {
-            for line in BufReader::new(stdout).lines() {
-                match line {
-                    Ok(line) => runtime.update(&event_id, |r| {
-                        consume_adapter_event(r, &line, &output_adapter)
-                    }),
-                    Err(error) => {
-                        runtime.update(&event_id, |r| {
-                            r.error = Some(format!("Agent output could not be read: {error}"))
-                        });
-                        break;
-                    }
-                }
+            if let Err(error) = super::process_control::bounded_lines(
+                BufReader::new(stdout),
+                1_000_000,
+                |line, truncated| {
+                    runtime.update(&event_id, |r| {
+                    if truncated { activity(r, "An oversized agent event was omitted. Inspect the agent session for full output."); }
+                    else { consume_adapter_event(r, &line, &output_adapter); }
+                });
+                },
+            ) {
+                runtime.update(&event_id, |r| {
+                    r.error = Some(format!("Agent output could not be read: {error}"))
+                });
             }
         });
         let runtime = self.clone();
         let event_id = id.to_string();
         let diagnostics = std::thread::spawn(move || {
-            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                runtime.update(&event_id, |r| {
-                    r.diagnostics.push(line.chars().take(6000).collect());
-                    if r.diagnostics.len() > 150 {
-                        r.diagnostics.remove(0);
+            let _ = super::process_control::bounded_lines(
+                BufReader::new(stderr),
+                6000,
+                |mut line, truncated| {
+                    if truncated {
+                        line.push_str(" [truncated]");
                     }
-                });
-            }
+                    runtime.update(&event_id, |r| r.diagnostics.push(line));
+                },
+            );
         });
         let exit = loop {
             if let Some(exit) = process
@@ -596,6 +704,7 @@ impl TaskRuntime {
             }
             std::thread::sleep(Duration::from_millis(100));
         };
+        tree.terminate();
         let _ = reader.join();
         let _ = diagnostics.join();
         if adapter == "grok" {
@@ -749,8 +858,24 @@ fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str) {
     }
 }
 
-fn discover_runner(policy: &super::agent_policy::AgentPolicy, id: &str, profiles_root: &std::path::Path) -> Runner {
-    let mut runner = Runner { id: id.to_string(), name: match id { "codex" => "Codex", "claude" => "Claude Code", _ => "Grok" }.into(), available: false, signed_in: false, account: "Current CLI account".into(), detail: String::new() };
+fn discover_runner(
+    policy: &super::agent_policy::AgentPolicy,
+    id: &str,
+    profiles_root: &std::path::Path,
+) -> Runner {
+    let mut runner = Runner {
+        id: id.to_string(),
+        name: match id {
+            "codex" => "Codex",
+            "claude" => "Claude Code",
+            _ => "Grok",
+        }
+        .into(),
+        available: false,
+        signed_in: false,
+        account: "Current CLI account".into(),
+        detail: String::new(),
+    };
     let mut discovery = policy.clone();
     discovery.enabled_agents.clear();
     match discovery.resolve(id) {
@@ -758,25 +883,45 @@ fn discover_runner(policy: &super::agent_policy::AgentPolicy, id: &str, profiles
         Ok((adapter, path)) => {
             runner.available = true;
             let profile_env = super::agent_profiles::env_var_for(&adapter).and_then(|name| {
-                super::agent_profiles::active_profile_dir(profiles_root, &adapter).map(|dir| (name, dir))
+                super::agent_profiles::active_profile_dir(profiles_root, &adapter)
+                    .map(|dir| (name, dir))
             });
-            if adapter == "grok" { runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into(); return runner; }
-            let args = if adapter == "codex" { vec!["login", "status"] } else { vec!["auth", "status"] };
+            if adapter == "grok" {
+                runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into();
+                return runner;
+            }
+            let args = if adapter == "codex" {
+                vec!["login", "status"]
+            } else {
+                vec!["auth", "status"]
+            };
             match probe_auth(path, args, profile_env) {
                 Ok(out) => {
                     if adapter == "claude" {
                         if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {
                             runner.signed_in = auth["loggedIn"] == true;
-                            runner.account = auth["email"].as_str().unwrap_or("Current CLI account").into();
+                            runner.account = auth["email"]
+                                .as_str()
+                                .unwrap_or("Current CLI account")
+                                .into();
                         }
-                    } else { runner.signed_in = out.status.success(); }
-                    runner.detail = if runner.signed_in { "Uses your existing CLI sign-in. Model follows your agent configuration." } else { "Sign in using the agent's CLI, then refresh." }.into();
+                    } else {
+                        runner.signed_in = out.status.success();
+                    }
+                    runner.detail = if runner.signed_in {
+                        "Uses your existing CLI sign-in. Model follows your agent configuration."
+                    } else {
+                        "Sign in using the agent's CLI, then refresh."
+                    }
+                    .into();
                 }
                 Err(error) => runner.detail = error.to_string(),
             }
         }
     }
-    if let Some(custom) = policy.custom_agents.iter().find(|a| a.id == id) { runner.name = custom.name.clone(); }
+    if let Some(custom) = policy.custom_agents.iter().find(|a| a.id == id) {
+        runner.name = custom.name.clone();
+    }
     runner
 }
 
@@ -798,7 +943,9 @@ pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>
         .map(|id| {
             let policy = policy.clone();
             let profiles_root = profiles_root.clone();
-            tauri::async_runtime::spawn_blocking(move || discover_runner(&policy, &id, &profiles_root))
+            tauri::async_runtime::spawn_blocking(move || {
+                discover_runner(&policy, &id, &profiles_root)
+            })
         })
         .collect();
     let mut runners = Vec::with_capacity(handles.len());
@@ -902,22 +1049,48 @@ pub fn task_history_recovery(state: State<'_, TaskRuntime>) -> HistoryRecovery {
 }
 
 #[tauri::command]
-pub async fn task_screenshot(run_id: String, screenshot_id: String, state: State<'_, TaskRuntime>) -> Result<Vec<u8>, String> {
+pub async fn task_screenshot(
+    run_id: String,
+    screenshot_id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Vec<u8>, String> {
     let (workspace, path) = {
         let inner = state.inner.lock().unwrap();
         let run = inner.runs.get(&run_id).ok_or("Task attempt not found")?;
-        let screenshot = run.screenshots.iter().find(|item| item.id == screenshot_id)
+        let screenshot = run
+            .screenshots
+            .iter()
+            .find(|item| item.id == screenshot_id)
             .ok_or("Screenshot not found in this task attempt")?;
-        (PathBuf::from(&run.workspace), PathBuf::from(&screenshot.file_path))
+        (
+            PathBuf::from(&run.workspace),
+            PathBuf::from(&screenshot.file_path),
+        )
     };
-    tauri::async_runtime::spawn_blocking(move || super::artifacts::read_screenshot(&workspace, &path))
-        .await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        super::artifacts::read_screenshot(&workspace, &path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn task_runs(state: State<'_, TaskRuntime>) -> Vec<TaskRun> {
+pub fn task_runs(state: State<'_, TaskRuntime>, detail_id: Option<String>) -> Vec<TaskRun> {
     let mut runs: Vec<_> = state.inner.lock().unwrap().runs.values().cloned().collect();
     runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    for run in &mut runs {
+        if detail_id.as_deref() != Some(run.id.as_str()) {
+            run.details_omitted = true;
+            run.prompt = run.prompt.chars().take(500).collect();
+            run.result.clear();
+            run.activity.clear();
+            run.diagnostics.clear();
+            if let Some(check) = &mut run.verification {
+                check.result.stdout.clear();
+                check.result.stderr.clear();
+            }
+        }
+    }
     runs
 }
 
@@ -939,19 +1112,59 @@ pub async fn task_respond_prompt(
     answer: String,
     runtime: State<'_, TaskRuntime>,
 ) -> Result<bool, String> {
-    let resolved = super::harness::resolve_user_prompt(&prompt_id, &answer);
-    runtime.update(&run_id, |r| {
-        if let Some(p) = r.prompts.iter_mut().find(|p| p.id == prompt_id) {
-            p.status = "answered".into();
-            p.answer = Some(answer.clone());
-            p.answered_at = Some(chrono::Utc::now().to_rfc3339());
-        }
-        r.activity.push(format!("User answered prompt: {answer}"));
-    });
-    Ok(resolved)
+    runtime.respond_prompt(&run_id, &prompt_id, &answer)
 }
 
 impl TaskRuntime {
+    pub(super) fn record_prompt(&self, prompt: &super::harness::PendingUserPrompt) {
+        self.update(&prompt.run_id, |run| {
+            if let Some(existing) = run.prompts.iter_mut().find(|p| p.id == prompt.id) {
+                if existing.status != "answered" {
+                    *existing = prompt.clone();
+                }
+            } else {
+                run.prompts.push(prompt.clone());
+            }
+        });
+    }
+
+    pub(super) fn respond_prompt(
+        &self,
+        run_id: &str,
+        prompt_id: &str,
+        answer: &str,
+    ) -> Result<bool, String> {
+        if answer.trim().is_empty() || answer.len() > 4000 {
+            return Err("Reply with 1–4,000 characters.".into());
+        }
+        {
+            let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+            let run = inner.runs.get_mut(run_id).ok_or("Attempt not found")?;
+            if !["starting", "running"].contains(&run.status.as_str()) {
+                return Err(
+                    "This attempt has ended. Continue the task to provide more input.".into(),
+                );
+            }
+            let mut updated = run.clone();
+            let prompt = updated
+                .prompts
+                .iter_mut()
+                .find(|p| p.id == prompt_id && p.run_id == run_id)
+                .ok_or("This question does not belong to the selected task.")?;
+            if prompt.status == "answered" {
+                return Err("This question has already been answered.".into());
+            }
+            prompt.status = "answered".into();
+            prompt.answer = Some(answer.trim().into());
+            prompt.answered_at = Some(Utc::now().to_rfc3339());
+            activity(&mut updated, "A response was saved for the agent.");
+            self.save(&updated)?;
+            *run = updated;
+        }
+        super::harness::resolve_user_prompt(prompt_id, answer.trim());
+        Ok(true)
+    }
+
     pub fn integration_runs(&self) -> Result<Vec<TaskRun>, String> {
         Ok(self
             .inner
@@ -973,10 +1186,18 @@ impl TaskRuntime {
         self.start_locked(request)
     }
     pub(super) fn start_locked(&self, mut request: RunRequest) -> Result<String, String> {
-        if self.directory.join(super::reset::RESET_MARKER).exists() { return Err("Jackalope is resetting.".into()); }
+        if super::release::installing() {
+            return Err(
+                "An app update is being installed. Start new work after reopening Jackalope."
+                    .into(),
+            );
+        }
+        if self.directory.join(super::reset::RESET_MARKER).exists() {
+            return Err("Jackalope is resetting.".into());
+        }
         if let Some(previous) = &request.previous_run_id {
             if super::integration::applied_run_ids(self)?.contains(previous) {
-                return Err("This task has already been integrated. Add a new task to start from the updated master.".into());
+                return Err("This task has already been integrated. Add a new task to start from the updated target branch.".into());
             }
         }
         if !valid_id(&request.id)
@@ -987,6 +1208,7 @@ impl TaskRuntime {
         }
         self.apply_policy(&mut request)?;
         let previous;
+        let (adapter, _) = self.policy()?.resolve(&request.agent)?;
         {
             let mut inner = self.inner.lock().unwrap();
             if let Some(existing) = inner.runs.get(&request.id) {
@@ -1029,6 +1251,34 @@ impl TaskRuntime {
                     return Err("Stop or finish this attempt before continuing.".into());
                 }
             }
+            let binding = if let Some(old) = &previous {
+                let binding = old.account_binding.clone().ok_or("This older attempt has no saved account profile. Start a new task to choose an account safely.")?;
+                if binding.adapter != adapter
+                    || request
+                        .agent_profile_id
+                        .as_ref()
+                        .is_some_and(|id| Some(id) != binding.profile_id.as_ref())
+                {
+                    return Err("Continue with the original agent account, or start a new task with another account.".into());
+                }
+                super::agent_profiles::validate_binding(&self.profiles_root(), &binding)?;
+                binding
+            } else {
+                super::agent_profiles::bind_account(
+                    &self.profiles_root(),
+                    &adapter,
+                    request.agent_profile_id.as_deref(),
+                )?
+            };
+            request.target_branch = Some(if let Some(old) = &previous {
+                old.target_branch.clone().unwrap_or_else(|| "master".into())
+            } else {
+                resolve_target_branch(&request.project_path, request.target_branch.as_deref())?
+            });
+            request.account_binding = Some(binding.clone());
+            if let Some(old) = &previous {
+                request.verify_command = old.verify_command.clone();
+            }
             let run = TaskRun {
                 id: request.id.clone(),
                 task_id: previous
@@ -1041,7 +1291,12 @@ impl TaskRuntime {
                 branch: String::new(),
                 base_head: String::new(),
                 agent: request.agent.clone(),
-                account: "Current CLI account (identity not tracked)".into(),
+                account: binding.label.clone(),
+                account_binding: Some(binding),
+                target_branch: request.target_branch.clone(),
+                process_contained: false,
+                verify_command: request.verify_command.clone(),
+                verification: None,
                 model: request.model.clone(),
                 prompt: request.prompt.clone(),
                 status: "starting".into(),
@@ -1049,6 +1304,7 @@ impl TaskRuntime {
                 ended_at: None,
                 session_id: None,
                 result: String::new(),
+                details_omitted: false,
                 activity: vec![],
                 diagnostics: vec![],
                 error: None,
@@ -1066,6 +1322,11 @@ impl TaskRuntime {
         let id = request.id.clone();
         std::thread::spawn(move || {
             if let Err(error) = runtime.execute(&request.id, &request, previous) {
+                {
+                    let mut inner = runtime.inner.lock().unwrap();
+                    inner.processes.remove(&request.id);
+                    inner.canceled.remove(&request.id);
+                }
                 runtime.fail(&request.id, error);
             }
         });
@@ -1150,6 +1411,11 @@ mod tests {
             branch: String::new(),
             base_head: String::new(),
             agent: agent.into(),
+            account_binding: None,
+            target_branch: None,
+            process_contained: false,
+            verify_command: None,
+            verification: None,
             account: "test".into(),
             model: None,
             prompt: "Example".into(),
@@ -1158,6 +1424,7 @@ mod tests {
             ended_at: None,
             session_id: None,
             result: String::new(),
+            details_omitted: false,
             activity: vec![],
             diagnostics: vec![],
             error: None,
@@ -1168,6 +1435,47 @@ mod tests {
             validation_steps: vec![],
             screenshots: vec![],
         }
+    }
+
+    #[test]
+    fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-answer-{}", uuid::Uuid::new_v4()));
+        let runtime = TaskRuntime::new(folder.clone()).unwrap();
+        let run = sample("codex");
+        runtime
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .insert(run.id.clone(), run.clone());
+        let prompt = super::super::harness::PendingUserPrompt {
+            id: "question-1".into(),
+            run_id: run.id.clone(),
+            question: "Choose".into(),
+            input_type: "choice".into(),
+            options: vec!["A".into(), "B".into()],
+            default_value: None,
+            status: "pending".into(),
+            answer: None,
+            created_at: Utc::now().to_rfc3339(),
+            answered_at: None,
+        };
+        runtime.record_prompt(&prompt);
+        assert!(runtime
+            .respond_prompt("another-attempt", &prompt.id, "A")
+            .is_err());
+        assert!(runtime.respond_prompt(&run.id, &prompt.id, "A").unwrap());
+        assert!(runtime.respond_prompt(&run.id, &prompt.id, "B").is_err());
+        runtime.record_prompt(&prompt);
+        let stored: TaskRun = serde_json::from_slice(
+            &std::fs::read(folder.join(format!("{}.json", run.id))).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(stored.prompts[0].answer.as_deref(), Some("A"));
+        assert_eq!(stored.prompts[0].status, "answered");
+        drop(runtime);
+        let _ = std::fs::remove_dir_all(folder);
     }
 
     #[test]
@@ -1251,6 +1559,9 @@ mod tests {
             project_path: root.into(),
             agent: "default".into(),
             agent_profile_id: None,
+            verify_command: None,
+            target_branch: None,
+            account_binding: None,
             model: None,
             prompt: "Fixture only".into(),
             isolated: false,
@@ -1368,7 +1679,10 @@ mod tests {
         assert!(inner.runs.contains_key(&good.id));
         assert_eq!(inner.recovery.len(), 2);
         assert!(inner.recovery.iter().all(|entry| entry.quarantined));
-        assert!(inner.recovery.iter().any(|entry| entry.reason == "invalid task identifier"));
+        assert!(inner
+            .recovery
+            .iter()
+            .any(|entry| entry.reason == "invalid task identifier"));
         drop(inner);
         drop(runtime);
 
@@ -1380,8 +1694,15 @@ mod tests {
         let restarted = TaskRuntime::new(folder.clone()).unwrap();
         let inner = restarted.inner.lock().unwrap();
         assert_eq!(inner.runs.len(), 1);
-        assert_eq!(inner.recovery.len(), 2, "backups remain visible after restart");
-        assert!(inner.recovery.iter().all(|entry| Path::new(&entry.path).exists()));
+        assert_eq!(
+            inner.recovery.len(),
+            2,
+            "backups remain visible after restart"
+        );
+        assert!(inner
+            .recovery
+            .iter()
+            .all(|entry| Path::new(&entry.path).exists()));
         drop(inner);
         drop(restarted);
 

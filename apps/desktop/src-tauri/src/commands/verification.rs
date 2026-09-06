@@ -1,0 +1,105 @@
+use super::{
+    process_control,
+    tasks::{TaskRun, TaskRuntime},
+};
+use serde::{Deserialize, Serialize};
+use std::{process::Command, time::Duration};
+use tauri::State;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Verification {
+    pub command: String,
+    pub checked_at: String,
+    pub tree: Option<String>,
+    pub result: process_control::CommandResult,
+}
+
+fn shell(command: &str, workspace: &str) -> Result<Command, String> {
+    if command.trim().is_empty() || command.len() > 4000 || command.contains('\0') {
+        return Err("Set a verification command of 1–4,000 characters in Project Settings.".into());
+    }
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut cmd = Command::new("cmd.exe");
+        cmd.args(["/D", "/S", "/C", command]);
+        cmd
+    };
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut cmd = Command::new("/bin/sh");
+        cmd.args(["-c", command]);
+        cmd
+    };
+    cmd.current_dir(workspace);
+    cmd.env_remove("JACKALOPE_BRIDGE_TOKEN")
+        .env_remove("JACKALOPE_BRIDGE_URL");
+    Ok(cmd)
+}
+
+fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verification, String> {
+    let directory = runtime.integration_directory();
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let before = super::integration::workspace_tree(run, &directory)?;
+    let agent_active = ["starting", "running"].contains(&run.status.as_str());
+    let result = process_control::run_cancellable(
+        shell(command, &run.workspace)?,
+        Duration::from_secs(300),
+        || agent_active && !runtime.is_running(&run.id),
+    )?;
+    let after = super::integration::workspace_tree(run, &directory)?;
+    let verification = Verification {
+        command: command.to_string(),
+        checked_at: chrono::Utc::now().to_rfc3339(),
+        tree: (before == after).then_some(after),
+        result,
+    };
+    runtime.update(&run.id, |r| r.verification = Some(verification.clone()));
+    Ok(verification)
+}
+
+pub async fn agent_verify(
+    runtime: TaskRuntime,
+    run: TaskRun,
+    input: super::harness::ComputerVerifyInput,
+) -> Result<serde_json::Value, String> {
+    let command = run.verify_command.clone().filter(|s| !s.trim().is_empty())
+        .ok_or("No project verification command is authorized. Ask the user to set one in Project Settings, or use your agent's own permitted tools.")?;
+    let requested = std::iter::once(input.command)
+        .chain(input.args)
+        .collect::<Vec<_>>()
+        .join(" ");
+    if requested != command {
+        return Err(
+            "Only this task's saved project verification command is allowed through the bridge."
+                .into(),
+        );
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = execute(&runtime, &run, &command)?;
+        Ok(serde_json::json!({ "exit_code": result.result.exit_code, "stdout": result.result.stdout,
+            "stderr": result.result.stderr, "success": result.result.success,
+            "timed_out": result.result.timed_out, "truncated": result.result.truncated }))
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn task_verify(
+    id: String,
+    command: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Verification, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        let run = runs.iter().find(|run| run.id == id).ok_or("Task not found")?;
+        if runs.iter().any(|other| other.workspace == run.workspace && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())) {
+            return Err("Stop active work and resolve interrupted attempts before verifying this workspace.".into());
+        }
+        if run.verify_command.as_ref().filter(|s| !s.trim().is_empty()).is_some_and(|saved| saved != &command) {
+            return Err("Run this attempt's saved verification command. Start a new attempt to change its required checks.".into());
+        }
+        execute(&runtime, run, &command)
+    }).await.map_err(|e| e.to_string())?
+}

@@ -8,6 +8,8 @@ use tauri::State;
 
 use super::tasks::TaskRuntime;
 
+static PROFILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AgentProfile {
     pub id: String,
@@ -74,10 +76,26 @@ fn load(root: &Path) -> Manifest {
         .unwrap_or_default()
 }
 
+fn load_checked(root: &Path) -> Result<Manifest, String> {
+    if !manifest_path(root).exists() {
+        return Ok(Manifest::default());
+    }
+    serde_json::from_slice(&fs::read(manifest_path(root)).map_err(|e| e.to_string())?).map_err(
+        |_| {
+            "Account settings are unreadable. Restore the manifest before changing accounts.".into()
+        },
+    )
+}
+
 fn save(root: &Path, manifest: &Manifest) -> Result<(), String> {
     fs::create_dir_all(root).map_err(|e| e.to_string())?;
-    let text = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())?;
-    fs::write(manifest_path(root), text).map_err(|e| e.to_string())
+    use std::io::Write;
+    let temporary = root.join("manifest.tmp");
+    let mut file = fs::File::create(&temporary).map_err(|e| e.to_string())?;
+    file.write_all(&serde_json::to_vec_pretty(manifest).map_err(|e| e.to_string())?)
+        .and_then(|_| file.sync_all())
+        .map_err(|e| e.to_string())?;
+    fs::rename(temporary, manifest_path(root)).map_err(|e| e.to_string())
 }
 
 fn dir_for(root: &Path, agent: &str, id: &str) -> PathBuf {
@@ -99,23 +117,83 @@ pub fn active_profile_dir(root: &Path, agent: &str) -> Option<PathBuf> {
         .then(|| dir_for(root, agent, active))
 }
 
-/// The profile directory to run `agent` under for one task: `explicit_id`
-/// (a project's chosen account for this agent) when it names a real profile,
-/// otherwise the agent's globally active profile. Returns None when neither
-/// applies, meaning the CLI's own default, unconfigured location should be
-/// used — unchanged behavior for every project that hasn't picked an account.
-pub fn resolve_profile_dir(root: &Path, agent: &str, explicit_id: Option<&str>) -> Option<PathBuf> {
-    if let Some(id) = explicit_id {
-        let manifest = load(root);
-        if let Some(entry) = manifest.agents.get(agent) {
-            if entry.profiles.iter().any(|p| p.id == id) {
-                return Some(dir_for(root, agent, id));
-            }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountBinding {
+    pub adapter: String,
+    pub profile_id: Option<String>,
+    pub directory: PathBuf,
+    pub label: String,
+}
+
+pub fn bind_account(
+    root: &Path,
+    adapter: &str,
+    explicit: Option<&str>,
+) -> Result<AccountBinding, String> {
+    let env_name = env_var_for(adapter).ok_or("This agent does not support account isolation.")?;
+    let manifest = if manifest_path(root).exists() {
+        serde_json::from_slice::<Manifest>(
+            &fs::read(manifest_path(root)).map_err(|e| e.to_string())?,
+        )
+        .map_err(|_| {
+            "Account settings cannot be read. Restore them before running work.".to_string()
+        })?
+    } else {
+        Manifest::default()
+    };
+    let entry = manifest.agents.get(adapter);
+    let id = explicit.or_else(|| entry.and_then(|e| e.active.as_deref()));
+    let (profile_id, directory, label) = if let Some(id) = id {
+        if id.is_empty() || !id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {
+            return Err("Invalid account selection.".into());
         }
-        // A stale/removed id falls through to the active profile rather than
-        // silently running under the CLI's default (mismatched-account risk).
+        let profile = entry
+            .and_then(|e| e.profiles.iter().find(|p| p.id == id))
+            .ok_or(
+                "The selected account was removed. Choose another account before running work.",
+            )?;
+        (
+            Some(id.to_string()),
+            dir_for(root, adapter, id),
+            profile.name.clone(),
+        )
+    } else {
+        let directory = std::env::var_os(env_name)
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                    .map(|home| PathBuf::from(home).join(format!(".{adapter}")))
+            })
+            .ok_or("Cannot locate the agent's default account directory.")?;
+        (
+            None,
+            directory,
+            "CLI default profile (identity not reported)".to_string(),
+        )
+    };
+    if !directory.is_absolute() {
+        return Err("The agent account directory must be an absolute path.".into());
     }
-    active_profile_dir(root, agent)
+    Ok(AccountBinding {
+        adapter: adapter.into(),
+        profile_id,
+        directory,
+        label,
+    })
+}
+
+pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
+    if let Some(id) = &binding.profile_id {
+        let resolved = bind_account(root, &binding.adapter, Some(id))?;
+        if resolved.directory != binding.directory {
+            return Err("The account location changed. Start a new task.".into());
+        }
+    }
+    if !binding.directory.is_absolute() {
+        return Err("Invalid saved account directory.".into());
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -145,8 +223,9 @@ pub fn agent_profile_create(
     if name.is_empty() {
         return Err("Give the account a name.".into());
     }
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
-    let mut manifest = load(&root);
+    let mut manifest = load_checked(&root)?;
     let entry = manifest.agents.entry(agent.clone()).or_default();
     let id = uuid::Uuid::new_v4().to_string();
     let profile = AgentProfile {
@@ -173,8 +252,9 @@ pub fn agent_profile_rename(
     if name.is_empty() {
         return Err("Give the account a name.".into());
     }
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
-    let mut manifest = load(&root);
+    let mut manifest = load_checked(&root)?;
     let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
     let profile = entry
         .profiles
@@ -191,18 +271,46 @@ pub fn agent_profile_delete(
     agent: String,
     id: String,
 ) -> Result<(), String> {
+    let _guard = super::integration::execution_guard()?;
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    env_var_for(&agent).ok_or("Unknown agent")?;
+    if id.is_empty() || !id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {
+        return Err("Invalid account ID".into());
+    }
+    if runtime.integration_runs()?.iter().any(|run| {
+        ["starting", "running", "stopping"].contains(&run.status.as_str())
+            && run.account_binding.as_ref().is_some_and(|binding| {
+                binding.adapter == agent && binding.profile_id.as_deref() == Some(&id)
+            })
+    }) {
+        return Err("Stop tasks using this account before removing it.".into());
+    }
     let root = runtime.profiles_root();
-    let mut manifest = load(&root);
-    let entry = manifest.agents.entry(agent.clone()).or_default();
+    let mut manifest = load_checked(&root)?;
+    let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
+    if !entry.profiles.iter().any(|p| p.id == id) {
+        return Err("Unknown account".into());
+    }
+    let directory = dir_for(&root, &agent, &id);
+    if directory.exists() {
+        let canonical = fs::canonicalize(&directory).map_err(|e| e.to_string())?;
+        let owned_root = fs::canonicalize(&root).map_err(|e| e.to_string())?;
+        if !canonical.starts_with(&owned_root)
+            || fs::symlink_metadata(&directory)
+                .map_err(|e| e.to_string())?
+                .file_type()
+                .is_symlink()
+        {
+            return Err("The account directory resolves outside its managed location.".into());
+        }
+        fs::remove_dir_all(&directory)
+            .map_err(|e| format!("Account files could not be removed: {e}"))?;
+    }
     entry.profiles.retain(|p| p.id != id);
     if entry.active.as_deref() == Some(id.as_str()) {
-        entry.active = entry.profiles.first().map(|p| p.id.clone());
+        entry.active = None;
     }
-    save(&root, &manifest)?;
-    // Best-effort: the account row is gone from the manifest either way, which
-    // is what makes it disappear from the UI and stop being selectable.
-    let _ = fs::remove_dir_all(dir_for(&root, &agent, &id));
-    Ok(())
+    save(&root, &manifest)
 }
 
 #[tauri::command]
@@ -211,8 +319,9 @@ pub fn agent_profile_set_active(
     agent: String,
     id: Option<String>,
 ) -> Result<(), String> {
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
-    let mut manifest = load(&root);
+    let mut manifest = load_checked(&root)?;
     let entry = manifest.agents.entry(agent).or_default();
     if let Some(id) = &id {
         if !entry.profiles.iter().any(|p| &p.id == id) {
@@ -236,7 +345,8 @@ pub fn agent_profile_sign_in(
     agent: String,
     id: String,
 ) -> Result<(), String> {
-    let env_name = env_var_for(&agent).ok_or("This agent has no known config-directory override.")?;
+    let env_name =
+        env_var_for(&agent).ok_or("This agent has no known config-directory override.")?;
     let root = runtime.profiles_root();
     let manifest = load(&root);
     let entry = manifest.agents.get(&agent).ok_or("Unknown account")?;
@@ -262,11 +372,22 @@ pub fn agent_profile_sign_in(
 }
 
 #[cfg(test)]
+fn resolve_profile_dir(root: &Path, agent: &str, explicit_id: Option<&str>) -> Option<PathBuf> {
+    bind_account(root, agent, explicit_id)
+        .ok()
+        .filter(|b| b.profile_id.is_some())
+        .map(|b| b.directory)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
     fn temp_root() -> PathBuf {
-        std::env::temp_dir().join(format!("jackalope-agent-profiles-test-{}", uuid::Uuid::new_v4()))
+        std::env::temp_dir().join(format!(
+            "jackalope-agent-profiles-test-{}",
+            uuid::Uuid::new_v4()
+        ))
     }
 
     #[test]
@@ -285,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_profile_wins_but_a_stale_id_falls_back_to_active() {
+    fn explicit_profile_wins_and_a_stale_id_is_rejected() {
         let root = temp_root();
         let mut manifest = Manifest::default();
         let entry = manifest.agents.entry("codex".into()).or_default();
@@ -310,13 +431,51 @@ mod tests {
             resolve_profile_dir(&root, "codex", None),
             Some(dir_for(&root, "codex", "personal"))
         );
-        // A removed/unknown id doesn't silently drop to the CLI's own default;
-        // it falls back to the active profile instead.
         assert_eq!(
             resolve_profile_dir(&root, "codex", Some("deleted-long-ago")),
-            Some(dir_for(&root, "codex", "personal"))
+            None
         );
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn saved_binding_survives_active_switch_and_rejects_deleted_or_corrupt_profiles() {
+        let root = temp_root();
+        let mut manifest = Manifest::default();
+        manifest.agents.insert(
+            "codex".into(),
+            AgentEntry {
+                profiles: vec![
+                    AgentProfile {
+                        id: "work".into(),
+                        name: "Work".into(),
+                    },
+                    AgentProfile {
+                        id: "personal".into(),
+                        name: "Personal".into(),
+                    },
+                ],
+                active: Some("work".into()),
+            },
+        );
+        save(&root, &manifest).unwrap();
+        let binding = bind_account(&root, "codex", None).unwrap();
+        manifest.agents.get_mut("codex").unwrap().active = Some("personal".into());
+        save(&root, &manifest).unwrap();
+        validate_binding(&root, &binding).unwrap();
+        assert_eq!(binding.profile_id.as_deref(), Some("work"));
+        assert!(bind_account(&root, "codex", Some("../outside")).is_err());
+        manifest
+            .agents
+            .get_mut("codex")
+            .unwrap()
+            .profiles
+            .retain(|p| p.id != "work");
+        save(&root, &manifest).unwrap();
+        assert!(validate_binding(&root, &binding).is_err());
+        fs::write(manifest_path(&root), "broken").unwrap();
+        assert!(bind_account(&root, "codex", None).is_err());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

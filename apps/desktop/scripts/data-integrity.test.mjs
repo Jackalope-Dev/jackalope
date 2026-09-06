@@ -7,7 +7,6 @@ import {
   ptyKill,
   ptySpawn,
   ptyWrite,
-  spawnAgentProcess,
 } from '../src/lib/tauri-bridge.ts';
 
 const storage = new Map();
@@ -80,7 +79,6 @@ test('native operations cannot fabricate worktrees, device details or processes'
     () => listWorktrees('/repo'),
     () => createWorktree('/repo', '.worktrees/test', 'test'),
     () => getSystemInfo(),
-    () => spawnAgentProcess('node', [], '/repo'),
     () => ptySpawn({ program: 'node', args: [], workingDir: '/repo' }),
     () => ptyWrite('missing', 'test'),
     () => ptyKill('missing'),
