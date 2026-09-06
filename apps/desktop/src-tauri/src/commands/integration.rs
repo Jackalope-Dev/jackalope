@@ -189,15 +189,10 @@ fn commit_tree(path: &Path, tree: &str, parents: &[&str], message: &str) -> Resu
 }
 
 fn save(directory: &Path, plan: &IntegrationPlan) -> Result<(), String> {
-    let destination = directory.join(format!("{}.json", plan.id));
-    let temporary = directory.join(format!("{}.tmp", plan.id));
-    let bytes = serde_json::to_vec_pretty(plan).map_err(|e| e.to_string())?;
-    use std::io::Write;
-    let mut file = fs::File::create(&temporary).map_err(|e| e.to_string())?;
-    file.write_all(&bytes)
-        .and_then(|_| file.sync_all())
-        .map_err(|e| e.to_string())?;
-    fs::rename(&temporary, &destination).map_err(|e| e.to_string())
+    super::history::write_atomic(
+        &directory.join(format!("{}.json", plan.id)),
+        &serde_json::to_vec_pretty(plan).map_err(|e| e.to_string())?,
+    )
 }
 
 fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, String> {
@@ -210,6 +205,11 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
             .iter()
             .find(|run| &run.id == id)
             .ok_or("A selected task no longer exists.")?;
+        if run.persistence_error.is_some() {
+            return Err(
+                "Save the task's latest history before preparing or applying integration.".into(),
+            );
+        }
         if !["review", "reviewed"].contains(&run.status.as_str()) {
             return Err(
                 "Only completed tasks awaiting review or already reviewed can be integrated."
@@ -924,6 +924,26 @@ mod tests {
         assert!(prepare(&fixture.plans, &[original, continuation], &ids)
             .unwrap_err()
             .contains("newer, active, or interrupted"));
+    }
+
+    #[test]
+    fn unsaved_task_history_blocks_preparation_and_application() {
+        let fixture = Fixture::new();
+        let mut run = fixture.run(1, "new.txt", "task\n");
+        let ids = vec![run.id.clone()];
+        let plan = prepare(&fixture.plans, &[run.clone()], &ids).unwrap();
+        let before = git(&fixture.project, &["rev-parse", "HEAD"]).unwrap();
+        run.persistence_error = Some("Storage unavailable".into());
+        assert!(prepare(&fixture.plans, &[run.clone()], &ids)
+            .unwrap_err()
+            .contains("latest history"));
+        assert!(apply(&fixture.plans, &[run], &plan.id)
+            .unwrap_err()
+            .contains("latest history"));
+        assert_eq!(
+            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            before
+        );
     }
 
     #[test]

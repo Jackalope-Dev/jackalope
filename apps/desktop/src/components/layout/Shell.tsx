@@ -13,9 +13,11 @@ import { DeviceMesh } from '../mesh/DeviceMesh';
 import { WorktreeManager } from '../projects/WorktreeManager';
 import { ScheduleManager } from '../schedules/ScheduleManager';
 import { SettingsDialog } from '../settings/SettingsDialog';
+import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 import { ProjectSetup } from '../tasks/ProjectSetup';
 import { RunnerConnections } from '../tasks/RunnerConnections';
+import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { UsageDashboard } from '../tasks/UsageDashboard';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
@@ -206,7 +208,9 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         className="workspace-canvas"
         aria-label={view.label}
       >
+        <UpdateNotice />
         <HistoryRecoveryNotice />
+        <UnsavedTasksNotice />
         {activeTab === 'kanban' && (
           <TaskWorkspace
             key={plannedTaskId ?? 'tasks'}

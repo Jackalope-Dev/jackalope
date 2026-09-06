@@ -76,12 +76,14 @@ interface ProjectState {
   updateProjectPreferences: (id: string, prefs: Partial<ProjectPreferences>) => void;
   removeProject: (id: string) => void;
   selectProject: (id: string) => void;
-  loadWorktreesForActiveProject: () => Promise<void>;
+  loadWorktreesForActiveProject: (targetBranch?: string) => Promise<void>;
   spawnTaskWorktree: (
     taskSlug: string,
     branchName: string,
   ) => Promise<{ ok: true; entry: WorktreeEntry } | { ok: false; error: string }>;
 }
+
+let worktreeRequest = 0;
 
 export const useProjectStore = create<ProjectState>()(
   persist(
@@ -127,18 +129,20 @@ export const useProjectStore = create<ProjectState>()(
         get().loadWorktreesForActiveProject();
       },
 
-      loadWorktreesForActiveProject: async () => {
+      loadWorktreesForActiveProject: async (targetBranch) => {
         const active = get().projects.find((p) => p.id === get().activeProjectId);
         if (!active) return;
+        const request = ++worktreeRequest;
 
         try {
           set({ loading: true, worktreesError: null });
-          const worktrees = await listWorktrees(active.path);
+          const worktrees = await listWorktrees(active.path, targetBranch);
+          if (request !== worktreeRequest || get().activeProjectId !== active.id) return;
           set((state) => ({
             projects: state.projects.map((p) => (p.id === active.id ? { ...p, worktrees } : p)),
           }));
         } catch (e) {
-          if (get().activeProjectId === active.id) {
+          if (request === worktreeRequest && get().activeProjectId === active.id) {
             set((state) => ({
               worktreesError: e instanceof Error ? e.message : String(e),
               projects: state.projects.map((p) =>
@@ -147,7 +151,7 @@ export const useProjectStore = create<ProjectState>()(
             }));
           }
         } finally {
-          set({ loading: false });
+          if (request === worktreeRequest) set({ loading: false });
         }
       },
 

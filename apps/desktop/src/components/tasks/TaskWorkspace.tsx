@@ -27,6 +27,7 @@ import {
   statusLabel,
   type TaskRun,
 } from '../../lib/task-runtime';
+import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
@@ -44,6 +45,7 @@ import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
 import { ProjectVerification } from './ProjectVerification';
 import { RunStatus } from './RunStatus';
+import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
 
@@ -170,7 +172,7 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
             {run.projectName} · {run.agent}
           </p>
           <h1 className="task-title task-prompt-title">
-            {runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt}
+            {taskTitle(attempts.at(-1)?.prompt ?? run.prompt)}
           </h1>
         </div>
         <div role="status">
@@ -222,17 +224,13 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
           </Select>
         </label>
       )}
-      {attempts.length > 1 && (
-        <div className="task-request">
-          <p className="task-label mb-2">This instruction</p>
-          <p>{run.prompt}</p>
+      <details className="supporting-details">
+        <summary>{attempts.length > 1 ? 'This attempt’s instruction' : 'Task instruction'}</summary>
+        <div className="task-request whitespace-pre-wrap [overflow-wrap:anywhere]">
+          {run.prompt}
         </div>
-      )}
-      {run.persistenceError && (
-        <p role="alert" className="task-error">
-          {run.persistenceError}
-        </p>
-      )}
+      </details>
+      <TaskSaveRecovery run={run} />
       {run.error && (
         <p role="alert" className="task-error">
           {run.error}
@@ -308,11 +306,13 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
       {!active && run.workspace && <ResultReview key={run.id} run={run} />}
       {((run.validationSteps && run.validationSteps.length > 0) ||
         (run.screenshots && run.screenshots.length > 0)) && (
-        <ValidationJourney
-          runId={run.id}
-          steps={run.validationSteps ?? []}
-          screenshots={run.screenshots ?? []}
-        />
+        <div className="mt-6">
+          <ValidationJourney
+            runId={run.id}
+            steps={run.validationSteps ?? []}
+            screenshots={run.screenshots ?? []}
+          />
+        </div>
       )}
       <div className="task-usage-line">
         <span>Reported usage</span>
@@ -815,7 +815,9 @@ export function TaskWorkspace({
               >
                 <div className="min-w-0">
                   <span className="block truncate font-medium">
-                    {runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt}
+                    {taskTitle(
+                      runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt,
+                    )}
                   </span>
                   <span className="task-muted text-xs mt-2 block">
                     {runners.find((runner) => runner.id === run.agent)?.name ?? run.agent} ·{' '}

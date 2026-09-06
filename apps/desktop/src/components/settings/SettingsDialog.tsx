@@ -34,6 +34,7 @@ const categories = [
   'Agents',
   'Privacy',
   'Project',
+  'Updates & support',
   'Data & reset',
 ] as const;
 type Category = (typeof categories)[number];
@@ -95,6 +96,8 @@ export function SettingsDialog({
         Agents: 'default models allowed restrict manual cli command executable configuration',
         Privacy: 'marketplace MCP network telemetry crash reporting',
         Project: 'repository name path agent instructions verification command',
+        'Updates & support':
+          'version automatic install release notes help feedback diagnostics report',
         'Data & reset':
           'export clipboard erase delete nuke reset first time setup history local data',
       }[c],
@@ -507,9 +510,9 @@ export function SettingsDialog({
                       )}
                     </>
                   )}
+                  {c === 'Updates & support' && <ReleaseSupport />}
                   {c === 'Data & reset' && (
                     <>
-                      <ReleaseSupport />
                       <p className="settings-section-subtitle mb-6">
                         Manage this Jackalope profile on this computer.
                       </p>

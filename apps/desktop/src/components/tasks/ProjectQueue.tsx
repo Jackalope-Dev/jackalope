@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
+import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -286,7 +287,7 @@ function MergeReview({
     const item = items.find((item) =>
       runs.some((original) => original.id === item.runId && original.taskId === run?.taskId),
     );
-    return item?.title ?? run?.prompt.split('\n')[0] ?? id;
+    return item?.title ?? (run ? taskTitle(run.prompt) : id);
   };
   const [selected, setSelected] = useState<string[]>([]);
   const [plans, setPlans] = useState<IntegrationPlan[]>([]);

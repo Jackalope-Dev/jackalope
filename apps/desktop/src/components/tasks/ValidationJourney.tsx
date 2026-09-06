@@ -37,11 +37,10 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
   const isComplete = totalCount > 0 && passedCount === totalCount;
 
   return (
-    <div className="task-review rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
-      {/* Header with summary stats */}
+    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] flex items-center justify-center">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 shrink-0 rounded-xl bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)] flex items-center justify-center">
             <FileCheck2 size={18} />
           </div>
           <div>
@@ -54,7 +53,7 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {totalCount > 0 && (
             <Badge
               variant={isComplete ? 'default' : failedCount > 0 ? 'warning' : 'outline'}
@@ -66,13 +65,12 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
           {screenshots.length > 0 && (
             <Badge variant="outline" className="text-xs px-2 py-0.5 gap-1">
               <Camera size={11} />
-              {screenshots.length} Screenshots
+              {screenshots.length} {screenshots.length === 1 ? 'screenshot' : 'screenshots'}
             </Badge>
           )}
         </div>
       </div>
 
-      {/* Step by Step Timeline */}
       {steps.length > 0 && (
         <div className="space-y-2.5">
           {steps.map((step, idx) => {
@@ -98,8 +96,8 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-[var(--color-text-primary)] break-words min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                    <span className="text-sm font-medium text-[var(--color-text-primary)] [overflow-wrap:anywhere] min-w-0">
                       {step.step}
                     </span>
                     <span className="text-xs text-[var(--color-text-muted)] shrink-0">
@@ -117,7 +115,7 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
                   </p>
 
                   {step.notes && (
-                    <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed">
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed [overflow-wrap:anywhere]">
                       {step.notes}
                     </p>
                   )}
@@ -127,7 +125,7 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
                       {[...new Set(step.evidence)].map((item) => (
                         <span
                           key={item}
-                          className="px-2 py-0.5 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] font-mono"
+                          className="max-w-full [overflow-wrap:anywhere] px-2 py-0.5 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] font-mono"
                         >
                           {item}
                         </span>
@@ -141,7 +139,9 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
         </div>
       )}
 
-      {/* Captured Screenshot Artifacts */}
+      {screenshots.length === 0 && (
+        <p className="task-muted text-xs">No screenshots recorded for this attempt.</p>
+      )}
       {screenshots.length > 0 && (
         <div className="space-y-2 pt-2">
           <span className="text-xs font-semibold text-[var(--color-text-secondary)] flex items-center gap-1.5">
@@ -180,7 +180,6 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
         </div>
       )}
 
-      {/* Image Lightbox Modal */}
       <Dialog.Root
         open={!!activeImage}
         onOpenChange={(open) => {

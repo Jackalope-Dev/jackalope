@@ -64,10 +64,19 @@ pub async fn app_release_status(app: AppHandle, check: bool) -> Result<ReleaseSt
     Ok(status)
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProgress {
+    phase: &'static str,
+    downloaded: u64,
+    total: Option<u64>,
+}
+
 #[tauri::command]
 pub async fn app_install_update(
     app: AppHandle,
     version: String,
+    progress: tauri::ipc::Channel<UpdateProgress>,
     runtime: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
     if !configured(&app) {
@@ -75,6 +84,7 @@ pub async fn app_install_update(
     }
     {
         let _guard = super::integration::execution_guard()?;
+        runtime.ensure_history_saved()?;
         if installing() {
             return Err("An update is already being installed.".into());
         }
@@ -104,7 +114,17 @@ pub async fn app_install_update(
             "The available version changed. Review the new update before installing.".into(),
         );
     }
-    update.download_and_install(|_, _| {}, || {}).await.map_err(|_| "Update could not be completed. Reopen Jackalope and check the installed version before retrying.".to_string())?;
+    let mut downloaded = 0u64;
+    let mut last_progress = std::time::Instant::now();
+    update.download_and_install(|chunk, total| {
+        downloaded = downloaded.saturating_add(chunk as u64);
+        if last_progress.elapsed() >= std::time::Duration::from_millis(100) || total == Some(downloaded) {
+            let _ = progress.send(UpdateProgress { phase: "downloading", downloaded, total });
+            last_progress = std::time::Instant::now();
+        }
+    }, || {
+        let _ = progress.send(UpdateProgress { phase: "installing", downloaded: 0, total: None });
+    }).await.map_err(|_| "Update could not be completed. Reopen Jackalope and check the installed version before retrying.".to_string())?;
     app.restart();
 }
 

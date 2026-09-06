@@ -1,5 +1,6 @@
 import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useState } from 'react';
+import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -239,7 +240,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                         onTask();
                       }}
                     >
-                      {run.prompt}
+                      {taskTitle(run.prompt)}
                     </button>
                     <span className="task-muted text-xs block mt-1">
                       {run.projectName} · {new Date(run.startedAt).toLocaleDateString()}

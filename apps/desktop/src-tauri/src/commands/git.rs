@@ -9,15 +9,36 @@ pub struct WorktreeEntry {
     pub branch: String,
     pub is_bare: bool,
     pub is_locked: bool,
+    #[serde(default)]
+    pub cleanup: Option<super::worktree_cleanup::CleanupStatus>,
 }
 
 #[tauri::command]
-pub async fn git_list_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>, String> {
-    let output = Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| format!("Failed to run git: {}", e))?;
+pub async fn git_list_worktrees(
+    repo_path: String,
+    target_branch: Option<String>,
+    state: tauri::State<'_, super::tasks::TaskRuntime>,
+) -> Result<Vec<WorktreeEntry>, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        super::worktree_cleanup::inspect(
+            &repo_path,
+            target_branch.as_deref(),
+            &runtime.integration_runs()?,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub(super) fn list_worktrees(repo_path: &str) -> Result<Vec<WorktreeEntry>, String> {
+    let output = super::worktree_cleanup::command(
+        Path::new(repo_path),
+        &["worktree", "list", "--porcelain", "-z"],
+    )
+    .output()
+    .map_err(|e| format!("Failed to run git: {}", e))?;
 
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
@@ -32,7 +53,7 @@ pub async fn git_list_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>,
     let mut is_bare = false;
     let mut is_locked = false;
 
-    for line in stdout.lines() {
+    for line in stdout.split('\0') {
         if line.starts_with("worktree ") {
             if !current_path.is_empty() {
                 worktrees.push(WorktreeEntry {
@@ -41,6 +62,7 @@ pub async fn git_list_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>,
                     branch: current_branch.clone(),
                     is_bare,
                     is_locked,
+                    cleanup: None,
                 });
                 current_head.clear();
                 current_branch.clear();
@@ -66,6 +88,7 @@ pub async fn git_list_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>,
             branch: current_branch,
             is_bare,
             is_locked,
+            cleanup: None,
         });
     }
 
@@ -135,10 +158,15 @@ pub async fn git_create_worktree(
 
     if !head_output.status.success() {
         let err = String::from_utf8_lossy(&head_output.stderr);
-        return Err(format!("Worktree created, but `git rev-parse HEAD` failed: {}", err));
+        return Err(format!(
+            "Worktree created, but `git rev-parse HEAD` failed: {}",
+            err
+        ));
     }
 
-    let head = String::from_utf8_lossy(&head_output.stdout).trim().to_string();
+    let head = String::from_utf8_lossy(&head_output.stdout)
+        .trim()
+        .to_string();
 
     Ok(WorktreeEntry {
         path: worktree_path,
@@ -146,6 +174,7 @@ pub async fn git_create_worktree(
         branch: branch_name,
         is_bare: false,
         is_locked: false,
+        cleanup: None,
     })
 }
 
@@ -267,8 +296,8 @@ mod tests {
         // directory name we can check was never created.
         let traversal = "../outside-the-repo".to_string();
 
-        let result = git_create_worktree(repo_path, traversal, "feat/escape".to_string(), None)
-            .await;
+        let result =
+            git_create_worktree(repo_path, traversal, "feat/escape".to_string(), None).await;
 
         assert!(result.is_err(), "a traversal attempt must be rejected");
         assert!(

@@ -9,7 +9,6 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    io::Write,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -175,6 +174,7 @@ pub struct Coordinator {
     pub(super) runtime: TaskRuntime,
     alive: Arc<AtomicBool>,
     _lock: Arc<std::fs::File>,
+    storage_error: Option<String>,
 }
 
 fn active(status: &str) -> bool {
@@ -293,11 +293,23 @@ impl Coordinator {
             .map_err(|e| e.to_string())?;
         lock.try_lock().map_err(|_| "Another Jackalope instance owns this task queue. Close it before opening this workspace.".to_string())?;
         let path = directory.join("queue.json");
-        let ledger = if path.exists() {
-            serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
-                .map_err(|e| format!("Cannot read coordination history: {e}"))?
-        } else {
-            Ledger::default()
+        let loaded = match path.try_exists() {
+            Ok(false) => Ok(Ledger::default()),
+            Ok(true) => super::history::read_bounded(&path, 32_000_000)
+                .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|e| e.to_string())),
+            Err(error) => Err(error.to_string()),
+        };
+        let (ledger, storage_error) = match loaded {
+            Ok(ledger) => (ledger, None),
+            Err(error) => {
+                let reason = format!("Task queue could not be loaded: {error}. Starting work is disabled to protect existing assignments. The original remains at {}. Close Jackalope, back it up and repair it, then restart.", path.display());
+                runtime.record_recovery(super::history::HistoryRecoveryEntry {
+                    path: path.to_string_lossy().into_owned(),
+                    reason: reason.clone(),
+                    quarantined: false,
+                });
+                (Ledger::default(), Some(reason))
+            }
         };
         Ok(Self {
             inner: Arc::new(Mutex::new(Inner {
@@ -312,19 +324,25 @@ impl Coordinator {
             runtime,
             alive: Arc::new(AtomicBool::new(true)),
             _lock: Arc::new(lock),
+            storage_error,
         })
     }
 
+    fn ensure_storage_loaded(&self) -> Result<(), String> {
+        self.storage_error.clone().map_or(Ok(()), Err)
+    }
+
     fn save(&self, ledger: &Ledger) -> Result<(), String> {
-        let temp = self.directory.join("queue.tmp");
-        let mut file = std::fs::File::create(&temp).map_err(|e| e.to_string())?;
-        file.write_all(&serde_json::to_vec(ledger).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-        file.sync_all().map_err(|e| e.to_string())?;
-        std::fs::rename(temp, self.directory.join("queue.json")).map_err(|e| e.to_string())
+        self.ensure_storage_loaded()?;
+        let bytes = serde_json::to_vec(ledger).map_err(|e| e.to_string())?;
+        if bytes.len() > 32_000_000 {
+            return Err("The task queue exceeds its storage limit. No changes were saved.".into());
+        }
+        super::history::write_atomic(&self.directory.join("queue.json"), &bytes)
     }
 
     fn view(&self) -> Result<QueueView, String> {
+        self.ensure_storage_loaded()?;
         let merged_run_ids = super::integration::applied_run_ids(&self.runtime)?;
         let inner = self.inner.lock().unwrap();
         Ok(QueueView {
@@ -444,8 +462,10 @@ impl Coordinator {
     }
 
     fn tick(&self) -> Result<(), String> {
+        self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
         let _guard = super::integration::execution_guard()?;
+        self.runtime.ensure_history_saved()?;
         let merged = super::integration::applied_run_ids(&self.runtime)?;
         let runs = self.runtime.integration_runs()?;
         let Some(url) = inner.url.clone() else {
@@ -555,6 +575,7 @@ impl Coordinator {
     }
 
     pub fn start_manual(&self, mut request: RunRequest) -> Result<String, String> {
+        self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
         if let Some(previous_id) = &request.previous_run_id {
             let runs = self.runtime.integration_runs()?;
@@ -960,6 +981,9 @@ pub async fn queue_dispatch(
         if !(1..=6).contains(&concurrency) {
             return Err("Choose between one and six concurrent agents.".into());
         }
+        if enabled {
+            service.ensure_storage_loaded()?;
+        }
         if enabled && inner.url.is_none() {
             return Err("The coordination bridge is unavailable.".into());
         }
@@ -1064,6 +1088,32 @@ pub async fn queue_release(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-queue-recovery-{}", Uuid::new_v4()));
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
+        let queue = folder.join("coordination");
+        std::fs::create_dir_all(&queue).unwrap();
+        let path = queue.join("queue.json");
+        std::fs::write(&path, b"{incomplete queue").unwrap();
+        let service = Coordinator::new(queue.clone(), runtime.clone()).unwrap();
+        assert!(service.view().err().unwrap().contains("original remains"));
+        assert!(service.save(&Ledger::default()).is_err());
+        assert!(service.tick().is_err());
+        assert!(service.ensure_storage_loaded().is_err());
+        assert!(service.inner.lock().unwrap().enabled.is_empty());
+        assert_eq!(std::fs::read(&path).unwrap(), b"{incomplete queue");
+        drop(service);
+        std::fs::write(&path, serde_json::to_vec(&Ledger::default()).unwrap()).unwrap();
+        let restored = Coordinator::new(queue, runtime.clone()).unwrap();
+        assert!(restored.view().unwrap().items.is_empty());
+        assert!(restored.inner.lock().unwrap().enabled.is_empty());
+        drop(restored);
+        drop(runtime);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
     fn entry(key: &str, dependencies: &[&str]) -> PlanEntry {
         PlanEntry {
             key: key.into(),

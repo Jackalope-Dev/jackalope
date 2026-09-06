@@ -92,8 +92,9 @@ export function HistoryRecoveryNotice() {
             Task history needs attention
           </Dialog.Title>
           <Dialog.Description className="task-muted mt-3">
-            These files could not be loaded. Other readable tasks are still available. This report
-            covers all projects in this app profile, as of startup.
+            These files need recovery or inspection. Other readable tasks are still available. This
+            report covers task records, unfinished saves and queue history across this app profile,
+            as of startup.
           </Dialog.Description>
           <p className="task-muted mt-3">
             Files set aside are preserved for inspection. Close Jackalope before repairing history,

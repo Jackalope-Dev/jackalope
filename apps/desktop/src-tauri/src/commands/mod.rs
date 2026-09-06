@@ -2,6 +2,7 @@ pub mod capacity;
 pub mod coordination;
 pub mod coordination_mcp;
 pub mod git;
+pub mod worktree_cleanup;
 pub mod harness;
 pub mod integration;
 pub mod mcp;

@@ -18,10 +18,10 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
     setError('');
     try {
       setResult(await nativeTask<Verification>('task_verify', { id: run.id, command: selected }));
-      await useExecutionStore.getState().refresh();
     } catch (cause) {
       setError(String(cause));
     } finally {
+      await useExecutionStore.getState().refresh();
       setBusy(false);
     }
   };
@@ -53,18 +53,20 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
           <p
             role="status"
             className={
-              check.result.success && check.tree
+              check.result.success && check.tree && !run.persistenceError
                 ? 'text-[var(--color-success)]'
                 : 'text-[var(--color-warning)]'
             }
           >
-            {check.result.timedOut
-              ? 'Checks timed out; command processes were stopped.'
-              : !check.result.success
-                ? `Checks failed (exit ${check.result.exitCode ?? 'unknown'}).`
-                : !check.tree
-                  ? 'Command passed, but files changed during the check. Run it again.'
-                  : 'Checks passed for the recorded file snapshot.'}
+            {run.persistenceError
+              ? 'Task history has unsaved changes. Save it before integrating.'
+              : check.result.timedOut
+                ? 'Checks timed out; command processes were stopped.'
+                : !check.result.success
+                  ? `Checks failed (exit ${check.result.exitCode ?? 'unknown'}).`
+                  : !check.tree
+                    ? 'Command passed, but files changed during the check. Run it again.'
+                    : 'Checks passed for the recorded file snapshot.'}
           </p>
           <p className="task-muted text-xs">
             {new Date(check.checkedAt).toLocaleString()} ·{' '}

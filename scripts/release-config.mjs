@@ -15,7 +15,7 @@ const directory = resolve('output/release');
 await mkdir(directory, { recursive: true });
 const config = {
   bundle: { createUpdaterArtifacts: true, windows: { certificateThumbprint, digestAlgorithm: 'sha256', timestampUrl, tsp: true } },
-  plugins: { updater: { pubkey: publicKey, endpoints: [endpoint] } },
+  plugins: { updater: { pubkey: publicKey, endpoints: [endpoint], windows: { installMode: 'passive' } } },
 };
 await writeFile(resolve(directory, 'tauri.release.json'), `${JSON.stringify(config, null, 2)}\n`);
 console.log('Release configuration prepared. Private signing material was not written.');

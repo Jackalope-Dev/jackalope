@@ -1,10 +1,21 @@
-import { Check, Copy, FolderGit2, GitBranch, Lock, Plus, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  FolderGit2,
+  GitBranch,
+  GitMerge,
+  Lock,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { cleanupWorktree, isTauriEnvironment, type WorktreeEntry } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
+import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
@@ -23,11 +34,23 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [target, setTarget] = useState('auto');
+  const [removing, setRemoving] = useState<string | null>(null);
+  const pending = busy || removing !== null;
+  const targetBranch = target === 'auto' ? undefined : target;
+  const projectId = useRef(activeProjectId);
+  const refreshButton = useRef<HTMLButtonElement>(null);
+  projectId.current = activeProjectId;
+  useEffect(() => {
+    if (!loading && !removing && feedback.startsWith('Removed ')) refreshButton.current?.focus();
+  }, [feedback, loading, removing]);
   const branchName = branch ?? `feat/${slug.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const desktop = isTauriEnvironment();
   useEffect(() => {
-    if (activeProjectId) void loadWorktreesForActiveProject();
-  }, [loadWorktreesForActiveProject, activeProjectId]);
+    setError('');
+    setFeedback('');
+    if (activeProjectId) void loadWorktreesForActiveProject(targetBranch);
+  }, [loadWorktreesForActiveProject, activeProjectId, targetBranch]);
   const nameInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (creating) nameInput.current?.focus();
@@ -40,11 +63,31 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     const result = await spawnTaskWorktree(slug.trim(), branchName.trim());
     setBusy(false);
     if (result.ok) {
+      await loadWorktreesForActiveProject(targetBranch);
       setCreating(false);
       setSlug('');
       setBranch(null);
       setFeedback('Worktree created.');
     } else setError(result.error);
+  };
+  const cleanup = async (worktree: WorktreeEntry) => {
+    if (pending || !project) return;
+    const id = project.id;
+    setRemoving(worktree.path);
+    setError('');
+    setFeedback('');
+    try {
+      await cleanupWorktree(project.path, worktree);
+      if (projectId.current === id) {
+        setFeedback(`Removed ${worktree.branch || worktree.path}. Branch and task history kept.`);
+      }
+    } catch (cause) {
+      if (projectId.current === id)
+        setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (projectId.current === id) await loadWorktreesForActiveProject(targetBranch);
+      setRemoving(null);
+    }
   };
   const copy = async (path: string) => {
     try {
@@ -67,16 +110,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 variant="ghost"
                 size="icon"
                 aria-label="Refresh worktrees"
+                ref={refreshButton}
                 title="Refresh worktrees"
-                disabled={loading || busy || !desktop}
-                onClick={() => void loadWorktreesForActiveProject()}
+                disabled={loading || pending || !desktop}
+                onClick={() => void loadWorktreesForActiveProject(targetBranch)}
               >
                 <RefreshCw size={18} />
               </Button>
               <Button
                 aria-expanded={creating}
                 aria-controls="worktree-create"
-                disabled={busy || !desktop}
+                disabled={pending || !desktop}
                 onClick={() => setCreating(!creating)}
               >
                 <Plus size={18} />
@@ -86,6 +130,19 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )
         }
       />
+      {error && (
+        <p role="alert" className="task-error">
+          {error}
+        </p>
+      )}
+      <div role="status">
+        {feedback && (
+          <p className="task-notice">
+            <Check size={16} aria-hidden="true" />
+            <span className="break-all">{feedback}</span>
+          </p>
+        )}
+      </div>
       {!project ? (
         <EmptyState
           icon={FolderGit2}
@@ -100,6 +157,22 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         />
       ) : (
         <>
+          <div className="worktree-cleanup-toolbar">
+            <label htmlFor="worktree-target">Check merged into</label>
+            <Select
+              id="worktree-target"
+              value={target}
+              onValueChange={setTarget}
+              disabled={pending || !desktop}
+            >
+              <SelectItem value="auto">Auto · main / master</SelectItem>
+              <SelectItem value="main">main</SelectItem>
+              <SelectItem value="master">master</SelectItem>
+            </Select>
+            <p className="task-muted">
+              Uses local branches. Cleanup removes the folder; keeps the branch and task history.
+            </p>
+          </div>
           {creating && (
             <form
               id="worktree-create"
@@ -116,7 +189,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     id="worktree-name"
                     ref={nameInput}
                     value={slug}
-                    disabled={busy}
+                    disabled={pending}
                     onChange={(e) => setSlug(e.target.value)}
                     placeholder="search-improvements"
                   />
@@ -126,12 +199,12 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   <Input
                     id="worktree-branch"
                     value={branchName}
-                    disabled={busy}
+                    disabled={pending}
                     onChange={(e) => setBranch(e.target.value)}
                     className="font-mono"
                   />
                 </label>
-                <Button type="submit" disabled={busy || !slug.trim() || !branchName.trim()}>
+                <Button type="submit" disabled={pending || !slug.trim() || !branchName.trim()}>
                   <GitBranch size={18} />
                   {busy ? 'Creating…' : 'Create worktree'}
                 </Button>
@@ -165,16 +238,40 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     </span>
                   )}
                   {wt.is_bare && <span>Bare repository</span>}
+                  <span className={wt.cleanup?.merged ? 'text-[var(--color-success)]' : ''}>
+                    <GitMerge size={14} aria-hidden="true" />
+                    {wt.cleanup?.merged === true
+                      ? `Merged into ${wt.cleanup.target_branch}`
+                      : wt.cleanup?.merged === false
+                        ? `Not merged into ${wt.cleanup.target_branch}`
+                        : 'Merge status unavailable'}
+                  </span>
                 </div>
+                {wt.cleanup?.blocked_reason && (
+                  <p className="task-muted mt-2">{wt.cleanup.blocked_reason}</p>
+                )}
               </div>
-              <Button
-                variant="ghost"
-                aria-label={`Copy path for ${wt.branch || wt.path}`}
-                onClick={() => void copy(wt.path)}
-              >
-                <Copy size={18} />
-                Copy path
-              </Button>
+              <div className="workspace-actions">
+                {wt.cleanup?.merged && !wt.cleanup.blocked_reason && (
+                  <Button
+                    variant="outline"
+                    disabled={loading || pending || !desktop}
+                    aria-label={`Clean up ${wt.branch || wt.path}`}
+                    onClick={() => void cleanup(wt)}
+                  >
+                    <Trash2 size={18} aria-hidden="true" />
+                    {removing === wt.path ? 'Cleaning up…' : 'Clean up'}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  aria-label={`Copy path for ${wt.branch || wt.path}`}
+                  onClick={() => void copy(wt.path)}
+                >
+                  <Copy size={18} />
+                  Copy path
+                </Button>
+              </div>
             </article>
           ))}
           {worktreesError && (
@@ -191,19 +288,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )}
         </>
       )}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
-      <p role="status" className="task-notice">
-        {feedback && (
-          <>
-            <Check size={16} aria-hidden="true" />
-            <span className="break-all">{feedback}</span>
-          </>
-        )}
-      </p>
     </section>
   );
 }

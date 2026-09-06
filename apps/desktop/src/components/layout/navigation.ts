@@ -2,8 +2,8 @@ import {
   Bot,
   CalendarClock,
   ChartNoAxesColumn,
+  FileCheck2,
   GitBranch,
-  Globe,
   History,
   Layers3,
   Network,
@@ -71,8 +71,8 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'browser',
     label: 'Evidence',
-    description: 'Review recorded screenshots and validation.',
-    icon: Globe,
+    description: 'Review screenshots and check results saved by tasks.',
+    icon: FileCheck2,
     primary: false,
   },
   {

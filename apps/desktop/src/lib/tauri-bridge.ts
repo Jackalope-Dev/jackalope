@@ -4,6 +4,12 @@ export interface WorktreeEntry {
   branch: string;
   is_bare: boolean;
   is_locked: boolean;
+  cleanup?: {
+    target_branch: string | null;
+    target_head: string | null;
+    merged: boolean | null;
+    blocked_reason: string | null;
+  } | null;
 }
 
 export interface SystemInfo {
@@ -17,12 +23,31 @@ export const isTauriEnvironment = (): boolean => {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 };
 
-export async function listWorktrees(repoPath: string): Promise<WorktreeEntry[]> {
+export async function listWorktrees(
+  repoPath: string,
+  targetBranch?: string,
+): Promise<WorktreeEntry[]> {
   if (isTauriEnvironment()) {
     const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<WorktreeEntry[]>('git_list_worktrees', { repoPath });
+    return invoke<WorktreeEntry[]>('git_list_worktrees', { repoPath, targetBranch });
   }
   throw new Error('Open the desktop app to read worktrees.');
+}
+
+export async function cleanupWorktree(repoPath: string, worktree: WorktreeEntry): Promise<void> {
+  if (!isTauriEnvironment()) throw new Error('Open the desktop app to clean up a worktree.');
+  const status = worktree.cleanup;
+  if (!status?.merged || status.blocked_reason || !status.target_branch || !status.target_head) {
+    throw new Error('Refresh and review this worktree before cleanup.');
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('git_cleanup_worktree', {
+    repoPath,
+    worktreePath: worktree.path,
+    targetBranch: status.target_branch,
+    expectedHead: worktree.head,
+    expectedTargetHead: status.target_head,
+  });
 }
 
 export async function createWorktree(

@@ -269,6 +269,14 @@ impl TaskRuntime {
             .map(|entry| entry.map(|entry| entry.path()).map_err(|e| e.to_string()))
             .collect::<Result<_, _>>()?;
         for path in paths {
+            if path.extension().is_some_and(|ext| ext == "tmp") {
+                runtime.inner.lock().unwrap().recovery.push(HistoryRecoveryEntry {
+                    path: path.to_string_lossy().into_owned(),
+                    reason: "An unfinished save was preserved. It has not replaced the last saved task. Keep a copy before inspecting or repairing it.".into(),
+                    quarantined: false,
+                });
+                continue;
+            }
             if path.extension().is_some_and(|ext| ext == "corrupt") {
                 runtime.inner.lock().unwrap().recovery.push(HistoryRecoveryEntry {
                     path: path.to_string_lossy().into_owned(),
@@ -278,19 +286,26 @@ impl TaskRuntime {
                 continue;
             }
             if path.extension().is_some_and(|ext| ext == "json") {
-                let parsed = std::fs::metadata(&path).map_err(|e| e.to_string())
-                    .and_then(|metadata| if metadata.len() > 8_000_000 { Err("History file exceeds the 8 MB load limit; preserved for manual recovery.".into()) } else { Ok(()) })
-                    .and_then(|_| std::fs::read(&path).map_err(|e| e.to_string()))
-                    .map_err(|e| e.to_string())
-                    .and_then(|data| {
-                        serde_json::from_slice::<TaskRun>(&data).map_err(|e| e.to_string())
-                    })
+                let bytes = match super::history::read_bounded(&path, 8_000_000) {
+                    Ok(bytes) => bytes,
+                    Err(reason) => {
+                        runtime.record_recovery(HistoryRecoveryEntry {
+                            path: path.to_string_lossy().into_owned(),
+                            reason,
+                            quarantined: false,
+                        });
+                        continue;
+                    }
+                };
+                let parsed = serde_json::from_slice::<TaskRun>(&bytes).map_err(|e| e.to_string())
                     .and_then(|run| {
-                        if valid_id(&run.id) {
-                            Ok(run)
-                        } else {
+                        if !valid_id(&run.id) {
                             Err("invalid task identifier".to_string())
-                        }
+                        } else if path.file_stem().and_then(|stem| stem.to_str()) != Some(run.id.as_str()) {
+                            Err("Task identifier does not match its history filename; the other task was not overwritten.".into())
+                        } else if run.details_omitted {
+                            Err("This file contains a task summary rather than a complete history record.".into())
+                        } else { Ok(run) }
                     });
                 match parsed {
                     Err(reason) => {
@@ -302,6 +317,7 @@ impl TaskRuntime {
                             .push(quarantine(&path, reason));
                     }
                     Ok(mut run) => {
+                        run.persistence_error = None;
                         if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
                             run.status = if cfg!(windows) && run.process_contained {
                                 "stopped"
@@ -311,7 +327,11 @@ impl TaskRuntime {
                             .into();
                             run.error = Some("Jackalope closed before this attempt finished. Review its workspace before continuing; work was not automatically rerun.".into());
                             run.ended_at = Some(Utc::now().to_rfc3339());
-                            runtime.save(&run)?;
+                            if let Err(error) = runtime.save(&run) {
+                                run.persistence_error = Some(format!(
+                                    "The recovered state could not be saved: {error}"
+                                ));
+                            }
                         }
                         runtime
                             .inner
@@ -333,16 +353,27 @@ impl TaskRuntime {
     }
 
     fn save(&self, run: &TaskRun) -> Result<(), String> {
-        let temp = self.directory.join(format!("{}.tmp", run.id));
-        let mut file = std::fs::File::create(&temp).map_err(|e| e.to_string())?;
-        file.write_all(&serde_json::to_vec(run).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-        file.sync_all().map_err(|e| e.to_string())?;
-        std::fs::rename(temp, self.directory.join(format!("{}.json", run.id)))
-            .map_err(|e| e.to_string())
+        if !valid_id(&run.id) || run.details_omitted {
+            return Err("Only a complete task record with a valid identifier can be saved.".into());
+        }
+        let mut saved = run.clone();
+        saved.persistence_error = None;
+        let bytes = serde_json::to_vec(&saved).map_err(|e| e.to_string())?;
+        if bytes.len() > 8_000_000 {
+            return Err("This task exceeds the history size limit. Save a recovery copy before closing Jackalope.".into());
+        }
+        super::history::write_atomic(&self.directory.join(format!("{}.json", run.id)), &bytes)
     }
 
     pub(super) fn update(&self, id: &str, update: impl FnOnce(&mut TaskRun)) {
+        let _ = self.update_checked(id, update);
+    }
+
+    pub(super) fn update_checked(
+        &self,
+        id: &str,
+        update: impl FnOnce(&mut TaskRun),
+    ) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();
         if let Some(run) = inner.runs.get_mut(id) {
             update(run);
@@ -370,9 +401,29 @@ impl TaskRuntime {
                 run.diagnostics.drain(..run.diagnostics.len() - 150);
             }
             if let Err(error) = self.save(run) {
-                run.persistence_error = Some(format!("History could not be saved: {error}"));
+                let error = format!("History could not be saved: {error}");
+                run.persistence_error = Some(error.clone());
+                return Err(error);
             }
+            run.persistence_error = None;
+            Ok(())
+        } else {
+            Err("Attempt not found".into())
         }
+    }
+
+    pub(super) fn ensure_history_saved(&self) -> Result<(), String> {
+        if self
+            .inner
+            .lock()
+            .map_err(|e| e.to_string())?
+            .runs
+            .values()
+            .any(|run| run.persistence_error.is_some())
+        {
+            return Err("Task history has unsaved changes. Open the affected task and retry saving before starting more work or installing an update.".into());
+        }
+        Ok(())
     }
 
     fn fail(&self, id: &str, error: String) {
@@ -527,11 +578,11 @@ impl TaskRuntime {
                 base,
             )
         };
-        self.update(id, |r| {
+        self.update_checked(id, |r| {
             r.workspace = workspace.clone();
             r.branch = branch;
             r.base_head = base_head;
-        });
+        })?;
         let policy = self.policy()?;
         let (adapter, executable) = policy.resolve(&req.agent)?;
         let selected_model = policy.model(&req.agent, req.model.as_deref())?;
@@ -644,12 +695,12 @@ impl TaskRuntime {
         let process = Arc::new(Mutex::new(child));
         inner.processes.insert(id.into(), process.clone());
         drop(inner);
-        self.update(id, |r| {
+        self.update_checked(id, |r| {
             r.process_contained = cfg!(windows);
             if r.status == "starting" {
                 r.status = "running".into();
             }
-        });
+        })?;
         let input_result = if adapter == "grok" {
             Ok(())
         } else {
@@ -1049,6 +1100,65 @@ pub fn task_history_recovery(state: State<'_, TaskRuntime>) -> HistoryRecovery {
 }
 
 #[tauri::command]
+pub fn task_retry_save(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {
+    state.update_checked(&id, |_| {})
+}
+
+impl TaskRuntime {
+    fn export_recovery(&self, id: &str, destination: &Path) -> Result<(), String> {
+        let parent = std::fs::canonicalize(destination.parent().ok_or("Choose a file location")?)
+            .map_err(|e| e.to_string())?;
+        let history = std::fs::canonicalize(&self.directory).map_err(|e| e.to_string())?;
+        if parent.starts_with(history) {
+            return Err("Choose a recovery location outside Jackalope's history folder.".into());
+        }
+        let run = self
+            .inner
+            .lock()
+            .map_err(|e| e.to_string())?
+            .runs
+            .get(id)
+            .cloned()
+            .ok_or("Attempt not found")?;
+        let bytes = serde_json::to_vec_pretty(&serde_json::json!({
+            "format": "jackalope-task-recovery", "version": 1,
+            "exportedAt": Utc::now().to_rfc3339(), "task": run,
+        }))
+        .map_err(|e| e.to_string())?;
+        super::history::write_atomic(destination, &bytes)
+    }
+}
+
+#[tauri::command]
+pub async fn task_export_recovery(
+    app: AppHandle,
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Option<String>, String> {
+    if !valid_id(&id) {
+        return Err("Invalid task identifier".into());
+    }
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(file) = app
+            .dialog()
+            .file()
+            .set_title("Save a task recovery copy")
+            .set_file_name(format!("task-{id}-recovery.json"))
+            .add_filter("Task recovery", &["json"])
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        runtime.export_recovery(&id, &path)?;
+        Ok(Some(path.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub async fn task_screenshot(
     run_id: String,
     screenshot_id: String,
@@ -1159,10 +1269,15 @@ impl TaskRuntime {
             prompt.answered_at = Some(Utc::now().to_rfc3339());
             activity(&mut updated, "A response was saved for the agent.");
             self.save(&updated)?;
+            updated.persistence_error = None;
             *run = updated;
         }
         super::harness::resolve_user_prompt(prompt_id, answer.trim());
         Ok(true)
+    }
+
+    pub(super) fn record_recovery(&self, entry: HistoryRecoveryEntry) {
+        self.inner.lock().unwrap().recovery.push(entry);
     }
 
     pub fn integration_runs(&self) -> Result<Vec<TaskRun>, String> {
@@ -1186,6 +1301,7 @@ impl TaskRuntime {
         self.start_locked(request)
     }
     pub(super) fn start_locked(&self, mut request: RunRequest) -> Result<String, String> {
+        self.ensure_history_saved()?;
         if super::release::installing() {
             return Err(
                 "An app update is being installed. Start new work after reopening Jackalope."
@@ -1352,6 +1468,7 @@ pub fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Result<(
     let mut updated = run.clone();
     updated.status = "reviewed".into();
     state.save(&updated)?;
+    updated.persistence_error = None;
     *run = updated;
     Ok(())
 }
@@ -1646,6 +1763,140 @@ mod tests {
             assert!(!valid_id(id));
         }
         assert!(valid_id("f22457f4-32ca-421c-9782-075f244004a9"));
+    }
+
+    #[test]
+    fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
+        let folder = std::env::temp_dir().join(format!("jackalope-retry-{}", uuid::Uuid::new_v4()));
+        let directory = folder.join("history");
+        let runtime = TaskRuntime::new(directory.clone()).unwrap();
+        let mut run = sample("codex");
+        run.status = "review".into();
+        run.result = "last saved output".into();
+        runtime.save(&run).unwrap();
+        runtime
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .insert(run.id.clone(), run.clone());
+        let path = directory.join(format!("{}.json", run.id));
+        let prior = folder.join("prior.json");
+        std::fs::rename(&path, &prior).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(runtime
+            .update_checked(&run.id, |r| r.result = "latest unsaved output".into())
+            .is_err());
+        assert!(runtime.ensure_history_saved().is_err());
+        let exported = folder.join("recovery.json");
+        runtime.export_recovery(&run.id, &exported).unwrap();
+        let recovery: Value = serde_json::from_slice(&std::fs::read(&exported).unwrap()).unwrap();
+        assert_eq!(recovery["task"]["result"], "latest unsaved output");
+        assert_eq!(recovery["format"], "jackalope-task-recovery");
+        assert!(
+            runtime.ensure_history_saved().is_err(),
+            "export must not claim the main record was saved"
+        );
+        assert!(runtime
+            .export_recovery(&run.id, &directory.join("overwrite.json"))
+            .is_err());
+        let old: TaskRun = serde_json::from_slice(&std::fs::read(&prior).unwrap()).unwrap();
+        assert_eq!(old.result, "last saved output");
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::rename(&prior, &path).unwrap();
+        runtime.update_checked(&run.id, |_| {}).unwrap();
+        runtime.ensure_history_saved().unwrap();
+        drop(runtime);
+        let restarted = TaskRuntime::new(directory).unwrap();
+        let saved = restarted.integration_runs().unwrap().pop().unwrap();
+        assert_eq!(saved.result, "latest unsaved output");
+        assert!(saved.persistence_error.is_none());
+        assert_eq!(saved.status, "review");
+        drop(restarted);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_written() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-startup-save-{}", uuid::Uuid::new_v4()));
+        let runtime = TaskRuntime::new(folder.clone()).unwrap();
+        let mut run = sample("codex");
+        run.process_contained = true;
+        runtime.save(&run).unwrap();
+        drop(runtime);
+        let path = folder.join(format!("{}.json", run.id));
+        let original = std::fs::metadata(&path).unwrap().permissions();
+        let mut readonly = original.clone();
+        readonly.set_readonly(true);
+        std::fs::set_permissions(&path, readonly).unwrap();
+        let runtime = TaskRuntime::new(folder.clone())
+            .expect("a failed checkpoint must not prevent reading other history");
+        let recovered = runtime.integration_runs().unwrap().pop().unwrap();
+        assert_eq!(recovered.status, "stopped");
+        assert!(recovered.persistence_error.is_some());
+        assert!(runtime.inner.lock().unwrap().processes.is_empty());
+        let saved: TaskRun = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(
+            saved.status, "running",
+            "failed replacement must keep the checkpoint intact"
+        );
+        std::fs::set_permissions(&path, original).unwrap();
+        runtime.update_checked(&run.id, |_| {}).unwrap();
+        assert!(runtime.integration_runs().unwrap()[0]
+            .persistence_error
+            .is_none());
+        drop(runtime);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-history-id-{}", uuid::Uuid::new_v4()));
+        let runtime = TaskRuntime::new(folder.clone()).unwrap();
+        let mut good = sample("codex");
+        good.status = "review".into();
+        good.result = "keep this result".into();
+        runtime.save(&good).unwrap();
+        let mut mismatch = good.clone();
+        mismatch.result = "wrong record".into();
+        let wrong = folder.join("another-attempt.json");
+        std::fs::write(&wrong, serde_json::to_vec(&mismatch).unwrap()).unwrap();
+        let unfinished = folder.join(format!("{}.tmp", good.id));
+        std::fs::write(&unfinished, b"partial JSON").unwrap();
+        drop(runtime);
+        let loaded = TaskRuntime::new(folder.clone()).unwrap();
+        assert_eq!(loaded.integration_runs().unwrap().len(), 1);
+        assert_eq!(
+            loaded.integration_runs().unwrap()[0].result,
+            "keep this result"
+        );
+        assert_eq!(loaded.inner.lock().unwrap().recovery.len(), 2);
+        assert_eq!(std::fs::read(&unfinished).unwrap(), b"partial JSON");
+        assert!(wrong.with_extension("json.corrupt").exists());
+        drop(loaded);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn oversized_or_summary_records_do_not_overwrite_complete_history() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-history-limit-{}", uuid::Uuid::new_v4()));
+        let runtime = TaskRuntime::new(folder.clone()).unwrap();
+        let mut run = sample("codex");
+        runtime.save(&run).unwrap();
+        let path = folder.join(format!("{}.json", run.id));
+        let original = std::fs::read(&path).unwrap();
+        run.details_omitted = true;
+        assert!(runtime.save(&run).is_err());
+        run.details_omitted = false;
+        run.result = "x".repeat(8_000_001);
+        assert!(runtime.save(&run).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        drop(runtime);
+        std::fs::remove_dir_all(folder).unwrap();
     }
 
     #[test]

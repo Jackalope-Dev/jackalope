@@ -54,7 +54,7 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         tree: (before == after).then_some(after),
         result,
     };
-    runtime.update(&run.id, |r| r.verification = Some(verification.clone()));
+    runtime.update_checked(&run.id, |r| r.verification = Some(verification.clone()))?;
     Ok(verification)
 }
 

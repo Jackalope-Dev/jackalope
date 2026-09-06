@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory)][string]$UpdateUrl,
     [Parameter(Mandatory)][string]$UpdaterPublicKey,
     [Parameter(Mandatory)][string]$CertificateThumbprint,
-    [Parameter(Mandatory)][string]$TimestampUrl
+    [Parameter(Mandatory)][string]$TimestampUrl,
+    [Parameter(Mandatory)][string]$ArtifactBaseUrl,
+    [Parameter(Mandatory)][string]$ReleaseNotesFile
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -37,5 +39,8 @@ try {
         [pscustomobject]@{ File = $artifact.Name; SHA256 = $hash.Hash }
     }
     $hashes | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $repo 'output/release/checksums.json') -Encoding utf8
-    Write-Output 'Signed artifacts verified locally. Publication remains a separate action.'
+    $manifest = Join-Path $repo 'output/release/latest.json'
+    node scripts/update-manifest.mjs $version $ArtifactBaseUrl $ReleaseNotesFile $artifacts[0].FullName $artifacts[1].FullName $manifest
+    if ($LASTEXITCODE -ne 0) { throw 'Update manifest generation failed.' }
+    Write-Output 'Signed artifacts and update manifest prepared locally. Publication remains a separate action.'
 } finally { Pop-Location }
