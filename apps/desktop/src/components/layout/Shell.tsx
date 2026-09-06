@@ -1,13 +1,10 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronDown, GitBranch, Search, Settings2, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { planningDraft } from '../../lib/planning';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useTaskStore } from '../../stores/taskStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { BrowserHarness } from '../browser/BrowserHarness';
-import { KanbanBoard } from '../kanban/KanbanBoard';
 import { McpWorkspace } from '../mcp/McpWorkspace';
 import { DeviceMesh } from '../mesh/DeviceMesh';
 import { WorktreeManager } from '../projects/WorktreeManager';
@@ -35,22 +32,10 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [newTaskAgent, setNewTaskAgent] = useState<string | null>(initialTaskAgent ?? null);
-  const [plannedTaskId, setPlannedTaskId] = useState<string | null>(null);
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const shortcut = navigator.platform.includes('Mac') ? '⌘ K' : 'Ctrl K';
-  const prepareTask = (id: string) => {
-    const task = useTaskStore.getState().tasks.find((task) => task.id === id);
-    if (!task) return;
-    selectProject(task.projectId);
-    useExecutionStore.getState().select(null);
-    useExecutionStore.getState().draft(`planning:${id}`, planningDraft(task));
-    setNewTaskAgent(null);
-    setPlannedTaskId(id);
-    setActiveTab('kanban');
-  };
-
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -213,18 +198,9 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         <UnsavedTasksNotice />
         {activeTab === 'kanban' && (
           <TaskWorkspace
-            key={plannedTaskId ?? 'tasks'}
-            plannedTaskId={plannedTaskId}
-            onPlanHandled={() => setPlannedTaskId(null)}
+            key={activeProjectId}
             newTaskAgent={newTaskAgent}
             onNewTaskHandled={() => setNewTaskAgent(null)}
-          />
-        )}
-        {activeTab === 'board' && (
-          <KanbanBoard
-            key={activeProjectId}
-            onOpenProject={() => setSetupOpen(true)}
-            onPrepare={prepareTask}
           />
         )}
         {activeTab === 'worktrees' && (
@@ -233,7 +209,6 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         {activeTab === 'agents' && (
           <RunnerConnections
             onNewTask={(agent) => {
-              setPlannedTaskId(null);
               useExecutionStore.getState().select(null);
               setNewTaskAgent(agent);
               setActiveTab('kanban');
@@ -252,7 +227,10 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
           <ScheduleManager
             key={activeProjectId}
             onOpenProject={() => setSetupOpen(true)}
-            onPlanning={() => setActiveTab('board')}
+            onPlanning={() => {
+              useExecutionStore.getState().select(null);
+              setActiveTab('kanban');
+            }}
           />
         )}
         {activeTab === 'browser' && (

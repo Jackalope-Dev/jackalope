@@ -77,7 +77,7 @@ export function ScheduleManager({
       status: 'backlog',
     });
     setFeedback({
-      message: `Added “${schedule.name}” to ${project.name}'s Planning board.`,
+      message: `Added “${schedule.name}” to ${project.name}'s Tasks.`,
       projectId: project.id,
     });
   };
@@ -118,7 +118,7 @@ export function ScheduleManager({
               onPlanning();
             }}
           >
-            View planning board
+            View tasks
           </Button>
         </div>
       )}

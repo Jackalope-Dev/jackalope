@@ -3,13 +3,11 @@ import {
   ArrowRight,
   Bot,
   Check,
-  ChevronRight,
   CircleCheck,
   Eye,
   FileDiff,
   FolderOpen,
   GitBranch,
-  ListTodo,
   Plus,
   ShieldAlert,
   Square,
@@ -18,8 +16,10 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { orchestrator } from '../../lib/orchestration/orchestrator';
+import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog.ts';
 import { assemblePrompt } from '../../lib/skills/context-assembler.ts';
+import { collectWork } from '../../lib/task-collection';
 import {
   isActive,
   nativeTask,
@@ -37,6 +37,7 @@ import {
   useProjectStore,
 } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { TaskModal } from '../kanban/TaskModal';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -45,6 +46,7 @@ import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
 import { ProjectVerification } from './ProjectVerification';
 import { RunStatus } from './RunStatus';
+import { TaskCollection, type TaskCollectionView } from './TaskCollection';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
@@ -121,6 +123,12 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
   const attempts = runs.filter((r) => r.taskId === run.taskId);
+  const sourceIdea = useTaskStore((state) =>
+    state.tasks.find(
+      (idea) =>
+        idea.projectId === run.projectId && attempts.some((attempt) => attempt.id === idea.runId),
+    ),
+  );
   const act = async (command: string) => {
     if (acting) return;
     setActing(true);
@@ -172,7 +180,7 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
             {run.projectName} · {run.agent}
           </p>
           <h1 className="task-title task-prompt-title">
-            {taskTitle(attempts.at(-1)?.prompt ?? run.prompt)}
+            {sourceIdea?.title ?? taskTitle(attempts.at(-1)?.prompt ?? run.prompt)}
           </h1>
         </div>
         <div role="status">
@@ -409,13 +417,9 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
 export function TaskWorkspace({
   newTaskAgent,
   onNewTaskHandled,
-  plannedTaskId,
-  onPlanHandled,
 }: {
   newTaskAgent?: string | null;
   onNewTaskHandled?: () => void;
-  plannedTaskId?: string | null;
-  onPlanHandled?: () => void;
 }) {
   const { projects, activeProjectId } = useProjectStore();
   const {
@@ -433,16 +437,26 @@ export function TaskWorkspace({
     discovering,
   } = useExecutionStore();
   const project = projects.find((p) => p.id === activeProjectId);
+  const [plannedTaskId, setPlannedTaskId] = useState<string | null>(null);
+  const [editingIdea, setEditingIdea] = useState<string | null>(null);
+  const ideas = useTaskStore((state) => state.tasks);
   const plannedTask = useTaskStore((state) =>
     state.tasks.find((task) => task.id === plannedTaskId && task.projectId === activeProjectId),
   );
   const [setup, setSetup] = useState(!!newTaskAgent && !project);
   const [submitError, setSubmitError] = useState('');
-  const [filter, setFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
+  const [collectionView, setCollectionView] = useState<TaskCollectionView>({
+    filter: 'all',
+    layout: 'list',
+    query: '',
+  });
   const [composing, setComposing] = useState(!!newTaskAgent || !!plannedTask);
   useEffect(() => {
     if (newTaskAgent && project) {
+      setComposing(true);
+      setParallel(false);
+      setPlannedTaskId(null);
       draft(project.id, { agent: newTaskAgent });
       onNewTaskHandled?.();
     }
@@ -454,13 +468,8 @@ export function TaskWorkspace({
   const key = plannedTask ? `planning:${plannedTask.id}` : (project?.id ?? 'projectless');
   const current = drafts[key] ?? emptyDraft;
   const selected = runs.find((run) => run.id === selectedId && run.projectId === project?.id);
-  const latest = runs.filter(
-    (run, index) =>
-      run.projectId === project?.id && runs.findIndex((r) => r.taskId === run.taskId) === index,
-  );
-  const filtered = latest.filter(
-    (run) => filter === 'all' || (filter === 'active' ? isActive(run) : run.status === 'review'),
-  );
+  const items = project ? collectWork(project.id, ideas, runs) : [];
+  const hasWork = items.length > 0;
   const agentConfig = useAgentConfigStore();
   const appDefaultRunner = agentConfig.defaultMetaAgent;
   const allowedRunners = runners.filter(
@@ -511,7 +520,7 @@ export function TaskWorkspace({
     try {
       const currentAdapter =
         agentConfig.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
-      await start({
+      const runId = await start({
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
@@ -523,10 +532,58 @@ export function TaskWorkspace({
         isolated: current.isolated,
       });
       draft(key, { prompt: '', skills: [] });
-      if (plannedTask) onPlanHandled?.();
+      if (plannedTask) useTaskStore.getState().updateTask(plannedTask.id, { runId });
+      setPlannedTaskId(null);
+      setComposing(false);
+      setCollectionView((view) => ({ ...view, filter: 'all', query: '' }));
     } catch (error) {
       setSubmitError(String(error));
     }
+  };
+  const prepareIdea = (id: string) => {
+    const idea = useTaskStore
+      .getState()
+      .tasks.find((item) => item.id === id && item.projectId === project?.id);
+    if (!idea || idea.runId) return;
+    const draftKey = `planning:${id}`;
+    if (!useExecutionStore.getState().drafts[draftKey]?.prompt)
+      draft(draftKey, planningDraft(idea));
+    setPlannedTaskId(id);
+    setComposing(true);
+    setSubmitError('');
+  };
+  const saveForLater = () => {
+    if (!project || !current.prompt.trim()) return;
+    const value = {
+      rawPrompt: current.prompt.trim(),
+      refinedPrompt: assembled.hasSupplementation ? assembled.assembledPrompt : undefined,
+      assignedAgent: currentAgent || undefined,
+      clarifications: [
+        {
+          question: 'Active Skill Guidelines',
+          answer: VETTED_SKILLS.filter((skill) => activeSkills.includes(skill.id))
+            .map((skill) => skill.name)
+            .join(', '),
+        },
+        {
+          question: 'Git Execution Mode',
+          answer: current.isolated ? 'Isolated worktree' : 'Active working checkout',
+        },
+      ],
+    };
+    if (plannedTask) useTaskStore.getState().updateTask(plannedTask.id, value);
+    else
+      useTaskStore.getState().addTask({
+        ...value,
+        projectId: project.id,
+        title: current.prompt.trim().split('\n')[0].slice(0, 160),
+        status: 'backlog',
+      });
+    draft(key, { prompt: '', skills: [] });
+    setPlannedTaskId(null);
+    setComposing(false);
+    setSubmitError('');
+    setCollectionView((view) => ({ ...view, filter: 'ideas', query: '' }));
   };
   if (selected) return <TaskDetail key={selected.id} run={selected} onBack={() => select(null)} />;
   if (parallel && project)
@@ -536,13 +593,13 @@ export function TaskWorkspace({
       <div className="task-introduction workspace-section-heading">
         <div>
           <h1 className="task-hero-title">
-            {project ? (latest.length ? 'Tasks' : 'What’s next?') : 'A place to get things done.'}
+            {project ? (hasWork ? 'Tasks' : 'What’s next?') : 'A place to get things done.'}
           </h1>
           <p className="task-muted mt-3">
             {project
-              ? latest.length
-                ? 'Follow the work. Review what’s ready.'
-                : 'Give an agent a clear next step.'
+              ? hasWork
+                ? 'From the first idea to the final review.'
+                : 'Capture an idea or give an agent a clear next step.'
               : 'Your projects and agents, in one place.'}
           </p>
         </div>
@@ -552,11 +609,15 @@ export function TaskWorkspace({
               <Workflow size={18} />
               Parallel work
             </Button>
-            {latest.length > 0 && (
+            {hasWork && (
               <Button
                 aria-expanded={composing}
                 aria-controls="task-composer"
-                onClick={() => setComposing(!composing)}
+                onClick={() => {
+                  setComposing(!composing);
+                  setPlannedTaskId(null);
+                  setSubmitError('');
+                }}
               >
                 <Plus size={18} />
                 {composing ? 'Close composer' : 'New task'}
@@ -565,11 +626,19 @@ export function TaskWorkspace({
           </div>
         )}
       </div>
-      {project && <CodebaseMemoryBar key={project.id} project={project} />}
+      {project && (composing || !hasWork) && (
+        <CodebaseMemoryBar key={project.id} project={project} />
+      )}
       {plannedTask && (
         <div className="task-notice flex flex-wrap items-center justify-between gap-3">
-          <span>Preparing “{plannedTask.title}”. Your regular task draft is saved separately.</span>
-          <Button variant="ghost" onClick={onPlanHandled}>
+          <span>Preparing “{plannedTask.title}”</span>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setPlannedTaskId(null);
+              setComposing(false);
+            }}
+          >
             Back to tasks
           </Button>
         </div>
@@ -603,7 +672,7 @@ export function TaskWorkspace({
           </ol>
         </div>
       ) : (
-        (!latest.length || composing) && (
+        (!hasWork || composing) && (
           <form
             id="task-composer"
             className="task-composer"
@@ -723,13 +792,23 @@ export function TaskWorkspace({
                   </Select>
                 </label>
               </div>
-              <Button
-                type="submit"
-                disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
-              >
-                {submitting ? 'Starting…' : 'Start task'}
-                <ArrowRight size={15} />
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={!current.prompt.trim() || submitting}
+                  onClick={saveForLater}
+                >
+                  {plannedTask ? 'Save idea' : 'Save for later'}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
+                >
+                  {submitting ? 'Starting…' : 'Start task'}
+                  <ArrowRight size={15} />
+                </Button>
+              </div>
             </div>
             <p className="task-composer-note">
               {current.isolated
@@ -778,68 +857,33 @@ export function TaskWorkspace({
         </p>
       )}
       {project && (
-        <div className="task-list-header">
-          <h2 className="font-medium">Your work</h2>
-          <fieldset className="task-filter-group" aria-label="Filter tasks">
-            {[
-              ['all', 'All', latest.length],
-              ['active', 'Working', latest.filter(isActive).length],
-              ['review', 'Review', latest.filter((r) => r.status === 'review').length],
-            ].map(([value, label, count]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={filter === value}
-                onClick={() => setFilter(String(value))}
-              >
-                {label}
-                <span>{count}</span>
-              </button>
-            ))}
-          </fieldset>
-        </div>
-      )}
-      {project &&
-        (loading ? (
-          <p role="status" className="task-muted py-5">
-            Loading task history…
-          </p>
-        ) : filtered.length ? (
-          <div className="task-list">
-            {filtered.map((run) => (
-              <button
-                type="button"
-                className="task-list-row"
-                key={run.id}
-                onClick={() => select(run.id)}
-              >
-                <div className="min-w-0">
-                  <span className="block truncate font-medium">
-                    {taskTitle(
-                      runs.filter((r) => r.taskId === run.taskId).at(-1)?.prompt ?? run.prompt,
-                    )}
-                  </span>
-                  <span className="task-muted text-xs mt-2 block">
-                    {runners.find((runner) => runner.id === run.agent)?.name ?? run.agent} ·{' '}
-                    {new Date(run.startedAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <RunStatus status={run.status} />
-                <ChevronRight size={15} className="text-[var(--color-text-muted)]" />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon={ListTodo}
-            title={filter === 'all' ? 'Ready for your first task' : 'Nothing here yet'}
-            description={
-              filter === 'all'
-                ? 'Describe the work above. Results and review will stay with the task.'
-                : 'Tasks will appear here as their status changes.'
-            }
+        <>
+          {loading && (
+            <p role="status" className="task-muted mt-5">
+              Loading task history…
+            </p>
+          )}
+          <TaskCollection
+            view={collectionView}
+            onViewChange={setCollectionView}
+            items={items}
+            runners={runners}
+            onOpen={(item) => {
+              if (item.run) select(item.run.id);
+              else if (item.idea) setEditingIdea(item.idea.id);
+            }}
           />
-        ))}
+        </>
+      )}
+      {editingIdea && (
+        <TaskModal
+          key={editingIdea}
+          taskId={editingIdea}
+          isOpen
+          onClose={() => setEditingIdea(null)}
+          onPrepare={prepareIdea}
+        />
+      )}
       <ProjectSetup
         open={setup}
         onClose={() => {

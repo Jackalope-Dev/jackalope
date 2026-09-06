@@ -1,9 +1,11 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { planningDraft } from '../../lib/planning';
+import { ideaStageLabels } from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useTaskStore } from '../../stores/taskStore';
+import { type TaskStatus, useTaskStore } from '../../stores/taskStore';
 import { PromptRefiner } from '../prompt/PromptRefiner';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
@@ -35,6 +37,7 @@ export function TaskModal({
   const [clarifications, setClarifications] = useState(existing?.clarifications);
   const [agent, setAgent] = useState(existing?.assignedAgent ?? 'Unassigned');
   const [refining, setRefining] = useState(false);
+  const [status, setStatus] = useState<TaskStatus>(existing?.status ?? 'backlog');
   const valid = !!project && !!title.trim() && !!prompt.trim();
   const save = () => {
     if (!valid || !projectId) return;
@@ -44,12 +47,20 @@ export function TaskModal({
       refinedPrompt: refined || undefined,
       assignedAgent: agent,
       clarifications,
+      status,
     };
     if (existing) {
       updateTask(existing.id, value);
+      if (
+        value.rawPrompt !== existing.rawPrompt ||
+        value.refinedPrompt !== existing.refinedPrompt ||
+        value.assignedAgent !== (existing.assignedAgent ?? 'Unassigned') ||
+        value.clarifications !== existing.clarifications
+      )
+        useExecutionStore.getState().draft(`planning:${existing.id}`, planningDraft(value));
       return existing.id;
     }
-    return addTask({ ...value, projectId, status: 'backlog' });
+    return addTask({ ...value, projectId });
   };
   return (
     <Dialog.Root
@@ -68,8 +79,7 @@ export function TaskModal({
             {existing ? 'Edit idea' : 'New idea'}
           </Dialog.Title>
           <Dialog.Description className="task-muted mt-3">
-            {project?.name ?? 'Choose a project'} · Save the idea here, then prepare a task when you
-            are ready to work on it.
+            {project?.name ?? 'Choose a project'} · Shape the idea, then start when you’re ready.
           </Dialog.Description>
           <form
             className="space-y-5 mt-6"
@@ -78,6 +88,12 @@ export function TaskModal({
               if (save()) onClose();
             }}
           >
+            {existing?.runId && (
+              <p className="task-notice">
+                This idea was started, but its execution history is unavailable. Restore task
+                history to review its result.
+              </p>
+            )}
             <label htmlFor="idea-title" className="block space-y-2">
               <span className="block text-sm font-medium">Title</span>
               <Input
@@ -125,6 +141,24 @@ export function TaskModal({
                   </SelectItem>
                 ))}
               </Select>
+            </label>
+            <label htmlFor="idea-stage" className="block space-y-2">
+              <span className="block text-sm font-medium">Planning stage</span>
+              <Select
+                id="idea-stage"
+                aria-label="Planning stage"
+                value={status}
+                onValueChange={(value) => setStatus(value as TaskStatus)}
+              >
+                {Object.entries(ideaStageLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </Select>
+              <span className="block task-muted text-xs">
+                A planning note; agent progress updates automatically after you start.
+              </span>
             </label>
             <Button
               type="button"
@@ -186,7 +220,7 @@ export function TaskModal({
                 <Button type="submit" variant={existing ? 'outline' : 'primary'} disabled={!valid}>
                   {existing ? 'Save changes' : 'Save idea'}
                 </Button>
-                {existing && (
+                {existing && !existing.runId && (
                   <Button
                     type="button"
                     disabled={!valid}

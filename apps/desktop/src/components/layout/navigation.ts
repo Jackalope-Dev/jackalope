@@ -15,7 +15,7 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'kanban',
     label: 'Tasks',
-    description: 'Shape an idea and follow it through.',
+    description: 'Plan ideas, follow work on the board, and review results.',
     icon: Layers3,
     primary: true,
   },
@@ -53,13 +53,6 @@ export const WORKSPACE_VIEWS = [
     description: 'Connect tools through MCP and choose which agents can use them.',
     icon: Plug,
     primary: true,
-  },
-  {
-    id: 'board',
-    label: 'Planning board',
-    description: 'Organize ideas and prepare them for an agent.',
-    icon: Layers3,
-    primary: false,
   },
   {
     id: 'schedules',

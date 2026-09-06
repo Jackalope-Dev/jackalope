@@ -61,3 +61,36 @@ test('rapidly created ideas and plans remain distinct through edits, deletion an
   assert.equal(schedules.getState().schedules.length, 19);
   assert.equal(tasks.getState().tasks.length, 20);
 });
+
+
+test('combined work links an idea to its latest attempt without duplicating or crossing projects', async () => {
+  const { collectWork } = await import('../src/lib/task-collection.ts');
+  const idea = { id: 'idea', projectId: 'a', title: 'Short title', rawPrompt: 'Original intent', status: 'backlog', createdAt: '2026-09-01', updatedAt: '2026-09-01', runId: 'first' };
+  const runs = [
+    { id: 'first', taskId: 'task', projectId: 'a', prompt: 'Original intent', status: 'review', startedAt: '2026-09-01' },
+    { id: 'next', taskId: 'task', projectId: 'a', prompt: 'Follow-up', status: 'running', startedAt: '2026-09-02' },
+    { id: 'foreign', taskId: 'other', projectId: 'b', prompt: 'Private to b', status: 'running', startedAt: '2026-09-03' },
+  ];
+  const work = collectWork('a', [idea], runs);
+  assert.equal(work.length, 1);
+  assert.equal(work[0].run.id, 'next');
+  assert.equal(work[0].title, 'Short title');
+  assert.equal(work[0].stage, 'working');
+  assert.equal(collectWork('a', [], runs)[0].title, 'Original intent');
+  assert.equal(collectWork('a', [{ ...idea, runId: 'missing' }], runs).length, 2);
+  assert.equal(collectWork('a', [{ ...idea, runId: undefined }], runs).length, 2);
+});
+
+test('manual planning never claims execution and questions or unsaved results need attention', async () => {
+  const { collectWork } = await import('../src/lib/task-collection.ts');
+  const idea = { id: 'idea', projectId: 'a', title: 'Intent', status: 'in_progress', createdAt: '2026-09-01', updatedAt: '2026-09-01' };
+  assert.equal(collectWork('a', [idea], [])[0].stage, 'ideas');
+  assert.equal(collectWork('a', [{ ...idea, status: 'verification' }], [])[0].stage, 'ideas');
+  assert.equal(collectWork('a', [{ ...idea, status: 'done' }], [])[0].stage, 'finished');
+  const run = { id: 'run', taskId: 'task', projectId: 'a', prompt: 'Work', startedAt: '2026-09-02' };
+  for (const status of ['failed', 'stopped', 'interrupted', 'review'])
+    assert.equal(collectWork('a', [], [{ ...run, status }])[0].stage, 'attention');
+  assert.equal(collectWork('a', [], [{ ...run, status: 'reviewed' }])[0].stage, 'finished');
+  assert.equal(collectWork('a', [], [{ ...run, status: 'running', prompts: [{ status: 'pending' }] }])[0].stage, 'attention');
+  assert.equal(collectWork('a', [], [{ ...run, status: 'reviewed', persistenceError: 'Disk full' }])[0].stage, 'attention');
+});

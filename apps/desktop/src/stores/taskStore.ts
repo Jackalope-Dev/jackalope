@@ -9,6 +9,7 @@ export interface TaskTicket {
   title: string;
   rawPrompt: string;
   refinedPrompt?: string;
+  runId?: string;
   status: TaskStatus;
   worktreePath?: string;
   assignedAgent?: string;
