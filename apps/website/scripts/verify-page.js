@@ -53,12 +53,13 @@ async function _verifyPage(page) {
   await page.keyboard.press('Enter');
   assert((await page.locator('details[open]').count()) === 1, 'Keyboard FAQ disclosure');
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Windows download status' }).click();
-  await page.getByRole('dialog', { name: 'A little more growing room.' }).waitFor();
+  await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Something good is taking shape.' }).waitFor();
   await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Join waitlist');
   assert(
     await page
-      .getByRole('button', { name: 'Windows download status' })
+      .getByRole('button', { name: 'Join waitlist', exact: true })
       .evaluate((el) => el === document.activeElement),
     'Download focus return',
   );
@@ -80,6 +81,9 @@ async function _verifyPage(page) {
   assert(media.playing, 'Video playback');
   await page.locator('video').evaluate((video) => video.pause());
   await page.keyboard.press('Escape');
+  await page.waitForFunction(
+    () => document.activeElement?.textContent.trim() === 'See it in motion',
+  );
   assert(
     await page
       .getByRole('button', { name: 'See it in motion' })
@@ -92,6 +96,11 @@ async function _verifyPage(page) {
     .getByText('The walkthrough couldn’t load.', { exact: false })
     .waitFor({ timeout: 10000 });
   await page.keyboard.press('Escape');
+  await page.waitForFunction(
+    () =>
+      document.activeElement?.getAttribute('aria-label') ===
+      'Play the Jackalope product walkthrough',
+  );
   assert(
     await page
       .getByRole('button', { name: 'Play the Jackalope product walkthrough' })

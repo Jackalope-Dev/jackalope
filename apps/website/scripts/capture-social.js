@@ -1,5 +1,5 @@
 async function _captureSocial(page) {
-  await page.goto('http://localhost:5180');
+  await page.goto(await page.evaluate(() => location.origin));
   await page.setViewportSize({ width: 1200, height: 900 });
   await page.getByRole('heading', { level: 1 }).waitFor();
   await page.evaluate(() => document.fonts.ready);

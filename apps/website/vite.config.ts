@@ -1,12 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 import { characterPaths } from '../desktop/src/components/mascot/character-paths.ts';
 import { PRESET_THEMES } from '../desktop/src/lib/theme-engine.ts';
+import { normalizePath, siteOrigin } from './src/content.ts';
+import { discoveryFiles, pageHtml, routes } from './src/seo.ts';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const download = env.VITE_WINDOWS_DOWNLOAD_URL;
-  const site = env.VITE_SITE_URL ? new URL(env.VITE_SITE_URL) : null;
+  const site = new URL(env.VITE_SITE_URL || siteOrigin);
   if (
     site &&
     (site.protocol !== 'https:' ||
@@ -21,6 +25,18 @@ export default defineConfig(({ mode }) => {
     );
   }
   const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 -8 128 128"><title>Jackalope</title><g fill="${PRESET_THEMES[0].accentHex}">${['farEar', 'nearEar', 'antler', 'head'].map((key) => `<path d="${characterPaths[key as keyof typeof characterPaths]}"/>`).join('')}</g></svg>`;
+  const files = discoveryFiles(site.origin);
+  const icons = {
+    'favicon-32.png': readFileSync(
+      new URL('../desktop/src-tauri/icons/32x32.png', import.meta.url),
+    ),
+    'icon-128.png': readFileSync(
+      new URL('../desktop/src-tauri/icons/128x128.png', import.meta.url),
+    ),
+    'icon-256.png': readFileSync(
+      new URL('../desktop/src-tauri/icons/128x128@2x.png', import.meta.url),
+    ),
+  };
   if (download) {
     const url = new URL(download);
     if (url.protocol !== 'https:' || url.username || url.password) {
@@ -36,34 +52,52 @@ export default defineConfig(({ mode }) => {
       {
         name: 'jackalope-brand',
         configureServer(server) {
-          server.middlewares.use('/favicon.svg', (_request, response) => {
-            response.setHeader('Content-Type', 'image/svg+xml');
-            response.end(favicon);
+          server.middlewares.use((request, response, next) => {
+            const name = request.url?.split('?')[0]?.slice(1) || '';
+            if (name === 'favicon.svg') {
+              response.setHeader('Content-Type', 'image/svg+xml');
+              response.end(favicon);
+            } else if (Object.hasOwn(icons, name)) {
+              response.setHeader('Content-Type', 'image/png');
+              response.end(icons[name as keyof typeof icons]);
+            } else if (Object.hasOwn(files, name)) {
+              response.setHeader(
+                'Content-Type',
+                name.endsWith('.xml')
+                  ? 'application/xml'
+                  : name.endsWith('.webmanifest')
+                    ? 'application/manifest+json'
+                    : 'text/plain; charset=utf-8',
+              );
+              response.end(files[name as keyof typeof files]);
+            } else next();
           });
         },
-        transformIndexHtml(html) {
-          if (!site) return html;
-          return html
-            .replace('content="/social-preview.png"', `content="${site.origin}/social-preview.png"`)
-            .replace(
-              '</head>',
-              `<link rel="canonical" href="${site.origin}/" /><meta property="og:url" content="${site.origin}/" /></head>`,
+        configurePreviewServer(server) {
+          server.middlewares.use((request, response, next) => {
+            const pathname = new URL(request.url || '/', 'http://localhost').pathname;
+            if (
+              !request.headers.accept?.includes('text/html') ||
+              routes.includes(normalizePath(pathname)) ||
+              /\.(?!html$)[a-z0-9]+$/i.test(pathname)
+            )
+              return next();
+            response.statusCode = 404;
+            response.setHeader('Content-Type', 'text/html; charset=utf-8');
+            response.end(
+              request.method === 'HEAD'
+                ? undefined
+                : readFileSync(resolve(server.config.root, server.config.build.outDir, '404.html')),
             );
+          });
+        },
+        transformIndexHtml(html, context) {
+          return pageHtml(html, context.path === '/index.html' ? '/' : context.path, site.origin);
         },
         generateBundle() {
           this.emitFile({ type: 'asset', fileName: 'favicon.svg', source: favicon });
-          if (site) {
-            this.emitFile({
-              type: 'asset',
-              fileName: 'robots.txt',
-              source: `User-agent: *\nAllow: /\nSitemap: ${site.origin}/sitemap.xml\n`,
-            });
-            this.emitFile({
-              type: 'asset',
-              fileName: 'sitemap.xml',
-              source: `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${site.origin}/</loc></url></urlset>`,
-            });
-          }
+          for (const [fileName, source] of Object.entries({ ...files, ...icons }))
+            this.emitFile({ type: 'asset', fileName, source });
         },
       },
     ],

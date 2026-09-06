@@ -1,0 +1,113 @@
+import { company, normalizePath, pages, posts, siteOrigin, updates } from './content.ts';
+
+const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ||
+      character,
+  );
+export const routes = pages.map((page) => page.path);
+
+export function pageHtml(html: string, path: string, origin = siteOrigin) {
+  const normalized = normalizePath(path);
+  const page = pages.find((item) => item.path === normalized);
+  const post = posts.find((item) => normalized === `/blog/${item.slug}/`);
+  const title = page?.title || 'Page not found — Jackalope';
+  const description = page?.description || 'Find your way back to Jackalope.';
+  const url = `${origin}${normalized}`;
+  const graph = [
+    {
+      '@type': 'Organization',
+      '@id': `${origin}/#organization`,
+      name: 'Jackalope',
+      url: origin,
+      logo: `${origin}/icon-256.png`,
+      parentOrganization: { '@type': 'Organization', name: company.name, url: company.url },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${origin}/#website`,
+      name: 'Jackalope',
+      url: origin,
+      publisher: { '@id': `${origin}/#organization` },
+    },
+    {
+      '@type': post ? 'BlogPosting' : 'WebPage',
+      '@id': url,
+      url,
+      name: title,
+      headline: title,
+      description,
+      isPartOf: { '@id': `${origin}/#website` },
+      ...(post
+        ? {
+            datePublished: post.date,
+            dateModified: post.date,
+            author: { '@type': 'Organization', name: company.name, url: company.url },
+            publisher: { '@id': `${origin}/#organization` },
+            image: `${origin}/social-preview.png`,
+            mainEntityOfPage: url,
+          }
+        : {}),
+    },
+  ];
+  const head = [
+    `<title>${escapeHtml(title)}</title>`,
+    `<meta name="description" content="${escapeHtml(description)}" />`,
+    `<meta name="robots" content="${page ? 'index,follow,max-image-preview:large' : 'noindex,follow'}" />`,
+    `<link rel="canonical" href="${escapeHtml(url)}" />`,
+    `<meta property="og:type" content="${post ? 'article' : 'website'}" />`,
+    `<meta property="og:site_name" content="Jackalope" />`,
+    `<meta property="og:locale" content="en_US" />`,
+    `<meta property="og:title" content="${escapeHtml(title)}" />`,
+    `<meta property="og:description" content="${escapeHtml(description)}" />`,
+    `<meta property="og:url" content="${escapeHtml(url)}" />`,
+    `<meta property="og:image" content="${origin}/social-preview.png" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta property="og:image:alt" content="Jackalope — Big ideas. Room to run. A desktop workspace for coding agents." />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+    `<meta name="twitter:image" content="${origin}/social-preview.png" />`,
+    `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')}</script>`,
+    `<link rel="alternate" type="application/rss+xml" title="Jackalope field notes" href="${origin}/feed.xml" />`,
+    `<link rel="alternate" type="text/plain" title="About Jackalope for language models" href="${origin}/llms.txt" />`,
+  ].join('\n');
+  return html
+    .replace(/<title>[\s\S]*?<\/title>/g, '')
+    .replace(
+      /<meta\s+(?:name="(?:description|robots|twitter:[^"]+)"|property="(?:og:[^"]+)")[^>]*>/g,
+      '',
+    )
+    .replace(/<link rel="(?:canonical|alternate)"[^>]*>/g, '')
+    .replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')
+    .replace('</head>', `${head}\n</head>`);
+}
+
+export function discoveryFiles(origin = siteOrigin) {
+  const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\nIn development as of September 6, 2026. Windows x64 is the initial release target. The first public installer is still being prepared. No public release date or price has been announced. macOS and Linux are planned, not currently supported downloads. Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use fictional Atlas sample data and do not prove real agent execution.\n\n`;
+  const links = pages
+    .map((page) => `- [${page.title}](${origin}${page.path}): ${page.description}`)
+    .join('\n');
+  return {
+    'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
+    'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc></url>`).join('')}</urlset>`,
+    'llms.txt': `${intro}## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
+    'llms-full.txt': `${intro}${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${post.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note}`).join('\n\n')}\n`,
+    'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
+    'site.webmanifest': JSON.stringify({
+      name: 'Jackalope',
+      short_name: 'Jackalope',
+      description: pages[0].description,
+      id: '/',
+      start_url: '/',
+      display: 'browser',
+      icons: [
+        { src: '/icon-128.png', sizes: '128x128', type: 'image/png' },
+        { src: '/icon-256.png', sizes: '256x256', type: 'image/png' },
+      ],
+    }),
+  };
+}

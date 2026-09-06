@@ -1,5 +1,5 @@
 :root {
-  font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -900,7 +900,7 @@ h1 span {
 .site-footer .wordmark {
   font-size: 17px;
 }
-.site-footer .wordmark svg {
+:where(.site-footer) .wordmark svg {
   width: 23px;
   height: 29px;
 }
@@ -908,13 +908,13 @@ h1 span {
   font-size: 11px;
   color: var(--color-text-muted);
 }
-.site-footer > p a {
+.site-footer > :where(p) a {
   color: var(--color-text-primary);
   text-decoration: underline;
   text-decoration-color: var(--color-border);
   text-underline-offset: 3px;
 }
-.site-footer > p a:hover {
+.site-footer > :where(p) a:hover {
   text-decoration-color: currentColor;
 }
 .site-footer .text-link {
@@ -1333,4 +1333,520 @@ fieldset {
   padding: 0;
   min-width: 0;
   margin-inline: 0;
+}
+
+.desktop-nav a[aria-current="page"] {
+  color: var(--color-accent-ink);
+}
+.wordmark svg {
+  transition: transform var(--motion-fast);
+}
+.wordmark:where(:hover, :focus-visible) svg {
+  transform: rotate(-8deg);
+}
+.hero-product {
+  perspective: 1400px;
+}
+.hero-surface {
+  transform-style: preserve-3d;
+}
+.button:disabled {
+  cursor: wait;
+}
+.button:disabled:hover {
+  transform: none;
+}
+.button:disabled::before {
+  animation: none;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 11px;
+}
+.footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-text-secondary);
+}
+.footer-links a:hover {
+  color: var(--color-accent-ink);
+}
+.newsletter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 72px;
+  padding-block: 80px;
+  border-top: 1px solid var(--color-border-subtle);
+  align-items: center;
+}
+.newsletter h2 {
+  margin-block: 16px 20px;
+  font-size: clamp(34px, 3.8vw, 46px);
+}
+.newsletter > :where(div) > p:last-child {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+.signup {
+  min-width: 0;
+  text-align: left;
+}
+.signup label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.signup-fields {
+  display: flex;
+  gap: 10px;
+  position: relative;
+}
+.signup input[type="email"] {
+  min-width: 0;
+  width: 100%;
+  min-height: 54px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+.signup input::placeholder {
+  color: var(--color-text-muted);
+}
+.signup-fields .button {
+  flex-shrink: 0;
+  gap: 8px;
+  padding-inline: 18px;
+}
+.signup-honey {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.signup-consent {
+  margin-top: 14px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.8;
+}
+.signup-consent a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.signup-provider {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+.signup-error {
+  font-size: 12px;
+  color: var(--color-danger);
+  margin-top: 12px;
+}
+.signup-success {
+  display: flex;
+  gap: 14px;
+  padding: 24px;
+  background: var(--color-accent-subtle);
+  border-radius: 14px;
+}
+.signup-success svg {
+  color: var(--color-accent-ink);
+}
+.signup-success h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+.signup-success p {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.signup-spinner {
+  animation: signup-spin 1s linear infinite;
+}
+@keyframes signup-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.waitlist-dialog {
+  width: min(540px, calc(100vw - 32px));
+}
+.waitlist-dialog .signup {
+  margin-top: 28px;
+}
+.waitlist-dialog .signup-fields {
+  flex-direction: column;
+}
+.waitlist-dialog .signup-consent {
+  font-size: 11px;
+}
+.waitlist-dialog .signup-error {
+  font-size: 12px;
+}
+.waitlist-dialog .signup-provider {
+  margin-top: 8px;
+}
+:where(.waitlist-dialog) .signup .button {
+  width: 100%;
+  margin: 0;
+}
+.journal-teaser {
+  padding-block: 100px;
+}
+.journal-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+.journal-section-heading h2 {
+  margin-top: 14px;
+}
+.notes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 44px;
+}
+.note-preview {
+  display: block;
+  min-width: 0;
+}
+.note-art {
+  height: 238px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: linear-gradient(145deg, var(--color-surface-sunken), var(--color-accent-subtle));
+}
+.note-art-1 {
+  background: linear-gradient(35deg, var(--color-accent-subtle), var(--color-surface));
+}
+.note-orbit {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border: 1px solid var(--color-accent-ink);
+  opacity: 0.25;
+  border-radius: 50%;
+  right: -40px;
+  top: -100px;
+  transition: transform 650ms;
+}
+.note-orbit::before,
+.note-orbit::after {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  border: inherit;
+  border-radius: inherit;
+}
+.note-orbit::after {
+  inset: 48px;
+}
+.note-seed {
+  position: absolute;
+  width: 70px;
+  height: 100px;
+  right: 80px;
+  top: 54px;
+  border-radius: 80% 25% 75% 40%;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-ink));
+  transform: rotate(-25deg);
+  box-shadow: 14px 24px 44px var(--color-accent-subtle);
+  transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.note-art-1 .note-orbit {
+  border-radius: 28px;
+  transform: rotate(30deg);
+}
+.note-art-1 .note-seed {
+  width: 70px;
+  height: 70px;
+  border-radius: 18px;
+  transform: rotate(15deg);
+}
+.note-art-label {
+  position: absolute;
+  left: 28px;
+  bottom: 28px;
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -1px;
+}
+.note-index {
+  position: absolute;
+  left: 28px;
+  top: 24px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.note-preview:is(:hover, :focus-visible) .note-seed {
+  transform: translateY(-6px) rotate(-10deg);
+}
+.note-preview:is(:hover, :focus-visible) .note-orbit {
+  transform: rotate(15deg) translateX(-10px);
+}
+.note-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-block: 24px 12px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+.note-preview h3 {
+  font-size: 23px;
+  line-height: 1.4;
+  letter-spacing: -0.8px;
+  margin-bottom: 12px;
+}
+.note-preview > p {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.note-preview > .text-link {
+  margin-top: 20px;
+}
+.journal-page {
+  padding-top: 80px;
+  padding-bottom: 80px;
+}
+.journal-heading {
+  margin-bottom: 64px;
+  max-width: 780px;
+}
+.journal-heading h1,
+.article-heading h1 {
+  font-size: clamp(44px, 6.4vw, 76px);
+  line-height: 1.09;
+  letter-spacing: -3.7px;
+  margin-block: 22px 26px;
+}
+.journal-heading > p:last-child,
+.article-deck {
+  font-size: 17px;
+  color: var(--color-text-secondary);
+}
+.journal-heading .button {
+  margin-top: 28px;
+}
+.journal-page > .journal-teaser {
+  width: 100%;
+  padding-block: 0;
+}
+.journal-page .journal-section-heading {
+  display: none;
+}
+.release-status {
+  display: flex;
+  gap: 14px;
+  align-items: start;
+  padding: 24px 28px;
+  border-radius: 14px;
+  background: var(--color-accent-subtle);
+  margin-bottom: 58px;
+}
+.release-status svg {
+  color: var(--color-accent-ink);
+  margin-top: 5px;
+}
+.release-status p {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.release-status strong {
+  color: var(--color-text-primary);
+}
+.change-entry {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 40px;
+  padding-block: 48px;
+  border-top: 1px solid var(--color-border-subtle);
+  scroll-margin-top: 30px;
+}
+.change-date {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.change-date span {
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  font-size: 10px;
+  color: var(--color-accent-ink);
+}
+.change-entry h2 {
+  font-size: 30px;
+  letter-spacing: -1.2px;
+  margin-bottom: 18px;
+}
+.change-entry p,
+.change-entry li {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.9;
+}
+.change-entry ul {
+  padding-left: 18px;
+  margin-block: 24px;
+}
+.change-entry li {
+  padding-left: 8px;
+  margin-block: 12px;
+}
+.change-entry .change-note {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  border-left: 2px solid var(--color-border);
+  padding-left: 18px;
+}
+.article {
+  max-width: 960px;
+  padding-block: 60px 100px;
+}
+.article-heading {
+  padding-block: 48px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.article-byline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.article-body {
+  max-width: 680px;
+  margin: 56px auto 0;
+}
+.article-body section {
+  margin-bottom: 44px;
+}
+.article-body h2 {
+  font-size: 26px;
+  letter-spacing: -0.9px;
+  margin-bottom: 20px;
+}
+.article-body p {
+  font-size: 15px;
+  line-height: 1.95;
+  margin-bottom: 18px;
+  color: var(--color-text-secondary);
+}
+.article-body p a {
+  color: var(--color-accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 960px) {
+  .newsletter {
+    gap: 38px;
+  }
+  .newsletter .signup-fields {
+    flex-direction: column;
+  }
+  .site-footer {
+    flex-wrap: wrap;
+    padding-block: 24px;
+  }
+}
+@media (max-width: 760px) {
+  .newsletter {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding-block: 56px;
+  }
+  .notes-grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+  .journal-teaser {
+    padding-block: 64px;
+  }
+  .journal-section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .journal-page {
+    padding-top: 42px;
+    padding-bottom: 54px;
+  }
+  .journal-heading h1,
+  .article-heading h1 {
+    letter-spacing: -2px;
+  }
+  .journal-heading > p:last-child,
+  .article-deck {
+    font-size: 15px;
+  }
+  .change-entry {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding-block: 32px;
+  }
+  .change-date {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .change-entry h2 {
+    font-size: 26px;
+  }
+  .release-status {
+    padding: 20px;
+  }
+  .article {
+    padding-block: 32px 64px;
+  }
+  .article-heading {
+    padding-block: 32px;
+  }
+  .article-body {
+    margin-top: 36px;
+  }
+  .footer-links {
+    gap: 4px 18px;
+  }
+  .note-art {
+    height: 215px;
+  }
+  .note-art-label {
+    font-size: 21px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-seed,
+  .note-orbit,
+  .wordmark svg {
+    transition: none;
+  }
+  .note-preview:is(:hover, :focus-visible) .note-seed,
+  .note-preview:is(:hover, :focus-visible) .note-orbit,
+  .wordmark:where(:hover, :focus-visible) svg {
+    transform: none;
+  }
+  .signup-spinner {
+    animation: none;
+  }
 }
