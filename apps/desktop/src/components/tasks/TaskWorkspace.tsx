@@ -4,14 +4,12 @@ import {
   Bot,
   Check,
   CircleCheck,
-  Eye,
   FileDiff,
   FolderOpen,
   GitBranch,
   Plus,
   ShieldAlert,
   Square,
-  Wand2,
   Workflow,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
@@ -43,11 +41,14 @@ import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { CodebaseMemoryBar } from './CodebaseMemoryBar';
+import { PatchPreview } from './PatchPreview';
 import { ProjectQueue } from './ProjectQueue';
 import { ProjectSetup } from './ProjectSetup';
 import { ProjectVerification } from './ProjectVerification';
 import { RunStatus } from './RunStatus';
+import { TaskActivity } from './TaskActivity';
 import { TaskCollection, type TaskCollectionView } from './TaskCollection';
+import { TaskContextPanel } from './TaskContextPanel';
 import { TaskImpact } from './TaskImpact';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
@@ -110,12 +111,7 @@ function ResultReview({ run }: { run: TaskRun }) {
             run={run}
             files={review.files}
           />
-          {review.diff && (
-            <details className="mt-4">
-              <summary className="task-summary">Read patch</summary>
-              <pre className="task-output mt-3">{review.diff}</pre>
-            </details>
-          )}
+          {review.diff && <PatchPreview key={review.diff} patch={review.diff} />}
         </div>
       )}
     </div>
@@ -303,14 +299,7 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
             </p>
           )
         )}
-        {run.activity.length > 0 && (
-          <details className="mt-5">
-            <summary className="task-summary">
-              Activity <span className="task-muted">· recent {run.activity.length} entries</span>
-            </summary>
-            <pre className="task-output mt-3">{run.activity.join('\n\n')}</pre>
-          </details>
-        )}
+        <TaskActivity entries={run.activity} active={active} />
         {run.diagnostics?.length > 0 && (
           <details className="mt-4">
             <summary className="task-summary">Agent diagnostics</summary>
@@ -468,7 +457,7 @@ export function TaskWorkspace({
       onNewTaskHandled?.();
     }
   }, [newTaskAgent, project, draft, onNewTaskHandled]);
-  const [showPromptPreview, setShowPromptPreview] = useState(false);
+
   useEffect(() => {
     if (composing) document.getElementById('task-intent')?.focus();
   }, [composing]);
@@ -518,7 +507,6 @@ export function TaskWorkspace({
   const finalPrompt = projectInstructions
     ? `${promptWithGuidelines}\n\n[Project Guidelines]:\n${projectInstructions}`
     : promptWithGuidelines;
-  const hasPromptDetails = assembled.hasSupplementation || !!projectInstructions;
 
   const toggleSkill = (skillId: string) => {
     const next = activeSkills.includes(skillId)
@@ -720,60 +708,13 @@ export function TaskWorkspace({
                 }
               }}
             />
-            {/* Vetted Skills & Quality Guidelines Bar */}
-            <div className="task-skill-bar">
-              <span className="task-skill-label">
-                <Wand2 size={13} aria-hidden="true" />
-                Guidelines:
-              </span>
-              {VETTED_SKILLS.map((skill) => {
-                const isSelected = activeSkills.includes(skill.id);
-                const isDetected = detectedSkills.some((d) => d.id === skill.id);
-                return (
-                  <button
-                    key={skill.id}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => toggleSkill(skill.id)}
-                    className={`task-skill-chip ${isSelected ? 'is-active' : ''} ${isDetected && !isSelected ? 'is-suggested' : ''}`}
-                    title={skill.description}
-                  >
-                    <span>{skill.shortLabel}</span>
-                    {isSelected && <Check size={11} className="shrink-0" />}
-                  </button>
-                );
-              })}
-              {hasPromptDetails && (
-                <button
-                  type="button"
-                  onClick={() => setShowPromptPreview(!showPromptPreview)}
-                  className="task-preview-toggle"
-                  title="Inspect the supplemented prompt that will be sent to the agent"
-                >
-                  <Eye size={12} />
-                  <span>{showPromptPreview ? 'Hide preview' : 'Preview prompt'}</span>
-                </button>
-              )}
-            </div>
-
-            {/* Collapsible Prompt Preview */}
-            {showPromptPreview && hasPromptDetails && (
-              <div className="task-prompt-preview">
-                <div className="task-preview-header">
-                  <span>
-                    Assembled agent prompt preview ({assembled.activeSkillCount} active guidelines)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowPromptPreview(false)}
-                    className="task-preview-close"
-                  >
-                    Close
-                  </button>
-                </div>
-                <pre>{finalPrompt}</pre>
-              </div>
-            )}
+            <TaskContextPanel
+              selected={activeSkills}
+              suggested={detectedSkills.map((skill) => skill.id)}
+              onToggle={toggleSkill}
+              instructions={projectInstructions}
+              prompt={current.prompt.trim() ? finalPrompt : ''}
+            />
             <div className="task-composer-footer">
               <div className="task-context-controls">
                 <label htmlFor="taskworkspace-field-2" className="task-context-chip">

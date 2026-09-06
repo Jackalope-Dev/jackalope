@@ -6,6 +6,7 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Select, SelectItem } from './components/ui/Select';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
+import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';
 import { applyThemeTokens, PRESET_THEMES, startThemeClock } from './lib/theme-engine';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
@@ -155,6 +156,7 @@ function DesignLab() {
             </label>
           </div>
         </section>
+        <TaskExperienceExamples />
       </div>
     </main>
   );
