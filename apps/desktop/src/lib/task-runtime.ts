@@ -88,6 +88,8 @@ export interface RunRequest {
   projectName: string;
   projectPath: string;
   agent: string;
+  /** Explicit account (agent-profile id) to run this agent as, if the project picked one. */
+  agentProfileId?: string;
   prompt: string;
   isolated: boolean;
   previousRunId?: string;

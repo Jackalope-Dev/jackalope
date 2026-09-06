@@ -181,6 +181,7 @@ export function McpInstallModal({
                   <button
                     key={item.id}
                     type="button"
+                    aria-pressed={scope === item.id}
                     onClick={() => setScope(item.id)}
                     className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                       scope === item.id

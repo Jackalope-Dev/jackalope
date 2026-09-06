@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Bot,
@@ -14,6 +13,7 @@ import {
   Trash2,
   Zap,
 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import type { AuditCategory, AuditSeverity } from '../../lib/orchestration/types';
 import { useAuditStore } from '../../stores/auditStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -71,15 +71,6 @@ export function AuditLogWorkspace() {
   }, [entries, selectedProjectFilter, selectedCategory, selectedSeverity, searchQuery]);
 
   // Statistics calculation
-  const stats = useMemo(() => {
-    const total = entries.length;
-    const routingCount = entries.filter((e) => e.category === 'routing').length;
-    const failoverCount = entries.filter((e) => e.category === 'failover').length;
-    const discoveryCount = entries.filter((e) => e.category === 'discovery').length;
-    const successCount = entries.filter((e) => e.severity === 'success').length;
-    return { total, routingCount, failoverCount, discoveryCount, successCount };
-  }, [entries]);
-
   const getCategoryIcon = (category: AuditCategory) => {
     switch (category) {
       case 'routing':
@@ -127,18 +118,16 @@ export function AuditLogWorkspace() {
   };
 
   return (
-    <div className="flex flex-col min-h-0 flex-1 overflow-y-auto bg-[var(--color-surface)]">
+    <div className="task-page activity-log">
       {/* Workspace Header */}
-      <div className="p-6 border-b border-[var(--color-border)] bg-gradient-to-b from-[var(--color-surface)] to-[var(--color-surface-sunken)]">
+      <div className="pb-5 border-b border-[var(--color-border)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="p-1.5 rounded-lg bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)]">
                 <History size={18} />
               </span>
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
-                Audit Log & Orchestration History
-              </h1>
+              <h1 className="task-title">Activity log</h1>
             </div>
             <p className="text-xs text-[var(--color-text-muted)]">
               Recorded routing decisions, task events, and codebase scans.
@@ -180,57 +169,6 @@ export function AuditLogWorkspace() {
           </div>
         </div>
 
-        {/* Stats Pill Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-          <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
-              Total Events
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-text-primary)]">
-                {stats.total}
-              </span>
-              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
-              Auto-Routed Tasks
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-warning)]">
-                {stats.routingCount}
-              </span>
-              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
-              Failover Events
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-danger)]">
-                {stats.failoverCount}
-              </span>
-              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider block">
-              Codebase Scans
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-xl font-semibold text-[var(--color-accent-ink)]">
-                {stats.discoveryCount}
-              </span>
-              <span className="text-xs text-[var(--color-text-muted)]">recorded</span>
-            </div>
-          </div>
-        </div>
-
         {/* Filter Controls Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mt-5 pt-4 border-t border-[var(--color-border-subtle)]">
           <div className="flex flex-wrap items-center gap-2">
@@ -242,7 +180,7 @@ export function AuditLogWorkspace() {
                 setConfirmClear(false);
                 setSelectedProjectFilter(value);
               }}
-              className="h-[50px] max-w-full"
+              className="h-11 max-w-full"
             >
               <SelectItem value="all">All Projects</SelectItem>
               <SelectItem value="global">Global / Jackalope Workspace</SelectItem>
@@ -256,7 +194,7 @@ export function AuditLogWorkspace() {
             {/* Category Chips */}
             <fieldset
               aria-label="Filter by category"
-              className="flex h-[50px] min-w-0 max-w-full items-center gap-1 overflow-x-auto bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-0.5"
+              className="flex h-11 min-w-0 max-w-full items-center gap-1 overflow-x-auto bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-0.5"
             >
               {(
                 [
@@ -288,7 +226,7 @@ export function AuditLogWorkspace() {
               aria-label="Filter by severity"
               value={selectedSeverity}
               onValueChange={(value) => setSelectedSeverity(value as AuditSeverity | 'all')}
-              className="h-[50px]"
+              className="h-11"
             >
               <SelectItem value="all">All Severities</SelectItem>
               <SelectItem value="info">Info only</SelectItem>
@@ -310,7 +248,7 @@ export function AuditLogWorkspace() {
               aria-label="Search audit events"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-[50px] w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+              className="h-11 w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
             />
           </div>
         </div>

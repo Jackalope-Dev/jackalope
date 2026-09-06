@@ -21,6 +21,7 @@ export function McpAddCustomModal({
   const { saveServer } = useMcpStore();
 
   const [id, setId] = useState(existingServer?.id || '');
+  const [idEdited, setIdEdited] = useState(!!existingServer);
   const [name, setName] = useState(existingServer?.name || '');
   const [scope, setScope] = useState(existingServer?.scope || 'global');
   const [transport, setTransport] = useState<'stdio' | 'http' | 'sse'>(
@@ -79,10 +80,13 @@ export function McpAddCustomModal({
       const parsedArgs: unknown = JSON.parse(argsStr.trim() || '[]');
       if (!Array.isArray(parsedArgs) || parsedArgs.some((arg) => typeof arg !== 'string'))
         throw new Error('Arguments must be a JSON array of strings.');
+      const extra: unknown = JSON.parse(extraJson);
+      if (!extra || typeof extra !== 'object' || Array.isArray(extra))
+        throw new Error('Advanced connection fields must be a JSON object.');
 
       const config: McpServerConfig = {
         id: existingServer?.id ?? id.trim(),
-        extra: JSON.parse(extraJson),
+        extra: extra as Record<string, unknown>,
         name: name.trim(),
         scope,
         transport,
@@ -140,6 +144,7 @@ export function McpAddCustomModal({
                   <button
                     key={item.id}
                     type="button"
+                    aria-pressed={scope === item.id}
                     disabled={!!existingServer}
                     onClick={() => setScope(item.id)}
                     className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
@@ -170,7 +175,7 @@ export function McpAddCustomModal({
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
-                    if (!existingServer && !id) {
+                    if (!idEdited) {
                       setId(e.target.value.toLowerCase().replaceAll(/[^a-z0-9_-]/g, '-'));
                     }
                   }}
@@ -190,7 +195,10 @@ export function McpAddCustomModal({
                   placeholder="e.g. postgres-db"
                   value={id}
                   disabled={!!existingServer}
-                  onChange={(e) => setId(e.target.value)}
+                  onChange={(e) => {
+                    setIdEdited(true);
+                    setId(e.target.value);
+                  }}
                   required
                 />
               </div>
@@ -221,6 +229,7 @@ export function McpAddCustomModal({
                 {transport === 'sse' && <span>Existing legacy SSE connection</span>}
                 <button
                   type="button"
+                  aria-pressed={transport === 'stdio'}
                   onClick={() => setTransport('stdio')}
                   className={`px-3 py-1.5 text-xs rounded-md border ${
                     transport === 'stdio'
@@ -232,6 +241,7 @@ export function McpAddCustomModal({
                 </button>
                 <button
                   type="button"
+                  aria-pressed={transport === 'http'}
                   onClick={() => setTransport('http')}
                   className={`px-3 py-1.5 text-xs rounded-md border ${
                     transport === 'http'
@@ -336,12 +346,14 @@ export function McpAddCustomModal({
                     <input
                       className="task-input flex-1 font-mono text-xs"
                       placeholder="KEY (e.g. API_TOKEN)"
+                      aria-label={`Environment variable ${idx + 1} name`}
                       value={item.key}
                       onChange={(e) => handleEnvChange(idx, 'key', e.target.value)}
                     />
                     <input
                       className="task-input flex-1 font-mono text-xs"
                       placeholder="VALUE"
+                      aria-label={`Environment variable ${idx + 1} value`}
                       type="password"
                       value={item.value}
                       onChange={(e) => handleEnvChange(idx, 'value', e.target.value)}
@@ -349,6 +361,7 @@ export function McpAddCustomModal({
                     <button
                       type="button"
                       onClick={() => handleRemoveEnv(idx)}
+                      aria-label={`Remove environment variable ${idx + 1}`}
                       className="p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
                     >
                       <Trash2 size={14} />

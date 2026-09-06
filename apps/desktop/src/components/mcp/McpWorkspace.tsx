@@ -17,6 +17,7 @@ import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
+import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { McpAddCustomModal } from './McpAddCustomModal';
@@ -63,6 +64,7 @@ export function McpWorkspace() {
   const [scopeFilter, setScopeFilter] = useState('all');
   const [configuredSearch, setConfiguredSearch] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState('');
 
   // Modals
   const [installServer, setInstallServer] = useState<AllMcpsServer | null>(null);
@@ -86,19 +88,28 @@ export function McpWorkspace() {
   const handleCopyJson = async (server: McpServerConfig) => {
     const snippet = {
       mcpServers: {
-        [server.id]: server.url
-          ? { url: server.url, description: server.description }
-          : {
-              command: server.command,
-              args: server.args,
-              env: server.env,
-              description: server.description,
-            },
+        [server.id]: {
+          ...server.extra,
+          ...(server.url
+            ? { type: server.transport, url: server.url }
+            : {
+                command: server.command,
+                args: server.args,
+              }),
+          env: server.env,
+          description: server.description,
+        },
       },
     };
-    await navigator.clipboard.writeText(JSON.stringify(snippet, null, 2));
-    setCopiedId(server.id);
-    setTimeout(() => setCopiedId(null), 1500);
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(snippet, null, 2));
+      setCopiedId(`${server.scope}:${server.id}`);
+      setCopyError('');
+    } catch {
+      setCopyError(
+        'Could not copy the configuration. Open Edit to inspect the connection settings.',
+      );
+    }
   };
 
   const filteredServers = servers.filter((s) => {
@@ -117,8 +128,8 @@ export function McpWorkspace() {
   return (
     <div className="mcp-workspace">
       <WorkspaceHeading
-        title="MCP Tools & Marketplace"
-        description="Manage MCP connections for your agents, or browse AllMCPs to discover and configure new tools."
+        title="Connections"
+        description="Give your agents access to tools and services through MCP. Check each connection before using it."
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -141,21 +152,27 @@ export function McpWorkspace() {
               }}
             >
               <Plus size={16} />
-              Add Custom MCP
+              Add connection
             </Button>
           </div>
         }
       />
+      {copyError && (
+        <p role="alert" className="task-error mb-4">
+          {copyError}
+        </p>
+      )}
 
       {/* Main Tabs */}
       <div className="mcp-tabs">
         <button
           type="button"
           onClick={() => setActiveTab('configured')}
+          aria-pressed={activeTab === 'configured'}
           className={`mcp-tab-btn ${activeTab === 'configured' ? 'active' : ''}`}
         >
           <Server size={17} />
-          <span>Configured MCPs</span>
+          <span>Your connections</span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
             {servers.length}
           </span>
@@ -163,15 +180,11 @@ export function McpWorkspace() {
         <button
           type="button"
           onClick={() => setActiveTab('marketplace')}
+          aria-pressed={activeTab === 'marketplace'}
           className={`mcp-tab-btn ${activeTab === 'marketplace' ? 'active' : ''}`}
         >
           <Globe size={17} />
-          <span>Marketplace (allmcps.com)</span>
-          {useMcpMarketplace && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-[var(--color-success)] border border-emerald-500/20">
-              Live
-            </span>
-          )}
+          <span>Discover tools</span>
         </button>
       </div>
 
@@ -210,6 +223,7 @@ export function McpWorkspace() {
                   key={item.id}
                   type="button"
                   onClick={() => setScopeFilter(item.id)}
+                  aria-pressed={scopeFilter === item.id}
                   className={`mcp-scope-chip ${scopeFilter === item.id ? 'active' : ''}`}
                 >
                   {item.label}
@@ -223,6 +237,7 @@ export function McpWorkspace() {
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
               />
               <input
+                aria-label="Filter connections"
                 className="task-input with-search-icon w-full py-1.5 text-xs"
                 placeholder="Filter configured MCPs…"
                 value={configuredSearch}
@@ -232,7 +247,11 @@ export function McpWorkspace() {
           </div>
 
           {/* Servers Grid */}
-          {filteredServers.length === 0 ? (
+          {loadingServers ? (
+            <p role="status" className="task-muted py-8">
+              Reading configured connections…
+            </p>
+          ) : serversError && !servers.length ? null : filteredServers.length === 0 ? (
             <EmptyState
               icon={Server}
               title={servers.length === 0 ? 'No MCP servers configured' : 'No matching MCP servers'}
@@ -351,7 +370,12 @@ export function McpWorkspace() {
                           onClick={() => void handleCopyJson(server)}
                           title="Copy JSON configuration"
                         >
-                          {copiedId === server.id ? <Check size={13} /> : <Copy size={13} />}
+                          {copiedId === key ? <Check size={13} /> : <Copy size={13} />}
+                          <span className="sr-only">
+                            {copiedId === key
+                              ? 'Configuration copied'
+                              : `Copy ${server.name} configuration`}
+                          </span>
                         </Button>
                       </div>
 
@@ -367,21 +391,17 @@ export function McpWorkspace() {
                         >
                           <Pencil size={13} />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:text-[var(--color-danger)]"
-                          onClick={() => {
-                            if (
-                              confirm(`Remove MCP server '${server.name}' from ${server.scope}?`)
-                            ) {
-                              void deleteServer(server.id, server.scope);
-                            }
-                          }}
-                          title="Delete server"
-                        >
-                          <Trash2 size={13} />
-                        </Button>
+                        <ConfirmAction
+                          title="Remove connection?"
+                          description={`Remove ${server.name} from ${server.scope}? You can configure it again later.`}
+                          label="Remove connection"
+                          onConfirm={() => deleteServer(server.id, server.scope)}
+                          trigger={
+                            <Button variant="ghost" size="sm" aria-label={`Remove ${server.name}`}>
+                              <Trash2 size={13} />
+                            </Button>
+                          }
+                        />
                       </div>
                     </div>
                   </article>
@@ -402,8 +422,8 @@ export function McpWorkspace() {
                   MCP Marketplace is currently disabled
                 </h3>
                 <p className="text-xs text-[var(--color-text-muted)] max-w-xl">
-                  You opted out of online registry access. Jackalope is operating in local-only mode
-                  and does not send requests to allmcps.com.
+                  Marketplace browsing is off. Configured connections remain available to your
+                  agents.
                 </p>
               </div>
               <Button

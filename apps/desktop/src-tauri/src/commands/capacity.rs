@@ -160,7 +160,7 @@ async fn response<R: AsyncRead + Unpin>(
     }
 }
 
-async fn read_codex() -> Result<CapacityRecord, String> {
+async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
     let executable = super::tasks::executable("codex")?;
     let mut command = Command::new(executable);
     command
@@ -169,6 +169,9 @@ async fn read_codex() -> Result<CapacityRecord, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+    if let Some(dir) = super::agent_profiles::active_profile_dir(profiles_root, "codex") {
+        command.env("CODEX_HOME", dir);
+    }
     #[cfg(windows)]
     command.creation_flags(0x08000000);
     let mut child = command
@@ -243,6 +246,7 @@ fn current_snapshot(mut record: CapacityRecord, now: i64) -> CapacityRecord {
 #[tauri::command]
 pub async fn capacity_snapshot(
     service: State<'_, CapacityService>,
+    runtime: State<'_, super::tasks::TaskRuntime>,
     refresh: Option<bool>,
 ) -> Result<Vec<CapacityRecord>, String> {
     let mut cache = service.0.lock().await;
@@ -250,10 +254,11 @@ pub async fn capacity_snapshot(
     let should_refresh = age.is_none()
         || (refresh.unwrap_or(false) && age.is_some_and(|age| age >= Duration::from_secs(60)));
     if should_refresh {
+        let profiles_root = runtime.profiles_root();
         let (codex, claude, grok) = tokio::join!(
-            read_codex(),
-            connected::read_claude(),
-            connected::read_grok()
+            read_codex(&profiles_root),
+            connected::read_claude(&profiles_root),
+            connected::read_grok(&profiles_root)
         );
         cache.codex = Some(match codex {
             Ok(record) => record,
@@ -311,7 +316,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "Reads the locally signed-in Codex account; no agent task is started"]
     async fn installed_codex_quota_read() {
-        let record = read_codex().await.unwrap();
+        let record = read_codex(&std::env::temp_dir().join("jackalope-no-profile-test"))
+            .await
+            .unwrap();
         assert_eq!(record.status, "reported");
         assert!(!record.windows.is_empty());
         assert!(record.observed_at.is_some());

@@ -1,96 +1,56 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Bot, CheckCircle2, GitBranch, Play, Sparkles, Trash2, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { ArrowRight, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useMascotStore } from '../../stores/mascotStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { PromptRefiner } from '../prompt/PromptRefiner';
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { ConfirmAction } from '../ui/ConfirmAction';
 import { Input } from '../ui/input';
 import { Select, SelectItem } from '../ui/Select';
+import { useDialogFocus } from '../ui/useDialogFocus';
 
-interface TaskModalProps {
+export function TaskModal({
+  taskId,
+  isOpen,
+  onClose,
+  onPrepare,
+}: {
   taskId: string | null;
   isOpen: boolean;
   onClose: () => void;
-}
-
-export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
-  const previousFocus = useRef(
-    document.activeElement instanceof HTMLElement ? document.activeElement : null,
-  );
+  onPrepare: (id: string) => void;
+}) {
+  const focus = useDialogFocus();
   const { tasks, addTask, updateTask, deleteTask } = useTaskStore();
-  const { spawnTaskWorktree, activeProjectId } = useProjectStore();
-  const { say, setMood } = useMascotStore();
-
+  const { projects, activeProjectId } = useProjectStore();
   const runners = useExecutionStore((state) => state.runners);
-  const existingTask = tasks.find((t) => t.id === taskId);
-  const isNew = !existingTask;
-
-  const [title, setTitle] = useState(existingTask?.title || '');
-  const [rawPrompt, setRawPrompt] = useState(existingTask?.rawPrompt || '');
-  const [refinedPrompt, setRefinedPrompt] = useState(existingTask?.refinedPrompt || '');
-  const [assignedAgent, setAssignedAgent] = useState(existingTask?.assignedAgent || 'Unassigned');
-  const [showRefiner, setShowRefiner] = useState(false);
-  const [isSpawningWorktree, setIsSpawningWorktree] = useState(false);
-
-  if (!isOpen) return null;
-
-  const handleSave = () => {
-    if (!title.trim() || (isNew && !activeProjectId)) return;
-
-    if (isNew) {
-      if (!activeProjectId) return;
-      addTask({
-        projectId: activeProjectId,
-        title,
-        rawPrompt,
-        refinedPrompt: refinedPrompt || undefined,
-        status: 'refinement',
-        assignedAgent,
-      });
-      say('Task ticket created! Ready to spin out worktree.', 3500);
-    } else {
-      updateTask(existingTask.id, {
-        title,
-        rawPrompt,
-        refinedPrompt,
-        assignedAgent,
-      });
-      say('Task ticket updated.', 2500);
+  const existing = tasks.find((task) => task.id === taskId);
+  const projectId = existing?.projectId ?? activeProjectId;
+  const project = projects.find((project) => project.id === projectId);
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [prompt, setPrompt] = useState(existing?.rawPrompt ?? '');
+  const [refined, setRefined] = useState(existing?.refinedPrompt ?? '');
+  const [clarifications, setClarifications] = useState(existing?.clarifications);
+  const [agent, setAgent] = useState(existing?.assignedAgent ?? 'Unassigned');
+  const [refining, setRefining] = useState(false);
+  const valid = !!project && !!title.trim() && !!prompt.trim();
+  const save = () => {
+    if (!valid || !projectId) return;
+    const value = {
+      title: title.trim(),
+      rawPrompt: prompt.trim(),
+      refinedPrompt: refined || undefined,
+      assignedAgent: agent,
+      clarifications,
+    };
+    if (existing) {
+      updateTask(existing.id, value);
+      return existing.id;
     }
-    onClose();
+    return addTask({ ...value, projectId, status: 'backlog' });
   };
-
-  const handleSpawnWorktree = async () => {
-    if (!existingTask) return;
-    setIsSpawningWorktree(true);
-    setMood('working');
-    say(`Spawning isolated git worktree for ${existingTask.title}...`, 4000);
-
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .slice(0, 24);
-    const branch = `feat/${slug}`;
-
-    const res = await spawnTaskWorktree(slug, branch);
-    setIsSpawningWorktree(false);
-
-    if (res.ok) {
-      updateTask(existingTask.id, {
-        worktreePath: res.entry.path,
-      });
-      setMood('success');
-      say(`Worktree created at ${res.entry.path}! Agent can operate safely.`, 4500);
-    } else {
-      setMood('idle');
-      say(`Couldn't create the worktree: ${res.error}`, 5000);
-    }
-  };
-
   return (
     <Dialog.Root
       open={isOpen}
@@ -99,194 +59,151 @@ export function TaskModal({ taskId, isOpen, onClose }: TaskModalProps) {
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--color-surface-sunken)]/70 backdrop-blur-sm" />
-        <Dialog.Content
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            if (previousFocus.current?.isConnected) previousFocus.current.focus();
-          }}
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[calc(100vw-2rem)] max-w-2xl rounded-2xl bg-[var(--color-surface)] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-        >
-          <Dialog.Description className="sr-only">
-            Describe the task and choose how you want to work on it.
+        <Dialog.Overlay className="task-dialog-overlay" />
+        <Dialog.Content {...focus} className="task-dialog appearance-panel planning-dialog">
+          <Dialog.Close className="task-close" aria-label="Close idea">
+            <X size={18} />
+          </Dialog.Close>
+          <Dialog.Title className="text-xl font-medium pr-10">
+            {existing ? 'Edit idea' : 'New idea'}
+          </Dialog.Title>
+          <Dialog.Description className="task-muted mt-3">
+            {project?.name ?? 'Choose a project'} · Save the idea here, then prepare a task when you
+            are ready to work on it.
           </Dialog.Description>
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40">
-            <div className="flex items-center gap-2">
-              <Dialog.Title className="text-sm font-semibold text-[var(--color-text-primary)]">
-                {isNew ? 'New task' : 'Task details'}
-              </Dialog.Title>
-              {existingTask && <Badge variant="accent">{existingTask.status.toUpperCase()}</Badge>}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close task"
-              className="p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Modal Body */}
-          <div className="p-6 overflow-y-auto space-y-4">
-            {/* Title */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="task-title"
-                className="text-xs font-semibold text-[var(--color-text-secondary)]"
-              >
-                Title
-              </label>
+          <form
+            className="space-y-5 mt-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (save()) onClose();
+            }}
+          >
+            <label htmlFor="idea-title" className="block space-y-2">
+              <span className="block text-sm font-medium">Title</span>
               <Input
-                id="task-title"
-                placeholder="e.g. Implement browser tool integration with Playwright"
+                id="idea-title"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-sm"
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="What needs to change?"
+                required
+                maxLength={160}
               />
-            </div>
-
-            {/* Raw Prompt / Description */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="task-raw-prompt"
-                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
-                >
-                  Instructions
-                </label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowRefiner(!showRefiner)}
-                  className="gap-1.5 text-[var(--color-accent-ink)] hover:text-[var(--color-accent-hover)]"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{showRefiner ? 'Hide questions' : 'Refine idea'}</span>
-                </Button>
-              </div>
+            </label>
+            <label htmlFor="idea-instructions" className="block space-y-2">
+              <span className="block text-sm font-medium">Instructions</span>
               <textarea
-                id="task-raw-prompt"
-                rows={3}
-                value={rawPrompt}
-                onChange={(e) => setRawPrompt(e.target.value)}
-                placeholder="Describe what you want the agent to build, optimize, or fix..."
-                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-3 text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] resize-none"
-              />
-            </div>
-
-            {/* Refiner Component */}
-            {showRefiner && (
-              <PromptRefiner
-                rawPrompt={rawPrompt}
-                onApplyRefinement={(refined) => {
-                  setRefinedPrompt(refined);
-                  setShowRefiner(false);
+                id="idea-instructions"
+                className="task-input w-full"
+                rows={5}
+                value={prompt}
+                required
+                maxLength={24000}
+                onChange={(event) => {
+                  setPrompt(event.target.value);
+                  setRefined('');
+                  setClarifications(undefined);
                 }}
-                onCancel={() => setShowRefiner(false)}
+                placeholder="Describe the outcome, constraints, and how to check the result."
+              />
+            </label>
+            <label htmlFor="idea-preferred-agent" className="block space-y-2">
+              <span className="block text-sm font-medium">Preferred agent</span>
+              <Select
+                id="idea-preferred-agent"
+                value={agent}
+                onValueChange={setAgent}
+                aria-label="Preferred agent"
+              >
+                <SelectItem value="Unassigned">Choose when preparing the task</SelectItem>
+                {agent !== 'Unassigned' && !runners.some((runner) => runner.id === agent) && (
+                  <SelectItem value={agent}>{agent} (saved preference)</SelectItem>
+                )}
+                {runners.map((runner) => (
+                  <SelectItem key={runner.id} value={runner.id} disabled={!runner.available}>
+                    {runner.name}
+                    {runner.available ? '' : ' (unavailable)'}
+                  </SelectItem>
+                ))}
+              </Select>
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={!prompt.trim()}
+              aria-expanded={refining}
+              onClick={() => setRefining(!refining)}
+            >
+              {refining ? 'Hide guidelines' : 'Add optional guidelines'}
+            </Button>
+            {refining && (
+              <PromptRefiner
+                rawPrompt={prompt}
+                initialClarifications={clarifications}
+                onApplyRefinement={(value, answers) => {
+                  setRefined(value);
+                  setClarifications(answers);
+                  setRefining(false);
+                }}
+                onCancel={() => setRefining(false)}
               />
             )}
-
-            {/* Refined Meta-Prompt Preview */}
-            {refinedPrompt && (
-              <div className="p-4 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent-subtle)]/40 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-accent-ink)]">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Synthesized Meta-Prompt (Agent Ready)</span>
-                  </div>
-                  <Badge variant="accent">Optimized</Badge>
-                </div>
-                <pre className="text-xs font-mono whitespace-pre-wrap text-[var(--color-text-primary)] leading-relaxed max-h-40 overflow-y-auto">
-                  {refinedPrompt}
-                </pre>
-              </div>
+            {refined && (
+              <details>
+                <summary className="task-summary">Prepared instructions</summary>
+                <pre className="task-output">{refined}</pre>
+              </details>
             )}
-
-            {/* Assigned Agent & Worktree Section */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="task-assigned-agent"
-                  className="text-xs font-semibold text-[var(--color-text-secondary)] flex items-center gap-1.5"
-                >
-                  <Bot className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
-                  <span>Assigned Agent Runner</span>
-                </label>
-                <Select
-                  id="task-assigned-agent"
-                  value={assignedAgent}
-                  onValueChange={(value) => setAssignedAgent(value)}
-                  className="w-full"
-                >
-                  <SelectItem value="Unassigned">Unassigned</SelectItem>
-                  {assignedAgent !== 'Unassigned' &&
-                    !runners.some((runner) => runner.id === assignedAgent) && (
-                      <SelectItem value={assignedAgent}>
-                        {assignedAgent} (saved assignment)
-                      </SelectItem>
-                    )}
-                  {runners.map((runner) => (
-                    <SelectItem key={runner.id} value={runner.id} disabled={!runner.available}>
-                      {runner.name}
-                      {runner.available ? '' : ' (unavailable)'}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--color-text-secondary)] flex items-center gap-1.5">
-                  <GitBranch className="w-3.5 h-3.5 text-[var(--color-accent-ink)]" />
-                  <span>Isolated Git Worktree</span>
-                </span>
-                {existingTask?.worktreePath ? (
-                  <div className="h-9 flex items-center px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] font-mono text-xs text-[var(--color-text-secondary)] truncate">
-                    {existingTask.worktreePath}
-                  </div>
-                ) : (
+            {existing?.worktreePath && (
+              <details>
+                <summary className="task-summary">Previously created worktree</summary>
+                <p className="task-path">{existing.worktreePath}</p>
+                <p className="task-muted">
+                  Preparing a task lets you choose its execution location.
+                </p>
+              </details>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-5">
+              {existing ? (
+                <ConfirmAction
+                  title="Delete this idea?"
+                  description="The planning record will be removed. Agent tasks and worktrees are kept."
+                  onConfirm={() => {
+                    deleteTask(existing.id);
+                    onClose();
+                  }}
+                  trigger={
+                    <Button type="button" variant="ghost" aria-label="Delete idea">
+                      <Trash2 size={16} />
+                    </Button>
+                  }
+                />
+              ) : (
+                <Button type="button" variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant={existing ? 'outline' : 'primary'} disabled={!valid}>
+                  {existing ? 'Save changes' : 'Save idea'}
+                </Button>
+                {existing && (
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSpawnWorktree}
-                    disabled={!existingTask || isSpawningWorktree}
-                    className="w-full h-9 gap-1.5 justify-center text-xs"
+                    type="button"
+                    disabled={!valid}
+                    onClick={() => {
+                      const id = save();
+                      if (id) {
+                        onPrepare(id);
+                        onClose();
+                      }
+                    }}
                   >
-                    <Play className="w-3 h-3 text-[var(--color-accent-ink)]" />
-                    <span>{isSpawningWorktree ? 'Spawning...' : 'Spin Out Worktree'}</span>
+                    Prepare task <ArrowRight size={16} />
                   </Button>
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30">
-            {existingTask ? (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  deleteTask(existingTask.id);
-                  onClose();
-                }}
-                className="gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Ticket</span>
-              </Button>
-            ) : (
-              <div />
-            )}
-
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>{isNew ? 'Create Ticket' : 'Save Changes'}</Button>
-            </div>
-          </div>
+          </form>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

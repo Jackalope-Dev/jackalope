@@ -30,7 +30,12 @@ import {
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
-import { useProjectStore } from '../../stores/projectStore';
+import {
+  agentAccountFor,
+  isAgentAllowedForProject,
+  useProjectStore,
+} from '../../stores/projectStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -298,7 +303,11 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
       {!active && run.workspace && <ResultReview key={run.id} run={run} />}
       {((run.validationSteps && run.validationSteps.length > 0) ||
         (run.screenshots && run.screenshots.length > 0)) && (
-        <ValidationJourney steps={run.validationSteps ?? []} screenshots={run.screenshots ?? []} />
+        <ValidationJourney
+          runId={run.id}
+          steps={run.validationSteps ?? []}
+          screenshots={run.screenshots ?? []}
+        />
       )}
       <div className="task-usage-line">
         <span>Reported usage</span>
@@ -395,9 +404,13 @@ function TaskDetail({ run, onBack }: { run: TaskRun; onBack: () => void }) {
 export function TaskWorkspace({
   newTaskAgent,
   onNewTaskHandled,
+  plannedTaskId,
+  onPlanHandled,
 }: {
   newTaskAgent?: string | null;
   onNewTaskHandled?: () => void;
+  plannedTaskId?: string | null;
+  onPlanHandled?: () => void;
 }) {
   const { projects, activeProjectId } = useProjectStore();
   const {
@@ -415,11 +428,14 @@ export function TaskWorkspace({
     discovering,
   } = useExecutionStore();
   const project = projects.find((p) => p.id === activeProjectId);
+  const plannedTask = useTaskStore((state) =>
+    state.tasks.find((task) => task.id === plannedTaskId && task.projectId === activeProjectId),
+  );
   const [setup, setSetup] = useState(!!newTaskAgent && !project);
   const [submitError, setSubmitError] = useState('');
   const [filter, setFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
-  const [composing, setComposing] = useState(!!newTaskAgent);
+  const [composing, setComposing] = useState(!!newTaskAgent || !!plannedTask);
   useEffect(() => {
     if (newTaskAgent && project) {
       draft(project.id, { agent: newTaskAgent });
@@ -430,7 +446,7 @@ export function TaskWorkspace({
   useEffect(() => {
     if (composing) document.getElementById('task-intent')?.focus();
   }, [composing]);
-  const key = project?.id ?? 'projectless';
+  const key = plannedTask ? `planning:${plannedTask.id}` : (project?.id ?? 'projectless');
   const current = drafts[key] ?? emptyDraft;
   const selected = runs.find((run) => run.id === selectedId && run.projectId === project?.id);
   const latest = runs.filter(
@@ -442,12 +458,20 @@ export function TaskWorkspace({
   );
   const agentConfig = useAgentConfigStore();
   const appDefaultRunner = agentConfig.defaultMetaAgent;
+  const allowedRunners = runners.filter(
+    (r) => agentConfig.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
+  );
+  const allowedRunnerIds = new Set(allowedRunners.map((r) => r.id));
   const preferredAgent =
-    project?.preferences?.preferredRunner && project.preferences.preferredRunner !== 'inherit'
+    project?.preferences?.preferredRunner &&
+    project.preferences.preferredRunner !== 'inherit' &&
+    allowedRunnerIds.has(project.preferences.preferredRunner)
       ? project.preferences.preferredRunner
-      : appDefaultRunner;
+      : (allowedRunners.find((r) => r.id === appDefaultRunner)?.id ?? allowedRunners[0]?.id ?? '');
 
-  const currentAgent = newTaskAgent || current.agent || preferredAgent;
+  const requestedAgent = newTaskAgent || current.agent;
+  const currentAgent =
+    requestedAgent && allowedRunnerIds.has(requestedAgent) ? requestedAgent : preferredAgent;
   const runner = runners.find((r) => r.id === currentAgent);
   const desktop = isTauriEnvironment();
 
@@ -460,6 +484,14 @@ export function TaskWorkspace({
       executionMode: current.isolated ? 'isolated' : 'current',
     });
   }, [current.prompt, activeSkills, current.isolated]);
+  const projectInstructions = project?.preferences?.customInstructions?.trim();
+  const promptWithGuidelines = assembled.hasSupplementation
+    ? assembled.assembledPrompt
+    : current.prompt.trim();
+  const finalPrompt = projectInstructions
+    ? `${promptWithGuidelines}\n\n[Project Guidelines]:\n${projectInstructions}`
+    : promptWithGuidelines;
+  const hasPromptDetails = assembled.hasSupplementation || !!projectInstructions;
 
   const toggleSkill = (skillId: string) => {
     const next = activeSkills.includes(skillId)
@@ -471,24 +503,20 @@ export function TaskWorkspace({
   const launch = async () => {
     if (!project || !current.prompt.trim()) return;
     setSubmitError('');
-    let finalPrompt = assembled.hasSupplementation
-      ? assembled.assembledPrompt
-      : current.prompt.trim();
-
-    if (project.preferences?.customInstructions?.trim()) {
-      finalPrompt = `${finalPrompt}\n\n[Project Guidelines]:\n${project.preferences.customInstructions.trim()}`;
-    }
-
     try {
+      const currentAdapter =
+        agentConfig.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
       await start({
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
         agent: currentAgent,
+        agentProfileId: agentAccountFor(project, currentAdapter),
         prompt: finalPrompt,
         isolated: current.isolated,
       });
       draft(key, { prompt: '', skills: [] });
+      if (plannedTask) onPlanHandled?.();
     } catch (error) {
       setSubmitError(String(error));
     }
@@ -530,7 +558,15 @@ export function TaskWorkspace({
           </div>
         )}
       </div>
-      {project && <CodebaseMemoryBar project={project} />}
+      {project && <CodebaseMemoryBar key={project.id} project={project} />}
+      {plannedTask && (
+        <div className="task-notice flex flex-wrap items-center justify-between gap-3">
+          <span>Preparing “{plannedTask.title}”. Your regular task draft is saved separately.</span>
+          <Button variant="ghost" onClick={onPlanHandled}>
+            Back to tasks
+          </Button>
+        </div>
+      )}
       {!project ? (
         <div>
           <EmptyState
@@ -607,6 +643,7 @@ export function TaskWorkspace({
                   <button
                     key={skill.id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleSkill(skill.id)}
                     className={`task-skill-chip ${isSelected ? 'is-active' : ''} ${isDetected && !isSelected ? 'is-suggested' : ''}`}
                     title={skill.description}
@@ -616,7 +653,7 @@ export function TaskWorkspace({
                   </button>
                 );
               })}
-              {assembled.hasSupplementation && (
+              {hasPromptDetails && (
                 <button
                   type="button"
                   onClick={() => setShowPromptPreview(!showPromptPreview)}
@@ -630,7 +667,7 @@ export function TaskWorkspace({
             </div>
 
             {/* Collapsible Prompt Preview */}
-            {showPromptPreview && assembled.hasSupplementation && (
+            {showPromptPreview && hasPromptDetails && (
               <div className="task-prompt-preview">
                 <div className="task-preview-header">
                   <span>
@@ -644,7 +681,7 @@ export function TaskWorkspace({
                     Close
                   </button>
                 </div>
-                <pre>{assembled.assembledPrompt}</pre>
+                <pre>{finalPrompt}</pre>
               </div>
             )}
             <div className="task-composer-footer">
@@ -658,13 +695,11 @@ export function TaskWorkspace({
                     value={currentAgent}
                     onValueChange={(value) => draft(key, { agent: value })}
                   >
-                    {runners
-                      .filter((r) => agentConfig.isAgentEnabled(r.id))
-                      .map((r) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.name}
-                        </SelectItem>
-                      ))}
+                    {allowedRunners.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
                   </Select>
                 </label>
                 <label htmlFor="taskworkspace-field-3" className="task-context-chip">
@@ -727,6 +762,12 @@ export function TaskWorkspace({
       {(submitError || error) && (
         <p role="alert" className="task-error mt-5">
           {submitError || error}
+        </p>
+      )}
+      {project && allowedRunners.length === 0 && (
+        <p role="alert" className="task-error mt-5">
+          No agents are allowed for {project.name}. Choose at least one in Settings → Project →
+          Agents available here.
         </p>
       )}
       {project && (

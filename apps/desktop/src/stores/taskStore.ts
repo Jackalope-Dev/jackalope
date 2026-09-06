@@ -38,7 +38,7 @@ export const useTaskStore = create<TaskState>()(
       activeModalTaskId: null,
 
       addTask: (taskData) => {
-        const id = `task-${Date.now()}`;
+        const id = `task-${crypto.randomUUID()}`;
         const newTask: TaskTicket = {
           ...taskData,
           id,

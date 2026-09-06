@@ -1,16 +1,10 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import {
-  Check,
-  ChevronDown,
-  FlaskConical,
-  GitBranch,
-  Search,
-  Settings2,
-  SlidersHorizontal,
-} from 'lucide-react';
+import { Check, ChevronDown, GitBranch, Search, Settings2, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { planningDraft } from '../../lib/planning';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { BrowserHarness } from '../browser/BrowserHarness';
 import { KanbanBoard } from '../kanban/KanbanBoard';
@@ -19,6 +13,7 @@ import { DeviceMesh } from '../mesh/DeviceMesh';
 import { WorktreeManager } from '../projects/WorktreeManager';
 import { ScheduleManager } from '../schedules/ScheduleManager';
 import { SettingsDialog } from '../settings/SettingsDialog';
+import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 import { ProjectSetup } from '../tasks/ProjectSetup';
 import { RunnerConnections } from '../tasks/RunnerConnections';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
@@ -32,16 +27,27 @@ import { TitleBar } from './TitleBar';
 
 export type { ActiveTab } from './navigation';
 
-export function Shell() {
+export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) {
   const [setupOpen, setSetupOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const [commandsOpen, setCommandsOpen] = useState(false);
-  const [newTaskAgent, setNewTaskAgent] = useState<string | null>(null);
+  const [newTaskAgent, setNewTaskAgent] = useState<string | null>(initialTaskAgent ?? null);
+  const [plannedTaskId, setPlannedTaskId] = useState<string | null>(null);
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const shortcut = navigator.platform.includes('Mac') ? '⌘ K' : 'Ctrl K';
+  const prepareTask = (id: string) => {
+    const task = useTaskStore.getState().tasks.find((task) => task.id === id);
+    if (!task) return;
+    selectProject(task.projectId);
+    useExecutionStore.getState().select(null);
+    useExecutionStore.getState().draft(`planning:${id}`, planningDraft(task));
+    setNewTaskAgent(null);
+    setPlannedTaskId(id);
+    setActiveTab('kanban');
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -200,25 +206,30 @@ export function Shell() {
         className="workspace-canvas"
         aria-label={view.label}
       >
-        {['schedules', 'browser', 'topology', 'mesh', 'board'].includes(activeTab) && (
-          <p className="prototype-notice">
-            <FlaskConical size={16} aria-hidden="true" />
-            Preview · changes here do not run agents.
-          </p>
-        )}
+        <HistoryRecoveryNotice />
         {activeTab === 'kanban' && (
           <TaskWorkspace
+            key={plannedTaskId ?? 'tasks'}
+            plannedTaskId={plannedTaskId}
+            onPlanHandled={() => setPlannedTaskId(null)}
             newTaskAgent={newTaskAgent}
             onNewTaskHandled={() => setNewTaskAgent(null)}
           />
         )}
-        {activeTab === 'board' && <KanbanBoard />}
+        {activeTab === 'board' && (
+          <KanbanBoard
+            key={activeProjectId}
+            onOpenProject={() => setSetupOpen(true)}
+            onPrepare={prepareTask}
+          />
+        )}
         {activeTab === 'worktrees' && (
           <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
         )}
         {activeTab === 'agents' && (
           <RunnerConnections
             onNewTask={(agent) => {
+              setPlannedTaskId(null);
               useExecutionStore.getState().select(null);
               setNewTaskAgent(agent);
               setActiveTab('kanban');
@@ -233,9 +244,23 @@ export function Shell() {
         {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
         {activeTab === 'audit' && <AuditLogWorkspace />}
         {activeTab === 'mcps' && <McpWorkspace />}
-        {activeTab === 'schedules' && <ScheduleManager />}
-        {activeTab === 'browser' && <BrowserHarness />}
-        {activeTab === 'topology' && <CodebaseMap />}
+        {activeTab === 'schedules' && (
+          <ScheduleManager
+            key={activeProjectId}
+            onOpenProject={() => setSetupOpen(true)}
+            onPlanning={() => setActiveTab('board')}
+          />
+        )}
+        {activeTab === 'browser' && (
+          <BrowserHarness
+            onOpenProject={() => setSetupOpen(true)}
+            onTask={(id) => {
+              useExecutionStore.getState().select(id);
+              setActiveTab('kanban');
+            }}
+          />
+        )}
+        {activeTab === 'topology' && <CodebaseMap onOpenProject={() => setSetupOpen(true)} />}
         {activeTab === 'mesh' && <DeviceMesh />}
       </main>
       <ProjectSetup open={setupOpen} onClose={() => setSetupOpen(false)} />

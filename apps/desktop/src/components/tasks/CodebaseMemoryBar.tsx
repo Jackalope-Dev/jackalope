@@ -1,200 +1,115 @@
-import { useState } from 'react';
-import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  CircleDot,
-  Clock,
-  ListTodo,
-  RefreshCw,
-  Shield,
-  Sparkles,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { useId, useState } from 'react';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 
-interface CodebaseMemoryBarProps {
+export function CodebaseMemoryBar({
+  project,
+  initiallyExpanded = false,
+}: {
   project: Project;
-}
-
-export function CodebaseMemoryBar({ project }: CodebaseMemoryBarProps) {
+  initiallyExpanded?: boolean;
+}) {
   const { memories, scanning, refreshMemory } = useContextMemoryStore();
   const memory = memories[project.id];
-  const isScanning = scanning[project.id] ?? false;
-
-  const [expanded, setExpanded] = useState(false);
-
-  const handleRefresh = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isScanning) return;
+  const busy = scanning[project.id] ?? false;
+  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [error, setError] = useState('');
+  const id = useId();
+  const refresh = async () => {
+    if (busy) return;
+    setError('');
     try {
-      await refreshMemory({
-        id: project.id,
-        name: project.name,
-        path: project.path,
-      });
-    } catch (e) {
-      console.warn('Refresh failed', e);
+      await refreshMemory(project);
+    } catch (error) {
+      setError(String(error));
     }
   };
-
-  const openTasks = memory?.openTasks.filter((t) => t.status === 'open') ?? [];
-  const relativeTime = memory?.lastScannedAt
-    ? new Date(memory.lastScannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : 'Not yet scanned';
-
   return (
-    <div className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] overflow-hidden transition-all">
-      {/* Summary Bar */}
-      <div className="p-3 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-[var(--color-surface-hover)] transition-colors">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="p-1 rounded-md bg-[var(--color-accent-subtle)] text-[var(--color-accent)] flex items-center gap-1 font-medium">
-            <Sparkles size={13} />
-            Repo Context
-          </span>
-
-          {/* Tech Stack Chips */}
-          {memory?.techStack && memory.techStack.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1">
-              {memory.techStack.slice(0, 4).map((tech) => (
-                <span
-                  key={tech}
-                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-surface)] text-[var(--color-text-primary)] border border-[var(--color-border-subtle)]"
-                >
-                  {tech}
-                </span>
-              ))}
-              {memory.techStack.length > 4 && (
-                <span className="text-xs text-[var(--color-text-muted)]">
-                  +{memory.techStack.length - 4}
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="text-xs text-[var(--color-text-muted)] italic">
-              Click refresh to discover codebase metadata
-            </span>
-          )}
-
-          {/* Open Tasks Count */}
-          {openTasks.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-[var(--color-warning)] border border-amber-500/30">
-              <ListTodo size={11} />
-              {openTasks.length} open {openTasks.length === 1 ? 'task' : 'tasks'}
-            </span>
-          )}
-
-          {/* Invariants / Conventions Count */}
-          {memory?.conventions && memory.conventions.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-[var(--color-success)] border border-emerald-500/30">
-              <Shield size={11} />
-              {memory.conventions.length} invariants
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-[var(--color-text-muted)] flex items-center gap-1">
-            <Clock size={11} />
-            {relativeTime}
-          </span>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isScanning}
-            className="h-7 px-2.5 text-xs gap-1.5"
-          >
-            <RefreshCw
-              size={12}
-              className={isScanning ? 'animate-spin text-[var(--color-accent)]' : ''}
-            />
-            {isScanning ? 'Scanning…' : 'Refresh Context'}
-          </Button>
-
-          <button
-            type="button"
-            className="p-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-            onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
-            aria-label={expanded ? 'Collapse context memory' : 'Expand context memory'}
-          >
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
+    <section className="context-summary">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button
+          variant="ghost"
+          aria-expanded={expanded}
+          aria-controls={id}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          Repository context{' '}
+          {memory?.techStack.length ? `· ${memory.techStack.slice(0, 3).join(', ')}` : ''}
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={busy || !isTauriEnvironment()}
+          onClick={() => void refresh()}
+        >
+          <RefreshCw size={16} />
+          {busy ? 'Reading…' : 'Refresh context'}
+        </Button>
       </div>
-
-      {/* Expanded Context Details Drawer */}
+      {error && (
+        <p role="alert" className="task-error mt-3">
+          {error}
+        </p>
+      )}
+      {busy && (
+        <p role="status" className="task-muted mt-3">
+          Reading project files…
+        </p>
+      )}
       {expanded && (
-        <div className="p-4 border-t border-[var(--color-border-subtle)] bg-[var(--color-surface)] space-y-4 text-xs">
-          {/* Summary & Manifests */}
-          <div>
-            <span className="font-semibold text-[var(--color-text-primary)] block mb-1">
-              Discovered Architecture & Manifests
-            </span>
-            <p className="text-[var(--color-text-muted)] leading-relaxed">
-              {memory?.summary ?? 'No summary available.'}
+        <div id={id} className="space-y-5 pt-4">
+          {!memory ? (
+            <p className="task-muted">
+              {isTauriEnvironment()
+                ? 'Refresh to read the repository instructions, build commands and planned work.'
+                : 'Open the desktop app to read repository context.'}
             </p>
-            {memory?.sourceFilesDetected && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {memory.sourceFilesDetected.map((file) => (
-                  <span
-                    key={file}
-                    className="font-mono text-xs px-1.5 py-0.5 rounded bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-muted)]"
-                  >
-                    {file}
-                  </span>
+          ) : (
+            <>
+              <p className="task-muted">{memory.summary}</p>
+              <p className="task-muted text-xs">
+                Last read {new Date(memory.lastScannedAt).toLocaleString()}. Refresh after
+                repository changes.
+              </p>
+              {memory.sourceFilesDetected.length > 0 && (
+                <div>
+                  <h3 className="text-base font-medium">Source files</h3>
+                  <p className="task-path">{memory.sourceFilesDetected.join(' · ')}</p>
+                </div>
+              )}
+              {[
+                { title: 'Project instructions', values: memory.conventions },
+                { title: 'Build commands', values: memory.buildCommands },
+                { title: 'Test commands', values: memory.testCommands },
+                {
+                  title: 'Planned work in repository files',
+                  values: memory.openTasks
+                    .filter((task) => task.status === 'open')
+                    .map((task) => task.title),
+                },
+              ]
+                .filter((group) => group.values.length)
+                .map((group) => (
+                  <details key={group.title}>
+                    <summary className="task-summary">
+                      {group.title} · {group.values.length}
+                    </summary>
+                    <ul className="space-y-2 mt-3 text-sm text-[var(--color-text-secondary)]">
+                      {[...new Set(group.values)].map((value) => (
+                        <li key={value} className="break-words">
+                          {value}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 ))}
-              </div>
-            )}
-          </div>
-
-          {/* Open Tasks List */}
-          {openTasks.length > 0 && (
-            <div>
-              <span className="font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5 mb-2">
-                <ListTodo size={13} className="text-[var(--color-warning)]" />
-                Detected Open Tasks (from TODO.md / STATUS.md)
-              </span>
-              <ul className="space-y-1.5 pl-1 max-h-40 overflow-y-auto pr-2">
-                {openTasks.slice(0, 8).map((task) => (
-                  <li
-                    key={task.id}
-                    className="flex items-start gap-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
-                  >
-                    <CircleDot size={12} className="text-[var(--color-warning)] shrink-0 mt-0.5" />
-                    <span>{task.title}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Conventions & Invariants */}
-          {memory?.conventions && memory.conventions.length > 0 && (
-            <div>
-              <span className="font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5 mb-2">
-                <Shield size={13} className="text-[var(--color-success)]" />
-                Project Invariants & Conventions (Injected into tasks)
-              </span>
-              <ul className="space-y-1 pl-1 max-h-36 overflow-y-auto pr-2">
-                {[...new Set(memory.conventions)].slice(0, 6).map((conv) => (
-                  <li key={conv} className="flex items-start gap-2 text-[var(--color-text-muted)]">
-                    <CheckCircle2
-                      size={12}
-                      className="text-[var(--color-success)] shrink-0 mt-0.5"
-                    />
-                    <span>{conv}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            </>
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

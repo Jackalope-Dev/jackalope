@@ -5,7 +5,8 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useOnboardingStore } from '../../stores/onboardingStore';
+import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AgentManager } from '../agents/AgentManager';
@@ -15,6 +16,7 @@ import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { ProjectAgentAccount } from './ProjectAgentAccount';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
 
@@ -66,10 +68,11 @@ export function SettingsDialog({
   const settings = useSettingsStore();
   const agents = useAgentConfigStore();
   const { currentTheme, setTheme } = useThemeStore();
-  const { mood, setMood, pet } = useMascotStore();
+  const { pet } = useMascotStore();
+  const [previewMood, setPreviewMood] = useState<MascotMood>('idle');
   const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
   const [category, setCategory] = useState<Category>(
-    initialCategory ?? (initialScope === 'project' ? 'Project' : 'Appearance'),
+    initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
   const [projectId, setProjectId] = useState(initialProjectId ?? '');
   const project = projects.find((p) => p.id === (projectId || activeProjectId)) ?? projects[0];
@@ -86,7 +89,7 @@ export function SettingsDialog({
     matches(
       c,
       {
-        General: 'window close exit system tray background quit minimize',
+        General: 'window close exit system tray background quit minimize guided setup onboarding',
         Appearance: 'theme color light dark atmosphere mascot companion moods reactions',
         Agents: 'default models allowed restrict manual cli command executable configuration',
         Privacy: 'marketplace MCP network telemetry crash reporting',
@@ -209,7 +212,25 @@ export function SettingsDialog({
               {visible.map((c) => (
                 <section key={c} className="settings-section">
                   <h2 className="settings-section-title">{c}</h2>
-                  {c === 'General' && <WindowBehaviorSettings />}
+                  {c === 'General' && (
+                    <>
+                      <Setting
+                        title="Guided setup"
+                        description="Choose a project and agent, then prepare your first task."
+                      >
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            onClose();
+                            useOnboardingStore.getState().begin();
+                          }}
+                        >
+                          Open guided setup
+                        </Button>
+                      </Setting>
+                      <WindowBehaviorSettings />
+                    </>
+                  )}
                   {c === 'Appearance' && (
                     <>
                       <p className="settings-section-subtitle mb-6">
@@ -218,7 +239,7 @@ export function SettingsDialog({
                       <ThemeEditor value={currentTheme} onChange={setTheme} />
                       <div className="settings-companion-box mt-6">
                         <div className="settings-companion-avatar">
-                          <JackalopeMascot size="md" />
+                          <JackalopeMascot size="md" overrideMood={previewMood} />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium">Companion preview</p>
@@ -229,9 +250,9 @@ export function SettingsDialog({
                               <button
                                 key={m}
                                 type="button"
-                                aria-pressed={mood === m}
-                                className={`settings-mood-chip ${mood === m ? 'is-active' : ''}`}
-                                onClick={() => setMood(m)}
+                                aria-pressed={previewMood === m}
+                                className={`settings-mood-chip ${previewMood === m ? 'is-active' : ''}`}
+                                onClick={() => setPreviewMood(m)}
                               >
                                 {m}
                               </button>
@@ -332,13 +353,89 @@ export function SettingsDialog({
                                   <SelectItem
                                     key={a.id}
                                     value={a.id}
-                                    disabled={!agents.isAgentEnabled(a.id)}
+                                    disabled={
+                                      !agents.isAgentEnabled(a.id) ||
+                                      !isAgentAllowedForProject(project, a.id)
+                                    }
                                   >
                                     {a.name}
                                   </SelectItem>
                                 ))}
                               </Select>
                             </Setting>
+                          </div>
+                          <div className="settings-group">
+                            <Setting
+                              title="Agents available here"
+                              description="Restrict which agents can be picked for this project's tasks — handy for keeping work projects on one agent and personal ones on another. Leave every agent on to allow all app-enabled agents."
+                            />
+                            {[
+                              { id: 'codex', name: 'Codex' },
+                              { id: 'claude', name: 'Claude Code' },
+                              { id: 'grok', name: 'Grok' },
+                              ...agents.customAgents,
+                            ].map((a) => {
+                              const allIds = [
+                                'codex',
+                                'claude',
+                                'grok',
+                                ...agents.customAgents.map((c) => c.id),
+                              ];
+                              const restricted = project.preferences?.allowedAgents;
+                              const isOn = restricted === undefined || restricted.includes(a.id);
+                              return (
+                                <Setting
+                                  key={a.id}
+                                  title={a.name}
+                                  description={
+                                    !agents.isAgentEnabled(a.id)
+                                      ? 'Disabled app-wide in Agent settings.'
+                                      : isOn
+                                        ? `Available for ${project.name}.`
+                                        : `Not allowed for ${project.name}.`
+                                  }
+                                >
+                                  <Switch
+                                    checked={isOn}
+                                    onCheckedChange={(checked) => {
+                                      const current = restricted ?? allIds;
+                                      const next = checked
+                                        ? [...new Set([...current, a.id])]
+                                        : current.filter((id) => id !== a.id);
+                                      updateProjectPreferences(project.id, {
+                                        allowedAgents:
+                                          next.length === allIds.length ? undefined : next,
+                                      });
+                                    }}
+                                    label={`Allow ${a.name} for ${project.name}`}
+                                  />
+                                  {!('isCustom' in a) && isOn && agents.isAgentEnabled(a.id) && (
+                                    <ProjectAgentAccount
+                                      agentId={a.id}
+                                      agentName={a.name}
+                                      projectName={project.name}
+                                      value={project.preferences?.agentAccounts?.[a.id]}
+                                      onChange={(id) => {
+                                        const next = {
+                                          ...(project.preferences?.agentAccounts ?? {}),
+                                        };
+                                        if (id) next[a.id] = id;
+                                        else delete next[a.id];
+                                        updateProjectPreferences(project.id, {
+                                          agentAccounts: next,
+                                        });
+                                      }}
+                                    />
+                                  )}
+                                </Setting>
+                              );
+                            })}
+                            {project.preferences?.allowedAgents?.length === 0 && (
+                              <p className="task-error">
+                                No agents are allowed here — tasks can’t start until you enable at
+                                least one.
+                              </p>
+                            )}
                           </div>
                           <label
                             className="block text-sm font-medium"

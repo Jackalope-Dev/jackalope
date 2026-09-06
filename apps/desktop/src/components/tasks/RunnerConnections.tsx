@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
@@ -23,6 +24,7 @@ export function RunnerConnections({
 }) {
   const { runners, runs, discovering, discover, error } = useExecutionStore();
   const config = useAgentConfigStore();
+  const capacity = useCapacityStore();
   const [adding, setAdding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -86,18 +88,29 @@ export function RunnerConnections({
         />
         <div className="agent-roster-heading">
           <span>On this computer</span>
-          <Button
-            variant="ghost"
-            disabled={!desktop || checking || discovering}
-            onClick={() => void checkAgents()}
-          >
-            <RefreshCw size={15} />
-            {checking || discovering ? 'Checking…' : 'Check agents'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              disabled={!desktop || capacity.loading}
+              onClick={() => void capacity.fetch(false)}
+              title="Reads each signed-in agent's account identity and remaining capacity."
+            >
+              <RefreshCw size={15} />
+              {capacity.loading ? 'Checking…' : 'Check account'}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={!desktop || checking || discovering}
+              onClick={() => void checkAgents()}
+            >
+              <RefreshCw size={15} />
+              {checking || discovering ? 'Checking…' : 'Check agents'}
+            </Button>
+          </div>
         </div>
-        {(checkError || error) && (
+        {(checkError || error || capacity.error) && (
           <p role="alert" className="task-error">
-            {checkError || error}
+            {checkError || error || capacity.error}
           </p>
         )}
         {!desktop && (
@@ -167,6 +180,9 @@ export function RunnerConnections({
                         : 'Sign-in is checked by the CLI when a task starts.';
               const attention = !!waitingRun || (!working && !canStart);
               const taskToOpen = waitingRun ?? activeRuns[0] ?? reviewRun;
+              const knownAccount = accountForAgent(capacity.records, runner.id);
+              const genericAccount = !runner.account || runner.account === 'Current CLI account';
+              const identity = knownAccount ?? (genericAccount ? null : runner.account);
               return (
                 <article key={runner.id} className="agent-roster-row" data-provider={provider}>
                   <AgentAvatar
@@ -187,6 +203,7 @@ export function RunnerConnections({
                       {status}
                     </p>
                     <p className="task-muted">{detail}</p>
+                    {identity && <p className="task-muted text-xs">{identity}</p>}
                     {taskToOpen && (
                       <button
                         className="agent-task-link"

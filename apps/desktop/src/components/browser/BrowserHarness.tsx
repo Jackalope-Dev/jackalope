@@ -2,10 +2,17 @@ import { Globe } from 'lucide-react';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ValidationJourney } from '../tasks/ValidationJourney';
+import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
-export function BrowserHarness() {
+export function BrowserHarness({
+  onOpenProject,
+  onTask,
+}: {
+  onOpenProject: () => void;
+  onTask: (id: string) => void;
+}) {
   const runs = useExecutionStore((state) => state.runs);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const evidenceRuns = runs.filter(
@@ -16,10 +23,9 @@ export function BrowserHarness() {
   return (
     <section className="task-page">
       <WorkspaceHeading
-        title="Browser"
+        title="Evidence"
         description="Review screenshots and validation checkpoints recorded by your tasks."
       />
-      <p className="task-muted mb-6">Interactive browsing is not available yet.</p>
       {evidenceRuns.length === 0 ? (
         <EmptyState
           icon={Globe}
@@ -28,6 +34,9 @@ export function BrowserHarness() {
             activeProjectId
               ? 'Screenshots and validation checkpoints will appear here when a task records them.'
               : 'Open a project to review its task evidence.'
+          }
+          action={
+            !activeProjectId ? <Button onClick={onOpenProject}>Open project</Button> : undefined
           }
         />
       ) : (
@@ -38,7 +47,14 @@ export function BrowserHarness() {
               <p className="task-muted">
                 {run.projectName} · {new Date(run.startedAt).toLocaleString()}
               </p>
-              <ValidationJourney steps={run.validationSteps ?? []} screenshots={run.screenshots} />
+              <Button variant="outline" onClick={() => onTask(run.id)}>
+                View task
+              </Button>
+              <ValidationJourney
+                runId={run.id}
+                steps={run.validationSteps ?? []}
+                screenshots={run.screenshots}
+              />
             </section>
           ))}
         </div>

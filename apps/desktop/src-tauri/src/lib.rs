@@ -3,6 +3,7 @@ pub mod state;
 mod window_behavior;
 
 use commands::agent_policy::*;
+use commands::agent_profiles::*;
 use commands::capacity::*;
 use commands::coordination::*;
 use commands::integration::*;
@@ -89,6 +90,8 @@ pub fn run() {
             task_pick_project,
             task_validate_project,
             task_runs,
+            task_history_recovery,
+            task_screenshot,
             task_start,
             task_stop,
             task_mark_reviewed,
@@ -108,6 +111,12 @@ pub fn run() {
             mcp_save_server,
             mcp_delete_server,
             mcp_probe_server,
+            agent_profile_list,
+            agent_profile_create,
+            agent_profile_rename,
+            agent_profile_delete,
+            agent_profile_set_active,
+            agent_profile_sign_in,
         ])
         .build(context)
         .expect("error while building jackalope application")

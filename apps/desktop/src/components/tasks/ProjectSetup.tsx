@@ -1,12 +1,11 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, FolderOpen, X } from 'lucide-react';
 import { useState } from 'react';
+import { openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { AgentManager } from '../agents/AgentManager';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
@@ -31,39 +30,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true);
     setError('');
     try {
-      await syncAgentConfig();
-      const info = await nativeTask<{ path: string; name: string; branch: string }>(
-        'task_validate_project',
-        { path: path.trim() },
-      );
-      const store = useProjectStore.getState();
-      const existing = store.projects.find(
-        (p) =>
-          p.path.replaceAll('\\', '/').toLowerCase() ===
-          info.path.replaceAll('\\', '/').toLowerCase(),
-      );
-      if (existing) {
-        store.selectProject(existing.id);
-        import('../../stores/contextMemoryStore')
-          .then(({ useContextMemoryStore }) => {
-            void useContextMemoryStore.getState().refreshMemory(existing);
-          })
-          .catch(() => {});
-      } else {
-        const newProj = {
-          id: crypto.randomUUID(),
-          name: info.name,
-          path: info.path,
-          gitBranch: info.branch || 'Detached HEAD',
-          agentProvider: 'codex' as const,
-        };
-        await store.addProject(newProj);
-        import('../../stores/contextMemoryStore')
-          .then(({ useContextMemoryStore }) => {
-            void useContextMemoryStore.getState().refreshMemory(newProj);
-          })
-          .catch(() => {});
-      }
+      await openProject(path);
       setPath('');
       onClose();
     } catch (error) {

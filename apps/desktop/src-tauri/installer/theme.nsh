@@ -1,0 +1,2 @@
+!define JACKALOPE_SURFACE "f6f5f4"
+!define JACKALOPE_TEXT "24201e"

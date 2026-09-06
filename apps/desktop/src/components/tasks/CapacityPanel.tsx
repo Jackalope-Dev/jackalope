@@ -1,28 +1,9 @@
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
 import { Button } from '../ui/button';
 import './capacity-panel.css';
-
-interface CapacityWindow {
-  poolId: string;
-  poolName: string;
-  window: string;
-  usedPercent: number | null;
-  remainingPercent: number | null;
-  durationMinutes: number | null;
-  resetsAt: number | null;
-}
-interface CapacityRecord {
-  agent: string;
-  status: string;
-  account: string;
-  source: string;
-  observedAt: string | null;
-  detail: string;
-  windows: CapacityWindow[];
-}
 
 const names: Record<string, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
 function windowName(window: CapacityWindow) {
@@ -41,24 +22,10 @@ function windowName(window: CapacityWindow) {
 }
 
 export function CapacityPanel() {
-  const [records, setRecords] = useState<CapacityRecord[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { records, loading, error, lastFetched, fetch } = useCapacityStore();
   const [now, setNow] = useState(Date.now());
-  const [nextRefresh, setNextRefresh] = useState(0);
-  const refresh = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setRecords(await nativeTask<CapacityRecord[]>('capacity_snapshot', { refresh: true }));
-      setNextRefresh(Date.now() + 60_000);
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setNow(Date.now());
-      setLoading(false);
-    }
-  };
+  const nextRefresh = lastFetched ? lastFetched + 60_000 : 0;
+  const refresh = () => void fetch(true);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);

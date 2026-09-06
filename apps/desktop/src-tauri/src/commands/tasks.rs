@@ -11,6 +11,7 @@ use std::{
 };
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
+use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +68,11 @@ pub struct RunRequest {
     pub project_name: String,
     pub project_path: String,
     pub agent: String,
+    /// Explicit account to run this agent as, overriding whichever profile is
+    /// globally active. None means "use the agent's globally active account,"
+    /// today's (and every existing caller's) unchanged behavior.
+    #[serde(default)]
+    pub agent_profile_id: Option<String>,
     pub prompt: String,
     pub isolated: bool,
     pub previous_run_id: Option<String>,
@@ -95,6 +101,7 @@ pub struct Runner {
 #[derive(Default)]
 struct Inner {
     runs: HashMap<String, TaskRun>,
+    recovery: Vec<HistoryRecoveryEntry>,
     processes: HashMap<String, Arc<Mutex<std::process::Child>>>,
     canceled: std::collections::HashSet<String>,
 }
@@ -173,9 +180,14 @@ fn valid_id(id: &str) -> bool {
 pub(super) fn probe_auth(
     path: PathBuf,
     args: Vec<&str>,
+    env: Option<(&str, PathBuf)>,
 ) -> Result<std::process::Output, std::io::Error> {
-    let mut child = command(path)
-        .args(args)
+    let mut cmd = command(path);
+    cmd.args(args);
+    if let Some((name, dir)) = env {
+        cmd.env(name, dir);
+    }
+    let mut child = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()?;
@@ -219,11 +231,19 @@ impl TaskRuntime {
             directory,
             _owner: Arc::new(owner),
         };
-        for entry in std::fs::read_dir(&runtime.directory)
+        let paths: Vec<_> = std::fs::read_dir(&runtime.directory)
             .map_err(|e| e.to_string())?
-            .flatten()
-        {
-            let path = entry.path();
+            .map(|entry| entry.map(|entry| entry.path()).map_err(|e| e.to_string()))
+            .collect::<Result<_, _>>()?;
+        for path in paths {
+            if path.extension().is_some_and(|ext| ext == "corrupt") {
+                runtime.inner.lock().unwrap().recovery.push(HistoryRecoveryEntry {
+                    path: path.to_string_lossy().into_owned(),
+                    reason: "This history file was set aside during an earlier startup. It has not been loaded or repaired.".into(),
+                    quarantined: true,
+                });
+                continue;
+            }
             if path.extension().is_some_and(|ext| ext == "json") {
                 let parsed = std::fs::read(&path)
                     .map_err(|e| e.to_string())
@@ -238,21 +258,8 @@ impl TaskRuntime {
                         }
                     });
                 match parsed {
-                    // A single unreadable entry (crash mid-write outside the
-                    // atomic tmp-then-rename `save()` path, disk error, a
-                    // stray file) must not stop the whole app from launching
-                    // — that would strand every other task's history behind
-                    // one bad file with no way for a user to recover.
-                    // Quarantine it (rename, don't delete, so it survives
-                    // for inspection) and keep loading everything else.
                     Err(reason) => {
-                        let quarantined = path.with_extension("json.corrupt");
-                        let _ = std::fs::rename(&path, &quarantined);
-                        eprintln!(
-                            "Jackalope: quarantined unreadable task history {} ({reason}); see {}",
-                            path.display(),
-                            quarantined.display()
-                        );
+                        runtime.inner.lock().unwrap().recovery.push(quarantine(&path, reason));
                     }
                     Ok(mut run) => {
                         if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
@@ -271,6 +278,7 @@ impl TaskRuntime {
                 }
             }
         }
+        runtime.inner.lock().unwrap().recovery.sort_by(|a, b| a.path.cmp(&b.path));
         Ok(runtime)
     }
 
@@ -431,6 +439,15 @@ impl TaskRuntime {
         let (adapter, executable) = policy.resolve(&req.agent)?;
         let selected_model = policy.model(&req.agent, req.model.as_deref())?;
         let mut cmd = command(executable);
+        if let Some(env_name) = super::agent_profiles::env_var_for(&adapter) {
+            if let Some(dir) = super::agent_profiles::resolve_profile_dir(
+                &self.profiles_root(),
+                &adapter,
+                req.agent_profile_id.as_deref(),
+            ) {
+                cmd.env(env_name, dir);
+            }
+        }
         if adapter == "codex" {
             cmd.args([
                 "exec",
@@ -732,7 +749,7 @@ fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str) {
     }
 }
 
-fn discover_runner(policy: &super::agent_policy::AgentPolicy, id: &str) -> Runner {
+fn discover_runner(policy: &super::agent_policy::AgentPolicy, id: &str, profiles_root: &std::path::Path) -> Runner {
     let mut runner = Runner { id: id.to_string(), name: match id { "codex" => "Codex", "claude" => "Claude Code", _ => "Grok" }.into(), available: false, signed_in: false, account: "Current CLI account".into(), detail: String::new() };
     let mut discovery = policy.clone();
     discovery.enabled_agents.clear();
@@ -740,9 +757,12 @@ fn discover_runner(policy: &super::agent_policy::AgentPolicy, id: &str) -> Runne
         Err(error) => runner.detail = error,
         Ok((adapter, path)) => {
             runner.available = true;
+            let profile_env = super::agent_profiles::env_var_for(&adapter).and_then(|name| {
+                super::agent_profiles::active_profile_dir(profiles_root, &adapter).map(|dir| (name, dir))
+            });
             if adapter == "grok" { runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into(); return runner; }
             let args = if adapter == "codex" { vec!["login", "status"] } else { vec!["auth", "status"] };
-            match probe_auth(path, args) {
+            match probe_auth(path, args, profile_env) {
                 Ok(out) => {
                     if adapter == "claude" {
                         if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {
@@ -763,6 +783,7 @@ fn discover_runner(policy: &super::agent_policy::AgentPolicy, id: &str) -> Runne
 #[tauri::command]
 pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
     let policy = runtime.policy()?;
+    let profiles_root = runtime.profiles_root();
     let mut ids: Vec<String> = vec!["codex".into(), "claude".into(), "grok".into()];
     ids.extend(policy.custom_agents.iter().map(|a| a.id.clone()));
     // Each agent's discovery/sign-in probe can take up to probe_auth's own
@@ -776,7 +797,8 @@ pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>
         .into_iter()
         .map(|id| {
             let policy = policy.clone();
-            tauri::async_runtime::spawn_blocking(move || discover_runner(&policy, &id))
+            let profiles_root = profiles_root.clone();
+            tauri::async_runtime::spawn_blocking(move || discover_runner(&policy, &id, &profiles_root))
         })
         .collect();
     let mut runners = Vec::with_capacity(handles.len());
@@ -872,6 +894,27 @@ pub async fn task_validate_project(path: String) -> Result<ProjectInfo, String> 
 }
 
 #[tauri::command]
+pub fn task_history_recovery(state: State<'_, TaskRuntime>) -> HistoryRecovery {
+    HistoryRecovery {
+        directory: state.directory.to_string_lossy().into_owned(),
+        entries: state.inner.lock().unwrap().recovery.clone(),
+    }
+}
+
+#[tauri::command]
+pub async fn task_screenshot(run_id: String, screenshot_id: String, state: State<'_, TaskRuntime>) -> Result<Vec<u8>, String> {
+    let (workspace, path) = {
+        let inner = state.inner.lock().unwrap();
+        let run = inner.runs.get(&run_id).ok_or("Task attempt not found")?;
+        let screenshot = run.screenshots.iter().find(|item| item.id == screenshot_id)
+            .ok_or("Screenshot not found in this task attempt")?;
+        (PathBuf::from(&run.workspace), PathBuf::from(&screenshot.file_path))
+    };
+    tauri::async_runtime::spawn_blocking(move || super::artifacts::read_screenshot(&workspace, &path))
+        .await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn task_runs(state: State<'_, TaskRuntime>) -> Vec<TaskRun> {
     let mut runs: Vec<_> = state.inner.lock().unwrap().runs.values().cloned().collect();
     runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
@@ -921,6 +964,9 @@ impl TaskRuntime {
     }
     pub fn integration_directory(&self) -> PathBuf {
         self.directory.join("integrations")
+    }
+    pub fn profiles_root(&self) -> PathBuf {
+        self.directory.join("agent-profiles")
     }
     pub(super) fn start(&self, request: RunRequest) -> Result<String, String> {
         let _integration_guard = super::integration::execution_guard()?;
@@ -1204,6 +1250,7 @@ mod tests {
             project_name: "Fixture".into(),
             project_path: root.into(),
             agent: "default".into(),
+            agent_profile_id: None,
             model: None,
             prompt: "Fixture only".into(),
             isolated: false,
@@ -1319,6 +1366,9 @@ mod tests {
         let inner = runtime.inner.lock().unwrap();
         assert_eq!(inner.runs.len(), 1, "only the valid entry should load");
         assert!(inner.runs.contains_key(&good.id));
+        assert_eq!(inner.recovery.len(), 2);
+        assert!(inner.recovery.iter().all(|entry| entry.quarantined));
+        assert!(inner.recovery.iter().any(|entry| entry.reason == "invalid task identifier"));
         drop(inner);
         drop(runtime);
 
@@ -1326,6 +1376,14 @@ mod tests {
         assert!(!folder.join("garbled-not-json.json").exists());
         assert!(folder.join("bad-id-file.json.corrupt").exists());
         assert!(!folder.join("bad-id-file.json").exists());
+
+        let restarted = TaskRuntime::new(folder.clone()).unwrap();
+        let inner = restarted.inner.lock().unwrap();
+        assert_eq!(inner.runs.len(), 1);
+        assert_eq!(inner.recovery.len(), 2, "backups remain visible after restart");
+        assert!(inner.recovery.iter().all(|entry| Path::new(&entry.path).exists()));
+        drop(inner);
+        drop(restarted);
 
         assert!(folder.starts_with(std::env::temp_dir()));
         std::fs::remove_dir_all(folder).unwrap();

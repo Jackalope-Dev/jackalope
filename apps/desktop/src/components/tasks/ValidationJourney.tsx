@@ -13,14 +13,19 @@ import { useState } from 'react';
 import type { ScreenshotArtifact, ValidationStep } from '../../lib/task-runtime';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { useDialogFocus } from '../ui/useDialogFocus';
+import { ScreenshotPreview } from './ScreenshotPreview';
 
 interface ValidationJourneyProps {
+  runId: string;
   steps: ValidationStep[];
   screenshots?: ScreenshotArtifact[];
 }
 
-export function ValidationJourney({ steps, screenshots = [] }: ValidationJourneyProps) {
+export function ValidationJourney({ runId, steps, screenshots = [] }: ValidationJourneyProps) {
   const [activeImage, setActiveImage] = useState<ScreenshotArtifact | null>(null);
+  const [imageAttempt, setImageAttempt] = useState(0);
+  const dialogFocus = useDialogFocus();
 
   if (steps.length === 0 && screenshots.length === 0) {
     return null;
@@ -41,10 +46,10 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
           </div>
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Verification & Validation Journey
+              Checks & screenshots
             </h3>
             <p className="text-xs text-[var(--color-text-muted)]">
-              Structured checkpoints and visual evidence verified by the agent
+              Results and evidence recorded by the agent
             </p>
           </div>
         </div>
@@ -94,13 +99,22 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-[var(--color-text-primary)] truncate">
+                    <span className="text-sm font-medium text-[var(--color-text-primary)] break-words min-w-0">
                       {step.step}
                     </span>
                     <span className="text-xs text-[var(--color-text-muted)] shrink-0">
                       {new Date(step.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
+                  <p className="task-muted text-xs">
+                    {isPassed
+                      ? 'Passed'
+                      : isFailed
+                        ? 'Failed'
+                        : isInProgress
+                          ? 'In progress'
+                          : 'Pending'}
+                  </p>
 
                   {step.notes && (
                     <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed">
@@ -132,7 +146,7 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
         <div className="space-y-2 pt-2">
           <span className="text-xs font-semibold text-[var(--color-text-secondary)] flex items-center gap-1.5">
             <Camera size={13} />
-            Visual UI Artifacts:
+            Screenshots
           </span>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {screenshots.map((s) => (
@@ -156,7 +170,7 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
                     </p>
                   </div>
                 </div>
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs gap-1">
+                <div className="absolute inset-0 bg-[var(--color-surface)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity flex items-center justify-center text-[var(--color-text-primary)] text-sm gap-1">
                   <Eye size={13} />
                   <span>Inspect</span>
                 </div>
@@ -176,20 +190,23 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
         {activeImage && (
           <Dialog.Portal>
             <Dialog.Overlay className="task-dialog-overlay" />
-            <Dialog.Content className="task-dialog appearance-panel max-w-3xl">
+            <Dialog.Content
+              {...dialogFocus}
+              className="task-dialog appearance-panel evidence-dialog"
+            >
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0 break-words">
                   <Dialog.Title className="text-sm font-semibold text-[var(--color-text-primary)]">
                     {activeImage.name}
                   </Dialog.Title>
-                  <Dialog.Description className="text-xs text-[var(--color-text-muted)] font-mono">
+                  <Dialog.Description className="text-xs text-[var(--color-text-muted)] font-mono break-all mt-2">
                     {activeImage.url} · {activeImage.filePath}
                   </Dialog.Description>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="shrink-0"
                   aria-label="Close screenshot details"
                   onClick={() => setActiveImage(null)}
                 >
@@ -197,17 +214,12 @@ export function ValidationJourney({ steps, screenshots = [] }: ValidationJourney
                 </Button>
               </div>
 
-              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-6 min-h-[260px] flex items-center justify-center text-center">
-                <div className="space-y-2">
-                  <Camera size={40} className="mx-auto text-[var(--color-accent)]" />
-                  <p className="text-xs text-[var(--color-text-secondary)] font-medium">
-                    {activeImage.name}
-                  </p>
-                  <p className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto">
-                    Path: {activeImage.filePath}
-                  </p>
-                </div>
-              </div>
+              <ScreenshotPreview
+                key={`${activeImage.id}:${imageAttempt}`}
+                runId={runId}
+                screenshot={activeImage}
+                onRetry={() => setImageAttempt((value) => value + 1)}
+              />
             </Dialog.Content>
           </Dialog.Portal>
         )}

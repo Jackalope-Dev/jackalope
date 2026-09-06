@@ -1,9 +1,12 @@
 import { MotionConfig } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Shell } from './components/layout/Shell';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { nativeTask } from './lib/task-runtime';
 import { startThemeClock } from './lib/theme-engine';
 import { observeExecution } from './stores/executionStore';
+import { useOnboardingStore } from './stores/onboardingStore';
+import { useProjectStore } from './stores/projectStore';
 import './components/tasks/task-workspace.css';
 import './components/ui/experience.css';
 
@@ -11,6 +14,12 @@ export default function App() {
   useEffect(startThemeClock, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
+  const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
+  const onboarding = useOnboardingStore();
+  useEffect(() => {
+    if (ready)
+      useOnboardingStore.getState().initialize(useProjectStore.getState().projects.length > 0);
+  }, [ready]);
   useEffect(() => {
     if (ready) return observeExecution();
     nativeTask('app_finish_reset')
@@ -31,7 +40,16 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <Shell />
+      {onboarding.status === 'new' || onboarding.status === 'active' ? (
+        <OnboardingFlow
+          onFinish={(agent) => {
+            setInitialTaskAgent(agent);
+            onboarding.finish(!agent);
+          }}
+        />
+      ) : (
+        <Shell initialTaskAgent={initialTaskAgent} />
+      )}
     </MotionConfig>
   );
 }

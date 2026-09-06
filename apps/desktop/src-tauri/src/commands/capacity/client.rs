@@ -14,7 +14,11 @@ pub(super) struct Client {
 }
 
 impl Client {
-    pub(super) fn spawn(agent: &str, args: &[&str]) -> Result<Self, String> {
+    pub(super) fn spawn(
+        agent: &str,
+        args: &[&str],
+        profiles_root: &std::path::Path,
+    ) -> Result<Self, String> {
         let mut command = Command::new(super::super::tasks::executable(agent)?);
         command
             .args(args)
@@ -23,6 +27,11 @@ impl Client {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true);
+        if let Some(env_name) = super::super::agent_profiles::env_var_for(agent) {
+            if let Some(dir) = super::super::agent_profiles::active_profile_dir(profiles_root, agent) {
+                command.env(env_name, dir);
+            }
+        }
         #[cfg(windows)]
         command.creation_flags(0x08000000);
         let mut child = command

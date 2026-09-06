@@ -24,6 +24,7 @@ interface ScheduleState {
   toggleSchedule: (id: string) => void;
   addSchedule: (schedule: Omit<ScheduledTask, 'id' | 'nextRun'>) => void;
   deleteSchedule: (id: string) => void;
+  updateSchedule: (id: string, value: Partial<Omit<ScheduledTask, 'id'>>) => void;
 }
 
 export const useScheduleStore = create<ScheduleState>()(
@@ -38,7 +39,7 @@ export const useScheduleStore = create<ScheduleState>()(
       },
 
       addSchedule: (sch) => {
-        const id = `sched-${Date.now()}`;
+        const id = `sched-${crypto.randomUUID()}`;
         const newSchedule: ScheduledTask = {
           ...sch,
           id,
@@ -52,6 +53,12 @@ export const useScheduleStore = create<ScheduleState>()(
           schedules: state.schedules.filter((s) => s.id !== id),
         }));
       },
+      updateSchedule: (id, value) =>
+        set((state) => ({
+          schedules: state.schedules.map((schedule) =>
+            schedule.id === id ? { ...schedule, ...value } : schedule,
+          ),
+        })),
     }),
     {
       name: 'jackalope-schedules',

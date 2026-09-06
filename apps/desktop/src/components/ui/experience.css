@@ -578,3 +578,81 @@ button:disabled {
   overflow-y: auto;
   overflow-wrap: anywhere;
 }
+.workspace-canvas {
+  --workspace-gutter: clamp(24px, 4vw, 48px);
+}
+.task-page,
+.mcp-workspace {
+  padding: 32px var(--workspace-gutter, 32px) 48px;
+  max-width: 1280px;
+  margin-inline: auto;
+}
+.planning-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 32px var(--workspace-gutter, 32px) 24px;
+}
+.planning-dialog {
+  width: 640px;
+}
+.evidence-dialog {
+  width: 880px;
+}
+.confirm-action-overlay {
+  z-index: 90;
+}
+.confirm-action-dialog {
+  z-index: 91;
+}
+.context-summary {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.context-summary > div > button:first-child {
+  padding-left: 0;
+  text-align: left;
+  white-space: normal;
+  height: auto;
+  min-height: 44px;
+}
+.schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 24px;
+  padding: 24px 0;
+  border-top: 1px solid var(--color-border);
+}
+.schedule-row > div:first-child {
+  flex-basis: 100%;
+}
+.schedule-row > div > p {
+  overflow-wrap: anywhere;
+}
+.mcp-tabs {
+  flex-wrap: wrap;
+}
+.mcp-scope-chip {
+  min-height: 44px;
+}
+.mcp-scope-filters {
+  margin-bottom: 0;
+}
+.activity-log .p-6 {
+  padding-inline: 0;
+}
+.planning-page h4 button {
+  min-height: 44px;
+}
+.task-result .task-next,
+.task-result .task-review {
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none;
+  }
+}

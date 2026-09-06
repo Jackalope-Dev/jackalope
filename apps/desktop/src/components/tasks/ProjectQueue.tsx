@@ -152,7 +152,7 @@ function AddWork({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content {...dialogFocus} className="task-dialog queue-dialog glass-panel">
+        <Dialog.Content {...dialogFocus} className="task-dialog queue-dialog appearance-panel">
           <Dialog.Title className="task-title">A clear piece of work</Dialog.Title>
           <Dialog.Description className="task-muted mt-3">
             Give one agent a focused scope. Add dependencies when it needs another task’s changes

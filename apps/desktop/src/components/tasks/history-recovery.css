@@ -1,0 +1,41 @@
+.history-recovery-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 12px;
+  padding: 8px 24px;
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+.history-recovery-notice > svg {
+  color: var(--color-warning);
+}
+
+.history-recovery-folder {
+  margin: 24px 0 12px;
+}
+
+.history-recovery-folder > button {
+  margin-top: 12px;
+}
+
+.history-recovery-path {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.history-recovery-files > li {
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.history-recovery-files > li > p {
+  overflow-wrap: anywhere;
+}

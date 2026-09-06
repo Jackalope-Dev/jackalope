@@ -449,6 +449,7 @@ impl Coordinator {
                 project_name: item.project_name,
                 project_path: item.project_path,
                 agent: item.agent,
+                agent_profile_id: None,
                 prompt: item.prompt,
                 isolated: true,
                 previous_run_id: None,

@@ -1,295 +1,327 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertCircle, Bot, CalendarClock, CheckCircle2, Play, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { isCronExpression, scheduleProject } from '../../lib/planning';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useScheduleStore } from '../../stores/scheduleStore';
+import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { ConfirmAction } from '../ui/ConfirmAction';
+import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
-export function ScheduleManager() {
+const TIMING = [
+  { value: '0 9 * * *', label: 'Daily at 9:00' },
+  { value: '0 9 * * 1-5', label: 'Weekdays at 9:00' },
+  { value: '0 * * * *', label: 'Every hour' },
+];
+export function ScheduleManager({
+  onOpenProject,
+  onPlanning,
+}: {
+  onOpenProject: () => void;
+  onPlanning: () => void;
+}) {
+  const { projects, activeProjectId, selectProject } = useProjectStore();
+  const { schedules, addSchedule, updateSchedule, deleteSchedule, toggleSchedule } =
+    useScheduleStore();
   const runners = useExecutionStore((state) => state.runners);
-  const dialogFocus = useDialogFocus();
-  const { schedules, toggleSchedule, addSchedule, deleteSchedule } = useScheduleStore();
-  const projectId = useProjectStore((state) => state.activeProjectId);
-  const [feedback, setFeedback] = useState('');
-
-  const [showAddModal, setShowAddModal] = useState(false);
+  const focus = useDialogFocus();
+  const [filter, setFilter] = useState(activeProjectId ?? 'all');
+  const [editing, setEditing] = useState<ScheduledTask | null | undefined>(undefined);
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [cronExpression, setCronExpression] = useState('0 2 * * *');
   const [prompt, setPrompt] = useState('');
-  const [assignedAgentProvider, setAssignedAgentProvider] = useState('Unassigned');
-
-  const handleManualRun = (id: string) => {
-    const schedule = schedules.find((item) => item.id === id);
-    if (!schedule || !projectId) return;
+  const [targetProjectId, setTargetProjectId] = useState(activeProjectId ?? '');
+  const [agent, setAgent] = useState('Unassigned');
+  const [timing, setTiming] = useState(TIMING[0].value);
+  const [custom, setCustom] = useState(false);
+  const [feedback, setFeedback] = useState<{ message: string; projectId: string } | null>(null);
+  const open = (schedule: ScheduledTask | null) => {
+    setEditing(schedule);
+    setName(schedule?.name ?? '');
+    setPrompt(schedule?.prompt ?? '');
+    setTargetProjectId(schedule?.targetProjectId ?? activeProjectId ?? projects[0]?.id ?? '');
+    setAgent(schedule?.assignedAgentProvider ?? 'Unassigned');
+    setTiming(schedule?.cronExpression ?? TIMING[0].value);
+    setCustom(!!schedule && !TIMING.some((item) => item.value === schedule.cronExpression));
+  };
+  const target = projects.find((project) => project.id === targetProjectId);
+  const valid = !!target && !!name.trim() && !!prompt.trim() && isCronExpression(timing);
+  const save = () => {
+    if (!valid) return;
+    const value = {
+      name: name.trim(),
+      prompt: prompt.trim(),
+      targetProjectId,
+      assignedAgentProvider: agent,
+      cronExpression: timing.trim(),
+      description: editing?.description ?? '',
+      enabled: editing?.enabled ?? true,
+    };
+    if (editing) updateSchedule(editing.id, value);
+    else addSchedule(value);
+    setEditing(undefined);
+  };
+  const createTask = (schedule: ScheduledTask) => {
+    const project = scheduleProject(schedule, projects);
+    if (!project) return;
     useTaskStore.getState().addTask({
-      projectId,
+      projectId: project.id,
       title: schedule.name,
       rawPrompt: schedule.prompt,
-      status: 'backlog',
       assignedAgent: schedule.assignedAgentProvider,
+      status: 'backlog',
     });
-    setFeedback('Task added to this project’s Planning board. It has not been dispatched.');
-  };
-
-  const handleCreateSchedule = () => {
-    if (!name.trim() || !prompt.trim()) return;
-    addSchedule({
-      name,
-      description: description.trim(),
-      cronExpression,
-      targetProjectId: projectId ?? '',
-      assignedAgentProvider,
-      prompt: prompt.trim(),
-      enabled: true,
+    setFeedback({
+      message: `Added “${schedule.name}” to ${project.name}'s Planning board.`,
+      projectId: project.id,
     });
-    setName('');
-    setDescription('');
-    setPrompt('');
-    setShowAddModal(false);
   };
-
+  const visible = schedules.filter(
+    (schedule) => filter === 'all' || schedule.targetProjectId === filter,
+  );
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]">
-        <div>
-          <h1 className="task-title">Schedules</h1>
-          <p className="task-muted mt-2">
-            Plan recurring work. Automatic execution is not connected yet.
-          </p>
+    <section className="task-page">
+      <WorkspaceHeading
+        title="Schedules"
+        description="Keep plans for recurring work together. Automatic runs are not available yet."
+        action={
+          <Button onClick={() => (projects.length ? open(null) : onOpenProject())}>
+            <Plus size={18} />
+            {projects.length ? 'New schedule plan' : 'Open project'}
+          </Button>
+        }
+      />
+      {projects.length > 0 && (
+        <div className="mb-6 max-w-sm">
+          <Select aria-label="Schedule project" value={filter} onValueChange={setFilter}>
+            <SelectItem value="all">All projects</SelectItem>
+            {projects.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                {project.name}
+              </SelectItem>
+            ))}
+          </Select>
         </div>
-
-        <Button
-          size="sm"
-          onClick={() => setShowAddModal(true)}
-          className="gap-1.5 text-xs shadow-sm"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New schedule</span>
-        </Button>
-      </div>
-
-      {/* Schedules List */}
-      <div className="space-y-3">
-        <div className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-          Saved schedules ({schedules.length})
+      )}
+      {feedback && (
+        <div className="task-notice flex flex-wrap items-center justify-between gap-3">
+          <p role="status">{feedback.message}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              selectProject(feedback.projectId);
+              onPlanning();
+            }}
+          >
+            View planning board
+          </Button>
         </div>
-
-        <div className="grid grid-cols-1 gap-3">
-          {schedules.map((sch) => (
-            <div
-              key={sch.id}
-              className={`p-4 rounded-2xl border transition-all shadow-sm flex flex-col justify-between space-y-3 ${
-                sch.enabled
-                  ? 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-focus)]'
-                  : 'border-[var(--color-border)]/60 bg-[var(--color-surface-sunken)]/50'
-              }`}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-[var(--color-text-primary)]">
-                      {sch.name}
-                    </h3>
-                    <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] text-[var(--color-accent-ink)] border border-[var(--color-border)]">
-                      {sch.cronExpression}
-                    </span>
-                    {sch.enabled ? (
-                      <Badge variant="success" className="text-xs">
-                        Planned
-                      </Badge>
-                    ) : (
-                      <Badge variant="default" className="text-xs">
-                        Paused
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-[var(--color-text-secondary)]">{sch.description}</p>
+      )}
+      {!visible.length ? (
+        <EmptyState
+          icon={CalendarClock}
+          title={schedules.length ? 'No plans for this project' : 'Plan work you want to repeat'}
+          description="Save the instructions and intended timing. You can create a planning task manually from each plan."
+        />
+      ) : (
+        <div className="schedule-list">
+          {visible.map((schedule) => {
+            const project = scheduleProject(schedule, projects);
+            return (
+              <article key={schedule.id} className="schedule-row">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-medium break-words">{schedule.name}</h2>
+                  <p className="task-muted mt-1">
+                    {project?.name ?? 'Project unavailable'} ·{' '}
+                    {TIMING.find((item) => item.value === schedule.cronExpression)?.label ??
+                      schedule.cronExpression}{' '}
+                    · {schedule.enabled ? 'Saved plan' : 'Paused plan'}
+                  </p>
+                  <p className="task-muted mt-2 whitespace-pre-wrap">{schedule.prompt}</p>
                 </div>
-
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => handleManualRun(sch.id)}
-                    disabled={!projectId}
-                    className="gap-1.5 text-xs"
+                    disabled={!project}
+                    onClick={() => createTask(schedule)}
                   >
-                    <Play className="w-3 h-3 text-[var(--color-accent-ink)]" />
-                    <span>Create planned task</span>
+                    Create planned task
                   </Button>
-
+                  <Button variant="ghost" onClick={() => toggleSchedule(schedule.id)}>
+                    {schedule.enabled ? 'Pause plan' : 'Resume plan'}
+                  </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    onClick={() => toggleSchedule(sch.id)}
-                    className="text-xs"
+                    size="icon"
+                    aria-label={`Edit ${schedule.name}`}
+                    onClick={() => open(schedule)}
                   >
-                    {sch.enabled ? 'Pause' : 'Resume'}
+                    <Pencil size={16} />
                   </Button>
-
-                  <button
-                    type="button"
-                    onClick={() => deleteSchedule(sch.id)}
-                    className="p-2 rounded-lg hover:bg-red-500/20 text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors cursor-pointer"
-                    title="Delete schedule"
-                    aria-label={`Delete ${sch.name}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <ConfirmAction
+                    title="Delete schedule plan?"
+                    description={`Remove “${schedule.name}”? Tasks already created from it are kept.`}
+                    onConfirm={() => deleteSchedule(schedule.id)}
+                    trigger={
+                      <Button variant="ghost" size="icon" aria-label={`Delete ${schedule.name}`}>
+                        <Trash2 size={16} />
+                      </Button>
+                    }
+                  />
                 </div>
-              </div>
-
-              {/* Execution Status & Agent Details */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--color-border-subtle)] text-xs text-[var(--color-text-muted)] font-mono">
-                <div className="flex items-center gap-2">
-                  <Bot className="w-3 h-3 text-[var(--color-accent-ink)]" />
-                  <span>{sch.assignedAgentProvider}</span>
-                  <span>•</span>
-                  <span>Automatic execution unavailable</span>
-                </div>
-
-                {sch.lastRun && (
-                  <div className="flex items-center gap-1.5">
-                    {sch.lastRun.status === 'success' ? (
-                      <CheckCircle2 className="w-3 h-3 text-[var(--color-success)]" />
-                    ) : (
-                      <AlertCircle className="w-3 h-3 text-[var(--color-danger)]" />
-                    )}
-                    <span className="text-[var(--color-text-secondary)]">
-                      Last: {sch.lastRun.summary} ({sch.lastRun.durationSeconds}s)
-                    </span>
-                  </div>
+                {!project && (
+                  <p className="task-error">
+                    Edit this plan to choose a project before creating a task.
+                  </p>
                 )}
-              </div>
-            </div>
-          ))}
+              </article>
+            );
+          })}
         </div>
-      </div>
-
-      {feedback && (
-        <p role="status" className="task-notice">
-          {feedback}
-        </p>
       )}
-      {!schedules.length && (
-        <p className="task-muted">
-          No schedules saved. Create a plan for recurring work; automatic execution is not connected
-          yet.
-        </p>
-      )}
-      {!projectId && (
-        <p className="task-muted">Open a project to turn a schedule into a planning task.</p>
-      )}
-      {/* Add Schedule Modal */}
-      <Dialog.Root open={showAddModal} onOpenChange={setShowAddModal}>
+      <Dialog.Root
+        open={editing !== undefined}
+        onOpenChange={(value) => {
+          if (!value) setEditing(undefined);
+        }}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="task-dialog-overlay" />
-          <Dialog.Content {...dialogFocus} className="task-dialog appearance-panel space-y-4">
-            <div className="flex items-center gap-2">
-              <CalendarClock className="w-5 h-5 text-[var(--color-accent-ink)]" />
-              <Dialog.Title className="text-xl font-medium">New schedule</Dialog.Title>
-            </div>
-
-            <Dialog.Description className="task-muted">
-              Save a recurring task plan. Automatic runs are not connected yet.
+          <Dialog.Content {...focus} className="task-dialog appearance-panel">
+            <Dialog.Close className="task-close" aria-label="Close schedule plan">
+              <X size={18} />
+            </Dialog.Close>
+            <Dialog.Title className="text-xl font-medium pr-10">
+              {editing ? 'Edit schedule plan' : 'New schedule plan'}
+            </Dialog.Title>
+            <Dialog.Description className="task-muted mt-3">
+              Save a reusable plan. This does not schedule automatic execution.
             </Dialog.Description>
-            <div className="space-y-3 text-left">
-              <div>
-                <label
-                  htmlFor="schedule-name"
-                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
-                >
-                  Name
-                </label>
+            <form
+              className="space-y-4 mt-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                save();
+              }}
+            >
+              <label htmlFor="schedule-name" className="block space-y-2">
+                <span className="block text-sm">Name</span>
                 <Input
                   id="schedule-name"
-                  placeholder="e.g. Daily Build & Performance Benchmark"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1 text-xs"
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                  maxLength={160}
+                  placeholder="Weekly dependency review"
                 />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="schedule-cron"
-                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
-                >
-                  Cron Expression (5-part)
-                </label>
-                <Input
-                  id="schedule-cron"
-                  placeholder="0 2 * * *"
-                  value={cronExpression}
-                  onChange={(e) => setCronExpression(e.target.value)}
-                  className="mt-1 text-xs font-mono"
-                />
-                <span className="text-xs text-[var(--color-text-muted)] mt-1 block">
-                  Example: <code>0 2 * * *</code> (Every day at 2am) or <code>0 * * * *</code>{' '}
-                  (Hourly)
-                </span>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="schedule-agent-provider"
-                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
-                >
-                  Assigned Agent Provider
-                </label>
+              </label>
+              <label htmlFor="schedule-project" className="block space-y-2">
+                <span className="block text-sm">Project</span>
                 <Select
-                  id="schedule-agent-provider"
-                  value={assignedAgentProvider}
-                  onValueChange={(value) => setAssignedAgentProvider(value)}
-                  className="w-full"
+                  id="schedule-project"
+                  aria-label="Project for this plan"
+                  value={targetProjectId}
+                  onValueChange={setTargetProjectId}
                 >
-                  <SelectItem value="Unassigned">Unassigned</SelectItem>
-                  {runners.map((runner) => (
-                    <SelectItem key={runner.id} value={runner.id} disabled={!runner.available}>
-                      {runner.name}
-                      {runner.available ? '' : ' (unavailable)'}
+                  {!target && (
+                    <SelectItem value={targetProjectId || 'missing'} disabled>
+                      Choose a project
+                    </SelectItem>
+                  )}
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
                     </SelectItem>
                   ))}
                 </Select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="schedule-prompt"
-                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+              </label>
+              <label htmlFor="schedule-intended-timing" className="block space-y-2">
+                <span className="block text-sm">Intended timing</span>
+                <Select
+                  id="schedule-intended-timing"
+                  aria-label="Intended timing"
+                  value={custom ? 'custom' : timing}
+                  onValueChange={(value) => {
+                    setCustom(value === 'custom');
+                    if (value !== 'custom') setTiming(value);
+                  }}
                 >
-                  Instructions
+                  {TIMING.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Custom timing</SelectItem>
+                </Select>
+              </label>
+              {custom && (
+                <label htmlFor="schedule-cron-expression" className="block space-y-2">
+                  <span className="block text-sm">Cron expression</span>
+                  <Input
+                    id="schedule-cron-expression"
+                    value={timing}
+                    onChange={(event) => setTiming(event.target.value)}
+                    aria-invalid={!isCronExpression(timing)}
+                    aria-describedby="schedule-format"
+                  />
+                  <span id="schedule-format" className="task-muted text-xs">
+                    Five numeric fields: minute, hour, day, month, weekday. Example: 0 9 * * 1-5.
+                  </span>
+                  {!isCronExpression(timing) && (
+                    <span role="alert" className="task-error block">
+                      Enter a valid five-part expression.
+                    </span>
+                  )}
                 </label>
+              )}
+              <label htmlFor="schedule-preferred-agent" className="block space-y-2">
+                <span className="block text-sm">Preferred agent</span>
+                <Select
+                  id="schedule-preferred-agent"
+                  aria-label="Preferred agent"
+                  value={agent}
+                  onValueChange={setAgent}
+                >
+                  <SelectItem value="Unassigned">Choose later</SelectItem>
+                  {agent !== 'Unassigned' && !runners.some((r) => r.id === agent) && (
+                    <SelectItem value={agent}>{agent} (saved preference)</SelectItem>
+                  )}
+                  {runners.map((runner) => (
+                    <SelectItem key={runner.id} value={runner.id} disabled={!runner.available}>
+                      {runner.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </label>
+              <label htmlFor="schedule-instructions" className="block space-y-2">
+                <span className="block text-sm">Instructions</span>
                 <textarea
-                  id="schedule-prompt"
-                  rows={2}
-                  placeholder="What should the agent execute during this routine?"
+                  id="schedule-instructions"
+                  className="task-input w-full"
+                  rows={4}
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  className="w-full mt-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-sunken)] p-2.5 text-xs text-[var(--color-text-primary)] focus:outline-none"
+                  onChange={(event) => setPrompt(event.target.value)}
+                  required
+                  maxLength={24000}
                 />
+              </label>
+              <div className="flex justify-end gap-2 pt-3">
+                <Button variant="ghost" type="button" onClick={() => setEditing(undefined)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!valid}>
+                  Save plan
+                </Button>
               </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--color-border)]">
-              <Button variant="ghost" onClick={() => setShowAddModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateSchedule} disabled={!name.trim() || !prompt.trim()}>
-                Save schedule
-              </Button>
-            </div>
+            </form>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </div>
+    </section>
   );
 }

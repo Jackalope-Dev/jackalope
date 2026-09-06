@@ -12,7 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   detectSkillsFromPrompt,
   type SkillCategory,
@@ -30,6 +30,7 @@ export interface PromptClarification {
 
 interface PromptRefinerProps {
   rawPrompt: string;
+  initialClarifications?: { question: string; answer?: string }[];
   onApplyRefinement: (refinedPrompt: string, clarifications: PromptClarification[]) => void;
   onCancel?: () => void;
 }
@@ -45,24 +46,35 @@ const CATEGORY_ICONS: Record<SkillCategory, React.ComponentType<{ className?: st
   browser: Globe,
 };
 
-export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: PromptRefinerProps) {
+export function PromptRefiner({
+  rawPrompt,
+  initialClarifications,
+  onApplyRefinement,
+  onCancel,
+}: PromptRefinerProps) {
   const { setMood, say } = useMascotStore();
 
   // Initial detection from raw prompt
   const initialMatches = useMemo(() => detectSkillsFromPrompt(rawPrompt), [rawPrompt]);
 
-  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>(() =>
-    initialMatches.length ? initialMatches.map((s) => s.id) : ['feature-scaffolding'],
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>(() => {
+    const saved = initialClarifications?.find(
+      (item) => item.question === 'Active Skill Guidelines',
+    )?.answer;
+    return saved === undefined
+      ? initialMatches.map((skill) => skill.id)
+      : VETTED_SKILLS.filter((skill) => saved.split(', ').includes(skill.name)).map(
+          (skill) => skill.id,
+        );
+  });
+  const [executionMode, setExecutionMode] = useState<'isolated' | 'current'>(() =>
+    initialClarifications?.some(
+      (item) => item.question === 'Git Execution Mode' && item.answer === 'Active working checkout',
+    )
+      ? 'current'
+      : 'isolated',
   );
-  const [executionMode, setExecutionMode] = useState<'isolated' | 'current'>('isolated');
   const [showPreview, setShowPreview] = useState(true);
-
-  // Update selected skills if rawPrompt changes externally and no manual edits were made
-  useEffect(() => {
-    if (initialMatches.length) {
-      setSelectedSkillIds(initialMatches.map((s) => s.id));
-    }
-  }, [initialMatches]);
 
   const toggleSkill = (skillId: string) => {
     setSelectedSkillIds((prev) =>
@@ -112,11 +124,10 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
           </div>
           <div>
             <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Context & Skill Supplementation
+              Optional task guidelines
             </h4>
             <p className="text-xs text-[var(--color-text-secondary)]">
-              Select vetted guidelines to enhance agent execution without altering your original
-              intent.
+              Choose the guidance you want included with your instructions.
             </p>
           </div>
         </div>
@@ -148,6 +159,7 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
                 key={skill.id}
                 type="button"
                 onClick={() => toggleSkill(skill.id)}
+                aria-pressed={isSelected}
                 className={`text-left p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
                   isSelected
                     ? 'border-[var(--color-accent)] bg-[var(--color-accent-subtle)]/40 shadow-xs'
@@ -202,6 +214,7 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
           <button
             type="button"
             onClick={() => setExecutionMode('isolated')}
+            aria-pressed={executionMode === 'isolated'}
             className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
               executionMode === 'isolated'
                 ? 'border-[var(--color-accent)] bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)] font-semibold'
@@ -213,6 +226,7 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
           <button
             type="button"
             onClick={() => setExecutionMode('current')}
+            aria-pressed={executionMode === 'current'}
             className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
               executionMode === 'current'
                 ? 'border-[var(--color-accent)] bg-[var(--color-accent-subtle)] text-[var(--color-text-primary)] font-semibold'
@@ -244,7 +258,7 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
       {/* Action Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-[var(--color-border)]">
         {onCancel && (
-          <Button variant="ghost" size="sm" onClick={onCancel}>
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
             Skip / Keep Raw
           </Button>
         )}
@@ -252,7 +266,7 @@ export function PromptRefiner({ rawPrompt, onApplyRefinement, onCancel }: Prompt
           <Button variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)}>
             {showPreview ? 'Hide preview' : 'Show preview'}
           </Button>
-          <Button onClick={handleApply} className="gap-2">
+          <Button type="button" onClick={handleApply} className="gap-2">
             <span>Apply Refinement</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Button>

@@ -24,9 +24,13 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
     setSubmitting(true);
     setError('');
     try {
-      await respondToPrompt(runId, prompt.id, answer.trim());
+      const delivered = await respondToPrompt(runId, prompt.id, answer.trim());
+      if (!delivered)
+        throw new Error(
+          'This request is no longer waiting for a response. Refresh the task to see its current state.',
+        );
       setMood('working');
-      say('Answer delivered to agent! Resuming test execution...', 3000);
+      say('Your response was delivered to the agent.', 3000);
       await refresh();
     } catch (err) {
       setError(String(err));
@@ -50,7 +54,7 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
             className={`w-7 h-7 rounded-lg flex items-center justify-center ${
               isAnswered
                 ? 'bg-[var(--color-surface-sunken)] text-[var(--color-text-muted)]'
-                : 'bg-[var(--color-accent)] text-[var(--color-accent-ink)]'
+                : 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
             }`}
           >
             <HelpCircle size={16} />
@@ -58,7 +62,7 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-[var(--color-text-primary)]">
-                Agent Requesting Input
+                {isAnswered ? 'Your response' : 'The agent needs your input'}
               </span>
               <Badge variant={isAnswered ? 'outline' : 'default'} className="text-xs px-1.5 py-0">
                 {isAnswered ? 'Answered' : 'Action Needed'}
@@ -71,7 +75,7 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
         </div>
       </div>
 
-      <p className="text-xs text-[var(--color-text-primary)] font-medium leading-relaxed mb-3 pl-9">
+      <p className="text-sm text-[var(--color-text-primary)] font-medium leading-relaxed mb-3 pl-9">
         {prompt.question}
       </p>
 
@@ -134,11 +138,12 @@ export function UserPromptCard({ runId, prompt }: UserPromptCardProps) {
             >
               <input
                 type="text"
+                aria-label="Your response to the agent"
                 value={answerText}
                 onChange={(e) => setAnswerText(e.target.value)}
                 placeholder={prompt.defaultValue ?? 'Enter response for agent...'}
                 disabled={submitting}
-                className="flex-1 px-3 py-1.5 rounded-xl bg-[var(--color-surface-sunken)] border border-[var(--color-border)] text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
+                className="task-input flex-1 min-w-0"
               />
               <Button
                 type="submit"

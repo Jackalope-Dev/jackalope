@@ -27,8 +27,10 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
 
       refreshMemory: async (project, options = {}) => {
         const { id, name, path } = project;
+        const previousMood = useMascotStore.getState().mood;
+        const showActivity = !options.silent && previousMood !== 'working';
         set((state) => ({ scanning: { ...state.scanning, [id]: true } }));
-        if (!options.silent) {
+        if (showActivity) {
           useMascotStore.getState().setMood('thinking');
         }
 
@@ -44,12 +46,7 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
             scanning: { ...state.scanning, [id]: false },
           }));
 
-          if (!options.silent) {
-            useMascotStore.getState().setMood('success');
-            setTimeout(() => {
-              useMascotStore.getState().setMood('idle');
-            }, 2500);
-          }
+          if (!options.silent) useMascotStore.getState().say('Repository context updated.', 2500);
 
           // Record in Audit Log
           useAuditStore.getState().addEntry({
@@ -79,6 +76,13 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
             message: `Could not read repository context: ${String(error)}`,
           });
           throw error;
+        } finally {
+          if (
+            showActivity &&
+            !Object.values(get().scanning).some(Boolean) &&
+            useMascotStore.getState().mood === 'thinking'
+          )
+            useMascotStore.getState().setMood(previousMood === 'thinking' ? 'idle' : previousMood);
         }
       },
 

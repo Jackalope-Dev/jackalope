@@ -161,7 +161,7 @@ fn parse_grok(value: &Value, account: Option<String>) -> CapacityRecord {
     result
 }
 
-pub(super) async fn read_claude() -> Result<CapacityRecord, String> {
+pub(super) async fn read_claude(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
     let mut client = Client::spawn(
         "claude",
         &[
@@ -175,6 +175,7 @@ pub(super) async fn read_claude() -> Result<CapacityRecord, String> {
             "--safe-mode",
             "--strict-mcp-config",
         ],
+        profiles_root,
     )?;
     let result = timeout(Duration::from_secs(20), async {
         let init = client.request(json!({"type":"control_request","request_id":"init","request":{"subtype":"initialize","hooks":{}}})).await?;
@@ -189,8 +190,8 @@ pub(super) async fn read_claude() -> Result<CapacityRecord, String> {
     result
 }
 
-pub(super) async fn read_grok() -> Result<CapacityRecord, String> {
-    let mut client = Client::spawn("grok", &["agent", "--no-leader", "stdio"])?;
+pub(super) async fn read_grok(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
+    let mut client = Client::spawn("grok", &["agent", "--no-leader", "stdio"], profiles_root)?;
     let result = timeout(Duration::from_secs(20), async {
         client.request(json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{},"clientInfo":{"name":"jackalope","version":env!("CARGO_PKG_VERSION")}}})).await?;
         let auth = client.request(json!({"jsonrpc":"2.0","id":1,"method":"_x.ai/auth/info","params":{}})).await?;
@@ -288,7 +289,8 @@ mod tests {
     #[tokio::test]
     #[ignore = "Reads installed CLI accounts without sending prompts or starting model tasks"]
     async fn installed_connected_quota_readers() {
-        let (claude, grok) = tokio::join!(read_claude(), read_grok());
+        let no_profile = std::env::temp_dir().join("jackalope-no-profile-test");
+        let (claude, grok) = tokio::join!(read_claude(&no_profile), read_grok(&no_profile));
         for result in [claude, grok] {
             let record = result.unwrap();
             assert_eq!(

@@ -4,6 +4,19 @@ import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-
 
 export interface ProjectPreferences {
   preferredRunner?: string;
+  /**
+   * Restricts which agents this project's tasks may use. Undefined or empty
+   * means every app-enabled agent is allowed (unrestricted, the default).
+   * When set, only listed agent ids may be selected for this project.
+   */
+  allowedAgents?: string[];
+  /**
+   * Which configured account (agent-profile id) this project's tasks use for
+   * a given agent, keyed by agent id ("codex"/"claude"/"grok"). Missing an
+   * entry means "whichever account is globally active for that agent" — the
+   * unchanged default for every project that hasn't picked one.
+   */
+  agentAccounts?: Record<string, string>;
   customInstructions?: string;
   baseBranch?: string;
   branchPrefix?: string;
@@ -11,6 +24,28 @@ export interface ProjectPreferences {
   verifyCommand?: string;
   autoVerify?: boolean;
   isolatedByDefault?: boolean;
+}
+
+/**
+ * Whether `agentId` may be used for tasks in `project`, per its allow-list preference.
+ * `allowedAgents` left unset means unrestricted (every app-enabled agent is allowed).
+ * An explicit list — including an empty one — restricts tasks to exactly those agents,
+ * matching the existing "empty restricted model list blocks launches" convention.
+ */
+export function isAgentAllowedForProject(
+  project: Pick<Project, 'preferences'> | undefined,
+  agentId: string,
+): boolean {
+  const allowed = project?.preferences?.allowedAgents;
+  return allowed === undefined || allowed.includes(agentId);
+}
+
+/** The account (agent-profile id) `project` wants for `agentId`, or undefined for the global default. */
+export function agentAccountFor(
+  project: Pick<Project, 'preferences'> | undefined,
+  agentId: string,
+): string | undefined {
+  return project?.preferences?.agentAccounts?.[agentId];
 }
 
 export interface Project {

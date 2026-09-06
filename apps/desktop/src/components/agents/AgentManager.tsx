@@ -6,6 +6,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { AddAgentForm } from './AddAgentForm';
+import { AgentAccounts } from './AgentAccounts';
 import './agent-manager.css';
 
 export function AgentManager() {
@@ -191,6 +192,14 @@ export function AgentManager() {
                 </p>
               </div>
             </details>
+            {!('isCustom' in agent) && (
+              <details>
+                <summary className="task-summary">Accounts</summary>
+                <div className="agent-config-fields">
+                  <AgentAccounts agentId={agent.id} agentName={agent.name} />
+                </div>
+              </details>
+            )}
           </section>
         );
       })}

@@ -11,5 +11,9 @@ pub mod mcp;
 pub mod harness;
 
 pub mod agent_policy;
+pub mod agent_profiles;
 
 pub mod reset;
+pub mod history;
+
+pub mod artifacts;

@@ -142,7 +142,7 @@ export function CommandPalette({
                 <span>{theme.name}</span>
               </button>
             ))}
-            {!views.length && !themes.length && (
+            {!views.length && !themes.length && !showSettings && (
               <p className="p-6 text-sm text-[var(--color-text-secondary)]">
                 No matches. Try “tasks”, “agents”, or a color.
               </p>
