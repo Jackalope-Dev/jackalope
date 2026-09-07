@@ -75,8 +75,16 @@ export function Shell({
     if (settingsOpen) telemetry.track({ name: 'feature_used', feature: 'settings' });
   }, [settingsOpen]);
   const [commandsOpen, setCommandsOpen] = useState(false);
-  const [capture, setCapture] = useState<{ ideaId?: string; agent?: string; draftKey?: string } | null>(
-    initialTaskAgent ? { agent: initialTaskAgent, draftKey: initialDraftKey } : initialCapture ? {} : null,
+  const [capture, setCapture] = useState<{
+    ideaId?: string;
+    agent?: string;
+    draftKey?: string;
+  } | null>(
+    initialTaskAgent
+      ? { agent: initialTaskAgent, draftKey: initialDraftKey }
+      : initialCapture
+        ? {}
+        : null,
   );
   const [scheduleRunId, setScheduleRunId] = useState<string>();
   const { projects, activeProjectId, selectProject } = useProjectStore();

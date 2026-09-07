@@ -27,7 +27,7 @@ export function OnboardingFlow({
   onFinish,
   onCapture,
 }: {
-  onFinish: (agent?: string) => void;
+  onFinish: (agent?: string, draftKey?: string) => void;
   onCapture?: () => void;
 }) {
   const onboarding = useOnboardingStore();
@@ -87,9 +87,9 @@ export function OnboardingFlow({
       onboarding.go('agent');
       return;
     }
-    execution.draft(project.id, { agent });
+    execution.draft(project.id, { agent, projectId: project.id });
     execution.select(null);
-    onFinish(agent);
+    onFinish(agent, project.id);
   };
 
   return (

@@ -144,12 +144,10 @@ async function _verifyOnboarding(page) {
         },
       ],
     });
-    useExecutionStore
-      .getState()
-      .draft('onboarding-fixture', {
-        agent: 'codex',
-        prompt: 'Review this fixture without executing any task.',
-      });
+    useExecutionStore.getState().draft('onboarding-fixture', {
+      agent: 'codex',
+      prompt: 'Review this fixture without executing any task.',
+    });
     useOnboardingStore.getState().go('task');
   });
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();
@@ -162,8 +160,19 @@ async function _verifyOnboarding(page) {
     ),
     'Finishing first task completes onboarding',
   );
-  assert((await page.getByRole('dialog').locator('textarea').inputValue()) === 'Review this fixture without executing any task.', 'First-task draft retained');
-  assert(await page.evaluate(() => JSON.parse(localStorage.getItem('jackalope-execution-ui-v1')).state.drafts.capture.prompt === ''), 'Earlier capture draft preserved');
+  assert(
+    (await page.getByRole('dialog').locator('textarea').inputValue()) ===
+      'Review this fixture without executing any task.',
+    'First-task draft retained',
+  );
+  assert(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('jackalope-execution-ui-v1')).state.drafts.capture
+          .prompt === '',
+    ),
+    'Earlier capture draft preserved',
+  );
   await page.getByRole('button', { name: 'Close capture', exact: true }).click();
   await reopen();
   await page.emulateMedia({ reducedMotion: 'reduce' });

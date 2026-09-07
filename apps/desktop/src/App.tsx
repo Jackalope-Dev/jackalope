@@ -21,7 +21,11 @@ export default function App() {
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
   const [initialCapture, setInitialCapture] = useState(false);
   const [initialDraftKey, setInitialDraftKey] = useState<string>();
-  const [entry, setEntry] = useState<{ agent?: string; draftKey?: string; capture?: boolean } | null>(null);
+  const [entry, setEntry] = useState<{
+    agent?: string;
+    draftKey?: string;
+    capture?: boolean;
+  } | null>(null);
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const completeEntry = useCallback(() => {
     if (!entry) return;

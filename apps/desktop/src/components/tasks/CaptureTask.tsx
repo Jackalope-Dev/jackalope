@@ -25,11 +25,13 @@ import { TaskTools } from './TaskTools';
 export function CaptureTask({
   ideaId,
   agent,
+  draftKey,
   onClose,
   onStarted,
 }: {
   ideaId?: string;
   agent?: string;
+  draftKey?: string;
   onClose: () => void;
   onStarted: () => void;
 }) {
@@ -40,9 +42,10 @@ export function CaptureTask({
   const [key] = useState(() =>
     ideaId
       ? `planning:${ideaId}`
-      : !drafts.capture && activeProjectId && drafts[activeProjectId]?.prompt
-        ? activeProjectId
-        : 'capture',
+      : (draftKey ??
+        (!drafts.capture && activeProjectId && drafts[activeProjectId]?.prompt
+          ? activeProjectId
+          : 'capture')),
   );
   const current = useMemo(() => {
     const initial = idea ? planningDraft(idea) : emptyDraft;
