@@ -6,6 +6,10 @@ async function _verifyPage(page) {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(await page.evaluate(() => location.origin));
   await page.evaluate(() => document.fonts.ready);
+  assert(
+    (await page.locator('.landing-kicker, .hero-edition, .echo-caption').count()) === 0,
+    'No redundant eyebrow labels',
+  );
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const [width, height] of [
     [1440, 1000],
@@ -15,6 +19,9 @@ async function _verifyPage(page) {
     [320, 720],
   ]) {
     await page.setViewportSize({ width, height });
+    const logo = await page.locator('.echo-art').boundingBox();
+    const center = await page.evaluate(() => document.documentElement.clientWidth / 2);
+    assert(Math.abs(logo.x + logo.width / 2 - center) < 1, `Centered logo at ${width}`);
     for (const id of ['inside', 'workflow', 'features', 'atmosphere', 'questions', 'download']) {
       await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
       assert(
@@ -37,11 +44,11 @@ async function _verifyPage(page) {
       );
     }
   }
-  await page.getByRole('tab', { name: 'Keep the whole picture' }).focus();
+  await page.getByRole('tab', { name: 'Tasks & ideas' }).focus();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'See what actually changed' }).waitFor();
+  await page.getByRole('tabpanel', { name: 'Changes & review' }).waitFor();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'Bring your favorite agents' }).waitFor();
+  await page.getByRole('tabpanel', { name: 'Agents & accounts' }).waitFor();
   await page.getByRole('tab', { name: 'Build a feature', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   await page.getByRole('tabpanel', { name: 'Find a stubborn bug', exact: true }).waitFor();

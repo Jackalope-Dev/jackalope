@@ -223,7 +223,7 @@ export function App({ path = '/' }: { path?: string }) {
           >
             <div className="video-heading">
               <div>
-                <Dialog.Title>A little look around.</Dialog.Title>
+                <Dialog.Title>Jackalope walkthrough</Dialog.Title>
                 <Dialog.Description>
                   The actual app, with an illustrative Atlas project. No audio.
                 </Dialog.Description>
