@@ -3,7 +3,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
-  ArrowDown,
   ArrowDownToLine,
   ArrowRight,
   BriefcaseBusiness,
@@ -27,6 +26,7 @@ import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 import { JournalPage, JournalTeaser } from './Journal';
 import { Newsletter, WaitlistButton } from './Signup';
+import { WorkflowDemo } from './WorkflowDemo';
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
 const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
@@ -54,36 +54,9 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
       className={`button button-primary button-download ${compact ? 'button-compact' : ''}`}
       href="#download"
     >
-      <span>{compact ? 'Get Jackalope' : 'Get Jackalope for Windows'}</span>
+      <span>Get Jackalope</span>
       <ArrowDownToLine size={16} />
     </a>
-  );
-}
-
-function HeroSurface({ children }: { children: ReactNode }) {
-  const reduced = useReducedMotion();
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  return (
-    <motion.div
-      className="product-surround hero-surface"
-      onPointerMove={(event) => {
-        if (reduced || event.pointerType !== 'mouse') return;
-        const bounds = event.currentTarget.getBoundingClientRect();
-        setTilt({
-          x: (event.clientX - bounds.left) / bounds.width - 0.5,
-          y: (event.clientY - bounds.top) / bounds.height - 0.5,
-        });
-      }}
-      onPointerLeave={() => setTilt({ x: 0, y: 0 })}
-      animate={{
-        rotateX: reduced ? 0 : -tilt.y * 2,
-        rotateY: reduced ? 0 : tilt.x * 2,
-        transformPerspective: 1400,
-      }}
-      transition={{ type: 'spring', stiffness: 130, damping: 25 }}
-    >
-      {children}
-    </motion.div>
   );
 }
 
@@ -147,13 +120,17 @@ const faqs = [
   ],
   [
     'Which operating systems can I use?',
-    'The initial release targets Windows x64. macOS and Linux are on the roadmap and are not available as supported downloads yet.',
+    'Windows, macOS, and Linux users are welcome on the waitlist. Windows x64 is the first release target; macOS and Linux are planned. We’ll announce each platform as its download becomes available.',
+  ],
+  [
+    'What happens after I join the waitlist?',
+    'We’ll email you about early access as places open up. No payment is needed to join, and there is no confirmed public launch date or price yet. Your coding agent’s own subscription and usage charges still apply.',
   ],
   [
     'Can I download it today?',
     downloadUrl
       ? `The Windows release is available below. Bring a local Git repository and a supported, signed-in coding agent to get started.`
-      : 'Jackalope is in development. The first Windows download is being prepared, and this page will link to it when it is published. The walkthrough shows the current interface with sample project data.',
+      : 'Jackalope is in early development, and the first public download is being prepared. Join the waitlist for access news. The interactive demo uses sample tasks; the app walkthrough shows the current interface with sample project data.',
   ],
 ];
 
@@ -244,21 +221,25 @@ export function App({ path = '/' }: { path?: string }) {
       {home ? (
         <main id="main">
           <section className="hero page-width" aria-labelledby="hero-title">
+            <p className="hero-category">Your desktop workspace for coding agents.</p>
             <h1 id="hero-title">
               Big ideas.
               <br />
               <span>Room to run.</span>
             </h1>
             <p className="hero-description">
-              Your projects. Your agents. One calm place to build.
-              <br className="desktop-break" /> Meet the desktop workspace that keeps it all
-              together.
+              Turn ideas into parallel work. Bring your favorite agents,
+              <br className="desktop-break" /> keep every project in context, and review what comes
+              back.
             </p>
             <div className="hero-actions">
               <DownloadButton />
+              <a className="button button-quiet" href="#playground">
+                Try the workflow <ArrowRight size={16} />
+              </a>
               <button
                 type="button"
-                className="button button-quiet"
+                className="text-link hero-video-link"
                 onClick={() => {
                   videoTrigger.current = document.activeElement as HTMLElement;
                   setVideoError(false);
@@ -271,45 +252,11 @@ export function App({ path = '/' }: { path?: string }) {
             <p className="release-note">
               {downloadUrl
                 ? `Windows x64 · ${version}`
-                : 'Coming first to Windows · Bring your own agents'}
+                : 'Bring your agents. Keep your accounts. Make room for what’s next.'}
             </p>
 
             <Reveal className="hero-product">
-              <HeroSurface>
-                <div className="product-caption">
-                  <span>
-                    <BrandMark /> TASKS & IDEAS
-                  </span>
-                  <span>JACKALOPE / DESKTOP</span>
-                </div>
-                <button
-                  className="screenshot-button"
-                  type="button"
-                  onClick={() => {
-                    videoTrigger.current = document.activeElement as HTMLElement;
-                    setVideoError(false);
-                    setVideoOpen(true);
-                  }}
-                  aria-label="Play the Jackalope product walkthrough"
-                >
-                  <img
-                    src={screenshot('tasks.png')}
-                    alt={scenes[0].alt}
-                    width="1440"
-                    height="840"
-                    fetchPriority="high"
-                  />
-                  <span className="play-pill">
-                    <Play size={15} fill="currentColor" /> Watch the walkthrough
-                  </span>
-                </button>
-              </HeroSurface>
-              <div className="under-capture">
-                <span>Actual app interface. Sample project.</span>
-                <a href="#workflow">
-                  A closer look <ArrowDown size={14} />
-                </a>
-              </div>
+              <WorkflowDemo />
             </Reveal>
           </section>
 
@@ -325,14 +272,15 @@ export function App({ path = '/' }: { path?: string }) {
                 </span>{' '}
                 Claude Code
               </span>
-              <span className="agent-strip-note">
-                Your accounts.
-                <br />
-                Your way of working.
+              <span>
+                <span aria-hidden="true">↗</span> Grok
+              </span>
+              <span>
+                <Code2 size={24} /> OpenCode
               </span>
             </div>
             <a className="text-link" href="#agents">
-              Also Grok & OpenCode · See agent support <ArrowRight size={15} />
+              Explore agent support <ArrowRight size={15} />
             </a>
           </section>
 
@@ -408,13 +356,27 @@ export function App({ path = '/' }: { path?: string }) {
                       </li>
                     ))}
                   </ul>
-                  <img
-                    src={screenshot(item.image)}
-                    alt={item.alt}
-                    width="1440"
-                    height="840"
-                    loading="lazy"
-                  />
+                  <button
+                    className="screenshot-button"
+                    type="button"
+                    aria-label="Play the Jackalope product walkthrough"
+                    onClick={() => {
+                      videoTrigger.current = document.activeElement as HTMLElement;
+                      setVideoError(false);
+                      setVideoOpen(true);
+                    }}
+                  >
+                    <img
+                      src={screenshot(item.image)}
+                      alt={item.alt}
+                      width="1440"
+                      height="840"
+                      loading="lazy"
+                    />
+                    <span className="play-pill">
+                      <Play size={15} fill="currentColor" /> Watch the walkthrough
+                    </span>
+                  </button>
                   <p className="capture-note">Actual app interface · Atlas sample project</p>
                 </Tabs.Content>
               ))}
@@ -618,25 +580,26 @@ export function App({ path = '/' }: { path?: string }) {
           <section className="details-row page-width" aria-label="Thoughtful by design">
             <div>
               <Layers3 size={22} />
-              <h3>Your project instructions.</h3>
+              <h3>Context that stays with you.</h3>
               <p>
-                Keep the original brief and repository guidelines beside the task that needs them.
+                Keep project instructions, reusable workflows, and lessons close. Give the next task
+                a better starting point.
               </p>
             </div>
             <div>
               <Monitor size={22} />
-              <h3>Your local repositories.</h3>
+              <h3>Your tools, in reach.</h3>
               <p>
-                Work with your local repositories and coding agents, in a dedicated desktop
-                workspace.
+                Manage project connections in one place and choose the tools a task needs.
+                Connection support varies by agent.
               </p>
             </div>
             <div>
               <GitBranch size={22} />
-              <h3>A history you can follow.</h3>
+              <h3>A rhythm for recurring work.</h3>
               <p>
-                Follow an idea through its attempts, results, and review. Pick up with the context
-                intact.
+                Schedule repeat tasks with their project context intact. Jackalope runs them while
+                the app and your computer are awake.
               </p>
             </div>
           </section>
@@ -671,7 +634,19 @@ export function App({ path = '/' }: { path?: string }) {
                 <br />
                 looks good from here.
               </h2>
-              <p>A little structure. A lot of possibility. That’s Jackalope.</p>
+              <p>Less juggling terminals. More room for the work you care about.</p>
+              <section className="platform-roadmap" aria-label="Platform availability">
+                <span>
+                  <Monitor size={16} />
+                  Windows <small>{downloadUrl ? 'Available' : 'First release'}</small>
+                </span>
+                <span>
+                  macOS <small>Planned</small>
+                </span>
+                <span>
+                  Linux <small>Planned</small>
+                </span>
+              </section>
               {downloadUrl ? (
                 <a className="button button-primary button-download" href={downloadUrl}>
                   <ArrowDownToLine size={18} />
@@ -683,7 +658,7 @@ export function App({ path = '/' }: { path?: string }) {
               <p className="release-note">
                 {downloadUrl
                   ? `Version ${version} · Windows x64 · Bring your own agents`
-                  : 'In development · Windows x64 first · macOS & Linux planned'}
+                  : 'Early access · Windows first · macOS & Linux planned'}
               </p>
             </div>
           </section>

@@ -102,8 +102,11 @@ h3 {
 }
 .site-header {
   height: 92px;
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 10;
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(16px);
 }
 .header-inner {
   height: 100%;
@@ -280,8 +283,13 @@ h3 {
   outline: none;
 }
 .hero {
-  padding-top: 65px;
+  padding-top: 42px;
   text-align: center;
+}
+.hero-category {
+  margin-bottom: 20px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
 }
 .eyebrow {
   font-size: 10px;
@@ -311,6 +319,31 @@ h1 span {
   align-items: center;
   gap: 12px;
   margin-top: 28px;
+  flex-wrap: wrap;
+}
+.hero-video-link {
+  border: 0;
+  background: transparent;
+  padding: 12px;
+  font-size: 12px;
+}
+.platform-roadmap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px 30px;
+  flex-wrap: wrap;
+  margin: 30px 0;
+}
+.platform-roadmap > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+.platform-roadmap small {
+  color: var(--color-text-secondary);
+  font-size: 11px;
 }
 .release-note {
   margin-top: 14px;
@@ -405,6 +438,7 @@ h1 span {
 }
 .agent-strip > div {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 55px;

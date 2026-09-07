@@ -175,7 +175,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
       <Dialog.Trigger
         className={`button button-primary button-download ${compact ? 'button-compact' : ''}`}
       >
-        <span>{label || (compact ? 'Join waitlist' : 'Join the Windows waitlist')}</span>
+        <span>{label || (compact ? 'Join waitlist' : 'Get early access')}</span>
         <ArrowRight size={16} />
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -206,10 +206,10 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
             <span className="waitlist-art-label">JACKALOPE / EARLY DAYS</span>
           </div>
           <div className="waitlist-body">
-            <Dialog.Title>Join the Windows waitlist</Dialog.Title>
+            <Dialog.Title>Join the Jackalope waitlist</Dialog.Title>
             <Dialog.Description>
-              Your projects, your agents, a calmer place to build. Join the Windows waitlist and be
-              there for what comes next.
+              Be there for your next big idea. Get access news as Jackalope opens up. Windows comes
+              first, with macOS and Linux planned.
             </Dialog.Description>
             <ul className="waitlist-perks">
               <li>
@@ -236,7 +236,7 @@ export function Newsletter() {
           <br />
           in your inbox.
         </h2>
-        <p>Windows launch news and occasional product updates.</p>
+        <p>Get early-access news. Bring your next big idea.</p>
       </div>
       <Signup />
     </section>

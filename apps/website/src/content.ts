@@ -92,7 +92,7 @@ export const posts = [
         title: 'Growing in the open.',
         paragraphs: [
           'Jackalope is in development, with Windows x64 as the initial release target. The first public installer is still being prepared. The website tour uses fictional project data to show the interface; it is not evidence of real agent execution.',
-          'We will share development notes and public release announcements here. Join the waitlist if you would like an email when the Windows download is available.',
+          'We will share development notes and public release announcements here. Join the waitlist if you would like early-access news, with Windows first and macOS and Linux planned.',
         ],
       },
     ],
@@ -164,7 +164,7 @@ export const updates = [
     items: [
       'Real interface captures in light and dark appearances, using an explicitly fictional Atlas project.',
       'An interactive recorded tour covering task drafting, patch review, agent selection, and the live theme palette.',
-      'A three-step introduction, product notes, and a Windows waitlist.',
+      'A three-step introduction, product notes, and an early-access waitlist.',
     ],
     note: 'The walkthrough illustrates the interface with sample data. It does not launch an agent task.',
   },
@@ -175,7 +175,7 @@ export const pages = [
     path: '/',
     title: 'Jackalope — A desktop workspace for coding agents',
     description:
-      'Manage coding agents, work and personal account profiles, project context, tasks, and reported usage in one desktop workspace. Join the Windows waitlist.',
+      'Manage coding agents, work and personal account profiles, project context, tasks, and reported usage in one desktop workspace. Join the early-access waitlist.',
   },
   {
     path: '/tour/',

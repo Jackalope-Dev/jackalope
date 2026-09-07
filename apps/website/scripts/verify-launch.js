@@ -77,7 +77,7 @@ async function _verifyLaunch(page) {
     });
   });
   await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Join the Windows waitlist' });
+  const dialog = page.getByRole('dialog', { name: 'Join the Jackalope waitlist' });
   const input = dialog.getByRole('textbox', { name: 'Email address' });
   const submit = dialog.getByRole('button', { name: 'Join the waitlist', exact: true });
   await input.fill('not-an-email');

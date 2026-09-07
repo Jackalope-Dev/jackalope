@@ -15,10 +15,53 @@ async function _verifyPage(page) {
     [320, 720],
   ]) {
     await page.setViewportSize({ width, height });
+    for (const name of ['Start with an idea', 'Give it room to run', 'Keep the final say']) {
+      await page.getByRole('tab', { name: new RegExp(name) }).click();
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        `Overflow at ${width}: ${name}`,
+      );
+    }
+  }
+  for (const [scenario, title, file] of [
+    ['Build a feature', 'Make search feel effortless.', 'src/components/Search.tsx'],
+    [
+      'Fix a rough edge',
+      'Keep the good ideas, even after a refresh.',
+      'src/components/TaskComposer.tsx',
+    ],
+    ['Polish the details', 'Give every theme a little more care.', 'src/components/Settings.css'],
+  ]) {
+    await page.getByRole('button', { name: scenario, exact: true }).click();
+    await page.getByRole('heading', { name: title, exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Grok', exact: true }).click();
+    await page.getByRole('button', { name: 'Explore parallel work' }).click();
+    await page.getByText('Grok · worktree 01', { exact: true }).waitFor();
     assert(
-      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-      `Overflow at ${width}`,
+      await page
+        .getByRole('tab', { name: /Give it room to run/ })
+        .evaluate((el) => el === document.activeElement),
+      'Forward navigation preserves keyboard focus',
     );
+    await page.keyboard.press('ArrowRight');
+    await page
+      .getByRole('region', { name: 'Illustrative code patch' })
+      .getByText(file, { exact: false })
+      .waitFor();
+    await page.getByRole('button', { name: 'I want to build like this' }).click();
+    await page.getByRole('dialog', { name: 'Join the Jackalope waitlist' }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(
+      () => document.activeElement?.textContent === 'I want to build like this',
+    );
+    assert(
+      await page
+        .getByRole('button', { name: 'I want to build like this' })
+        .evaluate((el) => el === document.activeElement),
+      'Demo signup focus return',
+    );
+    await page.getByRole('button', { name: 'Try another idea' }).click();
+    await page.getByRole('heading', { name: title, exact: true }).waitFor();
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Open navigation' }).click();
@@ -54,7 +97,7 @@ async function _verifyPage(page) {
   assert((await page.locator('details[open]').count()) === 1, 'Keyboard FAQ disclosure');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
-  await page.getByRole('dialog', { name: 'Join the Windows waitlist' }).waitFor();
+  await page.getByRole('dialog', { name: 'Join the Jackalope waitlist' }).waitFor();
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.activeElement?.textContent === 'Join waitlist');
   assert(
@@ -116,6 +159,7 @@ async function _verifyPage(page) {
   assert(errors.length === 0, errors.join('\n'));
   return {
     viewports: 5,
+    interactiveDemo: 'Three scenarios, agent selection, step navigation, reset and signup',
     keyboardTabs: true,
     menuAndDialogFocus: true,
     faq: true,
