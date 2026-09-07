@@ -3,7 +3,7 @@ import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Tabs from '@radix-ui/react-tabs';
 import { ArrowDown, ArrowRight, Check, GitBranch, Moon, Play, Plus, Sun } from 'lucide-react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
-import { type CSSProperties, type ReactNode, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useRef } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 
@@ -25,7 +25,7 @@ function EchoMark() {
       className="echo-art"
       style={{ '--spread': reduced ? 1 : spread } as CSSProperties}
     >
-      <svg viewBox="0 0 520 470" fill="none" aria-hidden="true">
+      <svg viewBox="80 25 440 430" fill="none" aria-hidden="true">
         <g transform="translate(-58 24) scale(3.3)">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((echo) => (
             <path
@@ -38,7 +38,6 @@ function EchoMark() {
           <path d={head} fill="currentColor" />
         </g>
       </svg>
-      <span className="echo-caption">Independent minds. Shared direction.</span>
     </motion.div>
   );
 }
@@ -46,8 +45,8 @@ function EchoMark() {
 const scenes = [
   {
     id: 'tasks',
-    label: 'Keep the whole picture',
-    title: 'Ideas, active work, and the next decision.',
+    label: 'Tasks & ideas',
+    title: 'Track tasks across your projects.',
     description:
       'Capture a thought. Start a task in a local project. See what is running, what needs an answer, and what is ready for review.',
     detail: 'Tasks & ideas',
@@ -55,8 +54,8 @@ const scenes = [
   },
   {
     id: 'review',
-    label: 'See what actually changed',
-    title: 'An answer is only part of the result.',
+    label: 'Changes & review',
+    title: 'Review the patch and its checks.',
     description:
       'Read the patch alongside the task and its checks. Ask for another iteration, or choose what to integrate into your project.',
     detail: 'Changes & review',
@@ -64,8 +63,8 @@ const scenes = [
   },
   {
     id: 'agents',
-    label: 'Bring your favorite agents',
-    title: 'Different agents. A familiar place to work.',
+    label: 'Agents & accounts',
+    title: 'Choose an agent for each task.',
     description:
       'Use installed Codex, Claude Code, Grok, and OpenCode CLIs with your existing accounts. Choose the right agent for each task.',
     detail: 'Agents & accounts',
@@ -109,8 +108,6 @@ const examples = [
 ];
 
 function Workbench() {
-  const [selected, setSelected] = useState(0);
-  const example = examples[selected];
   return (
     <section
       className="landing-section landing-width"
@@ -118,21 +115,13 @@ function Workbench() {
       aria-labelledby="workflow-title"
     >
       <div className="section-lead">
-        <span className="landing-kicker">02 / FROM INTENT TO RESULT</span>
-        <h2 id="workflow-title">
-          One idea can go
-          <br />a few ways at once.
-        </h2>
+        <h2 id="workflow-title">Run tasks in parallel.</h2>
         <p>
-          Give independent tasks their own space to run. Keep the context, progress, and review in
-          one place.
+          Assign independent tasks to different agents. Follow their progress and review the results
+          together.
         </p>
       </div>
-      <Tabs.Root
-        value={example.id}
-        onValueChange={(value) => setSelected(examples.findIndex((item) => item.id === value))}
-        className="workbench"
-      >
+      <Tabs.Root defaultValue="feature" className="workbench">
         <Tabs.List aria-label="Explore a use case" className="case-tabs">
           {examples.map((item) => (
             <Tabs.Trigger key={item.id} value={item.id}>
@@ -144,13 +133,12 @@ function Workbench() {
         {examples.map((item) => (
           <Tabs.Content key={item.id} value={item.id}>
             <div className="example-brief">
-              <span className="landing-kicker">YOUR BRIEF</span>
               <p>“{item.prompt}”</p>
               <span>{item.context}</span>
             </div>
             <div className="example-flow">
               <div className="example-step">
-                <span className="step-label">01 / WORK IN PARALLEL</span>
+                <h3 className="step-label">Separate worktrees</h3>
                 <div className="branch-tracks">
                   {item.tasks.map((task, index) => (
                     <div key={task}>
@@ -169,7 +157,7 @@ function Workbench() {
               </div>
               <ArrowRight className="flow-arrow" size={26} aria-hidden="true" />
               <div className="example-step">
-                <span className="step-label">02 / REVIEW THE RESULT</span>
+                <h3 className="step-label">Review before integrating</h3>
                 <div className="example-patch">
                   <span>
                     {item.file}
@@ -215,30 +203,17 @@ export function LandingPage({
 }) {
   return (
     <main id="main" className="landing">
-      <section className="landing-hero landing-width" aria-labelledby="hero-title">
-        <div className="hero-topline">
-          <span className="landing-kicker">JACKALOPE / A DESKTOP WORKSPACE FOR CODING AGENTS</span>
-          <span className="hero-edition">BUILT FOR MAKING THINGS</span>
-        </div>
-        <div className="hero-poster">
-          <div className="poster-type">
+      <section className="landing-hero" aria-labelledby="hero-title">
+        <div className="landing-width">
+          <div className="hero-poster">
+            <EchoMark />
             <h1 id="hero-title">
-              Many agents.
-              <br />
-              One workspace.
+              <span>Many agents.</span> <span>One workspace.</span>
             </h1>
-            <p>
-              Put your coding agents to work.
-              <br />
-              Keep the whole thing in view.
-            </p>
           </div>
-          <EchoMark />
-        </div>
-        <div className="hero-bottom">
-          <p>
-            Run tasks in parallel, carry your project context forward, and review what comes back.
-            All in a desktop app that feels like yours.
+          <p className="hero-description">
+            A desktop app to run coding agents in parallel, manage project context, and review their
+            changes.
           </p>
           <div className="hero-conversion">
             <div className="hero-actions">
@@ -254,33 +229,26 @@ export function LandingPage({
                 : 'Windows first · macOS & Linux planned'}
             </span>
           </div>
-        </div>
-        <div className="agent-line">
-          <span>YOUR AGENTS. YOUR ACCOUNTS.</span>
-          <p>
-            Codex <i> / </i> Claude Code <i> / </i> Grok <i> / </i> OpenCode
-          </p>
-          <a href="#inside" aria-label="Explore inside the app">
-            <ArrowDown size={20} />
-          </a>
+          <div className="agent-line">
+            <p>
+              Codex <i>/</i> Claude Code <i>/</i> Grok <i>/</i> OpenCode
+            </p>
+            <a href="#inside" aria-label="Explore inside the app">
+              <ArrowDown size={20} />
+            </a>
+          </div>
         </div>
       </section>
 
       <section className="workspace-section" id="inside" aria-labelledby="inside-title">
         <div className="landing-width">
           <div className="workspace-heading">
-            <span className="landing-kicker">01 / INSIDE JACKALOPE</span>
-            <h2 id="inside-title">
-              Less window juggling.
-              <br />
-              More forward motion.
-            </h2>
+            <h2 id="inside-title">See how it works.</h2>
           </div>
           <Tabs.Root defaultValue="tasks" className="product-explorer">
             <Tabs.List aria-label="Explore the workspace" className="product-tabs">
-              {scenes.map((scene, index) => (
+              {scenes.map((scene) => (
                 <Tabs.Trigger key={scene.id} value={scene.id}>
-                  <span>0{index + 1}</span>
                   {scene.label}
                   <ArrowRight size={17} />
                 </Tabs.Trigger>
@@ -328,12 +296,7 @@ export function LandingPage({
         aria-labelledby="features-title"
       >
         <div className="section-lead">
-          <span className="landing-kicker">03 / A WORKSPACE THAT CARRIES THE CONTEXT</span>
-          <h2 id="features-title">
-            Start the next task.
-            <br />
-            Keep the head start.
-          </h2>
+          <h2 id="features-title">Keep context across tasks.</h2>
         </div>
         <div className="capability-row">
           <div className="capability-art context-stack" aria-hidden="true">
@@ -345,12 +308,7 @@ export function LandingPage({
             </b>
           </div>
           <div>
-            <span className="landing-kicker">PROJECT KNOWLEDGE & TOOLS</span>
-            <h3>
-              Less explaining yourself.
-              <br />
-              More building on what works.
-            </h3>
+            <h3>Project knowledge & tools</h3>
             <p>
               Save project instructions, lessons, and reusable workflows. Manage connections
               centrally, then choose the knowledge and tools each task needs. Inspect the context an
@@ -369,15 +327,9 @@ export function LandingPage({
               <span>SIDE PROJECT</span>
               <b>Personal / Claude Code</b>
             </div>
-            <span className="ledger-rule" />
           </div>
           <div>
-            <span className="landing-kicker">PROJECTS, ACCOUNTS & USAGE</span>
-            <h3>
-              Different hats.
-              <br />
-              Same clear view.
-            </h3>
+            <h3>Accounts & usage</h3>
             <p>
               Choose agent accounts and allowed runners per project. Follow tasks and reported usage
               across client work and personal projects, with the right setup attached to each.
@@ -391,19 +343,15 @@ export function LandingPage({
           <div className="capability-art calendar-art" aria-hidden="true">
             <div>
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day, index) => (
-                <span key={day[0]} className={index === 2 ? 'calendar-selected' : ''}>
+                <span key={day} className={index === 2 ? 'calendar-selected' : ''}>
                   {day[0]}
                 </span>
               ))}
             </div>
-            <span>Same context. A fresh run.</span>
+            <span>Weekly schedule</span>
           </div>
           <div>
-            <span className="landing-kicker">RECURRING TASKS</span>
-            <h3>
-              Give repeat work
-              <br />a place in the week.
-            </h3>
+            <h3>Recurring tasks</h3>
             <p>
               Schedule recurring tasks with their project context intact. Each run keeps its own
               result and history, ready for you to inspect.
@@ -416,17 +364,8 @@ export function LandingPage({
       <section className="atmosphere-section" id="atmosphere" aria-labelledby="atmosphere-title">
         <div className="landing-width atmosphere-layout">
           <div>
-            <span className="landing-kicker">04 / MAKE YOURSELF AT HOME</span>
-            <h2 id="atmosphere-title">
-              Serious work.
-              <br />
-              Personal atmosphere.
-            </h2>
-            <p>
-              The same palettes as the desktop app.
-              <br />
-              Try one. Feel the whole page change.
-            </p>
+            <h2 id="atmosphere-title">Choose your theme.</h2>
+            <p>Preview the desktop palettes in light or dark.</p>
             <fieldset className="landing-palettes" aria-label="Try a color palette">
               {PRESET_THEMES.slice(0, 4).map((theme, index) => (
                 <button
@@ -461,7 +400,7 @@ export function LandingPage({
             </div>
             <div className="atmosphere-canvas">
               <BrandMark />
-              <span>A little more you.</span>
+              <span>Tasks</span>
               <span className="atmosphere-sample-action">
                 New task <Plus size={16} />
               </span>
@@ -476,13 +415,7 @@ export function LandingPage({
         aria-labelledby="questions-title"
       >
         <div>
-          <span className="landing-kicker">A FEW PRACTICAL DETAILS</span>
-          <h2 id="questions-title">Good questions.</h2>
-          <p>
-            Bring your own agents and accounts.
-            <br />
-            Jackalope gives them a place to work.
-          </p>
+          <h2 id="questions-title">Questions</h2>
         </div>
         <div className="faq-list">
           {faqs.map(([question, answer]) => (
@@ -510,16 +443,11 @@ export function LandingPage({
         <div className="landing-width">
           <div className="finale-top">
             <div>
-              <span className="landing-kicker">THE NEXT THING STARTS HERE</span>
-              <h2 id="download-title">
-                Make something
-                <br />
-                only you would.
-              </h2>
+              <h2 id="download-title">{available ? 'Download Jackalope.' : 'Get early access.'}</h2>
               <p>
                 {available
-                  ? 'Your Windows workspace is ready.'
-                  : 'Get on the list. Be part of what comes next.'}
+                  ? 'Install Jackalope for Windows and connect your coding agents.'
+                  : 'Join the waitlist. We’ll email you when access opens.'}
               </p>
               {downloadAction}
               <p className="availability">

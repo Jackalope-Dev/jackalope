@@ -40,11 +40,7 @@ export function AgentSupport() {
     >
       <div className="agent-support-heading">
         <div>
-          <h2 id="agent-support-title">
-            Different agents.
-            <br />
-            Same place to build.
-          </h2>
+          <h2 id="agent-support-title">Supported agents</h2>
         </div>
         <p>
           Choose the right agent for each project. Keep the brief, attempts, changes, and review
