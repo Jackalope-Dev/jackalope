@@ -1,10 +1,10 @@
 name: Deploy server
 on:
   push:
-    branches: [master]
-    paths: ['apps/server/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'scripts/release/**', '.github/workflows/deploy-server.yml']
+    branches: [master, beta]
+    paths: ['apps/server/**', 'packages/brand/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'scripts/release/**', '.github/workflows/deploy-server.yml']
   pull_request:
-    paths: ['apps/server/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'scripts/release/**', '.github/workflows/deploy-server.yml']
+    paths: ['apps/server/**', 'packages/brand/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'scripts/release/**', '.github/workflows/deploy-server.yml']
   workflow_dispatch:
     inputs:
       environment:
@@ -38,7 +38,7 @@ jobs:
       - run: pnpm --filter @jackalope/server build
   deploy:
     needs: verify
-    if: github.repository == 'Jackalope-Dev/jackalope' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
+    if: github.repository == 'Jackalope-Dev/jackalope' && ((github.ref == 'refs/heads/master' && inputs.environment == 'production') || (github.ref == 'refs/heads/beta' && inputs.environment != 'production')) && github.event_name != 'pull_request' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -47,6 +47,20 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       SERVER_D1_ID: ${{ inputs.environment == 'production' && vars.SERVER_PRODUCTION_D1_ID || vars.SERVER_STAGING_D1_ID }}
       UPDATE_BASE_URL: ${{ inputs.environment == 'production' && 'https://api.jackalope.dev' || 'https://staging-api.jackalope.dev' }}
+      STAGING_ADMIN_EMAIL: ${{ vars.STAGING_ADMIN_EMAIL }}
+      STAGING_ACCESS_ISSUER: ${{ vars.STAGING_ACCESS_ISSUER }}
+      STAGING_ACCESS_AUD: ${{ vars.STAGING_ACCESS_AUD }}
+      STAGING_INGESTION_ENABLED: ${{ vars.STAGING_INGESTION_ENABLED }}
+      STAGING_FEEDBACK_EMAIL_ENABLED: ${{ vars.STAGING_FEEDBACK_EMAIL_ENABLED }}
+      STAGING_FEEDBACK_EMAIL_FROM: ${{ vars.STAGING_FEEDBACK_EMAIL_FROM }}
+      STAGING_FEEDBACK_EMAIL_TO: ${{ vars.STAGING_FEEDBACK_EMAIL_TO }}
+      PRODUCTION_ADMIN_EMAIL: ${{ vars.PRODUCTION_ADMIN_EMAIL }}
+      PRODUCTION_ACCESS_ISSUER: ${{ vars.PRODUCTION_ACCESS_ISSUER }}
+      PRODUCTION_ACCESS_AUD: ${{ vars.PRODUCTION_ACCESS_AUD }}
+      PRODUCTION_INGESTION_ENABLED: ${{ vars.PRODUCTION_INGESTION_ENABLED }}
+      PRODUCTION_FEEDBACK_EMAIL_ENABLED: ${{ vars.PRODUCTION_FEEDBACK_EMAIL_ENABLED }}
+      PRODUCTION_FEEDBACK_EMAIL_FROM: ${{ vars.PRODUCTION_FEEDBACK_EMAIL_FROM }}
+      PRODUCTION_FEEDBACK_EMAIL_TO: ${{ vars.PRODUCTION_FEEDBACK_EMAIL_TO }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

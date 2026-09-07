@@ -1,4 +1,6 @@
+import { admin } from './admin';
 import { feedbackSchema, telemetrySchema } from './contracts';
+import { deliverFeedback } from './feedback-mail';
 import { prune, saveFeedback, saveTelemetry } from './storage';
 
 class ApiError extends Error {
@@ -149,9 +151,11 @@ async function release(request: Request, env: Env, path: string): Promise<Respon
   return new Response(object.body, { headers });
 }
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
+      if (url.pathname === '/admin' || url.pathname.startsWith('/admin/'))
+        return await admin(request, env, readJson);
       if (url.search) throw new ApiError(400, 'query_not_allowed');
       if (url.pathname.startsWith('/updates/')) return await release(request, env, url.pathname);
       if (request.method === 'GET' && url.pathname === '/healthz') return json({ status: 'ok' });
@@ -159,29 +163,33 @@ export default {
         const data = await env.DB.prepare('SELECT count(*) AS count FROM quotas').first<{
           count: number;
         }>();
-        if (data?.count !== 2 || env.RATE_SECRET?.length < 32 || !env.RATE_SECRET)
+        if (data?.count !== 4 || env.RATE_SECRET?.length < 32 || !env.RATE_SECRET)
           throw new ApiError(503, 'service_not_configured');
         return json({
           status: 'ready',
-          schemaVersion: 1,
+          schemaVersion: 2,
           ingestionEnabled: env.INGESTION_ENABLED === 'true',
         });
       }
-      if (!['/v1/telemetry', '/v1/feedback'].includes(url.pathname))
+      if (['/v1/telemetry', '/v1/feedback'].includes(url.pathname))
+        throw new ApiError(410, 'client_upgrade_required');
+      if (!['/v2/telemetry', '/v2/feedback'].includes(url.pathname))
         throw new ApiError(404, 'not_found');
       if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed');
       if (env.INGESTION_ENABLED !== 'true') throw new ApiError(503, 'ingestion_disabled');
       if (request.headers.has('origin')) throw new ApiError(403, 'browser_origin_not_allowed');
-      await limit(request, env, url.pathname === '/v1/feedback');
+      await limit(request, env, url.pathname === '/v2/feedback');
       const body = await readJson(request);
-      if (url.pathname === '/v1/telemetry') {
+      if (url.pathname === '/v2/telemetry') {
         const parsed = telemetrySchema.safeParse(body);
         if (!parsed.success) throw new ApiError(400, 'invalid_request');
         return json(await saveTelemetry(env, parsed.data), 202);
       }
       const parsed = feedbackSchema.safeParse(body);
       if (!parsed.success) throw new ApiError(400, 'invalid_request');
-      return json(await saveFeedback(env, parsed.data), 202);
+      const result = await saveFeedback(env, parsed.data);
+      if (ctx) ctx.waitUntil(deliverFeedback(env).catch(() => undefined));
+      return json(result, 202);
     } catch (error) {
       const detail = error instanceof Error ? error.message : '';
       const code =
@@ -208,6 +216,7 @@ export default {
   },
   async scheduled(_controller, env) {
     try {
+      await deliverFeedback(env);
       console.log(JSON.stringify({ event: 'retention_complete', ...(await prune(env)) }));
     } catch {
       console.log(JSON.stringify({ event: 'retention_failed' }));

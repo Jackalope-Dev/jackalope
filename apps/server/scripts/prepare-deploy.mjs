@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { applyCommunityConfig } from './community-config.mjs';
 
 const root = new URL('../', import.meta.url);
 const databaseId = process.env.SERVER_STAGING_D1_ID;
@@ -16,6 +17,7 @@ const staging = config.env?.staging;
 if (staging?.name !== 'jackalope-service-staging') {
   throw new Error('Expected the existing jackalope-service-staging environment.');
 }
+applyCommunityConfig(staging, 'staging');
 const database = staging.d1_databases?.find((binding) => binding.binding === 'DB');
 if (!database) throw new Error('Missing staging DB binding.');
 database.database_id = databaseId;

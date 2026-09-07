@@ -58,9 +58,11 @@ export async function verifyReadiness(origin, request = fetch) {
     signal: AbortSignal.timeout(30000),
   });
   const body = await response.json();
-  if (!response.ok || body.status !== 'ready' || body.schemaVersion !== 1)
+  if (!response.ok || body.status !== 'ready' || ![1, 2].includes(body.schemaVersion))
     throw new Error(`${origin}: service readiness failed`);
-  console.log(`Verified ${origin}: schema 1, ingestion enabled: ${body.ingestionEnabled}`);
+  console.log(
+    `Verified ${origin}: schema ${body.schemaVersion}, ingestion enabled: ${body.ingestionEnabled}`,
+  );
 }
 
 if (import.meta.main) {

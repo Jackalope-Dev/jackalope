@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { applyCommunityConfig } from '../../apps/server/scripts/community-config.mjs';
 import { origin, root } from './catalog.mjs';
 
 const environment = process.env.DEPLOY_ENV;
@@ -12,7 +13,7 @@ if (process.argv[2] === 'verify') {
     redirect: 'error',
   });
   const body = await ready.json();
-  if (!ready.ok || body.status !== 'ready' || body.schemaVersion !== 1)
+  if (!ready.ok || body.status !== 'ready' || body.schemaVersion !== 2)
     throw new Error('Deployed service failed readiness');
   console.log(`Verified ${environment} readiness; ingestion enabled: ${body.ingestionEnabled}`);
 } else if (process.argv[2] === 'prepare') {
@@ -33,6 +34,7 @@ if (process.argv[2] === 'verify') {
       binding.migrations_dir = resolve(root, 'apps/server', binding.migrations_dir);
   }
   config.env[environment].d1_databases.find((item) => item.binding === 'DB').database_id = database;
+  applyCommunityConfig(config.env[environment], environment);
   config.env = { [environment]: config.env[environment] };
   const directory = resolve(root, 'apps/server/.wrangler/release');
   await mkdir(directory, { recursive: true });

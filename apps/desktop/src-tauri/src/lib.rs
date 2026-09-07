@@ -46,6 +46,7 @@ pub fn run() {
             let preferences = directory.join("preferences");
             std::fs::create_dir_all(&preferences)?;
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));
+            app.manage(commands::community::Community::load(preferences.join("community.json")));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
             let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator.clone());
@@ -86,6 +87,11 @@ pub fn run() {
             git_create_worktree,
             commands::worktree_cleanup::git_cleanup_worktree,
             commands::release::app_diagnostics,
+            commands::community::app_community_settings,
+            commands::community::app_community_configure,
+            commands::community::app_release_channel,
+            commands::community::app_telemetry,
+            commands::community::app_submit_feedback,
             commands::release::app_release_status,
             commands::release::app_install_update,
             system_get_info,
@@ -100,6 +106,8 @@ pub fn run() {
             task_runners,
             agent_save_policy,
             task_read_context,
+            commands::repo_todos::repo_todos_read,
+            commands::repo_todos::repo_todos_save,
             task_pick_project,
             task_validate_project,
             task_runs,

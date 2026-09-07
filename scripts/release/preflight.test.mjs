@@ -71,6 +71,8 @@ test('readiness requires an operational service and migrated schema', async () =
   const reply = (status, schemaVersion) => async () =>
     Response.json({ status, schemaVersion, ingestionEnabled: false });
   await verifyReadiness('https://staging-api.jackalope.dev', reply('ready', 1));
+  await verifyReadiness('https://staging-api.jackalope.dev', reply('ready', 2));
+  await assert.rejects(verifyReadiness('https://staging-api.jackalope.dev', reply('ready', 3)));
   await assert.rejects(verifyReadiness('https://staging-api.jackalope.dev', reply('ready', 0)));
   await assert.rejects(verifyReadiness('https://staging-api.jackalope.dev', reply('degraded', 1)));
 });

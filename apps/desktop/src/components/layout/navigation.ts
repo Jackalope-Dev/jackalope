@@ -6,6 +6,7 @@ import {
   GitBranch,
   History,
   Layers3,
+  ListTodo,
   Network,
   Plug,
   Settings2,
@@ -51,6 +52,14 @@ export const WORKSPACE_VIEWS = [
     icon: ChartNoAxesColumn,
     group: 'usage',
     primary: true,
+  },
+  {
+    id: 'repo-todos',
+    label: 'Repo TODOs',
+    description: 'Tasks: view, edit and create repository TODOs and roadmaps.',
+    icon: ListTodo,
+    group: 'tasks',
+    primary: false,
   },
   {
     id: 'browser',

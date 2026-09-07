@@ -105,6 +105,12 @@ importers:
 
   apps/server:
     dependencies:
+      '@jackalope/brand':
+        specifier: workspace:*
+        version: link:../../packages/brand
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
       zod:
         specifier: 4.5.4
         version: 4.5.4
@@ -1801,6 +1807,9 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
@@ -3771,6 +3780,8 @@ snapshots:
   is-plain-obj@4.1.0: {}
 
   jiti@2.7.0: {}
+
+  jose@6.2.12: {}
 
   kleur@4.1.5: {}
 

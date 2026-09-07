@@ -19,7 +19,7 @@ export function UpdateSettings() {
     void update.load();
   }, [update.load]);
   const { release, progress } = update;
-  const busy = update.checking || update.installing;
+  const busy = update.checking || update.installing || update.changingChannel;
   const percent = progress?.total
     ? Math.min(100, Math.floor((progress.downloaded / progress.total) * 100))
     : null;
@@ -37,6 +37,28 @@ export function UpdateSettings() {
               ? 'This local build has no configured update service.'
               : 'Get new improvements without reinstalling manually. You choose when to install; Jackalope closes and reopens.'}
       </p>
+      {release?.configured && release.betaAvailable && (
+        <div className="space-y-2">
+          <label htmlFor="update-channel" className="block text-sm font-medium">
+            Update channel
+          </label>
+          <select
+            id="update-channel"
+            className="settings-input"
+            value={release.channel}
+            disabled={busy}
+            onChange={(event) => void update.setChannel(event.target.value as 'stable' | 'beta')}
+          >
+            <option value="stable">Stable</option>
+            <option value="beta">Beta — early access</option>
+          </select>
+          <p className="settings-row-description">
+            Beta releases may have unfinished features or regressions. Switching back waits for a
+            newer stable release; it does not downgrade. Usage sharing is controlled separately in
+            Privacy.
+          </p>
+        </div>
+      )}
       {release?.configured && (
         <>
           <div className="flex items-center justify-between gap-4">

@@ -1,4 +1,7 @@
-use super::tasks::TaskRuntime;
+use super::{
+    community::{self, Community, ReleaseChannel},
+    tasks::TaskRuntime,
+};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, State};
@@ -19,6 +22,8 @@ impl Drop for InstallGuard {
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseStatus {
     current_version: String,
+    channel: ReleaseChannel,
+    beta_available: bool,
     configured: bool,
     available_version: Option<String>,
     notes: Option<String>,
@@ -40,20 +45,55 @@ fn configured(app: &AppHandle) -> bool {
         })
 }
 
+fn channel_endpoint(app: &AppHandle, channel: ReleaseChannel) -> Option<reqwest::Url> {
+    community::configured_url(
+        app,
+        match channel {
+            ReleaseChannel::Stable => "stableEndpoint",
+            ReleaseChannel::Beta => "betaEndpoint",
+        },
+    )
+}
+fn updater(
+    app: &AppHandle,
+    channel: ReleaseChannel,
+    seconds: u64,
+) -> Result<tauri_plugin_updater::Updater, String> {
+    let mut builder = app
+        .updater_builder()
+        .timeout(std::time::Duration::from_secs(seconds));
+    if let Some(endpoint) = channel_endpoint(app, channel) {
+        builder = builder
+            .endpoints(vec![endpoint])
+            .map_err(|_| "Invalid update channel.")?;
+    } else if channel != community::build_channel(app) {
+        return Err("This build has no trusted source for that channel.".into());
+    }
+    builder
+        .build()
+        .map_err(|_| "Update settings unavailable.".into())
+}
 #[tauri::command]
-pub async fn app_release_status(app: AppHandle, check: bool) -> Result<ReleaseStatus, String> {
+pub async fn app_release_status(
+    app: AppHandle,
+    state: State<'_, Community>,
+    check: bool,
+) -> Result<ReleaseStatus, String> {
+    let channel = state
+        .preferences()?
+        .channel
+        .unwrap_or_else(|| community::build_channel(&app));
     let mut status = ReleaseStatus {
+        channel,
+        beta_available: channel_endpoint(&app, ReleaseChannel::Beta).is_some()
+            && channel_endpoint(&app, ReleaseChannel::Stable).is_some(),
         current_version: env!("CARGO_PKG_VERSION").into(),
         configured: configured(&app),
         available_version: None,
         notes: None,
     };
     if check && status.configured {
-        let updater = app
-            .updater_builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .map_err(|e| e.to_string())?;
+        let updater = updater(&app, channel, 30)?;
         if let Some(update) = updater.check().await.map_err(|_| {
             "Could not reach the update service. Check your connection and try again.".to_string()
         })? {
@@ -76,6 +116,8 @@ pub struct UpdateProgress {
 pub async fn app_install_update(
     app: AppHandle,
     version: String,
+    channel: ReleaseChannel,
+    state: State<'_, Community>,
     progress: tauri::ipc::Channel<UpdateProgress>,
     runtime: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
@@ -85,6 +127,14 @@ pub async fn app_install_update(
     {
         let _guard = super::integration::execution_guard()?;
         runtime.ensure_history_saved()?;
+        if state
+            .preferences()?
+            .channel
+            .unwrap_or_else(|| community::build_channel(&app))
+            != channel
+        {
+            return Err("The update channel changed. Check again before installing.".into());
+        }
         if installing() {
             return Err("An update is already being installed.".into());
         }
@@ -99,11 +149,7 @@ pub async fn app_install_update(
         INSTALLING.store(true, Ordering::SeqCst);
     }
     let _install = InstallGuard;
-    let updater = app
-        .updater_builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let updater = updater(&app, channel, 60)?;
     let update = updater
         .check()
         .await

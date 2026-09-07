@@ -2,6 +2,70 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createUpdateStore, UPDATE_INTERVAL } from '../src/stores/updateStore.ts';
 
+test('switching channels clears a previously offered update and preserves the selected channel for installation', async () => {
+  let channel = 'stable',
+    installed;
+  const f = fixture({
+    setChannel: async (value) => {
+      channel = value;
+    },
+    status: async (check) => ({
+      currentVersion: '0.1.0',
+      configured: true,
+      channel,
+      betaAvailable: true,
+      availableVersion: check ? '0.2.0' : null,
+      notes: null,
+    }),
+    install: async (version, _progress, selected) => {
+      installed = { version, selected };
+    },
+  });
+  await f.store.getState().check();
+  assert.equal(f.store.getState().release.availableVersion, '0.2.0');
+  await f.store.getState().setChannel('beta');
+  assert.equal(f.store.getState().release.availableVersion, null);
+  assert.equal(f.store.getState().lastChecked, null);
+  await f.store.getState().check();
+  await f.store.getState().install();
+  assert.deepEqual(installed, { version: '0.2.0', selected: 'beta' });
+});
+
+test('a channel cannot change while an update check is pending', async () => {
+  let finish,
+    calls = 0;
+  const f = fixture({
+    setChannel: async () => {
+      calls++;
+    },
+    status: async (check) =>
+      check
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : {
+            currentVersion: '0.1.0',
+            configured: true,
+            channel: 'stable',
+            availableVersion: null,
+            notes: null,
+          },
+  });
+  await f.store.getState().load();
+  const check = f.store.getState().check();
+  await Promise.resolve();
+  await f.store.getState().setChannel('beta');
+  assert.equal(calls, 0);
+  finish({
+    currentVersion: '0.1.0',
+    configured: true,
+    channel: 'stable',
+    availableVersion: null,
+    notes: null,
+  });
+  await check;
+});
+
 function fixture(overrides = {}) {
   let time = 1000;
   const calls = [];

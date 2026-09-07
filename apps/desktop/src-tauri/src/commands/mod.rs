@@ -9,6 +9,7 @@ pub mod mcp;
 pub mod pty;
 pub mod system;
 pub mod tasks;
+pub mod repo_todos;
 pub mod worktree_cleanup;
 
 pub mod agent_policy;
@@ -29,4 +30,5 @@ pub mod browser;
 
 mod resolver_fs;
 
+pub mod community;
 mod git_command;

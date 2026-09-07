@@ -1,5 +1,7 @@
 name: Desktop release
 on:
+  push:
+    branches: [beta]
   workflow_dispatch:
     inputs:
       mode:
@@ -16,23 +18,26 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: desktop-release-${{ inputs.channel }}
+  group: desktop-release-${{ inputs.channel || 'beta' }}
   cancel-in-progress: false
 jobs:
   build:
-    if: github.ref == 'refs/heads/master'
+    if: (github.ref == 'refs/heads/master' && inputs.channel == 'stable') || (github.ref == 'refs/heads/beta' && (github.event_name == 'push' || inputs.channel == 'beta'))
     runs-on: windows-latest
     timeout-minutes: 60
     env:
       RELEASE_MODE: ${{ inputs.mode == 'candidate' && 'publish' || 'rehearsal' }}
-      RELEASE_CHANNEL: ${{ inputs.channel }}
+      RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
       UPDATE_BASE_URL: ${{ inputs.channel == 'stable' && 'https://api.jackalope.dev' || 'https://staging-api.jackalope.dev' }}
+      STABLE_UPDATE_ENDPOINT: https://api.jackalope.dev/updates/stable/latest.json
+      BETA_UPDATE_ENDPOINT: https://staging-api.jackalope.dev/updates/beta/latest.json
+      COMMUNITY_SERVICE_URL: ${{ inputs.mode == 'candidate' && vars.COMMUNITY_SERVICE_URL || '' }}
       RELEASE_SIGNING_READY: ${{ vars.RELEASE_SIGNING_READY }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.mode == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.mode == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
       TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
-      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
-      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+      WINDOWS_CERTIFICATE_BASE64: ${{ inputs.mode == 'candidate' && secrets.WINDOWS_CERTIFICATE_BASE64 || '' }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ inputs.mode == 'candidate' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
       WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -60,7 +65,7 @@ jobs:
         run: ./scripts/release/build.ps1 -Mode $env:RELEASE_MODE -Channel $env:RELEASE_CHANNEL
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: desktop-${{ inputs.channel }}-${{ steps.version.outputs.version }}
+          name: desktop-${{ inputs.channel || 'beta' }}-${{ steps.version.outputs.version }}
           path: |
             output/release/*.exe
             output/release/*.msi

@@ -6,7 +6,6 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
-
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -17,6 +16,7 @@ import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { PrivacySettings } from './PrivacySettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { Setting } from './Setting';
 import { SystemInfoView } from './SystemInfo';
@@ -264,6 +264,7 @@ export function SettingsDialog({
                   )}
                   {c === 'Privacy' && (
                     <>
+                      <PrivacySettings />
                       <div className="settings-group mt-6">
                         <Setting
                           title="Use MCP marketplace"
@@ -277,10 +278,9 @@ export function SettingsDialog({
                         </Setting>
                       </div>
                       <p className="settings-disclosure-box">
-                        This build does not send usage telemetry or crash reports. Marketplace
-                        searches go to AllMCPs, which publicly logs requests, with User-Agent
-                        Jackalope/0.1.0. Your connected agents and MCP servers use their own
-                        services.
+                        Marketplace searches go to AllMCPs, which publicly logs requests, with
+                        User-Agent Jackalope/0.1.0. Your connected agents and MCP servers use their
+                        own services.
                       </p>
                     </>
                   )}

@@ -36,10 +36,15 @@ try {
     }
     $baseUrl = if ($env:UPDATE_BASE_URL) { $env:UPDATE_BASE_URL.TrimEnd('/') } else { 'https://staging-api.jackalope.dev' }
     New-Item -ItemType Directory -Force output/release | Out-Null
+    $env:RELEASE_CHANNEL = $Channel
+    $communityConfig = node scripts/release/channels.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Invalid channel configuration' }
     $updaterConfig = @{
         bundle = @{ createUpdaterArtifacts = $true }
         plugins = @{ updater = @{ pubkey = $env:TAURI_UPDATER_PUBLIC_KEY; endpoints = @("$baseUrl/updates/$Channel/latest.json"); windows = @{ installMode = 'passive' } } }
     }
+    $updaterConfig.plugins.jackalope = $communityConfig | ConvertFrom-Json
+    if ($Mode -eq 'rehearsal') { $updaterConfig.plugins.jackalope = @{ channel = $Channel } }
     if ($Mode -eq 'publish') {
         $updaterConfig.bundle.windows = @{ certificateThumbprint = $importedCertificate.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = $env:WINDOWS_TIMESTAMP_URL; tsp = $true }
     }

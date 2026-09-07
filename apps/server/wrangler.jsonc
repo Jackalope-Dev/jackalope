@@ -21,7 +21,13 @@
     "ENVIRONMENT": "local",
     "INGESTION_ENABLED": "false",
     "TELEMETRY_DAYS": "30",
-    "FEEDBACK_DAYS": "90"
+    "FEEDBACK_DAYS": "90",
+    "ADMIN_EMAIL": "",
+    "ACCESS_ISSUER": "",
+    "ACCESS_AUD": "",
+    "FEEDBACK_EMAIL_ENABLED": "false",
+    "FEEDBACK_EMAIL_FROM": "",
+    "FEEDBACK_EMAIL_TO": "contact@jackalope.dev"
   },
   "d1_databases": [
     {
@@ -64,7 +70,7 @@
     }
   ],
   "triggers": {
-    "crons": ["17 * * * *"]
+    "crons": ["*/5 * * * *"]
   },
   "env": {
     "staging": {
@@ -75,7 +81,13 @@
         "ENVIRONMENT": "staging",
         "INGESTION_ENABLED": "false",
         "TELEMETRY_DAYS": "30",
-        "FEEDBACK_DAYS": "90"
+        "FEEDBACK_DAYS": "90",
+        "ADMIN_EMAIL": "",
+        "ACCESS_ISSUER": "",
+        "ACCESS_AUD": "",
+        "FEEDBACK_EMAIL_ENABLED": "false",
+        "FEEDBACK_EMAIL_FROM": "",
+        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev"
       },
       "d1_databases": [
         {
@@ -118,7 +130,7 @@
         }
       ],
       "triggers": {
-        "crons": ["17 * * * *"]
+        "crons": ["*/5 * * * *"]
       },
       "secrets": {
         "required": ["RATE_SECRET"]
@@ -127,6 +139,12 @@
         {
           "pattern": "staging-api.jackalope.dev",
           "custom_domain": true
+        }
+      ],
+      "send_email": [
+        {
+          "name": "FEEDBACK_EMAIL",
+          "allowed_destination_addresses": ["contact@jackalope.dev"]
         }
       ]
     },
@@ -138,7 +156,13 @@
         "ENVIRONMENT": "production",
         "INGESTION_ENABLED": "false",
         "TELEMETRY_DAYS": "30",
-        "FEEDBACK_DAYS": "90"
+        "FEEDBACK_DAYS": "90",
+        "ADMIN_EMAIL": "",
+        "ACCESS_ISSUER": "",
+        "ACCESS_AUD": "",
+        "FEEDBACK_EMAIL_ENABLED": "false",
+        "FEEDBACK_EMAIL_FROM": "",
+        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev"
       },
       "d1_databases": [
         {
@@ -181,7 +205,7 @@
         }
       ],
       "triggers": {
-        "crons": ["17 * * * *"]
+        "crons": ["*/5 * * * *"]
       },
       "secrets": {
         "required": ["RATE_SECRET"]
@@ -191,10 +215,22 @@
           "pattern": "api.jackalope.dev",
           "custom_domain": true
         }
+      ],
+      "send_email": [
+        {
+          "name": "FEEDBACK_EMAIL",
+          "allowed_destination_addresses": ["contact@jackalope.dev"]
+        }
       ]
     }
   },
   "secrets": {
     "required": ["RATE_SECRET"]
-  }
+  },
+  "send_email": [
+    {
+      "name": "FEEDBACK_EMAIL",
+      "allowed_destination_addresses": ["contact@jackalope.dev"]
+    }
+  ]
 }

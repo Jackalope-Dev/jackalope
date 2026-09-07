@@ -21,14 +21,37 @@ export function retentionDays(value: string): number {
 }
 export async function saveTelemetry(env: Env, data: Telemetry, now = Date.now()) {
   const expires = now + retentionDays(env.TELEMETRY_DAYS) * 86400000;
-  const statements = await Promise.all(
-    data.events.map(async (event) => {
-      const payload = JSON.stringify(canonical(event));
-      return env.DB.prepare(
-        'INSERT INTO events(install_id,id,received_at,expires_at,hash,payload) VALUES(?,?,?,?,?,?) ON CONFLICT(install_id,id) DO UPDATE SET hash=excluded.hash WHERE hash<>excluded.hash',
-      ).bind(data.installId, event.id, now, expires, await digest(payload), payload);
-    }),
-  );
+  const statements = (
+    await Promise.all(
+      data.events.map(async (event) => {
+        const payload = JSON.stringify(canonical(event));
+        const dimension =
+          'state' in event
+            ? event.state
+            : 'feature' in event
+              ? event.feature
+              : 'code' in event
+                ? event.code
+                : '';
+        // D1 executes the batch atomically; changes() counts only the preceding receipt insert.
+        return [
+          env.DB.prepare(
+            'INSERT INTO telemetry_receipts(id,hash,expires_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET hash=excluded.hash WHERE hash<>excluded.hash',
+          ).bind(event.id, await digest(payload), expires),
+          env.DB.prepare(
+            'INSERT INTO metrics(day,version,channel,os,name,dimension,count) SELECT ?,?,?,?,?,?,1 WHERE changes()>0 ON CONFLICT(day,version,channel,os,name,dimension) DO UPDATE SET count=count+1',
+          ).bind(
+            new Date(now).toISOString().slice(0, 10),
+            event.appVersion,
+            event.channel,
+            event.os,
+            event.name,
+            dimension,
+          ),
+        ];
+      }),
+    )
+  ).flat();
   await env.DB.batch(statements);
   return { accepted: data.events.length };
 }
@@ -53,14 +76,22 @@ export async function prune(env: Env, now = Date.now()) {
   for (let batch = 0; batch < 20; batch++) {
     const result = await env.DB.batch([
       env.DB.prepare(
+        'DELETE FROM telemetry_receipts WHERE id IN (SELECT id FROM telemetry_receipts WHERE expires_at<=? LIMIT 5000) RETURNING 1',
+      ).bind(now),
+      env.DB.prepare(
+        'DELETE FROM metrics WHERE rowid IN (SELECT rowid FROM metrics WHERE day<=? LIMIT 5000) RETURNING 1',
+      ).bind(
+        new Date(now - retentionDays(env.TELEMETRY_DAYS) * 86400000).toISOString().slice(0, 10),
+      ),
+      env.DB.prepare(
         'DELETE FROM events WHERE rowid IN (SELECT rowid FROM events WHERE expires_at <= ? LIMIT 5000) RETURNING 1',
       ).bind(now),
       env.DB.prepare(
         'DELETE FROM feedback WHERE id IN (SELECT id FROM feedback WHERE expires_at <= ? LIMIT 5000) RETURNING 1',
       ).bind(now),
     ]);
-    events += result[0].results.length;
-    feedback += result[1].results.length;
+    events += result[0].results.length + result[2].results.length;
+    feedback += result[3].results.length;
     if (result.every((value) => value.results.length === 0)) break;
   }
   return { events, feedback };

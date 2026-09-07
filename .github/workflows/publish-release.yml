@@ -47,7 +47,8 @@ jobs:
           if ($env:CANDIDATE_RUN -notmatch '^\d+$' -or $env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid candidate inputs' }
           $run = gh api "repos/$env:GH_REPO/actions/runs/$env:CANDIDATE_RUN" | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($run.conclusion -ne 'success' -or $run.head_branch -ne 'master' -or $run.event -ne 'workflow_dispatch' -or $run.path -ne '.github/workflows/desktop-release.yml' -or $run.repository.full_name -ne $env:GH_REPO) { throw 'Expected a successful manually built master candidate from this repository' }
+          $expectedBranch = if ($env:RELEASE_CHANNEL -eq 'beta') { 'beta' } else { 'master' }
+          if ($run.conclusion -ne 'success' -or $run.head_branch -ne $expectedBranch -or $run.event -ne 'workflow_dispatch' -or $run.path -ne '.github/workflows/desktop-release.yml' -or $run.repository.full_name -ne $env:GH_REPO) { throw 'Expected a successful manually built candidate from the matching release branch in this repository' }
           "source=$($run.head_sha)" >> $env:GITHUB_OUTPUT
           "EXPECTED_SOURCE=$($run.head_sha)" >> $env:GITHUB_ENV
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

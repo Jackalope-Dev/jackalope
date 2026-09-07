@@ -175,6 +175,7 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | is-hexadecimal | 2.0.1 | MIT |
 | is-plain-obj | 4.1.0 | MIT |
 | jiti | 2.7.0 | MIT |
+| jose | 6.2.12 | MIT |
 | kleur | 4.1.5 | MIT |
 | lightningcss | 1.32.0, 1.33.0 | MPL-2.0 |
 | lightningcss-win32-x64-msvc | 1.32.0, 1.33.0 | MPL-2.0 |

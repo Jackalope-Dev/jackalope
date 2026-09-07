@@ -1,6 +1,8 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronDown, GitBranch, Search, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import type { Feature } from '../../lib/telemetry';
+import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AgentManager } from '../agents/AgentManager';
@@ -14,6 +16,7 @@ import { SettingsDialog } from '../settings/SettingsDialog';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 import { ProjectSetup } from '../tasks/ProjectSetup';
+import { RepoTodos } from '../tasks/RepoTodos';
 import { RunnerConnections } from '../tasks/RunnerConnections';
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
@@ -34,6 +37,23 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
     'General',
   );
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
+  useEffect(() => {
+    const feature: Partial<Record<ActiveTab, Feature>> = {
+      kanban: 'tasks',
+      topology: 'codebase',
+      agents: 'agents',
+      mcps: 'connections',
+      usage: 'usage',
+      browser: 'browser',
+      schedules: 'schedules',
+      worktrees: 'worktrees',
+    };
+    const selected = feature[activeTab];
+    if (selected) telemetry.track({ name: 'feature_used', feature: selected });
+  }, [activeTab]);
+  useEffect(() => {
+    if (settingsOpen) telemetry.track({ name: 'feature_used', feature: 'settings' });
+  }, [settingsOpen]);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [newTaskAgent, setNewTaskAgent] = useState<string | null>(initialTaskAgent ?? null);
   const { projects, activeProjectId, selectProject } = useProjectStore();
@@ -197,6 +217,12 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         )}
         {activeTab === 'worktrees' && (
           <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
+        )}
+        {activeTab === 'repo-todos' && (
+          <RepoTodos
+            key={project?.path ?? activeProjectId}
+            onOpenProject={() => setSetupOpen(true)}
+          />
         )}
         {activeTab === 'agents' && (
           <RunnerConnections

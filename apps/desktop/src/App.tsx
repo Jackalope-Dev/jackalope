@@ -3,6 +3,8 @@ import { MotionConfig } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Shell } from './components/layout/Shell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { PrivacyGate } from './components/settings/PrivacySettings';
+import { observeTelemetry } from './lib/observe-telemetry';
 import { nativeTask } from './lib/task-runtime';
 import { observeExecution } from './stores/executionStore';
 import { useOnboardingStore } from './stores/onboardingStore';
@@ -12,6 +14,7 @@ import './components/ui/experience.css';
 
 export default function App() {
   useEffect(startThemeClock, []);
+  useEffect(observeTelemetry, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
@@ -40,16 +43,18 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      {onboarding.status === 'new' || onboarding.status === 'active' ? (
-        <OnboardingFlow
-          onFinish={(agent) => {
-            setInitialTaskAgent(agent);
-            onboarding.finish(!agent);
-          }}
-        />
-      ) : (
-        <Shell initialTaskAgent={initialTaskAgent} />
-      )}
+      <PrivacyGate>
+        {onboarding.status === 'new' || onboarding.status === 'active' ? (
+          <OnboardingFlow
+            onFinish={(agent) => {
+              setInitialTaskAgent(agent);
+              onboarding.finish(!agent);
+            }}
+          />
+        ) : (
+          <Shell initialTaskAgent={initialTaskAgent} />
+        )}
+      </PrivacyGate>
     </MotionConfig>
   );
 }

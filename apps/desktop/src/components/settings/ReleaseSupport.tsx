@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
+import { FeedbackForm } from './FeedbackForm';
 import { UpdateSettings } from './UpdateSettings';
 
 export function ReleaseSupport() {
@@ -32,8 +33,9 @@ export function ReleaseSupport() {
   return (
     <div className="space-y-6">
       <UpdateSettings />
+      <FeedbackForm />
       <section className="space-y-3" aria-label="Support report">
-        <h3 className="text-base font-medium">Get help or share feedback</h3>
+        <h3 className="text-base font-medium">Prepare a local support report</h3>
         <p className="settings-row-description">
           Prepare a local report with app version, OS, and task outcome counts. It excludes account
           names, credentials, project paths, prompts, code, and command output. Nothing is sent

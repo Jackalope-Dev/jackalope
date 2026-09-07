@@ -2,7 +2,7 @@ name: Verify Windows
 on:
   pull_request:
   push:
-    branches: [master, main]
+    branches: [master, main, beta]
   workflow_dispatch:
 permissions:
   contents: read

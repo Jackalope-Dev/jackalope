@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { channelConfig } from './release/channels.mjs';
 
 const [endpoint, publicKey, certificateThumbprint, timestampUrl] = process.argv.slice(2);
 for (const value of [endpoint, timestampUrl]) {
@@ -22,6 +23,11 @@ const config = {
     windows: { certificateThumbprint, digestAlgorithm: 'sha256', timestampUrl, tsp: true },
   },
   plugins: {
+    jackalope: channelConfig(process.env.RELEASE_CHANNEL ?? 'stable', {
+      stableEndpoint: process.env.STABLE_UPDATE_ENDPOINT,
+      betaEndpoint: process.env.BETA_UPDATE_ENDPOINT,
+      serviceUrl: process.env.COMMUNITY_SERVICE_URL,
+    }),
     updater: { pubkey: publicKey, endpoints: [endpoint], windows: { installMode: 'passive' } },
   },
 };

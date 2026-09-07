@@ -4,6 +4,8 @@ import { isTauriEnvironment } from '../lib/tauri-bridge.ts';
 
 export interface ReleaseStatus {
   currentVersion: string;
+  channel: 'stable' | 'beta';
+  betaAvailable: boolean;
   configured: boolean;
   availableVersion: string | null;
   notes: string | null;
@@ -16,12 +18,19 @@ export interface UpdateProgress {
 interface UpdateBridge {
   desktop: () => boolean;
   status: (check: boolean) => Promise<ReleaseStatus>;
-  install: (version: string, progress: (value: UpdateProgress) => void) => Promise<void>;
+  setChannel?: (channel: 'stable' | 'beta') => Promise<void>;
+  install: (
+    version: string,
+    progress: (value: UpdateProgress) => void,
+    channel: 'stable' | 'beta',
+  ) => Promise<void>;
   now: () => number;
 }
 interface UpdateState {
   autoCheck: boolean;
   release: ReleaseStatus | null;
+  changingChannel: boolean;
+  setChannel: (channel: 'stable' | 'beta') => Promise<void>;
   checking: boolean;
   installing: boolean;
   progress: UpdateProgress | null;
@@ -52,6 +61,27 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
   return create<UpdateState>()((set, get) => ({
     autoCheck,
     release: null,
+    changingChannel: false,
+    setChannel: async (channel) => {
+      if (
+        !bridge.setChannel ||
+        get().checking ||
+        get().installing ||
+        get().changingChannel ||
+        loading
+      )
+        return;
+      set({ changingChannel: true, error: null });
+      try {
+        await bridge.setChannel(channel);
+        set({ release: null, lastAttempt: null, lastChecked: null, dismissedVersion: null });
+        await get().load();
+      } catch (error) {
+        set({ error: String(error) });
+      } finally {
+        set({ changingChannel: false });
+      }
+    },
     checking: false,
     installing: false,
     progress: null,
@@ -86,7 +116,7 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     },
     check: async (automatic = false) => {
       const state = get();
-      if (!bridge.desktop() || state.checking || state.installing) return;
+      if (!bridge.desktop() || state.checking || state.installing || state.changingChannel) return;
       if (
         automatic &&
         (!state.autoCheck ||
@@ -108,10 +138,14 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
     install: async () => {
       const state = get();
       const version = state.release?.availableVersion;
-      if (!version || state.checking || state.installing) return;
+      if (!version || state.checking || state.installing || state.changingChannel) return;
       set({ installing: true, error: null, progress: null });
       try {
-        await bridge.install(version, (progress) => set({ progress }));
+        await bridge.install(
+          version,
+          (progress) => set({ progress }),
+          state.release?.channel ?? 'stable',
+        );
       } catch (error) {
         set({ error: String(error) });
       } finally {
@@ -123,11 +157,12 @@ export function createUpdateStore(bridge: UpdateBridge, storage?: PreferenceStor
 export const useUpdateStore = createUpdateStore({
   desktop: isTauriEnvironment,
   status: (check) => nativeTask<ReleaseStatus>('app_release_status', { check }),
-  install: async (version, onProgress) => {
+  setChannel: (channel) => nativeTask('app_release_channel', { channel }),
+  install: async (version, onProgress, channel) => {
     const { Channel } = await import('@tauri-apps/api/core');
     const progress = new Channel<UpdateProgress>();
     progress.onmessage = onProgress;
-    await nativeTask('app_install_update', { version, progress });
+    await nativeTask('app_install_update', { version, progress, channel });
   },
   now: Date.now,
 });

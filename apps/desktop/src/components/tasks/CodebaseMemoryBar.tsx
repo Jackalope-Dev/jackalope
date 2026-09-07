@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 
 export function CodebaseMemoryBar({
@@ -47,6 +48,9 @@ export function CodebaseMemoryBar({
         >
           <RefreshCw size={16} />
           {busy ? 'Reading…' : 'Refresh context'}
+        </Button>
+        <Button variant="ghost" onClick={() => navigateWorkspace('repo-todos')}>
+          View repo TODOs
         </Button>
       </div>
       {error && (
