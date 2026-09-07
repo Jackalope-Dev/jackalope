@@ -91,12 +91,16 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
         .bind(now + 300000, lease, id, now)
         .first<{ payload: string; attempts: number }>();
       if (!row) return;
+      let stage = 'decrypt';
+      let providerStatus: number | null = null;
       try {
         const mail = await unseal<AccessMail>(row.payload, env.ACCESS_SECRET);
+        stage = 'render';
         const content = accessEmail(mail, env.ACCESS_WEB_ORIGIN);
+        stage = 'request';
         const response = await request('https://api.sequenzy.com/api/v1/transactional/send', {
           method: 'POST',
-          redirect: 'error',
+          redirect: 'manual',
           signal: AbortSignal.timeout(15000),
           headers: {
             Authorization: `Bearer ${env.SEQUENZY_API_KEY}`,
@@ -111,15 +115,23 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
             preview: content.preview,
           }),
         });
+        providerStatus = response.status;
+        stage = 'response';
         const result = await providerJson(response);
         if (!result.success || typeof result.jobId !== 'string')
           throw new Error('mail_provider_rejected');
+        stage = 'record';
         await env.DB.prepare(
           "UPDATE access_mail SET state='queued',provider_id=?,payload='',lease=NULL WHERE id=? AND lease=?",
         )
           .bind(result.jobId.slice(0, 200), id, lease)
           .run();
       } catch {
+        console.error('access_mail_delivery_failed', {
+          stage,
+          providerStatus,
+          attempt: row.attempts,
+        });
         await env.DB.prepare(
           "UPDATE access_mail SET state='failed',next_at=?,lease=NULL WHERE id=? AND lease=?",
         )

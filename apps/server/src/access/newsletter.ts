@@ -21,7 +21,7 @@ export async function syncNewsletter(env: Env, request = fetch, now = Date.now()
           `https://api.sequenzy.com/api/v1/forms/${env.ACCESS_NEWSLETTER_FORM}`,
           {
             method: 'POST',
-            redirect: 'error',
+            redirect: 'manual',
             signal: AbortSignal.timeout(15000),
             headers: { accept: 'application/json' },
             body: new URLSearchParams({ email: row.email, website: '' }),

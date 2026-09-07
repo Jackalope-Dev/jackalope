@@ -1,6 +1,6 @@
 import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
-import { beforeAll, beforeEach, expect, it } from 'vitest';
+import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { unseal } from '../src/access/crypto';
 import { type AccessMail, accessEmail, deliverAccessMail } from '../src/access/mail';
 import { syncNewsletter } from '../src/access/newsletter';
@@ -249,7 +249,9 @@ it('keeps newsletter consent optional and durable through provider failure witho
   await register(bindings, 'no@example.com', false, 'inline');
   await register(bindings, 'yes@example.com', true, 'popup');
   let calls = 0;
-  const send = (async (_url: unknown, init?: RequestInit) => {
+  const send = (async (url, init) => {
+    const request = new Request(url, init);
+    expect(request.redirect).toBe('manual');
     calls++;
     expect(String(init?.body)).toContain('yes%40example.com');
     return Response.json({ success: true, optIn: { required: true } });
@@ -265,6 +267,11 @@ it('keeps newsletter consent optional and durable through provider failure witho
     syncNewsletter(bindings, send, Date.now() + 3600000),
   ]);
   expect(calls).toBe(1);
+  expect(
+    await env.DB.prepare('SELECT newsletter_synced_at FROM access_members WHERE email=?')
+      .bind('yes@example.com')
+      .first(),
+  ).toEqual({ newsletter_synced_at: expect.any(Number) });
   expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 0 });
   expect(
     await env.DB.prepare('SELECT newsletter_attempts FROM access_members WHERE email=?')
@@ -351,3 +358,51 @@ it('bounds provider replies and retries only a finite number of times', async ()
     attempts: 5,
   });
 });
+
+it('reports delivery failure stages without recording private mail or provider bodies', async () => {
+  const person = await member('person@example.com');
+  await approve(bindings, person.id);
+  const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  try {
+    await deliverAccessMail(
+      bindings,
+      (async () => new Response('private provider detail', { status: 403 })) as typeof fetch,
+    );
+    expect(log.mock.calls).toEqual([
+      ['access_mail_delivery_failed', { stage: 'response', providerStatus: 403, attempt: 1 }],
+    ]);
+    log.mockClear();
+    await env.DB.prepare("UPDATE access_mail SET payload='invalid',next_at=0").run();
+    await deliverAccessMail(bindings);
+    expect(log.mock.calls).toEqual([
+      ['access_mail_delivery_failed', { stage: 'decrypt', providerStatus: null, attempt: 2 }],
+    ]);
+  } finally {
+    log.mockRestore();
+  }
+});
+
+it.each([200, 302])(
+  'uses Worker-compatible mail requests and rejects redirects (%s)',
+  async (status) => {
+    const person = await member('person@example.com');
+    await approve(bindings, person.id);
+    let transportError: unknown;
+    await deliverAccessMail(bindings, (async (input, init) => {
+      try {
+        const request = new Request(input, init);
+        expect(request.method).toBe('POST');
+        expect(request.redirect).toBe('manual');
+        return Response.json({ success: true, jobId: 'fixture-transport' }, { status });
+      } catch (error) {
+        transportError = error;
+        throw error;
+      }
+    }) as typeof fetch);
+    expect(transportError).toBeUndefined();
+    expect(await env.DB.prepare('SELECT state,provider_id FROM access_mail').first()).toEqual({
+      state: status === 200 ? 'queued' : 'failed',
+      provider_id: status === 200 ? 'fixture-transport' : null,
+    });
+  },
+);
