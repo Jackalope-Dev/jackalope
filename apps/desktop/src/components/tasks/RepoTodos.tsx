@@ -29,7 +29,6 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
   const [documents, setDocuments] = useState<RepoTodoDocument[]>([]);
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [query, setQuery] = useState('');
@@ -42,11 +41,11 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
   const [creating, setCreating] = useState(false);
   const [createPath, setCreatePath] = useState('TODO.md');
   const request = useRef(0);
-  const saveLock = useRef(false);
   const addInput = useRef<HTMLInputElement>(null);
-  const dialogFocus = useDialogFocus(!!editing || discarding || creating);
-  const { drafts, setDraft } = useRepoTodoStore();
+  const dialogFocus = useDialogFocus();
+  const { drafts, setDraft, saving: savingFiles, setSaving, revision } = useRepoTodoStore();
   const key = todoDraftKey(project?.path ?? '', selected);
+  const saving = savingFiles[key] ?? false;
   const draft = drafts[key];
   const document = documents.find((item) => item.path === selected);
   const content = draft?.content ?? document?.content ?? '';
@@ -55,8 +54,10 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
   const dirty = !!draft;
   const available = isTauriEnvironment();
 
+  const projectPath = project?.path;
+  const savedRevision = useRef(revision);
   const load = useCallback(async () => {
-    if (!project || !available) {
+    if (!projectPath || !available) {
       setLoading(false);
       return;
     }
@@ -65,23 +66,37 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
     setError('');
     try {
       const files = await nativeTask<RepoTodoDocument[]>('repo_todos_read', {
-        projectPath: project.path,
+        projectPath,
       });
       if (version !== request.current) return;
       setDocuments(files);
-      setSelected((current) => current || files.find((file) => file.content !== null)?.path || '');
+      setSelected(
+        (current) =>
+          current ||
+          TODO_FILES.find(
+            (path) => useRepoTodoStore.getState().drafts[todoDraftKey(projectPath, path)],
+          ) ||
+          files.find((file) => file.content !== null)?.path ||
+          '',
+      );
     } catch (cause) {
       if (version === request.current) setError(String(cause));
     } finally {
       if (version === request.current) setLoading(false);
     }
-  }, [project?.path, available]);
+  }, [projectPath, available]);
   useEffect(() => {
     void load();
     return () => {
       request.current++;
     };
   }, [load]);
+  useEffect(() => {
+    if (savedRevision.current !== revision) {
+      savedRevision.current = revision;
+      void load();
+    }
+  }, [revision, load]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (Object.keys(useRepoTodoStore.getState().drafts).length) event.preventDefault();
@@ -96,9 +111,8 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
     setNotice('');
   };
   const save = async () => {
-    if (!project || !draft || saveLock.current) return;
-    saveLock.current = true;
-    setSaving(true);
+    if (!project || !draft || useRepoTodoStore.getState().saving[key]) return;
+    setSaving(key, true);
     setError('');
     try {
       await nativeTask('repo_todos_save', {
@@ -113,6 +127,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
         ),
       );
       setDraft(key, null);
+      setSaving(key, false, true);
       setNotice(`Saved to ${selected}.`);
       useContextMemoryStore.getState().removeMemory(project.id);
       void useContextMemoryStore
@@ -122,8 +137,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
     } catch (cause) {
       setError(String(cause));
     } finally {
-      saveLock.current = false;
-      setSaving(false);
+      setSaving(key, false);
     }
   };
   const files = TODO_FILES.filter(
@@ -296,7 +310,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                     ) : (
                       <>
                         <div className="repo-todo-toolbar">
-                          <div className="repo-todo-filters" aria-label="Filter TODOs">
+                          <fieldset className="repo-todo-filters" aria-label="Filter TODOs">
                             {[
                               ['open', 'Open'],
                               ['done', 'Completed'],
@@ -311,7 +325,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                                 {label}
                               </button>
                             ))}
-                          </div>
+                          </fieldset>
                           <div className="repo-todo-search">
                             <Search size={16} aria-hidden="true" />
                             <Input
@@ -364,7 +378,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                                       }}
                                     >
                                       {item.depth > 0 && (
-                                        <span className="repo-todo-nested" aria-label="Nested TODO">
+                                        <span className="repo-todo-nested" aria-hidden="true">
                                           ↳{' '}
                                         </span>
                                       )}

@@ -1,9 +1,9 @@
 export const TODO_FILES = [
   'TODO.md',
-  'TASKS.md',
-  'ROADMAP.md',
   'docs/TODO.md',
+  'TASKS.md',
   'docs/TASKS.md',
+  'ROADMAP.md',
   'docs/ROADMAP.md',
 ] as const;
 
@@ -89,5 +89,8 @@ export function appendRepoTodo(content: string, title: string): string {
   if (!title.trim() || /[\r\n]/.test(title))
     throw new Error('Use a single, non-empty line for the TODO.');
   const newline = content.includes('\r\n') ? '\r\n' : '\n';
-  return `${content}${content && !content.endsWith('\n') ? newline : ''}- [ ] ${title.trim()}${newline}`;
+  const next = `${content}${content && !content.endsWith('\n') ? newline : ''}- [ ] ${title.trim()}${newline}`;
+  if (parseRepoTodos(next).length !== parseRepoTodos(content).length + 1)
+    throw new Error('Close the unfinished code block in Edit document before adding a TODO.');
+  return next;
 }

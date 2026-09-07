@@ -1,4 +1,5 @@
 import { useAgentConfigStore } from '../../stores/agentConfigStore.ts';
+import { parseRepoTodos, TODO_FILES } from '../repo-todos.ts';
 import { nativeTask } from '../task-runtime.ts';
 import type { DiscoveredCodebaseMemory, OpenTaskItem } from './types.ts';
 
@@ -14,38 +15,12 @@ export interface DiscoveryOptions {
  * Extracts open and completed markdown tasks from file contents (e.g. TODO.md or STATUS.md).
  */
 export function parseMarkdownTasks(content: string, filename: string): OpenTaskItem[] {
-  const lines = content.split('\n');
-  const tasks: OpenTaskItem[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]?.trim();
-    if (!line) continue;
-
-    // Matches `- [ ] Task title` or `* [ ] Task title`
-    const openMatch = line.match(/^[-*]\s+\[\s\]\s+(.+)$/);
-    if (openMatch?.[1]) {
-      tasks.push({
-        id: `${filename}-${i}`,
-        title: openMatch[1].replace(/\*\*/g, '').trim(),
-        sourceFile: filename,
-        status: 'open',
-      });
-      continue;
-    }
-
-    // Matches `- [x] Task title` or `* [x] Task title`
-    const doneMatch = line.match(/^[-*]\s+\[[xX]\]\s+(.+)$/);
-    if (doneMatch?.[1]) {
-      tasks.push({
-        id: `${filename}-${i}`,
-        title: doneMatch[1].replace(/\*\*/g, '').trim(),
-        sourceFile: filename,
-        status: 'completed',
-      });
-    }
-  }
-
-  return tasks;
+  return parseRepoTodos(content).map((item) => ({
+    id: `${filename}-${item.line}`,
+    title: item.title.replace(/\*\*/g, '').trim(),
+    sourceFile: filename,
+    status: item.completed ? 'completed' : 'open',
+  }));
 }
 
 /**
@@ -198,22 +173,21 @@ export async function discoverCodebaseContext(
     }
   }
 
-  // 4. Inspect TODO.md / STATUS.md
-  const todoContent = (await read('docs/TODO.md')) ?? (await read('TODO.md'));
-  if (todoContent) {
-    sourceFilesDetected.push('TODO.md');
-    const parsed = parseMarkdownTasks(todoContent, 'TODO.md');
-    openTasks.push(...parsed);
+  for (const path of TODO_FILES) {
+    const content = await read(path);
+    if (content === null) continue;
+    sourceFilesDetected.push(path);
+    openTasks.push(...parseMarkdownTasks(content, path));
+    if (path.endsWith('ROADMAP.md')) roadmapItems.push(...parseRoadmapItems(content));
   }
 
-  const statusContent = (await read('docs/STATUS.md')) ?? (await read('STATUS.md'));
-  if (statusContent) {
-    sourceFilesDetected.push('STATUS.md');
-    const roadmap = parseRoadmapItems(statusContent);
-    roadmapItems.push(...roadmap);
-    for (const c of parseConventions(statusContent)) {
-      conventions.add(c);
-    }
+  for (const path of ['docs/STATUS.md', 'STATUS.md']) {
+    const content = await read(path);
+    if (content === null) continue;
+    sourceFilesDetected.push(path);
+    roadmapItems.push(...parseRoadmapItems(content));
+    for (const convention of parseConventions(content)) conventions.add(convention);
+    break;
   }
 
   const duration = Date.now() - startTime;

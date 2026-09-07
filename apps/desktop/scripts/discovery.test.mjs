@@ -6,7 +6,64 @@ import {
   parseMarkdownTasks,
   parseRoadmapItems,
 } from '../src/lib/context/discovery.ts';
+import { appendRepoTodo, parseRepoTodos, updateRepoTodo } from '../src/lib/repo-todos.ts';
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
+
+test('TODO editing preserves Markdown, nested tasks, CRLF and unrelated lines', () => {
+  const source =
+    '\uFEFF# Plan\r\nIntro **unchanged**.\r\n## Next\r\n* [ ] **Ship** it\r\n  + [X] Nested\r\n\r\n## Later\r\n1. [ ] Follow up';
+  const items = parseRepoTodos(source);
+  assert.equal(items.length, 3);
+  assert.equal(items[0].section, 'Next');
+  assert.equal(items[1].depth, 2);
+  assert.equal(items[1].completed, true);
+  assert.equal(items[2].section, 'Later');
+  const checked = updateRepoTodo(source, 3, { completed: true });
+  assert.equal(checked, source.replace('* [ ]', '* [x]'));
+  assert.equal(
+    updateRepoTodo(checked, 3, { title: 'Ship [release](./release.md)' }),
+    checked.replace('**Ship** it', 'Ship [release](./release.md)'),
+  );
+  assert.equal(appendRepoTodo(source, 'New step'), `${source}\r\n- [ ] New step\r\n`);
+  assert.throws(() => updateRepoTodo(source, 1, { completed: true }));
+  assert.throws(() => updateRepoTodo(source, 3, { title: 'two\nlines' }));
+  assert.throws(() => appendRepoTodo(source, ' '));
+});
+
+test('code examples are excluded, including longer and mismatched fences', () => {
+  const source =
+    '# Tasks\n````md\n- [ ] Example\n```\n- [x] Still an example\n````\n~~~\n- [ ] Another example\n~~~\n- [ ] Real task\n';
+  assert.deepEqual(
+    parseRepoTodos(source).map((item) => item.title),
+    ['Real task'],
+  );
+  assert.throws(() => updateRepoTodo(source, 2, { completed: true }));
+  assert.throws(() => appendRepoTodo('```md\n- [ ] Example\n', 'Hidden item'));
+  assert.equal(parseRepoTodos(appendRepoTodo(source, 'New task')).length, 2);
+});
+
+test('discovery reads every supported list and preserves the actual source path', async () => {
+  const files = {
+    'TODO.md': '',
+    'docs/TODO.md': '- [ ] Docs task',
+    'TASKS.md': '- [ ] Root task',
+    'docs/TASKS.md': '- [x] Completed task',
+    'ROADMAP.md': '# Planned\n- Roadmap note\n- [ ] Roadmap task',
+    'docs/ROADMAP.md': '- [ ] Future task',
+  };
+  const result = await discoverCodebaseContext(
+    { projectId: 'todo-project', projectName: 'Lists', projectPath: '/fixture' },
+    async (path) => files[path] ?? null,
+  );
+  assert.equal(result.openTasks.length, 5);
+  assert.equal(
+    result.openTasks.find((item) => item.title === 'Docs task').sourceFile,
+    'docs/TODO.md',
+  );
+  assert.ok(result.sourceFilesDetected.includes('TODO.md'));
+  assert.ok(result.roadmapItems.includes('Roadmap note'));
+  assert.equal(new Set(result.openTasks.map((item) => item.id)).size, 5);
+});
 
 test('repository discovery preserves tasks, conventions, stack and assembled context', async () => {
   const sampleTodo = `
