@@ -18,6 +18,7 @@ export default function App() {
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
+  const [initialCapture, setInitialCapture] = useState(false);
   const onboarding = useOnboardingStore();
   useEffect(() => {
     if (ready)
@@ -46,13 +47,17 @@ export default function App() {
       <PrivacyGate>
         {onboarding.status === 'new' || onboarding.status === 'active' ? (
           <OnboardingFlow
+            onCapture={() => {
+              setInitialCapture(true);
+              onboarding.finish(true);
+            }}
             onFinish={(agent) => {
               setInitialTaskAgent(agent);
               onboarding.finish(!agent);
             }}
           />
         ) : (
-          <Shell initialTaskAgent={initialTaskAgent} />
+          <Shell initialTaskAgent={initialTaskAgent} initialCapture={initialCapture} />
         )}
       </PrivacyGate>
     </MotionConfig>

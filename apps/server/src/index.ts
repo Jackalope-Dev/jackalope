@@ -1,16 +1,13 @@
+import { deliverAccessMail } from './access/mail';
+import { syncNewsletter } from './access/newsletter';
+import { accessRoutes } from './access/routes';
+import { pruneAccess } from './access/service';
 import { admin } from './admin';
 import { feedbackSchema, telemetrySchema } from './contracts';
+import { ServiceError as ApiError } from './errors';
 import { deliverFeedback } from './feedback-mail';
 import { prune, saveFeedback, saveTelemetry } from './storage';
 
-class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-  ) {
-    super(code);
-  }
-}
 function json(value: unknown, status = 200) {
   return Response.json(value, {
     status,
@@ -154,8 +151,13 @@ export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
-      if (url.pathname === '/admin' || url.pathname.startsWith('/admin/'))
-        return await admin(request, env, readJson);
+      if (url.pathname.startsWith('/v1/access/'))
+        return await accessRoutes(request, env, readJson, (mail) => limit(request, env, mail), ctx);
+      if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+        const response = await admin(request, env, readJson);
+        if (response.ok && request.method === 'POST' && ctx) ctx.waitUntil(deliverAccessMail(env));
+        return response;
+      }
       if (url.search) throw new ApiError(400, 'query_not_allowed');
       if (url.pathname.startsWith('/updates/')) return await release(request, env, url.pathname);
       if (request.method === 'GET' && url.pathname === '/healthz') return json({ status: 'ok' });
@@ -216,6 +218,10 @@ export default {
   },
   async scheduled(_controller, env) {
     try {
+      if (env.EARLY_ACCESS_ENABLED === 'true') {
+        await Promise.all([deliverAccessMail(env), syncNewsletter(env)]);
+        await pruneAccess(env);
+      }
       await deliverFeedback(env);
       console.log(JSON.stringify({ event: 'retention_complete', ...(await prune(env)) }));
     } catch {

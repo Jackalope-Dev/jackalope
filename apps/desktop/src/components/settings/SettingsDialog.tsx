@@ -7,13 +7,14 @@ import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
 import { navigateWorkspace } from '../layout/navigation';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
+import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { PrivacySettings } from './PrivacySettings';
@@ -74,7 +75,8 @@ export function SettingsDialog({
       {
         System: 'device computer operating system architecture git',
         Diagnostics: 'activity log routing events errors codebase',
-        General: 'window close exit system tray background quit minimize guided setup onboarding',
+        General:
+          'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
         Appearance: 'theme color light dark atmosphere mascot companion moods reactions',
         Agents: 'default models allowed restrict manual cli command executable configuration',
         Privacy: 'marketplace MCP network telemetry crash reporting',
@@ -216,6 +218,34 @@ export function SettingsDialog({
                         </Button>
                       </Setting>
                       <WindowBehaviorSettings />
+                      <Setting
+                        title="Companion notifications"
+                        description="Choose when Jackalope draws your attention. All notices remain available in the helper."
+                      >
+                        <Select
+                          aria-label="Companion notifications"
+                          value={settings.notifications}
+                          onValueChange={(value) =>
+                            settings.updateSettings({ notifications: value as NotificationLevel })
+                          }
+                        >
+                          <SelectItem value="all">All notifications</SelectItem>
+                          <SelectItem value="failures-only">Needs attention only</SelectItem>
+                          <SelectItem value="none">Quiet</SelectItem>
+                        </Select>
+                      </Setting>
+                      <Setting
+                        title="Companion animations"
+                        description="Show reactions and movement for activity. Your reduced-motion preference always applies."
+                      >
+                        <Switch
+                          label="Companion animations"
+                          checked={settings.mascotReactions}
+                          onCheckedChange={(mascotReactions) =>
+                            settings.updateSettings({ mascotReactions })
+                          }
+                        />
+                      </Setting>
                     </>
                   )}
                   {c === 'Appearance' && (

@@ -3,9 +3,10 @@ import type { TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
 
 export const workStages = [
-  { id: 'ideas', label: 'Ideas' },
+  { id: 'attention', label: 'Needs you' },
+  { id: 'review', label: 'Ready to review' },
   { id: 'working', label: 'Working' },
-  { id: 'attention', label: 'Needs attention' },
+  { id: 'ideas', label: 'Saved ideas' },
   { id: 'finished', label: 'Finished' },
 ] as const;
 
@@ -26,20 +27,27 @@ export interface WorkItem {
   run?: TaskRun;
 }
 
-export function collectWork(projectId: string, ideas: TaskTicket[], runs: TaskRun[]): WorkItem[] {
-  const projectRuns = runs.filter((run) => run.projectId === projectId);
+export function collectWork(
+  projectId: string | null,
+  ideas: TaskTicket[],
+  runs: TaskRun[],
+  integratedRunIds: string[] = [],
+): WorkItem[] {
+  const projectRuns = runs.filter((run) => projectId === null || run.projectId === projectId);
   const byId = new Map(projectRuns.map((run) => [run.id, run]));
   const latest = new Map<string, TaskRun>();
   const original = new Map<string, TaskRun>();
   for (const run of projectRuns) {
     const newest = latest.get(run.taskId);
     const oldest = original.get(run.taskId);
-    if (!newest || run.startedAt > newest.startedAt) latest.set(run.taskId, run);
-    if (!oldest || run.startedAt < oldest.startedAt) original.set(run.taskId, run);
+    if (!newest || Date.parse(run.startedAt) > Date.parse(newest.startedAt))
+      latest.set(run.taskId, run);
+    if (!oldest || Date.parse(run.startedAt) < Date.parse(oldest.startedAt))
+      original.set(run.taskId, run);
   }
   const linkedIdeas = new Map<string, TaskTicket>();
   const items: WorkItem[] = [];
-  for (const idea of ideas.filter((idea) => idea.projectId === projectId)) {
+  for (const idea of ideas.filter((idea) => projectId === null || idea.projectId === projectId)) {
     const run = idea.runId ? byId.get(idea.runId) : undefined;
     if (run) {
       linkedIdeas.set(run.taskId, idea);
@@ -63,15 +71,24 @@ export function collectWork(projectId: string, ideas: TaskTicket[], runs: TaskRu
       stage:
         pending || run.persistenceError
           ? 'attention'
-          : active
-            ? 'working'
-            : run.status === 'reviewed'
-              ? 'finished'
-              : 'attention',
+          : integratedRunIds.includes(run.id)
+            ? 'finished'
+            : active
+              ? 'working'
+              : run.status === 'review'
+                ? 'review'
+                : run.status === 'reviewed'
+                  ? 'finished'
+                  : 'attention',
       date: run.startedAt,
       idea,
       run,
     });
   }
-  return items.sort((a, b) => b.date.localeCompare(a.date));
+  return items.sort(
+    (a, b) =>
+      workStages.findIndex((stage) => stage.id === a.stage) -
+        workStages.findIndex((stage) => stage.id === b.stage) ||
+      Date.parse(b.date) - Date.parse(a.date),
+  );
 }

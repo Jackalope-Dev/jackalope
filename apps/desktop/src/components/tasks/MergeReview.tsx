@@ -14,7 +14,9 @@ export function MergeReview({
   items,
   merged,
   onChanged,
+  onlyRunId,
 }: {
+  onlyRunId?: string;
   project: Project;
   runs: TaskRun[];
   items: QueueItem[];
@@ -28,7 +30,7 @@ export function MergeReview({
     );
     return item?.title ?? (run ? taskTitle(run.prompt) : id);
   };
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(onlyRunId ? [onlyRunId] : []);
   const [plans, setPlans] = useState<IntegrationPlan[]>([]);
   const [plan, setPlan] = useState<IntegrationPlan | null>(null);
   const [file, setFile] = useState('');
@@ -38,6 +40,7 @@ export function MergeReview({
     path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
   const candidates = runs.filter(
     (r) =>
+      (!onlyRunId || r.id === onlyRunId) &&
       r.projectId === project.id &&
       ['review', 'reviewed'].includes(r.status) &&
       r.workspace &&
@@ -124,7 +127,7 @@ export function MergeReview({
     <div className="merge-review">
       <div className="queue-section-heading">
         <div>
-          <h2>Bring the work together</h2>
+          <h2>{onlyRunId ? 'Review result' : 'Review & merge'}</h2>
           <p className="task-muted mt-2">
             Review the combined changes before updating the target branch. Your source worktrees
             stay intact.

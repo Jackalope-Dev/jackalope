@@ -1,5 +1,6 @@
 import { Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -17,12 +18,7 @@ export function AgentManager() {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const desktop = isTauriEnvironment();
-  const agents = [
-    { id: 'codex', name: 'Codex' },
-    { id: 'claude', name: 'Claude Code' },
-    { id: 'grok', name: 'Grok' },
-    ...config.customAgents,
-  ];
+  const agents = [...builtinAgents, ...config.customAgents];
   const save = async () => {
     setBusy(true);
     setError('');

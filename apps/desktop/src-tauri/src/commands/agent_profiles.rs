@@ -41,16 +41,12 @@ pub struct AgentProfilesView {
     pub env_var: Option<String>,
 }
 
-/// The environment variable each supported agent's CLI honors to redirect its
-/// entire config/credential directory to an isolated location. Confirmed
-/// empirically (2026-09-06) by pointing each installed CLI at an empty
-/// directory: all three started a fresh signed-out state there instead of
-/// touching the real signed-in profile, rather than assumed from docs.
 pub fn env_var_for(adapter: &str) -> Option<&'static str> {
     match adapter {
         "codex" => Some("CODEX_HOME"),
         "claude" => Some("CLAUDE_CONFIG_DIR"),
         "grok" => Some("GROK_HOME"),
+        "opencode" => Some("XDG_DATA_HOME"),
         _ => None,
     }
 }
@@ -59,6 +55,7 @@ fn login_args(adapter: &str) -> &'static [&'static str] {
     match adapter {
         "codex" => &["login"],
         "grok" => &["login"],
+        "opencode" => &["auth", "login"],
         // Claude Code has no separate login subcommand; launching it plain
         // prompts sign-in interactively when its redirected profile is empty.
         _ => &[],
@@ -162,8 +159,13 @@ pub fn bind_account(
         let directory = std::env::var_os(env_name)
             .map(PathBuf::from)
             .or_else(|| {
-                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-                    .map(|home| PathBuf::from(home).join(format!(".{adapter}")))
+                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(|home| {
+                    PathBuf::from(home).join(if adapter == "opencode" {
+                        ".local/share".to_string()
+                    } else {
+                        format!(".{adapter}")
+                    })
+                })
             })
             .ok_or("Cannot locate the agent's default account directory.")?;
         (
@@ -181,6 +183,21 @@ pub fn bind_account(
         directory,
         label,
     })
+}
+
+pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBinding) {
+    if let Some(name) = env_var_for(&binding.adapter) {
+        command.env(name, &binding.directory);
+    }
+    if binding.adapter == "opencode" && binding.profile_id.is_some() {
+        for (name, folder) in [
+            ("XDG_CONFIG_HOME", "config"),
+            ("XDG_CACHE_HOME", "cache"),
+            ("XDG_STATE_HOME", "state"),
+        ] {
+            command.env(name, binding.directory.join(folder));
+        }
+    }
 }
 
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
@@ -358,6 +375,7 @@ pub fn agent_profile_sign_in(
     let executable = super::tasks::executable(&agent)?;
     let mut command = std::process::Command::new(executable);
     command.args(login_args(&agent)).env(env_name, &dir);
+    apply_binding(&mut command, &bind_account(&root, &agent, Some(&id))?);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -395,7 +413,41 @@ mod tests {
         assert_eq!(env_var_for("codex"), Some("CODEX_HOME"));
         assert_eq!(env_var_for("claude"), Some("CLAUDE_CONFIG_DIR"));
         assert_eq!(env_var_for("grok"), Some("GROK_HOME"));
+        assert_eq!(env_var_for("opencode"), Some("XDG_DATA_HOME"));
         assert_eq!(env_var_for("some-custom-agent"), None);
+    }
+
+    #[test]
+    fn opencode_named_profile_redirects_data_config_cache_and_state() {
+        let directory = temp_root();
+        let mut binding = AccountBinding {
+            adapter: "opencode".into(),
+            profile_id: Some("work".into()),
+            directory: directory.clone(),
+            label: "Work".into(),
+        };
+        let mut command = std::process::Command::new("opencode");
+        apply_binding(&mut command, &binding);
+        let vars: HashMap<_, _> = command
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().to_string(),
+                    value.unwrap().to_os_string(),
+                )
+            })
+            .collect();
+        assert_eq!(vars["XDG_DATA_HOME"], directory.as_os_str());
+        assert_eq!(
+            vars["XDG_CONFIG_HOME"],
+            directory.join("config").as_os_str()
+        );
+        assert_eq!(vars["XDG_CACHE_HOME"], directory.join("cache").as_os_str());
+        assert_eq!(vars["XDG_STATE_HOME"], directory.join("state").as_os_str());
+        binding.profile_id = None;
+        let mut default = std::process::Command::new("opencode");
+        apply_binding(&mut default, &binding);
+        assert_eq!(default.get_envs().count(), 1);
     }
 
     #[test]

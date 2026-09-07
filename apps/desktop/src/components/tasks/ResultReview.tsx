@@ -1,5 +1,5 @@
 import { FileDiff } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -14,7 +14,7 @@ export function ResultReview({ run }: { run: TaskRun }) {
   const { projects } = useProjectStore();
   const project = projects.find((p) => p.id === run.projectId);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -24,7 +24,10 @@ export function ResultReview({ run }: { run: TaskRun }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [run.id]);
+  useEffect(() => {
+    void load();
+  }, [load]);
   return (
     <div className="task-review">
       <div className="flex items-center justify-between gap-3">
@@ -42,6 +45,11 @@ export function ResultReview({ run }: { run: TaskRun }) {
         </p>
       )}
       <ProjectVerification run={run} command={project?.preferences?.verifyCommand} />
+      {loading && (
+        <p role="status" className="task-muted">
+          Reading changes from this task’s workspace…
+        </p>
+      )}
       {review && (
         <div className="mt-4">
           <p className="task-muted text-xs mb-4">{review.note}</p>
@@ -57,11 +65,14 @@ export function ResultReview({ run }: { run: TaskRun }) {
           ) : (
             <p className="task-muted">No changed files found.</p>
           )}
-          <TaskImpact
-            key={`${run.id}:${JSON.stringify(review.files)}`}
-            run={run}
-            files={review.files}
-          />
+          <details className="supporting-details">
+            <summary>Explore affected code</summary>
+            <TaskImpact
+              key={`${run.id}:${JSON.stringify(review.files)}`}
+              run={run}
+              files={review.files}
+            />
+          </details>
           {review.diff && <PatchPreview key={review.diff} patch={review.diff} />}
         </div>
       )}

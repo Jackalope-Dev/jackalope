@@ -48,7 +48,6 @@
   letter-spacing: -0.04em;
   margin: 20px 0 16px;
 }
-.onboarding-intro > p,
 .onboarding-description {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
@@ -81,17 +80,9 @@
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
-.onboarding-steps strong,
-.onboarding-steps small {
-  display: block;
-}
 .onboarding-steps strong {
   font-size: var(--text-sm);
   font-weight: 500;
-}
-.onboarding-steps small {
-  font-size: var(--text-xs);
-  margin-top: 2px;
 }
 .onboarding-content {
   min-width: 0;
@@ -107,17 +98,13 @@
     font-size: var(--text-2xl);
     margin: 12px 0;
   }
-  .onboarding-intro > p {
-    font-size: var(--text-xs);
-  }
   .onboarding-intro {
     max-height: 100%;
     overflow: auto;
   }
 }
-.onboarding-eyebrow {
+.onboarding-progress {
   font-size: var(--text-xs);
-  letter-spacing: 0.09em;
   color: var(--color-text-muted);
   margin-bottom: 16px;
 }

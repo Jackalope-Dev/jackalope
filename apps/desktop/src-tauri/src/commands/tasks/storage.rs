@@ -12,6 +12,10 @@ impl TaskRuntime {
             .map_err(|e| e.to_string())?;
         owner.try_lock().map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
         let runtime = Self {
+            knowledge: super::super::knowledge::KnowledgeStore::new(
+                directory.join("knowledge/entries.json"),
+            ),
+            mcp_broker: super::super::mcp_broker::Broker::default(),
             inner: Arc::new(Mutex::new(Inner::default())),
             directory,
             _owner: Arc::new(owner),
@@ -21,6 +25,12 @@ impl TaskRuntime {
             .map(|entry| entry.map(|entry| entry.path()).map_err(|e| e.to_string()))
             .collect::<Result<_, _>>()?;
         for path in paths {
+            if path
+                .file_name()
+                .is_some_and(|name| name == "schedules.json")
+            {
+                continue;
+            }
             if path.extension().is_some_and(|ext| ext == "tmp") {
                 runtime.inner.lock().unwrap().recovery.push(HistoryRecoveryEntry {
                     path: path.to_string_lossy().into_owned(),

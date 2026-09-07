@@ -42,6 +42,8 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
   const [createPath, setCreatePath] = useState('TODO.md');
   const request = useRef(0);
   const addInput = useRef<HTMLInputElement>(null);
+  const filterButton = useRef<HTMLButtonElement>(null);
+  const checkboxes = useRef(new Map<number, HTMLInputElement>());
   const dialogFocus = useDialogFocus();
   const { drafts, setDraft, saving: savingFiles, setSaving, revision } = useRepoTodoStore();
   const key = todoDraftKey(project?.path ?? '', selected);
@@ -156,9 +158,8 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
   return (
     <section className="workspace-page repo-todos">
       <WorkspaceHeading
-        eyebrow={project?.name}
-        title="What’s left to do"
-        description="A clear view of the work recorded in your repository."
+        title="Repo TODOs"
+        description="View and edit TODOs and roadmaps saved in your repository."
         action={
           project && available && !loading && !error && creatable.length > 0 ? (
             <Button
@@ -319,6 +320,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                               <button
                                 type="button"
                                 key={id}
+                                ref={filter === id ? filterButton : undefined}
                                 aria-pressed={filter === id}
                                 onClick={() => setFilter(id)}
                               >
@@ -353,16 +355,33 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                                     <label className="repo-todo-check">
                                       <input
                                         type="checkbox"
+                                        ref={(element) => {
+                                          if (element) checkboxes.current.set(item.line, element);
+                                          else checkboxes.current.delete(item.line);
+                                        }}
                                         checked={item.completed}
                                         disabled={saving}
                                         aria-label={`Mark ${item.title} ${item.completed ? 'open' : 'complete'}`}
-                                        onChange={(event) =>
+                                        onChange={(event) => {
+                                          if (filter !== 'all') {
+                                            const index = visible.findIndex(
+                                              (entry) => entry.line === item.line,
+                                            );
+                                            const next = visible[index + 1] ?? visible[index - 1];
+                                            (next
+                                              ? checkboxes.current.get(next.line)
+                                              : filterButton.current
+                                            )?.focus();
+                                          }
                                           update(
                                             updateRepoTodo(content, item.line, {
                                               completed: event.target.checked,
                                             }),
-                                          )
-                                        }
+                                          );
+                                          setNotice(
+                                            `Marked ${item.title} ${event.target.checked ? 'complete' : 'open'}. Save to keep this change.`,
+                                          );
+                                        }}
                                       />
                                       <span aria-hidden="true">
                                         {item.completed && <Check size={14} />}
@@ -382,7 +401,14 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                                           ↳{' '}
                                         </span>
                                       )}
-                                      {item.title}
+                                      <span>
+                                        <ReactMarkdown
+                                          allowedElements={['strong', 'em', 'code', 'del']}
+                                          unwrapDisallowed
+                                        >
+                                          {item.title}
+                                        </ReactMarkdown>
+                                      </span>
                                       <span className="repo-todo-edit">
                                         <Pencil size={14} aria-hidden="true" />
                                         <span className="sr-only">Edit TODO</span>
@@ -456,7 +482,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                         )}
                       </>
                     )}
-                    <footer className="repo-todo-save">
+                    <footer className="repo-todo-save" data-dirty={dirty}>
                       <div>
                         <strong>
                           {saving

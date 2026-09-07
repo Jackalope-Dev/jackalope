@@ -14,6 +14,10 @@ pub struct QueueItem {
     pub agent_profile_id: Option<String>,
     #[serde(default)]
     pub verify_command: Option<String>,
+    #[serde(default)]
+    pub prepare_command: Option<String>,
+    #[serde(default)]
+    pub auto_verify: bool,
     pub title: String,
     pub prompt: String,
     pub agent: String,
@@ -37,6 +41,10 @@ pub struct QueueRequest {
     pub agent_profile_id: Option<String>,
     #[serde(default)]
     pub verify_command: Option<String>,
+    #[serde(default)]
+    pub prepare_command: Option<String>,
+    #[serde(default)]
+    pub auto_verify: bool,
     pub title: String,
     pub prompt: String,
     pub agent: String,
@@ -67,6 +75,10 @@ pub struct PlanRequest {
     pub(super) agent_accounts: HashMap<String, String>,
     #[serde(default)]
     pub(super) verify_command: Option<String>,
+    #[serde(default)]
+    pub(super) prepare_command: Option<String>,
+    #[serde(default)]
+    pub(super) auto_verify: bool,
     pub(super) items: Vec<PlanEntry>,
 }
 

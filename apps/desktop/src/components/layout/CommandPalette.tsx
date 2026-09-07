@@ -1,6 +1,6 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Search, Settings2 } from 'lucide-react';
+import { Plus, Search, Settings2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useThemeStore } from '../../stores/themeStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
@@ -10,11 +10,13 @@ export function CommandPalette({
   onClose,
   onNavigate,
   onOpenSettings,
+  onCapture,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: ActiveTab) => void;
   onOpenSettings?: () => void;
+  onCapture?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const previousFocus = useRef<HTMLElement | null>(null);
@@ -91,6 +93,21 @@ export function CommandPalette({
             </Dialog.Close>
           </div>
           <div className="max-h-[50vh] overflow-y-auto">
+            {onCapture && ('new task capture idea'.includes(search) || !search) && (
+              <button
+                data-command
+                type="button"
+                className="workspace-menu-item w-full"
+                onClick={() => {
+                  onClose();
+                  onCapture();
+                }}
+              >
+                <Plus size={16} />
+                <span>New task</span>
+                <kbd>Ctrl Shift N</kbd>
+              </button>
+            )}
             {showSettings && (
               <button
                 data-command

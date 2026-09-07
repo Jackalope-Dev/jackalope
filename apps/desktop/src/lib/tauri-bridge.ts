@@ -79,6 +79,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 }
 
 export interface McpServerConfig {
+  discovery?: boolean;
   extra?: Record<string, unknown>;
   id: string;
   name: string;

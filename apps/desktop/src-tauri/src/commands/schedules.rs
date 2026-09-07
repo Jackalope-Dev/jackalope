@@ -15,6 +15,8 @@ use tauri::State;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScheduleDefinition {
+    #[serde(default)]
+    pub monitor: Option<super::monitors::ChangeMonitor>,
     pub id: String,
     pub name: String,
     pub expression: String,
@@ -29,6 +31,8 @@ pub struct ScheduleDefinition {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Occurrence {
+    #[serde(default)]
+    pub change: Option<super::monitors::MonitorChange>,
     pub due_at: DateTime<Utc>,
     pub run_id: Option<String>,
     pub outcome: String,
@@ -37,6 +41,14 @@ pub struct Occurrence {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedSchedule {
+    #[serde(default)]
+    pub last_notice: Option<Occurrence>,
+    #[serde(default)]
+    pub observed_revision: Option<String>,
+    #[serde(default)]
+    pub local_checks: u64,
+    #[serde(default)]
+    pub quiet_checks: u64,
     pub definition: ScheduleDefinition,
     pub next_at: DateTime<Utc>,
     pub history: Vec<Occurrence>,
@@ -183,6 +195,117 @@ impl Scheduler {
                 &saved.definition.timezone,
                 now,
             )?;
+            let monitor_only = saved
+                .definition
+                .monitor
+                .as_ref()
+                .is_some_and(|m| m.action == super::monitors::MonitorAction::Notify);
+            let late = (now - saved.next_at).num_seconds() > 60;
+            let observation = saved
+                .definition
+                .monitor
+                .as_ref()
+                .filter(|_| !(late && saved.definition.missed == "skip"))
+                .map(|monitor| {
+                    monitor.observe(
+                        &saved.definition.request.project_path,
+                        saved
+                            .definition
+                            .request
+                            .target_branch
+                            .as_deref()
+                            .unwrap_or("master"),
+                    )
+                });
+            let quiet = observation.as_ref().is_some_and(|result| {
+                result.as_ref().is_ok_and(|revision| {
+                    saved
+                        .observed_revision
+                        .as_ref()
+                        .is_none_or(|old| old == revision)
+                })
+            });
+            let change = observation
+                .as_ref()
+                .and_then(|r| r.as_ref().ok())
+                .and_then(|after| {
+                    saved
+                        .observed_revision
+                        .as_ref()
+                        .filter(|before| *before != after)
+                        .map(|before| super::monitors::MonitorChange {
+                            project_path: saved.definition.request.project_path.clone(),
+                            before: before.clone(),
+                            after: after.clone(),
+                            path: saved
+                                .definition
+                                .monitor
+                                .as_ref()
+                                .map(|m| m.path.clone())
+                                .unwrap_or_default(),
+                            branch: saved
+                                .definition
+                                .request
+                                .target_branch
+                                .clone()
+                                .unwrap_or_default(),
+                        })
+                });
+            if let Some(result) = observation
+                .as_ref()
+                .filter(|r| r.is_err() || quiet || monitor_only)
+            {
+                let mut updated = ledger.clone();
+                let current = &mut updated.schedules[index];
+                let outcome = match result {
+                    Err(error) => format!("Monitor needs attention: {error}"),
+                    Ok(revision) => {
+                        current.local_checks += 1;
+                        let first = current.observed_revision.is_none();
+                        current.observed_revision = Some(revision.clone());
+                        if quiet {
+                            current.quiet_checks += 1;
+                        }
+                        if first {
+                            "Baseline recorded · no agent used".into()
+                        } else if quiet {
+                            "Unchanged · no agent used".into()
+                        } else {
+                            "Change detected · no agent used".into()
+                        }
+                    }
+                };
+                let event = Occurrence {
+                    change,
+                    due_at: current.next_at,
+                    run_id: None,
+                    outcome,
+                };
+                if event.outcome.starts_with("Change detected")
+                    || (result.is_err()
+                        && current
+                            .last_notice
+                            .as_ref()
+                            .is_none_or(|old| old.outcome != event.outcome))
+                {
+                    current.last_notice = Some(event.clone());
+                } else if result.is_ok()
+                    && current
+                        .last_notice
+                        .as_ref()
+                        .is_some_and(|e| e.outcome.starts_with("Monitor needs attention"))
+                {
+                    current.last_notice = None;
+                }
+                current.history.push(event);
+                current.next_at = next;
+                if current.history.len() > 200 {
+                    current.history.remove(0);
+                }
+                self.persist(&updated)?;
+                *ledger = updated;
+                continue;
+            }
             let runs = self.coordinator.runtime.integration_runs()?;
             let overlap = saved.last_run_id.iter().any(|id| {
                 runs.iter().any(|run| {
@@ -191,7 +314,6 @@ impl Scheduler {
                             .contains(&run.status.as_str())
                 })
             });
-            let late = (now - saved.next_at).num_seconds() > 60;
             let capacity_busy = runs
                 .iter()
                 .filter(|r| {
@@ -201,8 +323,10 @@ impl Scheduler {
                 >= 3;
             let skip = overlap || capacity_busy || (late && saved.definition.missed == "skip");
             let mut request = saved.definition.request.clone();
+            request.monitor_change = change.clone();
             request.id = uuid::Uuid::new_v4().to_string();
             let event = Occurrence {
+                change,
                 due_at: saved.next_at,
                 run_id: (!skip).then(|| request.id.clone()),
                 outcome: if overlap {
@@ -219,8 +343,14 @@ impl Scheduler {
             let mut updated = ledger.clone();
             updated.schedules[index].next_at = next;
             updated.schedules[index].history.push(event);
+            if observation.as_ref().is_some_and(|r| r.is_ok()) {
+                updated.schedules[index].local_checks += 1;
+            }
             if !skip {
                 updated.schedules[index].last_run_id = Some(request.id.clone());
+                if let Some(Ok(revision)) = observation {
+                    updated.schedules[index].observed_revision = Some(revision);
+                }
             }
             if updated.schedules[index].history.len() > 200 {
                 updated.schedules[index].history.remove(0);
@@ -256,6 +386,10 @@ impl Scheduler {
                 Err(error) => format!("Failed to start: {error}"),
             };
             ledger.schedules[index].history.last_mut().unwrap().outcome = outcome;
+            if ledger.schedules[index].definition.monitor.is_some() {
+                ledger.schedules[index].last_notice =
+                    ledger.schedules[index].history.last().cloned();
+            }
             self.persist(&ledger)?;
         }
         Ok(())
@@ -268,40 +402,106 @@ pub fn schedule_list(service: State<'_, Scheduler>) -> ScheduleLedger {
 }
 
 #[tauri::command]
-pub fn schedule_save(
-    mut definition: ScheduleDefinition,
+pub async fn schedule_inspect_change(
+    id: String,
+    due_at: DateTime<Utc>,
+    service: State<'_, Scheduler>,
+) -> Result<String, String> {
+    let (project, change) = {
+        let ledger = service.ledger.lock().map_err(|e| e.to_string())?;
+        let saved = ledger
+            .schedules
+            .iter()
+            .find(|s| s.definition.id == id)
+            .ok_or("Schedule not found")?;
+        let event = saved
+            .history
+            .iter()
+            .chain(saved.last_notice.iter())
+            .find(|e| e.due_at == due_at)
+            .ok_or("This occurrence is no longer retained")?;
+        let change = event
+            .change
+            .clone()
+            .ok_or("No content change was recorded for this occurrence")?;
+        let project = if change.project_path.is_empty() {
+            saved.definition.request.project_path.clone()
+        } else {
+            change.project_path.clone()
+        };
+        (project, change)
+    };
+    tauri::async_runtime::spawn_blocking(move || super::monitors::inspect(&project, &change))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn schedule_save(
+    definition: ScheduleDefinition,
     service: State<'_, Scheduler>,
 ) -> Result<(), String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || save_definition(definition, &service))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn save_definition(mut definition: ScheduleDefinition, service: &Scheduler) -> Result<(), String> {
     if uuid::Uuid::parse_str(&definition.id).is_err()
         || definition.name.trim().is_empty()
         || definition.name.len() > 160
         || !["skip", "once"].contains(&definition.missed.as_str())
-        || definition.request.prompt.trim().is_empty()
+        || (definition.request.prompt.trim().is_empty()
+            && !definition
+                .monitor
+                .as_ref()
+                .is_some_and(|m| m.action == super::monitors::MonitorAction::Notify))
         || definition.request.prompt.len() > 100_000
     {
         return Err("Provide a name, instructions and valid missed-run policy.".into());
     }
     definition.request.isolated = true;
     definition.request.previous_run_id = None;
-    service
-        .coordinator
-        .runtime
-        .apply_policy(&mut definition.request)?;
+    let monitor_only = definition
+        .monitor
+        .as_ref()
+        .is_some_and(|m| m.action == super::monitors::MonitorAction::Notify);
+    if !monitor_only {
+        service
+            .coordinator
+            .runtime
+            .apply_policy(&mut definition.request)?;
+    }
     definition.request.target_branch = Some(super::tasks::resolve_target_branch(
         &definition.request.project_path,
         definition.request.target_branch.as_deref(),
     )?);
-    let (adapter, _) = service
-        .coordinator
-        .runtime
-        .policy()?
-        .resolve(&definition.request.agent)?;
-    let account = super::agent_profiles::bind_account(
-        &service.coordinator.runtime.profiles_root(),
-        &adapter,
-        definition.request.agent_profile_id.as_deref(),
-    )?;
-    definition.request.agent_profile_id = account.profile_id.clone();
+    if let Some(monitor) = &definition.monitor {
+        let revision = monitor.observe(
+            &definition.request.project_path,
+            definition.request.target_branch.as_deref().unwrap(),
+        )?;
+        if revision == "absent" {
+            return Err("Choose a path that exists on the saved local branch.".into());
+        }
+    }
+    let account = if monitor_only {
+        None
+    } else {
+        let (adapter, _) = service
+            .coordinator
+            .runtime
+            .policy()?
+            .resolve(&definition.request.agent)?;
+        let account = super::agent_profiles::bind_account(
+            &service.coordinator.runtime.profiles_root(),
+            &adapter,
+            definition.request.agent_profile_id.as_deref(),
+        )?;
+        definition.request.agent_profile_id = account.profile_id.clone();
+        Some(account)
+    };
     let next = next_at(&definition.expression, &definition.timezone, Utc::now())?;
     let mut ledger = service.ledger.lock().map_err(|e| e.to_string())?;
     let mut updated = ledger.clone();
@@ -310,19 +510,33 @@ pub fn schedule_save(
         .iter_mut()
         .find(|saved| saved.definition.id == definition.id)
     {
+        if serde_json::to_value(&saved.definition.monitor).ok()
+            != serde_json::to_value(&definition.monitor).ok()
+            || saved.definition.request.project_path != definition.request.project_path
+            || saved.definition.request.target_branch != definition.request.target_branch
+        {
+            saved.observed_revision = None;
+            saved.last_notice = None;
+            saved.local_checks = 0;
+            saved.quiet_checks = 0;
+        }
         saved.definition = definition;
         saved.next_at = next;
-        saved.account = Some(account);
+        saved.account = account;
     } else {
         if updated.schedules.len() >= 100 {
             return Err("This profile already has 100 schedules.".into());
         }
         updated.schedules.push(SavedSchedule {
+            last_notice: None,
+            observed_revision: None,
+            local_checks: 0,
+            quiet_checks: 0,
             definition,
             next_at: next,
             history: vec![],
             last_run_id: None,
-            account: Some(account),
+            account,
         });
     }
     service.persist(&updated)?;
@@ -367,9 +581,11 @@ pub fn schedule_set_enabled(
 }
 
 #[cfg(test)]
+mod monitor_tests;
+#[cfg(test)]
 mod tests {
     use super::*;
-    fn fixture(missed: &str) -> (PathBuf, Scheduler) {
+    pub(super) fn fixture(missed: &str) -> (PathBuf, Scheduler) {
         let directory =
             std::env::temp_dir().join(format!("jackalope-schedule-{}", uuid::Uuid::new_v4()));
         let runtime = super::super::tasks::TaskRuntime::new(directory.clone()).unwrap();
@@ -385,6 +601,10 @@ mod tests {
             .unwrap()
             .schedules
             .push(SavedSchedule {
+                last_notice: None,
+                observed_revision: None,
+                local_checks: 0,
+                quiet_checks: 0,
                 definition,
                 next_at: DateTime::parse_from_rfc3339("2026-09-06T09:00:00Z")
                     .unwrap()

@@ -60,6 +60,8 @@ export function AddWork({
           projectPath: project.path,
           targetBranch: project.preferences?.baseBranch || project.gitBranch,
           verifyCommand: project.preferences?.verifyCommand,
+          prepareCommand: project.preferences?.prepareCommand,
+          autoVerify: project.preferences?.autoVerify === true,
           agentProfileId: project.preferences?.agentAccounts?.[draft.agent],
           scopes: draft.scopes
             .split(',')
@@ -133,9 +135,15 @@ export function AddWork({
                   value={draft.agent}
                   onValueChange={(value) => update({ agent: value })}
                 >
-                  {['codex', 'claude', 'grok'].map((id) => (
+                  {['codex', 'claude', 'grok', 'opencode'].map((id) => (
                     <SelectItem key={id} value={id}>
-                      {id === 'claude' ? 'Claude Code' : id === 'codex' ? 'Codex' : 'Grok'}
+                      {id === 'claude'
+                        ? 'Claude Code'
+                        : id === 'codex'
+                          ? 'Codex'
+                          : id === 'opencode'
+                            ? 'OpenCode'
+                            : 'Grok'}
                       {runners.find((r) => r.id === id)?.available ? '' : ' · not detected'}
                     </SelectItem>
                   ))}

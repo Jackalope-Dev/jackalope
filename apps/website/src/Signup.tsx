@@ -1,6 +1,9 @@
+import { accessMessage, accessOrigin, accessRequest } from './access-api';
+import './access.css';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, Check, LoaderCircle, Mail, X } from 'lucide-react';
+import { ArrowRight, Check, GitBranch, Layers3, LoaderCircle, X } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { BrandMark } from './BrandMark';
 import { signupActions } from './signup-config';
 
 export function Signup({ popup = false }: { popup?: boolean }) {
@@ -20,20 +23,33 @@ export function Signup({ popup = false }: { popup?: boolean }) {
     setState('sending');
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(action, {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-        body: new URLSearchParams({
-          email: String(data.get('email') || '').trim(),
-          website: String(data.get('website') || ''),
-        }),
-        signal: controller.signal,
-        credentials: 'omit',
-      });
-      const result = await response.json();
-      if (!response.ok || result.success !== true) {
+      const response = accessOrigin
+        ? null
+        : await fetch(action, {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+            body: new URLSearchParams({
+              email: String(data.get('email') || '').trim(),
+              website: String(data.get('website') || ''),
+            }),
+            signal: controller.signal,
+            credentials: 'omit',
+          });
+      const result = accessOrigin
+        ? await accessRequest<{ success: boolean; optIn?: { required: boolean } }>(
+            'waitlist',
+            {
+              email: String(data.get('email') || '').trim(),
+              website: String(data.get('website') || ''),
+              newsletter: data.get('newsletter') === 'on',
+              source: popup ? 'popup' : 'inline',
+            },
+            controller.signal,
+          )
+        : await response?.json();
+      if ((response && !response.ok) || result.success !== true) {
         setMessage(
-          response.status === 429
+          response?.status === 429
             ? 'A few too many attempts. Please wait a moment and try again.'
             : 'We could not subscribe this address. Check your email and try again.',
         );
@@ -42,13 +58,19 @@ export function Signup({ popup = false }: { popup?: boolean }) {
       }
       setState('success');
       setMessage(
-        result.optIn?.required
-          ? 'Check your inbox to confirm your email and finish joining the list.'
-          : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',
+        accessOrigin
+          ? 'You’re on the waitlist. We’ll email you when your access is approved. If you opted into product notes, check your inbox for any confirmation steps.'
+          : result.optIn?.required
+            ? 'Check your inbox to confirm your email and finish joining the list.'
+            : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',
       );
       form.reset();
-    } catch {
-      setMessage('The connection did not go through. Please try again in a moment.');
+    } catch (error) {
+      setMessage(
+        accessOrigin
+          ? accessMessage(error)
+          : 'The connection did not go through. Please try again in a moment.',
+      );
       setState('error');
     } finally {
       clearTimeout(timeout);
@@ -109,9 +131,24 @@ export function Signup({ popup = false }: { popup?: boolean }) {
             </button>
           </div>
           <p id={`${id}-consent`} className="signup-consent">
-            By joining, you agree to receive Jackalope launch news and occasional product notes from
-            Jackalope Digital LLC. Unsubscribe anytime. <a href="/privacy/">Privacy</a>.
+            {accessOrigin ? (
+              <>
+                We’ll email you about your access request. Product notes are optional.{' '}
+                <a href="/privacy/">Privacy</a>.
+              </>
+            ) : (
+              <>
+                By joining, you agree to receive Jackalope launch news and occasional product notes
+                from Jackalope Digital LLC. Unsubscribe anytime. <a href="/privacy/">Privacy</a>.
+              </>
+            )}
           </p>
+          {accessOrigin && (
+            <label className="signup-newsletter">
+              <input name="newsletter" type="checkbox" disabled={state === 'sending'} />
+              <span>Also send me occasional Jackalope product notes. Unsubscribe anytime.</span>
+            </label>
+          )}
           {state === 'error' && (
             <p className="signup-error" role="alert">
               {message}
@@ -132,6 +169,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
 }
 
 export function WaitlistButton({ compact = false, label }: { compact?: boolean; label?: string }) {
+  const content = useRef<HTMLDivElement>(null);
   return (
     <Dialog.Root>
       <Dialog.Trigger
@@ -142,17 +180,47 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="release-dialog waitlist-dialog">
+        <Dialog.Content
+          className="release-dialog waitlist-dialog"
+          ref={content}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            content.current
+              ?.querySelector<HTMLInputElement>('input[type="email"]')
+              ?.focus({ preventScroll: true });
+          }}
+        >
           <Dialog.Close className="icon-button dialog-close" aria-label="Close waitlist">
             <X size={20} />
           </Dialog.Close>
-          <Mail className="dialog-mark" size={32} />
-          <Dialog.Title>Something good is taking shape.</Dialog.Title>
-          <Dialog.Description>
-            Be there when Jackalope is ready. Get the Windows launch announcement and occasional
-            notes from the studio.
-          </Dialog.Description>
-          <Signup popup />
+          <div className="waitlist-art" aria-hidden="true">
+            <span className="waitlist-orbit" />
+            <span className="waitlist-orbit waitlist-orbit-inner" />
+            <span className="waitlist-stamp">
+              <BrandMark />
+            </span>
+            <span className="waitlist-art-note">
+              A little structure.
+              <br />A lot of possibility.
+            </span>
+            <span className="waitlist-art-label">JACKALOPE / EARLY DAYS</span>
+          </div>
+          <div className="waitlist-body">
+            <Dialog.Title>Join the Windows waitlist</Dialog.Title>
+            <Dialog.Description>
+              Your projects, your agents, a calmer place to build. Join the Windows waitlist and be
+              there for what comes next.
+            </Dialog.Description>
+            <ul className="waitlist-perks">
+              <li>
+                <Layers3 size={15} /> One home for your agents
+              </li>
+              <li>
+                <GitBranch size={15} /> Built for local projects
+              </li>
+            </ul>
+            <Signup popup />
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -163,16 +231,12 @@ export function Newsletter() {
   return (
     <section id="newsletter" className="newsletter page-width" aria-labelledby="newsletter-title">
       <div>
-        <p className="eyebrow">LET’S KEEP IN TOUCH</p>
         <h2 id="newsletter-title">
           The next chapter,
           <br />
           in your inbox.
         </h2>
-        <p>
-          Windows launch news. Thoughtful product notes.
-          <br />A little Jackalope, every now and then.
-        </p>
+        <p>Windows launch news and occasional product updates.</p>
       </div>
       <Signup />
     </section>

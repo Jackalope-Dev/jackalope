@@ -1,12 +1,14 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, GitBranch, Search, Settings2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AgentManager } from '../agents/AgentManager';
 import { BrowserHarness } from '../browser/BrowserHarness';
+import { Companion } from '../mascot/Companion';
+import { CompanionSources } from '../mascot/CompanionSources';
 import { McpWorkspace } from '../mcp/McpWorkspace';
 import { ProjectPreferences } from '../projects/ProjectPreferences';
 import { WorktreeManager } from '../projects/WorktreeManager';
@@ -14,9 +16,9 @@ import { ScheduleManager } from '../schedules/ScheduleManager';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { UpdateNotice } from '../settings/UpdateNotice';
+import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 import { ProjectSetup } from '../tasks/ProjectSetup';
-import { RepoTodos } from '../tasks/RepoTodos';
 import { RunnerConnections } from '../tasks/RunnerConnections';
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
@@ -30,7 +32,17 @@ import { TitleBar } from './TitleBar';
 
 export type { ActiveTab } from './navigation';
 
-export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) {
+const RepoTodos = lazy(() =>
+  import('../tasks/RepoTodos').then((module) => ({ default: module.RepoTodos })),
+);
+
+export function Shell({
+  initialTaskAgent,
+  initialCapture,
+}: {
+  initialTaskAgent?: string;
+  initialCapture?: boolean;
+} = {}) {
   const [setupOpen, setSetupOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsCategory, setSettingsCategory] = useState<'General' | 'System' | 'Diagnostics'>(
@@ -55,7 +67,10 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
     if (settingsOpen) telemetry.track({ name: 'feature_used', feature: 'settings' });
   }, [settingsOpen]);
   const [commandsOpen, setCommandsOpen] = useState(false);
-  const [newTaskAgent, setNewTaskAgent] = useState<string | null>(initialTaskAgent ?? null);
+  const [capture, setCapture] = useState<{ ideaId?: string; agent?: string } | null>(
+    initialTaskAgent ? { agent: initialTaskAgent } : initialCapture ? {} : null,
+  );
+  const [scheduleRunId, setScheduleRunId] = useState<string>();
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
@@ -76,6 +91,13 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setCommandsOpen((open) => !open);
+      } else if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'n'
+      ) {
+        event.preventDefault();
+        setCapture({});
       } else if ((event.metaKey || event.ctrlKey) && event.key === ',') {
         event.preventDefault();
         setSettingsOpen((open) => !open);
@@ -137,6 +159,16 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         <div className="flex items-center gap-3">
           <button
             type="button"
+            className="command-trigger"
+            onClick={() => setCapture({})}
+            aria-label="Capture a task"
+            title="New task (Ctrl+Shift+N)"
+          >
+            <Plus size={16} />
+            <span>New task</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setCommandsOpen(true)}
             className="command-trigger"
             aria-label="Search commands"
@@ -172,6 +204,36 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
             </button>
           ))}
         </nav>
+        <div className="workspace-nav-support">
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <button
+                type="button"
+                className="workspace-nav-item"
+                aria-label="Agents and connections"
+              >
+                Agents & connections
+                <ChevronDown size={14} />
+              </button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                {WORKSPACE_VIEWS.filter((item) => ['agents', 'mcps'].includes(item.id)).map(
+                  (item) => (
+                    <Menu.Item
+                      key={item.id}
+                      className="workspace-menu-item"
+                      onSelect={() => navigate(item.id)}
+                    >
+                      <item.icon size={16} />
+                      {item.label}
+                    </Menu.Item>
+                  ),
+                )}
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
+        </div>
       </div>
       <main
         id="workspace-content"
@@ -204,31 +266,39 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
             </nav>
           </div>
         )}
-        <UpdateNotice />
-        <ScheduleNotice />
-        <HistoryRecoveryNotice />
-        <UnsavedTasksNotice />
         {activeTab === 'kanban' && (
           <TaskWorkspace
-            key={activeProjectId}
-            newTaskAgent={newTaskAgent}
-            onNewTaskHandled={() => setNewTaskAgent(null)}
+            onCapture={(ideaId) => setCapture({ ideaId })}
+            onSchedule={(id) => {
+              const run = useExecutionStore.getState().runs.find((r) => r.id === id);
+              if (run) selectProject(run.projectId);
+              setScheduleRunId(id);
+              setActiveTab('schedules');
+            }}
           />
         )}
         {activeTab === 'worktrees' && (
           <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
         )}
         {activeTab === 'repo-todos' && (
-          <RepoTodos
-            key={project?.path ?? activeProjectId}
-            onOpenProject={() => setSetupOpen(true)}
-          />
+          <Suspense
+            fallback={
+              <p className="workspace-page" role="status">
+                Opening repository TODOs…
+              </p>
+            }
+          >
+            <RepoTodos
+              key={project?.path ?? activeProjectId}
+              onOpenProject={() => setSetupOpen(true)}
+            />
+          </Suspense>
         )}
         {activeTab === 'agents' && (
           <RunnerConnections
             onNewTask={(agent) => {
               useExecutionStore.getState().select(null);
-              setNewTaskAgent(agent);
+              setCapture({ agent });
               setActiveTab('kanban');
             }}
             onRun={(run) => {
@@ -249,6 +319,8 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         {activeTab === 'schedules' && (
           <ScheduleManager
             key={activeProjectId}
+            sourceRunId={scheduleRunId}
+            onSourceHandled={() => setScheduleRunId(undefined)}
             onOpenProject={() => setSetupOpen(true)}
             onPlanning={() => {
               useExecutionStore.getState().select(null);
@@ -267,11 +339,35 @@ export function Shell({ initialTaskAgent }: { initialTaskAgent?: string } = {}) 
         )}
         {activeTab === 'topology' && <CodebaseMap onOpenProject={() => setSetupOpen(true)} />}
       </main>
+      {capture && (
+        <CaptureTask
+          key={capture.ideaId ?? 'capture'}
+          {...capture}
+          onClose={() => setCapture(null)}
+          onStarted={() => {
+            setCapture(null);
+            setActiveTab('kanban');
+          }}
+        />
+      )}
+      <UpdateNotice />
+      <ScheduleNotice />
+      <HistoryRecoveryNotice />
+      <UnsavedTasksNotice />
+      <CompanionSources />
+      <Companion
+        onSearch={() => setCommandsOpen(true)}
+        onSettings={() => {
+          setSettingsCategory('General');
+          setSettingsOpen(true);
+        }}
+      />
       <ProjectSetup open={setupOpen} onClose={() => setSetupOpen(false)} />
       <CommandPalette
         isOpen={commandsOpen}
         onClose={() => setCommandsOpen(false)}
         onNavigate={navigate}
+        onCapture={() => setCapture({})}
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <SettingsDialog

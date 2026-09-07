@@ -2,7 +2,9 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
+import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
 import { Button } from '../ui/button';
 
 export function UnsavedTasksNotice() {
@@ -10,6 +12,17 @@ export function UnsavedTasksNotice() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const unsaved = runs.filter((run) => run.persistenceError);
   const selected = runs.find((run) => run.id === selectedId);
+  useCompanionNotices(
+    'unsaved',
+    unsaved.map((run) => ({
+      id: `unsaved:${run.id}`,
+      title: 'Task history has not been saved',
+      detail: `${run.projectName} · ${taskTitle(run.prompt)}\nKeep Jackalope open while you recover this task’s history.`,
+      kind: 'attention',
+      actionLabel: 'Recover task history',
+      onOpen: () => setSelectedId(run.id),
+    })),
+  );
   if (!unsaved.length && !selected) return null;
   return (
     <Dialog.Root
@@ -18,22 +31,12 @@ export function UnsavedTasksNotice() {
         if (!open) setSelectedId(null);
       }}
     >
-      {!!unsaved.length && (
-        <div className="history-recovery-notice">
-          <p role="status" className="min-w-0 flex-1">
-            {unsaved.length} {unsaved.length === 1 ? 'task has' : 'tasks have'} unsaved history.
-            Keep Jackalope open while you recover it.
-          </p>
-          <Dialog.Trigger asChild>
-            <Button variant="ghost" onClick={() => setSelectedId(unsaved[0].id)}>
-              Review unsaved task
-            </Button>
-          </Dialog.Trigger>
-        </div>
-      )}
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content className="task-dialog appearance-panel history-recovery-dialog">
+        <Dialog.Content
+          className="task-dialog appearance-panel history-recovery-dialog"
+          onCloseAutoFocus={returnToCompanion}
+        >
           <Dialog.Close className="task-close" aria-label="Close unsaved task recovery">
             <X size={18} />
           </Dialog.Close>

@@ -2,6 +2,8 @@ use super::*;
 
 fn sample(agent: &str) -> TaskRun {
     TaskRun {
+        monitor_change: None,
+        context_receipt: Default::default(),
         id: "test-attempt-123".into(),
         task_id: "task-123".into(),
         project_id: "project-123".into(),
@@ -15,7 +17,11 @@ fn sample(agent: &str) -> TaskRun {
         target_branch: None,
         process_contained: false,
         verify_command: None,
+        prepare_command: None,
+        auto_verify: false,
         verification: None,
+        finishing: false,
+        verification_error: None,
         account: "test".into(),
         connection_ids: None,
         model: None,
@@ -32,11 +38,168 @@ fn sample(agent: &str) -> TaskRun {
         persistence_error: None,
         exit_code: None,
         usage: Usage::default(),
+        mcp_usage: None,
         usage_observations: vec![],
         prompts: vec![],
         validation_steps: vec![],
         screenshots: vec![],
     }
+}
+
+#[test]
+fn opencode_stream_tracks_results_sessions_errors_and_deduplicated_step_usage() {
+    let mut run = sample("opencode");
+    consume_event(
+        &mut run,
+        r#"{"type":"text","sessionID":"ses_example","part":{"text":"First thought"}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"step_start","sessionID":"ses_example","part":{}}"#,
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"text","sessionID":"ses_example","part":{"text":"Done."}}"#,
+    );
+    let usage = r#"{"type":"step_finish","part":{"id":"part_1","tokens":{"input":10,"output":4,"cache":{"read":3,"write":2}},"cost":0.01}}"#;
+    consume_event(&mut run, usage);
+    consume_event(&mut run, usage);
+    assert_eq!(run.session_id.as_deref(), Some("ses_example"));
+    assert_eq!(run.result, "Done.");
+    assert_eq!((run.usage.input, run.usage.output), (15, 4));
+    assert_eq!(run.usage.estimated_cost_usd, Some(0.01));
+    assert!(run.usage.reported);
+    consume_event(
+        &mut run,
+        r#"{"type":"error","error":{"name":"APIError","data":{"message":"Provider unavailable"}}}"#,
+    );
+    assert_eq!(run.error.as_deref(), Some("Provider unavailable"));
+}
+
+#[test]
+#[ignore = "Runs a paid or free installed agent in a disposable repository; set JACKALOPE_AGENT_TRIAL"]
+fn installed_agent_lifecycle_trial() {
+    let agent = std::env::var("JACKALOPE_AGENT_TRIAL").expect("Choose the agent explicitly");
+    assert!(BUILTIN_AGENTS.contains(&agent.as_str()));
+    let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
+    let repo = root.join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    let repo_text = repo.to_string_lossy().to_string();
+    for args in [
+        vec!["init", "-b", "main"],
+        vec!["config", "core.autocrlf", "false"],
+        vec!["config", "user.name", "Jackalope fixture"],
+        vec!["config", "user.email", "fixture@example.invalid"],
+    ] {
+        git(&repo_text, &args).unwrap();
+    }
+    std::fs::write(
+        repo.join("README.md"),
+        "Disposable agent acceptance fixture.\n",
+    )
+    .unwrap();
+    git(&repo_text, &["add", "README.md"]).unwrap();
+    git(
+        &repo_text,
+        &[
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-m",
+            "Fixture baseline",
+        ],
+    )
+    .unwrap();
+    let history = root.join("history");
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
+    let model = std::env::var("JACKALOPE_AGENT_MODEL").ok();
+    let request = RunRequest {
+        id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
+        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: agent.clone(),
+        agent_profile_id: None, verify_command: None, target_branch: Some("main".into()),
+        account_binding: None, model,
+        prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
+        isolated: true, previous_run_id: None, connection_ids: Some(vec![]), coordination: None,
+        prepare_command: None, auto_verify: false, monitor_change: None,
+        context_selection: Default::default(), context_receipt: Default::default(),
+    };
+    fn settled(runtime: &TaskRuntime, id: &str) -> TaskRun {
+        let deadline = std::time::Instant::now() + Duration::from_secs(180);
+        loop {
+            let run = runtime.inner.lock().unwrap().runs[id].clone();
+            if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                return run;
+            }
+            if std::time::Instant::now() > deadline {
+                let _ = runtime.stop(id);
+                panic!(
+                    "Agent trial timed out; retained fixture history at {}",
+                    runtime.directory.display()
+                );
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    }
+    runtime.start(request.clone()).unwrap();
+    let first = settled(&runtime, &request.id);
+    assert_eq!(
+        first.status,
+        "review",
+        "{:?}; fixture {}",
+        first.error,
+        root.display()
+    );
+    assert_eq!(
+        std::fs::read_to_string(Path::new(&first.workspace).join("receipt.txt"))
+            .unwrap()
+            .trim(),
+        "JACKALOPE_NATIVE_OK"
+    );
+    assert!(!repo.join("receipt.txt").exists());
+    assert!(first.session_id.is_some());
+    assert!(first.usage.reported);
+    let mut next = request.clone();
+    next.id = uuid::Uuid::new_v4().to_string();
+    next.previous_run_id = Some(first.id.clone());
+    next.prompt = "Reply with only the phrase I asked you to remember in the previous turn. Do not use tools.".into();
+    runtime.start(next.clone()).unwrap();
+    let second = settled(&runtime, &next.id);
+    assert_eq!(second.status, "review", "{:?}", second.error);
+    assert!(
+        second.result.contains("copper-rabbit-731"),
+        "Continuation did not retain context"
+    );
+    assert_eq!(first.session_id, second.session_id);
+    assert_eq!(
+        first.account_binding.as_ref().unwrap().directory,
+        second.account_binding.as_ref().unwrap().directory
+    );
+    let mut stop = request;
+    stop.id = uuid::Uuid::new_v4().to_string();
+    stop.isolated = false;
+    stop.prompt = "Explain the tradeoffs of breadth-first and depth-first search in detail. Do not use tools.".into();
+    runtime.start(stop.clone()).unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while !runtime
+        .inner
+        .lock()
+        .unwrap()
+        .processes
+        .contains_key(&stop.id)
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    runtime.stop(&stop.id).unwrap();
+    assert_eq!(settled(&runtime, &stop.id).status, "stopped");
+    std::thread::sleep(Duration::from_millis(300));
+    drop(runtime);
+    let restored = TaskRuntime::new(history).unwrap();
+    assert_eq!(
+        restored.inner.lock().unwrap().runs[&second.id].result,
+        second.result
+    );
+    println!("Verified {agent}: isolated edit, reported usage, continuation, account binding, cancellation, restart. Fixture: {}", root.display());
 }
 
 #[test]
@@ -172,6 +335,9 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let request = RunRequest {
+        monitor_change: None,
+        context_selection: Default::default(),
+        context_receipt: Default::default(),
         id: "fixture-run-123".into(),
         project_id: "fixture".into(),
         project_name: "Fixture".into(),
@@ -179,6 +345,8 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
         agent: "default".into(),
         agent_profile_id: None,
         verify_command: None,
+        prepare_command: None,
+        auto_verify: false,
         target_branch: None,
         account_binding: None,
         model: None,
@@ -486,4 +654,91 @@ async fn per_agent_discovery_runs_concurrently_not_sequentially() {
         "four 150ms blocking tasks should overlap (~150ms total), not sum to ~600ms; took {:?}",
         started.elapsed()
     );
+}
+
+#[test]
+fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_stop() {
+    let root = std::env::temp_dir().join(format!("jackalope-finish-{}", uuid::Uuid::new_v4()));
+    let workspace = root.join("repo");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let path = workspace.to_str().unwrap();
+    git(path, &["init", "-b", "master"]).unwrap();
+    git(
+        path,
+        &[
+            "-c",
+            "user.name=Trial",
+            "-c",
+            "user.email=trial@example.test",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+    )
+    .unwrap();
+    let runtime = TaskRuntime::new(root.join("profile")).unwrap();
+    let mut run = sample("codex");
+    run.project_path = path.into();
+    run.workspace = path.into();
+    run.base_head = git(path, &["rev-parse", "HEAD"]).unwrap();
+    run.verify_command = Some("echo checked >> .git/check-count".into());
+    run.auto_verify = true;
+    runtime.save(&run).unwrap();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(run.id.clone(), run.clone());
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    let first = runtime
+        .integration_runs()
+        .unwrap()
+        .remove(0)
+        .verification
+        .unwrap();
+    assert!(first.result.success);
+    assert!(first.tree.is_some());
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(workspace.join(".git/check-count"))
+            .unwrap()
+            .lines()
+            .count(),
+        1
+    );
+    std::fs::write(workspace.join("result.txt"), "new output").unwrap();
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(workspace.join(".git/check-count"))
+            .unwrap()
+            .lines()
+            .count(),
+        2
+    );
+    runtime.stop(&run.id).unwrap();
+    std::fs::write(workspace.join("result.txt"), "changed again").unwrap();
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(workspace.join(".git/check-count"))
+            .unwrap()
+            .lines()
+            .count(),
+        2
+    );
+    drop(runtime);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn old_task_records_do_not_opt_into_automatic_execution() {
+    let mut value = serde_json::to_value(sample("codex")).unwrap();
+    for field in ["autoVerify", "finishing", "verificationError"] {
+        value.as_object_mut().unwrap().remove(field);
+    }
+    let saved: TaskRun = serde_json::from_value(value).unwrap();
+    assert!(!saved.auto_verify);
+    assert!(!saved.finishing);
+    assert!(saved.verification_error.is_none());
 }

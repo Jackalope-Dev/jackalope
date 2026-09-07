@@ -123,7 +123,11 @@ export function McpWorkspace() {
       return (
         s.name.toLowerCase().includes(q) ||
         s.id.toLowerCase().includes(q) ||
-        s.description?.toLowerCase().includes(q)
+        s.description?.toLowerCase().includes(q) ||
+        probeResults[`${s.scope}:${s.id}`]?.tools.some(
+          (tool) =>
+            tool.name.toLowerCase().includes(q) || tool.description?.toLowerCase().includes(q),
+        )
       );
     }
     return true;
@@ -251,7 +255,7 @@ export function McpWorkspace() {
               <input
                 aria-label="Filter connections"
                 className="task-input with-search-icon w-full py-1.5 text-xs"
-                placeholder="Filter configured MCPs…"
+                placeholder="Filter connections or checked tools…"
                 value={configuredSearch}
                 onChange={(e) => setConfiguredSearch(e.target.value)}
               />
@@ -305,7 +309,8 @@ export function McpWorkspace() {
                       <div className="mcp-card-header">
                         <h3 className="mcp-card-title">{server.name}</h3>
                         <div className="mcp-card-badges">
-                          {server.transport === 'http' &&
+                          {!server.discovery &&
+                            server.transport === 'http' &&
                             (server.scope === 'codex' ||
                               server.scope === 'claude' ||
                               server.scope.startsWith('project:') ||
@@ -345,6 +350,7 @@ export function McpWorkspace() {
                                 : server.scope}
                           </span>
                           <span className="mcp-pill">{server.transport}</span>
+                          {server.discovery && <span className="mcp-pill">On demand</span>}
                         </div>
                       </div>
 
@@ -374,7 +380,7 @@ export function McpWorkspace() {
                           {probe.ok ? (
                             <div className="text-xs text-[var(--color-success)] flex items-center gap-1.5 font-medium">
                               <CheckCircle size={13} />
-                              Active ({probe.latencyMs ?? 0}ms) · {probe.tools.length} tool
+                              Checked ({probe.latencyMs ?? 0}ms) · {probe.tools.length} tool
                               {probe.tools.length === 1 ? '' : 's'} available
                             </div>
                           ) : (
@@ -385,16 +391,32 @@ export function McpWorkspace() {
                           )}
 
                           {probe.ok && probe.tools.length > 0 && (
-                            <div className="mcp-tools-list">
-                              {probe.tools.map((t) => (
-                                <div key={t.name} className="mcp-tool-item">
-                                  <span className="mcp-tool-name">{t.name}</span>
-                                  {t.description && (
-                                    <span className="mcp-tool-desc">{t.description}</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                            <details>
+                              <summary className="min-h-11 py-3">
+                                Inspect {probe.tools.length} tools
+                              </summary>
+                              <div className="mcp-tools-list">
+                                {probe.tools
+                                  .filter(
+                                    (tool) =>
+                                      !configuredSearch.trim() ||
+                                      `${tool.name} ${tool.description ?? ''}`
+                                        .toLowerCase()
+                                        .includes(configuredSearch.toLowerCase()) ||
+                                      `${server.name} ${server.id} ${server.description ?? ''}`
+                                        .toLowerCase()
+                                        .includes(configuredSearch.toLowerCase()),
+                                  )
+                                  .map((t) => (
+                                    <div key={t.name} className="mcp-tool-item">
+                                      <span className="mcp-tool-name">{t.name}</span>
+                                      {t.description && (
+                                        <span className="mcp-tool-desc">{t.description}</span>
+                                      )}
+                                    </div>
+                                  ))}
+                              </div>
+                            </details>
                           )}
                         </div>
                       )}

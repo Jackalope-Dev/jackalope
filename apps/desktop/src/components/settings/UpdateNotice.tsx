@@ -2,7 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useUpdateStore } from '../../stores/updateStore';
-import { Button } from '../ui/button';
+import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
 import { UpdateSettings } from './UpdateSettings';
 
 export function UpdateNotice() {
@@ -25,27 +25,43 @@ export function UpdateNotice() {
     };
   }, [update.load]);
   const version = update.release?.availableVersion;
-  if (!open && (!version || update.dismissedVersion === version)) return null;
+  useCompanionNotices(
+    'update',
+    update.error
+      ? [
+          {
+            id: `update-error:${update.error}`,
+            title: 'Update needs attention',
+            detail: update.error,
+            kind: 'attention',
+            actionLabel: 'Review update',
+            onOpen: () => setOpen(true),
+          },
+        ]
+      : version && update.dismissedVersion !== version
+        ? [
+            {
+              id: `update:${version}`,
+              title: update.installing
+                ? 'Updating Jackalope…'
+                : `Jackalope ${version} is available`,
+              detail: 'Review what’s new and install when your work is saved.',
+              kind: 'info',
+              actionLabel: 'Review update',
+              onOpen: () => setOpen(true),
+              onDismiss: update.installing ? undefined : update.dismiss,
+            },
+          ]
+        : [],
+  );
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <div className="flex flex-wrap shrink-0 items-center gap-3 px-6 py-2 text-sm bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)]">
-        <p className="flex-1 min-w-0" role="status">
-          {update.installing
-            ? 'Updating Jackalope…'
-            : version
-              ? `Jackalope ${version} is available.`
-              : 'Jackalope is up to date.'}
-        </p>
-        <Dialog.Trigger asChild>
-          <Button variant="ghost">Review update</Button>
-        </Dialog.Trigger>
-        <Button variant="ghost" disabled={update.installing} onClick={update.dismiss}>
-          Later
-        </Button>
-      </div>
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content className="task-dialog appearance-panel history-recovery-dialog">
+        <Dialog.Content
+          className="task-dialog appearance-panel history-recovery-dialog"
+          onCloseAutoFocus={returnToCompanion}
+        >
           <Dialog.Close className="task-close" aria-label="Close update details">
             <X size={18} />
           </Dialog.Close>

@@ -11,6 +11,11 @@ interface JackalopeMascotProps {
   bubbleAlign?: 'center' | 'end';
   bubbleSide?: 'above' | 'below';
   reduceMotion?: boolean;
+  onActivate?: () => void;
+  label?: string;
+  buttonId?: string;
+  expanded?: boolean;
+  controls?: string;
 }
 
 const mascotMotion = {
@@ -59,6 +64,11 @@ export function JackalopeMascot({
   bubbleAlign = 'center',
   bubbleSide = 'above',
   reduceMotion: forceReducedMotion = false,
+  onActivate,
+  label,
+  buttonId,
+  expanded,
+  controls,
 }: JackalopeMascotProps) {
   const { mood, message, pet } = useMascotStore();
   const faceMask = useId();
@@ -98,14 +108,18 @@ export function JackalopeMascot({
       </AnimatePresence>
       <motion.button
         type="button"
-        onClick={pet}
+        onClick={onActivate ?? pet}
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        aria-label={`Pet Jackalope, currently ${currentMood}`}
+        id={buttonId}
+        aria-label={label ?? `Pet Jackalope, currently ${currentMood}`}
+        aria-expanded={expanded}
+        aria-controls={controls}
+        aria-haspopup={expanded === undefined ? undefined : 'dialog'}
         data-mood={currentMood}
-        title="Pet Jackalope"
+        title={label ?? 'Pet Jackalope'}
         whileHover={reduceMotion ? undefined : { scale: 1.04 }}
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
         className="relative cursor-pointer bg-transparent border-0 p-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-accent)]"

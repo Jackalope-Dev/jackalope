@@ -11,6 +11,8 @@ import {
   useProjectStore,
 } from '../../stores/projectStore';
 import { useScheduleStore } from '../../stores/scheduleStore';
+import { useTaskStore } from '../../stores/taskStore';
+import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { Input } from '../ui/input';
@@ -21,6 +23,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { SchedulePlans } from './SchedulePlans';
 
 interface Definition {
+  monitor?: { path: string; action: 'notify' | 'run' } | null;
   id: string;
   name: string;
   expression: string;
@@ -31,16 +34,28 @@ interface Definition {
   request: RunRequest;
 }
 interface SavedSchedule {
+  localChecks?: number;
+  quietChecks?: number;
   definition: Definition;
   nextAt: string;
-  history: { dueAt: string; runId: string | null; outcome: string }[];
+  history: {
+    dueAt: string;
+    runId: string | null;
+    outcome: string;
+    change?: { before: string; after: string; path: string; branch: string } | null;
+  }[];
 }
 interface Ledger {
   schedules: SavedSchedule[];
   error: string | null;
 }
 
-export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: () => void }) {
+export function ScheduleManager(props: {
+  onOpenProject: () => void;
+  onPlanning: () => void;
+  sourceRunId?: string;
+  onSourceHandled?: () => void;
+}) {
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const runners = useExecutionStore((s) => s.runners);
   const runs = useExecutionStore((s) => s.runs);
@@ -52,6 +67,7 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
   const [projectId, setProjectId] = useState(activeProjectId ?? '');
   const [agent, setAgent] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [changePreview, setChangePreview] = useState<{ title: string; text: string } | null>(null);
   const focus = useDialogFocus();
   const desktop = isTauriEnvironment();
   const refresh = async () => setLedger(await nativeTask<Ledger>('schedule_list'));
@@ -103,24 +119,50 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
       },
     );
   };
+  useEffect(() => {
+    if (!props.sourceRunId) return;
+    const run = useExecutionStore.getState().runs.find((r) => r.id === props.sourceRunId);
+    if (!run) return;
+    setProjectId(run.projectId);
+    setAgent(run.agent);
+    const original = useTaskStore
+      .getState()
+      .tasks.find(
+        (idea) =>
+          idea.runId === run.id || runs.some((r) => r.taskId === run.taskId && r.id === idea.runId),
+      );
+    setPrompt(original?.rawPrompt ?? run.prompt);
+    setEditing({
+      id: crypto.randomUUID(),
+      name: original?.title ?? 'Repeat this task',
+      expression: '0 9 * * 1-5',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      missed: 'skip',
+      enabled: false,
+      request: {} as RunRequest,
+    });
+    props.onSourceHandled?.();
+  }, [props.sourceRunId, props.onSourceHandled, runs]);
   const project = projects.find((p) => p.id === projectId);
+  const monitorOnly = editing?.monitor?.action === 'notify';
+  const instructions = project?.preferences?.customInstructions?.trim();
+  const finalPrompt = instructions
+    ? `${prompt.trim()}\n\n[Project Guidelines]:\n${instructions}`
+    : prompt.trim();
   const save = () =>
     act(async () => {
       if (!editing || !project) return;
-      if (!isAgentAllowedForProject(project, agent))
+      if (!monitorOnly && !isAgentAllowedForProject(project, agent))
         throw new Error('This agent is not allowed for the selected project.');
       await syncAgentConfig();
       const adapter =
         useAgentConfigStore.getState().customAgents.find((a) => a.id === agent)?.adapter ?? agent;
-      const instructions = project.preferences?.customInstructions?.trim();
-      const finalPrompt = instructions
-        ? `${prompt.trim()}\n\n[Project Guidelines]:\n${instructions}`
-        : prompt.trim();
       await nativeTask('schedule_save', {
         definition: {
           ...editing,
           rawPrompt: prompt.trim(),
           request: {
+            contextSelection: editing.request.contextSelection,
             id: editing.id,
             projectId: project.id,
             projectName: project.name,
@@ -131,6 +173,8 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
             agentProfileId: agentAccountFor(project, adapter),
             targetBranch: project.preferences?.baseBranch || project.gitBranch,
             verifyCommand: project.preferences?.verifyCommand,
+            prepareCommand: project.preferences?.prepareCommand,
+            autoVerify: project.preferences?.autoVerify === true,
           },
         },
       });
@@ -144,7 +188,7 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
     <section className="task-page">
       <WorkspaceHeading
         title="Recurring tasks"
-        description="Run saved instructions on this computer while Jackalope is open, including in the system tray."
+        description="Schedule agent work or watch code changes locally while Jackalope is open, including in the system tray."
         action={
           <Button
             disabled={!desktop || busy}
@@ -168,19 +212,36 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
         </p>
       )}
       <div className="schedule-list">
-        {visible.map(({ definition: d, nextAt, history }) => (
+        {visible.map(({ definition: d, nextAt, history, localChecks, quietChecks }) => (
           <article className="schedule-row" key={d.id}>
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-medium">{d.name}</h2>
               <p className="task-muted">
-                {d.request.projectName} · {d.request.agent} · {d.timezone}
+                {d.request.projectName} ·{' '}
+                {d.monitor?.action === 'notify' ? 'Local monitor' : d.request.agent} · {d.timezone}
               </p>
               <p className="task-muted">
                 {d.enabled ? `Next: ${new Date(nextAt).toLocaleString()}` : 'Paused'} ·{' '}
                 {d.expression}
               </p>
+              {d.monitor && (
+                <div className="task-muted mt-2">
+                  <p>
+                    Watching {d.monitor.path || 'all tracked files'} on {d.request.targetBranch}.{' '}
+                    {d.monitor.action === 'notify'
+                      ? 'Notify on change; no agent used.'
+                      : 'Run agent only when committed content changes.'}
+                  </p>
+                  <p>
+                    {localChecks ?? 0} local checks · {quietChecks ?? 0} quiet checks. Checks use
+                    zero model tokens.
+                  </p>
+                </div>
+              )}
               <details className="mt-3">
-                <summary>Instructions and run history ({history.length})</summary>
+                <summary className="min-h-11 py-3">
+                  Instructions and run history ({history.length})
+                </summary>
                 <p className="whitespace-pre-wrap my-3">{d.request.prompt}</p>
                 {[...history].reverse().map((event) => {
                   const run = runs.find((r) => r.id === event.runId);
@@ -189,6 +250,26 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
                       <span>
                         {new Date(event.dueAt).toLocaleString()} · {run?.status ?? event.outcome}
                       </span>
+                      {event.change && (
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(async () => {
+                              const text = await nativeTask<string>('schedule_inspect_change', {
+                                id: d.id,
+                                dueAt: event.dueAt,
+                              });
+                              setChangePreview({
+                                title: `${d.name} · ${new Date(event.dueAt).toLocaleString()}`,
+                                text,
+                              });
+                            })
+                          }
+                        >
+                          Inspect change
+                        </Button>
+                      )}
                       {run && (
                         <Button
                           variant="ghost"
@@ -256,6 +337,33 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
         </details>
       )}
       <Dialog.Root
+        open={!!changePreview}
+        onOpenChange={(open) => {
+          if (!open) setChangePreview(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="task-dialog-overlay" />
+          <Dialog.Content {...focus} className="task-dialog appearance-panel">
+            <Dialog.Close className="task-close" aria-label="Close change preview">
+              <X size={18} />
+            </Dialog.Close>
+            <Dialog.Title className="text-xl">{changePreview?.title}</Dialog.Title>
+            <Dialog.Description className="task-muted mt-3">
+              Local content difference captured by this monitor. No agent was used to produce this
+              preview.
+            </Dialog.Description>
+            <textarea
+              className="task-output mt-4 w-full"
+              aria-label="Recorded content diff"
+              readOnly
+              rows={14}
+              value={changePreview?.text || 'No text diff available.'}
+            />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      <Dialog.Root
         open={!!editing}
         onOpenChange={(value) => {
           if (!value && !busy) setEditing(null);
@@ -269,9 +377,8 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
             </Dialog.Close>
             <Dialog.Title className="text-xl">Schedule recurring work</Dialog.Title>
             <Dialog.Description className="task-muted mt-3">
-              Enabling authorizes automatic agent execution with these saved instructions. Runs use
-              isolated worktrees and require review before integration. The timezone follows
-              daylight saving time.
+              Choose a local change monitor or an agent schedule. Agent runs use isolated worktrees
+              and require review before integration. Jackalope must be open and this computer awake.
             </Dialog.Description>
             {editing && (
               <form
@@ -306,27 +413,98 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
                     ))}
                   </Select>
                 </label>
-                <label className="block" htmlFor="schedule-agent">
-                  Agent
+                <label className="block" htmlFor="schedule-mode">
+                  Run policy
                   <Select
-                    id="schedule-agent"
-                    value={agent}
-                    onValueChange={setAgent}
-                    aria-label="Schedule agent"
+                    id="schedule-mode"
+                    aria-label="Run policy"
+                    value={editing.monitor?.action ?? 'always'}
+                    onValueChange={(value) =>
+                      setEditing({
+                        ...editing,
+                        monitor:
+                          value === 'always'
+                            ? null
+                            : {
+                                path: editing.monitor?.path ?? '',
+                                action: value as 'notify' | 'run',
+                              },
+                      })
+                    }
                   >
-                    {runners.map((r) => (
-                      <SelectItem
-                        key={r.id}
-                        value={r.id}
-                        disabled={
-                          !r.available || !project || !isAgentAllowedForProject(project, r.id)
-                        }
-                      >
-                        {r.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="always">Run an agent every time</SelectItem>
+                    <SelectItem value="run">Run an agent only after code changes</SelectItem>
+                    <SelectItem value="notify">Notify about code changes · no agent</SelectItem>
                   </Select>
                 </label>
+                <label className="block" htmlFor="schedule-preset">
+                  Repeat
+                  <Select
+                    id="schedule-preset"
+                    aria-label="Repeat schedule"
+                    value={
+                      ['0 9 * * 1-5', '0 9 * * 1', '0 9 * * *'].includes(editing.expression)
+                        ? editing.expression
+                        : 'custom'
+                    }
+                    onValueChange={(expression) => {
+                      if (expression !== 'custom') setEditing({ ...editing, expression });
+                    }}
+                  >
+                    <SelectItem value="0 9 * * 1-5">Weekdays at 9:00</SelectItem>
+                    <SelectItem value="0 9 * * 1">Mondays at 9:00</SelectItem>
+                    <SelectItem value="0 9 * * *">Every day at 9:00</SelectItem>
+                    <SelectItem value="custom">Custom timing below</SelectItem>
+                  </Select>
+                </label>
+                {editing.monitor && (
+                  <label className="block" htmlFor="schedule-watch-path">
+                    Tracked path to watch (optional)
+                    <Input
+                      id="schedule-watch-path"
+                      maxLength={500}
+                      value={editing.monitor.path}
+                      onChange={(e) =>
+                        setEditing({
+                          ...editing,
+                          monitor: {
+                            action: editing.monitor?.action ?? 'notify',
+                            path: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="src or package.json; blank watches the whole branch"
+                    />
+                    <span className="task-muted">
+                      Checks committed content on the saved local target branch, without fetching.
+                      The first check records a baseline. Uncommitted edits are excluded.
+                    </span>
+                  </label>
+                )}
+                {!monitorOnly && (
+                  <label className="block" htmlFor="schedule-agent">
+                    Agent
+                    <Select
+                      id="schedule-agent"
+                      value={agent}
+                      onValueChange={setAgent}
+                      aria-label="Schedule agent"
+                      disabled={monitorOnly}
+                    >
+                      {runners.map((r) => (
+                        <SelectItem
+                          key={r.id}
+                          value={r.id}
+                          disabled={
+                            !r.available || !project || !isAgentAllowedForProject(project, r.id)
+                          }
+                        >
+                          {r.name}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  </label>
+                )}
                 <label className="block" htmlFor="schedule-timing">
                   Timing
                   <Input
@@ -363,42 +541,62 @@ export function ScheduleManager(props: { onOpenProject: () => void; onPlanning: 
                     <SelectItem value="once">Catch up once when available</SelectItem>
                   </Select>
                 </label>
-                <label className="block" htmlFor="schedule-instructions">
-                  Instructions
-                  <textarea
-                    id="schedule-instructions"
-                    className="task-input w-full"
-                    required
-                    maxLength={24000}
-                    rows={4}
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
+                {!monitorOnly && (
+                  <label className="block" htmlFor="schedule-instructions">
+                    Instructions
+                    <textarea
+                      id="schedule-instructions"
+                      className="task-input w-full"
+                      required={!monitorOnly}
+                      disabled={monitorOnly}
+                      maxLength={24000}
+                      rows={4}
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                    />
+                  </label>
+                )}
+                {project && !monitorOnly && (
+                  <TaskKnowledge
+                    key={project.id}
+                    projectId={project.id}
+                    projectPath={project.path}
+                    prompt={finalPrompt}
+                    selection={editing.request.contextSelection}
+                    onChange={(contextSelection) =>
+                      setEditing({ ...editing, request: { ...editing.request, contextSelection } })
+                    }
                   />
-                </label>
+                )}
                 <p className="task-muted">
                   Target:{' '}
                   {project?.preferences?.baseBranch || project?.gitBranch || 'Choose a project'}.
-                  Account and verification use the selected project's preferences when saved.
+                  {!monitorOnly &&
+                    "Account and verification use the selected project's preferences when saved."}
                 </p>
                 <div className="flex items-center gap-3">
                   <Switch
                     id="schedule-enabled"
-                    label="Enable automatic runs"
+                    label={monitorOnly ? 'Enable local checks' : 'Enable automatic runs'}
                     checked={editing.enabled}
                     onCheckedChange={(enabled) => setEditing({ ...editing, enabled })}
                   />
-                  <label htmlFor="schedule-enabled">Enable automatic runs</label>
+                  <label htmlFor="schedule-enabled">
+                    {monitorOnly ? 'Enable local checks' : 'Enable automatic runs'}
+                  </label>
                 </div>
                 <p className="task-muted">
-                  Leave this off to save a paused schedule. Enabled project connections are
-                  available to each run.
+                  {monitorOnly
+                    ? 'Enable to check locally and notify on changes, with zero model tokens.'
+                    : 'Enable to authorize agent runs with these instructions and selected workflow. Matching saved project lessons and enabled connections are available to each run.'}{' '}
+                  Leave off to save paused.
                 </p>
                 {error && (
                   <p role="alert" className="task-error">
                     {error}
                   </p>
                 )}
-                <Button type="submit" disabled={busy || !project || !agent}>
+                <Button type="submit" disabled={busy || !project || (!monitorOnly && !agent)}>
                   {busy ? 'Saving…' : 'Save schedule'}
                 </Button>
               </form>

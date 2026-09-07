@@ -31,6 +31,9 @@ export function ArcColorPicker() {
           className="appearance-trigger"
           aria-label="Personalize your workspace"
           title="Personalize your workspace"
+          onClick={() => {
+            if (open) setTheme(draft);
+          }}
         >
           <span
             className="size-5 rounded-full"
@@ -46,11 +49,12 @@ export function ArcColorPicker() {
           align="end"
           sideOffset={12}
           collisionPadding={16}
+          onInteractOutside={() => setTheme(draft)}
           aria-label="Workspace appearance"
           className="workspace-appearance appearance-panel w-[340px] max-w-[calc(100vw-2rem)] p-5 z-[70]"
         >
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-base tracking-tight font-semibold">A space of your own</h2>
+            <h2 className="text-base tracking-tight font-semibold">Appearance</h2>
             <Popover.Close asChild>
               <button type="button" className="quiet-icon" aria-label="Cancel theme preview">
                 <X className="size-4" />

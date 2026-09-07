@@ -54,7 +54,7 @@ impl AgentPolicy {
         }
         let custom = self.custom_agents.iter().find(|a| a.id == agent);
         let adapter = custom.and_then(|a| a.adapter.as_deref()).unwrap_or(agent);
-        if !["codex", "claude", "grok"].contains(&adapter) {
+        if !super::tasks::BUILTIN_AGENTS.contains(&adapter) {
             return Err("Choose a supported CLI adapter for this manually added agent.".into());
         }
         let configured = self
@@ -150,7 +150,8 @@ pub async fn agent_save_policy(
     let mut ids = std::collections::HashSet::new();
     for agent in &policy.custom_agents {
         if agent.id.is_empty()
-            || ["codex", "claude", "grok", "default"].contains(&agent.id.as_str())
+            || super::tasks::BUILTIN_AGENTS.contains(&agent.id.as_str())
+            || agent.id == "default"
             || !ids.insert(&agent.id)
         {
             return Err("Custom agents need unique IDs distinct from built-in agents.".into());

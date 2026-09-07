@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from 'jose';
+import { accessAdmin } from './access/admin';
 import { adminPage } from './admin-page';
 
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -57,6 +58,12 @@ export async function adminRoutes(
   readJson: (request: Request) => Promise<unknown>,
 ) {
   const url = new URL(request.url);
+  if (
+    url.pathname === '/admin/access' ||
+    url.pathname.startsWith('/admin/access/') ||
+    url.pathname === '/admin/api/access'
+  )
+    return accessAdmin(request, env, readJson);
   if (request.method === 'GET' && url.pathname === '/admin') {
     const nonce = crypto.randomUUID();
     return new Response(adminPage(nonce), {

@@ -221,8 +221,6 @@
   margin-top: 8px;
 }
 .repo-todo-save {
-  position: sticky;
-  bottom: -32px;
   background: var(--color-bg);
   z-index: 2;
   display: flex;
@@ -233,6 +231,10 @@
   padding: 20px 0;
   margin-top: 28px;
   border-top: 1px solid var(--color-border);
+}
+.repo-todo-save[data-dirty="true"] {
+  position: sticky;
+  bottom: -32px;
 }
 .repo-todo-save strong {
   font-weight: 500;
@@ -354,5 +356,29 @@
   }
   .repo-todo-document-heading {
     flex-wrap: wrap;
+  }
+}
+@media (max-height: 700px) {
+  .workspace-page.repo-todos {
+    padding: 20px 24px;
+  }
+  .repo-todos > header {
+    padding-bottom: 16px;
+  }
+  .repo-todo-document-heading {
+    padding-bottom: 12px;
+  }
+  .repo-todo-toolbar {
+    padding-block: 6px;
+  }
+  .repo-todo-group {
+    padding-top: 16px;
+  }
+  .repo-todo-save {
+    padding-block: 12px;
+    margin-top: 16px;
+  }
+  .repo-todo-save[data-dirty="true"] {
+    bottom: -20px;
   }
 }

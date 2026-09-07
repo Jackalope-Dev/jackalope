@@ -87,6 +87,87 @@ fn bridge_error(status: StatusCode) -> ErrorData {
 #[tool_router]
 impl CoordinationTools {
     #[tool(
+        description = "Search selected connections for tools. Returns only matching schemas and execution handles. Empty query browses; use server and offset to page through all tools.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn search_tools(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::mcp_broker::SearchInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let (result, usage) = self
+            .service
+            .runtime
+            .mcp_broker
+            .search(&run.id, input)
+            .await
+            .map_err(|e| ErrorData::invalid_request(e, None))?;
+        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
+        Ok(CallToolResult::structured(result))
+    }
+
+    #[tool(
+        description = "Call a discovered tool that its selected connection declares read-only. Requires a search handle; rejects tools that are mutable or lack a read-only declaration.",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn read_tool(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::mcp_broker::ExecuteInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let (result, usage) = self
+            .service
+            .runtime
+            .mcp_broker
+            .read(&run.id, input)
+            .await
+            .map_err(|e| ErrorData::invalid_request(e, None))?;
+        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
+        Ok(result)
+    }
+
+    #[tool(
+        description = "Execute a tool using a handle returned by search_tools and arguments matching its schema. May change external data. Discovery does not authorize side effects. Never retry uncertain writes automatically.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn execute_tool(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::mcp_broker::ExecuteInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let (result, usage) = self
+            .service
+            .runtime
+            .mcp_broker
+            .execute(&run.id, input)
+            .await
+            .map_err(|e| ErrorData::invalid_request(e, None))?;
+        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
+        Ok(result)
+    }
+
+    #[tool(
         description = "Read your assigned task, this project's task owners, work in progress and coordination messages. Check before editing so you can avoid overlapping work.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
@@ -390,7 +471,10 @@ mod tests {
         let router = CoordinationTools::tool_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
-        assert_eq!(names.len(), 10);
+        assert_eq!(names.len(), 13);
+        assert!(names.contains(&"read_tool"));
+        assert!(names.contains(&"search_tools"));
+        assert!(names.contains(&"execute_tool"));
         assert!(names.contains(&"project"));
         assert!(names.contains(&"message"));
         assert!(names.contains(&"browser_navigate"));

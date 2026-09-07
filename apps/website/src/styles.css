@@ -674,8 +674,125 @@ h1 span {
   gap: 100px;
   align-items: center;
 }
-.control-copy > p:not(.eyebrow),
-.atmosphere-copy > p:not(.eyebrow) {
+.agent-support-heading {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  align-items: end;
+  gap: 60px;
+  margin-bottom: 40px;
+}
+.agent-support-heading h2 {
+  margin-top: 18px;
+}
+.agent-support-heading > p {
+  color: var(--color-text-secondary);
+  max-width: 420px;
+}
+.agent-support-row {
+  display: grid;
+  grid-template-columns: 52px 150px 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 25px 0;
+  border-top: 1px solid var(--color-border);
+}
+.agent-support-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(140deg, var(--color-accent-subtle), var(--color-surface));
+  color: var(--color-accent-ink);
+  font-size: 23px;
+  font-family: var(--font-mono);
+}
+.agent-support-row h3 {
+  font-size: 17px;
+}
+.agent-support-row p {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.agent-support-row a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 12px;
+}
+.agent-support-common {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-block: 22px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.agent-support-common svg {
+  color: var(--color-accent-ink);
+}
+.agent-support-details {
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+.agent-support-details summary {
+  cursor: pointer;
+  min-height: 44px;
+  font-size: 13px;
+  align-content: center;
+}
+.agent-support-details :where(summary) svg {
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.agent-support-details > p {
+  max-width: 850px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 16px;
+}
+.agent-support-table {
+  overflow-x: auto;
+  margin-top: 20px;
+}
+.agent-support-table table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+}
+.agent-support-table :is(th, td) {
+  padding: 14px 18px 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.agent-support-table td {
+  color: var(--color-text-secondary);
+}
+@media (max-width: 760px) {
+  .agent-support-heading {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .agent-support-row {
+    grid-template-columns: 44px 1fr auto;
+    gap: 12px;
+  }
+  .agent-support-row p {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+  .agent-support-mark {
+    width: 44px;
+    height: 44px;
+  }
+  .agent-support-common {
+    line-height: 1.8;
+  }
+}
+.control-copy > p,
+.atmosphere-copy > p {
   margin-top: 23px;
   color: var(--color-text-secondary);
   font-size: 14px;
@@ -1579,7 +1696,178 @@ fieldset {
   }
 }
 .waitlist-dialog {
-  width: min(540px, calc(100vw - 32px));
+  width: min(570px, calc(100vw - 48px));
+  padding: 0;
+  isolation: isolate;
+}
+.waitlist-dialog .dialog-close {
+  z-index: 2;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.waitlist-art {
+  position: relative;
+  height: 172px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 78% 30%, var(--color-accent-subtle), transparent 70%),
+    linear-gradient(125deg, var(--color-surface-sunken), var(--color-accent-subtle));
+  color: var(--color-accent-ink);
+}
+.waitlist-orbit {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  left: -142px;
+  top: -122px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  border-radius: 50%;
+  animation: invitation-orbit 1.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.waitlist-orbit-inner {
+  width: 280px;
+  height: 280px;
+  left: -102px;
+  top: -82px;
+  animation-delay: 80ms;
+}
+.waitlist-stamp {
+  position: absolute;
+  left: 42px;
+  top: 25px;
+  width: 100px;
+  height: 116px;
+  display: grid;
+  place-items: center;
+  transform: rotate(-8deg);
+  animation: invitation-arrive 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  filter: drop-shadow(8px 14px 18px var(--color-accent-subtle));
+}
+.waitlist-stamp svg {
+  width: 82px;
+  height: 96px;
+}
+.waitlist-art-note {
+  position: absolute;
+  left: 49%;
+  top: 58px;
+  font-size: 15px;
+  line-height: 1.65;
+  letter-spacing: -0.3px;
+}
+.waitlist-art-label {
+  position: absolute;
+  left: 49%;
+  bottom: 22px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+}
+.waitlist-body {
+  padding: 28px 36px 26px;
+}
+.waitlist-body h2 {
+  font-size: clamp(28px, 5vw, 36px);
+  line-height: 1.2;
+}
+.waitlist-body h2 em {
+  color: var(--color-accent-ink);
+  font-style: normal;
+}
+.waitlist-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.waitlist-perks li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.waitlist-perks svg {
+  color: var(--color-accent-ink);
+}
+@keyframes invitation-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(18px) rotate(-18deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(-8deg) scale(1);
+  }
+}
+@keyframes invitation-orbit {
+  from {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (max-width: 480px) {
+  .waitlist-body {
+    padding: 24px;
+  }
+  .waitlist-art {
+    height: 140px;
+  }
+  .waitlist-stamp {
+    left: 22px;
+    top: 15px;
+    width: 80px;
+    height: 100px;
+  }
+  .waitlist-stamp svg {
+    width: 64px;
+    height: 80px;
+  }
+  .waitlist-art-note {
+    top: 36px;
+    font-size: 13px;
+  }
+  .waitlist-art-label {
+    font-size: 8px;
+    letter-spacing: 0.5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .waitlist-stamp,
+  .waitlist-orbit {
+    animation: none;
+  }
+}
+@media (max-height: 700px) and (min-width: 481px) {
+  .waitlist-art {
+    height: 110px;
+  }
+  .waitlist-stamp {
+    top: 5px;
+    height: 95px;
+  }
+  .waitlist-stamp svg {
+    height: 80px;
+  }
+  .waitlist-art-note {
+    top: 23px;
+    font-size: 13px;
+  }
+  .waitlist-art-label {
+    bottom: 10px;
+  }
+  .waitlist-body {
+    padding: 20px 36px;
+  }
+  .waitlist-body h2 {
+    font-size: 28px;
+  }
 }
 .waitlist-dialog .signup {
   margin-top: 28px;

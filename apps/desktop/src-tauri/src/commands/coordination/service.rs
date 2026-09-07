@@ -67,6 +67,8 @@ impl Coordinator {
             target_branch: Some(target_branch),
             agent_profile_id: req.agent_profile_id,
             verify_command: req.verify_command,
+            prepare_command: req.prepare_command,
+            auto_verify: req.auto_verify,
             title: req.title.trim().into(),
             prompt: req.prompt.trim().into(),
             agent: req.agent,
@@ -104,6 +106,8 @@ impl Coordinator {
                     target_branch: request.target_branch.clone(),
                     agent_profile_id: request.agent_accounts.get(&item.agent).cloned(),
                     verify_command: request.verify_command.clone(),
+                    prepare_command: request.prepare_command.clone(),
+                    auto_verify: request.auto_verify,
                     title: item.title,
                     prompt: item.prompt,
                     agent: item.agent,
@@ -152,6 +156,9 @@ impl Coordinator {
                 .insert(token.clone(), (item.id.clone(), run_id.clone()));
             let instructions = instructions(&item);
             let result = self.runtime.start_locked(RunRequest {
+                monitor_change: None,
+                context_selection: Default::default(),
+                context_receipt: Default::default(),
                 model: None,
                 id: run_id,
                 project_id: item.project_id.clone(),
@@ -160,6 +167,8 @@ impl Coordinator {
                 agent: item.agent,
                 agent_profile_id: item.agent_profile_id,
                 verify_command: item.verify_command,
+                prepare_command: item.prepare_command,
+                auto_verify: item.auto_verify,
                 target_branch: item.target_branch,
                 account_binding: None,
                 prompt: item.prompt,
@@ -197,6 +206,9 @@ impl Coordinator {
                         Some(format!("http://{}", listener.local_addr().unwrap()));
                     let router = Router::new()
                         .route("/v1/project", get(bridge_project))
+                        .route("/v1/tools/search", post(bridge_tool_search))
+                        .route("/v1/tools/execute", post(bridge_tool_execute))
+                        .route("/v1/tools/read", post(bridge_tool_read))
                         .route("/v1/messages", post(bridge_message))
                         .route("/v1/browser/navigate", post(bridge_browser_navigate))
                         .route("/v1/browser/screenshot", post(bridge_browser_screenshot))
@@ -366,6 +378,8 @@ impl Coordinator {
                         .as_ref()
                         .and_then(|b| b.profile_id.clone()),
                     verify_command: run.verify_command.clone(),
+                    prepare_command: run.prepare_command.clone(),
+                    auto_verify: run.auto_verify,
                     title: run.prompt.chars().take(50).collect(),
                     prompt: run.prompt.clone(),
                     agent: run.agent.clone(),

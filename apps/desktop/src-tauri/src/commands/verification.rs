@@ -37,6 +37,39 @@ fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     Ok(cmd)
 }
 
+pub(in crate::commands) fn prepare(
+    runtime: &TaskRuntime,
+    id: &str,
+    command: &str,
+    workspace: &str,
+) -> Result<process_control::CommandResult, String> {
+    let _guard = super::integration::execution_guard()?;
+    let runs = runtime.integration_runs()?;
+    if runs.iter().any(|other| {
+        other.id != id
+            && other.workspace == workspace
+            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
+    }) {
+        return Err("Another attempt owns this workspace. Resolve it before preparation.".into());
+    }
+    runtime.update_checked(id, |run| {
+        run.activity
+            .push("Preparing the workspace with the saved project command.".into())
+    })?;
+    let result = process_control::run_cancellable(
+        shell(command, workspace)?,
+        Duration::from_secs(300),
+        || !runtime.is_running(id),
+    )?;
+    runtime.update_checked(id, |run| {
+        run.diagnostics.push(format!(
+            "Workspace preparation: {command}\n{}\n{}",
+            result.stdout, result.stderr
+        ))
+    })?;
+    Ok(result)
+}
+
 fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verification, String> {
     let directory = runtime.integration_directory();
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
@@ -56,6 +89,38 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
     };
     runtime.update_checked(&run.id, |r| r.verification = Some(verification.clone()))?;
     Ok(verification)
+}
+
+pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
+    let _guard = super::integration::execution_guard()?;
+    let runs = runtime.integration_runs()?;
+    let run = runs
+        .iter()
+        .find(|run| run.id == id)
+        .ok_or("Task not found")?;
+    if !runtime.is_running(id) {
+        return Ok(());
+    }
+    let command = run
+        .verify_command
+        .as_deref()
+        .filter(|command| !command.trim().is_empty())
+        .ok_or("No verification command was saved for this task.")?;
+    if runs.iter().any(|other| {
+        other.id != id
+            && other.workspace == run.workspace
+            && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
+    }) {
+        return Err("Checks could not start while another attempt owns this workspace.".into());
+    }
+    if let Some(check) = &run.verification {
+        let tree = super::integration::workspace_tree(run, &runtime.integration_directory())?;
+        if check.command == command && check.result.success && check.tree.as_ref() == Some(&tree) {
+            return Ok(());
+        }
+    }
+    execute(runtime, run, command)?;
+    Ok(())
 }
 
 pub async fn agent_verify(

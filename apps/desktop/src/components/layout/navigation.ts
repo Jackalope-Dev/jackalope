@@ -23,7 +23,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'topology',
-    label: 'Project',
+    label: 'Projects',
     description: 'Explore codebase dependencies and project worktrees.',
     icon: Network,
     group: 'project',
@@ -35,7 +35,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Manage runners, accounts and configuration.',
     icon: Bot,
     group: 'agents',
-    primary: true,
+    primary: false,
   },
   {
     id: 'mcps',
@@ -43,7 +43,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Install and configure MCP tools.',
     icon: Plug,
     group: 'connections',
-    primary: true,
+    primary: false,
   },
   {
     id: 'usage',

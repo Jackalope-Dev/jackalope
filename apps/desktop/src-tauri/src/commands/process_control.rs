@@ -62,7 +62,23 @@ pub struct ProcessTree(std::os::windows::io::OwnedHandle);
 #[cfg(windows)]
 impl ProcessTree {
     pub fn attach(child: &Child) -> Result<Self, String> {
+        use std::os::windows::io::AsRawHandle;
+        Self::attach_handle(child.as_raw_handle())
+    }
+
+    pub fn attach_pid(pid: u32) -> Result<Self, String> {
         use std::os::windows::io::{AsRawHandle, FromRawHandle};
+        use windows_sys::Win32::System::Threading::*;
+        let handle = unsafe { OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, pid) };
+        if handle.is_null() {
+            return Err(std::io::Error::last_os_error().to_string());
+        }
+        let owned = unsafe { std::os::windows::io::OwnedHandle::from_raw_handle(handle) };
+        Self::attach_handle(owned.as_raw_handle())
+    }
+
+    fn attach_handle(process: std::os::windows::io::RawHandle) -> Result<Self, String> {
+        use std::os::windows::io::FromRawHandle;
         use windows_sys::Win32::System::JobObjects::*;
         unsafe {
             let handle = CreateJobObjectW(std::ptr::null(), std::ptr::null());
@@ -78,7 +94,7 @@ impl ProcessTree {
                 &info as *const _ as _,
                 std::mem::size_of_val(&info) as u32,
             ) == 0
-                || AssignProcessToJobObject(handle, child.as_raw_handle()) == 0
+                || AssignProcessToJobObject(handle, process) == 0
             {
                 return Err(format!(
                     "Cannot contain task processes: {}",
@@ -104,6 +120,9 @@ pub struct ProcessTree(u32);
 impl ProcessTree {
     pub fn attach(child: &Child) -> Result<Self, String> {
         Ok(Self(child.id()))
+    }
+    pub fn attach_pid(pid: u32) -> Result<Self, String> {
+        Ok(Self(pid))
     }
     pub fn terminate(&self) {
         let _ = Command::new("kill")

@@ -2,6 +2,8 @@ mod models;
 use models::Ledger;
 pub use models::{CoordinationMessage, PlanEntry, PlanRequest, QueueItem, QueueRequest, QueueView};
 mod eligibility;
+#[cfg(test)]
+mod native_mcp_trial;
 mod service;
 mod storage;
 #[cfg(test)]
@@ -399,4 +401,58 @@ pub async fn queue_release(
     inner.grants.retain(|_, (task, _)| task != &id);
     Ok(())
     }).await.map_err(|e| e.to_string())?
+}
+
+async fn bridge_tool_search(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::mcp_broker::SearchInput>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    let (result, usage) = service
+        .runtime
+        .mcp_broker
+        .search(&run.id, input)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    super::mcp_broker::record_usage(&service.runtime, &run, usage);
+    Ok(Json(result))
+}
+
+async fn bridge_tool_execute(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::mcp_broker::ExecuteInput>,
+) -> Result<Json<rmcp::model::CallToolResult>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    let (result, usage) = service
+        .runtime
+        .mcp_broker
+        .execute(&run.id, input)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    super::mcp_broker::record_usage(&service.runtime, &run, usage);
+    Ok(Json(result))
+}
+
+async fn bridge_tool_read(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::mcp_broker::ExecuteInput>,
+) -> Result<Json<rmcp::model::CallToolResult>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    let (result, usage) = service
+        .runtime
+        .mcp_broker
+        .read(&run.id, input)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    super::mcp_broker::record_usage(&service.runtime, &run, usage);
+    Ok(Json(result))
 }

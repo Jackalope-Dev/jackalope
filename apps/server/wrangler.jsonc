@@ -27,7 +27,13 @@
     "ACCESS_AUD": "",
     "FEEDBACK_EMAIL_ENABLED": "false",
     "FEEDBACK_EMAIL_FROM": "",
-    "FEEDBACK_EMAIL_TO": "contact@jackalope.dev"
+    "FEEDBACK_EMAIL_TO": "contact@jackalope.dev",
+    "EARLY_ACCESS_ENABLED": "false",
+    "ACCESS_WEB_ORIGIN": "https://jackalope.dev",
+    "ACCESS_EMAIL_FROM": "",
+    "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
+    "ACCESS_INSTALLER_KEY": "",
+    "ACCESS_NEWSLETTER_FORM": ""
   },
   "d1_databases": [
     {
@@ -87,7 +93,13 @@
         "ACCESS_AUD": "",
         "FEEDBACK_EMAIL_ENABLED": "false",
         "FEEDBACK_EMAIL_FROM": "",
-        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev"
+        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev",
+        "EARLY_ACCESS_ENABLED": "false",
+        "ACCESS_WEB_ORIGIN": "https://jackalope.dev",
+        "ACCESS_EMAIL_FROM": "",
+        "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
+        "ACCESS_INSTALLER_KEY": "",
+        "ACCESS_NEWSLETTER_FORM": ""
       },
       "d1_databases": [
         {
@@ -133,7 +145,7 @@
         "crons": ["*/5 * * * *"]
       },
       "secrets": {
-        "required": ["RATE_SECRET"]
+        "required": ["RATE_SECRET", "ACCESS_SECRET", "SEQUENZY_API_KEY"]
       },
       "routes": [
         {
@@ -162,7 +174,13 @@
         "ACCESS_AUD": "",
         "FEEDBACK_EMAIL_ENABLED": "false",
         "FEEDBACK_EMAIL_FROM": "",
-        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev"
+        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev",
+        "EARLY_ACCESS_ENABLED": "false",
+        "ACCESS_WEB_ORIGIN": "https://jackalope.dev",
+        "ACCESS_EMAIL_FROM": "",
+        "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
+        "ACCESS_INSTALLER_KEY": "",
+        "ACCESS_NEWSLETTER_FORM": ""
       },
       "d1_databases": [
         {
@@ -208,7 +226,7 @@
         "crons": ["*/5 * * * *"]
       },
       "secrets": {
-        "required": ["RATE_SECRET"]
+        "required": ["RATE_SECRET", "ACCESS_SECRET", "SEQUENZY_API_KEY"]
       },
       "routes": [
         {
@@ -225,7 +243,7 @@
     }
   },
   "secrets": {
-    "required": ["RATE_SECRET"]
+    "required": ["RATE_SECRET", "ACCESS_SECRET", "SEQUENZY_API_KEY"]
   },
   "send_email": [
     {

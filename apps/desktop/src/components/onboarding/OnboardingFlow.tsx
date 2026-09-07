@@ -17,13 +17,19 @@ import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import './onboarding.css';
 
-const steps: { id: OnboardingStep; label: string; detail: string }[] = [
-  { id: 'project', label: 'Your project', detail: 'A place to begin' },
-  { id: 'agent', label: 'Your agent', detail: 'Choose who does the work' },
-  { id: 'task', label: 'Your first task', detail: 'Give it a direction' },
+const steps: { id: OnboardingStep; label: string }[] = [
+  { id: 'project', label: 'Project' },
+  { id: 'agent', label: 'Agent' },
+  { id: 'task', label: 'First task' },
 ];
 
-export function OnboardingFlow({ onFinish }: { onFinish: (agent?: string) => void }) {
+export function OnboardingFlow({
+  onFinish,
+  onCapture,
+}: {
+  onFinish: (agent?: string) => void;
+  onCapture?: () => void;
+}) {
   const onboarding = useOnboardingStore();
   const { projects, activeProjectId } = useProjectStore();
   const project = projects.find((item) => item.id === activeProjectId);
@@ -100,38 +106,28 @@ export function OnboardingFlow({ onFinish }: { onFinish: (agent?: string) => voi
       <main className="onboarding-layout">
         <aside className="onboarding-intro" aria-label="Setup progress">
           <JackalopeMascot size="md" overrideMood={busy ? 'thinking' : 'idle'} />
-          <h1>
-            A place to get
-            <br />
-            things done.
-          </h1>
-          <p>
-            Bring a project. Pick your agent.
-            <br />
-            Let’s make something worth making.
-          </p>
+          <h1>Set up Jackalope</h1>
           <ol className="onboarding-steps">
             {steps.map((item, itemIndex) => (
               <li key={item.id} aria-current={step === item.id ? 'step' : undefined}>
                 <span className="onboarding-step-number">
                   {itemIndex < index ? <Check size={16} /> : itemIndex + 1}
                 </span>
-                <span>
-                  <strong>{item.label}</strong>
-                  <small>{item.detail}</small>
-                </span>
+                <strong>{item.label}</strong>
               </li>
             ))}
           </ol>
         </aside>
         <section className="onboarding-content" aria-labelledby="onboarding-heading">
-          <div className="onboarding-eyebrow">LET’S GET YOU SETTLED · {index + 1} OF 3</div>
+          <p className="onboarding-progress">
+            Step {index + 1} of {steps.length}
+          </p>
           <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
             {step === 'project'
-              ? 'Start with something real.'
+              ? 'Choose a project'
               : step === 'agent'
-                ? 'Who’s working with you?'
-                : 'What shall we work on?'}
+                ? 'Choose an agent'
+                : 'Describe your first task'}
           </h2>
           {step === 'project' && (
             <>
@@ -331,7 +327,6 @@ export function OnboardingFlow({ onFinish }: { onFinish: (agent?: string) => voi
                 Start with a codebase walkthrough
               </Button>
               <div className="onboarding-explanation">
-                <strong>You stay in control.</strong>
                 <p>
                   New tasks use an isolated worktree by default. Follow the agent’s progress,
                   inspect its changes, then decide what to keep.
@@ -358,6 +353,11 @@ export function OnboardingFlow({ onFinish }: { onFinish: (agent?: string) => voi
       </main>
       <footer className="onboarding-footer">
         <span>You can return to guided setup in Settings.</span>
+        {onCapture && (
+          <Button variant="outline" disabled={busy} onClick={onCapture}>
+            Capture an idea first
+          </Button>
+        )}
         <Button variant="ghost" disabled={busy} onClick={() => onFinish()}>
           {step === 'task' ? 'Finish without a task' : 'Skip setup for now'}
         </Button>

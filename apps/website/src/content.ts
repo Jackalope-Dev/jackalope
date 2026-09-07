@@ -24,7 +24,7 @@ export const posts = [
         title: 'One workspace, deliberate account choices.',
         paragraphs: [
           'A client repository and a weekend project can call for different accounts, instructions, and tools. Jackalope brings their tasks into one workspace while giving you explicit choices about which agent and account each project uses.',
-          'Separate account profiles are implemented for the built-in Codex, Claude Code, and Grok adapters. Custom agents without a supported profile mechanism do not get this capability. Windows release acceptance, including real multiple-account provider lifecycle trials, is still in progress.',
+          'Separate account profiles are implemented for the built-in Codex, Claude Code, Grok, and OpenCode adapters. Custom agents without a supported profile mechanism do not get this capability. Windows release acceptance, including real multiple-account provider lifecycle trials, is still in progress.',
         ],
       },
       {
@@ -199,6 +199,11 @@ export const pages = [
     title: 'Website & email privacy — Jackalope',
     description:
       'How the Jackalope marketing website and optional email waitlist handle the information you provide.',
+  },
+  {
+    path: '/access/',
+    title: 'Your early access — Jackalope',
+    description: 'Your private Jackalope downloads and invitations.',
   },
   ...posts.map((post) => ({
     path: `/blog/${post.slug}/`,

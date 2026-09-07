@@ -79,10 +79,13 @@ function parsePlan(text: string): PlanEntry[] {
         'codex',
         'claude',
         'grok',
+        'opencode',
         ...useAgentConfigStore.getState().customAgents.map((a) => a.id),
       ].includes(String(item.agent))
     )
-      throw new Error(`${label} must choose codex, claude or grok as its agent.`);
+      throw new Error(
+        `${label} must choose an available agent (codex, claude, grok, opencode or a configured custom agent).`,
+      );
     if (
       !Array.isArray(item.scopes) ||
       item.scopes.length < 1 ||
@@ -201,6 +204,8 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
             projectPath: project.path,
             targetBranch: project.preferences?.baseBranch || project.gitBranch,
             verifyCommand: project.preferences?.verifyCommand,
+            prepareCommand: project.preferences?.prepareCommand,
+            autoVerify: project.preferences?.autoVerify === true,
             agentAccounts: project.preferences?.agentAccounts,
             items: preview,
           },

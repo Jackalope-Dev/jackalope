@@ -66,8 +66,7 @@ export function RunnerConnections({
     <section className="task-page agents-page">
       <div className="agents-page-content">
         <WorkspaceHeading
-          title="Your agents"
-          description="Choose a partner for your next task."
+          title="Agents"
           action={
             <div className="agent-workspace-actions">
               <Button

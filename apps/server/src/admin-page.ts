@@ -18,6 +18,7 @@ export function adminPage(nonce: string) {
 <body>
 <main>
 <header>
+<a href="/admin/access">Manage early access</a>
 <span class="badge">Jackalope / private</span>
 <h1>Release observatory</h1>
 <p>See which releases are being used, where work fails, and what people ask for next.</p>

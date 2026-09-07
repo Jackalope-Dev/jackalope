@@ -2,6 +2,8 @@ import { Check, Columns3, Lightbulb, List, ListTodo, Search } from 'lucide-react
 
 import { ideaStageLabels, type WorkItem, workStages } from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
+import { taskNextAction } from '../../lib/task-workflow';
+import { useProjectStore } from '../../stores/projectStore';
 import { EmptyState } from '../ui/EmptyState';
 import { RunStatus } from './RunStatus';
 import './task-collection.css';
@@ -25,6 +27,7 @@ export function TaskCollection({
   view: TaskCollectionView;
   onViewChange: (view: TaskCollectionView) => void;
 }) {
+  const projects = useProjectStore((state) => state.projects);
   const { filter, layout, query } = view;
   const setFilter = (filter: string) => onViewChange({ ...view, filter });
   const setLayout = (layout: 'list' | 'board') => onViewChange({ ...view, layout });
@@ -43,6 +46,12 @@ export function TaskCollection({
         <span className="work-item-content">
           <span className="work-item-title">{item.title}</span>
           <span className="work-item-meta">
+            <span>
+              {item.run?.projectName ??
+                projects.find((p) => p.id === item.idea?.projectId)?.name ??
+                'No project yet'}{' '}
+              ·{' '}
+            </span>
             {agent && agent !== 'Unassigned' && (
               <span>{runners.find((r) => r.id === agent)?.name ?? agent} · </span>
             )}
@@ -51,11 +60,17 @@ export function TaskCollection({
         </span>
         {item.run ? (
           <span className="work-item-status">
-            <RunStatus status={item.run.status} />
-            {item.run.prompts?.some((prompt) => prompt.status === 'pending') &&
-              ['starting', 'running'].includes(item.run.status) && (
-                <span className="work-item-meta">Waiting for you</span>
-              )}
+            {item.stage === 'finished' && item.run.status !== 'reviewed' ? (
+              <span className="task-status">
+                <Check size={16} />
+                Integrated
+              </span>
+            ) : (
+              <RunStatus status={item.run.status} />
+            )}
+            <span className="work-item-action">
+              {item.stage === 'finished' ? 'Open result' : taskNextAction(item.run)}
+            </span>
             {item.run.persistenceError && <span className="work-item-meta">Not saved</span>}
           </span>
         ) : (

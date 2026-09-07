@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ContextSelection } from '../lib/knowledge';
 import {
   isActive,
   nativeTask,
@@ -10,9 +11,14 @@ import {
 import { isTauriEnvironment } from '../lib/tauri-bridge';
 import { syncAgentConfig } from './agentConfigStore';
 import { useMascotStore } from './mascotStore';
+import type { TaskStatus } from './taskStore';
 
 export interface TaskDraft {
+  contextSelection?: ContextSelection;
   prompt: string;
+  projectId?: string;
+  title?: string;
+  planningStatus?: TaskStatus;
   agent: string;
   isolated: boolean;
   skills?: string[];

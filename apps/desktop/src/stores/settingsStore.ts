@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { BuiltinAgentId } from '../lib/agent-catalog';
 
 export type ExperienceMode = 'simple' | 'advanced' | 'essential';
-export type DefaultRunnerId = 'codex' | 'claude' | 'grok';
+export type DefaultRunnerId = BuiltinAgentId;
 export type NotificationLevel = 'all' | 'failures-only' | 'none';
 
 export interface SettingsState {

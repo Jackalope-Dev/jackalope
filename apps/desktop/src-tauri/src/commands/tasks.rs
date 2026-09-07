@@ -10,6 +10,7 @@ use events::*;
 pub use models::*;
 use runners::discover_runner;
 pub(super) use runners::executable;
+pub(super) use runners::BUILTIN_AGENTS;
 
 use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
@@ -36,6 +37,8 @@ struct Inner {
 
 #[derive(Clone)]
 pub struct TaskRuntime {
+    pub(super) knowledge: super::knowledge::KnowledgeStore,
+    pub(in crate::commands) mcp_broker: super::mcp_broker::Broker,
     inner: Arc<Mutex<Inner>>,
     directory: PathBuf,
     _owner: Arc<std::fs::File>,
@@ -128,7 +131,7 @@ pub(super) fn probe_auth(
 pub async fn task_runners(runtime: State<'_, TaskRuntime>) -> Result<Vec<Runner>, String> {
     let policy = runtime.policy()?;
     let profiles_root = runtime.profiles_root();
-    let mut ids: Vec<String> = vec!["codex".into(), "claude".into(), "grok".into()];
+    let mut ids: Vec<String> = BUILTIN_AGENTS.iter().map(|id| (*id).into()).collect();
     ids.extend(policy.custom_agents.iter().map(|a| a.id.clone()));
     // Each agent's discovery/sign-in probe can take up to probe_auth's own
     // 10-second timeout. Running them in one sequential closure (the
@@ -322,6 +325,9 @@ pub fn task_runs(state: State<'_, TaskRuntime>, detail_id: Option<String>) -> Ve
             run.result.clear();
             run.activity.clear();
             run.diagnostics.clear();
+            for entry in &mut run.context_receipt.entries {
+                entry.content.clear();
+            }
             if let Some(check) = &mut run.verification {
                 check.result.stdout.clear();
                 check.result.stderr.clear();

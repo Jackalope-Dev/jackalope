@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ContextSelection } from '../lib/knowledge';
 
 export type TaskStatus = 'backlog' | 'refinement' | 'in_progress' | 'verification' | 'done';
 
 export interface TaskTicket {
+  contextSelection?: ContextSelection;
   id: string;
   projectId: string;
   title: string;
   rawPrompt: string;
   refinedPrompt?: string;
   runId?: string;
+  connectionIds?: string[];
   status: TaskStatus;
   worktreePath?: string;
   assignedAgent?: string;

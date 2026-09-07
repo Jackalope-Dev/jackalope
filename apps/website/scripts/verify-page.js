@@ -54,7 +54,7 @@ async function _verifyPage(page) {
   assert((await page.locator('details[open]').count()) === 1, 'Keyboard FAQ disclosure');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
-  await page.getByRole('dialog', { name: 'Something good is taking shape.' }).waitFor();
+  await page.getByRole('dialog', { name: 'Join the Windows waitlist' }).waitFor();
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.activeElement?.textContent === 'Join waitlist');
   assert(

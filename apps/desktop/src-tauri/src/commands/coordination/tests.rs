@@ -52,6 +52,8 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
         target_branch: None,
         agent_profile_id: None,
         verify_command: None,
+        prepare_command: None,
+        auto_verify: false,
         title: "Do a thing".into(),
         prompt: "Do a thing".into(),
         agent: "codex".into(),
@@ -141,6 +143,8 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
             target_branch: None,
             agent_profile_id: None,
             verify_command: None,
+            prepare_command: None,
+            auto_verify: false,
             title: "Test".into(),
             prompt: "Implement test".into(),
             agent: "codex".into(),
@@ -200,6 +204,8 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         target_branch: None,
         agent_accounts: HashMap::new(),
         verify_command: None,
+        prepare_command: None,
+        auto_verify: false,
         items,
     };
     let mut invalid = entry("invalid", &[]);

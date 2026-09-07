@@ -43,6 +43,11 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
           </Button>
         )}
       </div>
+      {run.verificationError && !check && (
+        <p role="alert" className="task-error">
+          Automatic checks could not finish: {run.verificationError}
+        </p>
+      )}
       {error && (
         <p className="task-error" role="alert">
           {error}

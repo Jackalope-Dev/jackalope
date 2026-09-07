@@ -52,6 +52,7 @@ export function McpAddCustomModal({
     String(existingServer?.extra?.bearer_token_env_var ?? ''),
   );
   const [extraJson, setExtraJson] = useState(JSON.stringify(existingServer?.extra ?? {}, null, 2));
+  const [discovery, setDiscovery] = useState(existingServer?.discovery ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,7 +107,8 @@ export function McpAddCustomModal({
         url: transport !== 'stdio' ? url.trim() : undefined,
         env: envRecord,
         description: description.trim() || undefined,
-        enabled: true,
+        enabled: existingServer?.enabled ?? true,
+        discovery: scope.startsWith('project:') && transport !== 'sse' && discovery,
       };
 
       await saveServer(config);
@@ -122,7 +124,10 @@ export function McpAddCustomModal({
     <Dialog.Root open={open} onOpenChange={(val) => !val && !busy && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content {...dialogFocus} className="task-dialog appearance-panel max-w-lg">
+        <Dialog.Content
+          {...dialogFocus}
+          className="task-dialog appearance-panel max-w-lg text-[var(--color-text-primary)]"
+        >
           <Dialog.Close className="task-close" aria-label="Close dialog" disabled={busy}>
             <X size={18} />
           </Dialog.Close>
@@ -335,6 +340,25 @@ export function McpAddCustomModal({
                   onChange={(e) => setUrl(e.target.value)}
                   required
                 />
+              </div>
+            )}
+
+            {scope.startsWith('project:') && transport !== 'sse' && (
+              <div>
+                <label className="flex items-center gap-3 min-h-11">
+                  <input
+                    type="checkbox"
+                    checked={discovery}
+                    onChange={(event) => setDiscovery(event.target.checked)}
+                    aria-describedby="mcp-discovery-help"
+                  />
+                  Discover tools on demand
+                </label>
+                <p id="mcp-discovery-help" className="task-muted">
+                  Load matching tools as the task needs them to reduce context usage. Uses this
+                  connection's configured credentials for each selected agent. Keep this off for
+                  agent-managed OAuth, resources, prompts, or interactive MCP servers.
+                </p>
               </div>
             )}
 

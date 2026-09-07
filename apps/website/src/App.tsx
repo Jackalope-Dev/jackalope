@@ -1,4 +1,3 @@
-import { characterPaths } from '@jackalope/brand/character';
 import { applyThemeTokens, PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Menu from '@radix-ui/react-dropdown-menu';
@@ -23,23 +22,15 @@ import {
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
+import { AccessPage } from './Access';
+import { AgentSupport } from './AgentSupport';
+import { BrandMark } from './BrandMark';
 import { JournalPage, JournalTeaser } from './Journal';
 import { Newsletter, WaitlistButton } from './Signup';
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
 const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
 const asset = (name: string) => `/media/${name}`;
-
-function BrandMark({ className = '' }: { className?: string }) {
-  return (
-    <svg viewBox="38 3 105 117" fill="currentColor" aria-hidden="true" className={className}>
-      <path d={characterPaths.farEar} />
-      <path d={characterPaths.nearEar} />
-      <path d={characterPaths.antler} />
-      <path d={characterPaths.head} />
-    </svg>
-  );
-}
 
 function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
   const reduced = useReducedMotion();
@@ -123,7 +114,7 @@ const scenes = [
     image: 'agents.png',
     title: 'Choose who takes the next task.',
     description:
-      'Choose Codex or Claude Code, keep your existing accounts, and give each task the right context.',
+      'Choose a supported coding agent, keep your existing accounts, and give each task the right context.',
     features: ['Use your existing sign-in', 'Choose an agent per task', 'See work in progress'],
     alt: 'The Jackalope Agents screen with locally configured Codex and Claude Code agents in the Atlas sample project.',
   },
@@ -136,7 +127,7 @@ const faqs = [
   ],
   [
     'Do I need an AI subscription?',
-    'You bring your own locally installed, signed-in coding agents. The initial Windows release focuses on Codex and Claude Code. Their account requirements, subscriptions, and usage limits still apply; Jackalope does not include model access.',
+    'Bring Codex, Claude Code, Grok, or OpenCode. Jackalope uses their installed command-line interfaces; see the agent section for connection and sign-in differences. Provider account requirements, subscriptions, and usage limits still apply. Jackalope does not include model access.',
   ],
   [
     'Does my code stay on my computer?',
@@ -208,7 +199,13 @@ export function App({ path = '/' }: { path?: string }) {
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <DownloadButton compact />
+            {path === '/access/' ? (
+              <a className="text-link" href="/tour/">
+                Take a look around <ArrowRight size={15} />
+              </a>
+            ) : (
+              <DownloadButton compact />
+            )}
             <Menu.Root>
               <Menu.Trigger asChild>
                 <button
@@ -281,7 +278,7 @@ export function App({ path = '/' }: { path?: string }) {
               <HeroSurface>
                 <div className="product-caption">
                   <span>
-                    <BrandMark /> YOUR NEXT CHAPTER, ALL IN ONE PLACE
+                    <BrandMark /> TASKS & IDEAS
                   </span>
                   <span>JACKALOPE / DESKTOP</span>
                 </div>
@@ -303,7 +300,7 @@ export function App({ path = '/' }: { path?: string }) {
                     fetchPriority="high"
                   />
                   <span className="play-pill">
-                    <Play size={15} fill="currentColor" /> Take a little look
+                    <Play size={15} fill="currentColor" /> Watch the walkthrough
                   </span>
                 </button>
               </HeroSurface>
@@ -334,6 +331,9 @@ export function App({ path = '/' }: { path?: string }) {
                 Your way of working.
               </span>
             </div>
+            <a className="text-link" href="#agents">
+              Also Grok & OpenCode · See agent support <ArrowRight size={15} />
+            </a>
           </section>
 
           <section
@@ -343,7 +343,6 @@ export function App({ path = '/' }: { path?: string }) {
           >
             <Reveal className="section-intro">
               <div>
-                <p className="eyebrow">A CLEAR PATH FROM IDEA TO DONE</p>
                 <h2 id="workflow-title">
                   Less keeping track.
                   <br />
@@ -501,10 +500,10 @@ export function App({ path = '/' }: { path?: string }) {
             </a>
           </section>
 
+          <AgentSupport />
           <section className="control-section section-space" aria-labelledby="control-title">
             <div className="page-width control-layout">
               <Reveal className="control-copy">
-                <p className="eyebrow">SPACE TO EXPLORE. CONTROL TO SHIP.</p>
                 <h2 id="control-title">
                   Let them branch out.
                   <br />
@@ -577,7 +576,6 @@ export function App({ path = '/' }: { path?: string }) {
               <span className="art-label">SAME WORKSPACE. A DIFFERENT FEELING.</span>
             </Reveal>
             <Reveal className="atmosphere-copy">
-              <p className="eyebrow">A WORKSPACE THAT FEELS LIKE YOU</p>
               <h2 id="atmosphere-title">
                 Find your
                 <br />
@@ -649,9 +647,7 @@ export function App({ path = '/' }: { path?: string }) {
             aria-labelledby="questions-title"
           >
             <Reveal>
-              <p className="eyebrow">A FEW THINGS TO KNOW</p>
-              <h2 id="questions-title">Curious by nature.</h2>
-              <p>So are we.</p>
+              <h2 id="questions-title">Common questions</h2>
               <BrandMark className="questions-mark" />
             </Reveal>
             <div className="faq-list">
@@ -670,7 +666,6 @@ export function App({ path = '/' }: { path?: string }) {
           <section id="download" className="download-section" aria-labelledby="download-title">
             <div className="page-width">
               <BrandMark className="download-mark" />
-              <p className="eyebrow">MAKE ROOM FOR WHAT’S NEXT</p>
               <h2 id="download-title">
                 Your next idea
                 <br />
@@ -694,11 +689,13 @@ export function App({ path = '/' }: { path?: string }) {
           </section>
           <JournalTeaser />
         </main>
+      ) : path === '/access/' ? (
+        <AccessPage />
       ) : (
         <JournalPage path={path} dark={dark} />
       )}
 
-      {path !== '/privacy/' && <Newsletter />}
+      {path !== '/privacy/' && path !== '/access/' && <Newsletter />}
 
       <footer className="site-footer page-width">
         <a href="/" className="wordmark">
@@ -712,6 +709,7 @@ export function App({ path = '/' }: { path?: string }) {
           <a href="/tour/">App tour</a>
           <a href="/changelog/">Changelog</a>
           <a href="/blog/">Field notes</a>
+          <a href="/access/">Your access</a>
           <a href="/privacy/">Privacy</a>
           <a href="/#questions">Questions</a>
         </nav>

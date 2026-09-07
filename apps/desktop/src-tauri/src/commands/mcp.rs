@@ -30,6 +30,8 @@ pub struct McpServerConfig {
     pub description: Option<String>,
     pub enabled: Option<bool>,
     #[serde(default)]
+    pub discovery: bool,
+    #[serde(default)]
     pub extra: serde_json::Map<String, Value>,
 }
 
@@ -137,6 +139,7 @@ fn parse_server_spec(id: &str, spec: &Value, scope: &str) -> McpServerConfig {
         "type",
         "transport",
         "name",
+        "jackalopeDiscovery",
     ] {
         extra.remove(key);
     }
@@ -159,6 +162,7 @@ fn parse_server_spec(id: &str, spec: &Value, scope: &str) -> McpServerConfig {
         url: spec["url"].as_str().map(str::to_string),
         description: spec["description"].as_str().map(str::to_string),
         enabled: Some(spec["enabled"].as_bool().unwrap_or(true)),
+        discovery: spec["jackalopeDiscovery"].as_bool().unwrap_or(false),
         extra,
     }
 }
@@ -202,6 +206,7 @@ fn spec(server: &McpServerConfig, scope: &str) -> Value {
     }
     if scope == "global" || scope.starts_with("project:") {
         value["name"] = json!(server.name);
+        value["jackalopeDiscovery"] = json!(server.discovery);
         if let Some(desc) = &server.description {
             value["description"] = json!(desc);
         }
@@ -265,6 +270,9 @@ fn write_config(path: &Path, text: &str) -> Result<(), String> {
 }
 
 fn validate(server: &McpServerConfig) -> Result<(), String> {
+    if server.discovery {
+        super::mcp_broker::validate_connection(server)?;
+    }
     if let Some(value) = server.extra.get("bearer_token_env_var") {
         let variable = value
             .as_str()
@@ -426,73 +434,7 @@ pub async fn mcp_probe_server(server: McpServerConfig) -> Result<McpProbeResult,
     validate(&server)?;
     let started = Instant::now();
     let future = async {
-        if server.transport == "sse" {
-            return Err("Legacy SSE probing is unavailable. Use the agent's connection test or a Streamable HTTP endpoint.".into());
-        }
-        let client = if server.transport == "http" {
-            let mut headers = HashMap::new();
-            if let Some(values) = server
-                .extra
-                .get("http_headers")
-                .or(server.extra.get("headers"))
-                .and_then(Value::as_object)
-            {
-                for (name, value) in values {
-                    headers.insert(
-                        name.parse().map_err(|_| "Invalid HTTP header name")?,
-                        value
-                            .as_str()
-                            .ok_or("HTTP header values must be strings")?
-                            .parse()
-                            .map_err(|_| "Invalid HTTP header value")?,
-                    );
-                }
-            }
-            let mut config = rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig::with_uri(server.url.clone().unwrap()).custom_headers(headers);
-            if let Some(variable) = server
-                .extra
-                .get("bearer_token_env_var")
-                .and_then(Value::as_str)
-            {
-                config = config.auth_header(
-                    std::env::var(variable)
-                        .map_err(|_| format!("Set {variable} before probing this connection."))?,
-                );
-            }
-            let http = reqwest::Client::builder()
-                .redirect(reqwest::redirect::Policy::none())
-                .build()
-                .map_err(|e| e.to_string())?;
-            ().serve(StreamableHttpClientTransport::with_client(http, config))
-                .await
-                .map_err(|e| e.to_string())?
-        } else {
-            let program = server.command.as_ref().unwrap();
-            let mut executable = PathBuf::from(program);
-            if cfg!(windows) && executable.extension().is_none() && !executable.is_absolute() {
-                if let Some(found) =
-                    std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
-                        .flat_map(|dir| {
-                            [
-                                dir.join(format!("{program}.exe")),
-                                dir.join(format!("{program}.cmd")),
-                            ]
-                        })
-                        .find(|path| path.is_file())
-                {
-                    executable = found;
-                }
-            }
-            let mut command = tokio::process::Command::new(executable);
-            command
-                .args(&server.args)
-                .envs(&server.env)
-                .kill_on_drop(true);
-            #[cfg(windows)]
-            command.creation_flags(0x08000000);
-            let transport = TokioChildProcess::new(command).map_err(|e| e.to_string())?;
-            ().serve(transport).await.map_err(|e| e.to_string())?
-        };
+        let client = connect(&server, None, None).await?;
         let result = client.list_all_tools().await.map_err(|e| e.to_string());
         let _ = client.cancel().await;
         result.map(|tools| {
@@ -525,6 +467,125 @@ pub async fn mcp_probe_server(server: McpServerConfig) -> Result<McpProbeResult,
     })
 }
 
+pub(super) struct Connection {
+    client: rmcp::service::RunningService<rmcp::RoleClient, ()>,
+    _tree: Option<super::process_control::ProcessTree>,
+}
+impl std::ops::Deref for Connection {
+    type Target = rmcp::service::RunningService<rmcp::RoleClient, ()>;
+    fn deref(&self) -> &Self::Target {
+        &self.client
+    }
+}
+impl Connection {
+    async fn cancel(self) {
+        let _ = self.client.cancel().await;
+    }
+}
+
+pub(super) async fn connect(
+    server: &McpServerConfig,
+    workspace: Option<&Path>,
+    account: Option<(&str, &Path)>,
+) -> Result<Connection, String> {
+    validate(server)?;
+    let mut tree = None;
+    if server.transport == "sse" {
+        return Err("Legacy SSE probing is unavailable. Use the agent's connection test or a Streamable HTTP endpoint.".into());
+    }
+    let client = if server.transport == "http" {
+        let mut headers = HashMap::new();
+        if let Some(values) = server
+            .extra
+            .get("http_headers")
+            .or(server.extra.get("headers"))
+            .and_then(Value::as_object)
+        {
+            for (name, value) in values {
+                headers.insert(
+                    name.parse().map_err(|_| "Invalid HTTP header name")?,
+                    value
+                        .as_str()
+                        .ok_or("HTTP header values must be strings")?
+                        .parse()
+                        .map_err(|_| "Invalid HTTP header value")?,
+                );
+            }
+        }
+        let mut config =
+            rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig::with_uri(
+                server.url.clone().unwrap(),
+            )
+            .custom_headers(headers);
+        if let Some(variable) = server
+            .extra
+            .get("bearer_token_env_var")
+            .and_then(Value::as_str)
+        {
+            config = config.auth_header(
+                std::env::var(variable)
+                    .map_err(|_| format!("Set {variable} before probing this connection."))?,
+            );
+        }
+        let http = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| e.to_string())?;
+        ().serve(StreamableHttpClientTransport::with_client(http, config))
+            .await
+            .map_err(|e| e.to_string())?
+    } else {
+        let program = server.command.as_ref().unwrap();
+        let mut executable = PathBuf::from(program);
+        if cfg!(windows) && executable.extension().is_none() && !executable.is_absolute() {
+            if let Some(found) =
+                std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+                    .flat_map(|dir| {
+                        [
+                            dir.join(format!("{program}.exe")),
+                            dir.join(format!("{program}.cmd")),
+                        ]
+                    })
+                    .find(|path| path.is_file())
+            {
+                executable = found;
+            }
+        }
+        let mut command = tokio::process::Command::new(executable);
+        command
+            .args(&server.args)
+            .envs(&server.env)
+            .kill_on_drop(true);
+        #[cfg(windows)]
+        command.creation_flags(0x08000000);
+        #[cfg(unix)]
+        command.process_group(0);
+        if let Some(workspace) = workspace {
+            command.current_dir(workspace);
+        }
+        if let Some((name, directory)) = account {
+            command.env(name, directory);
+        }
+        command
+            .env_remove("JACKALOPE_BRIDGE_TOKEN")
+            .env_remove("JACKALOPE_BRIDGE_URL");
+        let (transport, _) = TokioChildProcess::builder(command)
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        tree = Some(super::process_control::ProcessTree::attach_pid(
+            transport
+                .id()
+                .ok_or("MCP process exited before containment")?,
+        )?);
+        ().serve(transport).await.map_err(|e| e.to_string())?
+    };
+    Ok(Connection {
+        client,
+        _tree: tree,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -541,6 +602,8 @@ mod tests {
         let codex = project_servers(&id, Some(&selected), "codex").unwrap();
         assert_eq!(codex["test.server"]["bearer_token_env_var"], "TEST_TOKEN");
         let overrides = codex_overrides(&codex).unwrap();
+        assert_eq!(overrides.len(), 1);
+        assert_eq!(overrides[0].split_once('=').unwrap().0, "mcp_servers");
         let parsed: toml::Value = toml::from_str(&overrides.join("\n")).unwrap();
         assert_eq!(
             parsed["mcp_servers"]["test.server"]["url"].as_str(),
@@ -563,6 +626,43 @@ mod tests {
         assert!(validate(&invalid).is_err());
         fs::remove_file(&path).unwrap();
         fs::remove_dir(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn discovery_is_native_only_and_rejects_unsupported_adapters() {
+        let id = uuid::Uuid::new_v4().to_string();
+        let scope = format!("project:{id}");
+        let path = config_path(&scope).unwrap();
+        let server = parse_server_spec(
+            "tools",
+            &json!({"command":"node","jackalopeDiscovery":true}),
+            &scope,
+        );
+        assert!(server.discovery);
+        assert_eq!(spec(&server, &scope)["jackalopeDiscovery"], true);
+        assert!(spec(&server, "codex").get("jackalopeDiscovery").is_none());
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            json!({"mcpServers":{"tools":spec(&server,&scope)}}).to_string(),
+        )
+        .unwrap();
+        for adapter in ["codex", "claude", "grok"] {
+            let (direct, optimized) =
+                project_delivery(&id, Some(&["tools".into()]), adapter).unwrap();
+            assert!(direct.is_empty());
+            assert_eq!(optimized.len(), 1);
+            assert!(project_delivery(&id, Some(&[]), adapter)
+                .unwrap()
+                .1
+                .is_empty());
+        }
+        assert!(project_delivery(&id, Some(&["tools".into()]), "opencode").is_err());
+        assert!(project_delivery(&id, Some(&[]), "opencode")
+            .unwrap()
+            .1
+            .is_empty());
+        fs::remove_file(path).unwrap();
     }
 
     #[test]
@@ -617,16 +717,18 @@ mod tests {
     }
 }
 
-pub(super) fn project_servers(
+pub(super) fn project_delivery(
     project_id: &str,
     selection: Option<&[String]>,
     adapter: &str,
-) -> Result<serde_json::Map<String, Value>, String> {
+) -> Result<(serde_json::Map<String, Value>, Vec<McpServerConfig>), String> {
     let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
     let scope = format!("project:{project_id}");
     let path = config_path(&scope)?;
     let (_, root) = read_config(&path)?;
     let mut result = serde_json::Map::new();
+    let mut optimized = Vec::new();
+    let mut selected = std::collections::HashSet::new();
     if let Some(servers) = root["mcpServers"].as_object() {
         for (id, value) in servers {
             if selection.is_some_and(|ids| !ids.contains(id)) || value["enabled"] == false {
@@ -637,31 +739,44 @@ pub(super) fn project_servers(
             }
             let server = parse_server_spec(id, value, &scope);
             validate(&server)?;
+            selected.insert(id.clone());
+            if adapter == "opencode" {
+                return Err("OpenCode does not support project-selected MCP connections yet. Use its own CLI configuration or choose another agent.".into());
+            }
+            if server.discovery {
+                optimized.push(server);
+                continue;
+            }
             if adapter == "grok" || (adapter == "codex" && server.transport == "sse") {
                 return Err("This agent does not support the selected project MCP transport. Choose Claude or a compatible Codex connection.".into());
             }
             result.insert(id.clone(), spec(&server, adapter));
         }
     }
-    if selection.is_some_and(|ids| ids.iter().any(|id| !result.contains_key(id))) {
+    if selection.is_some_and(|ids| ids.iter().any(|id| !selected.contains(id))) {
         return Err("A selected project connection is disabled or missing. Review the task's tools before starting.".into());
     }
-    Ok(result)
+    Ok((result, optimized))
+}
+
+#[cfg(test)]
+fn project_servers(
+    project_id: &str,
+    selection: Option<&[String]>,
+    adapter: &str,
+) -> Result<serde_json::Map<String, Value>, String> {
+    project_delivery(project_id, selection, adapter).map(|(direct, _)| direct)
 }
 
 pub(super) fn codex_overrides(
     servers: &serde_json::Map<String, Value>,
 ) -> Result<Vec<String>, String> {
-    servers
-        .iter()
-        .map(|(id, value)| {
-            let value = toml::Value::try_from(value).map_err(|e| e.to_string())?;
-            Ok(format!(
-                "mcp_servers.{}={value}",
-                serde_json::to_string(id).map_err(|e| e.to_string())?
-            ))
-        })
-        .collect()
+    if servers.is_empty() {
+        return Ok(vec![]);
+    }
+    // CLI override keys split on dots without TOML unquoting; quote IDs inside the value instead.
+    let value = toml::Value::try_from(servers).map_err(|e| e.to_string())?;
+    Ok(vec![format!("mcp_servers={value}")])
 }
 
 #[tauri::command]

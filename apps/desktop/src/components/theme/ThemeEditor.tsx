@@ -82,7 +82,6 @@ export function ThemeEditor({
       <div>
         <div className="flex items-center justify-between text-xs mb-3">
           <span className="font-medium">{value.name}</span>
-          <span className="text-[var(--color-text-muted)]">Make a little space for color.</span>
         </div>
         <div
           role="slider"

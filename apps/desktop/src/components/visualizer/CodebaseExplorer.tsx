@@ -207,9 +207,8 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
   return (
     <div className="codebase-page">
       <WorkspaceHeading
-        eyebrow={snapshot ? undefined : project.name}
         title="Codebase"
-        description="Find your way through the files. Follow what depends on what."
+        description="Explore files and their dependencies."
         action={
           <div className="flex gap-2">
             {snapshot && (

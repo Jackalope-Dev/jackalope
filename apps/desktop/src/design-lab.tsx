@@ -25,8 +25,7 @@ function DesignLab() {
     <main className="h-dvh overflow-y-auto p-8 lg:p-16 bg-[var(--color-shell)]">
       <div className="max-w-5xl mx-auto">
         <WorkspaceHeading
-          eyebrow="Jackalope / living design library"
-          title="A workspace with a little life."
+          title="Design library"
           description="The same character, colors, and controls used in the app. Explore the details here."
           action={
             <a href="/" className="text-sm text-[var(--color-accent-ink)]">

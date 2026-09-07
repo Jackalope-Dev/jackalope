@@ -17,6 +17,8 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  monitorChange?: { before: string; after: string; path: string; branch: string } | null;
+  contextReceipt?: import('./knowledge').ContextReceipt;
   id: string;
   taskId: string;
   projectId: string;
@@ -27,8 +29,13 @@ export interface TaskRun {
   baseHead: string;
   agent: string;
   account: string;
+  connectionIds?: string[] | null;
   targetBranch?: string | null;
   verifyCommand?: string | null;
+  prepareCommand?: string | null;
+  autoVerify?: boolean;
+  finishing?: boolean;
+  verificationError?: string | null;
   verification?: Verification | null;
   accountBinding?: {
     adapter: string;
@@ -58,6 +65,14 @@ export interface TaskRun {
   persistenceError: string | null;
   exitCode: number | null;
   usage: RunUsage;
+  mcpUsage?: {
+    searches: number;
+    calls: number;
+    failures: number;
+    catalogTools: number;
+    catalogBytes: number;
+    schemaBytesReturned: number;
+  };
   usageObservations?: {
     messageId: string;
     parentToolUseId: string | null;
@@ -99,6 +114,7 @@ export interface ScreenshotArtifact {
   timestamp: string;
 }
 export interface RunRequest {
+  contextSelection?: import('./knowledge').ContextSelection;
   connectionIds?: string[];
   model?: string;
   id: string;
@@ -110,6 +126,8 @@ export interface RunRequest {
   agentProfileId?: string;
   targetBranch?: string;
   verifyCommand?: string;
+  prepareCommand?: string;
+  autoVerify?: boolean;
   prompt: string;
   isolated: boolean;
   previousRunId?: string;

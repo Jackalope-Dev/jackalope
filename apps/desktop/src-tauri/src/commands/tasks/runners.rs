@@ -1,5 +1,7 @@
 use super::*;
 
+pub(in crate::commands) const BUILTIN_AGENTS: &[&str] = &["codex", "claude", "grok", "opencode"];
+
 pub(super) fn discover_runner(
     policy: &crate::commands::agent_policy::AgentPolicy,
     id: &str,
@@ -10,7 +12,9 @@ pub(super) fn discover_runner(
         name: match id {
             "codex" => "Codex",
             "claude" => "Claude Code",
-            _ => "Grok",
+            "grok" => "Grok",
+            "opencode" => "OpenCode",
+            _ => id,
         }
         .into(),
         available: false,
@@ -31,6 +35,10 @@ pub(super) fn discover_runner(
                 });
             if adapter == "grok" {
                 runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into();
+                return runner;
+            }
+            if adapter == "opencode" {
+                runner.detail = "Installed. OpenCode validates the selected provider on launch; saved credentials do not prove current access. Free and local models may not require sign-in. Managed profiles isolate its saved credentials and sessions.".into();
                 return runner;
             }
             let args = if adapter == "codex" {
@@ -69,7 +77,7 @@ pub(super) fn discover_runner(
 }
 
 pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
-    if !["codex", "claude", "grok"].contains(&agent) {
+    if !BUILTIN_AGENTS.contains(&agent) {
         return Err("Unsupported agent".into());
     }
     let name = if cfg!(windows) {
@@ -81,7 +89,18 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
         std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect();
     if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
         dirs.push(PathBuf::from(&home).join(".local/bin"));
-        dirs.push(PathBuf::from(home).join(".grok/bin"));
+        dirs.push(PathBuf::from(&home).join(".grok/bin"));
+        dirs.push(PathBuf::from(home).join(".opencode/bin"));
+    }
+    if agent == "opencode" {
+        if let Some(roaming) = std::env::var_os("APPDATA") {
+            dirs.push(PathBuf::from(roaming).join("npm/node_modules/opencode-ai/bin"));
+        }
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            dirs.push(
+                PathBuf::from(local).join("Jackalope/agent-tools/node_modules/opencode-ai/bin"),
+            );
+        }
     }
     if agent == "codex" {
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {

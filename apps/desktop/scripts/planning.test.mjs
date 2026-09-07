@@ -188,9 +188,10 @@ test('manual planning never claims execution and questions or unsaved results ne
     prompt: 'Work',
     startedAt: '2026-09-02',
   };
-  for (const status of ['failed', 'stopped', 'interrupted', 'review'])
+  for (const status of ['failed', 'stopped', 'interrupted'])
     assert.equal(collectWork('a', [], [{ ...run, status }])[0].stage, 'attention');
   assert.equal(collectWork('a', [], [{ ...run, status: 'reviewed' }])[0].stage, 'finished');
+  assert.equal(collectWork('a', [], [{ ...run, status: 'review' }])[0].stage, 'review');
   assert.equal(
     collectWork('a', [], [{ ...run, status: 'running', prompts: [{ status: 'pending' }] }])[0]
       .stage,

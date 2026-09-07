@@ -24,6 +24,10 @@ pub struct UsageObservation {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
+    #[serde(default)]
+    pub monitor_change: Option<crate::commands::monitors::MonitorChange>,
+    #[serde(default)]
+    pub context_receipt: crate::commands::knowledge::ContextReceipt,
     pub id: String,
     pub task_id: String,
     pub project_id: String,
@@ -45,7 +49,15 @@ pub struct TaskRun {
     #[serde(default)]
     pub verify_command: Option<String>,
     #[serde(default)]
+    pub prepare_command: Option<String>,
+    #[serde(default)]
+    pub auto_verify: bool,
+    #[serde(default)]
     pub verification: Option<crate::commands::verification::Verification>,
+    #[serde(default)]
+    pub finishing: bool,
+    #[serde(default)]
+    pub verification_error: Option<String>,
     pub model: Option<String>,
     pub prompt: String,
     pub status: String,
@@ -63,6 +75,8 @@ pub struct TaskRun {
     pub exit_code: Option<i32>,
     pub usage: Usage,
     #[serde(default)]
+    pub mcp_usage: Option<crate::commands::mcp_broker::BrokerUsage>,
+    #[serde(default)]
     pub usage_observations: Vec<UsageObservation>,
     #[serde(default)]
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
@@ -75,6 +89,12 @@ pub struct TaskRun {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRequest {
+    #[serde(skip)]
+    pub monitor_change: Option<crate::commands::monitors::MonitorChange>,
+    #[serde(default)]
+    pub context_selection: crate::commands::knowledge::ContextSelection,
+    #[serde(skip)]
+    pub context_receipt: crate::commands::knowledge::ContextReceipt,
     pub model: Option<String>,
     pub id: String,
     pub project_id: String,
@@ -88,6 +108,10 @@ pub struct RunRequest {
     pub agent_profile_id: Option<String>,
     #[serde(default)]
     pub verify_command: Option<String>,
+    #[serde(default)]
+    pub prepare_command: Option<String>,
+    #[serde(default)]
+    pub auto_verify: bool,
     #[serde(default)]
     pub target_branch: Option<String>,
     #[serde(skip)]

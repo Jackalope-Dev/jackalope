@@ -1,5 +1,7 @@
+import { builtinAgents } from '../../lib/agent-catalog';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
+import { KnowledgeLibrary } from '../knowledge/KnowledgeLibrary';
 import { ProjectAgentAccount } from '../settings/ProjectAgentAccount';
 import { Setting } from '../settings/Setting';
 import { CodebaseMemoryBar } from '../tasks/CodebaseMemoryBar';
@@ -15,6 +17,7 @@ export function ProjectPreferences() {
     <section className="workspace-page">
       <h1 className="text-2xl">Project context</h1>
       {project && <CodebaseMemoryBar project={project} initiallyExpanded />}{' '}
+      {project && <KnowledgeLibrary key={project.id} project={project} />}
       {!project ? (
         <p className="settings-section-subtitle mt-4">
           Open a repository to configure project preferences.
@@ -56,12 +59,7 @@ export function ProjectPreferences() {
                 }
               >
                 <SelectItem value="inherit">App default</SelectItem>
-                {[
-                  { id: 'codex', name: 'Codex' },
-                  { id: 'claude', name: 'Claude Code' },
-                  { id: 'grok', name: 'Grok' },
-                  ...agents.customAgents,
-                ].map((a) => (
+                {[...builtinAgents, ...agents.customAgents].map((a) => (
                   <SelectItem
                     key={a.id}
                     value={a.id}
@@ -80,13 +78,11 @@ export function ProjectPreferences() {
               title="Agents available here"
               description="Restrict which agents can be picked for this project's tasks — handy for keeping work projects on one agent and personal ones on another. Leave every agent on to allow all app-enabled agents."
             />
-            {[
-              { id: 'codex', name: 'Codex' },
-              { id: 'claude', name: 'Claude Code' },
-              { id: 'grok', name: 'Grok' },
-              ...agents.customAgents,
-            ].map((a) => {
-              const allIds = ['codex', 'claude', 'grok', ...agents.customAgents.map((c) => c.id)];
+            {[...builtinAgents, ...agents.customAgents].map((a) => {
+              const allIds = [
+                ...builtinAgents.map((a) => a.id),
+                ...agents.customAgents.map((c) => c.id),
+              ];
               const restricted = project.preferences?.allowedAgents;
               const isOn = restricted === undefined || restricted.includes(a.id);
               return (
@@ -172,6 +168,23 @@ export function ProjectPreferences() {
             placeholder={project.gitBranch}
             onChange={(e) => updateProjectPreferences(project.id, { baseBranch: e.target.value })}
           />
+          <label className="block text-sm font-medium mt-6" htmlFor="preparation-command">
+            Workspace preparation
+          </label>
+          <p className="settings-row-description mb-3">
+            Optional command authorized to run before the agent in each new task workspace, such as
+            installing dependencies. It uses your OS permissions, stops after five minutes, and is
+            skipped for continuations.
+          </p>
+          <input
+            id="preparation-command"
+            className="settings-input w-full"
+            value={project.preferences?.prepareCommand ?? ''}
+            placeholder="pnpm install --frozen-lockfile"
+            onChange={(event) =>
+              updateProjectPreferences(project.id, { prepareCommand: event.target.value })
+            }
+          />
           <label className="block text-sm font-medium mt-6" htmlFor="verification-command">
             Verification command
           </label>
@@ -190,6 +203,16 @@ export function ProjectPreferences() {
               })
             }
           />
+          <Setting
+            title="Check results automatically"
+            description="Authorize the saved verification command after each successful task, before review. Applies to new tasks and schedules; existing attempts retain their saved policy."
+          >
+            <Switch
+              label="Check results automatically"
+              checked={project.preferences?.autoVerify === true}
+              onCheckedChange={(autoVerify) => updateProjectPreferences(project.id, { autoVerify })}
+            />
+          </Setting>
           <p className="settings-disclosure-box">
             Choose isolation in the task composer. Isolated tasks use .worktrees and the selected
             target branch. Custom worktree locations and automatic cleanup are planned.

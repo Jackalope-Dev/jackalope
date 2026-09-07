@@ -19,7 +19,6 @@ export function JournalTeaser() {
     <section className="journal-teaser page-width" aria-labelledby="notes-title">
       <div className="journal-section-heading">
         <div>
-          <p className="eyebrow">FROM THE STUDIO</p>
           <h2 id="notes-title">A few field notes.</h2>
         </div>
         <a className="text-link" href="/blog/">
@@ -163,13 +162,8 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
     return (
       <main id="main" className="journal-page page-width">
         <header className="journal-heading">
-          <p className="eyebrow">A WORK IN PROGRESS, WITH INTENTION</p>
-          <h1>Taking shape.</h1>
-          <p>
-            Small refinements. Meaningful steps forward.
-            <br />
-            Development notes and, when they’re ready, public releases.
-          </p>
+          <h1>Changelog</h1>
+          <p>Development updates and published releases.</p>
         </header>
         {publishedVersion && <PublishedReleases />}
         <div className="release-status">
@@ -217,7 +211,6 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
     return (
       <main id="main" className="article page-width">
         <header className="article-heading">
-          <p className="eyebrow">YOUR INFORMATION</p>
           <h1>Website & email privacy.</h1>
           <p className="article-deck">
             What this site collects, and what happens when you join the list.
@@ -241,10 +234,11 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
           <section>
             <h2>If you join the waitlist.</h2>
             <p>
-              The signup form sends your email address to Sequenzy, our email service, to manage
-              Jackalope launch announcements and occasional product notes. The form also records
-              that the signup came from jackalope.dev. Signing up is optional and does not create a
-              desktop account or promise a release date.
+              The waitlist records your email, request source, approval status, and optional
+              newsletter consent in our Cloudflare service. Approved members receive a private link
+              to downloads and invitations. Signing up does not create a desktop account or promise
+              a release date. Product notes are optional; access and invitation emails are sent to
+              carry out your request.
             </p>
             <p>
               Sequenzy processes the request and subscriber record, including technical information
@@ -255,11 +249,28 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
             </p>
           </section>
           <section>
+            <h2>Your access and invitations.</h2>
+            <p>
+              We keep a secure, essential sign-in cookie for up to 30 days. Sign out to remove it.
+              Private sign-in links expire after 30 minutes; welcome and invitation links expire
+              after seven days and can be used once. Email invitations reserve one of a member’s
+              places for seven days. Shared links claim a place after email verification.
+            </p>
+            <p>
+              Members can see the email addresses and acceptance status of people they invite. We
+              retain access and referral records to manage approvals and invitation limits until you
+              request deletion. Email queue records are removed after 30 days; private link payloads
+              are cleared after the email is queued or after seven days. Expired sessions and tokens
+              are removed by scheduled cleanup.
+            </p>
+          </section>
+          <section>
             <h2>Your choices.</h2>
             <p>
-              Use the unsubscribe link in a Jackalope email to stop receiving updates. To ask about
-              your information or request its deletion, contact Jackalope Digital LLC through{' '}
-              <a href="https://jackalope.digital">jackalope.digital</a>.
+              Use the unsubscribe link in a newsletter to stop receiving product updates. This does
+              not revoke your access or stop essential sign-in and invitation emails you request. To
+              ask about your information or request its deletion, contact Jackalope Digital LLC
+              through <a href="https://jackalope.digital">jackalope.digital</a>.
             </p>
           </section>
           <section>
@@ -277,13 +288,8 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
     return (
       <main id="main" className="journal-page page-width">
         <header className="journal-heading">
-          <p className="eyebrow">THE JACKALOPE JOURNAL</p>
           <h1>Field notes.</h1>
-          <p>
-            On making room for good work.
-            <br />
-            Ideas, practical guides, and notes from the studio.
-          </p>
+          <p>Ideas, practical guides, and product updates.</p>
         </header>
         <JournalTeaser />
       </main>
@@ -291,8 +297,7 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
   return (
     <main id="main" className="journal-page page-width">
       <header className="journal-heading">
-        <p className="eyebrow">A SMALL DETOUR</p>
-        <h1>Nothing here. Yet.</h1>
+        <h1>Page not found</h1>
         <p>This page doesn’t exist. Let’s get you back to Jackalope.</p>
         <a className="button button-primary" href="/">
           Back home <ArrowRight size={16} />

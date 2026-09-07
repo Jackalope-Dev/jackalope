@@ -79,6 +79,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             desktop_settings,
+            commands::knowledge::knowledge_list,
+            commands::knowledge::knowledge_save,
+            commands::knowledge::knowledge_remove,
+            commands::knowledge::knowledge_preview,
+            commands::knowledge::knowledge_search,
             commands::codebase::codebase_scan,
             desktop_set_close_to_tray,
             app_reset,
@@ -100,6 +105,7 @@ pub fn run() {
             pty_resize,
             pty_kill,
             schedule_list,
+            schedule_inspect_change,
             schedule_save,
             schedule_remove,
             schedule_set_enabled,

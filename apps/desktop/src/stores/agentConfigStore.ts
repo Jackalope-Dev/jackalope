@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { BuiltinAgentId } from '../lib/agent-catalog';
 import { nativeTask } from '../lib/task-runtime.ts';
 
 const memoryStore: Record<string, string> = {};
@@ -30,7 +31,7 @@ export interface CustomAgentConfig {
   id: string;
   name: string;
   command: string;
-  adapter?: 'codex' | 'claude' | 'grok';
+  adapter?: BuiltinAgentId;
   args?: string[];
   models: {
     id: string;
@@ -76,6 +77,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         codex: true,
         claude: true,
         grok: true,
+        opencode: true,
       },
       allowedModels: {
         // By default, all standard models are allowed

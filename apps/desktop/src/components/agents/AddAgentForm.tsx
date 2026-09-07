@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { type BuiltinAgentId, builtinAgents } from '../../lib/agent-catalog';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
@@ -8,7 +9,7 @@ export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
   const adapterId = useId();
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
-  const [adapter, setAdapter] = useState<'codex' | 'claude' | 'grok'>('codex');
+  const [adapter, setAdapter] = useState<BuiltinAgentId>('codex');
   const add = () => {
     if (!name.trim() || !path.trim()) return;
     useAgentConfigStore.getState().addCustomAgent({
@@ -26,8 +27,8 @@ export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
     <div className="agent-manager">
       <div className="agent-manual-form">
         <p className="task-muted">
-          Connect an installed Codex, Claude Code or Grok CLI. Use its existing sign-in; no
-          credentials are copied into Jackalope.
+          Connect an installed supported CLI. Use its existing sign-in; no credentials are copied
+          into Jackalope.
         </p>
         <label className="task-label">
           Name
@@ -40,9 +41,11 @@ export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
             value={adapter}
             onValueChange={(value) => setAdapter(value as typeof adapter)}
           >
-            <SelectItem value="codex">Codex</SelectItem>
-            <SelectItem value="claude">Claude Code</SelectItem>
-            <SelectItem value="grok">Grok</SelectItem>
+            {builtinAgents.map((agent) => (
+              <SelectItem key={agent.id} value={agent.id}>
+                {agent.name}
+              </SelectItem>
+            ))}
           </Select>
         </label>
         <label className="task-label">

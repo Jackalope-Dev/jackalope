@@ -3,7 +3,15 @@ import { VETTED_SKILLS } from './skills/catalog.ts';
 import { assemblePrompt } from './skills/context-assembler.ts';
 
 export function planningDraft(
-  task: Pick<TaskTicket, 'rawPrompt' | 'refinedPrompt' | 'assignedAgent' | 'clarifications'>,
+  task: Pick<
+    TaskTicket,
+    | 'rawPrompt'
+    | 'refinedPrompt'
+    | 'assignedAgent'
+    | 'clarifications'
+    | 'connectionIds'
+    | 'contextSelection'
+  >,
 ) {
   const isolated = !task.clarifications?.some(
     (item) => item.question === 'Git Execution Mode' && item.answer === 'Active working checkout',
@@ -22,10 +30,12 @@ export function planningDraft(
   }).assembledPrompt;
   const structured = !!task.refinedPrompt && task.refinedPrompt === generated;
   return {
+    contextSelection: task.contextSelection,
     prompt: structured ? task.rawPrompt : task.refinedPrompt || task.rawPrompt,
     skills: structured ? skills : [],
     agent: task.assignedAgent === 'Unassigned' ? '' : (task.assignedAgent ?? ''),
     isolated,
+    connectionIds: task.connectionIds,
   };
 }
 
