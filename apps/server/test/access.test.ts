@@ -2,7 +2,12 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { unseal } from '../src/access/crypto';
-import { type AccessMail, accessEmail, deliverAccessMail } from '../src/access/mail';
+import {
+  type AccessMail,
+  accessEmail,
+  deliverAccessMail,
+  type WaitlistMail,
+} from '../src/access/mail';
 import { syncNewsletter } from '../src/access/newsletter';
 import {
   acceptToken,
@@ -11,6 +16,7 @@ import {
   invitations,
   inviteEmails,
   type Member,
+  memberInsert,
   register,
   requestLink,
 } from '../src/access/service';
@@ -51,14 +57,14 @@ function required<T>(value: T | null | undefined): T {
   return value;
 }
 async function member(email: string) {
-  await register(bindings, email, false, 'fixture');
+  await memberInsert(bindings, email, 'fixture').run();
   return required(
     await env.DB.prepare('SELECT * FROM access_members WHERE email=?').bind(email).first<Member>(),
   );
 }
 async function mail(email: string) {
   const row = await env.DB.prepare(
-    'SELECT payload FROM access_mail WHERE email=? ORDER BY created_at DESC LIMIT 1',
+    "SELECT payload FROM access_mail WHERE email=? AND kind!='waitlist' ORDER BY created_at DESC LIMIT 1",
   )
     .bind(email)
     .first<{ payload: string }>();
@@ -108,12 +114,96 @@ it('normalizes waitlist emails, keeps approval private and makes approval idempo
   await Promise.all([approve(bindings, person.id), approve(bindings, person.id)]);
   expect(
     (await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first<{ n: number }>())?.n,
-  ).toBe(1);
+  ).toBe(2);
   const token = (await mail(person.email)).token;
   const response = await request('accept', { token });
   expect(response.status).toBe(200);
   expect(response.headers.get('set-cookie')).toContain('HttpOnly; Secure; SameSite=Lax');
   expect((await request('accept', { token })).status).toBe(410);
+});
+it('confirms a new signup once under contention, without issuing access or requiring newsletter consent', async () => {
+  await Promise.all(
+    Array.from({ length: 5 }, () => register(bindings, 'signup@example.com', false, 'popup')),
+  );
+  const rows = await env.DB.prepare('SELECT kind,payload FROM access_mail').all<{
+    kind: string;
+    payload: string;
+  }>();
+  expect(rows.results).toHaveLength(1);
+  expect(rows.results[0].kind).toBe('waitlist');
+  const message = await unseal<WaitlistMail>(rows.results[0].payload, bindings.ACCESS_SECRET);
+  expect(message).toEqual({ kind: 'waitlist', to: 'signup@example.com' });
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_tokens').first()).toEqual({ n: 0 });
+  expect(await env.DB.prepare('SELECT status,newsletter FROM access_members').first()).toEqual({
+    status: 'waiting',
+    newsletter: 0,
+  });
+  const content = accessEmail(message, bindings.ACCESS_WEB_ORIGIN);
+  expect(content.subject).toBe('You’re on the Jackalope waitlist');
+  expect(content.body).toContain('Your signup is confirmed');
+  expect(content.body).toContain('https://jackalope.dev/tour/');
+  expect(content.body).not.toContain('#token=');
+  expect(content.text).toContain('We’ll email you as early-access places open.');
+  await env.DB.prepare('DELETE FROM access_mail').run();
+  await register(bindings, message.to, true, 'inline');
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 0 });
+  expect(await env.DB.prepare('SELECT newsletter FROM access_members').first()).toEqual({
+    newsletter: 1,
+  });
+});
+it('retries confirmation failures and preserves one queue claim across competing deliveries', async () => {
+  await register(bindings, 'signup@example.com', false, 'inline');
+  await deliverAccessMail(
+    bindings,
+    (async () => new Response(null, { status: 503 })) as typeof fetch,
+  );
+  expect(await env.DB.prepare('SELECT state,attempts FROM access_mail').first()).toEqual({
+    state: 'failed',
+    attempts: 1,
+  });
+  let sends = 0;
+  const send = (async (_url, init) => {
+    sends++;
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.subject).toBe('You’re on the Jackalope waitlist');
+    expect(payload.body).not.toContain('#token=');
+    return Response.json({ success: true, jobId: 'fixture-confirmation' });
+  }) as typeof fetch;
+  await Promise.all([
+    deliverAccessMail(bindings, send, Date.now() + 3600000),
+    deliverAccessMail(bindings, send, Date.now() + 3600000),
+  ]);
+  expect(sends).toBe(1);
+  expect(await env.DB.prepare('SELECT state,payload FROM access_mail').first()).toEqual({
+    state: 'queued',
+    payload: '',
+  });
+});
+it('rolls back a signup if its confirmation cannot be durably queued', async () => {
+  await env.DB.exec(
+    "CREATE TRIGGER fail_confirmation BEFORE INSERT ON access_mail BEGIN SELECT RAISE(ABORT,'fixture_queue_failure'); END",
+  );
+  try {
+    await expect(register(bindings, 'signup@example.com', false, 'popup')).rejects.toThrow();
+    expect(await env.DB.prepare('SELECT count(*) AS n FROM access_members').first()).toEqual({
+      n: 0,
+    });
+  } finally {
+    await env.DB.exec('DROP TRIGGER fail_confirmation');
+  }
+});
+it('does not queue confirmations for honeypots or existing approved and revoked members', async () => {
+  expect((await request('waitlist', { email: 'bot@example.com', website: 'bot' })).status).toBe(
+    202,
+  );
+  const existing = await member('existing@example.com');
+  for (const status of ['approved', 'revoked']) {
+    await env.DB.prepare('UPDATE access_members SET status=? WHERE id=?')
+      .bind(status, existing.id)
+      .run();
+    await register(bindings, existing.email, false, 'popup');
+  }
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 0 });
 });
 it('allows exactly five competing shared acceptances and retains the sixth token for retry', async () => {
   const { person } = await admitted('owner@example.com');
@@ -244,7 +334,7 @@ it('queues branded transactional mail once with encrypted tokens and retries pro
   ).toMatchObject({ state: 'queued' });
 });
 
-it('keeps newsletter consent optional and durable through provider failure without sending service mail', async () => {
+it('keeps newsletter consent and retries independent of signup confirmation mail', async () => {
   bindings.ACCESS_NEWSLETTER_FORM = 'fixtureform12345678901234';
   await register(bindings, 'no@example.com', false, 'inline');
   await register(bindings, 'yes@example.com', true, 'popup');
@@ -272,7 +362,9 @@ it('keeps newsletter consent optional and durable through provider failure witho
       .bind('yes@example.com')
       .first(),
   ).toEqual({ newsletter_synced_at: expect.any(Number) });
-  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 0 });
+  expect(
+    await env.DB.prepare("SELECT count(*) AS n FROM access_mail WHERE kind='waitlist'").first(),
+  ).toEqual({ n: 2 });
   expect(
     await env.DB.prepare('SELECT newsletter_attempts FROM access_members WHERE email=?')
       .bind('no@example.com')

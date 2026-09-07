@@ -33,9 +33,9 @@ export async function accessRequest<T>(
 }
 export function accessMessage(error: unknown) {
   if (error instanceof AccessRequestError) {
-    if (error.status === 429) return 'A little pause. Please wait a minute before trying again.';
+    if (error.status === 429) return 'Please wait a minute before trying again.';
     if (error.code === 'invitation_full')
-      return 'Those places have just been claimed. Ask your friend for a new invitation, or join the waitlist.';
+      return 'This invitation has no places available. Request another invitation or join the waitlist.';
     if (error.code === 'link_expired')
       return 'This link has expired or has already been used. Request a fresh link below.';
     if (error.code === 'invitation_not_resendable')
@@ -44,5 +44,5 @@ export function accessMessage(error: unknown) {
       return 'Your sign-in has expired. Refresh the page to request a new link.';
     if (error.status === 400) return 'Check the email addresses and try again.';
   }
-  return 'We couldn’t connect just now. Please try again in a moment.';
+  return 'Couldn’t connect. Please try again.';
 }

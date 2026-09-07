@@ -221,43 +221,87 @@ export function App({ path = '/' }: { path?: string }) {
       {home ? (
         <main id="main">
           <section className="hero page-width" aria-labelledby="hero-title">
-            <p className="hero-category">Your desktop workspace for coding agents.</p>
-            <h1 id="hero-title">
-              Big ideas.
-              <br />
-              <span>Room to run.</span>
-            </h1>
-            <p className="hero-description">
-              Turn ideas into parallel work. Bring your favorite agents,
-              <br className="desktop-break" /> keep every project in context, and review what comes
-              back.
-            </p>
-            <div className="hero-actions">
-              <DownloadButton />
-              <a className="button button-quiet" href="#playground">
-                Try the workflow <ArrowRight size={16} />
-              </a>
-              <button
-                type="button"
-                className="text-link hero-video-link"
-                onClick={() => {
-                  videoTrigger.current = document.activeElement as HTMLElement;
-                  setVideoError(false);
-                  setVideoOpen(true);
-                }}
-              >
-                <Play size={16} fill="currentColor" /> See it in motion
-              </button>
+            <div className="hero-copy">
+              <h1 id="hero-title">
+                Big ideas.
+                <br />
+                <span>Room to run.</span>
+              </h1>
+              <p className="hero-description">
+                A desktop home for agent-assisted development. Give Codex, Claude Code, Grok, or
+                OpenCode a task, run work in parallel, and review the changes in one place.
+              </p>
+              <div className="hero-actions">
+                <DownloadButton />
+                <a className="button button-quiet" href="#playground">
+                  Try the workflow <ArrowRight size={16} />
+                </a>
+                <button
+                  type="button"
+                  className="text-link hero-video-link"
+                  onClick={() => {
+                    videoTrigger.current = document.activeElement as HTMLElement;
+                    setVideoError(false);
+                    setVideoOpen(true);
+                  }}
+                >
+                  <Play size={16} fill="currentColor" /> See it in motion
+                </button>
+              </div>
+              <p className="release-note">
+                {downloadUrl
+                  ? `Windows x64 · ${version}`
+                  : 'Windows first · macOS & Linux planned · Bring your own agent access'}
+              </p>
             </div>
-            <p className="release-note">
-              {downloadUrl
-                ? `Windows x64 · ${version}`
-                : 'Bring your agents. Keep your accounts. Make room for what’s next.'}
-            </p>
-
-            <Reveal className="hero-product">
-              <WorkflowDemo />
-            </Reveal>
+            <figure className="hero-stage" aria-label="An example journey from idea to code review">
+              <BrandMark className="hero-silhouette" />
+              <div className="hero-brief">
+                <span className="hero-art-label">ATLAS / NEW TASK</span>
+                <p>“Make search feel effortless.”</p>
+                <span>
+                  Atlas project <span aria-hidden="true">/</span> Your instructions & tools
+                </span>
+              </div>
+              <div className="hero-agent-lanes">
+                <div>
+                  <Code2 size={18} />
+                  <strong>Codex</strong>
+                  <span>Build the keyboard flow</span>
+                </div>
+                <div>
+                  <span className="claude-star" aria-hidden="true">
+                    ✳
+                  </span>
+                  <strong>Claude Code</strong>
+                  <span>Polish the experience</span>
+                </div>
+              </div>
+              <div className="hero-review">
+                <div className="hero-review-heading">
+                  <GitBranch size={17} />
+                  <span>Separate worktrees. One place to review.</span>
+                </div>
+                <img
+                  src={screenshot('review.png')}
+                  alt="Jackalope’s actual review screen with a search patch and project checks in the Atlas sample project."
+                  width="1440"
+                  height="840"
+                  fetchPriority="high"
+                />
+                <div className="hero-review-note">
+                  <Check size={17} />
+                  <span>
+                    The next move is yours.
+                    <small>Inspect the patch. Ask for changes. Choose what lands.</small>
+                  </span>
+                  <ArrowRight size={20} />
+                </div>
+              </div>
+              <figcaption className="hero-art-caption">
+                Illustrated workflow · actual app with sample data
+              </figcaption>
+            </figure>
           </section>
 
           <section className="agent-strip page-width" aria-label="Coding agents">
@@ -282,6 +326,23 @@ export function App({ path = '/' }: { path?: string }) {
             <a className="text-link" href="#agents">
               Explore agent support <ArrowRight size={15} />
             </a>
+          </section>
+
+          <section className="demo-section page-width" aria-labelledby="demo-title">
+            <Reveal className="section-intro">
+              <div>
+                <h2 id="demo-title">
+                  Take an idea
+                  <br />
+                  for a spin.
+                </h2>
+              </div>
+              <p>
+                Pick a brief, choose an agent, and follow the work through to review. An interactive
+                sample of your next everyday workflow — no setup needed.
+              </p>
+            </Reveal>
+            <WorkflowDemo />
           </section>
 
           <section
@@ -572,7 +633,6 @@ export function App({ path = '/' }: { path?: string }) {
                   <Moon size={16} />
                   Dark
                 </button>
-                <span>Go on. Try it here.</span>
               </fieldset>
             </Reveal>
           </section>

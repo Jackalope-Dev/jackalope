@@ -99,6 +99,7 @@ export async function accessRoutes(
         .parse(await readJson(request));
       if (!body.website) {
         await register(env, body.email, body.newsletter, body.source);
+        if (ctx) ctx.waitUntil(deliverAccessMail(env));
         if (ctx && body.newsletter) ctx.waitUntil(syncNewsletter(env));
       }
       return json({ success: true }, 202);

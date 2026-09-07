@@ -76,3 +76,27 @@ test('readiness requires an operational service and migrated schema', async () =
   await assert.rejects(verifyReadiness('https://staging-api.jackalope.dev', reply('ready', 0)));
   await assert.rejects(verifyReadiness('https://staging-api.jackalope.dev', reply('degraded', 1)));
 });
+
+test('edge blocks identify the origin and status without exposing response bodies', async () => {
+  await assert.rejects(
+    verifyReadiness(
+      'https://api.jackalope.dev',
+      async () =>
+        new Response('<html>private challenge</html>', {
+          status: 403,
+          headers: { 'content-type': 'text/html' },
+        }),
+    ),
+    {
+      message:
+        'https://api.jackalope.dev: readiness returned HTTP 403 (text/html); check edge rules if the service is healthy locally',
+    },
+  );
+  await assert.rejects(
+    verifyReadiness(
+      'https://api.jackalope.dev',
+      async () => new Response('invalid', { headers: { 'content-type': 'application/json' } }),
+    ),
+    { message: 'https://api.jackalope.dev: readiness returned invalid JSON' },
+  );
+});

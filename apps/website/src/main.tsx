@@ -6,6 +6,7 @@ import { App } from './App';
 import { normalizePath } from './content';
 import '@jackalope/brand/fonts.css';
 import './styles.css';
+import './launch.css';
 
 applyThemeTokens({ ...PRESET_THEMES[0], isDark: false, atmosphere: 18 });
 

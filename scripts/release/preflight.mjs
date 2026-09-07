@@ -57,8 +57,17 @@ export async function verifyReadiness(origin, request = fetch) {
     redirect: 'error',
     signal: AbortSignal.timeout(30000),
   });
-  const body = await response.json();
-  if (!response.ok || body.status !== 'ready' || ![1, 2].includes(body.schemaVersion))
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json'))
+    throw new Error(
+      `${origin}: readiness returned HTTP ${response.status} (${response.headers.get('content-type') ?? 'no content type'}); check edge rules if the service is healthy locally`,
+    );
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(`${origin}: readiness returned invalid JSON`);
+  }
+  if (body?.status !== 'ready' || ![1, 2].includes(body.schemaVersion))
     throw new Error(`${origin}: service readiness failed`);
   console.log(
     `Verified ${origin}: schema ${body.schemaVersion}, ingestion enabled: ${body.ingestionEnabled}`,

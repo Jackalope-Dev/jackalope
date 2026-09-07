@@ -30,7 +30,13 @@ export async function accessAdmin(
   if (request.method === 'GET' && url.pathname === '/admin/access/email-preview') {
     return new Response(
       accessEmail(
-        { to: 'preview@example.invalid', kind: 'welcome', token: 'preview-only-not-a-login-token' },
+        url.searchParams.get('kind') === 'waitlist'
+          ? { to: 'preview@example.invalid', kind: 'waitlist' }
+          : {
+              to: 'preview@example.invalid',
+              kind: 'welcome',
+              token: 'preview-only-not-a-login-token',
+            },
         env.ACCESS_WEB_ORIGIN,
       ).body,
       {

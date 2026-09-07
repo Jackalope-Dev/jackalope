@@ -59,7 +59,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
       setState('success');
       setMessage(
         accessOrigin
-          ? 'You’re on the waitlist. We’ll email you when your access is approved. If you opted into product notes, check your inbox for any confirmation steps.'
+          ? 'You’re on the waitlist. Look out for a signup confirmation, then a separate invitation when your access is ready. Product notes have their own confirmation if you opted in.'
           : result.optIn?.required
             ? 'Check your inbox to confirm your email and finish joining the list.'
             : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',

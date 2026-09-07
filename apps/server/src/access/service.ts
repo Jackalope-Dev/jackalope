@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ServiceError as AccessError } from '../errors';
 import { randomToken, tokenHash } from './crypto';
-import { mailStatements } from './mail';
+import { mailStatements, waitlistMailStatement } from './mail';
 
 export { ServiceError as AccessError } from '../errors';
 export const emailSchema = z.string().trim().toLowerCase().max(254).email();
@@ -21,16 +21,22 @@ export function memberInsert(
   source: string,
   newsletter = false,
   now = Date.now(),
+  id = crypto.randomUUID(),
 ) {
   return env.DB.prepare(
     'INSERT INTO access_members(id,email,created_at,source,share_code,newsletter) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET newsletter=max(newsletter,excluded.newsletter)',
-  ).bind(crypto.randomUUID(), email, now, source, randomToken(), Number(newsletter));
+  ).bind(id, email, now, source, randomToken(), Number(newsletter));
 }
 export async function register(env: Env, email: string, newsletter: boolean, source: string) {
-  await memberInsert(env, email, source, newsletter).run();
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  await env.DB.batch([
+    memberInsert(env, email, source, newsletter, now, id),
+    await waitlistMailStatement(env, email, id, now),
+  ]);
 }
 const cooldown =
-  'NOT EXISTS(SELECT 1 FROM access_mail WHERE email=? AND created_at>?) AND (SELECT count(*) FROM access_mail WHERE email=? AND created_at>?)<10';
+  "NOT EXISTS(SELECT 1 FROM access_mail WHERE email=? AND kind!='waitlist' AND created_at>?) AND (SELECT count(*) FROM access_mail WHERE email=? AND kind!='waitlist' AND created_at>?)<10";
 export async function requestLink(env: Env, email: string, shareCode?: string, now = Date.now()) {
   const member = await env.DB.prepare('SELECT * FROM access_members WHERE email=?')
     .bind(email)

@@ -1,15 +1,4 @@
-import { characterPaths } from '@jackalope/brand/character';
-import {
-  ArrowDownToLine,
-  ArrowRight,
-  Check,
-  Copy,
-  LoaderCircle,
-  LogOut,
-  Mail,
-  Sprout,
-} from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
+import { ArrowDownToLine, ArrowRight, Check, Copy, LoaderCircle, LogOut, Mail } from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import './access.css';
@@ -31,7 +20,6 @@ interface Membership {
 }
 
 export function AccessPage() {
-  const reduced = useReducedMotion();
   const [member, setMember] = useState<Membership | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -53,7 +41,7 @@ export function AccessPage() {
         if (/^[a-f0-9]{64}$/.test(raw)) {
           setToken(raw);
           setError('');
-        } else setError('This link is incomplete. Request a fresh private link below.');
+        } else setError('This link is incomplete. Request a new sign-in link below.');
       }
     }
     readLink();
@@ -112,7 +100,7 @@ export function AccessPage() {
       await accessRequest('accept', { token });
       setToken('');
       setMember(await accessRequest<Membership>('me'));
-      setNotice('You’re in. Make yourself at home.');
+      setNotice('You’re signed in.');
     });
   }
   async function signIn(event: FormEvent<HTMLFormElement>) {
@@ -147,7 +135,7 @@ export function AccessPage() {
       setMember((current) => (current ? { ...current, ...updated } : current));
       form.reset();
       setNotice(
-        'Invitations requested. New reservations appear below; recent duplicate requests are limited.',
+        'Invitations requested. Check their status below. Recent duplicate requests are limited.',
       );
     });
   }
@@ -157,45 +145,17 @@ export function AccessPage() {
       setMember((current) => (current ? { ...current, ...updated } : current));
       setNotice(
         action === 'resend'
-          ? 'A fresh invitation was requested. Recent duplicate emails are limited.'
+          ? 'Invitation resend requested. Recent duplicate emails are limited.'
           : 'Invitation withdrawn. That place is available again.',
       );
     });
   }
-  const mark = (
-    <svg viewBox="38 3 105 117" fill="currentColor" aria-hidden="true">
-      <path d={characterPaths.farEar} />
-      <path d={characterPaths.nearEar} />
-      <path d={characterPaths.antler} />
-      <path d={characterPaths.head} />
-    </svg>
-  );
   return (
-    <main id="main" className="access-page page-width">
-      <motion.header
-        className="access-heading"
-        initial={false}
-        animate={reduced ? {} : { y: [12, 0], opacity: [0.7, 1] }}
-        transition={{ duration: 0.6 }}
-      >
-        <div className="access-mascot">
-          {mark}
-          <span aria-hidden="true" />
-        </div>
-        <p className="eyebrow">A LITTLE ROOM FOR BIG IDEAS</p>
-        <h1>
-          {member
-            ? 'Make yourself at home.'
-            : invite || token
-              ? 'Good things are better shared.'
-              : 'Your next chapter starts here.'}
-        </h1>
-        <p>
-          {member
-            ? 'Your Jackalope download, a few first steps, and room for your favorite people.'
-            : 'One private link. Your own space to build. A few good people along for the ride.'}
-        </p>
-      </motion.header>
+    <main id="main" className={`access-page page-width${member ? ' access-page-member' : ''}`}>
+      <header className="access-heading">
+        <h1>{member ? 'Your access' : 'Early access'}</h1>
+        {member && <p>Download Jackalope and manage your invitations.</p>}
+      </header>
       {error && (
         <p className="access-alert" role="alert">
           {error}
@@ -206,15 +166,12 @@ export function AccessPage() {
       </p>
       {loading ? (
         <div className="access-loading" role="status">
-          <LoaderCircle className="signup-spinner" size={22} /> Opening your space…
+          <LoaderCircle className="signup-spinner" size={22} /> Loading…
         </div>
       ) : !accessOrigin ? (
         <section className="access-card access-entry">
-          <h2>A little more room, soon.</h2>
-          <p>
-            Early access is being prepared. Join the waitlist and we’ll let you know when your
-            invitation is ready.
-          </p>
+          <h2>Join the waitlist</h2>
+          <p>Sign-in is not available yet. Join the waitlist to hear when early access opens.</p>
           <a className="button button-primary" href="/#newsletter">
             Join the waitlist <ArrowRight size={17} />
           </a>
@@ -241,12 +198,7 @@ export function AccessPage() {
           </div>
           <section className="access-card access-download">
             <div>
-              <p className="eyebrow">YOUR WORKSPACE</p>
-              <h2>Big ideas. Room to run.</h2>
-              <p>
-                Jackalope keeps your local projects, coding agents, and review together. Your
-                desktop workspace stays local-first.
-              </p>
+              <h2>Download Jackalope</h2>
               {member.download ? (
                 <a
                   className="button button-primary button-download"
@@ -257,42 +209,42 @@ export function AccessPage() {
                 </a>
               ) : (
                 <div className="access-release">
-                  <Sprout size={22} />
+                  <ArrowDownToLine size={22} />
                   <div>
-                    <strong>Your access is ready. The build is taking shape.</strong>
-                    <p>The Windows installer will appear here after release checks are complete.</p>
+                    <strong>No download available yet</strong>
+                    <p>
+                      Your access is approved. The Windows installer will appear here when it’s
+                      ready.
+                    </p>
                   </div>
                 </div>
               )}
-              <small>Windows x64 first · Bring your own agents and subscriptions</small>
+              <small>
+                Windows x64 · Requires a supported coding agent and its provider account.
+              </small>
             </div>
             <ol className="access-steps">
               <li>
                 <span>01</span>
                 <div>
-                  <h3>Make a little space.</h3>
-                  <p>
-                    Install Jackalope when your download is ready, then open a local Git project.
-                  </p>
+                  <h3>Open a project</h3>
+                  <p>Install Jackalope, then open a local Git repository.</p>
                 </div>
               </li>
               <li>
                 <span>02</span>
                 <div>
-                  <h3>Bring your agents.</h3>
-                  <p>
-                    Connect a supported, locally installed CLI and choose the account profile for
-                    your work.
-                  </p>
+                  <h3>Connect an agent</h3>
+                  <p>Choose an installed coding agent and sign in with your provider account.</p>
                 </div>
               </li>
               <li>
                 <span>03</span>
                 <div>
-                  <h3>Let the idea run.</h3>
+                  <h3>Start a task</h3>
                   <p>
-                    Describe a task. Follow the attempt, inspect the changes, and decide what to
-                    keep.
+                    Describe the work, follow its progress, and review the changes before accepting
+                    them.
                   </p>
                 </div>
               </li>
@@ -301,11 +253,10 @@ export function AccessPage() {
           <section className="access-card access-invitations" aria-labelledby="invite-heading">
             <div className="access-invite-intro">
               <div>
-                <p className="eyebrow">GOOD COMPANY, GOOD IDEAS</p>
-                <h2 id="invite-heading">Leave room for your people.</h2>
+                <h2 id="invite-heading">Invite people</h2>
                 <p>
-                  Bring up to {member.limit} people straight in. Every person who accepts gets five
-                  invitations of their own.
+                  Invite up to {member.limit} people to early access. Each person who accepts gets
+                  five invitations of their own.
                 </p>
               </div>
               <div className="access-places">
@@ -313,19 +264,17 @@ export function AccessPage() {
                   {member.remaining}
                   <span>/{member.limit}</span>
                 </strong>
-                <small>places to share</small>
+                <small>invitations available</small>
               </div>
             </div>
             <div className="access-invite-options">
               <div>
                 <h3>
-                  <Mail size={18} /> Make it personal.
+                  <Mail size={18} /> Invite by email
                 </h3>
-                <p>
-                  Email invitations reserve a place for seven days. Unclaimed places return to you.
-                </p>
+                <p>Reserve a place for seven days. If it isn’t accepted, you can use it again.</p>
                 <form onSubmit={sendInvites}>
-                  <label htmlFor="invite-emails">Their email addresses</label>
+                  <label htmlFor="invite-emails">Email addresses</label>
                   <textarea
                     id="invite-emails"
                     name="emails"
@@ -337,7 +286,7 @@ export function AccessPage() {
                     aria-describedby="invite-emails-help"
                   />
                   <small id="invite-emails-help">
-                    Up to five addresses. Commas or new lines work.
+                    Up to five addresses, separated by commas or new lines.
                   </small>
                   <button
                     className="button button-primary button-download"
@@ -350,11 +299,11 @@ export function AccessPage() {
               </div>
               <div>
                 <h3>
-                  <Copy size={18} /> Let a link do the inviting.
+                  <Copy size={18} /> Share an invitation link
                 </h3>
                 <p>
-                  Send this link in a chat. A place is claimed when someone verifies their email.
-                  When your places are gone, the link closes.
+                  Places are claimed when recipients verify their email. This link works while you
+                  have invitations available.
                 </p>
                 <label htmlFor="share-link">Your invitation link</label>
                 <input
@@ -370,7 +319,7 @@ export function AccessPage() {
                   onClick={() =>
                     act(async () => {
                       await navigator.clipboard.writeText(member.shareUrl);
-                      setNotice('Link copied. Send it to someone you’d love to build alongside.');
+                      setNotice('Invitation link copied.');
                     })
                   }
                 >
@@ -381,7 +330,7 @@ export function AccessPage() {
             </div>
             {member.invites.length > 0 && (
               <div className="access-invite-list">
-                <h3>Your circle, taking shape.</h3>
+                <h3>Invitation status</h3>
                 <ul>
                   {member.invites.map((item) => (
                     <li key={item.id}>
@@ -389,7 +338,7 @@ export function AccessPage() {
                         <strong>{item.email}</strong>
                         <small>
                           {item.status === 'accepted'
-                            ? 'Accepted · They’re in'
+                            ? 'Accepted'
                             : `Reserved until ${new Date(item.expires_at).toLocaleDateString()}`}
                         </small>
                       </div>
@@ -426,39 +375,35 @@ export function AccessPage() {
         <section className="access-card access-entry">
           {token ? (
             <>
-              <h2>Your space is one click away.</h2>
-              <p>
-                Continue to verify your email and open your downloads and invitations. Keep this
-                private link to yourself.
-              </p>
-              <button
-                className="button button-primary button-download"
-                disabled={busy}
-                type="button"
-                onClick={accept}
-              >
-                {busy ? 'Opening…' : 'Continue to Jackalope'} <ArrowRight size={18} />
-              </button>
-              <button
-                className="text-link"
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setToken('');
-                  setError('');
-                }}
-              >
-                Need a fresh link?
-              </button>
+              <h2>Confirm sign-in</h2>
+              <p>Verify your email to access downloads and invitations. Keep this link private.</p>
+              <div className="access-entry-actions">
+                <button
+                  className="button button-primary button-download"
+                  disabled={busy}
+                  type="button"
+                  onClick={accept}
+                >
+                  {busy ? 'Opening…' : 'Continue to Jackalope'} <ArrowRight size={18} />
+                </button>
+                <button
+                  className="text-link"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setToken('');
+                    setError('');
+                  }}
+                >
+                  Need a fresh link?
+                </button>
+              </div>
             </>
           ) : sent ? (
             <>
-              <div className="access-mail-mark">
-                <Mail size={28} />
-              </div>
-              <h2>A little note, on its way.</h2>
+              <h2>Check your email</h2>
               <p>
-                If this address has access or a valid invitation, you’ll receive a private link.
+                If this address has access or a valid invitation, you’ll receive a sign-in link.
                 Check your inbox and spam folder.
               </p>
               <button className="text-link" type="button" onClick={() => setSent(false)}>
@@ -467,11 +412,11 @@ export function AccessPage() {
             </>
           ) : (
             <>
-              <h2>{invite ? 'You’ve been invited.' : 'Welcome back.'}</h2>
+              <h2>{invite ? 'Accept an invitation' : 'Sign in'}</h2>
               <p>
                 {invite
-                  ? 'Enter your email to claim an available place. Your invitation is confirmed when you follow the link in your inbox.'
-                  : 'Already approved or invited? Enter your email and we’ll send a private sign-in link.'}
+                  ? 'Enter your email. Follow the link we send to confirm your invitation while a place is available.'
+                  : 'Enter your approved or invited email address to receive a sign-in link.'}
               </p>
               {invite && available === false && (
                 <p className="access-alert">
@@ -500,7 +445,7 @@ export function AccessPage() {
                   type="submit"
                   disabled={busy}
                 >
-                  {busy ? 'Sending…' : 'Send my private link'} <ArrowRight size={17} />
+                  {busy ? 'Sending…' : 'Send sign-in link'} <ArrowRight size={17} />
                 </button>
               </form>
               {invite && (
@@ -510,10 +455,10 @@ export function AccessPage() {
                 </small>
               )}
               <p className="access-fine">
-                No password. No newsletter unless you choose it. <a href="/privacy/">Privacy</a>.
+                Signing in does not subscribe you to newsletters. <a href="/privacy/">Privacy</a>.
               </p>
               <a className="text-link" href="/#newsletter">
-                New here? Join the waitlist <ArrowRight size={14} />
+                Need access? Join the waitlist <ArrowRight size={14} />
               </a>
             </>
           )}

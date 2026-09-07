@@ -67,7 +67,9 @@ async function _verifyLaunch(page) {
   await page.goto(`${origin}/`);
   let submissions = 0;
   let reply = 'rate';
-  await page.route('https://api.sequenzy.com/api/v1/forms/**', async (route) => {
+  const signupRoutes =
+    /https:\/\/(?:api\.sequenzy\.com\/api\/v1\/forms\/|(?:staging-)?api\.jackalope\.dev\/v1\/access\/waitlist)/;
+  await page.route(signupRoutes, async (route) => {
     submissions++;
     if (reply === 'offline') return route.abort();
     await route.fulfill({
@@ -87,14 +89,14 @@ async function _verifyLaunch(page) {
   await submit.click();
   await dialog.getByRole('alert').waitFor();
   assert(
-    (await dialog.getByRole('alert').textContent()).includes('too many'),
+    /too many|wait a minute/.test(await dialog.getByRole('alert').textContent()),
     'Rate-limit feedback',
   );
   assert((await input.inputValue()) === 'browser-check@example.com', 'Keep email for retry');
   reply = 'offline';
   await submit.click();
   await page.waitForFunction(() =>
-    document.querySelector('[role="alert"]')?.textContent.includes('connection'),
+    document.querySelector('[role="alert"]')?.textContent.includes('connect'),
   );
   reply = 'success';
   await submit.click();
@@ -102,7 +104,7 @@ async function _verifyLaunch(page) {
   assert((await dialog.getByRole('form').count()) === 0, 'Success replaces form');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.activeElement?.textContent === 'Join waitlist');
-  await page.unroute('https://api.sequenzy.com/api/v1/forms/**');
+  await page.unroute(signupRoutes);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert(
     await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior === 'auto'),
