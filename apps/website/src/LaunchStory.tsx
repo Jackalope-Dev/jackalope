@@ -1,338 +1,652 @@
+import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Tabs from '@radix-ui/react-tabs';
-import {
-  ArrowDown,
-  ArrowRight,
-  Check,
-  Code2,
-  FileCode2,
-  GitBranch,
-  Layers3,
-  Play,
-} from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { ArrowDown, ArrowRight, Check, Moon, Play, Plus, Sun } from 'lucide-react';
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
+import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
+import { StoryMascot } from './StoryMascot';
 
+const useCases = [
+  {
+    id: 'feature',
+    label: 'Ship a feature',
+    idea: 'Make this project feel like a product.',
+    brief: 'Build keyboard search and polish the settings experience.',
+    tasks: ['Build keyboard search', 'Polish the settings'],
+    agents: ['Codex', 'Claude Code'],
+    file: 'Search.tsx',
+    code: ['+ onKeyDown={navigate}', '+ activeIndex={selected}', '+ onClose={returnFocus}'],
+    result: 'Keyboard search, ready for your review.',
+  },
+  {
+    id: 'fix',
+    label: 'Untangle a bug',
+    idea: 'Find the bug. Keep the good parts.',
+    brief: 'Fix lost task drafts and investigate the slow history view.',
+    tasks: ['Keep unfinished drafts', 'Investigate slow history'],
+    agents: ['Claude Code', 'Grok'],
+    file: 'TaskComposer.tsx',
+    code: ['+ const draft = useSavedDraft()', '+ restoreOnOpen(draft)', '+ clearAfterCreate()'],
+    result: 'Drafts survive a refresh. You inspect the fix.',
+  },
+  {
+    id: 'explore',
+    label: 'Try a bigger idea',
+    idea: 'What if the next version worked like this?',
+    brief: 'Explore a new navigation flow and a different settings layout.',
+    tasks: ['Explore navigation', 'Rethink settings'],
+    agents: ['OpenCode', 'Codex'],
+    file: 'Navigation.tsx',
+    code: ['+ <ProjectNavigation />', '+ <QuickActions />', '+ <RecentWork />'],
+    result: 'An experiment you can keep, refine, or leave.',
+  },
+];
 const chapters = [
   {
-    id: 'intent',
-    label: 'Your idea',
-    title: 'Start with what you want to build.',
-    description: 'Choose a project, bring its context, and give your agent a clear outcome.',
+    id: 'idea',
+    word: 'Start anywhere.',
+    title: 'A rough idea is enough.',
+    text: 'Capture the thought before it disappears. Keep it as a draft, or pick a local project and give an agent an outcome to work toward.',
+    feature: 'Ideas, drafts & agent tasks',
+  },
+  {
+    id: 'context',
+    word: 'Bring your world.',
+    title: 'The next task gets a head start.',
+    text: 'Bring the project’s instructions, selected tools, lessons, and reusable workflows. Inspect what the agent receives. Keep that context when you continue.',
+    feature: 'Project knowledge & connections',
   },
   {
     id: 'parallel',
-    label: 'Their focus',
-    title: 'A little more room. A lot more possibility.',
-    description:
-      'Assign independent tasks to agents in separate Git worktrees. Keep progress, questions, and dependencies together.',
+    word: 'Let it branch.',
+    title: 'More than one thing can move forward.',
+    text: 'Give independent tasks to different agents in separate Git worktrees. Follow their progress and questions together. Scopes and dependencies help coordinate the work.',
+    feature: 'Parallel tasks & isolated worktrees',
   },
   {
     id: 'review',
-    label: 'Your final say',
-    title: 'Everything comes back to you.',
-    description:
-      'Inspect each result, its patch, and its checks. Ask for another pass or explicitly integrate the work.',
+    word: 'Keep the last word.',
+    title: 'It comes back to your judgment.',
+    text: 'Read the result, inspect the patch, and check the evidence. Ask for another iteration or explicitly integrate the work. Finishing a task does not automatically merge it.',
+    feature: 'Changes, checks & guarded integration',
   },
 ];
 
-export function LaunchHero({
-  action,
-  releaseNote,
-  onPlay,
-}: {
-  action: ReactNode;
-  releaseNote: string;
-  onPlay: () => void;
-}) {
-  const [chapter, setChapter] = useState('parallel');
+function StoryVisual({ phase, example }: { phase: number; example: (typeof useCases)[number] }) {
+  const reduced = useReducedMotion();
   return (
-    <section className="launch-hero" aria-labelledby="hero-title">
-      <div className="page-width launch-opening">
-        <div>
-          <p className="launch-category">A desktop workspace for your coding agents</p>
-          <h1 id="hero-title">
-            One idea.
-            <br />
-            <span>Many possibilities.</span>
-          </h1>
-        </div>
-        <div className="launch-promise">
-          <p>
-            Put your agents to work. <br />
-            Keep the whole picture.
-          </p>
-          <p>
-            Bring Codex, Claude Code, Grok, or OpenCode together. Run tasks in parallel, carry your
-            project context forward, and review what lands.
-          </p>
-          <div className="launch-actions">
-            {action}
-            <a className="text-link" href="#playground">
-              Try it first <ArrowDown size={16} />
-            </a>
-          </div>
-          <small>{releaseNote}</small>
-        </div>
+    <div className="thread-visual" data-phase={phase}>
+      <div className="thread-caption">
+        <span>JACKALOPE / AN ILLUSTRATED WORKFLOW</span>
+        <span>{chapters[phase].feature}</span>
       </div>
-
-      <Tabs.Root value={chapter} onValueChange={setChapter} className="launch-theater page-width">
-        <div className="theater-heading">
-          <span>
-            <BrandMark /> An idea, given room to run.
-          </span>
-          <span>ILLUSTRATED WORKFLOW</span>
-        </div>
-        <div className="theater-canvas" data-chapter={chapter}>
-          <div className="theater-word" aria-hidden="true">
-            {chapter === 'intent'
-              ? 'imagine.'
-              : chapter === 'parallel'
-                ? 'branch out.'
-                : 'make it yours.'}
-          </div>
-          <div className="theater-origin">
-            <GitBranch size={16} />
-            <span>Atlas project</span>
-            <code>main</code>
-          </div>
-          <div className="theater-branches" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-          <div className="theater-work">
-            <div className="work-slip work-slip-context">
-              <span className="slip-label">
-                <Layers3 size={15} /> YOUR CONTEXT
-              </span>
-              <h3>
-                A head start.
-                <br />
-                Every time.
-              </h3>
-              <ul>
-                <li>
-                  <Check size={13} /> Project instructions
-                </li>
-                <li>
-                  <Check size={13} /> Selected tools
-                </li>
-                <li>
-                  <Check size={13} /> Lessons & workflows
-                </li>
-              </ul>
-              <span className="slip-foot">Brought into the task</span>
-            </div>
-            <div className="work-slip work-slip-primary" key={chapter}>
-              <span className="slip-label">
-                <Code2 size={16} />{' '}
-                {chapter === 'intent'
-                  ? 'YOUR BRIEF'
-                  : chapter === 'parallel'
-                    ? 'CODEX / SEARCH'
-                    : 'BACK TO YOU / REVIEW'}
-              </span>
-              <h3>
-                {chapter === 'intent'
-                  ? '“Make search feel effortless.”'
-                  : chapter === 'parallel'
-                    ? 'Build the keyboard flow.'
-                    : 'The change. The checks. The choice.'}
-              </h3>
-              {chapter === 'intent' ? (
-                <p>Arrow keys to explore. Enter to open. Escape to get back to work.</p>
-              ) : chapter === 'parallel' ? (
-                <div className="slip-code">
-                  <code>Search.tsx</code>
-                  <span>+ onKeyDown</span>
-                  <span>+ activeIndex</span>
-                  <span>+ returnFocus</span>
-                </div>
-              ) : (
-                <div className="slip-review">
-                  <span>
-                    <FileCode2 size={15} /> Search.tsx <b>+24 −8</b>
-                  </span>
-                  <span>
-                    <Check size={15} /> Keyboard & focus checks
-                  </span>
-                  <span>
-                    <Check size={15} /> Project build
-                  </span>
-                </div>
-              )}
-              <span className="slip-foot">
-                {chapter === 'intent'
-                  ? 'Your project. Your preferred agent.'
-                  : chapter === 'parallel'
-                    ? 'Isolated worktree / feature/search'
-                    : 'Inspect → iterate → integrate'}
-              </span>
-            </div>
-            <div className="work-slip work-slip-secondary">
-              <span className="slip-label">
-                <span aria-hidden="true">✳</span> CLAUDE CODE / SETTINGS
-              </span>
-              <h3>
-                Polish the <br />
-                little things.
-              </h3>
-              <div className="slip-swatches" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-              <p>Refine settings controls across light and dark themes.</p>
-              <span className="slip-foot">Isolated worktree / polish/settings</span>
-            </div>
-          </div>
-          <div className="theater-destination">
-            <span />
-            <span>
-              <Check size={16} /> You decide what lands.
+      <svg viewBox="0 0 640 580" className="thread-drawing" fill="none" aria-hidden="true">
+        <path
+          className="thread-ghost"
+          d="M80 95 C390 -10 590 110 410 190 C250 260 65 235 140 340 C205 420 395 260 490 340 C610 440 365 580 235 460"
+        />
+        <motion.path
+          className="thread-ink"
+          d="M80 95 C390 -10 590 110 410 190 C250 260 65 235 140 340 C205 420 395 260 490 340 C610 440 365 580 235 460"
+          initial={false}
+          animate={{ pathLength: [0.17, 0.47, 0.76, 1][phase] }}
+          transition={{ duration: reduced ? 0 : 1.1 }}
+        />
+        {phase === 2 && (
+          <g className="thread-forks">
+            <path d="M315 240 C315 290 150 255 150 350 L150 420 M315 240 C315 290 500 255 500 350 L500 420" />
+            <circle cx="150" cy="420" r="5" />
+            <circle cx="500" cy="420" r="5" />
+          </g>
+        )}
+        {phase === 1 && (
+          <g className="context-orbit">
+            <circle cx="320" cy="285" r="137" />
+            <circle cx="320" cy="285" r="187" />
+          </g>
+        )}
+      </svg>
+      <div className="thread-scene" key={`${phase}-${example.id}`}>
+        {phase === 0 && (
+          <div className="thought-art">
+            <span>A THOUGHT, STILL TAKING SHAPE</span>
+            <p>“{example.idea}”</p>
+            <small>{example.brief}</small>
+            <span className="pencil-arrow" aria-hidden="true">
+              ↙
             </span>
-            <span />
           </div>
-        </div>
-        <div className="theater-controls">
-          <Tabs.List aria-label="Explore the product story" className="story-tabs">
-            {chapters.map((item) => (
-              <Tabs.Trigger key={item.id} value={item.id}>
+        )}
+        {phase === 1 && (
+          <div className="context-art">
+            <span className="context-center">
+              <BrandMark />
+              Your project
+            </span>
+            <span className="context-note note-north">
+              The way you build<small>Project instructions</small>
+            </span>
+            <span className="context-note note-west">
+              What you’ve learned<small>Lessons & workflows</small>
+            </span>
+            <span className="context-note note-east">
+              What you need<small>Selected tools</small>
+            </span>
+          </div>
+        )}
+        {phase === 2 && (
+          <div className="parallel-art">
+            <p>
+              One project.
+              <br />
+              Room for both.
+            </p>
+            {example.tasks.map((task, index) => (
+              <div className={`agent-track track-${index}`} key={task}>
+                <span>{example.agents[index]}</span>
+                <h3>{task}</h3>
+                <small>Separate worktree / {index + 1}</small>
+              </div>
+            ))}
+          </div>
+        )}
+        {phase === 3 && (
+          <div className="review-art">
+            <span className="review-art-file">
+              {example.file} <span>ILLUSTRATIVE PATCH</span>
+            </span>
+            <pre>{example.code.join('\n')}</pre>
+            <div className="review-art-check">
+              <Check size={16} /> Example project checks passed
+            </div>
+            <p>{example.result}</p>
+            <span className="review-decision">
+              Your call.
+              <ArrowRight size={32} />
+            </span>
+          </div>
+        )}
+      </div>
+      <motion.div
+        className="thread-traveler"
+        initial={false}
+        animate={
+          reduced
+            ? { x: 0, y: 0 }
+            : {
+                x: [0, 50, 190, 20][phase],
+                y: [0, -35, 5, 25][phase],
+                rotate: [-8, 5, -5, 0][phase],
+              }
+        }
+        transition={{ duration: 0.9, type: 'spring', bounce: 0.15 }}
+      >
+        <StoryMascot
+          mood={
+            phase === 1 ? 'thinking' : phase === 2 ? 'working' : phase === 3 ? 'success' : 'idle'
+          }
+        />
+      </motion.div>
+      <div className="thread-scene-footer">
+        <span>Sample project. No agents are running here.</span>
+        <span aria-hidden="true">0{phase + 1} / 04</span>
+      </div>
+    </div>
+  );
+}
+
+function ScrollStory() {
+  const [exampleIndex, setExampleIndex] = useState(0);
+  const [phase, setPhase] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: root, offset: ['start center', 'end end'] });
+  useEffect(() => {
+    const rootNode = root.current;
+    if (!rootNode) return;
+    const nodes = [...rootNode.querySelectorAll<HTMLElement>('[data-story-chapter]')];
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const stageBottom =
+        rootNode.querySelector('.story-stage')?.getBoundingClientRect().bottom ?? 0;
+      const readingLine =
+        window.innerWidth <= 760
+          ? Math.min(innerHeight - 30, stageBottom + (innerHeight - stageBottom) * 0.45)
+          : innerHeight * 0.55;
+      let next = 0;
+      for (const [index, node] of nodes.entries()) {
+        if (node.getBoundingClientRect().top <= readingLine) next = index;
+      }
+      setPhase(next);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, []);
+  return (
+    <section className="wild-story" id="workflow" aria-labelledby="story-title">
+      <div className="wild-story-intro wild-width">
+        <span className="wild-label">FOLLOW ONE IDEA</span>
+        <h2 id="story-title">See where it goes.</h2>
+        <div className="story-choice-row">
+          <fieldset className="use-case-picker">
+            <legend>What do you want to do?</legend>
+            {useCases.map((item, index) => (
+              <button
+                type="button"
+                key={item.id}
+                aria-pressed={exampleIndex === index}
+                onClick={() => setExampleIndex(index)}
+              >
                 {item.label}
                 <ArrowRight size={15} />
-              </Tabs.Trigger>
+              </button>
             ))}
-          </Tabs.List>
-          {chapters.map((item) => (
-            <Tabs.Content className="story-caption" key={item.id} value={item.id}>
-              <h2>{item.title}</h2>
-              <p>{item.description}</p>
-            </Tabs.Content>
+          </fieldset>
+          <a className="wild-underlink" href="#inside">
+            Skip to the actual app <ArrowDown size={15} />
+          </a>
+        </div>
+      </div>
+      <div className="scroll-story-body wild-width" ref={root}>
+        <div className="story-stage">
+          <StoryVisual phase={phase} example={useCases[exampleIndex]} />
+          <nav aria-label="Story chapters" className="story-chapter-nav">
+            {chapters.map((chapter, index) => (
+              <a
+                key={chapter.id}
+                href={`#chapter-${chapter.id}`}
+                aria-current={phase === index ? 'step' : undefined}
+              >
+                {chapter.id}
+                <span className="sr-only">: {chapter.title}</span>
+              </a>
+            ))}
+          </nav>
+          <motion.div
+            className="story-progress"
+            style={{ scaleX: reduced ? 1 : scrollYProgress }}
+          />
+        </div>
+        <div className="story-prose">
+          {chapters.map((chapter, index) => (
+            <article
+              key={chapter.id}
+              id={`chapter-${chapter.id}`}
+              data-story-chapter
+              data-phase={index}
+              className="story-chapter"
+            >
+              <span className="chapter-word">{chapter.word}</span>
+              <h3>{chapter.title}</h3>
+              <p>{chapter.text}</p>
+              <span className="chapter-feature">{chapter.feature}</span>
+              {index < 3 ? (
+                <a href={`#chapter-${chapters[index + 1].id}`} className="chapter-next">
+                  {chapters[index + 1].word}
+                  <ArrowDown size={18} />
+                </a>
+              ) : (
+                <a href="#inside" className="chapter-next">
+                  Now see the app <ArrowDown size={18} />
+                </a>
+              )}
+            </article>
           ))}
         </div>
-        <div className="theater-footnote">
-          <span>Sample tasks, shown to explain the workflow.</span>
-          <button type="button" className="text-link" onClick={onPlay}>
-            <Play size={14} /> Watch the actual app
-          </button>
-        </div>
-      </Tabs.Root>
+      </div>
     </section>
   );
 }
 
-const features = [
+const scenes = [
   {
-    id: 'context',
-    label: 'Context that carries',
-    title: 'Stop starting from scratch.',
+    id: 'tasks',
+    label: 'Tasks & ideas',
+    title: 'The whole picture, without the window juggling.',
+    image: 'tasks',
     description:
-      'Keep project instructions, lessons, and reusable workflows close. Choose what goes into a task, then inspect the context it received.',
-    rows: [
-      ['Project instructions', 'How this codebase works'],
-      ['Lessons', 'What you learned last time'],
-      ['Reusable workflows', 'Your way of getting it done'],
-    ],
-    foot: 'A better starting point for the next task.',
+      'Save ideas, follow active tasks, and see what needs your attention across projects.',
   },
   {
-    id: 'connections',
-    label: 'Tools within reach',
-    title: 'Connect once. Choose per task.',
+    id: 'review',
+    label: 'Review & checks',
+    title: 'The result and the evidence, together.',
+    image: 'review',
     description:
-      'Manage project connections in one place and give each task the capabilities it needs. Tool delivery and discovery support varies by agent.',
-    rows: [
-      ['Project connections', 'Managed in one place'],
-      ['Task tools', 'Selected for this job'],
-      ['Agent support', 'Visible before you run'],
-    ],
-    foot: 'Your environment stays with the project.',
+      'Inspect a task’s patch and project checks, then continue the work or decide what to integrate.',
   },
   {
-    id: 'accounts',
-    label: 'Space for every project',
-    title: 'Work. Personal. All in view.',
+    id: 'agents',
+    label: 'Coding agents',
+    title: 'Familiar agents. A shared place to work.',
+    image: 'agents',
     description:
-      'Choose account profiles and allowed agents per project. Continuations keep the account they started with, while you follow tasks across your workspace.',
-    rows: [
-      ['Client project', 'Work account / Codex'],
-      ['Side project', 'Personal account / Claude Code'],
-      ['Usage', 'Reported by project and account'],
-    ],
-    foot: 'Separate sign-in profiles. One place to follow the work.',
-  },
-  {
-    id: 'recurring',
-    label: 'A rhythm for repeat work',
-    title: 'Give the routine a routine.',
-    description:
-      'Schedule repeat tasks with their project context intact. Jackalope runs them while the app and your computer are awake, with results ready for review.',
-    rows: [
-      ['Task', 'Review repository changes'],
-      ['Schedule', 'Every weekday'],
-      ['Result', 'A new attempt to inspect'],
-    ],
-    foot: 'Example schedule. Your computer needs to be awake.',
+      'Choose a supported local agent and bring your existing account. Model access is supplied by your provider.',
   },
 ];
 
-export function FeatureStory() {
+export function WildLanding({
+  action,
+  downloadAction,
+  dark,
+  setDark,
+  palette,
+  setPalette,
+  onPlay,
+  faqs,
+  available,
+  releaseVersion,
+}: {
+  action: ReactNode;
+  downloadAction: ReactNode;
+  dark: boolean;
+  setDark: (value: boolean) => void;
+  palette: number;
+  setPalette: (value: number) => void;
+  onPlay: () => void;
+  faqs: string[][];
+  available: boolean;
+  releaseVersion?: string;
+}) {
+  const hero = useRef<HTMLElement>(null);
+  const reduced = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: hero, offset: ['start start', 'end start'] });
+  const heroDrift = useTransform(scrollYProgress, [0, 1], [0, 70]);
   return (
-    <section
-      id="features"
-      className="feature-story section-space page-width"
-      aria-labelledby="features-title"
-    >
-      <div className="section-intro">
-        <h2 id="features-title">
-          The work moves on.
-          <br />
-          <span>The context stays.</span>
-        </h2>
-        <p>
-          The task is only the beginning. Jackalope keeps the instructions, connections, accounts,
-          and routines around it together.
-        </p>
-      </div>
-      <Tabs.Root defaultValue="context" className="feature-explorer">
-        <Tabs.List aria-label="Explore Jackalope features" className="feature-tabs">
-          {features.map((item) => (
-            <Tabs.Trigger key={item.id} value={item.id}>
-              {item.label}
-              <ArrowRight size={18} />
-            </Tabs.Trigger>
+    <main id="main" className="wild-landing">
+      <section className="wild-hero wild-width" aria-labelledby="hero-title" ref={hero}>
+        <div className="wild-hero-copy">
+          <p className="wild-label">YOUR AGENTS. A LITTLE MORE WILD.</p>
+          <h1 id="hero-title">
+            Your ideas
+            <br />
+            have <em>legs.</em>
+          </h1>
+          <div className="wild-hero-description">
+            <p>One desktop workspace to put your coding agents to work.</p>
+            <p>
+              Keep the context. Run tasks in parallel. Review what comes back. You bring the
+              ideas—and the final say.
+            </p>
+          </div>
+          <div className="wild-hero-actions">
+            <a href="#workflow" className="wild-follow">
+              Follow an idea <ArrowDown size={19} />
+            </a>
+            {action}
+          </div>
+          <p className="wild-availability">
+            {available
+              ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
+              : 'Early access · Windows first · macOS & Linux planned'}
+          </p>
+        </div>
+        <motion.div className="wild-hero-art" style={{ y: reduced ? 0 : heroDrift }}>
+          <svg className="hero-orbit" viewBox="0 0 650 660" fill="none" aria-hidden="true">
+            <path d="M-10 480 C20 100 610 40 625 330 C650 570 170 680 125 440 C60 130 530 50 675 180" />
+            <path d="M48 507 l-24 -15 27 -9" />
+          </svg>
+          <span className="hero-handnote">
+            a small spark.
+            <br />a curious creature.
+            <br />a whole lot of possibility.
+          </span>
+          <StoryMascot interactive className="hero-creature" />
+          <span className="hero-art-bottom">
+            GO ON. SAY HELLO. <span aria-hidden="true">↗</span>
+          </span>
+        </motion.div>
+        <div className="wild-hero-bottom">
+          <span>Built for the way you actually make things.</span>
+          <span>
+            Codex <i>/</i> Claude Code <i>/</i> Grok <i>/</i> OpenCode
+          </span>
+        </div>
+      </section>
+      <ScrollStory />
+      <section className="wild-inside wild-width" id="inside" aria-labelledby="inside-title">
+        <div className="wild-section-heading">
+          <span className="wild-label">YES, IT’S A REAL APP.</span>
+          <h2 id="inside-title">
+            A place for
+            <br />
+            all that possibility.
+          </h2>
+          <p>
+            Local projects. Your agent accounts. A focused workspace that carries the work from the
+            first thought to the next iteration.
+          </p>
+        </div>
+        <Tabs.Root defaultValue="tasks" className="wild-product">
+          <Tabs.List aria-label="Explore the workspace">
+            {scenes.map((scene) => (
+              <Tabs.Trigger value={scene.id} key={scene.id}>
+                {scene.label}
+                <ArrowRight size={16} />
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+          {scenes.map((scene) => (
+            <Tabs.Content value={scene.id} key={scene.id}>
+              <div className="wild-product-caption">
+                <h3>{scene.title}</h3>
+                <p>{scene.description}</p>
+              </div>
+              <button
+                type="button"
+                className="wild-capture"
+                aria-label="Play the Jackalope product walkthrough"
+                onClick={onPlay}
+              >
+                <img
+                  src={`/media/${scene.image}${dark ? '' : '-light'}.png`}
+                  width="1440"
+                  height="840"
+                  loading="lazy"
+                  alt={`Actual Jackalope ${scene.label.toLowerCase()} interface with Atlas sample project data`}
+                />
+                <span>
+                  <Play size={17} fill="currentColor" /> See it in motion
+                </span>
+              </button>
+              <p className="wild-caption">
+                Actual app · Atlas sample project · Recording uses illustrative data
+              </p>
+            </Tabs.Content>
           ))}
-        </Tabs.List>
-        {features.map((item) => (
-          <Tabs.Content key={item.id} value={item.id} className="feature-panel">
-            <div className="feature-panel-copy">
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              {item.id === 'accounts' && (
-                <a className="text-link" href="/blog/work-and-personal-accounts/">
-                  Explore account setup <ArrowRight size={16} />
-                </a>
-              )}
-            </div>
-            <div className="feature-receipt">
-              <span className="slip-label">
-                <BrandMark /> INSIDE YOUR WORKSPACE
-              </span>
-              <dl>
-                {item.rows.map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p>{item.foot}</p>
-              <small>Illustrative configuration</small>
-            </div>
-          </Tabs.Content>
-        ))}
-      </Tabs.Root>
-    </section>
+        </Tabs.Root>
+      </section>
+      <section
+        className="wild-fieldguide wild-width"
+        id="features"
+        aria-labelledby="features-title"
+      >
+        <span className="wild-label">THERE’S A METHOD TO THE WILD.</span>
+        <h2 id="features-title">
+          Less tending.
+          <br />
+          <em>More making.</em>
+        </h2>
+        <div className="fieldguide-row">
+          <div className="fieldguide-art memory-art" aria-hidden="true">
+            <span>instructions</span>
+            <span>lessons</span>
+            <span>workflows</span>
+            <b>→ next idea</b>
+          </div>
+          <div>
+            <h3>A project that remembers.</h3>
+            <p>
+              Save lessons and reusable workflows alongside project instructions. Choose the
+              knowledge and connected tools a task needs, then inspect the context it received.
+            </p>
+            <small>
+              Project knowledge & centrally managed connections. Tool support varies by agent.
+            </small>
+          </div>
+        </div>
+        <div className="fieldguide-row">
+          <div className="fieldguide-art accounts-art" aria-hidden="true">
+            <span>
+              work<span>●</span>
+            </span>
+            <i>↔</i>
+            <span>
+              play<span>●</span>
+            </span>
+          </div>
+          <div>
+            <h3>Room for every side of you.</h3>
+            <p>
+              Set agent accounts and allowed runners per project. Keep client work and personal
+              projects organized, while following tasks and reported usage in one place.
+            </p>
+            <a className="wild-underlink" href="/blog/work-and-personal-accounts/">
+              How account profiles work <ArrowRight size={15} />
+            </a>
+          </div>
+        </div>
+        <div className="fieldguide-row">
+          <div className="fieldguide-art rhythm-art" aria-hidden="true">
+            <span>M</span>
+            <span>T</span>
+            <span>W</span>
+            <span>T</span>
+            <span>F</span>
+            <svg viewBox="0 0 400 60" aria-hidden="true">
+              <path
+                d="M0 30 Q40 -15 80 30 T160 30 T240 30 T320 30 T400 30"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3>Put repeat work on a rhythm.</h3>
+            <p>
+              Schedule recurring tasks with their project context intact. Each run keeps its own
+              result and history for you to inspect.
+            </p>
+            <small>Scheduled work runs while Jackalope and your computer are awake.</small>
+          </div>
+        </div>
+      </section>
+      <section className="wild-atmosphere" id="atmosphere" aria-labelledby="atmosphere-title">
+        <div className="wild-width atmosphere-composition">
+          <div>
+            <span className="wild-label">A LITTLE PERSONALITY GOES A LONG WAY.</span>
+            <h2 id="atmosphere-title">
+              Make yourself
+              <br />
+              <em>at home.</em>
+            </h2>
+            <p>A workspace can feel like you. Try a palette—the whole page comes along.</p>
+            <fieldset className="palette-options" aria-label="Try a color palette">
+              {PRESET_THEMES.slice(0, 4).map((theme, index) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  className="palette-button"
+                  style={{ '--swatch': theme.accentHex } as CSSProperties}
+                  aria-label={theme.name}
+                  aria-pressed={palette === index}
+                  onClick={() => setPalette(index)}
+                >
+                  {palette === index && <Check size={17} />}
+                </button>
+              ))}
+              <span>{PRESET_THEMES[palette].name}</span>
+            </fieldset>
+            <fieldset className="appearance-options" aria-label="Try an appearance">
+              <button type="button" aria-pressed={!dark} onClick={() => setDark(false)}>
+                <Sun size={16} />
+                Light
+              </button>
+              <button type="button" aria-pressed={dark} onClick={() => setDark(true)}>
+                <Moon size={16} />
+                Dark
+              </button>
+            </fieldset>
+          </div>
+          <div className="atmosphere-character">
+            <StoryMascot interactive />
+            <span>
+              Same curious creature.
+              <br />
+              Your kind of atmosphere.
+            </span>
+          </div>
+        </div>
+      </section>
+      <div className="wild-width wild-agent-details">
+        <details>
+          <summary>
+            Meet your agents. Know what’s supported.
+            <Plus size={20} />
+          </summary>
+          <AgentSupport />
+        </details>
+      </div>
+      <section
+        className="wild-questions wild-width"
+        id="questions"
+        aria-labelledby="questions-title"
+      >
+        <h2 id="questions-title">
+          A few things
+          <br />
+          you might wonder.
+        </h2>
+        <div className="faq-list">
+          {faqs.map(([question, answer]) => (
+            <details key={question}>
+              <summary>
+                {question}
+                <Plus size={18} />
+              </summary>
+              <p>{answer}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+      <section className="wild-finale" id="download" aria-labelledby="download-title">
+        <div className="wild-width">
+          <span className="wild-label">THAT IDEA YOU KEEP COMING BACK TO?</span>
+          <h2 id="download-title">
+            Let’s see
+            <br />
+            where it <em>goes.</em>
+          </h2>
+          <div className="wild-finale-bottom">
+            <p>
+              {available
+                ? 'Your Windows workspace is ready.'
+                : 'Join the waitlist for early access.'}
+              <br />
+              Bring your own agent account. Keep your curiosity.
+            </p>
+            {downloadAction}
+          </div>
+          <p className="wild-availability">
+            {available
+              ? `Windows x64 · ${releaseVersion ?? 'Available now'} · macOS & Linux planned`
+              : 'Windows first · macOS & Linux planned · No payment to join'}
+          </p>
+          <BrandMark className="finale-mark" />
+        </div>
+      </section>
+    </main>
   );
 }

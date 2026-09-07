@@ -1,49 +1,18 @@
 import { applyThemeTokens, PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import * as Tabs from '@radix-ui/react-tabs';
-import {
-  ArrowDownToLine,
-  ArrowRight,
-  Check,
-  Code2,
-  Menu as MenuIcon,
-  Monitor,
-  Moon,
-  Play,
-  Plus,
-  Sun,
-  X,
-} from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
+import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
-import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
-import { JournalPage, JournalTeaser } from './Journal';
-import { FeatureStory, LaunchHero } from './LaunchStory';
+import { JournalPage } from './Journal';
+import { WildLanding } from './LaunchStory';
 import { LegalPage } from './Legal';
 import { Newsletter, WaitlistButton } from './Signup';
-import { WorkflowDemo } from './WorkflowDemo';
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
 const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
 const asset = (name: string) => `/media/${name}`;
-
-function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const reduced = useReducedMotion();
-  return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 1, y: 0 }}
-      whileInView={reduced ? {} : { y: [16, 0] }}
-      viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
-}
 
 function DownloadButton({ compact = false }: { compact?: boolean }) {
   if (!downloadUrl) return <WaitlistButton compact={compact} />;
@@ -57,39 +26,6 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
     </a>
   );
 }
-
-const scenes = [
-  {
-    id: 'tasks',
-    label: 'Tasks & ideas',
-    image: 'tasks.png',
-    title: 'Keep ideas and active work together.',
-    description:
-      'Save a thought for later or start an agent now. Switch between a list and a board as your project takes shape.',
-    features: ['Save ideas for later', 'List and board views', 'Follow each attempt'],
-    alt: 'Jackalope Tasks board with ideas, an agent at work, a task ready for review, and finished work in the Atlas sample project.',
-  },
-  {
-    id: 'review',
-    label: 'Review & checks',
-    image: 'review.png',
-    title: 'See the change before you accept it.',
-    description:
-      'Read the result, inspect the patch, and see the checks before deciding what comes next.',
-    features: ['Inspect the code patch', 'Run your project checks', 'Ask for another iteration'],
-    alt: 'Jackalope task review showing the search code patch, changed file, and passed project verification in the Atlas sample project.',
-  },
-  {
-    id: 'agents',
-    label: 'Coding agents',
-    image: 'agents.png',
-    title: 'Choose who takes the next task.',
-    description:
-      'Choose a supported coding agent, keep your existing accounts, and give each task the right context.',
-    features: ['Use your existing sign-in', 'Choose an agent per task', 'See work in progress'],
-    alt: 'The Jackalope Agents screen with locally configured Codex and Claude Code agents in the Atlas sample project.',
-  },
-];
 
 const faqs = [
   [
@@ -138,7 +74,6 @@ export function App({ path = '/' }: { path?: string }) {
   const [palette, setPalette] = useState(0);
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const [scene, setScene] = useState('tasks');
   const screenshot = (name: string) => asset(dark ? name : name.replace('.png', '-light.png'));
   const videoTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -159,8 +94,11 @@ export function App({ path = '/' }: { path?: string }) {
           <nav className="desktop-nav" aria-label="Main navigation">
             <a href={home ? '#workflow' : '/#workflow'}>How it works</a>
             <a href={home ? '#features' : '/#features'}>Features</a>
-            <a href="/changelog/" aria-current={path === '/changelog/' ? 'page' : undefined}>
-              Changelog
+            <a
+              href={home ? '#inside' : '/changelog/'}
+              aria-current={path === '/changelog/' ? 'page' : undefined}
+            >
+              {home ? 'Inside the app' : 'Changelog'}
             </a>
             <a href="/blog/" aria-current={path.startsWith('/blog/') ? 'page' : undefined}>
               Field notes
@@ -202,6 +140,7 @@ export function App({ path = '/' }: { path?: string }) {
                   {[
                     ['How it works', '/#workflow'],
                     ['Features', '/#features'],
+                    ['Inside the app', '/#inside'],
                     ['Make it yours', '/#atmosphere'],
                     ['Questions', '/#questions'],
                     ['Changelog', '/changelog/'],
@@ -219,256 +158,30 @@ export function App({ path = '/' }: { path?: string }) {
       </header>
 
       {home ? (
-        <main id="main" className="marketing-home">
-          <LaunchHero
-            action={<DownloadButton />}
-            releaseNote={
-              downloadUrl
-                ? `Windows x64 · ${version}`
-                : 'Early access · Windows first · macOS & Linux planned'
-            }
-            onPlay={() => {
-              videoTrigger.current = document.activeElement as HTMLElement;
-              setVideoError(false);
-              setVideoOpen(true);
-            }}
-          />
-          <section className="agent-strip page-width" aria-label="Coding agents">
-            <p>A new home for the agents you already know.</p>
-            <div>
-              <span>
-                <Code2 size={24} /> Codex
-              </span>
-              <span>
-                <span className="claude-star" aria-hidden="true">
-                  ✳
-                </span>{' '}
-                Claude Code
-              </span>
-              <span>
-                <span aria-hidden="true">↗</span> Grok
-              </span>
-              <span>
-                <Code2 size={24} /> OpenCode
-              </span>
-            </div>
-            <a className="text-link" href="#agents">
-              Explore agent support <ArrowRight size={15} />
-            </a>
-          </section>
-
-          <section
-            id="workflow"
-            className="workflow section-space page-width"
-            aria-labelledby="workflow-title"
-          >
-            <Reveal className="section-intro">
-              <div>
-                <h2 id="workflow-title">
-                  From a big idea.
-                  <br />
-                  To the actual work.
-                </h2>
-              </div>
-              <p>
-                Start with your local Git project and a signed-in coding agent. Here’s how an idea
-                becomes work you can review.
-              </p>
-            </Reveal>
-            <Tabs.Root value={scene} onValueChange={setScene} className="product-tour">
-              <Tabs.List className="tour-tabs" aria-label="Explore the workspace">
-                {scenes.map((item) => (
-                  <Tabs.Trigger key={item.id} value={item.id}>
-                    {item.label}
-                    <ArrowRight size={18} />
-                  </Tabs.Trigger>
-                ))}
-              </Tabs.List>
-              {scenes.map((item) => (
-                <Tabs.Content value={item.id} key={item.id} className="tour-panel">
-                  <div className="tour-copy">
-                    <h3>{item.title}</h3>
-                    <p>{item.description}</p>
-                  </div>
-                  <ul className="feature-callouts" aria-label={`${item.label} features`}>
-                    {item.features.map((feature) => (
-                      <li key={feature}>
-                        <Check size={14} aria-hidden="true" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    className="screenshot-button"
-                    type="button"
-                    aria-label="Play the Jackalope product walkthrough"
-                    onClick={() => {
-                      videoTrigger.current = document.activeElement as HTMLElement;
-                      setVideoError(false);
-                      setVideoOpen(true);
-                    }}
-                  >
-                    <img
-                      src={screenshot(item.image)}
-                      alt={item.alt}
-                      width="1440"
-                      height="840"
-                      loading="lazy"
-                    />
-                    <span className="play-pill">
-                      <Play size={15} fill="currentColor" /> Watch the walkthrough
-                    </span>
-                  </button>
-                  <p className="capture-note">Actual app interface · Atlas sample project</p>
-                </Tabs.Content>
-              ))}
-            </Tabs.Root>
-          </section>
-
-          <FeatureStory />
-
-          <section className="demo-section page-width" aria-labelledby="demo-title">
-            <Reveal className="section-intro">
-              <div>
-                <h2 id="demo-title">
-                  Take an idea
-                  <br />
-                  for a spin.
-                </h2>
-              </div>
-              <p>
-                Pick a brief, choose an agent, and follow the work through to review. An interactive
-                sample of your next everyday workflow — no setup needed.
-              </p>
-            </Reveal>
-            <WorkflowDemo />
-          </section>
-
-          <AgentSupport />
-
-          <section
-            id="atmosphere"
-            className="atmosphere section-space page-width"
-            aria-labelledby="atmosphere-title"
-          >
-            <Reveal className="atmosphere-art">
-              <div className="mini-window">
-                <div className="mini-chrome">
-                  <BrandMark />
-                  <span>Your little corner of focus.</span>
-                  <span aria-hidden="true">—</span>
-                </div>
-                <div className="mini-canvas">
-                  <BrandMark className="big-mark" />
-                  <p>Something good starts here.</p>
-                  <span>A place for your next idea.</span>
-                  <div className="mini-input">
-                    <span>What would you like to make?</span>
-                    <Plus size={18} />
-                  </div>
-                </div>
-              </div>
-              <span className="art-label">SAME WORKSPACE. A DIFFERENT FEELING.</span>
-            </Reveal>
-            <Reveal className="atmosphere-copy">
-              <h2 id="atmosphere-title">
-                Find your
-                <br />
-                kind of calm.
-              </h2>
-              <p>
-                Warm and mellow. Cool and collected. Make the atmosphere your own, with thoughtful
-                color and light that carry through the whole app.
-              </p>
-              <fieldset className="palette-options" aria-label="Try a color palette">
-                {PRESET_THEMES.slice(0, 4).map((theme, index) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    style={{ '--swatch': theme.accentHex } as CSSProperties}
-                    className="palette-button"
-                    aria-label={theme.name}
-                    aria-pressed={index === palette}
-                    onClick={() => setPalette(index)}
-                  >
-                    {index === palette && <Check size={17} />}
-                  </button>
-                ))}
-                <span>{PRESET_THEMES[palette].name}</span>
-              </fieldset>
-              <fieldset className="appearance-options" aria-label="Try an appearance">
-                <button type="button" aria-pressed={!dark} onClick={() => setDark(false)}>
-                  <Sun size={16} />
-                  Light
-                </button>
-                <button type="button" aria-pressed={dark} onClick={() => setDark(true)}>
-                  <Moon size={16} />
-                  Dark
-                </button>
-              </fieldset>
-            </Reveal>
-          </section>
-
-          <section
-            id="questions"
-            className="questions section-space page-width"
-            aria-labelledby="questions-title"
-          >
-            <Reveal>
-              <h2 id="questions-title">Common questions</h2>
-              <BrandMark className="questions-mark" />
-            </Reveal>
-            <div className="faq-list">
-              {faqs.map(([question, answer]) => (
-                <details key={question}>
-                  <summary>
-                    {question}
-                    <Plus size={18} />
-                  </summary>
-                  <p>{answer}</p>
-                </details>
-              ))}
-            </div>
-          </section>
-
-          <section id="download" className="download-section" aria-labelledby="download-title">
-            <div className="page-width">
-              <BrandMark className="download-mark" />
-              <h2 id="download-title">
-                Your next idea
-                <br />
-                looks good from here.
-              </h2>
-              <p>Less juggling terminals. More room for the work you care about.</p>
-              <section className="platform-roadmap" aria-label="Platform availability">
-                <span>
-                  <Monitor size={16} />
-                  Windows <small>{downloadUrl ? 'Available' : 'First release'}</small>
-                </span>
-                <span>
-                  macOS <small>Planned</small>
-                </span>
-                <span>
-                  Linux <small>Planned</small>
-                </span>
-              </section>
-              {downloadUrl ? (
-                <a className="button button-primary button-download" href={downloadUrl}>
-                  <ArrowDownToLine size={18} />
-                  <span>Download for Windows</span>
-                </a>
-              ) : (
-                <WaitlistButton />
-              )}
-              <p className="release-note">
-                {downloadUrl
-                  ? `Version ${version} · Windows x64 · Bring your own agents`
-                  : 'Early access · Windows first · macOS & Linux planned'}
-              </p>
-            </div>
-          </section>
-          <JournalTeaser />
-        </main>
+        <WildLanding
+          available={Boolean(downloadUrl)}
+          releaseVersion={version}
+          action={<DownloadButton />}
+          downloadAction={
+            downloadUrl ? (
+              <a className="button button-primary button-download" href={downloadUrl}>
+                Download for Windows <ArrowDownToLine size={18} />
+              </a>
+            ) : (
+              <WaitlistButton />
+            )
+          }
+          dark={dark}
+          setDark={setDark}
+          palette={palette}
+          setPalette={setPalette}
+          onPlay={() => {
+            videoTrigger.current = document.activeElement as HTMLElement;
+            setVideoError(false);
+            setVideoOpen(true);
+          }}
+          faqs={faqs}
+        />
       ) : path === '/access/' ? (
         <AccessPage />
       ) : path === '/privacy/' || path === '/terms/' ? (
@@ -477,7 +190,7 @@ export function App({ path = '/' }: { path?: string }) {
         <JournalPage path={path} dark={dark} />
       )}
 
-      {!['/privacy/', '/terms/', '/access/'].includes(path) && <Newsletter />}
+      {!['/', '/privacy/', '/terms/', '/access/'].includes(path) && <Newsletter />}
 
       <footer className="site-footer page-width">
         <a href="/" className="wordmark">
@@ -527,7 +240,7 @@ export function App({ path = '/' }: { path?: string }) {
                   className="button button-primary"
                   onClick={() => {
                     setVideoOpen(false);
-                    document.getElementById('workflow')?.scrollIntoView();
+                    document.getElementById('inside')?.scrollIntoView();
                   }}
                 >
                   Explore the workspace
