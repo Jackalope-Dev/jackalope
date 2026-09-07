@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
 import { BrandMark } from './BrandMark';
 import { JournalPage } from './Journal';
-import { WildLanding } from './LaunchStory';
+import { LandingPage } from './LandingPage';
 import { LegalPage } from './Legal';
 import { Newsletter, WaitlistButton } from './Signup';
 
@@ -158,7 +158,7 @@ export function App({ path = '/' }: { path?: string }) {
       </header>
 
       {home ? (
-        <WildLanding
+        <LandingPage
           available={Boolean(downloadUrl)}
           releaseVersion={version}
           action={<DownloadButton />}
@@ -192,7 +192,7 @@ export function App({ path = '/' }: { path?: string }) {
 
       {!['/', '/privacy/', '/terms/', '/access/'].includes(path) && <Newsletter />}
 
-      <footer className="site-footer page-width">
+      <footer className={`site-footer ${home ? 'landing-footer' : 'page-width'}`}>
         <a href="/" className="wordmark">
           <BrandMark />
           Jackalope

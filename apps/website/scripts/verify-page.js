@@ -7,7 +7,6 @@ async function _verifyPage(page) {
   await page.goto(await page.evaluate(() => location.origin));
   await page.evaluate(() => document.fonts.ready);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const chapters = ['idea', 'context', 'parallel', 'review'];
   for (const [width, height] of [
     [1440, 1000],
     [1280, 840],
@@ -16,68 +15,61 @@ async function _verifyPage(page) {
     [320, 720],
   ]) {
     await page.setViewportSize({ width, height });
-    for (const [index, chapter] of chapters.entries()) {
-      await page.locator(`#chapter-${chapter}`).evaluate((el) => el.scrollIntoView());
-      await page.waitForFunction(
-        (value) =>
-          document.querySelector('.thread-visual')?.getAttribute('data-phase') === String(value),
-        index,
-      );
+    for (const id of ['inside', 'workflow', 'features', 'atmosphere', 'questions', 'download']) {
+      await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
       assert(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        `Overflow at ${width}, ${chapter}`,
+        `Overflow at ${width}, ${id}`,
       );
-      const geometry = await page.locator('.story-stage').boundingBox();
+    }
+    for (const [label, task, file] of [
+      ['Build a feature', 'Build keyboard search', 'Search.tsx'],
+      ['Find a stubborn bug', 'Investigate lost drafts', 'TaskComposer.tsx'],
+      ['Explore a new direction', 'Explore navigation', 'Navigation.tsx'],
+    ]) {
+      await page.getByRole('tab', { name: label, exact: true }).click();
+      const panel = page.getByRole('tabpanel', { name: label, exact: true });
+      await panel.getByText(task, { exact: true }).waitFor();
+      await panel.getByText(file, { exact: false }).waitFor();
       assert(
-        geometry.y >= 0 && geometry.y + geometry.height <= height,
-        `Sticky stage visible at ${width}, ${chapter}`,
-      );
-    }
-    for (const index of [2, 1, 0]) {
-      await page
-        .getByRole('navigation', { name: 'Story chapters' })
-        .getByRole('link')
-        .nth(index)
-        .click();
-      await page.waitForFunction(
-        (value) =>
-          document.querySelector('.thread-visual')?.getAttribute('data-phase') === String(value),
-        index,
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        `Use case overflow at ${width}: ${label}`,
       );
     }
   }
-  for (const [label, task, file] of [
-    ['Ship a feature', 'Build keyboard search', 'Search.tsx'],
-    ['Untangle a bug', 'Keep unfinished drafts', 'TaskComposer.tsx'],
-    ['Try a bigger idea', 'Explore navigation', 'Navigation.tsx'],
-  ]) {
-    await page.getByRole('button', { name: label, exact: true }).click();
-    await page.locator('#chapter-parallel').evaluate((el) => el.scrollIntoView());
-    await page.getByRole('heading', { name: task, exact: true }).waitFor();
-    await page.locator('#chapter-review').evaluate((el) => el.scrollIntoView());
-    await page.locator('.review-art-file').getByText(file, { exact: false }).waitFor();
-  }
-  await page.getByRole('link', { name: 'Skip to the actual app' }).click();
-  await page.getByRole('tab', { name: 'Tasks & ideas' }).focus();
+  await page.getByRole('tab', { name: 'Keep the whole picture' }).focus();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'Review & checks' }).waitFor();
+  await page.getByRole('tabpanel', { name: 'See what actually changed' }).waitFor();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'Coding agents' }).waitFor();
+  await page.getByRole('tabpanel', { name: 'Bring your favorite agents' }).waitFor();
+  await page.getByRole('tab', { name: 'Build a feature', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('tabpanel', { name: 'Find a stubborn bug', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Electric Indigo', exact: true }).click();
   await page.getByRole('button', { name: 'Dark', exact: true }).click();
   assert(
     await page.evaluate(() => document.documentElement.style.colorScheme === 'dark'),
     'Dark appearance',
   );
+  assert(
+    (await page.locator('.product-capture img').getAttribute('src')) === '/media/agents.png',
+    'Dark app screenshot',
+  );
   await page.getByRole('button', { name: 'Light', exact: true }).click();
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
-  const emblem = page.getByRole('link', { name: 'Explore the Jackalope workflow', exact: true });
-  await emblem.focus();
-  await page.keyboard.press('Enter');
-  assert(await page.evaluate(() => location.hash === '#workflow'), 'Keyboard logo navigation');
   assert(
-    (await page.locator('.brand-emblem mask, .brand-emblem ellipse').count()) === 0,
-    'Clean logo silhouette',
+    (await page.locator('.product-capture img').getAttribute('src')) === '/media/agents-light.png',
+    'Light app screenshot',
+  );
+  assert(
+    await page
+      .locator('.landing-finale')
+      .evaluate(
+        (el) =>
+          getComputedStyle(el).backgroundColor ===
+          getComputedStyle(document.querySelector('.landing-footer')).backgroundColor,
+      ),
+    'Continuous footer color',
   );
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('menuitem', { name: 'How it works' }).waitFor();
@@ -96,7 +88,8 @@ async function _verifyPage(page) {
   await page.getByRole('dialog', { name: 'Join the Jackalope waitlist' }).waitFor();
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.activeElement?.textContent === 'Join waitlist');
-  await page.getByRole('button', { name: 'Play the Jackalope product walkthrough' }).click();
+  const play = page.getByRole('button', { name: 'Watch the app', exact: true });
+  await play.click();
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 1);
   const media = await page.locator('video').evaluate(async (video) => {
     video.muted = true;
@@ -107,45 +100,46 @@ async function _verifyPage(page) {
   });
   assert(media.playing, 'Video playback');
   await page.keyboard.press('Escape');
-  await page.waitForFunction(
-    () =>
-      document.activeElement?.getAttribute('aria-label') ===
-      'Play the Jackalope product walkthrough',
-  );
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Watch the app');
   await page.route('**/media/walkthrough.webm', (route) => route.abort());
-  await page.getByRole('button', { name: 'Play the Jackalope product walkthrough' }).click();
+  await play.click();
   await page.getByText('The walkthrough couldn’t load.', { exact: false }).waitFor();
-  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Explore the workspace', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.unroute('**/media/walkthrough.webm');
   assert(
     await page
-      .locator('.thread-scene')
+      .locator('.workbench [role="tabpanel"][data-state="active"]')
       .evaluate((el) => getComputedStyle(el).animationName === 'none'),
     'Reduced scene motion',
   );
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page
-    .locator('#chapter-context')
-    .evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
+  await page.reload();
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
   await page.waitForFunction(
-    () => document.querySelector('.thread-visual')?.getAttribute('data-phase') === '1',
+    () => Number(document.querySelector('.echo-art').style.getPropertyValue('--spread')) > 0.95,
   );
-  assert(
-    await page
-      .locator('.thread-scene')
-      .evaluate((el) => getComputedStyle(el).animationName === 'scene-unfold'),
-    'Normal scene motion',
+  await page.evaluate(() => scrollTo({ top: 400, behavior: 'instant' }));
+  await page.waitForFunction(
+    () => Number(document.querySelector('.echo-art').style.getPropertyValue('--spread')) < 0.65,
   );
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await page.waitForFunction(
+    () => Number(document.querySelector('.echo-art').style.getPropertyValue('--spread')) === 1,
+  );
+  await page.goto(`${await page.evaluate(() => location.origin)}/#agents`);
+  await page.locator('#agents').waitFor({ state: 'visible' });
   assert(errors.length === 0, errors.join('\n'));
   return {
     viewports: 5,
-    scrollChapters: 4,
-    reverseNavigation: true,
     useCases: 3,
     keyboard: true,
-    logoNavigation: true,
     appearance: true,
     reducedMotion: true,
+    scrollArtwork: true,
+    supportDeepLink: true,
     media,
     errors,
   };
