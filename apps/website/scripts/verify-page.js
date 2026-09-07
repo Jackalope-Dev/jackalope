@@ -106,7 +106,7 @@ async function _verifyPage(page) {
       .evaluate((el) => el === document.activeElement),
     'Download focus return',
   );
-  await page.getByRole('button', { name: 'See it in motion' }).click();
+  await page.getByRole('button', { name: 'Watch the actual app' }).click();
   await page.waitForFunction(() => {
     const video = document.querySelector('video');
     return video && video.readyState >= 1 && video.videoWidth > 0;
@@ -125,11 +125,11 @@ async function _verifyPage(page) {
   await page.locator('video').evaluate((video) => video.pause());
   await page.keyboard.press('Escape');
   await page.waitForFunction(
-    () => document.activeElement?.textContent.trim() === 'See it in motion',
+    () => document.activeElement?.textContent.trim() === 'Watch the actual app',
   );
   assert(
     await page
-      .getByRole('button', { name: 'See it in motion' })
+      .getByRole('button', { name: 'Watch the actual app' })
       .evaluate((el) => el === document.activeElement),
     'Video focus return',
   );

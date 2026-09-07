@@ -5,17 +5,13 @@ import * as Tabs from '@radix-ui/react-tabs';
 import {
   ArrowDownToLine,
   ArrowRight,
-  BriefcaseBusiness,
   Check,
   Code2,
-  GitBranch,
-  Layers3,
   Menu as MenuIcon,
   Monitor,
   Moon,
   Play,
   Plus,
-  Sprout,
   Sun,
   X,
 } from 'lucide-react';
@@ -25,6 +21,7 @@ import { AccessPage } from './Access';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 import { JournalPage, JournalTeaser } from './Journal';
+import { FeatureStory, LaunchHero } from './LaunchStory';
 import { LegalPage } from './Legal';
 import { Newsletter, WaitlistButton } from './Signup';
 import { WorkflowDemo } from './WorkflowDemo';
@@ -161,6 +158,7 @@ export function App({ path = '/' }: { path?: string }) {
           </a>
           <nav className="desktop-nav" aria-label="Main navigation">
             <a href={home ? '#workflow' : '/#workflow'}>How it works</a>
+            <a href={home ? '#features' : '/#features'}>Features</a>
             <a href="/changelog/" aria-current={path === '/changelog/' ? 'page' : undefined}>
               Changelog
             </a>
@@ -203,6 +201,7 @@ export function App({ path = '/' }: { path?: string }) {
                 >
                   {[
                     ['How it works', '/#workflow'],
+                    ['Features', '/#features'],
                     ['Make it yours', '/#atmosphere'],
                     ['Questions', '/#questions'],
                     ['Changelog', '/changelog/'],
@@ -220,91 +219,20 @@ export function App({ path = '/' }: { path?: string }) {
       </header>
 
       {home ? (
-        <main id="main">
-          <section className="hero page-width" aria-labelledby="hero-title">
-            <div className="hero-copy">
-              <h1 id="hero-title">
-                Big ideas.
-                <br />
-                <span>Room to run.</span>
-              </h1>
-              <p className="hero-description">
-                A desktop home for agent-assisted development. Give Codex, Claude Code, Grok, or
-                OpenCode a task, run work in parallel, and review the changes in one place.
-              </p>
-              <div className="hero-actions">
-                <DownloadButton />
-                <a className="button button-quiet" href="#playground">
-                  Try the workflow <ArrowRight size={16} />
-                </a>
-                <button
-                  type="button"
-                  className="text-link hero-video-link"
-                  onClick={() => {
-                    videoTrigger.current = document.activeElement as HTMLElement;
-                    setVideoError(false);
-                    setVideoOpen(true);
-                  }}
-                >
-                  <Play size={16} fill="currentColor" /> See it in motion
-                </button>
-              </div>
-              <p className="release-note">
-                {downloadUrl
-                  ? `Windows x64 · ${version}`
-                  : 'Windows first · macOS & Linux planned · Bring your own agent access'}
-              </p>
-            </div>
-            <figure className="hero-stage" aria-label="An example journey from idea to code review">
-              <BrandMark className="hero-silhouette" />
-              <div className="hero-brief">
-                <span className="hero-art-label">ATLAS / NEW TASK</span>
-                <p>“Make search feel effortless.”</p>
-                <span>
-                  Atlas project <span aria-hidden="true">/</span> Your instructions & tools
-                </span>
-              </div>
-              <div className="hero-agent-lanes">
-                <div>
-                  <Code2 size={18} />
-                  <strong>Codex</strong>
-                  <span>Build the keyboard flow</span>
-                </div>
-                <div>
-                  <span className="claude-star" aria-hidden="true">
-                    ✳
-                  </span>
-                  <strong>Claude Code</strong>
-                  <span>Polish the experience</span>
-                </div>
-              </div>
-              <div className="hero-review">
-                <div className="hero-review-heading">
-                  <GitBranch size={17} />
-                  <span>Separate worktrees. One place to review.</span>
-                </div>
-                <img
-                  src={screenshot('review.png')}
-                  alt="Jackalope’s actual review screen with a search patch and project checks in the Atlas sample project."
-                  width="1440"
-                  height="840"
-                  fetchPriority="high"
-                />
-                <div className="hero-review-note">
-                  <Check size={17} />
-                  <span>
-                    The next move is yours.
-                    <small>Inspect the patch. Ask for changes. Choose what lands.</small>
-                  </span>
-                  <ArrowRight size={20} />
-                </div>
-              </div>
-              <figcaption className="hero-art-caption">
-                Illustrated workflow · actual app with sample data
-              </figcaption>
-            </figure>
-          </section>
-
+        <main id="main" className="marketing-home">
+          <LaunchHero
+            action={<DownloadButton />}
+            releaseNote={
+              downloadUrl
+                ? `Windows x64 · ${version}`
+                : 'Early access · Windows first · macOS & Linux planned'
+            }
+            onPlay={() => {
+              videoTrigger.current = document.activeElement as HTMLElement;
+              setVideoError(false);
+              setVideoOpen(true);
+            }}
+          />
           <section className="agent-strip page-width" aria-label="Coding agents">
             <p>A new home for the agents you already know.</p>
             <div>
@@ -329,23 +257,6 @@ export function App({ path = '/' }: { path?: string }) {
             </a>
           </section>
 
-          <section className="demo-section page-width" aria-labelledby="demo-title">
-            <Reveal className="section-intro">
-              <div>
-                <h2 id="demo-title">
-                  Take an idea
-                  <br />
-                  for a spin.
-                </h2>
-              </div>
-              <p>
-                Pick a brief, choose an agent, and follow the work through to review. An interactive
-                sample of your next everyday workflow — no setup needed.
-              </p>
-            </Reveal>
-            <WorkflowDemo />
-          </section>
-
           <section
             id="workflow"
             className="workflow section-space page-width"
@@ -354,9 +265,9 @@ export function App({ path = '/' }: { path?: string }) {
             <Reveal className="section-intro">
               <div>
                 <h2 id="workflow-title">
-                  Less keeping track.
+                  From a big idea.
                   <br />
-                  More moving forward.
+                  To the actual work.
                 </h2>
               </div>
               <p>
@@ -364,37 +275,6 @@ export function App({ path = '/' }: { path?: string }) {
                 becomes work you can review.
               </p>
             </Reveal>
-            <ol className="getting-started" aria-label="How to use Jackalope">
-              <li>
-                <span className="step-number" aria-hidden="true">
-                  01
-                </span>
-                <h3>Open your project.</h3>
-                <p>
-                  Choose a local Git repository. Keep its branch, guidelines, and context close.
-                </p>
-              </li>
-              <li>
-                <span className="step-number" aria-hidden="true">
-                  02
-                </span>
-                <h3>Give an agent a task.</h3>
-                <p>
-                  Open <strong>New task</strong>, choose your agent, and describe the outcome. Use
-                  an isolated worktree for room to experiment.
-                </p>
-              </li>
-              <li>
-                <span className="step-number" aria-hidden="true">
-                  03
-                </span>
-                <h3>Review what comes back.</h3>
-                <p>
-                  Read the result, inspect the patch, and run your checks. Ask for changes or decide
-                  what to integrate.
-                </p>
-              </li>
-            </ol>
             <Tabs.Root value={scene} onValueChange={setScene} className="product-tour">
               <Tabs.List className="tour-tabs" aria-label="Explore the workspace">
                 {scenes.map((item) => (
@@ -445,135 +325,26 @@ export function App({ path = '/' }: { path?: string }) {
             </Tabs.Root>
           </section>
 
-          <section
-            id="accounts"
-            className="accounts-section section-space page-width"
-            aria-labelledby="accounts-title"
-          >
-            <Reveal className="accounts-intro">
-              <h2 id="accounts-title">
-                Work and personal.
-                <br />
-                Each in its own context.
-              </h2>
+          <FeatureStory />
+
+          <section className="demo-section page-width" aria-labelledby="demo-title">
+            <Reveal className="section-intro">
+              <div>
+                <h2 id="demo-title">
+                  Take an idea
+                  <br />
+                  for a spin.
+                </h2>
+              </div>
               <p>
-                Bring your accounts into one workspace. Give each project its own agent choices,
-                sign-in profile, and instructions — then follow the work without juggling windows.
+                Pick a brief, choose an agent, and follow the work through to review. An interactive
+                sample of your next everyday workflow — no setup needed.
               </p>
             </Reveal>
-            <Reveal className="accounts-example">
-              <div className="accounts-lanes">
-                {[
-                  { name: 'Work', project: 'Client project', icon: BriefcaseBusiness },
-                  { name: 'Personal', project: 'Side project', icon: Sprout },
-                ].map(({ name, project, icon: Icon }) => (
-                  <div className="account-lane" key={name}>
-                    <div className="account-lane-heading">
-                      <Icon size={20} aria-hidden="true" />
-                      <h3>{name}</h3>
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>Project</dt>
-                        <dd>{project}</dd>
-                      </div>
-                      <div>
-                        <dt>Agent account</dt>
-                        <dd>Codex · {name}</dd>
-                      </div>
-                      <div>
-                        <dt>Context</dt>
-                        <dd>Project instructions & selected tools</dd>
-                      </div>
-                    </dl>
-                  </div>
-                ))}
-              </div>
-              <p className="accounts-shared">
-                <Layers3 size={18} aria-hidden="true" />
-                One place to follow tasks, review changes, and inspect usage.
-              </p>
-              <p className="capture-note">
-                Example organization · separate sign-in profiles for the same agent
-              </p>
-            </Reveal>
-            <Reveal className="accounts-benefits">
-              <div>
-                <h3>The right account, remembered.</h3>
-                <p>
-                  Set an account per project. Continuing a task keeps the account it started with.
-                </p>
-              </div>
-              <div>
-                <h3>Context you can choose.</h3>
-                <p>
-                  Choose which agents a project can use, add its instructions, and select task
-                  tools.
-                </p>
-              </div>
-              <div>
-                <h3>A clear view of the work.</h3>
-                <p>
-                  Filter reported usage by project and account. Inspect attempts, export records,
-                  and review what changed.
-                </p>
-              </div>
-            </Reveal>
-            <a className="text-link" href="/blog/work-and-personal-accounts/">
-              See how to set up your accounts <ArrowRight size={17} />
-            </a>
+            <WorkflowDemo />
           </section>
 
           <AgentSupport />
-          <section className="control-section section-space" aria-labelledby="control-title">
-            <div className="page-width control-layout">
-              <Reveal className="control-copy">
-                <h2 id="control-title">
-                  Let them branch out.
-                  <br />
-                  Keep the final say.
-                </h2>
-                <p>
-                  Give your agents room to work in separate Git worktrees. Follow their progress,
-                  answer a question, and review what changed when it’s ready.
-                </p>
-                <a className="text-link" href="#download">
-                  Build on your terms <ArrowRight size={17} />
-                </a>
-              </Reveal>
-              <Reveal className="branch-story">
-                <div className="branch-main">
-                  <GitBranch size={18} />
-                  <span>Your project</span>
-                  <code>main</code>
-                </div>
-                <div className="branch-forks">
-                  <div>
-                    <Code2 />
-                    <span>
-                      Improve search<small>Codex · isolated worktree</small>
-                    </span>
-                  </div>
-                  <div>
-                    <span className="claude-star" aria-hidden="true">
-                      ✳
-                    </span>
-                    <span>
-                      Polish the settings<small>Claude Code · isolated worktree</small>
-                    </span>
-                  </div>
-                </div>
-                <div className="branch-review">
-                  <Check size={18} />
-                  <div>
-                    Back to you for review
-                    <small>Inspect changes. Run checks. Decide what lands.</small>
-                  </div>
-                </div>
-                <p className="capture-note">An example of how your work can flow.</p>
-              </Reveal>
-            </div>
-          </section>
 
           <section
             id="atmosphere"
@@ -636,33 +407,6 @@ export function App({ path = '/' }: { path?: string }) {
                 </button>
               </fieldset>
             </Reveal>
-          </section>
-
-          <section className="details-row page-width" aria-label="Thoughtful by design">
-            <div>
-              <Layers3 size={22} />
-              <h3>Context that stays with you.</h3>
-              <p>
-                Keep project instructions, reusable workflows, and lessons close. Give the next task
-                a better starting point.
-              </p>
-            </div>
-            <div>
-              <Monitor size={22} />
-              <h3>Your tools, in reach.</h3>
-              <p>
-                Manage project connections in one place and choose the tools a task needs.
-                Connection support varies by agent.
-              </p>
-            </div>
-            <div>
-              <GitBranch size={22} />
-              <h3>A rhythm for recurring work.</h3>
-              <p>
-                Schedule repeat tasks with their project context intact. Jackalope runs them while
-                the app and your computer are awake.
-              </p>
-            </div>
           </section>
 
           <section
