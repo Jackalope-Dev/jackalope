@@ -91,8 +91,8 @@ export const posts = [
       {
         title: 'Growing in the open.',
         paragraphs: [
-          'Jackalope is in development, with Windows x64 as the initial release target. The first public installer is still being prepared. The website tour uses fictional project data to show the interface; it is not evidence of real agent execution.',
-          'We will share development notes and public release announcements here. Join the waitlist if you would like early-access news, with Windows first and macOS and Linux planned.',
+          'Jackalope is coming soon. The website tour uses fictional project data to show the interface; it is not evidence of real agent execution.',
+          'We will share development notes and public release announcements here. Join the waitlist for early-access news.',
         ],
       },
     ],
@@ -192,7 +192,7 @@ export const pages = [
     path: '/changelog/',
     title: 'Changelog — Jackalope',
     description:
-      'Follow Jackalope development milestones, website updates, and future public Windows releases.',
+      'Follow Jackalope development milestones, website updates, and future public releases.',
   },
   {
     path: '/privacy/',

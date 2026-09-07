@@ -145,7 +145,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
 export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
   const availability = releaseVersion
     ? `Windows x64 version ${releaseVersion} is available at ${origin}/#download. macOS and Linux are planned.`
-    : 'In development as of September 6, 2026. Windows x64 is the initial release target. The first public installer is still being prepared. No public release date or price has been announced. macOS and Linux are planned, not currently supported downloads.';
+    : 'Coming soon. Join the waitlist for early-access news. No public release date or price has been announced.';
   const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use fictional Atlas sample data and do not prove real agent execution.\n\n`;
   const publicPages = pages.filter((page) => page.path !== '/access/');
   const links = publicPages

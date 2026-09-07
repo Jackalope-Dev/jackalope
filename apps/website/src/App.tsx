@@ -52,10 +52,7 @@ const faqs = [
     'What can I see across my accounts?',
     'Follow task progress and review changes in one workspace. In Usage, filter Jackalope attempts by project and account, inspect reported token usage, and export the selected records. Missing reports remain unavailable; this is not a complete provider billing history or a record of work done outside Jackalope.',
   ],
-  [
-    'Which operating systems can I use?',
-    'Windows, macOS, and Linux users are welcome on the waitlist. Windows x64 is the first release target; macOS and Linux are planned. We’ll announce each platform as its download becomes available.',
-  ],
+  ['When will Jackalope be available?', 'Coming soon. Join the waitlist for early-access news.'],
   [
     'What happens after I join the waitlist?',
     'We’ll email you about early access as places open up. No payment is needed to join, and there is no confirmed public launch date or price yet. Your coding agent’s own subscription and usage charges still apply.',

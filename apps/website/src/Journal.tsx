@@ -110,10 +110,10 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
                   <a href="/#download">Jackalope {publishedVersion} for Windows</a> is available.
                 </>
               ) : (
-                'The first public Windows x64 installer is being prepared.'
+                'Coming soon.'
               )}{' '}
-              macOS and Linux are planned. <a href="/#newsletter">Join the waitlist</a> for launch
-              news, or <a href="/changelog/">follow the development changelog</a>.
+              <a href="/#newsletter">Join the waitlist</a> for launch news, or{' '}
+              <a href="/changelog/">follow the development changelog</a>.
             </p>
           </section>
         </div>
@@ -177,8 +177,8 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
               </>
             ) : (
               <>
-                <strong>Windows is on the way.</strong> The first public installer is being
-                prepared. These are development milestones, not downloadable releases.
+                <strong>Coming soon.</strong> These are development milestones, not downloadable
+                releases.
               </>
             )}
           </p>

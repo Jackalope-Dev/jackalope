@@ -222,9 +222,7 @@ export function LandingPage({
               </button>
             </div>
             <span className="availability">
-              {available
-                ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
-                : 'Windows first · macOS & Linux planned'}
+              {available ? `Windows x64 · ${releaseVersion ?? 'Available now'}` : 'Coming soon'}
             </span>
           </div>
           <div className="agent-line">
@@ -451,9 +449,7 @@ export function LandingPage({
               <p className="availability">
                 {available
                   ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
-                  : 'Early access · No payment to join'}
-                <br />
-                macOS & Linux planned
+                  : 'Coming soon · No payment to join'}
               </p>
             </div>
             <BrandMark className="finale-mark" />

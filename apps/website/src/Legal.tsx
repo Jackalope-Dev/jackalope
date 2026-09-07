@@ -299,8 +299,7 @@ const terms: Section[] = [
         <p>
           Joining the waitlist is free. It does not guarantee admission, an invitation date, a
           finished product, a particular feature, or a future price. Approval does not mean an
-          installer is available yet. Windows x64 is the first release target; other platforms are
-          planned, not promised.
+          installer is available yet. Jackalope is coming soon.
         </p>
         <p>
           Early-access software may contain errors, change substantially, or become unavailable.

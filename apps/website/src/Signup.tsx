@@ -219,8 +219,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
           <div className="waitlist-body">
             <Dialog.Title>Join the Jackalope waitlist</Dialog.Title>
             <Dialog.Description>
-              Be there for your next big idea. Get access news as Jackalope opens up. Windows comes
-              first, with macOS and Linux planned.
+              Coming soon. Join the waitlist for early-access news.
             </Dialog.Description>
             <ul className="waitlist-perks">
               <li>
