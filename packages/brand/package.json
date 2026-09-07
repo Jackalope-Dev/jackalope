@@ -7,8 +7,15 @@
   "exports": {
     "./theme": "./src/theme.ts",
     "./character": "./src/character.ts",
+    "./echo": "./src/EchoMark.tsx",
     "./fonts.css": "./src/fonts.css",
     "./tokens": "./src/tokens.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.4"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.3.0",

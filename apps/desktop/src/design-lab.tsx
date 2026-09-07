@@ -1,4 +1,4 @@
-import { applyThemeTokens, PRESET_THEMES, startThemeClock } from '@jackalope/brand/theme';
+import { applyThemeTokens, DEFAULT_THEME, startThemeClock } from '@jackalope/brand/theme';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
@@ -14,7 +14,7 @@ import './components/ui/experience.css';
 
 function DesignLab() {
   useEffect(startThemeClock, []);
-  const [theme, setTheme] = useState(PRESET_THEMES[0]);
+  const [theme, setTheme] = useState(DEFAULT_THEME);
   const [replay, setReplay] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [period, setPeriod] = useState('30');

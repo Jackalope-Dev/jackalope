@@ -1,6 +1,6 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -39,10 +39,18 @@ const RepoTodos = lazy(() =>
 export function Shell({
   initialTaskAgent,
   initialCapture,
+  initialDraftKey,
+  focusOnMount,
 }: {
   initialTaskAgent?: string;
   initialCapture?: boolean;
+  initialDraftKey?: string;
+  focusOnMount?: boolean;
 } = {}) {
+  const canvas = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focusOnMount && !initialTaskAgent && !initialCapture) canvas.current?.focus();
+  }, [focusOnMount, initialTaskAgent, initialCapture]);
   const [setupOpen, setSetupOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsCategory, setSettingsCategory] = useState<'General' | 'System' | 'Diagnostics'>(
@@ -67,8 +75,8 @@ export function Shell({
     if (settingsOpen) telemetry.track({ name: 'feature_used', feature: 'settings' });
   }, [settingsOpen]);
   const [commandsOpen, setCommandsOpen] = useState(false);
-  const [capture, setCapture] = useState<{ ideaId?: string; agent?: string } | null>(
-    initialTaskAgent ? { agent: initialTaskAgent } : initialCapture ? {} : null,
+  const [capture, setCapture] = useState<{ ideaId?: string; agent?: string; draftKey?: string } | null>(
+    initialTaskAgent ? { agent: initialTaskAgent, draftKey: initialDraftKey } : initialCapture ? {} : null,
   );
   const [scheduleRunId, setScheduleRunId] = useState<string>();
   const { projects, activeProjectId, selectProject } = useProjectStore();
@@ -236,6 +244,7 @@ export function Shell({
         </div>
       </div>
       <main
+        ref={canvas}
         id="workspace-content"
         tabIndex={-1}
         className="workspace-canvas"

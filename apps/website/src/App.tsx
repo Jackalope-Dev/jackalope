@@ -1,4 +1,4 @@
-import { applyThemeTokens, PRESET_THEMES } from '@jackalope/brand/theme';
+import { applyThemeTokens, DEFAULT_THEME, PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'lucide-react';
@@ -71,7 +71,9 @@ const faqs = [
 export function App({ path = '/' }: { path?: string }) {
   const home = path === '/';
   const [dark, setDark] = useState(false);
-  const [palette, setPalette] = useState(0);
+  const [palette, setPalette] = useState(() =>
+    PRESET_THEMES.findIndex((theme) => theme.id === DEFAULT_THEME.id),
+  );
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const screenshot = (name: string) => asset(dark ? name : name.replace('.png', '-light.png'));

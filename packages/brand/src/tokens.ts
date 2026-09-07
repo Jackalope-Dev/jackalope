@@ -67,6 +67,8 @@ export const PRESET_THEMES: ThemePalette[] = [
   },
 ];
 
+export const DEFAULT_THEME = PRESET_THEMES[2];
+
 export function isDarkAtTime(theme: ThemePalette, now = new Date()) {
   if (theme.appearance !== 'automatic') return theme.isDark !== false;
   return now.getHours() < 7 || now.getHours() >= 19;

@@ -1,8 +1,9 @@
 import { startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Shell } from './components/layout/Shell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { WorkspaceTransition } from './components/onboarding/WorkspaceTransition';
 import { PrivacyGate } from './components/settings/PrivacySettings';
 import { observeTelemetry } from './lib/observe-telemetry';
 import { nativeTask } from './lib/task-runtime';
@@ -19,6 +20,18 @@ export default function App() {
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
   const [initialCapture, setInitialCapture] = useState(false);
+  const [initialDraftKey, setInitialDraftKey] = useState<string>();
+  const [entry, setEntry] = useState<{ agent?: string; draftKey?: string; capture?: boolean } | null>(null);
+  const [focusWorkspace, setFocusWorkspace] = useState(false);
+  const completeEntry = useCallback(() => {
+    if (!entry) return;
+    setInitialTaskAgent(entry.agent);
+    setInitialDraftKey(entry.draftKey);
+    setInitialCapture(Boolean(entry.capture));
+    setFocusWorkspace(true);
+    useOnboardingStore.getState().finish(!entry.agent);
+    setEntry(null);
+  }, [entry]);
   const onboarding = useOnboardingStore();
   useEffect(() => {
     if (ready)
@@ -45,19 +58,20 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <PrivacyGate>
-        {onboarding.status === 'new' || onboarding.status === 'active' ? (
+        {entry ? (
+          <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
+        ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
           <OnboardingFlow
-            onCapture={() => {
-              setInitialCapture(true);
-              onboarding.finish(true);
-            }}
-            onFinish={(agent) => {
-              setInitialTaskAgent(agent);
-              onboarding.finish(!agent);
-            }}
+            onCapture={() => setEntry({ capture: true })}
+            onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}
           />
         ) : (
-          <Shell initialTaskAgent={initialTaskAgent} initialCapture={initialCapture} />
+          <Shell
+            initialTaskAgent={initialTaskAgent}
+            initialCapture={initialCapture}
+            initialDraftKey={initialDraftKey}
+            focusOnMount={focusWorkspace}
+          />
         )}
       </PrivacyGate>
     </MotionConfig>

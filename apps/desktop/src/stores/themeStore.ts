@@ -1,8 +1,8 @@
 import {
   applyThemeTokens,
+  DEFAULT_THEME,
   hexToHsl,
   hslToHex,
-  PRESET_THEMES,
   type ThemePalette,
 } from '@jackalope/brand/theme';
 import { create } from 'zustand';
@@ -15,7 +15,7 @@ interface ThemeState {
   setCustomHsl: (h: number, s: number, l: number) => void;
 }
 
-const initialTheme = PRESET_THEMES[0]; // Mojave Sunset
+const initialTheme = DEFAULT_THEME;
 applyThemeTokens(initialTheme); // avoids a flash of unstyled theme before persisted state rehydrates
 
 export const useThemeStore = create<ThemeState>()(

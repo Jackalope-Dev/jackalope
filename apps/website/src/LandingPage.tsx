@@ -1,44 +1,42 @@
-import { characterPaths } from '@jackalope/brand/character';
+import { EchoMark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Tabs from '@radix-ui/react-tabs';
-import { ArrowDown, ArrowRight, Check, GitBranch, Moon, Play, Plus, Sun } from 'lucide-react';
-import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
-import { type CSSProperties, type ReactNode, useRef } from 'react';
+import {
+  ArrowDown,
+  ArrowRight,
+  Check,
+  GitBranch,
+  Moon,
+  Pause,
+  Play,
+  Plus,
+  Sun,
+} from 'lucide-react';
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 
-const head = [
-  characterPaths.farEar,
-  characterPaths.nearEar,
-  characterPaths.antler,
-  characterPaths.head,
-].join(' ');
-
-function EchoMark() {
+function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
-  const reduced = useReducedMotion();
-  const { scrollYProgress } = useScroll({ target: root, offset: ['start start', 'end start'] });
-  const spread = useTransform(scrollYProgress, [0, 1], [1, 0.25]);
+  const [visible, setVisible] = useState(true);
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+    if (root.current) observer.observe(root.current);
+    return () => observer.disconnect();
+  }, []);
   return (
-    <motion.div
-      ref={root}
-      className="echo-art"
-      style={{ '--spread': reduced ? 1 : spread } as CSSProperties}
-    >
-      <svg viewBox="80 25 440 430" fill="none" aria-hidden="true">
-        <g transform="translate(-58 24) scale(3.3)">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((echo) => (
-            <path
-              key={echo}
-              d={head}
-              className="echo-line"
-              style={{ '--echo': echo } as CSSProperties}
-            />
-          ))}
-          <path d={head} fill="currentColor" />
-        </g>
-      </svg>
-    </motion.div>
+    <div ref={root} className="echo-art">
+      <EchoMark animated={visible && !paused} />
+      <button
+        type="button"
+        className="echo-toggle"
+        onClick={() => setPaused(!paused)}
+        aria-label={paused ? 'Play logo animation' : 'Pause logo animation'}
+      >
+        {paused ? <Play size={15} /> : <Pause size={15} />}
+      </button>
+    </div>
   );
 }
 
@@ -206,7 +204,7 @@ export function LandingPage({
       <section className="landing-hero" aria-labelledby="hero-title">
         <div className="landing-width">
           <div className="hero-poster">
-            <EchoMark />
+            <HeroMark />
             <h1 id="hero-title">
               <span>Many agents.</span> <span>One workspace.</span>
             </h1>

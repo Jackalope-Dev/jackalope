@@ -7,6 +7,12 @@ async function _verifyPage(page) {
   await page.goto(await page.evaluate(() => location.origin));
   await page.evaluate(() => document.fonts.ready);
   assert(
+    await page.evaluate(
+      () => document.documentElement.style.getPropertyValue('--accent-h') === '245',
+    ),
+    'Default Indigo theme',
+  );
+  assert(
     (await page.locator('.landing-kicker, .hero-edition, .echo-caption').count()) === 0,
     'No redundant eyebrow labels',
   );
@@ -124,17 +130,26 @@ async function _verifyPage(page) {
   await page.reload();
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+  const line = page.locator('.brand-echo-line').first();
+  const transform = await line.evaluate((el) => getComputedStyle(el).transform);
   await page.waitForFunction(
-    () => Number(document.querySelector('.echo-art').style.getPropertyValue('--spread')) > 0.95,
+    (before) => getComputedStyle(document.querySelector('.brand-echo-line')).transform !== before,
+    transform,
   );
-  await page.evaluate(() => scrollTo({ top: 400, behavior: 'instant' }));
+  await page.getByRole('button', { name: 'Pause logo animation', exact: true }).click();
+  assert(
+    await line.evaluate((el) => getComputedStyle(el).animationPlayState === 'paused'),
+    'Pause looping logo',
+  );
+  await page.getByRole('button', { name: 'Play logo animation', exact: true }).click();
+  await page.locator('#features').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
   await page.waitForFunction(
-    () => Number(document.querySelector('.echo-art').style.getPropertyValue('--spread')) < 0.65,
+    () => document.querySelector('.echo-art .brand-echo').dataset.animated === 'false',
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.reload();
-  await page.waitForFunction(
-    () => Number(document.querySelector('.echo-art').style.getPropertyValue('--spread')) === 1,
+  assert(
+    await line.evaluate((el) => getComputedStyle(el).animationName === 'none'),
+    'Reduced motion stops logo loop',
   );
   await page.goto(`${await page.evaluate(() => location.origin)}/#agents`);
   await page.locator('#agents').waitFor({ state: 'visible' });
@@ -145,7 +160,7 @@ async function _verifyPage(page) {
     keyboard: true,
     appearance: true,
     reducedMotion: true,
-    scrollArtwork: true,
+    loopingArtwork: true,
     supportDeepLink: true,
     media,
     errors,

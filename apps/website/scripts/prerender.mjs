@@ -13,14 +13,14 @@ try {
   const { siteOrigin } = await server.ssrLoadModule('/src/content.ts');
   const origin = new URL(loadEnv('production', process.cwd(), 'VITE_').VITE_SITE_URL || siteOrigin)
     .origin;
-  const { applyThemeTokens, PRESET_THEMES } = await server.ssrLoadModule('@jackalope/brand/theme');
+  const { applyThemeTokens, DEFAULT_THEME } = await server.ssrLoadModule('@jackalope/brand/theme');
   const tokens = new Map();
   const previousDocument = globalThis.document;
   try {
     globalThis.document = {
       documentElement: { style: { setProperty: (name, value) => tokens.set(name, value) } },
     };
-    applyThemeTokens({ ...PRESET_THEMES[0], isDark: false, atmosphere: 18 });
+    applyThemeTokens({ ...DEFAULT_THEME, isDark: false, atmosphere: 18 });
   } finally {
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
