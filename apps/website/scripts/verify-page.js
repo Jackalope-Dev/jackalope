@@ -71,12 +71,13 @@ async function _verifyPage(page) {
   );
   await page.getByRole('button', { name: 'Light', exact: true }).click();
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
-  const mascot = page.getByRole('button', { name: 'Say hello to Jackalope' }).first();
-  await mascot.focus();
+  const emblem = page.getByRole('link', { name: 'Explore the Jackalope workflow', exact: true });
+  await emblem.focus();
   await page.keyboard.press('Enter');
+  assert(await page.evaluate(() => location.hash === '#workflow'), 'Keyboard logo navigation');
   assert(
-    (await mascot.locator('.character-hello').textContent()) === 'Right. Let’s make something.',
-    'Keyboard mascot reaction',
+    (await page.locator('.brand-emblem mask, .brand-emblem ellipse').count()) === 0,
+    'Clean logo silhouette',
   );
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('menuitem', { name: 'How it works' }).waitFor();
@@ -142,7 +143,7 @@ async function _verifyPage(page) {
     reverseNavigation: true,
     useCases: 3,
     keyboard: true,
-    mascot: true,
+    logoNavigation: true,
     appearance: true,
     reducedMotion: true,
     media,

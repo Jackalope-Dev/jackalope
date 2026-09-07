@@ -1,5 +1,9 @@
 .wild-landing {
-  --wild-rule: color-mix(in srgb, var(--color-text-primary) 22%, transparent);
+  --wild-rule: var(--color-border);
+  background: var(--color-bg);
+  border: 12px solid var(--color-shell);
+  border-top: 0;
+  border-radius: 24px;
   overflow: clip;
 }
 .wild-width {
@@ -17,13 +21,12 @@
 .wild-landing h1,
 .wild-landing h2 {
   font-weight: 500;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.055em;
 }
 .wild-landing em {
   font-weight: 500;
   color: var(--color-accent-ink);
-  font-style: italic;
-  font-synthesis: style;
+  font-style: normal;
 }
 .wild-hero {
   position: relative;
@@ -38,8 +41,8 @@
   z-index: 2;
 }
 .wild-hero h1 {
-  font-size: clamp(74px, 8.8vw, 130px);
-  line-height: 0.97;
+  font-size: clamp(64px, 7.1vw, 104px);
+  line-height: 1.04;
   margin-block: 30px 28px;
 }
 .wild-hero-description {
@@ -87,73 +90,51 @@
 }
 .hero-orbit {
   position: absolute;
-  width: 125%;
+  width: 108%;
   height: 100%;
-  inset: -15px -8% auto;
+  inset: 0 -4% auto;
   z-index: -1;
   stroke: var(--color-accent);
   stroke-width: 1;
-  opacity: 0.6;
-  transform: rotate(-12deg);
+  opacity: 0.4;
 }
-.story-character {
-  color: var(--color-accent);
+.brand-emblem {
+  color: var(--color-text-primary);
 }
-.story-character svg {
+.brand-emblem svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
-.character-button {
+.emblem-link {
   position: relative;
   background: transparent;
   border: 0;
   padding: 0;
-  border-radius: 45%;
+  border-radius: 12px;
 }
-.character-ears {
+.emblem-ears {
   transform-origin: 84px 65px;
   transition: transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.character-button:is(:hover, :focus-visible) .character-ears {
-  transform: rotate(-9deg);
-}
-.character-hello {
-  position: absolute;
-  top: 36%;
-  right: -4%;
-  max-width: 180px;
-  background: var(--color-text-primary);
-  color: var(--color-bg);
-  font-size: 12px;
-  padding: 12px 18px;
-  border-radius: 14px 14px 14px 0;
-  opacity: 0;
-  transform: translateY(8px) rotate(4deg);
-  transition:
-    opacity 180ms,
-    transform 180ms;
-  pointer-events: none;
-}
-.character-button:is(:hover, :focus-visible) .character-hello {
-  opacity: 1;
-  transform: translateY(0) rotate(4deg);
+.emblem-link:is(:hover, :focus-visible) .emblem-ears {
+  transform: rotate(-3deg);
 }
 .hero-creature {
-  width: min(100%, 430px);
-  transform: rotate(-9deg);
-  margin-top: 32px;
-  filter: drop-shadow(14px 24px 0 color-mix(in srgb, var(--color-accent) 9%, transparent));
+  display: block;
+  width: min(64%, 300px);
+  transform: rotate(-3deg);
+  margin-top: 12px;
 }
 .hero-handnote {
   position: absolute;
-  right: -5px;
-  top: -10px;
-  transform: rotate(8deg);
-  font-size: 14px;
-  font-style: italic;
-  line-height: 1.7;
+  left: 10%;
+  top: 20px;
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  line-height: 1.8;
   color: var(--color-text-secondary);
 }
 .hero-art-bottom {
@@ -255,7 +236,9 @@
 .thread-visual {
   height: calc(100% - 48px);
   position: relative;
-  background: var(--color-shell);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
   isolation: isolate;
   overflow: hidden;
 }
@@ -723,7 +706,7 @@
   font-size: 23px;
   font-style: italic;
   border-bottom: 1px solid var(--color-accent);
-  transform: rotate(-9deg);
+  transform: rotate(-3deg);
 }
 .memory-art > span:nth-child(2) {
   transform: rotate(8deg) translateY(-20px);
@@ -799,13 +782,11 @@
   justify-content: center;
   gap: 20px;
 }
-.atmosphere-character .story-character {
+.atmosphere-character .brand-emblem {
   width: 230px;
 }
 .atmosphere-character > span {
-  transform: rotate(7deg);
-  font-size: 13px;
-  font-style: italic;
+  font-size: 12px;
   color: var(--color-text-secondary);
   line-height: 1.6;
 }
@@ -842,8 +823,8 @@
   position: relative;
   isolation: isolate;
   padding-block: 85px 60px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-shell);
+  color: var(--color-text-primary);
   overflow: hidden;
 }
 .wild-finale h2 {
@@ -898,10 +879,10 @@
     padding-top: 45px;
   }
   .wild-hero h1 {
-    font-size: 90px;
+    font-size: 76px;
   }
   .hero-creature {
-    width: 350px;
+    width: 260px;
   }
   .hero-handnote {
     font-size: 12px;
@@ -939,6 +920,11 @@
   }
 }
 @media (max-width: 760px) {
+  .wild-landing {
+    border-width: 6px;
+    border-top-width: 0;
+    border-radius: 16px;
+  }
   .wild-width {
     width: calc(100% - 44px);
   }
@@ -947,7 +933,7 @@
     padding-top: 26px;
   }
   .wild-hero h1 {
-    font-size: clamp(76px, 14vw, 112px);
+    font-size: clamp(58px, 10vw, 76px);
     margin-top: 22px;
   }
   .wild-hero-description {
@@ -958,7 +944,7 @@
     margin-top: 15px;
   }
   .hero-creature {
-    width: 260px;
+    width: 195px;
     margin-top: 0;
   }
   .hero-handnote {
@@ -1231,7 +1217,7 @@
   .atmosphere-composition h2 {
     font-size: 52px;
   }
-  .atmosphere-character .story-character {
+  .atmosphere-character .brand-emblem {
     width: 160px;
   }
   .atmosphere-character > span {
@@ -1271,7 +1257,7 @@
 }
 @media (max-width: 360px) {
   .wild-hero h1 {
-    font-size: 66px;
+    font-size: 53px;
   }
   .wild-hero-actions {
     gap: 14px;
@@ -1316,8 +1302,7 @@
   .thread-scene {
     animation: none;
   }
-  .character-ears,
-  .character-hello,
+  .emblem-ears,
   .wild-capture {
     transition: none;
   }
@@ -1336,4 +1321,23 @@
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+.landing-header {
+  background: var(--color-shell);
+}
+.wild-landing .button-download,
+.landing-header .button-download {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-flat);
+}
+.wild-landing .button-download:hover,
+.landing-header .button-download:hover {
+  background: var(--color-accent-hover);
+  box-shadow: var(--shadow-flat);
+}
+.wild-landing .button-download::before,
+.landing-header .button-download::before {
+  display: none;
 }

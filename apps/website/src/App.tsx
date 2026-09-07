@@ -85,7 +85,7 @@ export function App({ path = '/' }: { path?: string }) {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className="site-header">
+      <header className={`site-header${home ? ' landing-header' : ''}`}>
         <div className="header-inner">
           <a href="/" className="wordmark" aria-label="Jackalope home">
             <BrandMark />

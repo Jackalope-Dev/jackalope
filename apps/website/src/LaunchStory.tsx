@@ -4,8 +4,8 @@ import { ArrowDown, ArrowRight, Check, Moon, Play, Plus, Sun } from 'lucide-reac
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
+import { BrandEmblem } from './BrandEmblem';
 import { BrandMark } from './BrandMark';
-import { StoryMascot } from './StoryMascot';
 
 const useCases = [
   {
@@ -182,11 +182,7 @@ function StoryVisual({ phase, example }: { phase: number; example: (typeof useCa
         }
         transition={{ duration: 0.9, type: 'spring', bounce: 0.15 }}
       >
-        <StoryMascot
-          mood={
-            phase === 1 ? 'thinking' : phase === 2 ? 'working' : phase === 3 ? 'success' : 'idle'
-          }
-        />
+        <BrandEmblem />
       </motion.div>
       <div className="thread-scene-footer">
         <span>Sample project. No agents are running here.</span>
@@ -367,11 +363,11 @@ export function WildLanding({
     <main id="main" className="wild-landing">
       <section className="wild-hero wild-width" aria-labelledby="hero-title" ref={hero}>
         <div className="wild-hero-copy">
-          <p className="wild-label">YOUR AGENTS. A LITTLE MORE WILD.</p>
+          <p className="wild-label">A LOCAL WORKSPACE FOR CODING AGENTS</p>
           <h1 id="hero-title">
-            Your ideas
+            Your ideas.
             <br />
-            have <em>legs.</em>
+            In good company.
           </h1>
           <div className="wild-hero-description">
             <p>One desktop workspace to put your coding agents to work.</p>
@@ -394,18 +390,18 @@ export function WildLanding({
         </div>
         <motion.div className="wild-hero-art" style={{ y: reduced ? 0 : heroDrift }}>
           <svg className="hero-orbit" viewBox="0 0 650 660" fill="none" aria-hidden="true">
-            <path d="M-10 480 C20 100 610 40 625 330 C650 570 170 680 125 440 C60 130 530 50 675 180" />
-            <path d="M48 507 l-24 -15 27 -9" />
+            <circle cx="325" cy="330" r="235" />
+            <circle cx="325" cy="330" r="270" strokeDasharray="2 8" />
+            <path d="M325 30 V100 M325 560 V630 M20 330 H90 M560 330 H630 M70 75 H95 M82 62 V88 M555 75 H580 M568 62 V88 M70 585 H95 M82 572 V598 M555 585 H580 M568 572 V598" />
+            <path d="M130 525 L515 140 M125 135 L520 530" opacity="0.2" />
           </svg>
           <span className="hero-handnote">
-            a small spark.
-            <br />a curious creature.
-            <br />a whole lot of possibility.
+            J / JACKALOPE
+            <br />
+            LOCAL BY DESIGN
           </span>
-          <StoryMascot interactive className="hero-creature" />
-          <span className="hero-art-bottom">
-            GO ON. SAY HELLO. <span aria-hidden="true">↗</span>
-          </span>
+          <BrandEmblem href="#workflow" className="hero-creature" />
+          <span className="hero-art-bottom">CONTEXT → WORK → REVIEW</span>
         </motion.div>
         <div className="wild-hero-bottom">
           <span>Built for the way you actually make things.</span>
@@ -417,7 +413,7 @@ export function WildLanding({
       <ScrollStory />
       <section className="wild-inside wild-width" id="inside" aria-labelledby="inside-title">
         <div className="wild-section-heading">
-          <span className="wild-label">YES, IT’S A REAL APP.</span>
+          <span className="wild-label">INSIDE THE WORKSPACE</span>
           <h2 id="inside-title">
             A place for
             <br />
@@ -472,7 +468,7 @@ export function WildLanding({
         id="features"
         aria-labelledby="features-title"
       >
-        <span className="wild-label">THERE’S A METHOD TO THE WILD.</span>
+        <span className="wild-label">BUILT AROUND THE WORK</span>
         <h2 id="features-title">
           Less tending.
           <br />
@@ -546,7 +542,7 @@ export function WildLanding({
       <section className="wild-atmosphere" id="atmosphere" aria-labelledby="atmosphere-title">
         <div className="wild-width atmosphere-composition">
           <div>
-            <span className="wild-label">A LITTLE PERSONALITY GOES A LONG WAY.</span>
+            <span className="wild-label">YOUR WORKSPACE, YOUR ATMOSPHERE</span>
             <h2 id="atmosphere-title">
               Make yourself
               <br />
@@ -581,11 +577,11 @@ export function WildLanding({
             </fieldset>
           </div>
           <div className="atmosphere-character">
-            <StoryMascot interactive />
+            <BrandEmblem />
             <span>
-              Same curious creature.
+              The same shared palette.
               <br />
-              Your kind of atmosphere.
+              From the site to your workspace.
             </span>
           </div>
         </div>
@@ -623,7 +619,7 @@ export function WildLanding({
       </section>
       <section className="wild-finale" id="download" aria-labelledby="download-title">
         <div className="wild-width">
-          <span className="wild-label">THAT IDEA YOU KEEP COMING BACK TO?</span>
+          <span className="wild-label">MAKE ROOM FOR YOUR NEXT IDEA</span>
           <h2 id="download-title">
             Let’s see
             <br />
@@ -635,7 +631,7 @@ export function WildLanding({
                 ? 'Your Windows workspace is ready.'
                 : 'Join the waitlist for early access.'}
               <br />
-              Bring your own agent account. Keep your curiosity.
+              Bring your own agents. Keep control of the work.
             </p>
             {downloadAction}
           </div>
