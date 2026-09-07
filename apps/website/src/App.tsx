@@ -25,6 +25,7 @@ import { AccessPage } from './Access';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 import { JournalPage, JournalTeaser } from './Journal';
+import { LegalPage } from './Legal';
 import { Newsletter, WaitlistButton } from './Signup';
 import { WorkflowDemo } from './WorkflowDemo';
 
@@ -726,11 +727,13 @@ export function App({ path = '/' }: { path?: string }) {
         </main>
       ) : path === '/access/' ? (
         <AccessPage />
+      ) : path === '/privacy/' || path === '/terms/' ? (
+        <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
       ) : (
         <JournalPage path={path} dark={dark} />
       )}
 
-      {path !== '/privacy/' && path !== '/access/' && <Newsletter />}
+      {!['/privacy/', '/terms/', '/access/'].includes(path) && <Newsletter />}
 
       <footer className="site-footer page-width">
         <a href="/" className="wordmark">
@@ -746,6 +749,7 @@ export function App({ path = '/' }: { path?: string }) {
           <a href="/blog/">Field notes</a>
           <a href="/access/">Your access</a>
           <a href="/privacy/">Privacy</a>
+          <a href="/terms/">Terms</a>
           <a href="/#questions">Questions</a>
         </nav>
       </footer>

@@ -149,6 +149,17 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               <span>Also send me occasional Jackalope product notes. Unsubscribe anytime.</span>
             </label>
           )}
+          <p className="signup-consent">
+            By joining, you confirm you’re 18 or older and agree to the <a href="/terms/">Terms</a>.
+          </p>
+          {accessOrigin && (
+            <noscript>
+              <p className="signup-consent">
+                Without JavaScript, this form joins the email list for launch news and product notes
+                through Sequenzy, rather than creating an access request. Unsubscribe anytime.
+              </p>
+            </noscript>
+          )}
           {state === 'error' && (
             <p className="signup-error" role="alert">
               {message}

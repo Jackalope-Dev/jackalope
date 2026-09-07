@@ -377,6 +377,10 @@ export function AccessPage() {
             <>
               <h2>Confirm sign-in</h2>
               <p>Verify your email to access downloads and invitations. Keep this link private.</p>
+              <p className="access-fine">
+                By continuing, you confirm you’re 18 or older and agree to the{' '}
+                <a href="/terms/">Terms</a>. See our <a href="/privacy/">Privacy Policy</a>.
+              </p>
               <div className="access-entry-actions">
                 <button
                   className="button button-primary button-download"
@@ -455,7 +459,9 @@ export function AccessPage() {
                 </small>
               )}
               <p className="access-fine">
-                Signing in does not subscribe you to newsletters. <a href="/privacy/">Privacy</a>.
+                By requesting a link, you confirm you’re 18 or older and agree to the{' '}
+                <a href="/terms/">Terms</a>. Signing in does not subscribe you to newsletters.{' '}
+                <a href="/privacy/">Privacy</a>.
               </p>
               <a className="text-link" href="/#newsletter">
                 Need access? Join the waitlist <ArrowRight size={14} />

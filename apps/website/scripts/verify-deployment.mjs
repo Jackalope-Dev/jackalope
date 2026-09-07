@@ -7,6 +7,7 @@ const pages = [
   '/blog/',
   '/changelog/',
   '/privacy/',
+  '/terms/',
   '/blog/room-for-the-work/',
   '/blog/from-brief-to-review/',
   '/blog/work-and-personal-accounts/',

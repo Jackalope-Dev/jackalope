@@ -196,9 +196,15 @@ export const pages = [
   },
   {
     path: '/privacy/',
-    title: 'Website & email privacy — Jackalope',
+    title: 'Privacy policy — Jackalope',
     description:
-      'How the Jackalope marketing website and optional email waitlist handle the information you provide.',
+      'How Jackalope handles website, early-access, desktop, feedback, and optional usage information.',
+  },
+  {
+    path: '/terms/',
+    title: 'Terms of service — Jackalope',
+    description:
+      'Terms for Jackalope’s website and hosted early-access service, with desktop open-source license information.',
   },
   {
     path: '/access/',
