@@ -366,6 +366,14 @@ pub fn knowledge_search(
         return Ok(vec![]);
     }
     let mut runs = state.integration_runs()?;
+    // Include recently archived history so retention does not hide older results.
+    let loaded: HashSet<String> = runs.iter().map(|r| r.id.clone()).collect();
+    runs.extend(
+        state
+            .archived_full(200)
+            .into_iter()
+            .filter(|r| !loaded.contains(&r.id)),
+    );
     runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
     Ok(runs
         .into_iter()

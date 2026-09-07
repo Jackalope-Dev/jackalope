@@ -132,6 +132,22 @@ pub struct CoordinationContext {
     pub instructions: String,
 }
 
+/// Lightweight summary of a run that retention moved out of the loaded history
+/// into the `archive/` folder. Enough to recognise and restore it; the full
+/// record stays on disk until restored.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedRun {
+    pub id: String,
+    pub task_id: String,
+    pub project_name: String,
+    pub agent: String,
+    pub prompt: String,
+    pub status: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Runner {

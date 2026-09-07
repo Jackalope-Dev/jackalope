@@ -88,7 +88,6 @@
 .echo-art {
   width: 295px;
   height: 280px;
-  position: relative;
   color: inherit;
 }
 .echo-art svg {
@@ -1317,24 +1316,5 @@
   .branch-tracks > div,
   .example-patch {
     animation: none;
-  }
-}
-
-.echo-toggle {
-  position: absolute;
-  right: -35px;
-  bottom: 5px;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  color: inherit;
-  background: transparent;
-}
-@media (prefers-reduced-motion: reduce) {
-  .echo-toggle {
-    display: none;
   }
 }

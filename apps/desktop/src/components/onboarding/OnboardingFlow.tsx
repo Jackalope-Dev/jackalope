@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Check, FolderOpen, RefreshCw } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -8,7 +8,6 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { AgentManager } from '../agents/AgentManager';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
@@ -16,6 +15,10 @@ import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import './onboarding.css';
+
+const AgentManager = lazy(() =>
+  import('../agents/AgentManager').then((m) => ({ default: m.AgentManager })),
+);
 
 const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
@@ -258,7 +261,9 @@ export function OnboardingFlow({
               )}
               <details className="onboarding-advanced">
                 <summary>Agent commands, models & manual setup</summary>
-                <AgentManager />
+                <Suspense fallback={<p className="task-muted">Loading agent setup…</p>}>
+                  <AgentManager />
+                </Suspense>
               </details>
               <Button
                 variant="ghost"

@@ -1,17 +1,7 @@
 import { EchoMark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Tabs from '@radix-ui/react-tabs';
-import {
-  ArrowDown,
-  ArrowRight,
-  Check,
-  GitBranch,
-  Moon,
-  Pause,
-  Play,
-  Plus,
-  Sun,
-} from 'lucide-react';
+import { ArrowDown, ArrowRight, Check, GitBranch, Moon, Play, Plus, Sun } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
@@ -19,23 +9,15 @@ import { BrandMark } from './BrandMark';
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
-  const [paused, setPaused] = useState(false);
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
     if (root.current) observer.observe(root.current);
     return () => observer.disconnect();
   }, []);
+  // The loop also stops for prefers-reduced-motion, handled in echo.css.
   return (
     <div ref={root} className="echo-art">
-      <EchoMark animated={visible && !paused} />
-      <button
-        type="button"
-        className="echo-toggle"
-        onClick={() => setPaused(!paused)}
-        aria-label={paused ? 'Play logo animation' : 'Pause logo animation'}
-      >
-        {paused ? <Play size={15} /> : <Pause size={15} />}
-      </button>
+      <EchoMark animated={visible} />
     </div>
   );
 }

@@ -315,6 +315,49 @@ pub async fn task_screenshot(
 }
 
 #[tauri::command]
+pub async fn task_archived_runs(state: State<'_, TaskRuntime>) -> Result<Vec<ArchivedRun>, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || runtime.archived_runs())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn task_restore_archived(
+    id: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<(), String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || runtime.restore_archived(&id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn task_import_recovery(
+    app: AppHandle,
+    state: State<'_, TaskRuntime>,
+) -> Result<Option<String>, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(file) = app
+            .dialog()
+            .file()
+            .set_title("Restore a task recovery copy")
+            .add_filter("Task recovery", &["json"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        let bytes = crate::commands::history::read_bounded(&path, 8_000_000)?;
+        runtime.import_recovery(&bytes).map(Some)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn task_runs(state: State<'_, TaskRuntime>, detail_id: Option<String>) -> Vec<TaskRun> {
     let mut runs: Vec<_> = state.inner.lock().unwrap().runs.values().cloned().collect();
     runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));

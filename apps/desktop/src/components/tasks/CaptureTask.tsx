@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt } from '../../lib/skills/context-assembler';
@@ -20,7 +20,10 @@ import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ProjectSetup } from './ProjectSetup';
 import { TaskComposer } from './TaskComposer';
-import { TaskTools } from './TaskTools';
+
+// The tools panel pulls in the agent, connection and project editors; load it
+// only when the user opens it.
+const TaskTools = lazy(() => import('./TaskTools').then((m) => ({ default: m.TaskTools })));
 
 export function CaptureTask({
   ideaId,
@@ -377,14 +380,16 @@ export function CaptureTask({
             </details>
           )}
           {toolsOpen && (
-            <TaskTools
-              onClose={() => {
-                setToolsOpen(false);
-                setLoadedProject(null);
-                setToolRevision((n) => n + 1);
-                if (desktop) void discover();
-              }}
-            />
+            <Suspense fallback={null}>
+              <TaskTools
+                onClose={() => {
+                  setToolsOpen(false);
+                  setLoadedProject(null);
+                  setToolRevision((n) => n + 1);
+                  if (desktop) void discover();
+                }}
+              />
+            </Suspense>
           )}
           {project && !runner?.available && (
             <div className="task-notice mt-4">

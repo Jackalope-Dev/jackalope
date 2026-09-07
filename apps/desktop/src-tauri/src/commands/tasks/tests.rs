@@ -742,3 +742,101 @@ fn old_task_records_do_not_opt_into_automatic_execution() {
     assert!(!saved.finishing);
     assert!(saved.verification_error.is_none());
 }
+
+#[test]
+fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
+    let folder = std::env::temp_dir().join(format!("jackalope-retention-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    for status in ["review", "failed", "interrupted"] {
+        let mut run = sample("codex");
+        run.id = format!("keep-{status}");
+        run.status = status.into();
+        runtime.save(&run).unwrap();
+    }
+    for i in 0..205 {
+        let mut run = sample("codex");
+        run.id = format!("reviewed-{i:04}");
+        run.status = "reviewed".into();
+        run.started_at = format!("2026-01-01T00:{:02}:{:02}Z", i / 60, i % 60);
+        run.ended_at = Some(run.started_at.clone());
+        runtime.save(&run).unwrap();
+    }
+    drop(runtime);
+
+    let restarted = TaskRuntime::new(folder.clone()).unwrap();
+    let loaded = restarted.integration_runs().unwrap();
+    assert_eq!(
+        loaded.iter().filter(|r| r.status == "reviewed").count(),
+        200
+    );
+    assert!(loaded.iter().any(|r| r.id == "reviewed-0204"));
+    assert!(!loaded.iter().any(|r| r.id == "reviewed-0000"));
+    for status in ["review", "failed", "interrupted"] {
+        assert!(
+            loaded.iter().any(|r| r.status == status),
+            "{status} retained"
+        );
+    }
+
+    let archived = restarted.archived_runs();
+    assert_eq!(archived.len(), 5);
+    assert!(archived.iter().any(|r| r.id == "reviewed-0000"));
+    assert!(folder.join("archive/reviewed-0000.json").exists());
+    assert!(!folder.join("reviewed-0000.json").exists());
+
+    restarted.restore_archived("reviewed-0000").unwrap();
+    assert!(restarted
+        .integration_runs()
+        .unwrap()
+        .iter()
+        .any(|r| r.id == "reviewed-0000"));
+    assert!(!folder.join("archive/reviewed-0000.json").exists());
+    assert!(folder.join("reviewed-0000.json").exists());
+    assert!(
+        restarted.restore_archived("reviewed-0000").is_err(),
+        "a loaded task cannot be restored again"
+    );
+    assert!(restarted.restore_archived("../escape").is_err());
+
+    drop(restarted);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+fn recovery_exports_import_once_and_never_shadow_a_present_task() {
+    let folder = std::env::temp_dir().join(format!("jackalope-import-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let mut run = sample("codex");
+    run.id = "imported-attempt-01".into();
+    run.status = "review".into();
+    run.result = "recovered output".into();
+    let envelope = serde_json::json!({
+        "format": "jackalope-task-recovery", "version": 1,
+        "exportedAt": Utc::now().to_rfc3339(), "task": run,
+    });
+    let bytes = serde_json::to_vec(&envelope).unwrap();
+
+    let id = runtime.import_recovery(&bytes).unwrap();
+    assert_eq!(id, "imported-attempt-01");
+    assert_eq!(
+        runtime
+            .integration_runs()
+            .unwrap()
+            .iter()
+            .find(|r| r.id == id)
+            .unwrap()
+            .result,
+        "recovered output"
+    );
+    assert!(
+        runtime.import_recovery(&bytes).is_err(),
+        "a present task cannot be imported over"
+    );
+    assert!(runtime.import_recovery(b"{}").is_err());
+    assert!(runtime
+        .import_recovery(br#"{"format":"other","task":{}}"#)
+        .is_err());
+
+    drop(runtime);
+    std::fs::remove_dir_all(folder).unwrap();
+}

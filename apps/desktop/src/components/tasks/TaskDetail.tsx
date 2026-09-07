@@ -17,11 +17,13 @@ import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
 import { TaskIntegration } from './TaskIntegration';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
-import { TaskTools } from './TaskTools';
 import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
 
 const Markdown = lazy(() => import('react-markdown'));
+// The tools panel pulls in the agent, connection and project editors; load it
+// only when the user opens it.
+const TaskTools = lazy(() => import('./TaskTools').then((m) => ({ default: m.TaskTools })));
 
 export function TaskDetail({
   run,
@@ -578,20 +580,22 @@ export function TaskDetail({
         </details>
       )}
       {toolsOpen && (
-        <TaskTools
-          onClose={() => {
-            setToolsOpen(false);
-            void listMcpServers(run.projectId)
-              .then((servers) =>
-                setConnections(
-                  servers.filter(
-                    (s) => s.enabled !== false && s.scope === `project:${run.projectId}`,
+        <Suspense fallback={null}>
+          <TaskTools
+            onClose={() => {
+              setToolsOpen(false);
+              void listMcpServers(run.projectId)
+                .then((servers) =>
+                  setConnections(
+                    servers.filter(
+                      (s) => s.enabled !== false && s.scope === `project:${run.projectId}`,
+                    ),
                   ),
-                ),
-              )
-              .catch((cause) => setError(String(cause)));
-          }}
-        />
+                )
+                .catch((cause) => setError(String(cause)));
+            }}
+          />
+        </Suspense>
       )}
       {notice && (
         <p role="status" className="task-muted">

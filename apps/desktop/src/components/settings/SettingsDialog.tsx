@@ -17,6 +17,7 @@ import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { ArchivedHistory } from './ArchivedHistory';
 import { PrivacySettings } from './PrivacySettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { Setting } from './Setting';
@@ -337,6 +338,7 @@ export function SettingsDialog({
                       <Button variant="outline" onClick={() => void exportConfig()}>
                         Copy preferences to clipboard
                       </Button>
+                      <ArchivedHistory />
                       <div className="settings-reset-box mt-6">
                         <h3 className="text-base font-semibold">Reset Jackalope</h3>
                         <p className="settings-row-description mt-3">

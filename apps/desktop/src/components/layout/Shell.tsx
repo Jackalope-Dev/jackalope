@@ -5,35 +5,57 @@ import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { AgentManager } from '../agents/AgentManager';
-import { BrowserHarness } from '../browser/BrowserHarness';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
-import { McpWorkspace } from '../mcp/McpWorkspace';
-import { ProjectPreferences } from '../projects/ProjectPreferences';
-import { WorktreeManager } from '../projects/WorktreeManager';
-import { ScheduleManager } from '../schedules/ScheduleManager';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
-import { SettingsDialog } from '../settings/SettingsDialog';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
 import { ProjectSetup } from '../tasks/ProjectSetup';
-import { RunnerConnections } from '../tasks/RunnerConnections';
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
-import { UsageDashboard } from '../tasks/UsageDashboard';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { CodebaseMap } from '../visualizer/CodebaseMap';
-import { CommandPalette } from './CommandPalette';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
 
 export type { ActiveTab } from './navigation';
 
-const RepoTodos = lazy(() =>
-  import('../tasks/RepoTodos').then((module) => ({ default: module.RepoTodos })),
+// Workspace views and heavy dialogs load on demand so the first paint ships only
+// the task workspace. Each stays in its own chunk keyed by the tab that shows it.
+const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default: m.RepoTodos })));
+const CodebaseMap = lazy(() =>
+  import('../visualizer/CodebaseMap').then((m) => ({ default: m.CodebaseMap })),
+);
+const ScheduleManager = lazy(() =>
+  import('../schedules/ScheduleManager').then((m) => ({ default: m.ScheduleManager })),
+);
+const BrowserHarness = lazy(() =>
+  import('../browser/BrowserHarness').then((m) => ({ default: m.BrowserHarness })),
+);
+const UsageDashboard = lazy(() =>
+  import('../tasks/UsageDashboard').then((m) => ({ default: m.UsageDashboard })),
+);
+const WorktreeManager = lazy(() =>
+  import('../projects/WorktreeManager').then((m) => ({ default: m.WorktreeManager })),
+);
+const RunnerConnections = lazy(() =>
+  import('../tasks/RunnerConnections').then((m) => ({ default: m.RunnerConnections })),
+);
+const AgentManager = lazy(() =>
+  import('../agents/AgentManager').then((m) => ({ default: m.AgentManager })),
+);
+const McpWorkspace = lazy(() =>
+  import('../mcp/McpWorkspace').then((m) => ({ default: m.McpWorkspace })),
+);
+const ProjectPreferences = lazy(() =>
+  import('../projects/ProjectPreferences').then((m) => ({ default: m.ProjectPreferences })),
+);
+const SettingsDialog = lazy(() =>
+  import('../settings/SettingsDialog').then((m) => ({ default: m.SettingsDialog })),
+);
+const CommandPalette = lazy(() =>
+  import('./CommandPalette').then((m) => ({ default: m.CommandPalette })),
 );
 
 export function Shell({
@@ -75,6 +97,16 @@ export function Shell({
     if (settingsOpen) telemetry.track({ name: 'feature_used', feature: 'settings' });
   }, [settingsOpen]);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  // Keep the settings and command-palette chunks out of first paint; mount each
+  // once it has been opened and leave it mounted so close transitions still run.
+  const [settingsSeen, setSettingsSeen] = useState(false);
+  const [commandsSeen, setCommandsSeen] = useState(false);
+  useEffect(() => {
+    if (settingsOpen) setSettingsSeen(true);
+  }, [settingsOpen]);
+  useEffect(() => {
+    if (commandsOpen) setCommandsSeen(true);
+  }, [commandsOpen]);
   const [capture, setCapture] = useState<{
     ideaId?: string;
     agent?: string;
@@ -233,7 +265,12 @@ export function Shell({
               </button>
             </Menu.Trigger>
             <Menu.Portal>
-              <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+              <Menu.Content
+                className="workspace-menu"
+                align="end"
+                sideOffset={8}
+                collisionPadding={12}
+              >
                 {WORKSPACE_VIEWS.filter((item) => ['agents', 'mcps'].includes(item.id)).map(
                   (item) => (
                     <Menu.Item
@@ -283,78 +320,78 @@ export function Shell({
             </nav>
           </div>
         )}
-        {activeTab === 'kanban' && (
-          <TaskWorkspace
-            onCapture={(ideaId) => setCapture({ ideaId })}
-            onSchedule={(id) => {
-              const run = useExecutionStore.getState().runs.find((r) => r.id === id);
-              if (run) selectProject(run.projectId);
-              setScheduleRunId(id);
-              setActiveTab('schedules');
-            }}
-          />
-        )}
-        {activeTab === 'worktrees' && (
-          <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
-        )}
-        {activeTab === 'repo-todos' && (
-          <Suspense
-            fallback={
-              <p className="workspace-page" role="status">
-                Opening repository TODOs…
-              </p>
-            }
-          >
+        <Suspense
+          fallback={
+            <p className="workspace-page" role="status">
+              Opening {view.label}…
+            </p>
+          }
+        >
+          {activeTab === 'kanban' && (
+            <TaskWorkspace
+              onCapture={(ideaId) => setCapture({ ideaId })}
+              onSchedule={(id) => {
+                const run = useExecutionStore.getState().runs.find((r) => r.id === id);
+                if (run) selectProject(run.projectId);
+                setScheduleRunId(id);
+                setActiveTab('schedules');
+              }}
+            />
+          )}
+          {activeTab === 'worktrees' && (
+            <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
+          )}
+          {activeTab === 'repo-todos' && (
             <RepoTodos
               key={project?.path ?? activeProjectId}
               onOpenProject={() => setSetupOpen(true)}
             />
-          </Suspense>
-        )}
-        {activeTab === 'agents' && (
-          <RunnerConnections
-            onNewTask={(agent) => {
-              useExecutionStore.getState().select(null);
-              setCapture({ agent });
-              setActiveTab('kanban');
-            }}
-            onRun={(run) => {
-              selectProject(run.projectId);
-              useExecutionStore.getState().select(run.id);
-              setActiveTab('kanban');
-            }}
-          />
-        )}
-        {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
-        {activeTab === 'agent-settings' && (
-          <section className="workspace-page">
-            <AgentManager />
-          </section>
-        )}
-        {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
-        {activeTab === 'mcps' && <McpWorkspace />}
-        {activeTab === 'schedules' && (
-          <ScheduleManager
-            key={activeProjectId}
-            sourceRunId={scheduleRunId}
-            onSourceHandled={() => setScheduleRunId(undefined)}
-            onOpenProject={() => setSetupOpen(true)}
-            onPlanning={() => {
-              useExecutionStore.getState().select(null);
-              setActiveTab('kanban');
-            }}
-          />
-        )}
-        {activeTab === 'browser' && (
-          <BrowserHarness
-            onOpenProject={() => setSetupOpen(true)}
-            onTask={(id) => {
-              useExecutionStore.getState().select(id);
-              setActiveTab('kanban');
-            }}
-          />
-        )}
-        {activeTab === 'topology' && <CodebaseMap onOpenProject={() => setSetupOpen(true)} />}
+          )}
+          {activeTab === 'agents' && (
+            <RunnerConnections
+              onNewTask={(agent) => {
+                useExecutionStore.getState().select(null);
+                setCapture({ agent });
+                setActiveTab('kanban');
+              }}
+              onRun={(run) => {
+                selectProject(run.projectId);
+                useExecutionStore.getState().select(run.id);
+                setActiveTab('kanban');
+              }}
+            />
+          )}
+          {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
+          {activeTab === 'agent-settings' && (
+            <section className="workspace-page">
+              <AgentManager />
+            </section>
+          )}
+          {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
+          {activeTab === 'mcps' && <McpWorkspace />}
+          {activeTab === 'schedules' && (
+            <ScheduleManager
+              key={activeProjectId}
+              sourceRunId={scheduleRunId}
+              onSourceHandled={() => setScheduleRunId(undefined)}
+              onOpenProject={() => setSetupOpen(true)}
+              onPlanning={() => {
+                useExecutionStore.getState().select(null);
+                setActiveTab('kanban');
+              }}
+            />
+          )}
+          {activeTab === 'browser' && (
+            <BrowserHarness
+              onOpenProject={() => setSetupOpen(true)}
+              onTask={(id) => {
+                useExecutionStore.getState().select(id);
+                setActiveTab('kanban');
+              }}
+            />
+          )}
+          {activeTab === 'topology' && <CodebaseMap onOpenProject={() => setSetupOpen(true)} />}
+        </Suspense>
       </main>
       {capture && (
         <CaptureTask
@@ -380,19 +417,25 @@ export function Shell({
         }}
       />
       <ProjectSetup open={setupOpen} onClose={() => setSetupOpen(false)} />
-      <CommandPalette
-        isOpen={commandsOpen}
-        onClose={() => setCommandsOpen(false)}
-        onNavigate={navigate}
-        onCapture={() => setCapture({})}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
-      <SettingsDialog
-        key={settingsCategory + String(settingsOpen)}
-        initialCategory={settingsCategory}
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      <Suspense fallback={null}>
+        {commandsSeen && (
+          <CommandPalette
+            isOpen={commandsOpen}
+            onClose={() => setCommandsOpen(false)}
+            onNavigate={navigate}
+            onCapture={() => setCapture({})}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        )}
+        {settingsSeen && (
+          <SettingsDialog
+            key={settingsCategory + String(settingsOpen)}
+            initialCategory={settingsCategory}
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

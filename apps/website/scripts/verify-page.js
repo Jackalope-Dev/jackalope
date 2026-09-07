@@ -136,12 +136,10 @@ async function _verifyPage(page) {
     (before) => getComputedStyle(document.querySelector('.brand-echo-line')).transform !== before,
     transform,
   );
-  await page.getByRole('button', { name: 'Pause logo animation', exact: true }).click();
   assert(
-    await line.evaluate((el) => getComputedStyle(el).animationPlayState === 'paused'),
-    'Pause looping logo',
+    (await page.locator('.echo-art button').count()) === 0,
+    'No manual logo animation control',
   );
-  await page.getByRole('button', { name: 'Play logo animation', exact: true }).click();
   await page.locator('#features').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
   await page.waitForFunction(
     () => document.querySelector('.echo-art .brand-echo').dataset.animated === 'false',

@@ -1,5 +1,11 @@
 use super::*;
 
+/// Most recent reviewed runs kept in the loaded history. Older reviewed runs are
+/// moved to `archive/` on startup: still on disk and restorable, but out of the
+/// in-memory set that every poll serialises. Active, review-ready, failed,
+/// interrupted and unsaved runs are never archived.
+const RETAINED_REVIEWED: usize = 200;
+
 impl TaskRuntime {
     pub fn new(directory: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
@@ -105,6 +111,7 @@ impl TaskRuntime {
                 }
             }
         }
+        runtime.archive_old_reviewed();
         runtime
             .inner
             .lock()
@@ -112,6 +119,155 @@ impl TaskRuntime {
             .recovery
             .sort_by(|a, b| a.path.cmp(&b.path));
         Ok(runtime)
+    }
+
+    fn archive_directory(&self) -> PathBuf {
+        self.directory.join("archive")
+    }
+
+    fn recency_key(run: &TaskRun) -> &str {
+        run.ended_at.as_deref().unwrap_or(run.started_at.as_str())
+    }
+
+    /// Move reviewed runs beyond [`RETAINED_REVIEWED`] into `archive/`, newest
+    /// kept. A move that fails leaves the run loaded rather than losing it.
+    fn archive_old_reviewed(&self) {
+        let stale: Vec<String> = {
+            let inner = self.inner.lock().unwrap();
+            let mut reviewed: Vec<&TaskRun> = inner
+                .runs
+                .values()
+                .filter(|run| run.status == "reviewed" && run.persistence_error.is_none())
+                .collect();
+            reviewed.sort_by(|a, b| Self::recency_key(b).cmp(Self::recency_key(a)));
+            reviewed
+                .into_iter()
+                .skip(RETAINED_REVIEWED)
+                .map(|run| run.id.clone())
+                .collect()
+        };
+        if stale.is_empty() {
+            return;
+        }
+        let archive = self.archive_directory();
+        if std::fs::create_dir_all(&archive).is_err() {
+            return;
+        }
+        for id in stale {
+            let from = self.directory.join(format!("{id}.json"));
+            if std::fs::rename(&from, archive.join(format!("{id}.json"))).is_ok() {
+                self.inner.lock().unwrap().runs.remove(&id);
+            }
+        }
+    }
+
+    /// Parse the newest `limit` archived records by modification time.
+    pub(in crate::commands) fn archived_full(&self, limit: usize) -> Vec<TaskRun> {
+        let Ok(entries) = std::fs::read_dir(self.archive_directory()) else {
+            return vec![];
+        };
+        let mut files: Vec<(PathBuf, std::time::SystemTime)> = entries
+            .flatten()
+            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+            .filter_map(|entry| Some((entry.path(), entry.metadata().ok()?.modified().ok()?)))
+            .collect();
+        files.sort_by(|a, b| b.1.cmp(&a.1));
+        files.truncate(limit);
+        files
+            .into_iter()
+            .filter_map(|(path, _)| {
+                let bytes = crate::commands::history::read_bounded(&path, 8_000_000).ok()?;
+                let run = serde_json::from_slice::<TaskRun>(&bytes).ok()?;
+                (path.file_stem().and_then(|stem| stem.to_str()) == Some(run.id.as_str()))
+                    .then_some(run)
+            })
+            .collect()
+    }
+
+    pub(in crate::commands) fn archived_runs(&self) -> Vec<ArchivedRun> {
+        let mut runs: Vec<ArchivedRun> = self
+            .archived_full(500)
+            .into_iter()
+            .map(|run| ArchivedRun {
+                id: run.id,
+                task_id: run.task_id,
+                project_name: run.project_name,
+                agent: run.agent,
+                prompt: run.prompt.chars().take(200).collect(),
+                status: run.status,
+                started_at: run.started_at,
+                ended_at: run.ended_at,
+            })
+            .collect();
+        runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        runs
+    }
+
+    pub(in crate::commands) fn restore_archived(&self, id: &str) -> Result<(), String> {
+        if !valid_id(id) {
+            return Err("Invalid task identifier".into());
+        }
+        if self.inner.lock().unwrap().runs.contains_key(id) {
+            return Err("This task is already in your loaded history.".into());
+        }
+        let live = self.directory.join(format!("{id}.json"));
+        if live.exists() {
+            return Err("A loaded history file with this identifier already exists.".into());
+        }
+        let archived = self.archive_directory().join(format!("{id}.json"));
+        let bytes = crate::commands::history::read_bounded(&archived, 8_000_000)?;
+        let mut run = serde_json::from_slice::<TaskRun>(&bytes).map_err(|e| e.to_string())?;
+        if run.id != id {
+            return Err("Archived record identifier does not match its filename.".into());
+        }
+        run.persistence_error = None;
+        std::fs::rename(&archived, &live).map_err(|e| e.to_string())?;
+        self.inner.lock().unwrap().runs.insert(run.id.clone(), run);
+        Ok(())
+    }
+
+    /// Load a `jackalope-task-recovery` export back into history. Refuses to
+    /// shadow a task that is still present or running.
+    pub(in crate::commands) fn import_recovery(&self, bytes: &[u8]) -> Result<String, String> {
+        let envelope: Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+        if envelope.get("format").and_then(Value::as_str) != Some("jackalope-task-recovery") {
+            return Err("This file is not a Jackalope task recovery export.".into());
+        }
+        let task = envelope
+            .get("task")
+            .cloned()
+            .ok_or("The export contains no task record.")?;
+        let mut run = serde_json::from_value::<TaskRun>(task)
+            .map_err(|e| format!("The task record could not be read: {e}"))?;
+        if !valid_id(&run.id) {
+            return Err("The task record has an invalid identifier.".into());
+        }
+        if let Some(existing) = self.inner.lock().unwrap().runs.get(&run.id) {
+            return Err(
+                if ["starting", "running", "stopping"].contains(&existing.status.as_str()) {
+                    "A running task already uses this identifier."
+                } else {
+                    "This task is already in your history."
+                }
+                .into(),
+            );
+        }
+        if self.directory.join(format!("{}.json", run.id)).exists() {
+            return Err("A history file with this identifier already exists.".into());
+        }
+        run.persistence_error = None;
+        if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            run.status = "interrupted".into();
+            run.error.get_or_insert_with(|| {
+                "Restored from a recovery copy of an unfinished attempt; it was not rerun.".into()
+            });
+            run.ended_at.get_or_insert_with(|| Utc::now().to_rfc3339());
+        }
+        self.save(&run)?;
+        let id = run.id.clone();
+        let _ = std::fs::remove_file(self.archive_directory().join(format!("{id}.json")));
+        self.inner.lock().unwrap().runs.insert(id.clone(), run);
+        Ok(id)
     }
 
     pub(super) fn save(&self, run: &TaskRun) -> Result<(), String> {

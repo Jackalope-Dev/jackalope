@@ -84,6 +84,16 @@ export interface TaskRun {
   validationSteps?: ValidationStep[];
   screenshots?: ScreenshotArtifact[];
 }
+export interface ArchivedRun {
+  id: string;
+  taskId: string;
+  projectName: string;
+  agent: string;
+  prompt: string;
+  status: TaskRun['status'];
+  startedAt: string;
+  endedAt: string | null;
+}
 export interface PendingUserPrompt {
   id: string;
   runId: string;

@@ -1,13 +1,16 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, FolderOpen, X } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { AgentManager } from '../agents/AgentManager';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
+
+const AgentManager = lazy(() =>
+  import('../agents/AgentManager').then((m) => ({ default: m.AgentManager })),
+);
 
 export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialogFocus = useDialogFocus();
@@ -69,7 +72,9 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
           <details className="mb-5">
             <summary className="task-summary">Set up agents & models</summary>
             <div className="mt-4">
-              <AgentManager />
+              <Suspense fallback={<p className="task-muted">Loading agent setup…</p>}>
+                <AgentManager />
+              </Suspense>
             </div>
           </details>
           <form
