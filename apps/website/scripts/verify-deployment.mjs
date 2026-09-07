@@ -9,6 +9,7 @@ const pages = [
   '/privacy/',
   '/blog/room-for-the-work/',
   '/blog/from-brief-to-review/',
+  '/blog/work-and-personal-accounts/',
 ];
 
 for (const path of pages) {
@@ -44,5 +45,5 @@ const missing = await fetch(new URL('/deployment-check-missing-page', origin));
 assert.equal(missing.status, 404);
 assert.match(await missing.text(), /noindex/);
 console.log(
-  'Verified seven prerendered routes, discovery assets, canonical redirect, headers and real 404.',
+  `Verified ${pages.length} prerendered routes, discovery assets, canonical redirect, headers and real 404.`,
 );

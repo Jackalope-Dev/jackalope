@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ArrowDownToLine,
   ArrowRight,
+  BriefcaseBusiness,
   Check,
   Code2,
   GitBranch,
@@ -16,6 +17,7 @@ import {
   Moon,
   Play,
   Plus,
+  Sprout,
   Sun,
   X,
 } from 'lucide-react';
@@ -143,6 +145,14 @@ const faqs = [
   [
     'Can agents work on different tasks at once?',
     'Yes. Parallel tasks can use isolated Git worktrees, with scopes and dependencies to coordinate the work. You can inspect the proposed changes and checks before explicitly applying an integration.',
+  ],
+  [
+    'Can I keep work and personal accounts separate?',
+    'Yes. Create separate sign-in profiles for supported agents such as Codex and Claude Code, then choose an account and allowed agents for each project. Task continuations keep their original account. Profiles organize sign-ins and project context; they are not a security sandbox. Provider settings, connected tools, and local file permissions still apply.',
+  ],
+  [
+    'What can I see across my accounts?',
+    'Follow task progress and review changes in one workspace. In Usage, filter Jackalope attempts by project and account, inspect reported token usage, and export the selected records. Missing reports remain unavailable; this is not a complete provider billing history or a record of work done outside Jackalope.',
   ],
   [
     'Which operating systems can I use?',
@@ -410,6 +420,85 @@ export function App({ path = '/' }: { path?: string }) {
                 </Tabs.Content>
               ))}
             </Tabs.Root>
+          </section>
+
+          <section
+            id="accounts"
+            className="accounts-section section-space page-width"
+            aria-labelledby="accounts-title"
+          >
+            <Reveal className="accounts-intro">
+              <h2 id="accounts-title">
+                Work and personal.
+                <br />
+                Each in its own context.
+              </h2>
+              <p>
+                Bring your accounts into one workspace. Give each project its own agent choices,
+                sign-in profile, and instructions — then follow the work without juggling windows.
+              </p>
+            </Reveal>
+            <Reveal className="accounts-example">
+              <div className="accounts-lanes">
+                {[
+                  { name: 'Work', project: 'Client project', icon: BriefcaseBusiness },
+                  { name: 'Personal', project: 'Side project', icon: Sprout },
+                ].map(({ name, project, icon: Icon }) => (
+                  <div className="account-lane" key={name}>
+                    <div className="account-lane-heading">
+                      <Icon size={20} aria-hidden="true" />
+                      <h3>{name}</h3>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>Project</dt>
+                        <dd>{project}</dd>
+                      </div>
+                      <div>
+                        <dt>Agent account</dt>
+                        <dd>Codex · {name}</dd>
+                      </div>
+                      <div>
+                        <dt>Context</dt>
+                        <dd>Project instructions & selected tools</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+              <p className="accounts-shared">
+                <Layers3 size={18} aria-hidden="true" />
+                One place to follow tasks, review changes, and inspect usage.
+              </p>
+              <p className="capture-note">
+                Example organization · separate sign-in profiles for the same agent
+              </p>
+            </Reveal>
+            <Reveal className="accounts-benefits">
+              <div>
+                <h3>The right account, remembered.</h3>
+                <p>
+                  Set an account per project. Continuing a task keeps the account it started with.
+                </p>
+              </div>
+              <div>
+                <h3>Context you can choose.</h3>
+                <p>
+                  Choose which agents a project can use, add its instructions, and select task
+                  tools.
+                </p>
+              </div>
+              <div>
+                <h3>A clear view of the work.</h3>
+                <p>
+                  Filter reported usage by project and account. Inspect attempts, export records,
+                  and review what changed.
+                </p>
+              </div>
+            </Reveal>
+            <a className="text-link" href="/blog/work-and-personal-accounts/">
+              See how to set up your accounts <ArrowRight size={17} />
+            </a>
           </section>
 
           <section className="control-section section-space" aria-labelledby="control-title">

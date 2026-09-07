@@ -642,6 +642,7 @@ mod tests {
             let plans = root.join("plans");
             fs::create_dir_all(&project).unwrap();
             git(&project, &["init", "--initial-branch=master"]).unwrap();
+            git(&project, &["config", "core.autocrlf", "false"]).unwrap();
             git(&project, &["config", "user.name", "Integration Test"]).unwrap();
             git(
                 &project,

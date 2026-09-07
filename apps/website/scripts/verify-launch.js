@@ -20,6 +20,7 @@ async function _verifyLaunch(page) {
     '/privacy/',
     '/blog/room-for-the-work/',
     '/blog/from-brief-to-review/',
+    '/blog/work-and-personal-accounts/',
   ];
   for (const path of paths) {
     const response = await page.goto(origin + path);

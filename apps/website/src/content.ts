@@ -12,6 +12,53 @@ export const tour = {
 
 export const posts = [
   {
+    slug: 'work-and-personal-accounts',
+    title: 'Work and personal accounts, with room for both.',
+    category: 'Working with agents',
+    date: '2026-09-06',
+    readingTime: '3 min read',
+    description:
+      'Set up separate agent sign-ins, choose accounts for each project, and inspect task usage together in Jackalope.',
+    sections: [
+      {
+        title: 'One workspace, deliberate account choices.',
+        paragraphs: [
+          'A client repository and a weekend project can call for different accounts, instructions, and tools. Jackalope brings their tasks into one workspace while giving you explicit choices about which agent and account each project uses.',
+          'Separate account profiles are implemented for the built-in Codex, Claude Code, and Grok adapters. Custom agents without a supported profile mechanism do not get this capability. Windows release acceptance, including real multiple-account provider lifecycle trials, is still in progress.',
+        ],
+      },
+      {
+        title: '01. Give each sign-in a name.',
+        paragraphs: [
+          'In Agents → Configuration, expand Accounts for your agent. Add profiles with useful names such as Work and Personal, then use Sign in for each one. The agent opens its own sign-in flow with a separate profile directory; you do not paste provider passwords into Jackalope.',
+          'The active account supplies the default for projects that inherit it. You can also return to the normal CLI sign-in. These labels are yours to manage; a profile name is not proof of the provider identity signed in there.',
+        ],
+      },
+      {
+        title: '02. Set the project’s account and context.',
+        paragraphs: [
+          'Open Project → Context. Choose the default task agent, restrict which agents are available for that project, and select an account for each supported agent. Pin Work for your client project and Personal for your own project instead of leaving both on “Whichever account is active.”',
+          'Add the project instructions and review the context included with a new task. Select the tools the task needs. Project-selected connections are additional to the agent’s existing configuration, so review any inherited provider or CLI-global tools too.',
+        ],
+      },
+      {
+        title: '03. Follow the work across accounts.',
+        paragraphs: [
+          'Jackalope records the account profile used for an attempt. Continuing that task retains the original profile even if you change the active account later. To work under another account, start a new task rather than moving an existing conversation between identities.',
+          'Use Tasks to follow progress, answer questions, and inspect changes. Parallel plans coordinate agent work in separate Git worktrees, with scopes and dependencies; review and integration remain explicit decisions.',
+          'In Usage, filter by account, project, and period, then inspect or export the selected attempts. Token totals use reported usage from Jackalope tasks. Missing reports stay unavailable, and activity outside Jackalope is not a complete part of this view.',
+        ],
+      },
+      {
+        title: 'Know what the separation means.',
+        paragraphs: [
+          'Profiles separate supported agents’ sign-in and configuration directories. Project settings organize instructions and agent choices. They do not create separate operating-system users or prevent an agent with local permissions from reading other files.',
+          'Provider accounts, subscriptions, data policies, and connected tools still apply. Follow your organization’s requirements for repositories and credentials. Jackalope makes the choices easier to manage and inspect; it does not promise complete data isolation or a replacement for provider billing.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'room-for-the-work',
     title: 'A little more room for the work.',
     category: 'From the studio',
@@ -128,7 +175,7 @@ export const pages = [
     path: '/',
     title: 'Jackalope — A desktop workspace for coding agents',
     description:
-      'A calmer desktop home for your coding agents, tasks, Git worktrees, and review. Join the Windows waitlist for Jackalope by Jackalope Digital LLC.',
+      'Manage coding agents, work and personal account profiles, project context, tasks, and reported usage in one desktop workspace. Join the Windows waitlist.',
   },
   {
     path: '/tour/',
