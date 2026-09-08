@@ -43,8 +43,8 @@ async function _verifyPage(page) {
       ['Find a stubborn bug', 'Investigate lost drafts', 'TaskComposer.tsx'],
       ['Explore a new direction', 'Explore navigation', 'Navigation.tsx'],
     ]) {
-      await page.getByRole('tab', { name: label, exact: true }).click();
-      const panel = page.getByRole('tabpanel', { name: label, exact: true });
+      await page.getByRole('tab', { name: label }).click();
+      const panel = page.getByRole('tabpanel', { name: label });
       await panel.getByText(task, { exact: true }).waitFor();
       await panel.getByText(file, { exact: false }).waitFor();
       assert(
@@ -58,9 +58,9 @@ async function _verifyPage(page) {
   await page.getByRole('tabpanel', { name: 'Changes & review' }).waitFor();
   await page.keyboard.press('ArrowRight');
   await page.getByRole('tabpanel', { name: 'Agents & accounts' }).waitFor();
-  await page.getByRole('tab', { name: 'Build a feature', exact: true }).focus();
+  await page.getByRole('tab', { name: 'Build a feature' }).focus();
   await page.keyboard.press('ArrowRight');
-  await page.getByRole('tabpanel', { name: 'Find a stubborn bug', exact: true }).waitFor();
+  await page.getByRole('tabpanel', { name: 'Find a stubborn bug' }).waitFor();
   await page.getByRole('button', { name: 'Electric Indigo', exact: true }).click();
   await page.getByRole('button', { name: 'Dark', exact: true }).click();
   assert(

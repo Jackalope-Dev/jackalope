@@ -1,3 +1,4 @@
+import updates from './changelog.json' with { type: 'json' };
 import { marketingPages } from './marketing-content.ts';
 
 export const siteOrigin = 'https://jackalope.dev';
@@ -141,36 +142,7 @@ export const posts = [
   },
 ];
 
-export const updates = [
-  {
-    id: 'workspace-foundations',
-    date: '2026-09-06',
-    status: 'In development',
-    title: 'More of the work, in one place.',
-    description:
-      'The current development build brings task work and project context into a more focused workspace.',
-    items: [
-      'Tasks groups active work, saved evidence, and recurring work. Project holds codebase exploration, worktrees, and context.',
-      'Project tool selections can travel with Codex and Claude Code task launches, while existing CLI-global tools remain available.',
-      'Recurring work includes timezone and missed-run controls. The app must remain running; it cannot wake a closed app or a sleeping computer.',
-      'Account-aware usage views and locally bundled fonts are part of the current development build.',
-    ],
-    note: 'Development milestone, not a public release. Installed-app acceptance, signing, and the first public Windows installer remain pending.',
-  },
-  {
-    id: 'a-first-look',
-    date: '2026-09-06',
-    status: 'Website',
-    title: 'A first look at Jackalope.',
-    description: 'A place to explore the product and follow what comes next.',
-    items: [
-      'Real interface captures in light and dark appearances, using an explicitly fictional Atlas project.',
-      'An interactive recorded tour covering task drafting, patch review, agent selection, and the live theme palette.',
-      'A three-step introduction, product notes, and an early-access waitlist.',
-    ],
-    note: 'The walkthrough illustrates the interface with sample data. It does not launch an agent task.',
-  },
-];
+export { updates };
 
 export const pages = [
   {

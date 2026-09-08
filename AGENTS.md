@@ -9,6 +9,8 @@
   with pnpm verify, and update the short current status/backlog. Do not claim
   native or installed-app acceptance from a frontend build.
 - Keep comments for non-obvious behavior and contracts, not narration or task history.
+- Add a public changelog entry for user-visible product or website changes with
+  `pnpm changelog:add`; repository verification checks its structure and ordering.
 - Follow CONTRIBUTING.md for checks and docs/ARCHITECTURE.md for ownership. Native
   changes preserve coordinator → execution guard → runtime lock order, reservation,
   process ownership, history recovery and Git safeguards.

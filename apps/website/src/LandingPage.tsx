@@ -1,7 +1,19 @@
 import { EchoMark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Tabs from '@radix-ui/react-tabs';
-import { ArrowDown, ArrowRight, Check, GitBranch, Moon, Play, Plus, Sun } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowRight,
+  Check,
+  GitBranch,
+  GitMerge,
+  Moon,
+  Play,
+  Plus,
+  ScanSearch,
+  Sparkles,
+  Sun,
+} from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
@@ -56,6 +68,8 @@ const examples = [
   {
     id: 'feature',
     label: 'Build a feature',
+    index: '01',
+    kicker: 'Ship a feature',
     prompt: 'Add keyboard search and polish the settings.',
     tasks: ['Build keyboard search', 'Polish the settings'],
     agents: ['Codex', 'Claude Code'],
@@ -67,6 +81,8 @@ const examples = [
   {
     id: 'bug',
     label: 'Find a stubborn bug',
+    index: '02',
+    kicker: 'Trace a regression',
     prompt: 'Find why drafts disappear. Check for related regressions.',
     tasks: ['Investigate lost drafts', 'Check draft recovery'],
     agents: ['Claude Code', 'Codex'],
@@ -78,6 +94,8 @@ const examples = [
   {
     id: 'idea',
     label: 'Explore a new direction',
+    index: '03',
+    kicker: 'Explore two directions',
     prompt: 'Try a simpler navigation and a new settings layout.',
     tasks: ['Explore navigation', 'Rethink settings'],
     agents: ['OpenCode', 'Grok'],
@@ -87,6 +105,134 @@ const examples = [
     diff: '+ <ProjectNavigation />\n+ <QuickActions />',
   },
 ];
+
+function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
+  if (item.id === 'feature') {
+    return (
+      <div className="case-stage case-stage-feature">
+        <div className="case-copy">
+          <small>{item.kicker}</small>
+          <p>“{item.prompt}”</p>
+          <span>{item.context}</span>
+        </div>
+        <div className="feature-art">
+          <svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
+            <path className="route route-orange" d="M0 76 H170 C240 76 220 180 310 180 H720" />
+            <path className="route route-indigo" d="M0 282 H150 C235 282 232 190 310 190 H720" />
+          </svg>
+          <div className="agent-node agent-node-one">
+            <GitBranch size={18} />
+            <span>
+              <b>{item.tasks[0]}</b>
+              <small>{item.agents[0]} · Worktree 01</small>
+            </span>
+          </div>
+          <div className="agent-node agent-node-two">
+            <GitBranch size={18} />
+            <span>
+              <b>{item.tasks[1]}</b>
+              <small>{item.agents[1]} · Worktree 02</small>
+            </span>
+          </div>
+          <div className="merge-node">
+            <GitMerge size={22} />
+          </div>
+          <div className="result-poster">
+            <span>{item.file}</span>
+            <pre>{item.diff}</pre>
+            <strong>
+              <Check size={15} /> Combined review
+            </strong>
+          </div>
+        </div>
+        <p className="case-outcome">{item.outcome}</p>
+      </div>
+    );
+  }
+
+  if (item.id === 'bug') {
+    return (
+      <div className="case-stage case-stage-bug">
+        <div className="case-copy">
+          <small>{item.kicker}</small>
+          <p>“{item.prompt}”</p>
+          <span>{item.context}</span>
+        </div>
+        <div className="bug-art">
+          <div className="trace-window">
+            <span className="scan-line" aria-hidden="true" />
+            <div className="trace-heading">
+              <ScanSearch size={20} />
+              <span>Draft lifecycle</span>
+            </div>
+            <div className="trace-code">
+              <span>01&nbsp;&nbsp;compose draft</span>
+              <span>02&nbsp;&nbsp;persist locally</span>
+              <span className="trace-hit">03&nbsp;&nbsp;close composer</span>
+              <span>04&nbsp;&nbsp;restore on open</span>
+            </div>
+            <span className="trace-target" aria-hidden="true" />
+          </div>
+          <div className="finding-card">
+            <small>CAUSE ISOLATED</small>
+            <b>{item.tasks[0]}</b>
+            <span>{item.file}</span>
+            <pre>{item.diff}</pre>
+            <strong>
+              <Check size={14} /> {item.tasks[1]}
+            </strong>
+          </div>
+        </div>
+        <p className="case-outcome">{item.outcome}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="case-stage case-stage-idea">
+      <div className="case-copy">
+        <small>{item.kicker}</small>
+        <p>“{item.prompt}”</p>
+        <span>{item.context}</span>
+      </div>
+      <div className="idea-art">
+        <div className="idea-orbit" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="layout-study layout-study-one">
+          <small>{item.agents[0]} / A</small>
+          <b>{item.tasks[0]}</b>
+          <div className="layout-frame layout-frame-sidebar">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+        <div className="layout-study layout-study-two">
+          <small>{item.agents[1]} / B</small>
+          <b>{item.tasks[1]}</b>
+          <div className="layout-frame layout-frame-dock">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+        <div className="idea-verdict">
+          <Sparkles size={17} />
+          <span>
+            <small>COMPARE</small>
+            <b>{item.file}</b>
+          </span>
+        </div>
+      </div>
+      <p className="case-outcome">{item.outcome}</p>
+    </div>
+  );
+}
 
 const differentiators = [
   {
@@ -133,49 +279,15 @@ function Workbench() {
         <Tabs.List aria-label="Explore a use case" className="case-tabs">
           {examples.map((item) => (
             <Tabs.Trigger key={item.id} value={item.id}>
-              {item.label}
+              <span className="case-tab-index">{item.index}</span>
+              <strong className="case-tab-title">{item.label}</strong>
               <ArrowRight size={16} />
             </Tabs.Trigger>
           ))}
         </Tabs.List>
         {examples.map((item) => (
           <Tabs.Content key={item.id} value={item.id}>
-            <div className="example-brief">
-              <p>“{item.prompt}”</p>
-              <span>{item.context}</span>
-            </div>
-            <div className="example-flow">
-              <div className="example-step">
-                <h3 className="step-label">Separate worktrees</h3>
-                <div className="branch-tracks">
-                  {item.tasks.map((task, index) => (
-                    <div key={task}>
-                      <GitBranch size={18} />
-                      <span>
-                        <b>{task}</b>
-                        <small>{item.agents[index]} · Separate worktree</small>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <p>
-                  Separate Git worktrees give independent tasks room to move without sharing the
-                  same checkout.
-                </p>
-              </div>
-              <ArrowRight className="flow-arrow" size={26} aria-hidden="true" />
-              <div className="example-step">
-                <h3 className="step-label">Review before integrating</h3>
-                <div className="example-patch">
-                  <span>
-                    {item.file}
-                    <span>EXAMPLE PATCH</span>
-                  </span>
-                  <pre>{item.diff}</pre>
-                </div>
-                <p>{item.outcome} Integration stays an explicit decision.</p>
-              </div>
-            </div>
+            <UseCaseVisual item={item} />
             <p className="example-note">
               Illustrated workflow · No agents are running in this demo
             </p>

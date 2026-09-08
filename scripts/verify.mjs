@@ -7,6 +7,7 @@ if (!pnpm || !/\.[cm]?js$/i.test(pnpm)) throw new Error('Run this check with pnp
 const checks = [
   [process.execPath, [pnpm, 'check']],
   [process.execPath, ['scripts/check-docs.mjs']],
+  [process.execPath, ['scripts/changelog.mjs', 'check']],
   [process.execPath, ['--test', 'scripts/release/*.test.mjs']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'types']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'typecheck']],
