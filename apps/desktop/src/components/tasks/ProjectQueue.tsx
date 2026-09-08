@@ -147,9 +147,6 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           <h1 className="task-hero-title">
             {tab === 'review' ? 'Review & merge' : 'Feature work'}
           </h1>
-          {!items.length && (
-            <p className="task-muted mt-3">Independent tasks. Shared progress. One review.</p>
-          )}
         </div>
         <div className="flex flex-col items-end gap-3">
           <Button disabled={!desktop} onClick={() => setPlanningFeature(true)}>
@@ -301,10 +298,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
             <div className="queue-empty">
               <ListPlus size={28} />
               <h2>Start with independent pieces</h2>
-              <p className="task-muted">
-                Give each task an agent and a clear set of files. Add dependencies for work that
-                must follow another change.
-              </p>
+              <p className="task-muted">Assign agents, files and dependencies to each task.</p>
               <button
                 type="button"
                 className="task-link"
@@ -407,8 +401,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           )}
           <p className="task-muted text-sm my-4">
             Tasks start from committed {project.preferences?.baseBranch || project.gitBranch}.
-            Commit any local changes the agents need. Restarting Jackalope pauses dispatch. Pausing
-            leaves current work running.
+            Pausing or restarting stops new dispatches.
           </p>
           <section className="queue-coordination">
             <h2 className="text-base font-medium">
@@ -417,12 +410,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 ? ` · ${queue.messages.filter((m) => m.projectId === project.id).length} messages`
                 : ''}
             </h2>
-            <p className="task-muted mt-4">
-              {queue.bridgeUrl
-                ? 'Local bridge is available. Each running task receives temporary access to this project’s assignments and messages.'
-                : 'The local coordination bridge is not available.'}{' '}
-              Claims belong to Jackalope; worker notes do not complete or merge tasks.
-            </p>
+            {!queue.bridgeUrl && <p className="task-muted mt-4">Coordination unavailable.</p>}
             {queue.messages
               .filter((m) => m.projectId === project.id)
               .slice(-30)

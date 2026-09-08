@@ -68,10 +68,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
           </Button>
         </div>
       </div>
-      <p className="task-muted">
-        Save lessons for matching tasks and workflows you can reuse. Nothing is learned
-        automatically.
-      </p>
+
       {!desktop && <p className="task-notice">Open the desktop app to manage saved knowledge.</p>}
       {loading && <p role="status">Loading saved knowledge…</p>}
       {(error || actionError) && (
@@ -83,10 +80,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
         </p>
       )}
       {desktop && !loading && !error && !entries.length && (
-        <p className="task-muted">
-          No saved knowledge yet. Add a lesson here, or save one from a reviewed task to keep its
-          source attached.
-        </p>
+        <p className="task-muted">No saved lessons or workflows.</p>
       )}
       {entries.map((entry) => (
         <article key={entry.id} className="py-4 border-b border-[var(--color-border)]">
@@ -197,9 +191,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             {searching ? 'Searching…' : 'Search'}
           </Button>
         </form>
-        <p className="task-muted">
-          Local text search. No agent or model tokens used. Shows up to ten recent matches.
-        </p>
+
         {matches?.map((match) => (
           <div key={match.runId} className="py-3">
             <p className="whitespace-pre-wrap break-words">{match.excerpt}</p>

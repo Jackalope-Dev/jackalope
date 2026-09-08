@@ -121,6 +121,10 @@
 .onboarding-description {
   margin: 16px 0 28px;
 }
+.onboarding-content h2[data-step="theme"],
+.onboarding-content h2[data-step="project"] {
+  margin-bottom: 20px;
+}
 .onboarding-folder {
   display: flex;
   gap: 8px;

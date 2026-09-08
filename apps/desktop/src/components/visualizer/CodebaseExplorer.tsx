@@ -208,7 +208,6 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
     <div className="codebase-page">
       <WorkspaceHeading
         title="Codebase"
-        description="Explore files and their dependencies."
         action={
           <div className="flex gap-2">
             {snapshot && (
@@ -244,8 +243,8 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
           title={busy ? 'Building your map' : 'A map of the code you have'}
           description={
             isTauriEnvironment()
-              ? 'Analyze this repository to explore directories, follow file references, and inspect dependency cycles. Files stay on this machine; project code is never executed.'
-              : 'Open the desktop app to analyze local files. Browser preview cannot access your repository.'
+              ? 'Explore file references and dependency cycles.'
+              : 'Open the desktop app to analyze this repository.'
           }
         />
       ) : (

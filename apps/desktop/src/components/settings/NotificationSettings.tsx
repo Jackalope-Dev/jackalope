@@ -28,8 +28,8 @@ export function NotificationSettings() {
         <div className="settings-row-info">
           <div className="settings-row-label">OS task notifications</div>
           <p className="settings-row-description">
-            Show questions, failures and review notices while Jackalope is in the background. Uses
-            your notification preference above. Prompts and project names stay private.
+            Use the preference above while Jackalope is in the background. Task content stays
+            private.
           </p>
         </div>
         <div className="settings-control-wrapper">
@@ -43,8 +43,8 @@ export function NotificationSettings() {
       </div>
       <p className="task-muted">
         {!status?.supported
-          ? 'Available in the Windows desktop app. In-app notices remain available everywhere.'
-          : 'Click a notification to open its task while Jackalope is running. Quit stops background notifications. Windows can silence delivery; development notifications may appear under PowerShell.'}
+          ? 'Available in the Windows desktop app.'
+          : 'Notifications stop when Jackalope quits.'}
       </p>
       {status?.supported && (
         <Button className="mt-3" variant="outline" disabled={busy} onClick={() => void test()}>

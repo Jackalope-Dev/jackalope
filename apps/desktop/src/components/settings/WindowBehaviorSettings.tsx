@@ -51,8 +51,7 @@ export function WindowBehaviorSettings() {
           <div className="settings-row-info">
             <div className="settings-row-label">Close to system tray</div>
             <p id="close-to-tray-description" className="settings-row-description">
-              Keep Jackalope and running agents active when you close the window. Turn this off to
-              quit when closing.
+              Keep tasks running when the window closes.
             </p>
           </div>
           <div className="settings-control-wrapper">
@@ -66,13 +65,9 @@ export function WindowBehaviorSettings() {
           </div>
         </div>
       </div>
-      <p className="settings-disclosure-box">
-        {!native
-          ? 'Available in the desktop app.'
-          : settings && !settings.trayAvailable
-            ? 'The system tray is unavailable. Closing the window will quit Jackalope.'
-            : 'Click the tray icon to reopen Jackalope. Right-click it and choose Quit Jackalope to exit and stop running agents.'}
-      </p>
+      {settings && !settings.trayAvailable && (
+        <p className="settings-disclosure-box">System tray unavailable. Closing quits Jackalope.</p>
+      )}
       {error && (
         <p role="alert" className="text-sm text-[var(--color-danger)]">
           Could not save or load window preferences: {error}

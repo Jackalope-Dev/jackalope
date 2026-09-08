@@ -36,8 +36,7 @@ export function AgentSupport({ adapter }: { adapter: string }) {
         ))}
       </dl>
       <p className="task-muted">
-        Requires an installed, compatible CLI and its permissions. Messages are read at checkpoints;
-        they do not interrupt other agents. Reported usage depends on the model.
+        Messages arrive at checkpoints. Usage depends on provider reports.
       </p>
     </section>
   );

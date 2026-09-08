@@ -159,7 +159,6 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
     <section className="workspace-page repo-todos">
       <WorkspaceHeading
         title="Repo TODOs"
-        description="View and edit TODOs and roadmaps saved in your repository."
         action={
           project && available && !loading && !error && creatable.length > 0 ? (
             <Button

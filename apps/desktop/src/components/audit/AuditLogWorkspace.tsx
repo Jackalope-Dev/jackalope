@@ -127,9 +127,6 @@ export function AuditLogWorkspace() {
               </span>
               <h1 className="task-title">Activity log</h1>
             </div>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Recorded routing decisions, task events, and codebase scans.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -263,7 +260,7 @@ export function AuditLogWorkspace() {
             <p className="text-xs text-[var(--color-text-muted)] mt-1 max-w-sm mx-auto">
               {searchQuery || selectedCategory !== 'all' || selectedProjectFilter !== 'all'
                 ? 'Try adjusting your filters or search query.'
-                : 'Orchestration events, routing decisions, and failovers will automatically appear here.'}
+                : 'No activity recorded.'}
             </p>
           </div>
         ) : (
@@ -345,7 +342,7 @@ export function AuditLogWorkspace() {
                       </pre>
                     ) : (
                       <p className="text-xs text-[var(--color-text-muted)] italic">
-                        No additional telemetry captured for this event.
+                        No additional details.
                       </p>
                     )}
                   </div>

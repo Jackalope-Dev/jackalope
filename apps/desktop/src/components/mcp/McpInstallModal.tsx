@@ -150,9 +150,7 @@ export function McpInstallModal({
           </div>
 
           <p className="task-notice mb-4">
-            Review the publisher and exact command below. Marketplace listings can contain incorrect
-            install hints. Configuration is saved locally; packages may download when the agent or
-            connection test starts them.
+            Review the publisher and command. Packages may download when the connection starts.
           </p>
           <div className="space-y-4 text-sm">
             {/* Target Scope */}

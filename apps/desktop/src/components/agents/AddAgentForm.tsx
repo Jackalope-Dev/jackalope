@@ -26,10 +26,6 @@ export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
   return (
     <div className="agent-manager">
       <div className="agent-manual-form">
-        <p className="task-muted">
-          Connect an installed supported CLI. Use its existing sign-in; no credentials are copied
-          into Jackalope.
-        </p>
         <label className="task-label">
           Name
           <input className="task-input" value={name} onChange={(e) => setName(e.target.value)} />

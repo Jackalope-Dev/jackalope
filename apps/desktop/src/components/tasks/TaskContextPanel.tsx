@@ -9,28 +9,29 @@ export function TaskContextPanel({
   onToggle,
   instructions,
   prompt,
+  embedded = false,
 }: {
   selected: string[];
   suggested: string[];
   onToggle: (id: string) => void;
   instructions?: string;
   prompt: string;
+  embedded?: boolean;
 }) {
   const active = VETTED_SKILLS.filter((skill) => selected.includes(skill.id));
+  const Container = embedded ? 'section' : 'details';
+  const Heading = embedded ? 'div' : 'summary';
   return (
-    <details className="task-context-panel">
-      <summary className="task-experience-summary">
+    <Container className="task-context-panel">
+      <Heading className="task-experience-summary">
         <Layers size={18} aria-hidden="true" />
         <span>Task context</span>
         <span className="task-experience-meta">
           {active.length} {active.length === 1 ? 'guideline' : 'guidelines'}
           {instructions ? ' · Project instructions' : ''}
         </span>
-      </summary>
+      </Heading>
       <div className="task-context-body">
-        <p className="task-experience-muted">
-          Choose the guidance to include. Open a guideline to read exactly what it adds.
-        </p>
         <div className="task-context-guidelines">
           {VETTED_SKILLS.map((skill) => {
             const included = selected.includes(skill.id);
@@ -73,7 +74,7 @@ export function TaskContextPanel({
               <FileText size={16} aria-hidden="true" />
               Project instructions<span className="task-experience-meta">Included</span>
             </summary>
-            <p className="task-experience-muted">Managed in Project settings.</p>
+
             <CodeSurface label="Project instructions">{instructions}</CodeSurface>
           </details>
         )}
@@ -89,6 +90,6 @@ export function TaskContextPanel({
           )}
         </details>
       </div>
-    </details>
+    </Container>
   );
 }

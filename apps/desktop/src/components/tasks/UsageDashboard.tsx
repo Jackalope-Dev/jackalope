@@ -106,7 +106,6 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
     <section className="task-page usage-page">
       <WorkspaceHeading
         title="Usage"
-        description="Tokens used by your tasks, and capacity across your accounts."
         action={
           <Button variant="outline" onClick={exportUsage} disabled={!filtered.length}>
             <Download size={18} />
@@ -222,10 +221,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
             </div>
           </div>
           <p className="task-muted text-sm my-4">
-            Reported attempts, including retries and follow-ups. Cached input is counted once.
-            Missing and in-progress reports are excluded, not counted as zero. Account profiles
-            identify the configured CLI, not a verified person. Child message observations are
-            partial and never added to attempt totals.
+            Reported usage only; missing reports are excluded. Cached input is counted once.
           </p>
         </>
       )}
@@ -301,10 +297,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
       {filtered.some((r) => r.usageObservations?.length) && (
         <details className="my-6">
           <summary>Message and subagent observations</summary>
-          <p className="task-muted">
-            Partial provider observations, deduplicated by message ID. These are a breakdown only
-            and are never added to the reported totals above.
-          </p>
+          <p className="task-muted">Partial observations; not added to the totals above.</p>
           {filtered
             .filter((r) => r.usageObservations?.length)
             .map((r) => (

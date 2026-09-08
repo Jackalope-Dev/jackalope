@@ -99,8 +99,7 @@ export function ArchivedHistory() {
         </div>
       </div>
       <p className="settings-row-description mt-3">
-        Reviewed tasks beyond the most recent 200 move here to keep the workspace fast. They stay on
-        disk and searchable, and can be restored to the main list.
+        Older reviewed tasks stay searchable and can be restored.
       </p>
       {error && (
         <p role="alert" className="task-error mt-4">

@@ -63,8 +63,10 @@ const setupTips: Record<OnboardingStep, string[]> = {
 
 export function OnboardingFlow({
   onFinish,
+  onSkip,
 }: {
   onFinish: (agent: string, draftKey: string) => void;
+  onSkip: () => void;
 }) {
   const onboarding = useOnboardingStore();
   const { projects, activeProjectId } = useProjectStore();
@@ -215,9 +217,6 @@ export function OnboardingFlow({
           </h2>
           {step === 'theme' && (
             <>
-              <p className="onboarding-description">
-                Choose an appearance and palette for your workspace. You can change them anytime.
-              </p>
               <ThemeEditor value={themeDraft} onChange={setThemeDraft} />
               <details className="onboarding-privacy-panel">
                 <summary>
@@ -288,9 +287,6 @@ export function OnboardingFlow({
           )}
           {step === 'project' && (
             <>
-              <p className="onboarding-description">
-                Open a local Git repository or create a new project to start building.
-              </p>
               <fieldset className="onboarding-project-options" aria-label="Project setup">
                 <Button
                   variant={projectMode === 'existing' ? 'primary' : 'outline'}
@@ -421,9 +417,6 @@ export function OnboardingFlow({
                         Browse
                       </Button>
                     </div>
-                    <p className="onboarding-note">
-                      Opening a project does not start an agent or change your files.
-                    </p>
                   </>
                 )}
                 <div className="onboarding-actions">
@@ -462,8 +455,7 @@ export function OnboardingFlow({
           {step === 'agent' && (
             <>
               <p className="onboarding-description">
-                Jackalope works with agents installed on this computer. Choose one for{' '}
-                <strong>{project?.name}</strong>.
+                Choose an agent for <strong>{project?.name}</strong>.
               </p>
               <fieldset className="onboarding-runner-list" aria-label="Choose your agent">
                 {execution.runners.map((item) => {
@@ -523,10 +515,11 @@ export function OnboardingFlow({
                 <RefreshCw size={15} />
                 {execution.discovering ? 'Checking agents…' : 'Check again'}
               </Button>
-              <p className="onboarding-note">
-                If sign-in isn’t confirmed, finish signing in through your agent’s CLI before
-                starting a task.
-              </p>
+              {runner && !runner.signedIn && (
+                <p className="onboarding-note">
+                  Sign in through {runner.name} before starting a task.
+                </p>
+              )}
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('project')}>
                   <ArrowLeft size={16} />
@@ -553,12 +546,10 @@ export function OnboardingFlow({
           {step === 'task' && (
             <>
               <p className="onboarding-description">
-                Give {runner?.name ?? 'your agent'} a clear first step in{' '}
-                <strong>{project?.name}</strong>. You’ll review the task and workspace before
-                starting.
+                {runner?.name ?? 'Your agent'} · <strong>{project?.name}</strong>
               </p>
               <label htmlFor="onboarding-prompt" className="task-label">
-                Your first task
+                Your first task (optional)
               </label>
               <textarea
                 id="onboarding-prompt"
@@ -581,16 +572,14 @@ export function OnboardingFlow({
               >
                 Start with a codebase walkthrough
               </Button>
-              <div className="onboarding-explanation">
-                <p>
-                  New tasks use an isolated worktree by default. Follow the agent’s progress,
-                  inspect its changes, then decide what to keep.
-                </p>
-              </div>
+
               <div className="onboarding-actions">
                 <Button variant="ghost" onClick={() => onboarding.go('agent')}>
                   <ArrowLeft size={16} />
                   Back
+                </Button>
+                <Button variant="outline" onClick={onSkip}>
+                  Skip for now
                 </Button>
                 <Button disabled={!draft.trim()} onClick={finish}>
                   Review first task

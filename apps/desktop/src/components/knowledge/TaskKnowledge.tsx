@@ -12,12 +12,14 @@ export function TaskKnowledge({
   prompt,
   selection = {},
   onChange,
+  embedded = false,
 }: {
   projectId: string;
   projectPath: string;
   prompt: string;
   selection?: ContextSelection;
   onChange: (value: ContextSelection) => void;
+  embedded?: boolean;
 }) {
   const { entries, error } = useKnowledge(projectId, projectPath);
   const [receipt, setReceipt] = useState<ContextReceipt | null>(null);
@@ -51,16 +53,14 @@ export function TaskKnowledge({
   }, [projectId, projectPath, prompt, signature]);
   const workflow = entries.find((e) => e.id === selection.workflowId);
   const workflows = entries.filter((e) => e.kind === 'workflow' && e.enabled);
+  const Container = embedded ? 'section' : 'details';
+  const Heading = embedded ? 'div' : 'summary';
   return (
-    <details className="my-3">
-      <summary className="min-h-11 py-3">
+    <Container className="my-3">
+      <Heading className="min-h-11 py-3">
         Saved project context{receipt ? ` · ${receipt.entries.length} included` : ''}
-      </summary>
+      </Heading>
       <div className="space-y-3">
-        <p className="task-muted">
-          Matching happens locally, without a model call. Only selected context is sent to your
-          agent. Manage lessons and workflows in Project → Context.
-        </p>
         <label className="block" htmlFor="task-workflow">
           Workflow
           <Select
@@ -159,17 +159,10 @@ export function TaskKnowledge({
             Restore skipped lessons
           </Button>
         )}
-        {receipt && (
-          <p className="task-muted">
-            {receipt.bytes
-              ? `${receipt.bytes.toLocaleString()} bytes of additional context. Agent input tokens apply; no background inference.`
-              : 'No additional context will be sent.'}
-          </p>
-        )}
         <Button type="button" variant="ghost" onClick={() => navigateWorkspace('project-settings')}>
           Manage project knowledge
         </Button>
       </div>
-    </details>
+    </Container>
   );
 }

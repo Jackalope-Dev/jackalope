@@ -128,10 +128,6 @@ export function MergeReview({
       <div className="queue-section-heading">
         <div>
           <h2>{onlyRunId ? 'Review result' : 'Review & merge'}</h2>
-          <p className="task-muted mt-2">
-            Review the combined changes before updating the target branch. Your source worktrees
-            stay intact.
-          </p>
         </div>
         <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />
       </div>

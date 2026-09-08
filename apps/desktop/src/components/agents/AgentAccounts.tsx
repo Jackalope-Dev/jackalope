@@ -89,11 +89,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
 
   return (
     <div className="agent-accounts">
-      <p className="task-muted">
-        Give {agentName} more than one sign-in — for example a work account and a personal one — and
-        switch which one Jackalope tasks use. Signing in opens {agentName}'s own login in a separate
-        window; each account keeps its own credentials, untouched by the others.
-      </p>
+      <p className="task-muted">Each account uses a separate {agentName} sign-in.</p>
       {error && (
         <p role="alert" className="task-error">
           {error}
@@ -120,9 +116,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
       {loading && !profiles.length ? (
         <p className="task-muted text-sm">Loading accounts…</p>
       ) : profiles.length === 0 ? (
-        <p className="task-muted text-sm">
-          No accounts added yet. {agentName} uses its normal, single sign-in until you add one.
-        </p>
+        <p className="task-muted text-sm">Using the current {agentName} sign-in.</p>
       ) : (
         <ul className="agent-accounts-list">
           {profiles.map((profile) => (

@@ -92,10 +92,7 @@ export function PrivacySettings() {
           release with the service enabled.
         </p>
       )}
-      <p className="settings-row-description">
-        Sharing is optional. Changes save immediately. You can turn sharing off in Settings →
-        Privacy at any time. Sending written feedback is a separate action.
-      </p>
+      <p className="settings-row-description">Sharing is optional. Written feedback is separate.</p>
       {community.busy && <p role="status">Saving privacy choices…</p>}
       {community.error && (
         <p role="alert">

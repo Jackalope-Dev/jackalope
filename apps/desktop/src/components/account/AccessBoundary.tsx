@@ -116,7 +116,6 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
               Open saved work
               <ArrowRight size={14} aria-hidden="true" />
             </Button>
-            <p>Your projects stay on this computer.</p>
           </footer>
         </section>
         <p className="access-caption">Jackalope · Early access</p>

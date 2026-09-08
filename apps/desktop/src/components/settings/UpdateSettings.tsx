@@ -67,8 +67,7 @@ export function UpdateSettings() {
             <div>
               <p className="text-sm font-medium">Automatically check for updates</p>
               <p className="settings-row-description">
-                Check on startup and every six hours while open. Downloads begin only when you
-                choose Install.
+                Check on startup and every six hours. Install updates manually.
               </p>
             </div>
             <Switch

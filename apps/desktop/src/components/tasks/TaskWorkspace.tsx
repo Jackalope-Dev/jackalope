@@ -91,22 +91,16 @@ export function TaskWorkspace({
       <div className="task-introduction workspace-section-heading">
         <div>
           <h1 className="task-hero-title">Tasks</h1>
-          <p className="task-muted mt-3">
-            {needsInput || ready
-              ? [
-                  needsInput
-                    ? `${needsInput} ${needsInput === 1 ? 'task needs' : 'tasks need'} you`
-                    : '',
-                  ready ? `${ready} ready to review` : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : projectFilter === 'all'
-                ? 'Work across all your projects.'
-                : projectFilter === 'unassigned'
-                  ? 'Ideas without a project.'
-                  : `Work in ${project?.name ?? 'this project'}.`}
-          </p>
+          {!!(needsInput || ready) && (
+            <p className="task-muted mt-3">
+              {[
+                needsInput ? `${needsInput} ${needsInput === 1 ? 'needs' : 'need'} attention` : '',
+                ready ? `${ready} ready to review` : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
         </div>
         <div className="task-home-actions">
           <Button onClick={() => onCapture()}>
@@ -177,7 +171,6 @@ export function TaskWorkspace({
             <EmptyState
               icon={FolderOpen}
               title="No tasks in this project"
-              description="Choose another project to find your work, or create a new task."
               action={
                 <Button variant="outline" onClick={() => setProjectFilter('all')}>
                   Show all projects
@@ -198,29 +191,24 @@ export function TaskWorkspace({
       ) : !loading && !error ? (
         <div className="task-welcome">
           <h2>What would you like to work on?</h2>
-          <p className="task-muted">
-            Use New task to describe an outcome. Start with an agent, or save the idea for later.
-          </p>
+
           <ol className="task-welcome-steps">
             <li>
               <FolderOpen size={20} />
               <div>
                 <h3>Choose a project</h3>
-                <p>Give the work a home when you’re ready to start.</p>
               </div>
             </li>
             <li>
               <Bot size={20} />
               <div>
                 <h3>Let an agent work</h3>
-                <p>Follow progress and answer questions here.</p>
               </div>
             </li>
             <li>
               <Check size={20} />
               <div>
                 <h3>Review the result</h3>
-                <p>Inspect the changes and decide what happens next.</p>
               </div>
             </li>
           </ol>

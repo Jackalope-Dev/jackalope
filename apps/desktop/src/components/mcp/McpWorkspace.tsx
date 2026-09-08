@@ -148,11 +148,6 @@ export function McpWorkspace({
     <div className="mcp-workspace">
       <WorkspaceHeading
         title={activeTab === 'configured' ? 'MCP connections' : 'MCP marketplace'}
-        description={
-          activeTab === 'configured'
-            ? 'Connect tools and services for your agents.'
-            : 'Find tools to add to your workspace.'
-        }
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -290,7 +285,7 @@ export function McpWorkspace({
               title={servers.length === 0 ? 'No MCP servers configured' : 'No matching MCP servers'}
               description={
                 servers.length === 0
-                  ? 'Add a custom MCP server or browse the AllMCPs marketplace to discover new tools.'
+                  ? 'Add a connection or browse the marketplace.'
                   : 'Try selecting a different scope or clearing your search query.'
               }
               action={

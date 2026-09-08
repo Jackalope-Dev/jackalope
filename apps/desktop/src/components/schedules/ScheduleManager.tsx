@@ -206,7 +206,7 @@ export function ScheduleManager(props: {
     <section className="task-page">
       <WorkspaceHeading
         title="Recurring tasks"
-        description="Schedule agent work or watch code changes locally while Jackalope is open, including in the system tray."
+        description="Runs while Jackalope is open, including in the tray."
         action={
           <Button
             ref={newSchedule}
@@ -225,11 +225,7 @@ export function ScheduleManager(props: {
         </p>
       )}
       {desktop && !ledger && !error && <p role="status">Loading schedules…</p>}
-      {ledger && !visible.length && (
-        <p className="task-muted">
-          No schedules for this project. Choose New schedule to save instructions and timing.
-        </p>
-      )}
+      {ledger && !visible.length && <p className="task-muted">No schedules for this project.</p>}
       <div className="schedule-list">
         {visible.map(({ definition: d, nextAt, history, localChecks, quietChecks }) => (
           <article className="schedule-row" key={d.id}>
@@ -346,15 +342,14 @@ export function ScheduleManager(props: {
         ))}
       </div>
       <p className="task-muted mt-5">
-        Overlapping or interrupted runs are skipped. Pausing keeps existing work; use Stop run to
-        cancel execution. Failed starts are recorded without automatic retries.
+        Pausing keeps active runs. Overlapping or interrupted runs are skipped; failed starts are
+        not retried.
       </p>
       {legacy.length > 0 && (
         <details className="mt-6">
           <summary>Recover saved schedule plans ({legacy.length})</summary>
           <p className="task-muted my-3">
-            These plans have never run automatically. Review their project, agent and timing to save
-            them as real schedules. Recovered schedules start paused.
+            Review and save these plans as schedules. They start paused.
           </p>
           <div className="schedule-list">
             {legacy.map((plan) => (

@@ -178,7 +178,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     <section className="task-page">
       <WorkspaceHeading
         title="Worktrees"
-        description="Separate branches and folders for work that can happen together."
         action={
           project && (
             <div className="workspace-actions">
@@ -308,7 +307,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   {busy ? 'Creating…' : 'Create worktree'}
                 </Button>
               </div>
-              <p className="task-muted mt-3">A new branch and folder inside .worktrees.</p>
             </form>
           )}
           {loading && (

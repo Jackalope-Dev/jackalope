@@ -1,10 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { connectionSupport } from '../../lib/agent-capabilities';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt } from '../../lib/skills/context-assembler';
 import { ideaStageLabels } from '../../lib/task-collection';
+import { effortPrompt, suggestedRunner } from '../../lib/task-effort';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
@@ -65,7 +67,7 @@ export function CaptureTask({
           : (projects.find((p) => p.id === activeProjectId)?.preferences?.isolatedByDefault ??
             true)),
       projectId: drafts[key]?.projectId ?? idea?.projectId ?? activeProjectId ?? '',
-      agent: drafts[key]?.agent || agent || initial.agent,
+      agent: drafts[key]?.agent ?? agent ?? initial.agent,
     };
   }, [idea, projects, activeProjectId, drafts, key, agent]);
   const project = projects.find((p) => p.id === current.projectId);
@@ -74,14 +76,32 @@ export function CaptureTask({
     (r) => config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
   const preferred = project?.preferences?.preferredRunner;
-  const defaultAgent =
-    allowed.find((r) => r.id === preferred)?.id ??
-    allowed.find((r) => r.id === config.defaultMetaAgent)?.id ??
-    allowed.find((r) => r.available)?.id ??
-    allowed[0]?.id ??
-    '';
+  const defaultAgent = suggestedRunner(allowed, preferred, config.defaultMetaAgent)?.id ?? '';
   const currentAgent = current.agent || defaultAgent;
   const runner = allowed.find((r) => r.id === currentAgent);
+  const modelOptions = config.runnerOptions[currentAgent];
+  const defaultModel =
+    modelOptions?.defaultModel ||
+    (modelOptions?.restrictModels ? modelOptions.models[0] : '') ||
+    '';
+  const models = [
+    ...new Set([
+      ...(modelOptions?.models ?? []),
+      ...(modelOptions?.restrictModels
+        ? []
+        : (config.customAgents.find((a) => a.id === currentAgent)?.models.map((m) => m.id) ?? [])),
+      ...(defaultModel ? [defaultModel] : []),
+    ]),
+  ].filter(
+    (model) =>
+      config.isModelAllowed(model) &&
+      config.isModelAllowed(`${currentAgent}:${model}`) &&
+      (!modelOptions?.restrictModels || modelOptions.models.includes(model)),
+  );
+  const modelError =
+    current.model && !models.includes(current.model)
+      ? 'The selected model is no longer allowed. Choose another model or use the agent default.'
+      : '';
   const [error, setError] = useState('');
   const [toolsOpen, setToolsOpen] = useState(false);
   const [toolRevision, setToolRevision] = useState(0);
@@ -91,6 +111,21 @@ export function CaptureTask({
   const connections = servers.filter(
     (s) => s.enabled !== false && s.scope === `project:${project?.id}`,
   );
+  const adapter = config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
+  const connectionIssues = Object.fromEntries(
+    connections.flatMap((server) => {
+      const reason = connectionSupport(adapter, server.transport, server.discovery === true);
+      return reason ? [[server.id, reason]] : [];
+    }),
+  );
+  const incompatible = connections.filter(
+    (server) =>
+      connectionIssues[server.id] &&
+      (!current.connectionIds || current.connectionIds.includes(server.id)),
+  );
+  const toolError = incompatible.length
+    ? `Check Tools: ${incompatible.map((server) => server.name).join(', ')} cannot be used with this agent. Change the connection settings, deselect it, or choose another agent.`
+    : '';
   const [loadedProject, setLoadedProject] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState('');
   const desktop = isTauriEnvironment();
@@ -117,7 +152,7 @@ export function CaptureTask({
     };
   }, [project, desktop, toolRevision]);
   useEffect(() => {
-    if (agent) draft(key, { agent });
+    if (agent) draft(key, { agent, model: undefined });
   }, [agent, key, draft]);
   const update = (value: Partial<typeof current>) => draft(key, { ...current, ...value });
   const skills = current.skills ?? [];
@@ -130,6 +165,7 @@ export function CaptureTask({
   const finalPrompt = [
     assembled.assembledPrompt || current.prompt.trim(),
     instructions ? `[Project Guidelines]:\n${instructions}` : '',
+    effortPrompt(current.effort),
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -140,7 +176,9 @@ export function CaptureTask({
       status: current.planningStatus ?? 'backlog',
       rawPrompt: current.prompt.trim(),
       refinedPrompt: assembled.hasSupplementation ? assembled.assembledPrompt : undefined,
-      assignedAgent: currentAgent || undefined,
+      assignedAgent: current.agent || undefined,
+      effort: current.effort,
+      model: current.model,
       connectionIds: current.connectionIds,
       contextSelection: current.contextSelection,
       clarifications: [
@@ -178,18 +216,19 @@ export function CaptureTask({
       !desktop ||
       loadedProject !== `${project.id}:${toolRevision}` ||
       connectionError ||
+      modelError ||
+      toolError ||
       !current.prompt.trim()
     )
       return;
     setError('');
     try {
-      const adapter =
-        config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
       const id = await start({
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
         agent: currentAgent,
+        model: current.model,
         agentProfileId: agentAccountFor(project, adapter),
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
@@ -238,11 +277,11 @@ export function CaptureTask({
           <Dialog.Title className="text-2xl pr-10">
             {idea ? idea.title : 'What do you want to accomplish?'}
           </Dialog.Title>
-          <Dialog.Description className="task-muted mt-2 mb-5">
-            Describe the outcome. Your draft stays here when you close this window.
+          <Dialog.Description className="sr-only">
+            Configure a task or save an idea.
           </Dialog.Description>
-          {project && <WorkspaceReadiness key={project.id} project={project} />}
           <TaskComposer
+            workspaceSetup={project && <WorkspaceReadiness key={project.id} project={project} />}
             setup={
               <Button
                 type="button"
@@ -253,7 +292,7 @@ export function CaptureTask({
                   setToolsOpen(true);
                 }}
               >
-                Set up agents, connections & checks
+                Agent & tool settings
               </Button>
             }
             projectId={project?.id ?? ''}
@@ -273,6 +312,7 @@ export function CaptureTask({
                     onValueChange={(id) =>
                       update({
                         projectId: id === 'unassigned' ? '' : id,
+                        model: undefined,
                         connectionIds: undefined,
                         contextSelection: undefined,
                       })
@@ -297,17 +337,19 @@ export function CaptureTask({
                     Open project
                   </Button>
                 </div>
-                <p className="task-muted mb-4">
-                  {project
-                    ? `${project.preferences?.agentAccounts?.[config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent] ? 'Uses the saved project account.' : 'Uses the agent’s current account.'}${project.preferences?.autoVerify && project.preferences.verifyCommand ? ' Project checks run automatically.' : ''}`
-                    : current.projectId
-                      ? 'The saved project is unavailable. Choose a destination or keep this as an idea.'
-                      : 'No project required to save. Choose one before starting work.'}
-                </p>
+                {!project && (
+                  <p className="task-muted mb-4">
+                    {current.projectId
+                      ? 'Project unavailable. Choose another project.'
+                      : 'Choose a project to start, or save for later.'}
+                  </p>
+                )}
               </>
             }
-            current={{ ...current, agent: currentAgent }}
-            currentAgent={currentAgent}
+            current={current}
+            models={models}
+            defaultModel={defaultModel}
+            automaticAgent={allowed.find((r) => r.id === defaultAgent)?.name}
             runner={runner}
             allowedRunners={allowed}
             submitting={submitting}
@@ -315,13 +357,16 @@ export function CaptureTask({
               desktop &&
               !!project &&
               loadedProject === `${project.id}:${toolRevision}` &&
-              !connectionError
+              !connectionError &&
+              !modelError &&
+              !toolError
             }
             activeSkills={skills}
             suggestedSkills={detectSkillsFromPrompt(current.prompt).map((s) => s.id)}
             projectInstructions={instructions}
             finalPrompt={finalPrompt}
             projectConnections={connections}
+            connectionIssues={connectionIssues}
             editingIdea={!!idea}
             toggleSkill={(id) =>
               update({
@@ -411,14 +456,9 @@ export function CaptureTask({
               Retry loading connections
             </Button>
           )}
-          {(error || connectionError) && (
+          {(error || connectionError || modelError || toolError) && (
             <p role="alert" className="task-error mt-4">
-              {error || connectionError}
-            </p>
-          )}
-          {!desktop && (
-            <p className="task-muted mt-3">
-              Browser preview · ideas are saved locally; execution requires the desktop app.
+              {error || connectionError || modelError || toolError}
             </p>
           )}
           <ProjectSetup
@@ -427,7 +467,12 @@ export function CaptureTask({
               setSetup(false);
               const id = useProjectStore.getState().activeProjectId;
               if (id && id !== setupProject)
-                update({ projectId: id, connectionIds: undefined, contextSelection: undefined });
+                update({
+                  projectId: id,
+                  model: undefined,
+                  connectionIds: undefined,
+                  contextSelection: undefined,
+                });
             }}
           />
         </Dialog.Content>

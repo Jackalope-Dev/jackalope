@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ContextSelection } from '../lib/knowledge';
+import type { TaskEffort } from '../lib/task-effort';
 
 export type TaskStatus = 'backlog' | 'refinement' | 'in_progress' | 'verification' | 'done';
 
 export interface TaskTicket {
+  effort?: TaskEffort;
+  model?: string;
   contextSelection?: ContextSelection;
   id: string;
   projectId: string;

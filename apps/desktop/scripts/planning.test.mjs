@@ -203,3 +203,33 @@ test('manual planning never claims execution and questions or unsaved results ne
     'attention',
   );
 });
+
+import { effortFor, effortPrompt, suggestedRunner } from '../src/lib/task-effort.ts';
+
+test('task effort is restored with the idea without nesting guidance in the editable intent', () => {
+  const draft = planningDraft({
+    rawPrompt: 'Fix the dialog',
+    effort: 'thorough',
+    model: 'configured-model',
+  });
+  assert.equal(draft.prompt, 'Fix the dialog');
+  assert.equal(draft.effort, 'thorough');
+  assert.equal(draft.model, 'configured-model');
+  assert.equal(effortFor(undefined).id, 'balanced');
+  assert.equal(effortFor('unknown').id, 'balanced');
+  assert.match(effortPrompt('quick'), /relevant checks/);
+  assert.match(effortPrompt(draft.effort), /separate review pass/);
+  assert.notEqual(effortPrompt('quick'), effortPrompt('balanced'));
+});
+
+test('automatic agent selection uses an available preference and never leaves the allowed roster', () => {
+  const runners = [
+    { id: 'preferred', available: false },
+    { id: 'default', available: true },
+    { id: 'other', available: true },
+  ];
+  assert.equal(suggestedRunner(runners, 'preferred', 'default').id, 'default');
+  assert.equal(suggestedRunner(runners, 'other', 'default').id, 'other');
+  assert.equal(suggestedRunner(runners, 'disabled', 'missing').id, 'default');
+  assert.equal(suggestedRunner([], 'preferred', 'default'), undefined);
+});

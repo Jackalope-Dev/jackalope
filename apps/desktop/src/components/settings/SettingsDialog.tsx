@@ -208,24 +208,11 @@ export function SettingsDialog({
                 <section key={c} className="settings-section">
                   <header className="settings-section-header">
                     <h2 className="settings-section-title">{c}</h2>
-                    {c === 'Appearance' && (
-                      <p className="settings-section-subtitle">
-                        Changes save immediately and apply throughout Jackalope.
-                      </p>
-                    )}
-                    {c === 'Data & reset' && (
-                      <p className="settings-section-subtitle">
-                        Manage this Jackalope profile on this computer.
-                      </p>
-                    )}
                   </header>
                   {c === 'Jackalope account' && <JackalopeAccount />}
                   {c === 'General' && (
                     <>
-                      <Setting
-                        title="Guided setup"
-                        description="Choose a project and agent, then prepare your first task."
-                      >
+                      <Setting title="Guided setup">
                         <Button
                           variant="outline"
                           onClick={() => {
@@ -239,7 +226,7 @@ export function SettingsDialog({
                       <WindowBehaviorSettings />
                       <Setting
                         title="Companion notifications"
-                        description="Choose when Jackalope draws your attention. All notices remain available in the helper."
+                        description="All notices remain in the helper."
                       >
                         <Select
                           aria-label="Companion notifications"
@@ -254,10 +241,7 @@ export function SettingsDialog({
                         </Select>
                       </Setting>
                       <NotificationSettings />
-                      <Setting
-                        title="Companion animations"
-                        description="Show reactions and movement for activity. Your reduced-motion preference always applies."
-                      >
+                      <Setting title="Companion animations">
                         <Switch
                           label="Companion animations"
                           checked={settings.mascotReactions}

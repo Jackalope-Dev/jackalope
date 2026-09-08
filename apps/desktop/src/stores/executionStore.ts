@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ContextSelection } from '../lib/knowledge';
+import type { TaskEffort } from '../lib/task-effort';
 import {
   isActive,
   nativeTask,
@@ -14,6 +15,8 @@ import { useMascotStore } from './mascotStore';
 import type { TaskStatus } from './taskStore';
 
 export interface TaskDraft {
+  effort?: TaskEffort;
+  model?: string;
   contextSelection?: ContextSelection;
   prompt: string;
   projectId?: string;

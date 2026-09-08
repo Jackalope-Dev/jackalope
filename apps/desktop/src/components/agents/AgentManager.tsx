@@ -40,9 +40,6 @@ export function AgentManager() {
     <div className="agent-manager">
       <div>
         <h2 className="text-xl font-medium">Agent configuration</h2>
-        <p className="task-muted mt-2">
-          Choose an agent to manage its models, executable and accounts.
-        </p>
       </div>
       <div className="flex flex-wrap gap-3">
         <Button
@@ -201,8 +198,7 @@ export function AgentManager() {
                     </label>
                   </div>
                   <p className="task-muted">
-                    Use model IDs supported by this account. An empty restricted list blocks
-                    Jackalope launches; CLI use outside the app is unchanged.
+                    Use supported model IDs. An empty restricted list blocks task launches.
                   </p>
                 </div>
               </section>

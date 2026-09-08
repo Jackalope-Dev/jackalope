@@ -21,7 +21,7 @@ export function ProjectPreferences() {
       ) : (
         <>
           <div className="settings-group">
-            <Setting title="Project name" description="Label shown in the project switcher.">
+            <Setting title="Project name">
               <input
                 className="settings-input"
                 aria-label="Project name"
@@ -30,10 +30,7 @@ export function ProjectPreferences() {
               />
             </Setting>
             <Setting title="Repository path" description={project.path} />
-            <Setting
-              title="Default task agent"
-              description="Used for new tasks unless the composer has an explicit selection."
-            >
+            <Setting title="Default task agent">
               <Select
                 aria-label="Default task agent"
                 value={project.preferences?.preferredRunner ?? 'inherit'}
@@ -57,10 +54,7 @@ export function ProjectPreferences() {
             </Setting>
           </div>
           <div className="settings-group">
-            <Setting
-              title="Agents available here"
-              description="Choose which enabled agents this project can use."
-            />
+            <Setting title="Agents available here" />
             {[...builtinAgents, ...agents.customAgents].map((a) => {
               const allIds = [
                 ...builtinAgents.map((a) => a.id),
@@ -75,9 +69,7 @@ export function ProjectPreferences() {
                   description={
                     !agents.isAgentEnabled(a.id)
                       ? 'Disabled app-wide in Agent settings.'
-                      : isOn
-                        ? `Available for ${project.name}.`
-                        : `Not allowed for ${project.name}.`
+                      : undefined
                   }
                 >
                   <Switch
@@ -141,8 +133,7 @@ export function ProjectPreferences() {
             Target branch
           </label>
           <p className="settings-row-description mb-3">
-            New tasks start from this local branch. Their review keeps the same target even if you
-            switch branches later.
+            Starting branch for new tasks and their review.
           </p>
           <input
             id="project-base-branch"
@@ -155,9 +146,8 @@ export function ProjectPreferences() {
             Workspace preparation
           </label>
           <p className="settings-row-description mb-3">
-            Optional command authorized to run before the agent in each new task workspace, such as
-            installing dependencies. It uses your OS permissions, stops after five minutes, and is
-            skipped for continuations.
+            Runs before new tasks, with your OS permissions. Five-minute limit; skipped for
+            continuations.
           </p>
           <input
             id="preparation-command"
@@ -172,8 +162,7 @@ export function ProjectPreferences() {
             Verification command
           </label>
           <p className="settings-row-description mb-3">
-            Run from task review, or by an agent through the verification tool. Commands use your OS
-            permissions and stop after five minutes.
+            Runs with your OS permissions. Five-minute limit.
           </p>
           <input
             id="verification-command"
@@ -188,7 +177,7 @@ export function ProjectPreferences() {
           />
           <Setting
             title="Check results automatically"
-            description="Authorize the saved verification command after each successful task, before review. Applies to new tasks and schedules; existing attempts retain their saved policy."
+            description="Run this command after new tasks and scheduled runs finish successfully."
           >
             <Switch
               label="Check results automatically"
@@ -196,10 +185,6 @@ export function ProjectPreferences() {
               onCheckedChange={(autoVerify) => updateProjectPreferences(project.id, { autoVerify })}
             />
           </Setting>
-          <p className="settings-disclosure-box">
-            Choose isolation in the task composer. Isolated tasks use .worktrees and the selected
-            target branch. Custom worktree locations and automatic cleanup are planned.
-          </p>
         </>
       )}
     </section>

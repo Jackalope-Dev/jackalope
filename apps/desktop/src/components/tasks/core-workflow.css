@@ -23,22 +23,6 @@
   flex: 1;
   min-width: 0;
 }
-.capture-options {
-  padding: 4px 24px;
-}
-.capture-options > summary {
-  min-height: 44px;
-  padding: 12px 0;
-  cursor: pointer;
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-.capture-options .task-context-controls {
-  margin-top: 12px;
-}
-.capture-options .task-context-panel {
-  margin: 12px 0;
-}
 .work-scope {
   justify-content: space-between;
   margin-bottom: 24px;
@@ -188,11 +172,6 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: 1.6;
-}
-.capture-options-summary {
-  margin-left: 8px;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
 }
 .capture-dialog .task-composer-note {
   padding-top: 12px;

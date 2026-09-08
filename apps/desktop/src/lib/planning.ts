@@ -11,6 +11,8 @@ export function planningDraft(
     | 'clarifications'
     | 'connectionIds'
     | 'contextSelection'
+    | 'effort'
+    | 'model'
   >,
 ) {
   const isolated = !task.clarifications?.some(
@@ -30,6 +32,8 @@ export function planningDraft(
   }).assembledPrompt;
   const structured = !!task.refinedPrompt && task.refinedPrompt === generated;
   return {
+    effort: task.effort,
+    model: task.model,
     contextSelection: task.contextSelection,
     prompt: structured ? task.rawPrompt : task.refinedPrompt || task.rawPrompt,
     skills: structured ? skills : [],

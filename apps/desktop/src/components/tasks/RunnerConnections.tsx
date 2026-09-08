@@ -111,19 +111,13 @@ export function RunnerConnections({
             {checkError || error || capacity.error}
           </p>
         )}
-        {!desktop && (
-          <p className="task-muted">
-            Open the desktop app to discover installed agents. Manually added agents stay unverified
-            until checked there.
-          </p>
-        )}
+        {!desktop && <p className="task-muted">Agent discovery requires the desktop app.</p>}
         {identified.length === 0 ? (
           <EmptyState
             icon={Plus}
             title={
               discovering || checking ? 'Looking for your agents…' : 'No agents identified yet'
             }
-            description="Jackalope looks for Codex, Claude Code and Grok. Add an installed agent manually if it lives somewhere else."
             action={
               <Button variant="outline" onClick={() => setAdding(true)}>
                 <Plus size={18} />
@@ -242,17 +236,6 @@ export function RunnerConnections({
             through the CLI, then check again.
           </p>
         )}
-        <p className="agent-workspace-note">
-          Manage model choices, executable paths and defaults in{' '}
-          <button
-            type="button"
-            className="task-link"
-            onClick={() => navigateWorkspace('agent-settings')}
-          >
-            Configuration
-            <ArrowRight size={14} />
-          </button>
-        </p>
       </div>
       <Dialog.Root open={adding} onOpenChange={setAdding}>
         <Dialog.Portal>

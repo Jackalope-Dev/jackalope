@@ -81,10 +81,7 @@ export function JackalopeAccount({
   return (
     <div className={welcome ? 'access-account' : 'space-y-6'}>
       {!welcome && (
-        <p className="settings-row-description">
-          Connect the account you use for early access and invitations. Beta builds require approved
-          access to start new work. Your projects and agent accounts stay on this computer.
-        </p>
+        <p className="settings-row-description">Beta access requires an approved account.</p>
       )}
       {!account && !error && <p role="status">Reading account connection…</p>}
       {account?.state === 'unavailable' && (

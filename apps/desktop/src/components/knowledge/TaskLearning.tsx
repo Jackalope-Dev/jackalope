@@ -34,11 +34,7 @@ export function TaskLearning({ run }: { run: TaskRun }) {
             Saved context used · {context.entries.length}{' '}
             {context.entries.length === 1 ? 'entry' : 'entries'}
           </h3>
-          <p className="task-muted">
-            {context.bytes.toLocaleString()} bytes of saved project notes supplied at the first
-            attempt. Continuations reuse their agent session; the task agreement is repeated with
-            the current step.
-          </p>
+          <p className="task-muted">{context.bytes.toLocaleString()} bytes · first attempt</p>
           {context.entries.map((entry) => (
             <div key={entry.id} className="py-3">
               <h3 className="font-medium">
@@ -51,11 +47,8 @@ export function TaskLearning({ run }: { run: TaskRun }) {
       )}
       {run.status === 'reviewed' && (
         <>
-          <h2 className="text-base font-medium">Make the next task easier</h2>
-          <p className="task-muted">
-            Save a concise lesson or a repeatable procedure for any agent in this project. You
-            choose the content; Jackalope keeps this task as its source.
-          </p>
+          <h2 className="text-base font-medium">Save project knowledge</h2>
+
           <div className="flex flex-wrap gap-2">
             {hasEarlierAttempt && (
               <Button

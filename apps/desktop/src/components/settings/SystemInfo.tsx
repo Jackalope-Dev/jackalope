@@ -34,7 +34,6 @@ export function SystemInfoView() {
     <section className="task-page">
       <WorkspaceHeading
         title="Devices"
-        description="Tasks run on this computer. Remote device pairing is not available yet."
         action={
           <Button variant="outline" disabled={!desktop || loading} onClick={() => void load()}>
             <RefreshCw size={16} />

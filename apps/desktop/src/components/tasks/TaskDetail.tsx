@@ -436,12 +436,12 @@ export function TaskDetail({
             {finished && (
               <p className="task-result-assurance">
                 {run.verification?.result.success && run.verification.tree
-                  ? 'Project checks passed for a recorded file snapshot. Changes after that check require verification again.'
+                  ? 'Checks passed for the recorded snapshot.'
                   : run.verificationError
                     ? `Checks need attention: ${run.verificationError}`
                     : run.verification
-                      ? 'Project checks need attention. Open Changes & checks before using this result.'
-                      : 'No project checks are recorded. Open Changes & checks to verify the result.'}
+                      ? 'Checks need attention.'
+                      : 'No checks recorded.'}
               </p>
             )}
           </Tabs.Content>
@@ -547,10 +547,7 @@ export function TaskDetail({
             {isLatest && (
               <section className="mt-6" aria-label="Connections for the next step">
                 <h3 className="text-base font-medium mb-3">Connections for the next step</h3>
-                <p className="task-muted">
-                  These choices apply when you continue. The active attempt keeps its existing tools
-                  and account.
-                </p>
+                <p className="task-muted">Changes apply to the next continuation.</p>
                 {connections?.map((server) => (
                   <label key={server.id} className="flex items-center gap-3 min-h-11">
                     <input
@@ -655,12 +652,6 @@ export function TaskDetail({
                 </Button>
               )}
             </>
-          )}
-          {finished && (
-            <p className="task-muted text-xs mt-3">
-              Mark reviewed records your decision. Review integration previews the changes before an
-              explicit merge; nothing is pushed or cleaned up.
-            </p>
           )}
         </div>
       )}

@@ -35,7 +35,7 @@ export function CapacityPanel() {
       <div className="capacity-heading">
         <div>
           <h2 id="capacity-title">Connected capacity</h2>
-          <p className="task-muted">Remaining account limits · independent of the filters above.</p>
+          <p className="task-muted">All accounts · includes activity outside Jackalope</p>
         </div>
         <Button
           variant="outline"
@@ -132,10 +132,6 @@ export function CapacityPanel() {
           Refresh available in {Math.ceil((nextRefresh - now) / 1000)}s.
         </p>
       )}
-      <p className="task-muted text-sm mt-4">
-        Includes work outside Jackalope. Missing or stale snapshots cannot establish available
-        budget.
-      </p>
     </section>
   );
 }

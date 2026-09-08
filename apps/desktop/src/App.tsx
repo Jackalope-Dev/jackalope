@@ -24,8 +24,8 @@ export default function App() {
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
   const [initialDraftKey, setInitialDraftKey] = useState<string>();
   const [entry, setEntry] = useState<{
-    agent: string;
-    draftKey: string;
+    agent?: string;
+    draftKey?: string;
   } | null>(null);
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const completeEntry = useCallback(() => {
@@ -69,7 +69,10 @@ export default function App() {
         {entry ? (
           <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
         ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
-          <OnboardingFlow onFinish={(agent, draftKey) => setEntry({ agent, draftKey })} />
+          <OnboardingFlow
+            onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}
+            onSkip={() => setEntry({})}
+          />
         ) : (
           <Shell
             initialTaskAgent={initialTaskAgent}
