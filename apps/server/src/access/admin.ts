@@ -1,8 +1,34 @@
-import { PRESET_THEMES, themeTokens } from '@jackalope/brand/tokens';
 import { z } from 'zod';
+import { accessAdminPage } from './admin-page';
 import { randomToken } from './crypto';
 import { accessEmail } from './mail';
-import { approve, requestLink } from './service';
+import { checkMailDelivery } from './mail-status';
+import { installerKey } from './routes';
+import { AccessError, approve, requestLink } from './service';
+
+function mailConfigured(env: Env) {
+  return !!(env.ACCESS_SECRET?.length >= 32 && env.SEQUENZY_API_KEY && env.ACCESS_EMAIL_FROM);
+}
+export async function accessReadiness(env: Env) {
+  const key = installerKey(env);
+  let download: 'available' | 'missing' | 'unconfigured' | 'unknown' = key
+    ? 'unknown'
+    : 'unconfigured';
+  let version: string | null = null;
+  if (key) {
+    try {
+      const object = await env.RELEASES.head(key);
+      download = object && object.size > 0 ? 'available' : 'missing';
+      if (download === 'available') version = key.split('/')[1];
+    } catch {}
+  }
+  return {
+    enabled: env.EARLY_ACCESS_ENABLED === 'true',
+    mailConfigured: mailConfigured(env),
+    download,
+    version,
+  };
+}
 
 export async function accessAdmin(
   request: Request,
@@ -28,103 +54,148 @@ export async function accessAdmin(
     });
   }
   if (request.method === 'GET' && url.pathname === '/admin/access/email-preview') {
-    return new Response(
-      accessEmail(
-        url.searchParams.get('kind') === 'waitlist'
-          ? { to: 'preview@example.invalid', kind: 'waitlist' }
-          : {
-              to: 'preview@example.invalid',
-              kind: 'welcome',
-              token: 'preview-only-not-a-login-token',
-            },
-        env.ACCESS_WEB_ORIGIN,
-      ).body,
-      {
-        headers: {
-          ...headers,
-          'content-type': 'text/html; charset=utf-8',
-          'content-security-policy':
-            "default-src 'none'; style-src 'unsafe-inline'; img-src https://jackalope.dev; base-uri 'none'; frame-ancestors 'none'",
-        },
+    const kind = url.searchParams.get('kind');
+    const mail =
+      kind === 'waitlist'
+        ? { to: 'preview@example.invalid', kind: 'waitlist' as const }
+        : {
+            to: 'preview@example.invalid',
+            kind: kind === 'login' ? ('login' as const) : ('welcome' as const),
+            token: 'preview-only-not-a-login-token',
+          };
+    return new Response(accessEmail(mail, env.ACCESS_WEB_ORIGIN).body, {
+      headers: {
+        ...headers,
+        'content-type': 'text/html; charset=utf-8',
+        'content-security-policy':
+          "default-src 'none'; style-src 'unsafe-inline'; img-src https://jackalope.dev; base-uri 'none'; frame-ancestors 'none'",
       },
-    );
-  }
-  if (request.method === 'GET' && url.pathname === '/admin/api/access') {
-    const status = url.searchParams.get('status') ?? 'waiting';
-    const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
-    const query = (url.searchParams.get('query') ?? '').trim().toLowerCase();
-    if (
-      !['waiting', 'approved', 'revoked'].includes(status) ||
-      !Number.isSafeInteger(before) ||
-      before < 0 ||
-      query.length > 254
-    )
-      return json({ error: 'invalid_filter' }, 400);
-    const members = await env.DB.prepare(
-      "SELECT rowid AS cursor,id,email,status,created_at,approved_at,newsletter,newsletter_synced_at,newsletter_attempts,(SELECT email FROM access_members i WHERE i.id=m.invited_by) AS invited_by,(SELECT count(*) FROM access_invites WHERE owner_id=m.id AND status='accepted') AS accepted,(SELECT state FROM access_mail WHERE email=m.email ORDER BY created_at DESC LIMIT 1) AS mail_state FROM access_members m WHERE status=? AND rowid<? AND instr(email,?)>0 ORDER BY rowid DESC LIMIT 50",
-    )
-      .bind(status, before, query)
-      .all();
-    const counts = await env.DB.prepare(
-      'SELECT status,count(*) AS count FROM access_members GROUP BY status',
-    ).all();
-    return json({
-      members: members.results,
-      counts: counts.results,
-      enabled: env.EARLY_ACCESS_ENABLED === 'true',
     });
   }
-  if (request.method === 'POST' && url.pathname === '/admin/api/access') {
-    if (request.headers.get('origin') !== url.origin)
-      return json({ error: 'origin_required' }, 403);
-    if (
-      env.EARLY_ACCESS_ENABLED !== 'true' ||
-      !env.ACCESS_SECRET ||
-      !env.SEQUENZY_API_KEY ||
-      !env.ACCESS_EMAIL_FROM
-    )
-      return json({ error: 'access_not_configured' }, 503);
-    const parsed = z
-      .strictObject({ id: z.uuid(), action: z.enum(['approve', 'resend', 'revoke', 'restore']) })
-      .safeParse(await readJson(request));
-    if (!parsed.success) return json({ error: 'invalid_request' }, 400);
-    const { id, action } = parsed.data;
-    const member = await env.DB.prepare('SELECT email,status FROM access_members WHERE id=?')
-      .bind(id)
-      .first<{ email: string; status: string }>();
-    if (!member) return json({ error: 'member_not_found' }, 404);
-    if (action === 'approve') await approve(env, id);
-    else if (action === 'resend' && member.status === 'approved')
-      await requestLink(env, member.email);
-    else if (action === 'restore' && member.status === 'revoked')
-      await env.DB.prepare(
-        "UPDATE access_members SET status='waiting',approved_at=NULL,verified_at=NULL,share_code=? WHERE id=? AND status='revoked'",
+  try {
+    if (request.method === 'GET' && url.pathname === '/admin/api/access/readiness')
+      return json(await accessReadiness(env));
+    if (request.method === 'GET' && url.pathname === '/admin/api/access/member') {
+      const id = z.uuid().parse(url.searchParams.get('id'));
+      const member = await env.DB.prepare(
+        'SELECT id,email,status,created_at,approved_at,verified_at,source,newsletter,newsletter_synced_at,newsletter_attempts,invite_limit FROM access_members WHERE id=?',
       )
-        .bind(randomToken(), id)
-        .run();
-    else if (action === 'revoke')
-      await env.DB.batch([
-        env.DB.prepare("UPDATE access_members SET status='revoked' WHERE id=?").bind(id),
-        env.DB.prepare('DELETE FROM access_sessions WHERE member_id=?').bind(id),
-        env.DB.prepare('DELETE FROM access_tokens WHERE email=?').bind(member.email),
+        .bind(id)
+        .first<{ email: string }>();
+      if (!member) return json({ error: 'member_not_found' }, 404);
+      const [mail, devices, invites] = await Promise.all([
         env.DB.prepare(
-          "UPDATE access_invites SET status='revoked' WHERE (owner_id=? OR email=?) AND status='pending'",
-        ).bind(id, member.email),
+          'SELECT id,kind,state,created_at,attempts,next_at,provider_send_id IS NOT NULL AS can_check,delivery_status,delivery_checked_at FROM access_mail WHERE email=? ORDER BY created_at DESC,rowid DESC LIMIT 10',
+        )
+          .bind(member.email)
+          .all(),
+        env.DB.prepare(
+          'SELECT created_at,expires_at FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 10',
+        )
+          .bind(id, Date.now())
+          .all(),
+        env.DB.prepare(
+          "SELECT status,count(*) AS count FROM access_invites WHERE owner_id=? AND (status='accepted' OR (status='pending' AND expires_at>?)) GROUP BY status",
+        )
+          .bind(id, Date.now())
+          .all(),
       ]);
-    return json({ success: true });
+      return json({
+        member,
+        mail: mail.results,
+        devices: devices.results,
+        invites: invites.results,
+      });
+    }
+    if (request.method === 'GET' && url.pathname === '/admin/api/access') {
+      const status = url.searchParams.get('status') ?? 'waiting';
+      const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
+      const query = (url.searchParams.get('query') ?? '').trim().toLowerCase();
+      if (
+        !['waiting', 'approved', 'revoked', 'all'].includes(status) ||
+        !Number.isSafeInteger(before) ||
+        before < 0 ||
+        query.length > 254
+      )
+        return json({ error: 'invalid_filter' }, 400);
+      const members = await env.DB.prepare(
+        "SELECT m.rowid AS cursor,m.id,m.email,m.status,m.created_at,m.approved_at,m.verified_at,m.invite_limit,(SELECT count(*) FROM access_devices WHERE member_id=m.id AND expires_at>?) AS devices,(SELECT count(*) FROM access_invites WHERE owner_id=m.id AND status='accepted') AS accepted,a.kind AS mail_kind,a.state AS mail_state,a.attempts AS mail_attempts,a.next_at AS mail_next_at,a.created_at AS mail_created_at,a.delivery_status FROM access_members m LEFT JOIN access_mail a ON a.rowid=(SELECT rowid FROM access_mail WHERE email=m.email ORDER BY created_at DESC,rowid DESC LIMIT 1) WHERE (?='all' OR m.status=?) AND m.rowid<? AND instr(m.email,?)>0 ORDER BY m.rowid DESC LIMIT 51",
+      )
+        .bind(Date.now(), status, status, before, query)
+        .all();
+      const counts = await env.DB.prepare(
+        'SELECT status,count(*) AS count FROM access_members GROUP BY status',
+      ).all();
+      return json({
+        members: members.results.slice(0, 50),
+        hasMore: members.results.length > 50,
+        counts: counts.results,
+        enabled: env.EARLY_ACCESS_ENABLED === 'true',
+      });
+    }
+    if (request.method === 'POST') {
+      if (request.headers.get('origin') !== url.origin)
+        return json({ error: 'origin_required' }, 403);
+      if (url.pathname === '/admin/api/access/delivery') {
+        const { id } = z.strictObject({ id: z.uuid() }).parse(await readJson(request));
+        return json(await checkMailDelivery(env, id));
+      }
+      if (url.pathname === '/admin/api/access') {
+        const { id, action, allowWithoutDownload } = z
+          .strictObject({
+            id: z.uuid(),
+            action: z.enum(['approve', 'resend', 'revoke', 'restore']),
+            allowWithoutDownload: z.boolean().default(false),
+          })
+          .parse(await readJson(request));
+        const member = await env.DB.prepare('SELECT email,status FROM access_members WHERE id=?')
+          .bind(id)
+          .first<{ email: string; status: string }>();
+        if (!member) return json({ error: 'member_not_found' }, 404);
+        const expected = {
+          approve: 'waiting',
+          resend: 'approved',
+          revoke: 'approved',
+          restore: 'revoked',
+        }[action];
+        if (member.status !== expected) return json({ error: 'member_changed' }, 409);
+        if (action === 'approve' || action === 'resend') {
+          if (env.EARLY_ACCESS_ENABLED !== 'true' || !mailConfigured(env))
+            return json({ error: 'access_not_configured' }, 503);
+          if (
+            action === 'approve' &&
+            !allowWithoutDownload &&
+            (await accessReadiness(env)).download !== 'available'
+          )
+            return json({ error: 'download_not_ready' }, 409);
+          const queued =
+            action === 'approve' ? await approve(env, id) : await requestLink(env, member.email);
+          return json({ success: true, mailQueued: !!queued });
+        }
+        if (action === 'restore')
+          await env.DB.prepare(
+            "UPDATE access_members SET status='waiting',approved_at=NULL,verified_at=NULL,share_code=? WHERE id=? AND status='revoked'",
+          )
+            .bind(randomToken(), id)
+            .run();
+        else
+          await env.DB.batch([
+            env.DB.prepare(
+              "UPDATE access_members SET status='revoked' WHERE id=? AND status='approved'",
+            ).bind(id),
+            env.DB.prepare('DELETE FROM access_sessions WHERE member_id=?').bind(id),
+            env.DB.prepare('DELETE FROM access_tokens WHERE email=?').bind(member.email),
+            env.DB.prepare(
+              "UPDATE access_invites SET status='revoked' WHERE (owner_id=? OR email=?) AND status='pending'",
+            ).bind(id, member.email),
+          ]);
+        return json({ success: true });
+      }
+    }
+    return json({ error: 'not_found' }, 404);
+  } catch (error) {
+    if (error instanceof AccessError) return json({ error: error.code }, error.status);
+    if (error instanceof z.ZodError) return json({ error: 'invalid_request' }, 400);
+    return json({ error: 'access_unavailable' }, 503);
   }
-  return json({ error: 'not_found' }, 404);
-}
-const colors = (isDark: boolean) =>
-  Object.entries(themeTokens({ ...PRESET_THEMES[0], isDark }))
-    .map(([k, v]) => `${k}:${v};`)
-    .join('');
-function accessAdminPage(nonce: string) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Early access · Jackalope</title><style nonce="${nonce}">
-:root{${colors(false)}}@media(prefers-color-scheme:dark){:root{${colors(true)}}}*{box-sizing:border-box}body{margin:0;background:var(--color-surface);color:var(--color-text-primary);font:15px/1.6 system-ui}main{max-width:1080px;margin:auto;padding:40px 24px}a{color:var(--color-accent-ink)}h1{font-size:clamp(32px,5vw,48px);letter-spacing:-.04em;margin:16px 0}p,small{color:var(--color-text-secondary)}nav,.filters,.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}button,input,select{font:inherit;color:inherit;min-height:44px;padding:9px 14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface)}button{cursor:pointer}button.primary{background:var(--color-accent);color:var(--color-on-accent);border-color:transparent}button:disabled{opacity:.5;cursor:wait}:focus-visible{outline:2px solid var(--color-accent-ink);outline-offset:3px}.filters{margin:32px 0}label{display:grid;gap:5px}article{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;padding:24px 0;border-top:1px solid var(--color-border)}article strong{overflow-wrap:anywhere}article p{margin:6px 0;font-size:13px}.badge{color:var(--color-accent-ink);font-size:12px;letter-spacing:.1em}#notice{min-height:24px}#more{margin-top:24px}@media(max-width:600px){article{grid-template-columns:1fr}.filters>*{width:100%}}[hidden]{display:none}
-</style></head><body><main><nav><a href="/admin">Release observatory</a><a href="/admin/access/email-preview" target="_blank" rel="noreferrer">Preview welcome email</a></nav><header><p class="badge">JACKALOPE / PRIVATE</p><h1>Make a little room.</h1><p>Approve people from the waitlist. They receive a private access link and five invitations of their own. Email reservations expire after seven days; accepted places stay counted.</p><p id="counts"></p></header><div class="filters"><label>People<select id="status"><option value="waiting">Waiting for approval</option><option value="approved">Approved</option><option value="revoked">Revoked</option></select></label><label>Find an email<input id="query" type="search" maxlength="254" placeholder="Email address"></label><button id="search">Find people</button></div><p id="notice" role="status" aria-live="polite"></p><div id="members"></div><button id="more" hidden>Load more</button></main><script nonce="${nonce}">
-const $=id=>document.getElementById(id);let cursor=null,busy=false;
-async function load(append=false){if(busy)return;busy=true;$('notice').textContent='Loading…';try{const p=new URLSearchParams({status:$('status').value,query:$('query').value});if(append&&cursor)p.set('before',cursor);const r=await fetch('/admin/api/access?'+p);if(!r.ok)throw Error('Could not load people. Refresh your private sign-in and try again.');const data=await r.json();if(!append)$('members').replaceChildren();$('counts').textContent=data.counts.map(x=>x.count+' '+x.status).join(' · ');for(const person of data.members){const row=document.createElement('article'),info=document.createElement('div'),name=document.createElement('strong'),detail=document.createElement('p'),actions=document.createElement('div');name.textContent=person.email;detail.textContent='Requested '+new Date(person.created_at).toLocaleDateString()+(person.invited_by?' · Invited by '+person.invited_by:'')+' · '+person.accepted+' accepted invitations'+(person.mail_state?' · Email '+person.mail_state:'')+(person.newsletter&&person.newsletter_synced_at===null?' · Product notes '+(person.newsletter_attempts>=5?'need attention':'pending sync'):'');info.append(name,detail);actions.className='actions';const choices=person.status==='waiting'?[['approve','Approve & email']]:person.status==='approved'?[['resend','Send access link'],['revoke','Revoke access']]:[['restore','Return to waitlist']];for(const [action,label] of choices){const button=document.createElement('button');button.textContent=label;button.disabled=!data.enabled;if(action==='approve')button.className='primary';button.onclick=async()=>{if(action==='revoke'&&!confirm('Revoke access for '+person.email+'? Their accepted invitees keep their own access.'))return;button.disabled=true;try{const result=await fetch('/admin/api/access',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:person.id,action})});if(!result.ok)throw Error('Could not update access. Check the service and try again.');await load();$('notice').textContent=action==='approve'?'Approved. The welcome email is queued.':action==='resend'?'Access link requested. Recent requests are limited to prevent duplicate emails.':'Access updated.';}catch(e){$('notice').textContent=e.message;button.disabled=false;}};actions.append(button);}row.append(info,actions);$('members').append(row);}cursor=data.members.at(-1)?.cursor;$('more').hidden=data.members.length<50;$('notice').textContent=!data.enabled?'Early access is disabled. Configure the service before approving people.':!data.members.length?'No people match this view.':'';}catch(e){$('notice').textContent=e.message;}finally{busy=false;}}
-$('status').onchange=()=>load();$('search').onclick=()=>load();$('query').onkeydown=e=>{if(e.key==='Enter')load();};$('more').onclick=()=>load(true);load();
-</script></body></html>`;
 }

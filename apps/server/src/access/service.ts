@@ -54,7 +54,7 @@ export async function requestLink(env: Env, email: string, shareCode?: string, n
     .bind(email, now, owner ? owner.id : null, owner ? owner.id : null)
     .first<{ id: string }>();
   if (member?.status !== 'approved' && !invite && !owner) return;
-  await env.DB.batch([
+  const results = await env.DB.batch([
     memberInsert(env, email, 'invitation', false, now),
     ...(await mailStatements(
       env,
@@ -68,6 +68,7 @@ export async function requestLink(env: Env, email: string, shareCode?: string, n
       },
     )),
   ]);
+  return results.at(-1)?.meta.changes === 1;
 }
 export async function approve(env: Env, id: string, now = Date.now()) {
   const member = await env.DB.prepare('SELECT * FROM access_members WHERE id=?')
@@ -76,7 +77,7 @@ export async function approve(env: Env, id: string, now = Date.now()) {
   if (!member) throw new AccessError(404, 'member_not_found');
   if (member.status !== 'waiting') return;
   const guard = "EXISTS(SELECT 1 FROM access_members WHERE id=? AND status='waiting')";
-  await env.DB.batch([
+  const results = await env.DB.batch([
     ...(await mailStatements(
       env,
       { to: member.email, kind: 'welcome' },
@@ -89,6 +90,7 @@ export async function approve(env: Env, id: string, now = Date.now()) {
       "UPDATE access_invites SET status='revoked' WHERE email=? AND status='pending'",
     ).bind(member.email),
   ]);
+  return results[1].meta.changes === 1;
 }
 export async function sessionMember(request: Request, env: Env, now = Date.now()) {
   const cookie = request.headers

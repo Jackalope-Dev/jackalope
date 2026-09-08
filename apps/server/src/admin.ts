@@ -61,7 +61,8 @@ export async function adminRoutes(
   if (
     url.pathname === '/admin/access' ||
     url.pathname.startsWith('/admin/access/') ||
-    url.pathname === '/admin/api/access'
+    url.pathname === '/admin/api/access' ||
+    url.pathname.startsWith('/admin/api/access/')
   )
     return accessAdmin(request, env, readJson);
   if (request.method === 'GET' && url.pathname === '/admin') {

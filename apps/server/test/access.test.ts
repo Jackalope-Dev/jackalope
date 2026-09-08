@@ -392,7 +392,12 @@ it('protects private approval and revocation routes and preserves accepted place
     );
   expect((await call({ id: person.id, action: 'approve' })).status).toBe(403);
   expect(
-    (await call({ id: person.id, action: 'approve' }, 'https://api.jackalope.dev')).status,
+    (
+      await call(
+        { id: person.id, action: 'approve', allowWithoutDownload: true },
+        'https://api.jackalope.dev',
+      )
+    ).status,
   ).toBe(200);
   const session = await acceptToken(bindings, (await mail(person.email)).token);
   const current = required(

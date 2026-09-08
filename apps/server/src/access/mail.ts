@@ -155,6 +155,7 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
             subject: content.subject,
             body: content.body,
             preview: content.preview,
+            trackingSettings: { openTracking: false, clickTracking: false },
           }),
         });
         providerStatus = response.status;
@@ -164,9 +165,17 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
           throw new Error('mail_provider_rejected');
         stage = 'record';
         await env.DB.prepare(
-          "UPDATE access_mail SET state='queued',provider_id=?,payload='',lease=NULL WHERE id=? AND lease=?",
+          "UPDATE access_mail SET state='queued',provider_id=?,provider_send_id=?,payload='',lease=NULL WHERE id=? AND lease=?",
         )
-          .bind(result.jobId.slice(0, 200), id, lease)
+          .bind(
+            result.jobId.slice(0, 200),
+            typeof result.emailSendId === 'string' &&
+              /^[a-zA-Z0-9_-]{1,200}$/.test(result.emailSendId)
+              ? result.emailSendId
+              : null,
+            id,
+            lease,
+          )
           .run();
       } catch {
         console.error('access_mail_delivery_failed', {
