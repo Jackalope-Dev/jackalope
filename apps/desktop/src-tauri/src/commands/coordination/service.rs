@@ -17,6 +17,14 @@ impl Coordinator {
     }
 
     pub(super) fn append(ledger: &mut Ledger, req: QueueRequest) -> Result<String, String> {
+        super::super::outcomes::ProcessTemplate {
+            outcomes: req.context_selection.outcomes.clone(),
+            ..Default::default()
+        }
+        .validate()?;
+        if req.context_selection.advance_workflow {
+            return Err("A queued task must begin at the first workflow step.".into());
+        }
         if req.title.trim().is_empty()
             || req.title.len() > 160
             || req.prompt.trim().is_empty()
@@ -60,6 +68,9 @@ impl Coordinator {
         }
         let id = Uuid::new_v4().to_string();
         ledger.items.push(QueueItem {
+            feature: req.feature,
+            feature_id: req.feature_id,
+            context_selection: req.context_selection,
             id: id.clone(),
             project_id: req.project_id,
             project_name: req.project_name,
@@ -91,8 +102,68 @@ impl Coordinator {
     }
 
     pub(super) fn import(&self, request: PlanRequest) -> Result<Vec<String>, String> {
+        if request
+            .feature
+            .as_ref()
+            .is_some_and(|f| f.trim().is_empty() || f.len() > 160)
+        {
+            return Err("Use a feature title up to 160 bytes.".into());
+        }
         let items = ordered_plan(request.items)?;
         let mut inner = self.inner.lock().unwrap();
+        if let Some(feature_id) = &request.feature_id {
+            if uuid::Uuid::parse_str(feature_id).is_err() {
+                return Err("Invalid feature identifier.".into());
+            }
+            let existing: Vec<_> = inner
+                .ledger
+                .items
+                .iter()
+                .filter(|i| i.feature_id.as_ref() == Some(feature_id))
+                .collect();
+            if !existing.is_empty() {
+                let existing_ids: HashMap<_, _> = items
+                    .iter()
+                    .zip(&existing)
+                    .map(|(item, old)| (item.key.as_str(), old.id.as_str()))
+                    .collect();
+                if existing.len() != items.len()
+                    || existing.iter().zip(&items).any(|(old, item)| {
+                        old.project_id != request.project_id
+                            || old.project_path != request.project_path
+                            || old.title != item.title.trim()
+                            || old.prompt != item.prompt.trim()
+                            || old.agent != item.agent
+                            || old.agent_profile_id
+                                != request.agent_accounts.get(&item.agent).cloned()
+                            || request
+                                .target_branch
+                                .as_ref()
+                                .is_some_and(|branch| old.target_branch.as_ref() != Some(branch))
+                            || scopes(item.scopes.clone()).ok().as_ref() != Some(&old.scopes)
+                            || item
+                                .depends_on
+                                .iter()
+                                .filter_map(|key| existing_ids.get(key.as_str()).copied())
+                                .collect::<Vec<_>>()
+                                != old
+                                    .dependencies
+                                    .iter()
+                                    .map(String::as_str)
+                                    .collect::<Vec<_>>()
+                            || old.feature != request.feature
+                            || old.verify_command != request.verify_command
+                            || old.prepare_command != request.prepare_command
+                            || old.auto_verify != request.auto_verify
+                            || serde_json::to_value(&old.context_selection).ok()
+                                != serde_json::to_value(&item.context_selection).ok()
+                    })
+                {
+                    return Err("This feature plan was already saved with different tasks. Open the saved plan before adding more work.".into());
+                }
+                return Ok(existing.iter().map(|item| item.id.clone()).collect());
+            }
+        }
         let mut ledger = inner.ledger.clone();
         let mut ids = HashMap::new();
         let mut created = Vec::new();
@@ -100,6 +171,9 @@ impl Coordinator {
             let id = Self::append(
                 &mut ledger,
                 QueueRequest {
+                    feature: request.feature.clone(),
+                    feature_id: request.feature_id.clone(),
+                    context_selection: item.context_selection,
                     project_id: request.project_id.clone(),
                     project_name: request.project_name.clone(),
                     project_path: request.project_path.clone(),
@@ -124,6 +198,7 @@ impl Coordinator {
         }
         self.save(&ledger)?;
         inner.ledger = ledger;
+        inner.enabled.remove(&request.project_id);
         Ok(created)
     }
 
@@ -158,7 +233,7 @@ impl Coordinator {
             let instructions = instructions(&item);
             let result = self.runtime.start_locked(RunRequest {
                 monitor_change: None,
-                context_selection: Default::default(),
+                context_selection: item.context_selection.clone(),
                 context_receipt: Default::default(),
                 model: None,
                 id: run_id,
@@ -372,6 +447,9 @@ impl Coordinator {
                     .find(|r| r.id == run_id)
                     .ok_or(StatusCode::UNAUTHORIZED)?;
                 QueueItem {
+                    feature: None,
+                    feature_id: None,
+                    context_selection: Default::default(),
                     id: run.task_id.clone(),
                     project_id: run.project_id.clone(),
                     project_name: run.project_name.clone(),

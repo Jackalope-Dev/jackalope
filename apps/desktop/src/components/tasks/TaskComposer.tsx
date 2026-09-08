@@ -8,6 +8,7 @@ import type { TaskDraft } from '../../stores/executionStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
+import { OutcomeEditor } from './OutcomeEditor';
 import { TaskContextPanel } from './TaskContextPanel';
 
 interface Props {
@@ -104,6 +105,16 @@ export function TaskComposer({
           }}
         />
         {context}
+        <OutcomeEditor
+          values={current.contextSelection?.outcomes ?? []}
+          onChange={(outcomes) =>
+            onChange({ contextSelection: { ...current.contextSelection, outcomes } })
+          }
+        />
+        <p className="task-muted">
+          Optional. Each added requirement needs your evidence review before the task can be marked
+          reviewed or integrated.
+        </p>
         <details className="capture-options">
           <summary>
             Task options

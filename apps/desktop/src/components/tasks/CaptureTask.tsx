@@ -20,6 +20,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ProjectSetup } from './ProjectSetup';
 import { TaskComposer } from './TaskComposer';
+import { WorkspaceReadiness } from './WorkspaceReadiness';
 
 // The tools panel pulls in the agent, connection and project editors; load it
 // only when the user opens it.
@@ -240,6 +241,7 @@ export function CaptureTask({
           <Dialog.Description className="task-muted mt-2 mb-5">
             Describe the outcome. Your draft stays here when you close this window.
           </Dialog.Description>
+          {project && <WorkspaceReadiness key={project.id} project={project} />}
           <TaskComposer
             setup={
               <Button

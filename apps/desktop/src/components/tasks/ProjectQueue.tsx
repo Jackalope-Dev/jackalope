@@ -27,6 +27,7 @@ import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { AddWork } from './AddWork';
+import { FeaturePlanner } from './FeaturePlanner';
 import { MergeReview } from './MergeReview';
 import { PlanImport } from './PlanImport';
 import './project-queue.css';
@@ -48,6 +49,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
   const { runs, select, refresh } = useExecutionStore();
   const [queue, setQueue] = useState<QueueView>(emptyQueue);
   const [adding, setAdding] = useState(false);
+  const [planningFeature, setPlanningFeature] = useState(false);
   const [importing, setImporting] = useState(false);
   const [tab, setTab] = useState('plan');
   const [filter, setFilter] = useState('all');
@@ -143,13 +145,16 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
       <div className={`queue-heading ${items.length ? 'queue-heading-active' : ''}`}>
         <div>
           <h1 className="task-hero-title">
-            {tab === 'review' ? 'Review & merge' : 'Parallel work'}
+            {tab === 'review' ? 'Review & merge' : 'Feature work'}
           </h1>
           {!items.length && (
             <p className="task-muted mt-3">Independent tasks. Shared progress. One review.</p>
           )}
         </div>
         <div className="flex flex-col items-end gap-3">
+          <Button disabled={!desktop} onClick={() => setPlanningFeature(true)}>
+            Plan a feature
+          </Button>
           <Button variant="outline" disabled={!desktop} onClick={() => setAdding(true)}>
             <ListPlus size={16} />
             Add work
@@ -164,7 +169,29 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           </button>
         </div>
       </div>
-      <nav className="queue-tabs" aria-label="Parallel work views">
+      {planningFeature && (
+        <FeaturePlanner
+          project={project}
+          onClose={() => setPlanningFeature(false)}
+          onAdded={load}
+        />
+      )}
+      {[...new Set(items.filter((i) => i.feature).map((i) => i.featureId ?? i.feature))].map(
+        (featureId) => {
+          const steps = items.filter((i) => (i.featureId ?? i.feature) === featureId);
+          const feature = steps[0]?.feature;
+          const integrated = steps.filter((i) => state(i) === 'merged').length;
+          const attention = steps.filter((i) => state(i) === 'attention').length;
+          return (
+            <p key={featureId} className="task-notice my-3">
+              {feature} · {integrated} of {steps.length} tasks integrated
+              {attention ? ` · ${attention} need attention` : ''}
+              {integrated === steps.length ? ' · Plan integrated; check the combined feature.' : ''}
+            </p>
+          );
+        },
+      )}
+      <nav className="queue-tabs" aria-label="Feature work views">
         <button aria-pressed={tab === 'plan'} type="button" onClick={() => setTab('plan')}>
           Plan & progress
         </button>
@@ -198,10 +225,10 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
         <>
           <div className="queue-controls">
             <label htmlFor="projectqueue-field-2" className="task-label">
-              Concurrent agents
+              Concurrent tasks
               <Select
                 id="projectqueue-field-2"
-                aria-label="Concurrent agents"
+                aria-label="Concurrent tasks"
                 className="task-input"
                 value={String(queue.concurrency)}
                 disabled={busy || !desktop}

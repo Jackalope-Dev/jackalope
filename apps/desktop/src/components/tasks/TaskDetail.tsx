@@ -2,6 +2,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
+import { recoveryHandoff } from '../../lib/project-return';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { latestAttempt, safeResultLink } from '../../lib/task-workflow';
@@ -17,9 +18,12 @@ import { RunStatus } from './RunStatus';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
 import { TaskIntegration } from './TaskIntegration';
+import { TaskOutcomes } from './TaskOutcomes';
+import { TaskPreview } from './TaskPreview';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
+import { WorkspaceReadiness } from './WorkspaceReadiness';
 
 const Markdown = lazy(() => import('react-markdown'));
 // The tools panel pulls in the agent, connection and project editors; load it
@@ -68,6 +72,7 @@ export function TaskDetail({
         idea.projectId === run.projectId && attempts.some((attempt) => attempt.id === idea.runId),
     ),
   );
+  const currentProject = useProjectStore((s) => s.projects.find((p) => p.id === run.projectId));
   const title = sourceIdea?.title ?? taskTitle(attempts[0]?.prompt ?? run.prompt);
   const pending = run.prompts?.filter((p) => p.status === 'pending') ?? [];
   const isolated =
@@ -168,7 +173,19 @@ export function TaskDetail({
     const id = useTaskStore.getState().addTask({
       projectId: run.projectId,
       title: `Continue: ${title}`.slice(0, 160),
-      rawPrompt: `Continue this work after inspecting its existing result and workspace.\n\nOriginal instruction:\n${sourceIdea?.rawPrompt ?? attempts[0]?.prompt ?? run.prompt}\n\nPrevious result:\n${run.result.slice(0, 8000)}\n\nWorkspace to inspect: ${run.workspace}\n\nRequested next step:\n${reply}`,
+      rawPrompt: recoveryHandoff(
+        run,
+        sourceIdea?.rawPrompt ?? attempts[0]?.prompt ?? run.prompt,
+        reply,
+      ),
+      contextSelection: {
+        workflowId: run.contextReceipt?.entries.find((e) => e.kind === 'workflow')?.id,
+        inputValues: run.contract?.inputs,
+        outcomes: (run.contract?.requirements ?? [])
+          .filter((r) => !r.checkpoint)
+          .map((r) => r.title),
+      },
+      connectionIds: run.connectionIds ?? undefined,
       assignedAgent: run.agent,
       status: 'backlog',
     });
@@ -220,6 +237,11 @@ export function TaskDetail({
         </div>
       )}
       <TaskSaveRecovery run={run} />
+      {!!run.contract?.requirements.length && (
+        <Button variant="ghost" onClick={() => setTab('outcomes')}>
+          Review {run.contract.requirements.length} outcomes and checkpoints
+        </Button>
+      )}
       {run.error && (
         <p role="alert" className="task-error">
           {run.error}
@@ -306,23 +328,58 @@ export function TaskDetail({
           </Button>
         </div>
       )}
+      {!active && run.status !== 'interrupted' && !!run.workspace && (
+        <TaskPreview key={`preview:${run.id}`} run={run} />
+      )}
       <Tabs.Root value={tab} onValueChange={setTab}>
         <Tabs.List className="result-tabs" aria-label="Task sections">
-          {['result', 'changes', 'evidence', 'activity', 'context'].map((value) => (
+          {[
+            'result',
+            ...(run.contract?.requirements.length ? ['outcomes'] : []),
+            'changes',
+            'evidence',
+            'activity',
+            'context',
+          ].map((value) => (
             <Tabs.Trigger key={value} value={value}>
               {value === 'result'
                 ? 'Result'
-                : value === 'changes'
-                  ? 'Changes & checks'
-                  : value === 'evidence'
-                    ? 'Evidence'
-                    : value === 'activity'
-                      ? 'Activity'
-                      : 'Context'}
+                : value === 'outcomes'
+                  ? 'Outcomes'
+                  : value === 'changes'
+                    ? 'Changes & checks'
+                    : value === 'evidence'
+                      ? 'Evidence'
+                      : value === 'activity'
+                        ? 'Activity'
+                        : 'Context'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
         <div className="result-canvas">
+          <Tabs.Content value="outcomes" forceMount hidden={tab !== 'outcomes'}>
+            <TaskOutcomes
+              key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
+              run={run}
+              canReview={finished && isLatest && !integrated}
+              onCorrect={(prompt) =>
+                draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
+              }
+              onAdvance={async () => {
+                await start({
+                  projectId: run.projectId,
+                  projectName: run.projectName,
+                  projectPath: run.projectPath,
+                  agent: run.agent,
+                  prompt:
+                    'Continue with the next agreed workflow step. Preserve completed work and report evidence for this step.',
+                  isolated: false,
+                  previousRunId: run.id,
+                  contextSelection: { advanceWorkflow: true },
+                });
+              }}
+            />
+          </Tabs.Content>
           <Tabs.Content value="result">
             {!!run.screenshots?.length && (
               <figure className="result-preview">
@@ -421,7 +478,7 @@ export function TaskDetail({
           <Tabs.Content value="context">
             {' '}
             <section className="task-environment" aria-label="Context, history and usage">
-              <TaskLearning key={`knowledge:${run.id}`} run={run} />
+              {run.status !== 'reviewed' && <TaskLearning key={`knowledge:${run.id}`} run={run} />}
               <p className="task-muted">
                 {run.agent} · {run.model || 'Agent-configured model'} · {run.account} · This
                 computer
@@ -606,6 +663,14 @@ export function TaskDetail({
             </p>
           )}
         </div>
+      )}
+      {run.status === 'reviewed' && <TaskLearning key={`learning:${run.id}`} run={run} />}
+      {!active && currentProject && (
+        <WorkspaceReadiness
+          key={`readiness:${run.id}`}
+          project={currentProject}
+          path={run.workspace || run.projectPath}
+        />
       )}
       {toolsOpen && (
         <Suspense fallback={null}>

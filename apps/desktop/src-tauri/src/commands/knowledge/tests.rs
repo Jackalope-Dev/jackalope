@@ -2,6 +2,7 @@ use super::*;
 
 fn entry(id: usize, kind: KnowledgeKind, phrase: &str) -> KnowledgeEntry {
     KnowledgeEntry {
+        process: Default::default(),
         id: format!("00000000-0000-4000-8000-{id:012}"),
         project_id: "project".into(),
         project_path: std::env::temp_dir().to_string_lossy().into(),
@@ -11,6 +12,7 @@ fn entry(id: usize, kind: KnowledgeKind, phrase: &str) -> KnowledgeEntry {
         keywords: vec![phrase.into()],
         enabled: true,
         source_run_id: None,
+        source_head: None,
         revision: 0,
         updated_at: String::new(),
     }

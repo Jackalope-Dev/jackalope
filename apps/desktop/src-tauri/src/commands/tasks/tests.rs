@@ -2,6 +2,7 @@ use super::*;
 
 fn sample(agent: &str) -> TaskRun {
     TaskRun {
+        contract: Default::default(),
         monitor_change: None,
         context_receipt: Default::default(),
         id: "test-attempt-123".into(),
@@ -253,6 +254,42 @@ fn installed_agent_lifecycle_trial() {
         prepare_command: None, auto_verify: false, monitor_change: None,
         context_selection: Default::default(), context_receipt: Default::default(),
     };
+    let workflow_trial = std::env::var_os("JACKALOPE_WORKFLOW_TRIAL").is_some();
+    let mut request = request;
+    if workflow_trial {
+        let workflow = runtime
+            .knowledge
+            .save(crate::commands::knowledge::KnowledgeEntry {
+                id: uuid::Uuid::new_v4().to_string(),
+                project_id: request.project_id.clone(),
+                project_path: request.project_path.clone(),
+                kind: crate::commands::knowledge::KnowledgeKind::Workflow,
+                title: "Native acceptance workflow".into(),
+                content: "Follow the task's exact instructions. Each step pauses for human review."
+                    .into(),
+                keywords: vec![],
+                enabled: true,
+                source_run_id: None,
+                source_head: None,
+                revision: 0,
+                updated_at: String::new(),
+                process: crate::commands::outcomes::ProcessTemplate {
+                    inputs: vec!["Receipt name".into()],
+                    steps: vec![
+                        "Create receipt.txt and remember the phrase, as specified in the task"
+                            .into(),
+                        "Recall the remembered phrase without using tools".into(),
+                    ],
+                    outcomes: vec!["receipt.txt retains exactly JACKALOPE_NATIVE_OK".into()],
+                },
+            })
+            .unwrap();
+        request.context_selection.workflow_id = Some(workflow.id);
+        request
+            .context_selection
+            .input_values
+            .insert("Receipt name".into(), "receipt.txt".into());
+    }
     fn settled(runtime: &TaskRuntime, id: &str) -> TaskRun {
         let deadline = std::time::Instant::now() + Duration::from_secs(180);
         loop {
@@ -292,6 +329,30 @@ fn installed_agent_lifecycle_trial() {
     next.id = uuid::Uuid::new_v4().to_string();
     next.previous_run_id = Some(first.id.clone());
     next.prompt = "Reply with only the phrase I asked you to remember in the previous turn. Do not use tools.".into();
+    if workflow_trial {
+        assert_eq!(first.contract.step, 0);
+        assert_eq!(first.contract.requirements.len(), 3);
+        next.context_selection.advance_workflow = true;
+        assert!(runtime
+            .start(next.clone())
+            .unwrap_err()
+            .contains("Accept current evidence"));
+        let directory = runtime.integration_directory();
+        std::fs::create_dir_all(&directory).unwrap();
+        let tree = crate::commands::integration::workspace_tree(&first, &directory).unwrap();
+        crate::commands::outcomes::record(
+            &runtime,
+            crate::commands::outcomes::OutcomeReview {
+                run_id: first.id.clone(),
+                requirement_id: first.contract.requirements[0].id.clone(),
+                expected_tree: tree,
+                accepted: true,
+                evidence: "manual".into(),
+                note: "Native trial read the receipt and verified its exact contents.".into(),
+            },
+        )
+        .unwrap();
+    }
     runtime.start(next.clone()).unwrap();
     let second = settled(&runtime, &next.id);
     assert_eq!(second.status, "review", "{:?}", second.error);
@@ -304,6 +365,39 @@ fn installed_agent_lifecycle_trial() {
         first.account_binding.as_ref().unwrap().directory,
         second.account_binding.as_ref().unwrap().directory
     );
+    if workflow_trial {
+        assert_eq!(second.contract.step, 1);
+        assert!(
+            second.contract.requirements[0]
+                .receipt
+                .as_ref()
+                .unwrap()
+                .accepted
+        );
+        assert!(second.contract.requirements[1].receipt.is_none());
+        let directory = runtime.integration_directory();
+        let tree = crate::commands::integration::workspace_tree(&second, &directory).unwrap();
+        for requirement in second.contract.requirements.iter().skip(1) {
+            crate::commands::outcomes::record(
+                &runtime,
+                crate::commands::outcomes::OutcomeReview {
+                    run_id: second.id.clone(),
+                    requirement_id: requirement.id.clone(),
+                    expected_tree: tree.clone(),
+                    accepted: true,
+                    evidence: "manual".into(),
+                    note: "Native trial verified recalled phrase and preserved receipt contents."
+                        .into(),
+                },
+            )
+            .unwrap();
+        }
+        runtime.inner.lock().unwrap().runs[&second.id]
+            .contract
+            .require_accepted(&tree)
+            .unwrap();
+        println!("Workflow acceptance retained at {}", root.display());
+    }
     let mut stop = request;
     stop.id = uuid::Uuid::new_v4().to_string();
     stop.isolated = false;

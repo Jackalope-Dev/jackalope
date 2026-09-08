@@ -266,6 +266,9 @@ fn preview(path: &Path, base: &str, target: &str) -> Result<(Vec<String>, String
 }
 
 fn require_verification(run: &TaskRun, tree: &str) -> Result<(), String> {
+    super::previews::ensure_idle(&run.workspace)?;
+    super::previews::ensure_idle(&run.project_path)?;
+    run.contract.require_accepted(tree)?;
     if run
         .verify_command
         .as_ref()
@@ -730,6 +733,37 @@ mod tests {
                     .contains(&runs[0].id)
             );
         }
+    }
+
+    #[test]
+    fn acceptance_blocks_integration_and_is_invalidated_by_edits() {
+        use super::super::outcomes::{OutcomeReceipt, Requirement};
+        let fixture = Fixture::new();
+        let mut run = fixture.run(1, "feature.txt", "works\n");
+        run.contract.requirements.push(Requirement {
+            id: "outcome".into(),
+            title: "Feature works".into(),
+            checkpoint: false,
+            receipt: None,
+        });
+        assert!(prepare(&fixture.plans, &[run.clone()], &[run.id.clone()])
+            .unwrap_err()
+            .contains("current evidence"));
+        let tree = workspace_tree(&run, &fixture.plans).unwrap();
+        run.contract.requirements[0].receipt = Some(OutcomeReceipt {
+            accepted: true,
+            evidence: "manual".into(),
+            note: "Exercised the feature".into(),
+            tree,
+            recorded_at: Utc::now().to_rfc3339(),
+        });
+        let plan = prepare(&fixture.plans, &[run.clone()], &[run.id.clone()]).unwrap();
+        fs::write(Path::new(&run.workspace).join("feature.txt"), "changed\n").unwrap();
+        assert!(apply(&fixture.plans, &[run.clone()], &plan.id).is_err());
+        assert!(prepare(&fixture.plans, &[run.clone()], &[run.id.clone()])
+            .unwrap_err()
+            .contains("current evidence"));
+        assert!(!fixture.project.join("feature.txt").exists());
     }
 
     #[test]

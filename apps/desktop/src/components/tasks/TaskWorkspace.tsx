@@ -12,6 +12,7 @@ import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { ProjectQueue } from './ProjectQueue';
+import { ProjectReturn } from './ProjectReturn';
 import { TaskCollection, type TaskCollectionView } from './TaskCollection';
 import { TaskDetail } from './TaskDetail';
 
@@ -128,7 +129,7 @@ export function TaskWorkspace({
                 >
                   <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
                     <Workflow size={16} />
-                    Organize parallel work · {project.name}
+                    Plan feature work · {project.name}
                   </Menu.Item>
                 </Menu.Content>
               </Menu.Portal>
@@ -136,6 +137,15 @@ export function TaskWorkspace({
           )}
         </div>
       </div>
+      {project && (
+        <ProjectReturn
+          key={project.id}
+          project={project}
+          runs={runs}
+          integratedIds={integratedIds}
+          onOpen={select}
+        />
+      )}
       {loading && (
         <p role="status" className="task-muted">
           Loading task history…

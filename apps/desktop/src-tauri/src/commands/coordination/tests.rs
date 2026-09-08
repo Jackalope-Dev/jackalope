@@ -26,6 +26,7 @@ fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
 }
 fn entry(key: &str, dependencies: &[&str]) -> PlanEntry {
     PlanEntry {
+        context_selection: Default::default(),
         key: key.into(),
         title: key.into(),
         prompt: "Do a task".into(),
@@ -45,6 +46,9 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
     // a manually-started standalone task did, via a separate, unshared
     // copy of this same text.
     let item = QueueItem {
+        feature: None,
+        feature_id: None,
+        context_selection: Default::default(),
         id: "task-1".into(),
         project_id: "project".into(),
         project_name: "Project".into(),
@@ -137,6 +141,9 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
     assert!(Coordinator::new(dir.join("queue"), runtime.clone()).is_err());
     let id = service
         .add(QueueRequest {
+            feature: None,
+            feature_id: None,
+            context_selection: Default::default(),
             project_id: "project".into(),
             project_name: "Project".into(),
             project_path: dir.to_string_lossy().into(),
@@ -197,7 +204,10 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         .success());
     let runtime = TaskRuntime::new(dir.join("runs")).unwrap();
     let service = Coordinator::new(dir.join("queue"), runtime).unwrap();
+    let feature_id = Uuid::new_v4().to_string();
     let request = |items| PlanRequest {
+        feature: Some("Feature".into()),
+        feature_id: Some(feature_id.clone()),
         project_id: "project".into(),
         project_name: "Project".into(),
         project_path: dir.to_string_lossy().into(),
@@ -224,6 +234,27 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
             entry("after", &["first"]),
         ]))
         .unwrap();
+    let mut shared = entry("shared", &[]);
+    shared.scopes = vec!["docs/first.md".into()];
+    let retry_ids = service
+        .import(request(vec![
+            entry("first", &[]),
+            entry("independent", &[]),
+            shared.clone(),
+            entry("after", &["first"]),
+        ]))
+        .unwrap();
+    assert_eq!(retry_ids.len(), 4);
+    assert_eq!(service.inner.lock().unwrap().ledger.items.len(), 4);
+    shared.scopes = vec!["different".into()];
+    assert!(service
+        .import(request(vec![
+            entry("first", &[]),
+            entry("independent", &[]),
+            shared,
+            entry("after", &["first"])
+        ]))
+        .is_err());
     let mut inner = service.inner.lock().unwrap();
     inner.enabled.insert("project".into());
     let first = ready_items(&inner, &[], &[]);

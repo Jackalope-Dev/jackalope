@@ -145,6 +145,12 @@ pub fn run() {
             task_start,
             task_stop,
             task_mark_reviewed,
+            commands::outcomes::task_outcome_snapshot,
+            commands::readiness::project_readiness,
+            commands::previews::task_preview_start,
+            commands::previews::task_preview_status,
+            commands::previews::task_preview_stop,
+            commands::outcomes::task_outcome_review,
             task_review,
             commands::verification::task_verify,
             task_respond_prompt,
@@ -177,6 +183,7 @@ pub fn run() {
                 app.state::<Scheduler>().shutdown();
                 app.state::<commands::notifications::Notifications>().shutdown();
                 commands::browser::close_all();
+                commands::previews::close_all();
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
                 app.state::<AppState>().kill_all_pty_sessions();

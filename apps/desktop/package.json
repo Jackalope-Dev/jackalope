@@ -17,7 +17,7 @@
     "test:mcp": "node --test scripts/mcp.test.mjs",
     "brand:generate": "node scripts/generate-brand.mjs && tauri icon src-tauri/icons/source-icon.svg --ios-color \"#1d1a18\" && node scripts/generate-brand.mjs --copy-icon && pnpm brand:installer",
     "brand:installer": "node scripts/generate-installer-brand.mjs",
-    "test": "node --test scripts/visual-state.test.mjs scripts/skills.test.mjs scripts/settings.test.mjs scripts/planning.test.mjs scripts/workflow.test.mjs scripts/onboarding.test.mjs scripts/mcp.test.mjs scripts/data-integrity.test.mjs scripts/codebase.test.mjs ../../scripts/release-config.test.mjs scripts/updates.test.mjs ../../scripts/update-manifest.test.mjs scripts/discovery.test.mjs scripts/telemetry.test.mjs scripts/companion.test.mjs",
+    "test": "node --test scripts/visual-state.test.mjs scripts/skills.test.mjs scripts/settings.test.mjs scripts/planning.test.mjs scripts/workflow.test.mjs scripts/outcomes.test.mjs scripts/onboarding.test.mjs scripts/mcp.test.mjs scripts/data-integrity.test.mjs scripts/codebase.test.mjs ../../scripts/release-config.test.mjs scripts/updates.test.mjs ../../scripts/update-manifest.test.mjs scripts/discovery.test.mjs scripts/telemetry.test.mjs scripts/companion.test.mjs",
     "test:discovery": "node --test scripts/discovery.test.mjs",
     "build:lab": "vite build --mode lab --outDir dist-lab"
   },

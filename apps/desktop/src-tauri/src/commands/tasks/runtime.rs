@@ -239,6 +239,7 @@ impl TaskRuntime {
                 "sandbox_mode=\"workspace-write\"",
             ]);
             if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
                 cmd.args(["resume", old.session_id.as_deref().unwrap()]);
             }
             cmd.args(["--json", "-"]);
@@ -252,6 +253,7 @@ impl TaskRuntime {
                 "acceptEdits",
             ]);
             if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
         } else if adapter == "antigravity" {
@@ -263,6 +265,7 @@ impl TaskRuntime {
         } else if adapter == "opencode" {
             cmd.args(["run", "--format", "json"]);
             if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
                 cmd.args(["--session", old.session_id.as_deref().unwrap()]);
             }
         } else {
@@ -275,6 +278,7 @@ impl TaskRuntime {
             cmd.arg("--prompt-file")
                 .arg(self.directory.join(format!("{id}.prompt")));
             if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
         }
@@ -318,10 +322,20 @@ impl TaskRuntime {
         let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. If permissions are denied, explain what is needed and stop; do not bypass the denial.\n", req.prompt);
         if req.previous_run_id.is_none() {
             input.push_str(&req.context_receipt.text());
+
             if let Some(change) = &req.monitor_change {
                 input.push_str(&format!("\nA local monitor detected committed content changes on branch {}, path {}. Previous content object: {}. Observed content object: {}. These are Git content object IDs, not necessarily commits. The branch may have advanced since this observation; verify the current workspace.\n", change.branch, if change.path.is_empty() { "(whole project)" } else { &change.path }, change.before, change.after));
             }
         }
+        let contract = self
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .get(id)
+            .map(|r| r.contract.clone())
+            .unwrap_or_default();
+        input.push_str(&contract.text());
         if let Some(context) = &req.coordination {
             cmd.env("JACKALOPE_BRIDGE_URL", &context.endpoint)
                 .env("JACKALOPE_BRIDGE_TOKEN", &context.token);
@@ -639,6 +653,23 @@ impl TaskRuntime {
         {
             return Err("Provide a task between 1 and 100,000 bytes.".into());
         }
+        if !request.isolated && request.previous_run_id.is_none() {
+            crate::commands::previews::ensure_idle(&request.project_path)?;
+        }
+        let advanced_contract = if request.context_selection.advance_workflow {
+            let runs = self.integration_runs()?;
+            let old = runs
+                .iter()
+                .find(|r| Some(&r.id) == request.previous_run_id.as_ref())
+                .ok_or("Choose a previous workflow attempt.")?;
+            crate::commands::previews::ensure_idle(&old.workspace)?;
+            let directory = self.integration_directory();
+            std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+            let tree = crate::commands::integration::workspace_tree(old, &directory)?;
+            Some(old.contract.advance(&tree)?)
+        } else {
+            None
+        };
         self.apply_policy(&mut request)?;
         let previous;
         let (adapter, _) = self.policy()?.resolve(&request.agent)?;
@@ -665,6 +696,14 @@ impl TaskRuntime {
                 })
                 .transpose()?;
             if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
+                if inner
+                    .runs
+                    .values()
+                    .any(|r| r.task_id == old.task_id && r.started_at > old.started_at)
+                {
+                    return Err("Open the latest attempt before continuing this task.".into());
+                }
                 if old.status == "interrupted" {
                     return Err("This attempt was interrupted. Inspect the agent's CLI session and workspace before starting new work; automatic resume is unavailable because process ownership is unknown.".into());
                 }
@@ -717,22 +756,34 @@ impl TaskRuntime {
                     request.connection_ids = old.connection_ids.clone();
                 }
             }
+            let context_receipt = if let Some(old) = &previous {
+                old.context_receipt.clone()
+            } else {
+                self.knowledge.select(
+                    &request.project_id,
+                    &request.project_path,
+                    &request.prompt,
+                    &request.context_selection,
+                )?
+            };
+            request.context_receipt = context_receipt.clone();
+            let contract = if let Some(old) = &previous {
+                advanced_contract
+                    .clone()
+                    .unwrap_or_else(|| old.contract.continuation())
+            } else {
+                crate::commands::outcomes::TaskContract::build(
+                    &request.context_selection,
+                    &context_receipt,
+                )?
+            };
             let run = TaskRun {
+                contract,
                 monitor_change: previous
                     .as_ref()
                     .and_then(|r| r.monitor_change.clone())
                     .or_else(|| request.monitor_change.clone()),
-                context_receipt: if let Some(old) = &previous {
-                    old.context_receipt.clone()
-                } else {
-                    request.context_receipt = self.knowledge.select(
-                        &request.project_id,
-                        &request.project_path,
-                        &request.prompt,
-                        &request.context_selection,
-                    )?;
-                    request.context_receipt.clone()
-                },
+                context_receipt,
                 id: request.id.clone(),
                 task_id: previous
                     .as_ref()

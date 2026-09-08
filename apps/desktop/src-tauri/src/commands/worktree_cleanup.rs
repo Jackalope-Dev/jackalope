@@ -115,6 +115,7 @@ fn hard_block(
         );
     }
     let path = canonical(&wt.path)?;
+    super::previews::ensure_idle(&wt.path)?;
     if repo.starts_with(&path) {
         return Err("Current project folder — kept.".into());
     }

@@ -4,6 +4,12 @@ use std::collections::HashMap;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueueItem {
+    #[serde(default)]
+    pub feature: Option<String>,
+    #[serde(default)]
+    pub feature_id: Option<String>,
+    #[serde(default)]
+    pub context_selection: super::super::knowledge::ContextSelection,
     pub id: String,
     pub project_id: String,
     pub project_name: String,
@@ -32,6 +38,12 @@ pub struct QueueItem {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueueRequest {
+    #[serde(default)]
+    pub feature: Option<String>,
+    #[serde(default)]
+    pub feature_id: Option<String>,
+    #[serde(default)]
+    pub context_selection: super::super::knowledge::ContextSelection,
     pub project_id: String,
     pub project_name: String,
     pub project_path: String,
@@ -55,6 +67,8 @@ pub struct QueueRequest {
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanEntry {
+    #[serde(default)]
+    pub context_selection: super::super::knowledge::ContextSelection,
     pub(super) key: String,
     pub(super) title: String,
     pub(super) prompt: String,
@@ -66,6 +80,10 @@ pub struct PlanEntry {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanRequest {
+    #[serde(default)]
+    pub feature: Option<String>,
+    #[serde(default)]
+    pub feature_id: Option<String>,
     pub(super) project_id: String,
     pub(super) project_name: String,
     pub(super) project_path: String,

@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 import type { KnowledgeEntry } from '../../lib/knowledge';
 import { nativeTask } from '../../lib/task-runtime';
+import { OutcomeEditor } from '../tasks/OutcomeEditor';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useDialogFocus } from '../ui/useDialogFocus';
@@ -99,6 +100,45 @@ export function KnowledgeEditor({
                 ? 'Keep it concise; at most three matching lessons are included per task.'
                 : 'Only included when you select this workflow.'}
             </p>
+            {!memory && (
+              <>
+                <OutcomeEditor
+                  label="Required inputs"
+                  values={value.process?.inputs ?? []}
+                  onChange={(inputs) =>
+                    setValue({
+                      ...value,
+                      process: { outcomes: [], steps: [], ...value.process, inputs },
+                    })
+                  }
+                />
+                <OutcomeEditor
+                  label="Process steps, with approval before advancing"
+                  values={value.process?.steps ?? []}
+                  onChange={(steps) =>
+                    setValue({
+                      ...value,
+                      process: { outcomes: [], inputs: [], ...value.process, steps },
+                    })
+                  }
+                />
+                <OutcomeEditor
+                  label="Expected outcomes"
+                  values={value.process?.outcomes ?? []}
+                  onChange={(outcomes) =>
+                    setValue({
+                      ...value,
+                      process: { inputs: [], steps: [], ...value.process, outcomes },
+                    })
+                  }
+                />
+                <p className="task-muted">
+                  Inputs are required before launch. Each step runs separately and pauses for your
+                  evidence review before the next step. Final outcomes require review before
+                  completion or integration. They do not grant the agent new permissions.
+                </p>
+              </>
+            )}
             {memory && (
               <label className="block" htmlFor="knowledge-phrases">
                 Use when a task mentions

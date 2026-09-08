@@ -38,7 +38,7 @@ interface ExecutionState {
   draft: (key: string, value: Partial<TaskDraft>) => void;
   discover: () => Promise<void>;
   refresh: () => Promise<void>;
-  start: (request: Omit<RunRequest, 'id'>) => Promise<string>;
+  start: (request: Omit<RunRequest, 'id'>, options?: { background?: boolean }) => Promise<string>;
 }
 let refreshing: Promise<void> | undefined;
 export const useExecutionStore = create<ExecutionState>()(
@@ -93,7 +93,7 @@ export const useExecutionStore = create<ExecutionState>()(
         });
         return refreshing;
       },
-      start: async (request) => {
+      start: async (request, options) => {
         if (get().submitting) throw new Error('A task is already being submitted.');
         set({ submitting: true });
         try {
@@ -101,7 +101,7 @@ export const useExecutionStore = create<ExecutionState>()(
           const id = await nativeTask<string>('task_start', {
             request: { ...request, id: crypto.randomUUID() },
           });
-          set({ selectedId: id });
+          if (!options?.background) set({ selectedId: id });
           await get().refresh();
           return id;
         } finally {

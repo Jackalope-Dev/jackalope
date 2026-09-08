@@ -49,6 +49,7 @@ export function TaskKnowledge({
       clearTimeout(timer);
     };
   }, [projectId, projectPath, prompt, signature]);
+  const workflow = entries.find((e) => e.id === selection.workflowId);
   const workflows = entries.filter((e) => e.kind === 'workflow' && e.enabled);
   return (
     <details className="my-3">
@@ -83,6 +84,35 @@ export function TaskKnowledge({
             ))}
           </Select>
         </label>
+        {workflow?.process?.inputs.map((name, index) => (
+          <label key={name} className="block" htmlFor={`workflow-input-${index}`}>
+            {name}
+            <textarea
+              id={`workflow-input-${index}`}
+              className="task-input w-full"
+              rows={2}
+              maxLength={2000}
+              value={selection.inputValues?.[name] ?? ''}
+              onChange={(e) =>
+                onChange({
+                  ...selection,
+                  inputValues: { ...selection.inputValues, [name]: e.target.value },
+                })
+              }
+            />
+            <span className="task-muted">Required for this workflow. Do not enter secrets.</span>
+          </label>
+        ))}
+        {!!workflow?.process?.steps.length && (
+          <p className="task-muted">Review checkpoints: {workflow.process.steps.join(' → ')}</p>
+        )}
+        {!!workflow?.process?.outcomes.length && (
+          <ul className="list-disc pl-5">
+            {workflow.process.outcomes.map((outcome) => (
+              <li key={outcome}>{outcome}</li>
+            ))}
+          </ul>
+        )}
         <label className="flex gap-3 items-center min-h-11">
           <input
             type="checkbox"

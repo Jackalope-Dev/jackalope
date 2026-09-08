@@ -17,6 +17,7 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  contract?: import('./task-outcomes').TaskContract;
   monitorChange?: { before: string; after: string; path: string; branch: string } | null;
   contextReceipt?: import('./knowledge').ContextReceipt;
   id: string;

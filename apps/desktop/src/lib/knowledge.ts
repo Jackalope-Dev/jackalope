@@ -4,7 +4,13 @@ import { useProjectStore } from '../stores/projectStore';
 import { nativeTask } from './task-runtime';
 import { isTauriEnvironment } from './tauri-bridge';
 
+export interface ProcessTemplate {
+  outcomes: string[];
+  steps: string[];
+  inputs: string[];
+}
 export interface KnowledgeEntry {
+  process?: ProcessTemplate;
   id: string;
   projectId: string;
   projectPath: string;
@@ -14,10 +20,14 @@ export interface KnowledgeEntry {
   keywords: string[];
   enabled: boolean;
   sourceRunId: string | null;
+  sourceHead?: string | null;
   revision: number;
   updatedAt: string;
 }
 export interface ContextSelection {
+  advanceWorkflow?: boolean;
+  outcomes?: string[];
+  inputValues?: Record<string, string>;
   workflowId?: string | null;
   excludedMemoryIds?: string[];
   memoryOff?: boolean;

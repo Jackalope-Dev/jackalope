@@ -25,6 +25,8 @@ pub struct UsageObservation {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]
+    pub contract: crate::commands::outcomes::TaskContract,
+    #[serde(default)]
     pub monitor_change: Option<crate::commands::monitors::MonitorChange>,
     #[serde(default)]
     pub context_receipt: crate::commands::knowledge::ContextReceipt,

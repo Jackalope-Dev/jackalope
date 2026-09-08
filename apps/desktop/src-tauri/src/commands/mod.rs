@@ -27,6 +27,9 @@ pub mod verification;
 
 pub mod knowledge;
 pub mod monitors;
+pub mod outcomes;
+pub mod previews;
+pub mod readiness;
 pub mod schedules;
 
 pub mod browser;

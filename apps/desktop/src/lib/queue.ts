@@ -2,6 +2,9 @@ import { syncAgentConfig } from '../stores/agentConfigStore.ts';
 import { nativeTask } from './task-runtime.ts';
 
 export interface QueueItem {
+  feature?: string | null;
+  featureId?: string | null;
+  contextSelection?: import('./knowledge').ContextSelection;
   id: string;
   projectId: string;
   title: string;

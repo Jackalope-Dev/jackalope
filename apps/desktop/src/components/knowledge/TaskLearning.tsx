@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { KnowledgeEntry } from '../../lib/knowledge';
 import type { TaskRun } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
+import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 
@@ -9,6 +10,15 @@ export function TaskLearning({ run }: { run: TaskRun }) {
   const [editing, setEditing] = useState<KnowledgeEntry | null>(null);
   const [saved, setSaved] = useState('');
   const context = run.contextReceipt;
+  const hasEarlierAttempt = useExecutionStore((s) =>
+    s.runs.some(
+      (r) =>
+        r.taskId === run.taskId &&
+        r.id !== run.id &&
+        r.startedAt < run.startedAt &&
+        (r.contract?.step ?? 0) === (run.contract?.step ?? 0),
+    ),
+  );
   return (
     <section className="my-5 space-y-3" aria-label="Project knowledge used by this task">
       {run.monitorChange && (
@@ -25,8 +35,9 @@ export function TaskLearning({ run }: { run: TaskRun }) {
             {context.entries.length === 1 ? 'entry' : 'entries'}
           </h3>
           <p className="task-muted">
-            {context.bytes.toLocaleString()} bytes supplied at the first attempt. Continuations
-            reuse their agent session; this context is not appended again.
+            {context.bytes.toLocaleString()} bytes of saved project notes supplied at the first
+            attempt. Continuations reuse their agent session; the task agreement is repeated with
+            the current step.
           </p>
           {context.entries.map((entry) => (
             <div key={entry.id} className="py-3">
@@ -46,6 +57,24 @@ export function TaskLearning({ run }: { run: TaskRun }) {
             choose the content; Jackalope keeps this task as its source.
           </p>
           <div className="flex flex-wrap gap-2">
+            {hasEarlierAttempt && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const entry = newKnowledge(
+                    { id: run.projectId, path: run.projectPath },
+                    'memory',
+                    run.id,
+                  );
+                  entry.title = 'Lesson from this correction';
+                  if (new TextEncoder().encode(run.prompt).length <= 800)
+                    entry.content = run.prompt;
+                  setEditing(entry);
+                }}
+              >
+                Turn this correction into a lesson
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() =>
@@ -65,12 +94,24 @@ export function TaskLearning({ run }: { run: TaskRun }) {
                   run.id,
                 );
                 entry.title = taskTitle(run.prompt).slice(0, 100);
-                const seed = `${run.prompt}\n\nVerification\n${run.verifyCommand || 'Describe how to verify the result.'}`;
+                entry.process = {
+                  inputs: Object.keys(run.contract?.inputs ?? {}),
+                  steps: (run.contract?.requirements ?? [])
+                    .filter((r) => r.checkpoint)
+                    .map((r) => r.title),
+                  outcomes: (run.contract?.requirements ?? [])
+                    .filter((r) => !r.checkpoint)
+                    .map((r) => r.title),
+                };
+                const procedure =
+                  run.contextReceipt?.entries.find((e) => e.kind === 'workflow')?.content ||
+                  run.prompt;
+                const seed = `${procedure}\n\nVerification\n${run.verifyCommand || 'Describe how to verify the result.'}`;
                 if (new TextEncoder().encode(seed).length <= 6000) entry.content = seed;
                 setEditing(entry);
               }}
             >
-              Save workflow
+              Use this process again
             </Button>
           </div>
           {saved && (

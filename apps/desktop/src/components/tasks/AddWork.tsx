@@ -7,9 +7,11 @@ import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
+import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { OutcomeEditor } from './OutcomeEditor';
 export function AddWork({
   project,
   items,
@@ -70,7 +72,7 @@ export function AddWork({
             .filter(Boolean),
         },
       });
-      update({ title: '', prompt: '', scopes: '', dependencies: [] });
+      update({ title: '', prompt: '', scopes: '', dependencies: [], contextSelection: undefined });
       await onAdded();
       onClose();
     } catch (error) {
@@ -159,6 +161,19 @@ export function AddWork({
               Separate paths with commas. Shared scopes wait for integration. Scope is an agent
               instruction, not a filesystem sandbox.
             </p>
+            <OutcomeEditor
+              values={draft.contextSelection?.outcomes ?? []}
+              onChange={(outcomes) =>
+                update({ contextSelection: { ...draft.contextSelection, outcomes } })
+              }
+            />
+            <TaskKnowledge
+              projectId={project.id}
+              projectPath={project.path}
+              prompt={draft.prompt}
+              selection={draft.contextSelection}
+              onChange={(contextSelection) => update({ contextSelection })}
+            />
             {items.some((i) => !i.canceled) && (
               <fieldset>
                 <legend className="task-label mb-2">Wait for these tasks to merge</legend>

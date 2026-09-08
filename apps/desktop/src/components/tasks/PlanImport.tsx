@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
 interface PlanEntry {
+  contextSelection?: import('../../lib/knowledge').ContextSelection;
   key: string;
   title: string;
   prompt: string;
@@ -105,6 +106,7 @@ function parsePlan(text: string): PlanEntry[] {
     if (!Array.isArray(item.dependsOn) || item.dependsOn.some((key) => typeof key !== 'string'))
       throw new Error(`${label} needs a dependsOn array of task keys (or [] for no dependencies).`);
     const entry: PlanEntry = {
+      contextSelection: item.contextSelection as PlanEntry['contextSelection'],
       key: item.key,
       title: item.title.trim(),
       prompt: item.prompt.trim(),
@@ -336,7 +338,8 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
               </ol>
               {enabled && !added && (
                 <p className="task-notice mt-5">
-                  Parallel work is enabled. Eligible tasks may start as soon as you add this plan.
+                  Adding this plan pauses project dispatch so you can review the tasks before
+                  starting.
                 </p>
               )}
               {!enabled && !added && (

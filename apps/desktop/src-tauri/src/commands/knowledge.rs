@@ -18,6 +18,8 @@ pub enum KnowledgeKind {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KnowledgeEntry {
+    #[serde(default)]
+    pub process: super::outcomes::ProcessTemplate,
     pub id: String,
     pub project_id: String,
     pub project_path: String,
@@ -27,6 +29,8 @@ pub struct KnowledgeEntry {
     pub keywords: Vec<String>,
     pub enabled: bool,
     pub source_run_id: Option<String>,
+    #[serde(default)]
+    pub source_head: Option<String>,
     pub revision: u64,
     pub updated_at: String,
 }
@@ -34,6 +38,12 @@ pub struct KnowledgeEntry {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextSelection {
+    #[serde(default)]
+    pub advance_workflow: bool,
+    #[serde(default)]
+    pub outcomes: Vec<String>,
+    #[serde(default)]
+    pub input_values: std::collections::BTreeMap<String, String>,
     pub workflow_id: Option<String>,
     #[serde(default)]
     pub excluded_memory_ids: Vec<String>,
@@ -100,7 +110,26 @@ impl KnowledgeStore {
     }
 
     pub fn save(&self, mut entry: KnowledgeEntry) -> Result<KnowledgeEntry, String> {
+        entry.process.validate()?;
+        if entry.kind == KnowledgeKind::Memory
+            && (!entry.process.steps.is_empty()
+                || !entry.process.inputs.is_empty()
+                || !entry.process.outcomes.is_empty())
+        {
+            return Err("Lessons cannot contain workflow steps.".into());
+        }
         entry.project_path = canonical(&entry.project_path)?;
+        let output = super::git_command::command(
+            std::path::Path::new(&entry.project_path),
+            &["rev-parse", "HEAD"],
+            super::git_command::Policy::Isolated,
+        )
+        .output()
+        .map_err(|e| e.to_string())?;
+        entry.source_head = output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string());
         entry.title = entry.title.trim().into();
         entry.content = entry.content.trim().into();
         entry.keywords = entry

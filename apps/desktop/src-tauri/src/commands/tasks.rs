@@ -414,18 +414,42 @@ pub async fn task_stop(id: String, state: State<'_, TaskRuntime>) -> Result<(), 
 }
 
 #[tauri::command]
-pub fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {
-    let mut inner = state.inner.lock().unwrap();
-    let run = inner.runs.get_mut(&id).ok_or("Attempt not found")?;
-    if run.status != "review" {
-        return Err("Only a finished result can be marked reviewed.".into());
-    }
-    let mut updated = run.clone();
-    updated.status = "reviewed".into();
-    state.save(&updated)?;
-    updated.persistence_error = None;
-    *run = updated;
-    Ok(())
+pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        let runs = state.integration_runs()?;
+        let current = runs
+            .iter()
+            .find(|r| r.id == id)
+            .ok_or("Attempt not found")?;
+        if !current.contract.requirements.is_empty() {
+            if runs.iter().any(|r| {
+                r.workspace == current.workspace
+                    && ["starting", "running", "stopping", "interrupted"]
+                        .contains(&r.status.as_str())
+            }) {
+                return Err("Resolve active workspace ownership before completing review.".into());
+            }
+            let directory = state.integration_directory();
+            std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+            let tree = super::integration::workspace_tree(current, &directory)?;
+            current.contract.require_accepted(&tree)?;
+        }
+        let mut inner = state.inner.lock().unwrap();
+        let run = inner.runs.get_mut(&id).ok_or("Attempt not found")?;
+        if run.status != "review" {
+            return Err("Only a finished result can be marked reviewed.".into());
+        }
+        let mut updated = run.clone();
+        updated.status = "reviewed".into();
+        state.save(&updated)?;
+        updated.persistence_error = None;
+        *run = updated;
+        Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[derive(Serialize)]
