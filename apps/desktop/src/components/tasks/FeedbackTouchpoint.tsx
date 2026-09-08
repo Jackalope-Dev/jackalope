@@ -18,12 +18,14 @@ export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: b
   const [error, setError] = useState('');
   const slot = useRef<HTMLElement>(null);
   const claiming = useRef(false);
+  const mounted = useRef(false);
   useEffect(() => {
+    mounted.current = true;
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), {
       threshold: 0.5,
     });
     if (slot.current) observer.observe(slot.current);
-    return () => observer.disconnect();
+    return () => { mounted.current = false; observer.disconnect(); };
   }, []);
   useEffect(() => {
     if (paused || working) return;
@@ -60,15 +62,11 @@ export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: b
       return;
     if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
     claiming.current = true;
-    let alive = true;
     const id = crypto.randomUUID();
     void request({ action: 'claim', id }).then((result) => {
-      if (alive && result?.claimed) setInvitation(id);
+      if (mounted.current && result?.claimed) setInvitation(id);
       claiming.current = false;
     });
-    return () => {
-      alive = false;
-    };
   }, [configured, view?.eligible, visible, paused, working, invitation, request]);
   const dismiss = async (action: 'later' | 'stop') => {
     if (!invitation) return;

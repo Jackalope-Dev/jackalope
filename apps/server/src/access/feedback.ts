@@ -26,6 +26,8 @@ export const feedbackAction = z.discriminatedUnion('action', [
     enabled: z.boolean(),
     promptsEnabled: z.boolean(),
     defer: z.boolean().default(false),
+    promptCount: z.number().int().min(0).max(2).default(0),
+    nextPromptAt: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   }),
   z.strictObject({ action: z.literal('activity'), result: tokenSchema.optional() }),
   z.strictObject({ action: z.literal('claim'), id: z.uuid() }),
@@ -40,35 +42,40 @@ async function campaign(env: Env, member: string) {
 }
 function view(row: Campaign | null, now: number, claimed = false) {
   return {
+    linked: !!row,
     enabled: row?.enabled === 1,
     promptsEnabled: row?.prompts_enabled !== 0,
     completed: row?.completed_at != null,
     nextPromptAt: row?.next_prompt_at ?? 0,
     promptCount: row?.prompt_count ?? 0,
     eligible:
-      !!row &&
+      !row || (
       row.prompts_enabled === 1 &&
       row.completed_at === null &&
       (row.enabled === 0 || (row.active_days === 2 && JSON.parse(row.results).length === 2)) &&
       row.next_prompt_at <= now &&
-      row.prompt_count < 2,
+      row.prompt_count < 2),
     claimed,
   };
 }
 export async function memberFeedback(env: Env, member: string, input: unknown, now = Date.now()) {
   const action = feedbackAction.parse(input);
+  if (action.action === 'stop' || action.action === 'completed') {
+    await env.DB.prepare('INSERT OR IGNORE INTO access_feedback(member_id,updated_at) VALUES(?,?)').bind(member, now).run();
+  }
   if (action.action === 'preferences') {
-    await env.DB.prepare(`INSERT INTO access_feedback(member_id,enabled,prompts_enabled,consent_at,next_prompt_at,updated_at) VALUES(?,?,?,?,?,?)
+    await env.DB.prepare(`INSERT INTO access_feedback(member_id,enabled,prompts_enabled,consent_at,next_prompt_at,updated_at,prompt_count) VALUES(?,?,?,?,?,?,?)
       ON CONFLICT(member_id) DO UPDATE SET enabled=excluded.enabled,prompts_enabled=excluded.prompts_enabled,
       consent_at=CASE WHEN excluded.enabled=1 AND access_feedback.enabled=0 THEN excluded.consent_at ELSE access_feedback.consent_at END,
-      next_prompt_at=max(access_feedback.next_prompt_at,excluded.next_prompt_at),updated_at=excluded.updated_at`)
+      next_prompt_at=max(access_feedback.next_prompt_at,excluded.next_prompt_at),prompt_count=max(access_feedback.prompt_count,excluded.prompt_count),updated_at=excluded.updated_at`)
       .bind(
         member,
         Number(action.enabled),
         Number(action.promptsEnabled),
         action.enabled ? now : null,
-        action.defer ? now + 7 * day : 0,
+        Math.max(action.defer ? now + 7 * day : 0, Math.min(action.nextPromptAt, now + 14 * day)),
         now,
+        action.promptCount,
       )
       .run();
   } else if (action.action === 'activity') {

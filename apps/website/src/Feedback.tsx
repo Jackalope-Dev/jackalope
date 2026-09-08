@@ -17,25 +17,32 @@ export function FeedbackPage() {
   const draft = useRef('');
   const tokenRef = useRef('');
   useEffect(() => {
-    const fragment = new URLSearchParams(location.hash.slice(1));
-    const value = fragment.get('token') ?? fragment.get('unsubscribe') ?? tokenRef.current;
-    tokenRef.current = value;
-    setToken(value);
-    if (fragment.has('unsubscribe')) setUnsubscribe(true);
-    history.replaceState(null, '', location.pathname);
-    if (!/^[a-f0-9]{64}$/.test(value)) {
-      setError(
-        'Open the private link in your feedback invitation. You can also send feedback from the app’s Updates & support settings.',
-      );
-      return;
-    }
-    const controller = new AbortController();
-    void accessRequest<Status>('feedback', { action: 'status', token: value }, controller.signal)
-      .then(setStatus)
-      .catch((cause) => {
-        if (!controller.signal.aborted) setError(feedbackError(cause));
-      });
-    return () => controller.abort();
+    let controller: AbortController | undefined;
+    const load = () => {
+      controller?.abort();
+      const fragment = new URLSearchParams(location.hash.slice(1));
+      const value = fragment.get('token') ?? fragment.get('unsubscribe') ?? tokenRef.current;
+      if (value !== tokenRef.current) { setMessage(''); setPreview(false); id.current = ''; draft.current = ''; }
+      tokenRef.current = value;
+      setToken(value);
+      setStatus(null);
+      setError('');
+      if (fragment.has('unsubscribe')) setUnsubscribe(true);
+      else if (fragment.has('token')) setUnsubscribe(false);
+      history.replaceState(null, '', location.pathname);
+      if (!/^[a-f0-9]{64}$/.test(value)) {
+        setError('Open the private link in your feedback invitation. You can also send feedback from the app’s Updates & support settings.');
+        return;
+      }
+      controller = new AbortController();
+      const signal = controller.signal;
+      void accessRequest<Status>('feedback', { action: 'status', token: value }, signal)
+        .then(result => { if (!signal.aborted) setStatus(result); })
+        .catch(cause => { if (!signal.aborted) setError(feedbackError(cause)); });
+    };
+    load();
+    window.addEventListener('hashchange', load);
+    return () => { controller?.abort(); window.removeEventListener('hashchange', load); };
   }, []);
   const act = async (action: 'status' | 'submit' | 'unsubscribe') => {
     if (pending.current) return;
@@ -52,6 +59,7 @@ export function FeedbackPage() {
         token,
         ...(action === 'submit' ? { id: id.current, message: draft.current } : {}),
       });
+      if (tokenRef.current !== token) return;
       setStatus(result);
       if (action === 'submit') {
         setMessage('');

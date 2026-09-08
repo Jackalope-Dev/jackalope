@@ -65,6 +65,8 @@ pub enum Action {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeedbackView {
+    #[serde(default)]
+    linked: bool,
     enabled: bool,
     #[serde(default = "yes")]
     prompts_enabled: bool,
@@ -85,6 +87,7 @@ impl LocalFeedback {
     }
     fn view(&self, now: i64, claimed: bool) -> FeedbackView {
         FeedbackView {
+            linked: self.linked,
             enabled: self.enabled,
             prompts_enabled: self.prompts_enabled,
             completed: self.completed,
@@ -142,7 +145,8 @@ fn remote_action(
     let mut body =
         serde_json::to_value(action).map_err(|_| "Could not prepare feedback request.")?;
     if matches!(action, Action::Preferences { .. }) {
-        body["defer"] = (local.next_prompt_at > now).into();
+        body["promptCount"] = local.prompt_count.into();
+        body["nextPromptAt"] = local.next_prompt_at.min(now + 14 * DAY).max(0).into();
     }
     Ok(body)
 }
@@ -196,6 +200,7 @@ pub async fn app_account_feedback(
         return Err("Connect your Jackalope account first.".into());
     }
     let mut claimed = false;
+    if matches!(action, Action::Activity { .. }) { record.feedback.activity(now, task.clone()); }
     match &action {
         Action::Preferences {
             enabled,
@@ -203,12 +208,13 @@ pub async fn app_account_feedback(
         } => {
             record.feedback.enabled = *enabled;
             record.feedback.prompts_enabled = *prompts_enabled;
-            record.feedback.linked |= *enabled;
+            record.feedback.linked = true;
             if record.feedback.linked {
                 record.feedback.pending = Some(action.clone());
             }
         }
         Action::Stop => {
+            record.feedback.linked = true;
             record.feedback.enabled = false;
             record.feedback.prompts_enabled = false;
             if record.feedback.linked {
@@ -216,6 +222,7 @@ pub async fn app_account_feedback(
             }
         }
         Action::Completed => {
+            record.feedback.linked = true;
             record.feedback.completed = true;
             record.feedback.enabled = false;
             if record.feedback.linked {
@@ -249,6 +256,19 @@ pub async fn app_account_feedback(
         return Ok(record.feedback.view(now, false));
     }
     let mut remote_view = None;
+    if !record.feedback.linked {
+        let view = remote(&api, &record, serde_json::json!({"action":"status"})).await?;
+        if view.linked { record.feedback.linked = true; merge(&mut record.feedback, &view); }
+        remote_view = Some(view);
+    }
+    if matches!(action, Action::Claim { .. }) && !record.feedback.linked {
+        if !record.feedback.eligible(now) { return Ok(record.feedback.view(now, false)); }
+        let preferences = Action::Preferences { enabled: false, prompts_enabled: record.feedback.prompts_enabled };
+        let view = remote(&api, &record, remote_action(&preferences, &record.feedback, now)?).await?;
+        record.feedback.linked = true;
+        merge(&mut record.feedback, &view);
+        state.save(&record)?;
+    }
     if record.feedback.linked {
         let body = if matches!(action, Action::Activity { .. }) && record.feedback.enabled {
             let receipt = task.as_ref().map(|id| {
@@ -273,7 +293,7 @@ pub async fn app_account_feedback(
         remote_view = Some(view);
     }
     match action {
-        Action::Activity { .. } => record.feedback.activity(now, task),
+        Action::Activity { .. } => {},
         Action::Claim { id } => {
             if !record.feedback.linked && record.feedback.eligible(now) {
                 record.feedback.prompt_count += 1;
