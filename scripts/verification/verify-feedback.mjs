@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
+import { accessEmail } from '../../apps/server/src/access/mail-templates.ts';
 
 const html = 'apps/desktop/.feedback-fixture.html';
 const entry = 'apps/desktop/.feedback-fixture.tsx';
@@ -60,9 +61,22 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
     await page.clock.install();
     await page.goto('http://127.0.0.1:5297/.feedback-fixture.html');
     await page.getByRole('heading', { name: 'Help shape Jackalope' }).waitFor();
+    await page.evaluate(() => window.fixtureExecution.setState({ runs: [{ status: 'running' }] }));
+    await page.clock.fastForward(16000);
+    assert.equal(
+      await page.getByRole('button', { name: 'Share thoughts', exact: true }).count(),
+      0,
+    );
+    await page.evaluate(() => window.fixtureExecution.setState({ runs: [] }));
     await page.clock.fastForward(16000);
     await page.getByRole('button', { name: 'Share thoughts', exact: true }).waitFor();
     assert.equal(await page.getByRole('dialog').count(), 0);
+    await page.evaluate(() => window.fixtureExecution.setState({ runs: [{ status: 'running' }] }));
+    await page
+      .getByRole('button', { name: 'Share thoughts', exact: true })
+      .waitFor({ state: 'hidden' });
+    await page.evaluate(() => window.fixtureExecution.setState({ runs: [] }));
+    await page.getByRole('button', { name: 'Share thoughts', exact: true }).waitFor();
     for (const dark of [false, true]) {
       await page.evaluate((dark) => {
         const s = window.fixtureTheme;
@@ -171,6 +185,24 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
     await context.close();
   }
   assert.deepEqual(errors, []);
+  const email = accessEmail(
+    { to: 'fixture@example.invalid', kind: 'feedback_request', token: 'a'.repeat(64) },
+    'https://jackalope.dev',
+  );
+  writeFileSync('output/feedback-invitations/email.html', email.body);
+  for (const width of [640, 390]) {
+    const page = await browser.newPage({ viewport: { width, height: 1000 } });
+    await page.route('https://jackalope.dev/icon-128.png', (route) =>
+      route.fulfill({ path: 'apps/desktop/src-tauri/icons/128x128.png', contentType: 'image/png' }),
+    );
+    await page.setContent(email.body);
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.screenshot({
+      path: `output/feedback-invitations/email-${width}.png`,
+      fullPage: true,
+    });
+    await page.close();
+  }
   const admin = readFileSync('apps/server/src/access/admin-page.ts', 'utf8');
   const script = admin.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
   if (script) new Function(script);

@@ -16,17 +16,14 @@ async function _verifyPage(page) {
     (await page.locator('.landing-kicker, .hero-edition, .echo-caption').count()) === 0,
     'No redundant eyebrow labels',
   );
-  assert(
-    await page.locator('.hero-inline-signup').evaluate((element) => {
-      const echoLayer = Number.parseInt(getComputedStyle(element, '::before').zIndex, 10);
-      const surfaceLayer = Number.parseInt(
-        getComputedStyle(element.querySelector(':scope > .signup')).zIndex,
-        10,
-      );
-      return echoLayer < surfaceLayer;
-    }),
-    'Signup echo remains behind its surface',
-  );
+  const heroWaitlist = page
+    .locator('.hero-actions')
+    .getByRole('button', { name: 'Join the waitlist' });
+  await heroWaitlist.click();
+  await page.getByRole('dialog', { name: 'Join the Jackalope waitlist' }).waitFor();
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).waitFor();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.activeElement?.closest('.hero-actions'));
   const xLink = page.getByRole('link', { name: 'Follow on X', exact: true });
   assert(
     (await xLink.getAttribute('href')) === 'https://x.com/JackalopeDotDev',
@@ -45,10 +42,19 @@ async function _verifyPage(page) {
   ]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => scrollTo(0, 0));
-    const logo = await page.locator('.hero-poster .echo-art').boundingBox();
+    const logo = page.locator('.landing-hero > .echo-art');
     assert(
-      logo.x >= 0 && logo.x + logo.width <= width && logo.y >= 0,
-      `Visible hero mark at ${width}`,
+      await logo.evaluate(
+        (element) =>
+          element.getAttribute('aria-hidden') === 'true' &&
+          getComputedStyle(element).pointerEvents === 'none',
+      ),
+      `Decorative background does not intercept controls at ${width}`,
+    );
+    const capture = await page.locator('.hero-window').boundingBox();
+    assert(
+      capture.x >= 0 && capture.x + capture.width <= width,
+      `Complete app preview at ${width}`,
     );
     for (const id of ['inside', 'workflow', 'features', 'atmosphere', 'questions', 'download']) {
       await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));

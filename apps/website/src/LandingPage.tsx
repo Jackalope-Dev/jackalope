@@ -4,6 +4,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 import {
   ArrowDown,
   ArrowRight,
+  ArrowUpRight,
   Check,
   GitBranch,
   GitMerge,
@@ -17,7 +18,6 @@ import {
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
-import { Signup } from './Signup';
 
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
@@ -27,9 +27,8 @@ function HeroMark() {
     if (root.current) observer.observe(root.current);
     return () => observer.disconnect();
   }, []);
-  // The loop also stops for prefers-reduced-motion, handled in echo.css.
   return (
-    <div ref={root} className="echo-art">
+    <div ref={root} className="echo-art" aria-hidden="true">
       <EchoMark animated={visible} />
     </div>
   );
@@ -117,8 +116,16 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
         </div>
         <div className="feature-art">
           <svg viewBox="0 0 720 360" preserveAspectRatio="none" aria-hidden="true">
-            <path className="route route-orange" d="M0 76 H170 C240 76 220 180 310 180 H720" />
-            <path className="route route-indigo" d="M0 282 H150 C235 282 232 190 310 190 H720" />
+            <path
+              className="route route-orange"
+              pathLength="1"
+              d="M0 76 H170 C240 76 220 180 310 180 H720"
+            />
+            <path
+              className="route route-indigo"
+              pathLength="1"
+              d="M0 282 H150 C235 282 232 190 310 190 H720"
+            />
           </svg>
           <div className="agent-node agent-node-one">
             <GitBranch size={18} />
@@ -264,22 +271,29 @@ const differentiators = [
 function Workbench() {
   return (
     <section
-      className="landing-section landing-width"
+      className="landing-section landing-width workflow-story"
       id="workflow"
       aria-labelledby="workflow-title"
+      data-reveal=""
     >
       <div className="section-lead">
-        <h2 id="workflow-title">Run tasks in parallel.</h2>
+        <h2 id="workflow-title">
+          One idea.
+          <br />
+          <span>More ways forward.</span>
+        </h2>
         <p>
-          Assign independent tasks to different agents. Follow their progress and review the results
-          together.
+          Build the feature. Chase the bug. Explore another direction. Give independent tasks their
+          own agents and worktrees, then decide what comes together.
         </p>
       </div>
       <Tabs.Root defaultValue="feature" className="workbench">
         <Tabs.List aria-label="Explore a use case" className="case-tabs">
           {examples.map((item) => (
             <Tabs.Trigger key={item.id} value={item.id}>
-              <span className="case-tab-index">{item.index}</span>
+              <span className="case-tab-index" aria-hidden="true">
+                {item.index}
+              </span>
               <strong className="case-tab-title">{item.label}</strong>
               <ArrowRight size={16} />
             </Tabs.Trigger>
@@ -321,46 +335,51 @@ export function LandingPage({
   available: boolean;
   releaseVersion?: string;
 }) {
+  const landing = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          (entry.target as HTMLElement).dataset.entered = 'true';
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.12 },
+    );
+    for (const section of landing.current?.querySelectorAll('[data-reveal]') ?? []) {
+      observer.observe(section);
+    }
+    return () => observer.disconnect();
+  }, []);
   return (
-    <main id="main" className="landing">
+    <main id="main" className="landing landing-story" ref={landing}>
       <section className="landing-hero" aria-labelledby="hero-title">
+        <HeroMark />
         <div className="landing-width landing-hero-grid">
-          <div>
+          <div className="hero-copy">
             <div className="hero-poster">
-              <HeroMark />
               <h1 id="hero-title">
-                <span>Your agents. Side by side.</span> <span>Your final say.</span>
+                <span>Your agents.</span> <span>Side by side.</span> <span>Your final say.</span>
               </h1>
             </div>
             <p className="hero-description">
-              A cross-platform workspace for <strong>Codex, Claude Code, Grok, and OpenCode</strong>
-              , with project context, isolated Git worktrees, and one place to review the result.
+              The desktop workspace for <strong>Codex, Claude Code, Grok, and OpenCode</strong>. Run
+              tasks in parallel. Keep the context. Review the results in one place.
             </p>
             <p className="hero-launch">One workspace. Planned for macOS, Windows, and Linux.</p>
             <div className="hero-conversion">
-              {available ? (
-                <div className="hero-actions">
-                  {action}
-                  <button type="button" onClick={onPlay} className="landing-text-button">
-                    <Play size={15} fill="currentColor" />
-                    Watch the app
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="hero-inline-signup">
-                    <Signup />
-                  </div>
-                  <button type="button" onClick={onPlay} className="landing-text-button">
-                    <Play size={15} fill="currentColor" />
-                    Watch the app
-                  </button>
-                </>
-              )}
+              <div className="hero-actions">
+                {action}
+                <button type="button" onClick={onPlay} className="landing-text-button">
+                  <Play size={15} fill="currentColor" />
+                  Watch the app
+                </button>
+              </div>
               <span className="availability">
                 {available
                   ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
-                  : 'macOS · Windows · Linux at launch · No payment to join'}
+                  : 'In development · No payment to join'}
               </span>
             </div>
           </div>
@@ -372,8 +391,8 @@ export function LandingPage({
               aria-label="Play the 32-second Jackalope app tour"
             >
               <span className="hero-window-meta">
-                <span>ACTUAL APP / ATLAS SAMPLE PROJECT</span>
-                <span>BRIEF → WORK → REVIEW</span>
+                <span>JACKALOPE / TASKS</span>
+                <span>ATLAS SAMPLE PROJECT</span>
               </span>
               <img
                 src={`/media/tasks${dark ? '' : '-light'}.png`}
@@ -381,7 +400,22 @@ export function LandingPage({
                 height="840"
                 alt="Jackalope task board with separate project work ready, running, and under review"
               />
+              <span className="hero-film-cue">
+                <span>
+                  <Play size={18} fill="currentColor" /> See the workspace in action
+                </span>
+                <span>
+                  32 sec <ArrowUpRight size={16} />
+                </span>
+              </span>
             </button>
+            <div className="hero-review-note">
+              <GitMerge size={21} />
+              <span>
+                <strong>Separate worktrees. One clear review.</strong>
+                <small>You choose what makes it into your project.</small>
+              </span>
+            </div>
           </div>
           <div className="agent-line">
             <p>
@@ -394,24 +428,46 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="landing-width evidence-rail" aria-label="Jackalope product principles">
+      <section className="landing-width journey-rail" aria-label="From idea to reviewed work">
         {[
-          ['01 / LOCAL', 'Your repositories and task workspaces stay on your computer.'],
-          ['02 / ISOLATED', 'Independent tasks can work in separate Git worktrees.'],
-          ['03 / CONTEXTUAL', 'Project knowledge and selected tools travel with the task.'],
-          ['04 / REVIEWED', 'Integration stays a visible, explicit decision.'],
-        ].map(([label, description]) => (
-          <div key={label}>
-            <small>{label}</small>
-            <strong>{description}</strong>
-          </div>
+          [
+            'Brief with context.',
+            'Your project knowledge and tools, ready for the next task.',
+            '#features',
+          ],
+          ['Work in parallel.', 'Independent agents, each with room to work.', '#workflow'],
+          ['Review together.', 'The patch, checks, and final decision in one place.', '#inside'],
+        ].map(([label, description, href]) => (
+          <a key={label} href={href}>
+            <strong>
+              {label}
+              <ArrowRight size={20} />
+            </strong>
+            <span>{description}</span>
+          </a>
         ))}
       </section>
 
-      <section className="workspace-section" id="inside" aria-labelledby="inside-title">
+      <Workbench />
+
+      <section
+        className="workspace-section"
+        id="inside"
+        aria-labelledby="inside-title"
+        data-reveal=""
+      >
         <div className="landing-width">
           <div className="workspace-heading">
-            <h2 id="inside-title">See how it works.</h2>
+            <h2 id="inside-title">
+              Less window juggling.
+              <br />
+              More forward motion.
+            </h2>
+            <p>
+              Your tasks, agents, and changes share one workspace.
+              <br />
+              Take a look inside the actual app.
+            </p>
           </div>
           <Tabs.Root defaultValue="tasks" className="product-explorer">
             <Tabs.List aria-label="Explore the workspace" className="product-tabs">
@@ -456,7 +512,11 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="landing-width differentiators" aria-labelledby="different-title">
+      <section
+        className="landing-width differentiators"
+        aria-labelledby="different-title"
+        data-reveal=""
+      >
         <div className="differentiators-heading">
           <h2 id="different-title">Worktrees separate files. Jackalope keeps the work together.</h2>
           <p>
@@ -523,12 +583,12 @@ export function LandingPage({
           Compare Jackalope and other workspaces <ArrowRight size={17} />
         </a>
       </section>
-      <Workbench />
 
       <section
         className="landing-section landing-width capabilities"
         id="features"
         aria-labelledby="features-title"
+        data-reveal=""
       >
         <div className="section-lead">
           <h2 id="features-title">Keep context across tasks.</h2>
@@ -596,11 +656,24 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="atmosphere-section" id="atmosphere" aria-labelledby="atmosphere-title">
+      <section
+        className="atmosphere-section"
+        id="atmosphere"
+        aria-labelledby="atmosphere-title"
+        data-reveal=""
+      >
         <div className="landing-width atmosphere-layout">
           <div>
-            <h2 id="atmosphere-title">Choose your theme.</h2>
-            <p>Preview the desktop palettes in light or dark.</p>
+            <h2 id="atmosphere-title">
+              Serious work.
+              <br />
+              Your kind of space.
+            </h2>
+            <p>
+              Try a palette. The whole page comes along.
+              <br />
+              Preview the desktop themes in light or dark.
+            </p>
             <fieldset className="landing-palettes" aria-label="Try a color palette">
               {PRESET_THEMES.slice(0, 4).map((theme, index) => (
                 <button

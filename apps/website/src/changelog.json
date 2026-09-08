@@ -1,5 +1,17 @@
 [
   {
+    "id": "a-closer-look-at-jackalope",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A closer look at Jackalope.",
+    "description": "A more expressive landing page brings the workspace and its parallel workflow into focus.",
+    "items": [
+      "An oversized animated brand mark frames the actual app, with a quick path to the tour and waitlist.",
+      "Explore parallel tasks earlier, review the interface, and try palettes across the page."
+    ],
+    "note": "Website development milestone, not a public app release."
+  },
+  {
     "id": "feedback-after-you-have-tried-jackalope",
     "date": "2026-09-08",
     "status": "In development",

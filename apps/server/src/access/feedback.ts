@@ -40,7 +40,7 @@ async function campaign(env: Env, member: string) {
     .bind(member)
     .first<Campaign>();
 }
-function view(row: Campaign | null, now: number, claimed = false) {
+function view(row: Campaign | null, now: number, claimed = false, available = true) {
   return {
     linked: !!row,
     enabled: row?.enabled === 1,
@@ -49,12 +49,13 @@ function view(row: Campaign | null, now: number, claimed = false) {
     nextPromptAt: row?.next_prompt_at ?? 0,
     promptCount: row?.prompt_count ?? 0,
     eligible:
-      !row ||
-      (row.prompts_enabled === 1 &&
-        row.completed_at === null &&
-        (row.enabled === 0 || (row.active_days === 2 && JSON.parse(row.results).length === 2)) &&
-        row.next_prompt_at <= now &&
-        row.prompt_count < 2),
+      available &&
+      (!row ||
+        (row.prompts_enabled === 1 &&
+          row.completed_at === null &&
+          (row.enabled === 0 || (row.active_days === 2 && JSON.parse(row.results).length === 2)) &&
+          row.next_prompt_at <= now &&
+          row.prompt_count < 2)),
     claimed,
   };
 }
@@ -80,7 +81,7 @@ export async function memberFeedback(env: Env, member: string, input: unknown, n
         action.promptCount,
       )
       .run();
-  } else if (action.action === 'activity') {
+  } else if (action.action === 'activity' && env.INGESTION_ENABLED === 'true') {
     const today = new Date(now).toISOString().slice(0, 10);
     await env.DB.prepare(`UPDATE access_feedback SET first_active_at=coalesce(first_active_at,?),
       active_days=min(2,active_days+CASE WHEN last_active_day IS NULL OR last_active_day<? THEN 1 ELSE 0 END),
@@ -98,6 +99,8 @@ export async function memberFeedback(env: Env, member: string, input: unknown, n
       )
       .run();
   } else if (action.action === 'claim') {
+    if (env.INGESTION_ENABLED !== 'true')
+      return view(await campaign(env, member), now, false, false);
     const claimed =
       await env.DB.prepare(`UPDATE access_feedback SET prompt_id=?,prompt_count=prompt_count+1,next_prompt_at=?,updated_at=?
       WHERE member_id=? AND ${eligibleSql} AND prompts_enabled=1 AND prompt_count<2 AND next_prompt_at<=? RETURNING member_id`)
@@ -134,7 +137,7 @@ export async function memberFeedback(env: Env, member: string, input: unknown, n
       .bind(member)
       .run();
   }
-  return view(await campaign(env, member), now);
+  return view(await campaign(env, member), now, false, env.INGESTION_ENABLED === 'true');
 }
 
 export async function queueFeedbackMail(env: Env, now = Date.now()) {
@@ -190,6 +193,7 @@ export async function pruneFeedbackInvitations(env: Env, now = Date.now()) {
 }
 
 export async function feedbackMailAllowed(env: Env, id: string, now = Date.now()) {
+  if (env.INGESTION_ENABLED !== 'true') return false;
   return !!(await env.DB.prepare(`SELECT 1 FROM access_feedback f JOIN access_members m ON m.id=f.member_id
     WHERE f.email_id=? AND f.enabled=1 AND f.completed_at IS NULL AND m.status='approved' AND m.verified_at IS NOT NULL
     AND f.token_expires_at>? AND NOT EXISTS(SELECT 1 FROM access_mail a WHERE a.email=m.email AND a.delivery_status IN ('bounced','complained','suppressed'))`)

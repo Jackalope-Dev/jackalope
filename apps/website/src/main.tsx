@@ -10,6 +10,7 @@ import './styles.css';
 import './launch.css';
 import './growth.css';
 import './refinement.css';
+import './landing-story.css';
 
 applyThemeTokens({ ...DEFAULT_THEME, isDark: false, atmosphere: 18 });
 signupCampaign();

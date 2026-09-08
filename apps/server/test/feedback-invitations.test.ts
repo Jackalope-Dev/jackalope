@@ -174,6 +174,21 @@ it('rechecks opt-outs, revocation, and provider suppression before sending; keep
   await queueFeedbackMail(bindings, start + 3 * day);
   const queued = await mail();
   expect(await feedbackMailAllowed(bindings, queued.id, start + 3 * day)).toBe(true);
+  const unavailable = { ...bindings, INGESTION_ENABLED: 'false' };
+  expect(await feedbackMailAllowed(unavailable, queued.id, start + 3 * day)).toBe(false);
+  expect(
+    (await memberFeedback(unavailable, owner.id, { action: 'status' }, start + 20 * day)).eligible,
+  ).toBe(false);
+  expect(
+    (
+      await memberFeedback(
+        unavailable,
+        owner.id,
+        { action: 'claim', id: crypto.randomUUID() },
+        start + 20 * day,
+      )
+    ).claimed,
+  ).toBe(false);
   await env.DB.prepare("UPDATE access_members SET status='revoked' WHERE id=?")
     .bind(owner.id)
     .run();
