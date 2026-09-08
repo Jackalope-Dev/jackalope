@@ -152,7 +152,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   const head = [
     `<title>${escapeHtml(title)}</title>`,
     `<meta name="description" content="${escapeHtml(description)}" />`,
-    `<meta name="robots" content="${page && normalized !== '/access/' ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1' : 'noindex,follow'}" />`,
+    `<meta name="robots" content="${page && !['/access/', '/waitlist/'].includes(normalized) ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1' : 'noindex,follow'}" />`,
     `<link rel="canonical" href="${escapeHtml(url)}" />`,
     `<meta property="og:type" content="${post ? 'article' : 'website'}" />`,
     `<meta property="og:site_name" content="Jackalope" />`,
@@ -195,7 +195,7 @@ export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
     ? `Windows x64 version ${releaseVersion} is available at ${origin}/#download. The first full launch is planned across macOS, Windows, and Linux.`
     : 'First launch planned for macOS, Windows, and Linux. Join the waitlist for early-access news. No public release date or price has been announced.';
   const intro = `# Jackalope\n\n> A cross-platform workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use fictional Atlas sample data and do not prove real agent execution.\n\n`;
-  const publicPages = pages.filter((page) => page.path !== '/access/');
+  const publicPages = pages.filter((page) => !['/access/', '/waitlist/'].includes(page.path));
   const links = publicPages
     .map((page) => `- [${page.title}](${origin}${page.path}): ${page.description}`)
     .join('\n');

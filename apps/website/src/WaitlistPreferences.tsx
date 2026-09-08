@@ -64,8 +64,7 @@ export function WaitlistPreferences({ token }: { token: string }) {
       pending.current = false;
     }
   }
-  const shareUrl =
-    'https://jackalope.dev/?utm_source=member-share&utm_medium=social&utm_campaign=early-access';
+  const shareUrl = 'https://jackalope.dev/';
   return (
     <section className="waitlist-preferences" aria-labelledby={`${id}-title`}>
       {state === 'done' || state === 'skipped' ? (
@@ -76,7 +75,7 @@ export function WaitlistPreferences({ token }: { token: string }) {
           <p>
             {state === 'done'
               ? 'Your preferences will help us prioritize platforms, agents, and workflows.'
-              : 'We’ll email you when your access is ready.'}
+              : 'Check your email to verify your place and unlock your referral link.'}
           </p>
           <a href="/tour/" className="button button-primary">
             Explore the app <ArrowRight size={16} />
@@ -93,11 +92,14 @@ export function WaitlistPreferences({ token }: { token: string }) {
               }
             }}
           >
-            <Copy size={16} /> Share the waitlist
+            <Copy size={16} /> Copy public website link
           </button>
+          <a className="button button-secondary" href="/waitlist/">
+            See my waitlist place <ArrowRight size={16} />
+          </a>
           <p className="signup-consent">
-            Once invited, you can bring five people straight into early access. Sharing this
-            waitlist link doesn’t change your place.
+            Use your personal link from your waitlist page to earn referral priority. Once accepted,
+            you get five Instant Access Passes to bring people straight in.
           </p>
         </>
       ) : (

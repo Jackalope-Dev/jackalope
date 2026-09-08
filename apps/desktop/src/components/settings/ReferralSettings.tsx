@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Copy, Mail, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, Mail, RefreshCw, Ticket } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -24,7 +24,7 @@ interface ReferralView {
 }
 
 const invitationMessage =
-  'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an early-access invitation if you want to try it.';
+  'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an Instant Access Pass for you to skip the waitlist after email verification, while a pass is available.';
 
 async function openExternal(url: string) {
   if (isTauriEnvironment()) {
@@ -42,7 +42,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
     setLoading(true);
     setError('');
     try {
-      if (!isTauriEnvironment()) throw new Error('Open the Windows app to manage invitations.');
+      if (!isTauriEnvironment()) throw new Error('Open the desktop app to manage passes.');
       setReferrals(await nativeTask<ReferralView>('app_account_referrals'));
     } catch (cause) {
       setReferrals(null);
@@ -90,14 +90,14 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
   if (loading)
     return (
       <p role="status" className="settings-row-description">
-        Loading invitations…
+        Loading passes…
       </p>
     );
   if (!referrals)
     return (
       <div className="space-y-4">
         <p role="alert" className="settings-row-description">
-          {error || 'Invitations are unavailable.'}
+          {error || 'Passes are unavailable.'}
         </p>
         <div className="flex flex-wrap gap-3">
           <Button onClick={onAccount}>Open account settings</Button>
@@ -112,7 +112,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
       <div className="referral-summary">
         <div>
           <strong>{referrals.remaining}</strong>
-          <span>of {referrals.limit} invitations available</span>
+          <span>of {referrals.limit} Instant Access Passes available</span>
         </div>
         <p>
           {referrals.accepted
@@ -120,8 +120,29 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
             : 'Invite a developer who would enjoy working with local coding agents.'}
         </p>
       </div>
+      <ol className="desktop-pass-strip" aria-label="Instant Access Pass allowance">
+        {Array.from({ length: Math.min(referrals.limit, 100) }, (_, index) => index + 1).map((passNumber) => {
+          const state =
+            passNumber <= referrals.accepted
+              ? 'Claimed'
+              : passNumber <= referrals.limit - referrals.remaining
+                ? 'Reserved'
+                : 'Available';
+          return (
+            <li key={passNumber} data-state={state}>
+              <Ticket size={24} />
+              <strong>Pass {passNumber}</strong>
+              <span>{state}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="settings-row-description">
+        Each pass lets one person skip the waitlist. These are separate from unlimited waitlist
+        referrals.
+      </p>
       <div className="referral-share">
-        <label htmlFor="desktop-referral-link">Your invitation link</label>
+        <label htmlFor="desktop-referral-link">Your pass link</label>
         <div className="referral-link-row">
           <input
             id="desktop-referral-link"
@@ -131,7 +152,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
           />
           <Button
             disabled={!referrals.remaining}
-            onClick={() => void copy(referrals.shareUrl, 'Invitation link copied.')}
+            onClick={() => void copy(referrals.shareUrl, 'Pass link copied.')}
           >
             <Copy size={16} /> Copy link
           </Button>
@@ -141,10 +162,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
             variant="outline"
             disabled={!referrals.remaining}
             onClick={() =>
-              void copy(
-                `${invitationMessage}\n\n${referrals.shareUrl}`,
-                'Invitation message copied.',
-              )
+              void copy(`${invitationMessage}\n\n${referrals.shareUrl}`, 'Pass message copied.')
             }
           >
             <Copy size={16} /> Copy message
@@ -185,8 +203,8 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
       {referrals.invites.length ? (
         <div className="referral-progress">
           <div className="referral-progress-heading">
-            <h3>Invitation progress</h3>
-            <button type="button" onClick={() => void load()} aria-label="Refresh invitations">
+            <h3>Your people</h3>
+            <button type="button" onClick={() => void load()} aria-label="Refresh passes">
               <RefreshCw size={15} /> Refresh
             </button>
           </div>
@@ -201,7 +219,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
                       : invite.downloadedAt
                         ? 'Opened the download'
                         : invite.status === 'accepted'
-                          ? 'Invitation accepted'
+                          ? 'Pass claimed'
                           : `Reserved until ${new Date(invite.expiresAt).toLocaleDateString()}`}
                   </span>
                 </div>
@@ -221,10 +239,10 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
           </ul>
         </div>
       ) : (
-        <p className="settings-row-description">No invitations sent yet.</p>
+        <p className="settings-row-description">Your passes are ready for good company.</p>
       )}
       <Button variant="outline" onClick={() => void openManagement()}>
-        Manage email invitations <ArrowUpRight size={16} />
+        Manage email passes <ArrowUpRight size={16} />
       </Button>
       {error && (
         <p role="alert" className="settings-row-description">

@@ -137,7 +137,7 @@ export function JackalopeAccount({
         )}
         {connected && (
           <>
-            {onInvitations && <Button onClick={onInvitations}>View invitations</Button>}
+            {onInvitations && <Button onClick={onInvitations}>View Instant Access Passes</Button>}
             <Button
               variant="outline"
               disabled={busy}

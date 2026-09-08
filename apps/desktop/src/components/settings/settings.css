@@ -1,3 +1,39 @@
+.desktop-pass-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.desktop-pass-strip li {
+  display: grid;
+  gap: 8px;
+  padding: 16px 12px;
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-accent);
+  border-radius: 10px;
+  background: var(--color-surface);
+  font-size: 12px;
+}
+.desktop-pass-strip svg {
+  color: var(--color-accent-ink);
+}
+.desktop-pass-strip span {
+  color: var(--color-text-secondary);
+}
+.desktop-pass-strip li[data-state="Reserved"] {
+  border-top-style: dashed;
+}
+.desktop-pass-strip li[data-state="Claimed"] {
+  border-top-color: var(--color-success);
+}
+@media (max-width: 700px) {
+  .desktop-pass-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* Settings Dialog & Panel Styling */
 
 .settings-dialog-overlay {
@@ -585,3 +621,4 @@
     gap: 8px;
   }
 }
+

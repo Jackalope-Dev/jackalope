@@ -12,6 +12,8 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import './access.css';
+import './waitlist.css';
+import { BrandMark } from './BrandMark';
 
 interface Invitation {
   id: string;
@@ -36,7 +38,7 @@ interface Membership {
 }
 
 const invitationMessage =
-  'I have an invitation to Jackalope: one cross-platform workspace for coding agents, Git worktrees, and review. Join me in early access.';
+  'I have an Instant Access Pass to Jackalope: one cross-platform workspace for coding agents, Git worktrees, and review. Skip the waitlist after verifying your email, while a pass is available.';
 
 export function AccessPage() {
   const [member, setMember] = useState<Membership | null>(null);
@@ -177,7 +179,7 @@ export function AccessPage() {
       setNotice(
         action === 'resend'
           ? 'Invitation resend requested. Recent duplicate emails are limited.'
-          : 'Invitation withdrawn. That place is available again.',
+          : 'Pass withdrawn. That place is available again.',
       );
     });
   }
@@ -209,7 +211,7 @@ export function AccessPage() {
     <main id="main" className={`access-page page-width${member ? ' access-page-member' : ''}`}>
       <header className="access-heading">
         <h1>{member ? 'Your access' : invite ? 'You’re invited' : 'Early access'}</h1>
-        {member && <p>Download Jackalope and manage your invitations.</p>}
+        {member && <p>Download Jackalope and share your Instant Access Passes.</p>}
       </header>
       {error && (
         <p className="access-alert" role="alert">
@@ -255,7 +257,7 @@ export function AccessPage() {
           </div>
           <nav className="member-navigation" aria-label="Your account">
             <a href="#setup">Get started</a>
-            <a href="#invitations">Invitations</a>
+            <a href="#invitations">Instant Access Passes</a>
             <a href="#desktops">Connected desktops</a>
           </nav>
           <section id="setup" className="access-card access-download">
@@ -321,10 +323,10 @@ export function AccessPage() {
           >
             <div className="access-invite-intro">
               <div>
-                <h2 id="invite-heading">Invite people</h2>
+                <h2 id="invite-heading">Bring your people.</h2>
                 <p>
-                  Invite up to {member.limit} people to early access. They skip the waitlist after
-                  email verification, then get five invitations of their own.
+                  Your {member.limit} Instant Access Passes let people skip the waitlist after email
+                  verification. Once accepted, they get five passes of their own.
                 </p>
               </div>
               <div className="access-places">
@@ -332,7 +334,7 @@ export function AccessPage() {
                   {member.remaining}
                   <span>/{member.limit}</span>
                 </strong>
-                <small>invitations available</small>
+                <small>passes available</small>
                 {!!member.accepted && (
                   <span>
                     {member.accepted} accepted · {member.downloaded} downloaded · {member.connected}{' '}
@@ -341,10 +343,34 @@ export function AccessPage() {
                 )}
               </div>
             </div>
+            <ol className="pass-strip" aria-label="Instant Access Pass allowance">
+              {Array.from({ length: Math.min(member.limit, 100) }, (_, index) => index + 1).map((passNumber) => {
+                const state =
+                  passNumber <= member.accepted
+                    ? 'Claimed'
+                    : passNumber <= member.limit - member.remaining
+                      ? 'Reserved'
+                      : 'Available';
+                return (
+                  <li key={passNumber} data-state={state}>
+                    <BrandMark />
+                    <strong>Instant Access</strong>
+                    <span>
+                      Pass {String(passNumber).padStart(2, '0')} · {state}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="access-fine">
+              Your shared pass link draws from this allowance. Email passes reserve a place for
+              seven days. <a href="/waitlist/">Your unlimited waitlist link</a> stays separate and
+              never spends a pass.
+            </p>
             <div className="access-invite-options">
               <div>
                 <h3>
-                  <Mail size={18} /> Invite by email
+                  <Mail size={18} /> Send a pass by email
                 </h3>
                 <p>Reserve a place for seven days. If it isn’t accepted, you can use it again.</p>
                 <form onSubmit={sendInvites}>
@@ -367,19 +393,19 @@ export function AccessPage() {
                     disabled={busy || member.remaining === 0}
                     type="submit"
                   >
-                    Send invitations <ArrowRight size={17} />
+                    Send passes <ArrowRight size={17} />
                   </button>
                 </form>
               </div>
               <div>
                 <h3>
-                  <Copy size={18} /> Share an invitation link
+                  <Copy size={18} /> Share a pass link
                 </h3>
                 <p>
                   Places are claimed when recipients verify their email. This link works while you
-                  have invitations available.
+                  have passes available.
                 </p>
-                <label htmlFor="share-link">Your invitation link</label>
+                <label htmlFor="share-link">Your pass link</label>
                 <input
                   id="share-link"
                   readOnly
@@ -393,11 +419,11 @@ export function AccessPage() {
                   onClick={() =>
                     act(async () => {
                       await navigator.clipboard.writeText(member.shareUrl);
-                      setNotice('Invitation link copied.');
+                      setNotice('Pass link copied.');
                     })
                   }
                 >
-                  <Copy size={16} /> Copy invitation link
+                  <Copy size={16} /> Copy pass link
                 </button>
                 <button
                   type="button"
@@ -408,7 +434,7 @@ export function AccessPage() {
                       await navigator.clipboard.writeText(
                         `${invitationMessage}\n\n${member.shareUrl}`,
                       );
-                      setNotice('Invitation message copied.');
+                      setNotice('Pass message copied.');
                     })
                   }
                 >
@@ -464,7 +490,7 @@ export function AccessPage() {
             </div>
             {member.invites.length > 0 && (
               <div className="access-invite-list">
-                <h3>Invitation status</h3>
+                <h3>Your people</h3>
                 <ul>
                   {member.invites.map((item) => (
                     <li key={item.id}>
@@ -476,7 +502,7 @@ export function AccessPage() {
                             : item.downloaded_at
                               ? 'Opened the download'
                               : item.status === 'accepted'
-                                ? 'Invitation accepted'
+                                ? 'Pass claimed'
                                 : `Reserved until ${new Date(item.expires_at).toLocaleDateString()}`}
                         </small>
                       </div>
@@ -516,10 +542,13 @@ export function AccessPage() {
         </>
       ) : (
         <section className="access-card access-entry">
+          <p>
+            Still waiting? <a href="/waitlist/">Check your place & referrals</a>.
+          </p>
           {token ? (
             <>
               <h2>Confirm sign-in</h2>
-              <p>Verify your email to access downloads and invitations. Keep this link private.</p>
+              <p>Verify your email to access downloads and passes. Keep this link private.</p>
               <p className="access-fine">
                 By continuing, you confirm you’re 18 or older and agree to the{' '}
                 <a href="/terms/">Terms</a>. See our <a href="/privacy/">Privacy Policy</a>.
@@ -581,7 +610,7 @@ export function AccessPage() {
                   </ul>
                 </div>
               )}
-              <h2>{invite ? 'Accept an invitation' : 'Sign in'}</h2>
+              <h2>{invite ? 'Claim your pass' : 'Sign in'}</h2>
               <p>
                 {invite
                   ? 'Enter your email. Follow the link we send to confirm your invitation while a place is available.'

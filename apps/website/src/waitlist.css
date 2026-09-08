@@ -1,0 +1,203 @@
+.waitlist-page {
+  max-width: 1040px;
+}
+.waitlist-heading {
+  max-width: 700px;
+  margin: 0 0 24px;
+}
+.waitlist-heading > svg {
+  width: 52px;
+  height: 52px;
+  color: var(--color-accent-ink);
+  margin-bottom: 18px;
+}
+.waitlist-heading h1 {
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+  margin: 0;
+}
+.waitlist-heading p {
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  margin-top: 20px;
+}
+.queue-ticket {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  margin: 28px 0 40px;
+  overflow: hidden;
+}
+.queue-ticket-number {
+  padding: 36px;
+  background: linear-gradient(135deg, var(--color-accent-subtle), var(--color-surface));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+.queue-ticket-number strong {
+  font-size: clamp(64px, 10vw, 112px);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.07em;
+  color: var(--color-accent-ink);
+  overflow-wrap: anywhere;
+}
+.queue-ticket-number span:last-child {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+.queue-ticket-progress {
+  padding: 32px;
+  border-left: 2px dashed var(--color-border);
+}
+.queue-ticket-progress dl {
+  margin: 0 0 20px;
+  display: grid;
+  gap: 18px;
+}
+.queue-ticket-progress dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.queue-ticket-progress dt {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+.queue-ticket-progress dd {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.waitlist-sharing {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+}
+.waitlist-sharing label {
+  margin-top: 0;
+}
+.waitlist-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.waitlist-next {
+  display: flex;
+  align-items: start;
+  gap: 24px;
+  padding: 24px 0;
+  border-top: 1px solid var(--color-border);
+}
+.waitlist-next > svg {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  color: var(--color-accent-ink);
+}
+.waitlist-next h2 {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+.waitlist-next p {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+.pass-strip {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.pass-strip li {
+  padding: 20px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  border-top: 3px solid var(--color-accent);
+  background: var(--color-surface);
+  min-width: 0;
+  transition: transform 0.18s ease;
+}
+.pass-strip li[data-state="Available"]:hover {
+  transform: translateY(-4px);
+}
+.pass-strip svg {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 20px;
+  color: var(--color-accent-ink);
+}
+.pass-strip span,
+.pass-strip strong {
+  display: block;
+}
+.pass-strip strong {
+  font-size: 14px;
+}
+.pass-strip span {
+  font-size: 12px;
+  margin-top: 8px;
+  color: var(--color-text-secondary);
+}
+.pass-strip li[data-state="Claimed"] {
+  border-top-color: var(--color-success);
+}
+.pass-strip li[data-state="Reserved"] {
+  border-top-style: dashed;
+}
+.pass-strip li[data-state="Claimed"] svg {
+  color: var(--color-success);
+}
+@media (max-width: 700px) {
+  .queue-ticket,
+  .waitlist-sharing {
+    grid-template-columns: 1fr;
+  }
+  .queue-ticket-progress {
+    border-left: 0;
+    border-top: 2px dashed var(--color-border);
+    padding: 24px;
+  }
+  .queue-ticket-number {
+    padding: 28px;
+  }
+  .waitlist-sharing {
+    gap: 24px;
+  }
+  .pass-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pass-strip li:last-child {
+    grid-column: 1 / -1;
+  }
+  .waitlist-page {
+    padding-top: 36px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pass-strip li {
+    transition: none;
+  }
+  .pass-strip li[data-state="Available"]:hover {
+    transform: none;
+  }
+}
+
+.waitlist-page .signup-honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

@@ -130,10 +130,10 @@ export function CompanionSources() {
       ? [
           {
             id: `referrals:${referralAccount}`,
-            title: 'Your invitations are ready',
-            detail: 'Invite a few developers to join Jackalope early access.',
+            title: 'Your Instant Access Passes are ready',
+            detail: 'Bring five people straight into Jackalope early access.',
             kind: 'success',
-            actionLabel: 'Open invitations',
+            actionLabel: 'See my passes',
             onOpen: () => openSettings('Invitations'),
           },
         ]

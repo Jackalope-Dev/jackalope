@@ -212,7 +212,11 @@ it('confirms a new signup once under contention, without issuing access or requi
   expect(rows.results).toHaveLength(1);
   expect(rows.results[0].kind).toBe('waitlist');
   const message = await unseal<WaitlistMail>(rows.results[0].payload, bindings.ACCESS_SECRET);
-  expect(message).toEqual({ kind: 'waitlist', to: 'signup@example.com' });
+  expect(message).toMatchObject({
+    kind: 'waitlist',
+    to: 'signup@example.com',
+    token: expect.stringMatching(/^[a-f0-9]{64}$/),
+  });
   expect(await env.DB.prepare('SELECT count(*) AS n FROM access_tokens').first()).toEqual({ n: 0 });
   expect(await env.DB.prepare('SELECT status,newsletter FROM access_members').first()).toEqual({
     status: 'waiting',
@@ -220,10 +224,10 @@ it('confirms a new signup once under contention, without issuing access or requi
   });
   const content = accessEmail(message, bindings.ACCESS_WEB_ORIGIN);
   expect(content.subject).toBe('You’re on the Jackalope waitlist');
-  expect(content.body).toContain('Your signup is confirmed');
-  expect(content.body).toContain('https://jackalope.dev/tour/');
-  expect(content.body).not.toContain('#token=');
-  expect(content.text).toContain('We’ll email you as early-access places open.');
+  expect(content.body).toContain('Confirm your email');
+  expect(content.body).toContain('https://jackalope.dev/waitlist/#token=');
+  expect(content.body).not.toContain('/access/#token=');
+  expect(content.text).toContain('Each new person who verifies their email');
   await env.DB.prepare('DELETE FROM access_mail').run();
   await register(bindings, message.to, true, 'inline');
   expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 0 });
@@ -246,7 +250,7 @@ it('retries confirmation failures and preserves one queue claim across competing
     sends++;
     const payload = JSON.parse(String(init?.body));
     expect(payload.subject).toBe('You’re on the Jackalope waitlist');
-    expect(payload.body).not.toContain('#token=');
+    expect(payload.body).toContain('/waitlist/#token=');
     return Response.json({ success: true, jobId: 'fixture-confirmation' });
   }) as typeof fetch;
   await Promise.all([

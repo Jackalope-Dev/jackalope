@@ -169,7 +169,7 @@ export const growthPost = {
     {
       title: 'Bring someone who would use it.',
       paragraphs: [
-        'Approved members receive five invitations. A valid invitation grants access once the recipient verifies their email, without another manual approval, and that person receives five invitations of their own. Downloads appear when a reviewed build is available.',
+        'Approved members receive five Instant Access Passes. A valid invitation grants access once the recipient verifies their email, without another manual approval, and that person receives five passes of their own. Downloads appear when a reviewed build is available.',
         'Share with people who would find the workflow useful. The benefit is direct access for the person you invite.',
       ],
     },

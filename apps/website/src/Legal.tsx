@@ -60,14 +60,19 @@ const privacy: Section[] = [
           plans. We record campaign labels and the signup page, without advertising cookies or
           cross-site tracking. We also keep verification, session, invitation, and delivery records
           to provide access, prevent repeated emails, and enforce invitation limits. We do not
-          collect payment details for the waitlist.
+          collect payment details for the waitlist. A referral link records who introduced a new
+          signup. We keep that attribution and verification status to calculate referral totals and
+          queue priority. A first-party browser session remembers a referral while you browse this
+          site; it is not an advertising cookie. Waitlist referrers see counts, not the referred
+          email addresses.
         </p>
         <p>
-          We send signup confirmations and the access or invitation messages needed to handle your
-          request. Product newsletters are a separate choice in the access-service signup form. A
-          legacy email-only form, including the fallback used without JavaScript, subscribes you to
-          launch news and product notes as disclosed next to that form; it does not create an
-          approved access account.
+          We send waitlist verification and sign-in links, referral milestone updates, and pass
+          approval, claim, and reservation-expiry messages needed to handle your request. Product
+          newsletters are a separate choice in the access-service signup form. A legacy email-only
+          form, including the fallback used without JavaScript, subscribes you to launch news and
+          product notes as disclosed next to that form; it does not create an approved access
+          account.
         </p>
         <p>
           Someone may give us your email address to invite you. The inviting member can see the
@@ -312,9 +317,13 @@ const terms: Section[] = [
     content: (
       <>
         <p>
-          Joining the waitlist is free. It does not guarantee admission, an invitation date, a
-          finished product, a particular feature, or a future price. Approval does not mean an
-          installer is available yet. Jackalope is coming soon.
+          Waitlist referrals are unlimited. Each new, verified referral earns one day of priority
+          against your signup time; earlier signups break ties. Your displayed position can move as
+          people join, refer, are approved, or are removed. Duplicate signups and self-referrals do
+          not earn credit. Five Instant Access Passes are granted after acceptance and are separate
+          from waitlist referrals. Joining the waitlist is free. It does not guarantee admission, an
+          invitation date, a finished product, a particular feature, or a future price. Approval
+          does not mean an installer is available yet. Jackalope is coming soon.
         </p>
         <p>
           Early-access software may contain errors, change substantially, or become unavailable.

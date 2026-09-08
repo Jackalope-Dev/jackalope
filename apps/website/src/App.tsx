@@ -10,7 +10,9 @@ import { LandingPage } from './LandingPage';
 import { LegalPage } from './Legal';
 import { MarketingPage } from './MarketingPage';
 import { marketingPages } from './marketing-content';
+import { waitlistReferral } from './referral';
 import { Newsletter, WaitlistButton } from './Signup';
+import { WaitlistPage } from './Waitlist';
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
 const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
@@ -65,7 +67,7 @@ const faqs = [
   ['When will Jackalope be available?', 'Coming soon. Join the waitlist for early-access news.'],
   [
     'What happens after I join the waitlist?',
-    'We’ll email you about early access as places open up. No payment is needed to join, and there is no confirmed public launch date or price yet. Your coding agent’s own subscription and usage charges still apply.',
+    'Verify your email to see your place and share a personal link. Waitlist referrals are unlimited; each verified new signup earns one day of priority. After acceptance, you get five Instant Access Passes for people to skip the line. No payment is needed to join, and there is no confirmed public launch date or price yet. Your coding agent’s own subscription and usage charges still apply.',
   ],
   [
     'Can I download it today?',
@@ -76,6 +78,9 @@ const faqs = [
 ];
 
 export function App({ path = '/' }: { path?: string }) {
+  useEffect(() => {
+    waitlistReferral();
+  }, []);
   const home = path === '/';
   const marketingPage = marketingPages.find((page) => page.path === path);
   const [dark, setDark] = useState(false);
@@ -150,6 +155,7 @@ export function App({ path = '/' }: { path?: string }) {
                   collisionPadding={16}
                 >
                   {[
+                    ['Your waitlist place', '/waitlist/'],
                     ['Member access', '/access/'],
                     ['Compare workflows', '/compare/'],
                     ['Product tour', '/#inside'],
@@ -198,6 +204,8 @@ export function App({ path = '/' }: { path?: string }) {
           }}
           faqs={faqs}
         />
+      ) : path === '/waitlist/' ? (
+        <WaitlistPage />
       ) : path === '/access/' ? (
         <AccessPage />
       ) : path === '/privacy/' || path === '/terms/' ? (
@@ -208,7 +216,7 @@ export function App({ path = '/' }: { path?: string }) {
         <JournalPage path={path} dark={dark} />
       )}
 
-      {!['/', '/privacy/', '/terms/', '/access/'].includes(path) && <Newsletter />}
+      {!['/', '/privacy/', '/terms/', '/access/', '/waitlist/'].includes(path) && <Newsletter />}
 
       <footer className={`site-footer ${home ? 'landing-footer' : 'page-width'}`}>
         <a href="/" className="wordmark">
@@ -228,7 +236,8 @@ export function App({ path = '/' }: { path?: string }) {
           <a href="https://x.com/JackalopeDotDev" rel="me">
             Follow on X
           </a>
-          <a href="/access/">Your access</a>
+          <a href="/waitlist/">Your waitlist place</a>
+          <a href="/access/">Your access & passes</a>
           <a href="/privacy/">Privacy</a>
           <a href="/terms/">Terms</a>
           <a href="/#questions">Questions</a>

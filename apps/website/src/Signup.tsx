@@ -1,4 +1,5 @@
 import { accessMessage, accessOrigin, accessRequest } from './access-api';
+import { waitlistReferral } from './referral';
 import './access.css';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, Check, GitBranch, Layers3, LoaderCircle, X } from 'lucide-react';
@@ -50,6 +51,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               newsletter: data.get('newsletter') === 'on',
               source: popup ? 'popup' : 'inline',
               campaign: signupCampaign(),
+              referral: waitlistReferral(),
             },
             controller.signal,
           )
@@ -67,7 +69,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
       setSurveyToken(result.surveyToken ?? '');
       setMessage(
         accessOrigin
-          ? 'You’re on the waitlist. Look out for a signup confirmation, then a separate invitation when your access is ready. Product notes have their own confirmation if you opted in.'
+          ? 'Your place is saved. Check your email to verify it, see your number, and get your unlimited referral link. Product notes have their own confirmation if you opted in.'
           : result.optIn?.required
             ? 'Check your inbox to confirm your email and finish joining the list.'
             : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',

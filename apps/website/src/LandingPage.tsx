@@ -507,7 +507,7 @@ export function LandingPage({
           <li>
             <strong>Bring your people.</strong>
             <p>
-              Once approved, you get five invitations to share. Each person who joins can invite
+              Once approved, you get five Instant Access Passes to share. Each person who joins can invite
               five more.
             </p>
           </li>

@@ -4,8 +4,10 @@ import { randomToken } from './crypto';
 import { waitlistInsights } from './insights';
 import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
+import type { Mail } from './mail-templates';
 import { installerKey, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
+import { waitlistRankSql } from './waitlist';
 
 function mailConfigured(env: Env) {
   return !!(env.ACCESS_SECRET?.length >= 32 && env.SEQUENZY_API_KEY && env.ACCESS_EMAIL_FROM);
@@ -64,14 +66,19 @@ export async function accessAdmin(
   }
   if (request.method === 'GET' && url.pathname === '/admin/access/email-preview') {
     const kind = url.searchParams.get('kind');
-    const mail =
+    const mail: Mail =
       kind === 'waitlist'
-        ? { to: 'preview@example.invalid', kind: 'waitlist' as const }
-        : {
-            to: 'preview@example.invalid',
-            kind: kind === 'login' ? ('login' as const) : ('welcome' as const),
-            token: 'preview-only-not-a-login-token',
-          };
+        ? { to: 'preview@example.invalid', kind: 'waitlist', token: 'preview-only' }
+        : kind === 'referral' ||
+            kind === 'passes_ready' ||
+            kind === 'pass_claimed' ||
+            kind === 'pass_expired'
+          ? { to: 'preview@example.invalid', kind, total: 5 }
+          : {
+              to: 'preview@example.invalid',
+              kind: kind === 'invite' ? 'invite' : kind === 'login' ? 'login' : 'welcome',
+              token: 'preview-only',
+            };
     return new Response(accessEmail(mail, env.ACCESS_WEB_ORIGIN).body, {
       headers: {
         ...headers,
@@ -89,7 +96,7 @@ export async function accessAdmin(
     if (request.method === 'GET' && url.pathname === '/admin/api/access/member') {
       const id = z.uuid().parse(url.searchParams.get('id'));
       const member = await env.DB.prepare(
-        'SELECT id,email,status,created_at,approved_at,verified_at,source,newsletter,newsletter_synced_at,newsletter_attempts,invite_limit,preferences,campaign FROM access_members WHERE id=?',
+        `SELECT id,email,status,created_at,approved_at,verified_at,source,newsletter,newsletter_synced_at,newsletter_attempts,invite_limit,preferences,campaign,referral_count,waitlist_verified_at,(SELECT count(*) FROM access_members r WHERE r.waitlist_referrer_id=access_members.id AND r.waitlist_verified_at IS NULL AND r.status!='revoked') AS pending_referrals FROM access_members WHERE id=?`,
       )
         .bind(id)
         .first<{ email: string }>();
@@ -120,6 +127,15 @@ export async function accessAdmin(
     }
     if (request.method === 'GET' && url.pathname === '/admin/api/access') {
       const status = url.searchParams.get('status') ?? 'waiting';
+      const sort = z
+        .enum(['priority', 'newest', 'referrals'])
+        .parse(url.searchParams.get('sort') ?? (status === 'waiting' ? 'priority' : 'newest'));
+      const offset = z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(200000)
+        .parse(url.searchParams.get('offset') ?? 0);
       const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
       const query = (url.searchParams.get('query') ?? '').trim().toLowerCase();
       const platform = z
@@ -136,7 +152,7 @@ export async function accessAdmin(
       )
         return json({ error: 'invalid_filter' }, 400);
       const members = await env.DB.prepare(
-        "SELECT m.rowid AS cursor,m.id,m.email,m.status,m.created_at,m.approved_at,m.verified_at,m.invite_limit,m.preferences,m.first_desktop_at,(SELECT count(*) FROM access_devices WHERE member_id=m.id AND expires_at>?) AS devices,(SELECT count(*) FROM access_invites WHERE owner_id=m.id AND status='accepted') AS accepted,a.kind AS mail_kind,a.state AS mail_state,a.attempts AS mail_attempts,a.next_at AS mail_next_at,a.created_at AS mail_created_at,a.delivery_status FROM access_members m LEFT JOIN access_mail a ON a.rowid=(SELECT rowid FROM access_mail WHERE email=m.email ORDER BY created_at DESC,rowid DESC LIMIT 1) WHERE (?='all' OR m.status=?) AND m.rowid<? AND instr(m.email,?)>0 AND (?='all' OR EXISTS(SELECT 1 FROM json_each(m.preferences,'$.platforms') WHERE value=?)) AND (?='all' OR (?='not-signed-in' AND m.status='approved' AND m.verified_at IS NULL) OR (?='not-connected' AND m.status='approved' AND m.verified_at IS NOT NULL AND m.first_desktop_at IS NULL) OR (?='connected' AND m.first_desktop_at IS NOT NULL) OR (?='email-failed' AND (a.state='failed' OR a.delivery_status IN ('bounced','failed','complained')))) ORDER BY m.rowid DESC LIMIT 51",
+        `WITH ranked AS (${waitlistRankSql}) SELECT m.rowid AS cursor,w.position,m.referral_count,m.waitlist_verified_at,(SELECT count(*) FROM access_members r WHERE r.waitlist_referrer_id=m.id AND r.waitlist_verified_at IS NULL AND r.status!='revoked') AS pending_referrals,m.id,m.email,m.status,m.created_at,m.approved_at,m.verified_at,m.invite_limit,m.preferences,m.first_desktop_at,(SELECT count(*) FROM access_devices WHERE member_id=m.id AND expires_at>?) AS devices,(SELECT count(*) FROM access_invites WHERE owner_id=m.id AND status='accepted') AS accepted,a.kind AS mail_kind,a.state AS mail_state,a.attempts AS mail_attempts,a.next_at AS mail_next_at,a.created_at AS mail_created_at,a.delivery_status FROM access_members m LEFT JOIN ranked w ON w.id=m.id LEFT JOIN access_mail a ON a.rowid=(SELECT rowid FROM access_mail WHERE email=m.email ORDER BY created_at DESC,rowid DESC LIMIT 1) WHERE (?='all' OR m.status=?) AND m.rowid<? AND instr(m.email,?)>0 AND (?='all' OR EXISTS(SELECT 1 FROM json_each(m.preferences,'$.platforms') WHERE value=?)) AND (?='all' OR (?='not-signed-in' AND m.status='approved' AND m.verified_at IS NULL) OR (?='not-connected' AND m.status='approved' AND m.verified_at IS NOT NULL AND m.first_desktop_at IS NULL) OR (?='connected' AND m.first_desktop_at IS NOT NULL) OR (?='email-failed' AND (a.state='failed' OR a.delivery_status IN ('bounced','failed','complained')))) ORDER BY CASE WHEN ?='priority' THEN coalesce(w.position,200001) WHEN ?='referrals' THEN -m.referral_count ELSE -m.rowid END,m.created_at,m.id LIMIT 51 OFFSET ?`,
       )
         .bind(
           Date.now(),
@@ -151,6 +167,9 @@ export async function accessAdmin(
           stage,
           stage,
           stage,
+          sort,
+          sort,
+          offset,
         )
         .all();
       const counts = await env.DB.prepare(
@@ -188,7 +207,8 @@ export async function accessAdmin(
           revoke: 'approved',
           restore: 'revoked',
         }[action];
-        if (member.status !== expected) return json({ error: 'member_changed' }, 409);
+        if (member.status !== expected && !(action === 'revoke' && member.status === 'waiting'))
+          return json({ error: 'member_changed' }, 409);
         if (action === 'approve' || action === 'resend') {
           if (env.EARLY_ACCESS_ENABLED !== 'true' || !mailConfigured(env))
             return json({ error: 'access_not_configured' }, 503);
@@ -211,9 +231,14 @@ export async function accessAdmin(
         else
           await env.DB.batch([
             env.DB.prepare(
-              "UPDATE access_members SET status='revoked' WHERE id=? AND status='approved'",
+              "UPDATE access_members SET status='revoked' WHERE id=? AND status IN ('approved','waiting')",
             ).bind(id),
             env.DB.prepare('DELETE FROM access_sessions WHERE member_id=?').bind(id),
+            env.DB.prepare('DELETE FROM access_waitlist_sessions WHERE member_id=?').bind(id),
+            env.DB.prepare('DELETE FROM access_waitlist_tokens WHERE member_id=?').bind(id),
+            env.DB.prepare(
+              'UPDATE access_growth_events SET queued_at=? WHERE member_id=? AND queued_at IS NULL',
+            ).bind(Date.now(), id),
             env.DB.prepare('DELETE FROM access_tokens WHERE email=?').bind(member.email),
             env.DB.prepare(
               "UPDATE access_invites SET status='revoked' WHERE (owner_id=? OR email=?) AND status='pending'",

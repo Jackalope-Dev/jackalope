@@ -183,6 +183,11 @@ export const pages = [
       'Terms for Jackalope’s website and hosted early-access service, with desktop open-source license information.',
   },
   {
+    path: '/waitlist/',
+    title: 'Your waitlist place | Jackalope',
+    description: 'Your private waitlist position and referral progress.',
+  },
+  {
     path: '/access/',
     title: 'Your early access | Jackalope',
     description: 'Your private Jackalope downloads and invitations.',
