@@ -1,12 +1,12 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import remarkGfm from 'remark-gfm';
+
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { recoveryHandoff } from '../../lib/project-return';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
-import { latestAttempt, safeResultLink } from '../../lib/task-workflow';
+import { latestAttempt } from '../../lib/task-workflow';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -26,7 +26,7 @@ import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 
-const Markdown = lazy(() => import('react-markdown'));
+const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 // The tools panel pulls in the agent, connection and project editors; load it
 // only when the user opens it.
 const TaskTools = lazy(() => import('./TaskTools').then((m) => ({ default: m.TaskTools })));
@@ -404,38 +404,11 @@ export function TaskDetail({
                     </p>
                   }
                 >
-                  <Markdown
-                    skipHtml
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      table: ({ children }) => (
-                        <section
-                          className="task-result-table"
-                          aria-label="Result table"
-                          // biome-ignore lint/a11y/noNoninteractiveTabindex: Wide tables need a keyboard scrolling target.
-                          tabIndex={0}
-                        >
-                          <table>{children}</table>
-                        </section>
-                      ),
-                      a: ({ href, children }) => {
-                        const safe = safeResultLink(href);
-                        return safe ? (
-                          <button
-                            type="button"
-                            className="task-link result-link"
-                            onClick={() => void openLink(safe)}
-                          >
-                            {children}
-                          </button>
-                        ) : (
-                          <span>{children}</span>
-                        );
-                      },
-                    }}
-                  >
-                    {run.result}
-                  </Markdown>
+                  <TaskMarkdown
+                    content={run.result}
+                    active={active}
+                    onOpenLink={(url) => void openLink(url)}
+                  />
                 </Suspense>
               </div>
             ) : (

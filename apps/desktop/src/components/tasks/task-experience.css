@@ -214,25 +214,6 @@ details[open] > .task-activity-entry > svg {
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
-.task-patch-code {
-  padding: 12px 0;
-}
-.task-patch-line {
-  display: block;
-  padding: 0 14px;
-  min-height: 1.7em;
-}
-.task-patch-line[data-tone="add"] {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 8%, transparent);
-}
-.task-patch-line[data-tone="remove"] {
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
-}
-.task-patch-line[data-tone="header"] {
-  color: var(--color-accent-ink);
-}
 .task-context-panel {
   border-top: 1px solid var(--color-border-subtle);
   border-bottom: 1px solid var(--color-border-subtle);

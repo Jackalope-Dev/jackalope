@@ -1,0 +1,19 @@
+Jackalope open-source integrations
+
+@pierre/diffs 1.4.1: Apache-2.0. See pierre-diffs.txt.
+streamdown 2.6.0: Apache-2.0. See streamdown.txt.
+@streamdown/code 1.1.1: Apache-2.0. See streamdown-code.txt.
+Jackalope modifies the code plugin's highlighting cache key to include the full
+source text. The modification is maintained in patches/@streamdown__code@1.1.1.patch.
+Upstream: https://github.com/vercel/streamdown
+Both renderers use Shiki 3.23.0 (MIT). See shiki.txt.
+
+notify 8.2.0: CC0-1.0. See notify.txt.
+notify-debouncer-mini 0.7.0: MIT OR Apache-2.0; MIT selected here.
+See notify-debouncer-mini.txt.
+gix 0.87.1: MIT OR Apache-2.0; MIT selected here. See gix.txt.
+
+The separately bundled agent-browser executable includes axe-core 4.12.1.
+Its MPL-2.0 license and corresponding-source notice accompany that executable.
+
+Additional dependency license and notice files are collected in dependencies.txt.

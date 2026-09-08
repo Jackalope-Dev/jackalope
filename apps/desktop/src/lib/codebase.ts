@@ -33,3 +33,27 @@ export async function scanCodebase(repoPath: string): Promise<CodebaseSnapshot> 
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<CodebaseSnapshot>('codebase_scan', { repoPath });
 }
+
+export async function watchCodebase(repoPath: string, onChange: (unavailable: boolean) => void) {
+  const [{ invoke }, { listen }] = await Promise.all([
+    import('@tauri-apps/api/core'),
+    import('@tauri-apps/api/event'),
+  ]);
+  let id: string | undefined;
+  const unlisten = await listen<{ id: string; unavailable: boolean }>(
+    'codebase-changed',
+    (event) => {
+      if (event.payload.id === id) onChange(event.payload.unavailable);
+    },
+  );
+  try {
+    id = await invoke<string>('codebase_watch', { repoPath });
+  } catch (error) {
+    unlisten();
+    throw error;
+  }
+  return async () => {
+    unlisten();
+    await invoke('codebase_unwatch', { id });
+  };
+}

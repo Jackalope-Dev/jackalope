@@ -39,6 +39,20 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     Ok(output.stdout.trim().to_string())
 }
 
+fn head_metadata(root: &Path) -> Option<(String, String)> {
+    let repo = gix::open_opts(root, gix::open::Options::isolated().bail_if_untrusted(true)).ok()?;
+    let head = repo.head().ok()?;
+    let branch = match head.referent_name() {
+        Some(name) => name
+            .as_bstr()
+            .to_string()
+            .strip_prefix("refs/heads/")?
+            .to_string(),
+        None => String::new(),
+    };
+    Some((head.id()?.to_string(), branch))
+}
+
 fn variable_names(bytes: &[u8]) -> Vec<String> {
     String::from_utf8_lossy(bytes)
         .lines()
@@ -58,9 +72,16 @@ fn variable_names(bytes: &[u8]) -> Vec<String> {
 pub fn inspect(path: &str) -> Result<Readiness, String> {
     let root =
         dunce::canonicalize(path).map_err(|_| "Project folder is unavailable.".to_string())?;
+    let (head, branch) = match head_metadata(&root) {
+        Some(metadata) => metadata,
+        None => (
+            git(&root, &["rev-parse", "HEAD"])?,
+            git(&root, &["branch", "--show-current"])?,
+        ),
+    };
     let mut result = Readiness {
-        head: git(&root, &["rev-parse", "HEAD"])?,
-        branch: git(&root, &["branch", "--show-current"])?,
+        head,
+        branch,
         changes: git(&root, &["status", "--short", "--untracked-files=normal"])?,
         recent_changes: git(&root, &["log", "-5", "--format=%h %s"])?,
         prepare_command: None,
@@ -146,6 +167,58 @@ pub async fn project_readiness(path: String) -> Result<Readiness, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn metadata_matches_git_for_packed_detached_linked_and_sha256_repositories() {
+        let fixture = std::env::temp_dir().join(format!("jackalope-gix-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&fixture).unwrap();
+        for format in ["sha1", "sha256"] {
+            let root = fixture.join(format);
+            std::fs::create_dir(&root).unwrap();
+            git(
+                &root,
+                &[
+                    "init",
+                    "-b",
+                    "feature/metadata",
+                    &format!("--object-format={format}"),
+                ],
+            )
+            .unwrap();
+            assert!(head_metadata(&root).is_none());
+            git(
+                &root,
+                &[
+                    "-c",
+                    "user.name=Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "-c",
+                    "core.hooksPath=disabled-hooks",
+                    "-c",
+                    "commit.gpgsign=false",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "fixture",
+                ],
+            )
+            .unwrap();
+            git(&root, &["pack-refs", "--all"]).unwrap();
+            let expected = (
+                git(&root, &["rev-parse", "HEAD"]).unwrap(),
+                "feature/metadata".into(),
+            );
+            assert_eq!(head_metadata(&root).unwrap(), expected);
+            let linked = fixture.join(format!("{format}-linked"));
+            git(
+                &root,
+                &["worktree", "add", "--detach", linked.to_str().unwrap()],
+            )
+            .unwrap();
+            assert_eq!(head_metadata(&linked).unwrap(), (expected.0, String::new()));
+        }
+        std::fs::remove_dir_all(fixture).unwrap();
+    }
     #[test]
     fn configuration_output_contains_names_only() {
         assert_eq!(

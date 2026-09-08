@@ -42,6 +42,8 @@ cron = "0.17"
 chrono-tz = "0.10"
 dunce = "1"
 oxc_resolver = "11"
+notify-debouncer-mini = "=0.7.0"
+gix = { version = "=0.87.1", default-features = false, features = ["sha1", "sha256"] }
 
 [features]
 default = ["custom-protocol"]

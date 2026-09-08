@@ -68,6 +68,28 @@ async fn real_agent_browser_workflow() {
     }
     let _cleanup = Cleanup(vec![id.clone(), other.clone()]);
     browser_navigate(&id, &url).await.unwrap();
+    let audit = browser_inspect(
+        &id,
+        BrowserInspectRequest {
+            kind: "accessibility".into(),
+            selector: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(audit["audit"]["engine"], "4.12.1");
+    assert!(audit["audit"]["counts"]["violations"].as_u64().unwrap() > 0);
+    assert_eq!(accessibility_checkpoint(&audit).unwrap().status, "failed");
+    assert!(audit["content"].as_str().unwrap().contains("html-has-lang"));
+    assert!(browser_inspect(
+        &id,
+        BrowserInspectRequest {
+            kind: "accessibility".into(),
+            selector: Some("#missing-audit-scope".into())
+        }
+    )
+    .await
+    .is_err());
     let snapshot = browser_snapshot(&id, serde_json::from_value(json!({})).unwrap())
         .await
         .unwrap();
@@ -179,6 +201,24 @@ async fn real_agent_browser_workflow() {
         .unwrap();
     close(&other);
     println!("Real browser evidence retained at {}", directory.display());
+}
+
+#[test]
+fn accessibility_checkpoint_preserves_findings_and_manual_review() {
+    for (violations, incomplete, status) in
+        [(1, 0, "failed"), (0, 1, "in_progress"), (0, 0, "passed")]
+    {
+        let value = json!({"audit":{"engine":"4.12.1","counts":{"violations":violations,"incomplete":incomplete},"scope":"main"},"content":"fixture report","truncated":true});
+        let checkpoint = accessibility_checkpoint(&value).unwrap();
+        assert_eq!(checkpoint.status, status);
+        assert_eq!(checkpoint.evidence, vec!["fixture report"]);
+        assert!(checkpoint
+            .notes
+            .unwrap()
+            .contains("Findings were truncated"));
+    }
+    assert!(accessibility_checkpoint(&json!({"content":"ordinary inspection"})).is_none());
+    assert!(accessibility_checkpoint(&json!({"audit":{}})).is_none());
 }
 
 #[tokio::test]

@@ -1,15 +1,13 @@
 import { Check, Copy, FileDiff } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '../ui/button';
-import { CodeSurface } from './CodeSurface';
+import { DiffPreview } from './DiffPreview';
 import './task-experience.css';
 
 export function PatchPreview({ patch }: { patch: string }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
-  const [expanded, setExpanded] = useState(false);
-  const lines = patch.split('\n').map((text, number) => ({ text, number }));
-  const visible = expanded ? lines : lines.slice(0, 160);
+  const [open, setOpen] = useState(false);
   const copy = async () => {
     setError('');
     try {
@@ -20,10 +18,10 @@ export function PatchPreview({ patch }: { patch: string }) {
     }
   };
   return (
-    <details className="task-patch">
+    <details className="task-patch" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary className="task-experience-summary">
         <FileDiff size={18} aria-hidden="true" />
-        Read patch<span className="task-experience-meta">Unified diff</span>
+        Read patch<span className="task-experience-meta">File changes</span>
       </summary>
       <div className="task-patch-toolbar">
         <span>+ Added · − Removed</span>
@@ -37,36 +35,7 @@ export function PatchPreview({ patch }: { patch: string }) {
           {error}
         </p>
       )}
-      <CodeSurface className="task-patch-code" label="Workspace patch">
-        <code>
-          {visible.map(({ text: line, number }) => (
-            <span
-              key={number}
-              className="task-patch-line"
-              data-tone={
-                line.startsWith('+++') ||
-                line.startsWith('---') ||
-                line.startsWith('diff ') ||
-                line.startsWith('@@')
-                  ? 'header'
-                  : line.startsWith('+')
-                    ? 'add'
-                    : line.startsWith('-')
-                      ? 'remove'
-                      : undefined
-              }
-            >
-              {line}
-              {number < visible.length - 1 ? '\n' : ''}
-            </span>
-          ))}
-        </code>
-      </CodeSurface>
-      {!expanded && lines.length > visible.length && (
-        <Button variant="ghost" onClick={() => setExpanded(true)}>
-          Show all {lines.length} lines
-        </Button>
-      )}
+      {open && <DiffPreview patch={patch} />}
     </details>
   );
 }

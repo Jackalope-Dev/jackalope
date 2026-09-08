@@ -15,6 +15,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ScreenshotPreview } from './ScreenshotPreview';
+import { ValidationEvidence } from './ValidationEvidence';
 
 interface ValidationJourneyProps {
   runId: string;
@@ -123,12 +124,7 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
                   {step.evidence && step.evidence.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {[...new Set(step.evidence)].map((item) => (
-                        <span
-                          key={item}
-                          className="max-w-full [overflow-wrap:anywhere] px-2 py-0.5 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[var(--color-text-muted)] font-mono"
-                        >
-                          {item}
-                        </span>
+                        <ValidationEvidence key={item} text={item} />
                       ))}
                     </div>
                   )}

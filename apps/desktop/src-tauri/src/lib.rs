@@ -102,6 +102,8 @@ pub fn run() {
             commands::knowledge::knowledge_preview,
             commands::knowledge::knowledge_search,
             commands::codebase::codebase_scan,
+            commands::codebase_watch::codebase_watch,
+            commands::codebase_watch::codebase_unwatch,
             desktop_set_close_to_tray,
             app_reset,
             app_finish_reset,

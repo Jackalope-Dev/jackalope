@@ -263,28 +263,6 @@
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
 }
-.merge-patch {
-  background: var(--color-surface-sunken);
-  overflow: auto;
-  max-height: 480px;
-  min-height: 220px;
-  padding: 15px;
-  font-size: var(--text-xs);
-  line-height: 1.8;
-  tab-size: 2;
-}
-.patch-added {
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-}
-.patch-removed {
-  color: var(--color-text-secondary);
-  text-decoration-color: var(--color-text-muted);
-  background: var(--color-surface-hover);
-}
-.patch-context {
-  color: var(--color-text-muted);
-}
 .merge-approval {
   display: flex;
   flex-wrap: wrap;

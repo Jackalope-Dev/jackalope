@@ -57,7 +57,7 @@ async fn installed_agents_verify_browser_flow() {
         .split(',')
     {
         let id = uuid::Uuid::new_v4().to_string();
-        let prompt = format!("Test the local fixture at {url} using only Jackalope browser tools supplied through native MCP. Do not use shell, other browser tools, inspect repository files, or modify files. Navigate, take browser_snapshot, identify Display name by its @e reference and fill it with Jackalope trial (replace Old). Click Save profile, wait for Verified text, then take a fresh snapshot and report the entire Verified message including its unknown code. Configure the viewport to 960x640 with dark scheme and reduced motion. Capture a screenshot named Browser acceptance using browser_screenshot. Inspect page errors using browser_inspect. Record a passed validation step named Browser acceptance only if the observed message and screenshot succeeded. Briefly report actual results and stop. This is an authorized local fixture with no real account, payment or messages.");
+        let prompt = format!("Test the local fixture at {url} using only Jackalope browser tools supplied through native MCP. Do not use shell, other browser tools, inspect repository files, or modify files. Navigate, take browser_snapshot, identify Display name by its @e reference and fill it with Jackalope trial (replace Old). Click Save profile, then call browser_interact with action wait, an empty selector and text Verified. Then take a fresh snapshot and report the entire Verified message including its unknown code. Configure the viewport to 960x640 with dark scheme and reduced motion. Capture a screenshot named Browser acceptance using browser_screenshot. Inspect page errors using browser_inspect. Also run browser_inspect with kind accessibility on the whole page and report its real findings; this fixture intentionally omits the page language. The tool records that audit automatically, so do not fabricate or separately record an accessibility checkpoint. Record a passed validation step named Browser acceptance only if the observed message and screenshot succeeded. Briefly report actual results and stop. This is an authorized local fixture with no real account, payment or messages.");
         let request: RunRequest = serde_json::from_value(json!({"id":id,"projectId":uuid::Uuid::new_v4().to_string(),"projectName":"Browser acceptance","projectPath":repo,"agent":agent,"isolated":false,"autoVerify":false,"connectionIds":[],"prompt":prompt})).unwrap();
         if let Err(error) = coordinator.start_manual(request) {
             failures.push(format!("{agent}: {error}"));
@@ -83,6 +83,11 @@ async fn installed_agents_verify_browser_flow() {
                     || !run.result.contains(&nonce)
                     || run.screenshots.is_empty()
                     || !run.validation_steps.iter().any(|s| s.status == "passed")
+                    || !run.validation_steps.iter().any(|s| {
+                        s.step == "Automated accessibility audit"
+                            && s.status == "failed"
+                            && s.evidence.iter().any(|e| e.contains("html-has-lang"))
+                    })
                 {
                     failures.push(format!(
                         "{agent}: browser evidence incomplete; inspect retained profile"

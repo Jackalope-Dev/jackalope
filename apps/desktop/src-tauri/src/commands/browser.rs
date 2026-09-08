@@ -357,23 +357,26 @@ pub async fn browser_inspect(
     run_id: &str,
     request: BrowserInspectRequest,
 ) -> Result<Value, String> {
-    let action = match request.kind.as_str() {
-        "text" => "gettext",
-        "value" => "inputvalue",
-        "visible" => "isvisible",
-        "enabled" => "isenabled",
-        "checked" => "ischecked",
-        "console" => "console",
-        "errors" => "errors",
-        _ => {
-            return Err("Choose text, value, visible, enabled, checked, console or errors.".into())
-        }
-    };
+    let action =
+        match request.kind.as_str() {
+            "text" => "gettext",
+            "value" => "inputvalue",
+            "visible" => "isvisible",
+            "enabled" => "isenabled",
+            "checked" => "ischecked",
+            "console" => "console",
+            "errors" => "errors",
+            "accessibility" => "a11y",
+            _ => return Err(
+                "Choose text, value, visible, enabled, checked, console, errors or accessibility."
+                    .into(),
+            ),
+        };
     if request
         .selector
         .as_ref()
         .is_some_and(|s| s.is_empty() || s.len() > 2000)
-        || (!matches!(action, "console" | "errors") && request.selector.is_none())
+        || (!matches!(action, "console" | "errors" | "a11y") && request.selector.is_none())
     {
         return Err("Provide a CSS selector or @e reference for element inspection.".into());
     }
@@ -382,12 +385,36 @@ pub async fn browser_inspect(
         if let Some(selector) = request.selector {
             command["selector"] = json!(selector);
         }
-        let result = engine.call(command)?;
+        let result = engine.call(command.clone())?;
         let text = serde_json::to_string(&result).map_err(|e| e.to_string())?;
         let (text, truncated) = bounded(&text);
+        if action == "a11y" {
+            return Ok(
+                json!({"content":text,"truncated":truncated,"untrustedContent":true,
+                "audit":{"engine":result["axeVersion"],"counts":result["counts"],
+                    "scope":command["selector"],"automatedOnly":true}}),
+            );
+        }
         Ok(json!({"content":text,"truncated":truncated,"untrustedContent":true}))
     })
     .await
+}
+
+pub(super) fn accessibility_checkpoint(value: &Value) -> Option<super::harness::ValidationStep> {
+    let audit = value.get("audit")?;
+    let violations = audit["counts"]["violations"].as_u64()?;
+    let incomplete = audit["counts"]["incomplete"].as_u64()?;
+    Some(super::harness::ValidationStep {
+        id: uuid::Uuid::new_v4().to_string(),
+        step: "Automated accessibility audit".into(),
+        status: if violations > 0 { "failed" } else if incomplete > 0 { "in_progress" } else { "passed" }.into(),
+        notes: Some(format!("axe-core {}: {violations} rule violations; {incomplete} checks need manual review. Scope: {}. Automated checks do not establish accessibility compliance.{}",
+            audit["engine"].as_str().unwrap_or("unknown"),
+            audit["scope"].as_str().unwrap_or("current page"),
+            if value["truncated"] == true { " Findings were truncated." } else { "" })),
+        evidence: vec![value["content"].as_str().unwrap_or_default().to_owned()],
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    })
 }
 
 pub async fn browser_tabs(run_id: &str, request: BrowserTabsRequest) -> Result<Value, String> {

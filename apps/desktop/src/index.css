@@ -1,5 +1,15 @@
 @import "tailwindcss";
 @import "@jackalope/brand/fonts.css";
+@source "../node_modules/streamdown/dist/*.js";
+
+@theme inline {
+  --color-sidebar: var(--color-surface);
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text-primary);
+  --color-muted: var(--color-surface-hover);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-border: var(--color-border-subtle);
+}
 
 @theme {
   --font-sans: "Plus Jakarta Sans Variable", "Segoe UI", system-ui, sans-serif;

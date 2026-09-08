@@ -3,10 +3,12 @@ import { AgentQuestion } from '../components/tasks/AgentQuestion';
 import { PatchPreview } from '../components/tasks/PatchPreview';
 import { TaskActivity } from '../components/tasks/TaskActivity';
 import { TaskContextPanel } from '../components/tasks/TaskContextPanel';
+import TaskMarkdown from '../components/tasks/TaskMarkdown';
 import { Button } from '../components/ui/button';
 import { Select, SelectItem } from '../components/ui/Select';
 import { assemblePrompt } from '../lib/skills/context-assembler';
 import type { PendingUserPrompt } from '../lib/task-runtime';
+import '../components/tasks/task-workspace.css';
 
 const patch =
   'diff --git a/src/search.ts b/src/search.ts\n--- a/src/search.ts\n+++ b/src/search.ts\n@@ -1,3 +1,3 @@\n export function search(query: string) {\n-  return query;\n+  return query.trim();\n }';
@@ -127,10 +129,20 @@ export function TaskExperienceExamples() {
         key={String(long)}
         patch={
           long
-            ? `${patch}\n${Array.from({ length: 200 }, (_, index) => `+// Example line ${index + 1}`).join('\n')}`
+            ? `diff --git a/example.ts b/example.ts\nnew file mode 100644\n--- /dev/null\n+++ b/example.ts\n@@ -0,0 +1,10000 @@\n${Array.from({ length: 10000 }, (_, index) => `+export const example${index + 1} = ${index + 1};`).join('\n')}\n`
             : patch
         }
       />
+      <div className="task-result-text mt-6">
+        <TaskMarkdown
+          active={long}
+          onOpenLink={(url) => setAnswer(url)}
+          content={
+            '## Result\n\nWhitespace is handled.\n\n```typescript\nexport const search = (query: string) => query.trim();\n```\n\n| Check | Result |\n| --- | --- |\n| Search | Passed |\n\n[Documentation](https://example.com) · [Unsafe](javascript:alert(1))\n\n<script>alert(1)</script>\n\n' +
+            (long ? '**Still streaming' : '**Complete.**')
+          }
+        />
+      </div>
     </section>
   );
 }

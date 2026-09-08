@@ -245,7 +245,6 @@
 }
 .task-result-text,
 .task-output,
-.merge-patch,
 .task-path,
 .task-request {
   user-select: text;

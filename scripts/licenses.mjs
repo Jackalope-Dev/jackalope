@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -63,4 +64,41 @@ ${table(jsRows)}
 ${table(rustRows)}
 `;
 writeFileSync(new URL('../docs/DEPENDENCIES.md', import.meta.url), report);
+const production = execute(process.execPath, [pnpm, 'licenses', 'list', '--prod', '--json']);
+const packages = [
+  ...Object.values(production)
+    .flat()
+    .flatMap((item) =>
+      item.paths.map((directory) => ({
+        directory,
+        name: `${item.name} ${item.versions.join(', ')}`,
+      })),
+    ),
+  ...cargo.packages
+    .filter((item) => item.source)
+    .map((item) => ({
+      directory: path.dirname(item.manifest_path),
+      name: `${item.name} ${item.version}`,
+    })),
+];
+const notices = new Map();
+for (const item of packages) {
+  for (const entry of readdirSync(item.directory, { withFileTypes: true })) {
+    if (!entry.isFile() || !/^(?:licen[sc]e|copying|notice|unlicense)(?:[.-]|$)/i.test(entry.name))
+      continue;
+    const text = readFileSync(path.join(item.directory, entry.name), 'utf8').trim();
+    if (!text) continue;
+    const owners = notices.get(text) ?? new Set();
+    owners.add(`${item.name} (${entry.name})`);
+    notices.set(text, owners);
+  }
+}
+const sections = [...notices].map(
+  ([text, owners]) => `${[...owners].sort().join('\n')}\n\n${text}`,
+);
+sections.sort();
+writeFileSync(
+  new URL('../apps/desktop/public/licenses/dependencies.txt', import.meta.url),
+  `Dependency license and notice files\n\nGenerated from installed production JavaScript packages and the locked Rust dependency graph.\nIncludes optional target dependencies. Identical texts are grouped; package declarations are listed in docs/DEPENDENCIES.md.\n\n${sections.join('\n\n============================================================\n\n')}\n`,
+);
 console.log(`Recorded ${jsRows.length} JavaScript and ${rustRows.length} Rust packages.`);
