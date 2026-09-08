@@ -15,6 +15,7 @@ pub mod worktree_cleanup;
 
 pub mod agent_policy;
 pub mod agent_profiles;
+pub mod agent_sign_in;
 
 pub mod history;
 pub mod reset;

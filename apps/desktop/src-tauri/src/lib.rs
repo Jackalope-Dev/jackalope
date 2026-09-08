@@ -4,6 +4,7 @@ mod window_behavior;
 
 use commands::agent_policy::*;
 use commands::agent_profiles::*;
+use commands::agent_sign_in::*;
 use commands::capacity::*;
 use commands::coordination::*;
 use commands::integration::*;
@@ -31,6 +32,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
+        .manage(SignInService::default())
         .manage(CapacityService::default())
         .setup(move |app| {
             let directory = profile
@@ -175,6 +177,11 @@ pub fn run() {
             agent_profile_delete,
             agent_profile_set_active,
             agent_profile_sign_in,
+            agent_profile_sign_in_poll,
+            agent_profile_sign_in_input,
+            agent_profile_sign_in_resize,
+            agent_profile_sign_in_stop,
+            agent_profile_status,
         ])
         .build(context)
         .expect("error while building jackalope application")
@@ -187,6 +194,7 @@ pub fn run() {
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
                 app.state::<AppState>().kill_all_pty_sessions();
+                app.state::<SignInService>().stop_all();
             }
         });
 }

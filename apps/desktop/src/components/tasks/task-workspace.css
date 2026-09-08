@@ -256,6 +256,38 @@ select option {
   background: transparent;
   padding: 0;
 }
+.task-result-table {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 14px 0 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.task-result-table:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.task-result-table table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow-wrap: normal;
+}
+.task-result-table th,
+.task-result-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: top;
+}
+.task-result-table th {
+  background: var(--color-surface-elevated);
+  font-weight: 500;
+}
+.task-result-table :where(th:not([align])) {
+  text-align: left;
+}
+.task-result-table :where(tr:last-child) td {
+  border-bottom: 0;
+}
 .task-output {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

@@ -1,6 +1,7 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import remarkGfm from 'remark-gfm';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { recoveryHandoff } from '../../lib/project-return';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
@@ -405,7 +406,18 @@ export function TaskDetail({
                 >
                   <Markdown
                     skipHtml
+                    remarkPlugins={[remarkGfm]}
                     components={{
+                      table: ({ children }) => (
+                        <section
+                          className="task-result-table"
+                          aria-label="Result table"
+                          // biome-ignore lint/a11y/noNoninteractiveTabindex: Wide tables need a keyboard scrolling target.
+                          tabIndex={0}
+                        >
+                          <table>{children}</table>
+                        </section>
+                      ),
                       a: ({ href, children }) => {
                         const safe = safeResultLink(href);
                         return safe ? (

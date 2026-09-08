@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Plus, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { type ScheduleTemplate, scheduleTemplateDraft } from '../../lib/schedule-templates';
 import { type ScheduleDefinition as Definition, savedPlanDraft } from '../../lib/schedules';
 import { nativeTask, type RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -21,6 +22,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { ScheduleTemplateLibrary } from './ScheduleTemplateLibrary';
 
 interface SavedSchedule {
   localChecks?: number;
@@ -38,7 +40,6 @@ interface Ledger {
   schedules: SavedSchedule[];
   error: string | null;
 }
-
 export function ScheduleManager(props: {
   onOpenProject: () => void;
   onPlanning: () => void;
@@ -57,15 +58,25 @@ export function ScheduleManager(props: {
   const [projectId, setProjectId] = useState(activeProjectId ?? '');
   const [agent, setAgent] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [template, setTemplate] = useState<ScheduleTemplate | null>(null);
+  const [templateContext, setTemplateContext] = useState('');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [changePreview, setChangePreview] = useState<{ title: string; text: string } | null>(null);
   const focus = useDialogFocus();
   const newSchedule = useRef<HTMLButtonElement>(null);
   const imported = useRef(false);
   const importFocusPending = useRef(false);
+  const scheduleOpener = useRef<HTMLElement | null>(null);
+  const scheduleFocusPending = useRef(false);
   useEffect(() => {
     if (importFocusPending.current && !busy && !editing) {
       newSchedule.current?.focus();
       importFocusPending.current = false;
+    }
+    if (scheduleFocusPending.current && !busy && !editing) {
+      (scheduleOpener.current?.isConnected ? scheduleOpener.current : newSchedule.current)?.focus();
+      scheduleFocusPending.current = false;
     }
   }, [busy, editing]);
   const desktop = isTauriEnvironment();
@@ -102,6 +113,12 @@ export function ScheduleManager(props: {
     }
   };
   const open = (value?: Definition, planId: string | null = null) => {
+    scheduleOpener.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setAdvancedOpen(false);
+    setInstructionsOpen(!value?.request.prompt);
+    setTemplate(null);
+    setTemplateContext('');
     imported.current = false;
     setImporting(planId);
     const project = projects.find((p) => p.id === (value?.request.projectId ?? activeProjectId));
@@ -120,6 +137,24 @@ export function ScheduleManager(props: {
       },
     );
   };
+  const chooseTemplate = (selected: ScheduleTemplate) => {
+    const target =
+      projects.find((item) => item.id === activeProjectId) ??
+      (projects.length === 1 ? projects[0] : undefined);
+    const allowed = runners.filter(
+      (runner) => runner.available && target && isAgentAllowedForProject(target, runner.id),
+    );
+    const preferred = allowed.find((runner) => runner.id === target?.preferences?.preferredRunner);
+    open(
+      scheduleTemplateDraft(selected, {
+        id: crypto.randomUUID(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        projectId: target?.id ?? '',
+        agent: preferred?.id ?? (allowed.length === 1 ? allowed[0].id : ''),
+      }),
+    );
+    setTemplate(selected);
+  };
   const reviewPlan = (plan: ScheduledTask) => {
     try {
       const id = useScheduleStore.getState().prepareImport(plan.id);
@@ -134,6 +169,11 @@ export function ScheduleManager(props: {
     const run = useExecutionStore.getState().runs.find((r) => r.id === props.sourceRunId);
     if (!run) return;
     imported.current = false;
+    setTemplate(null);
+    setTemplateContext('');
+    setAdvancedOpen(false);
+    setInstructionsOpen(false);
+    scheduleOpener.current = null;
     setImporting(null);
     setProjectId(run.projectId);
     setAgent(run.agent);
@@ -158,9 +198,12 @@ export function ScheduleManager(props: {
   const project = projects.find((p) => p.id === projectId);
   const monitorOnly = editing?.monitor?.action === 'notify';
   const instructions = project?.preferences?.customInstructions?.trim();
-  const finalPrompt = instructions
-    ? `${prompt.trim()}\n\n[Project Guidelines]:\n${instructions}`
+  const rawPrompt = templateContext.trim()
+    ? `${prompt.trim()}\n\nProject-specific context\n${templateContext.trim()}`
     : prompt.trim();
+  const finalPrompt = instructions
+    ? `${rawPrompt}\n\n[Project Guidelines]:\n${instructions}`
+    : rawPrompt;
   const save = () =>
     act(async () => {
       if (!editing || !project) return;
@@ -172,7 +215,7 @@ export function ScheduleManager(props: {
       await nativeTask('schedule_save', {
         definition: {
           ...editing,
-          rawPrompt: prompt.trim(),
+          rawPrompt,
           request: {
             contextSelection: editing.request.contextSelection,
             id: editing.id,
@@ -219,13 +262,13 @@ export function ScheduleManager(props: {
         }
       />
       {!desktop && <p className="task-notice">Open the desktop app to schedule execution.</p>}
+      {visible.length > 0 && <h2 className="text-base font-medium mt-5">Your schedules</h2>}
       {(error || ledger?.error) && (
         <p role="alert" className="task-error">
           {error || ledger?.error}
         </p>
       )}
       {desktop && !ledger && !error && <p role="status">Loading schedules…</p>}
-      {ledger && !visible.length && <p className="task-muted">No schedules for this project.</p>}
       <div className="schedule-list">
         {visible.map(({ definition: d, nextAt, history, localChecks, quietChecks }) => (
           <article className="schedule-row" key={d.id}>
@@ -341,10 +384,13 @@ export function ScheduleManager(props: {
           </article>
         ))}
       </div>
-      <p className="task-muted mt-5">
-        Pausing keeps active runs. Overlapping or interrupted runs are skipped; failed starts are
-        not retried.
-      </p>
+      {visible.length > 0 && (
+        <p className="task-muted mt-5">
+          Pausing keeps active runs. Overlapping or interrupted runs are skipped; failed starts are
+          not retried.
+        </p>
+      )}
+      <ScheduleTemplateLibrary onChoose={chooseTemplate} disabled={!desktop || busy} />
       {legacy.length > 0 && (
         <details className="mt-6">
           <summary>Recover saved schedule plans ({legacy.length})</summary>
@@ -422,17 +468,27 @@ export function ScheduleManager(props: {
                 event.preventDefault();
                 newSchedule.current?.focus();
                 imported.current = false;
-              } else focus.onCloseAutoFocus(event);
+              } else {
+                event.preventDefault();
+                if (busy) scheduleFocusPending.current = true;
+                else
+                  (scheduleOpener.current?.isConnected
+                    ? scheduleOpener.current
+                    : newSchedule.current
+                  )?.focus();
+              }
             }}
-            className="task-dialog appearance-panel"
+            className="task-dialog appearance-panel schedule-editor"
           >
             <Dialog.Close className="task-close" disabled={busy} aria-label="Close schedule">
               <X size={18} />
             </Dialog.Close>
-            <Dialog.Title className="text-xl">Schedule recurring work</Dialog.Title>
-            <Dialog.Description className="task-muted mt-3">
-              Choose a local change monitor or an agent schedule. Agent runs use isolated worktrees
-              and require review before integration. Jackalope must be open and this computer awake.
+            <Dialog.Title className="text-xl">
+              {template?.name ?? 'Schedule recurring work'}
+            </Dialog.Title>
+            <Dialog.Description className="task-muted mt-2">
+              {template?.outcome ??
+                'Choose instructions, an agent, and a repeat schedule for your project.'}
             </Dialog.Description>
             {editing && (
               <form
@@ -442,219 +498,306 @@ export function ScheduleManager(props: {
                   void save();
                 }}
               >
-                <label className="block" htmlFor="schedule-name">
-                  Name
-                  <Input
-                    id="schedule-name"
-                    required
-                    maxLength={160}
-                    value={editing.name}
-                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  />
-                </label>
-                <label className="block" htmlFor="schedule-project">
-                  Project
-                  <Select
-                    id="schedule-project"
-                    value={projectId}
-                    onValueChange={setProjectId}
-                    aria-label="Schedule project"
-                    placeholder="Choose a project"
-                  >
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                </label>
-                <label className="block" htmlFor="schedule-mode">
-                  Run policy
-                  <Select
-                    id="schedule-mode"
-                    aria-label="Run policy"
-                    value={editing.monitor?.action ?? 'always'}
-                    onValueChange={(value) =>
-                      setEditing({
-                        ...editing,
-                        monitor:
-                          value === 'always'
-                            ? null
-                            : {
-                                path: editing.monitor?.path ?? '',
-                                action: value as 'notify' | 'run',
-                              },
-                      })
-                    }
-                  >
-                    <SelectItem value="always">Run an agent every time</SelectItem>
-                    <SelectItem value="run">Run an agent only after code changes</SelectItem>
-                    <SelectItem value="notify">Notify about code changes · no agent</SelectItem>
-                  </Select>
-                </label>
-                <label className="block" htmlFor="schedule-preset">
-                  Repeat
-                  <Select
-                    id="schedule-preset"
-                    aria-label="Repeat schedule"
-                    value={
-                      ['0 9 * * 1-5', '0 9 * * 1', '0 9 * * *'].includes(editing.expression)
-                        ? editing.expression
-                        : 'custom'
-                    }
-                    onValueChange={(expression) => {
-                      if (expression !== 'custom') setEditing({ ...editing, expression });
-                    }}
-                  >
-                    <SelectItem value="0 9 * * 1-5">Weekdays at 9:00</SelectItem>
-                    <SelectItem value="0 9 * * 1">Mondays at 9:00</SelectItem>
-                    <SelectItem value="0 9 * * *">Every day at 9:00</SelectItem>
-                    <SelectItem value="custom">Custom timing below</SelectItem>
-                  </Select>
-                </label>
-                {editing.monitor && (
-                  <label className="block" htmlFor="schedule-watch-path">
-                    Tracked path to watch (optional)
+                <div className="schedule-fields">
+                  <label className="block" htmlFor="schedule-name">
+                    Name
                     <Input
-                      id="schedule-watch-path"
-                      maxLength={500}
-                      value={editing.monitor.path}
-                      onChange={(e) =>
+                      id="schedule-name"
+                      required
+                      maxLength={160}
+                      value={editing.name}
+                      onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                    />
+                  </label>
+                  <label className="block" htmlFor="schedule-project">
+                    Project
+                    <Select
+                      id="schedule-project"
+                      value={projectId}
+                      onValueChange={(value) => {
+                        setProjectId(value);
+                        const nextProject = projects.find((item) => item.id === value);
+                        if (!isAgentAllowedForProject(nextProject, agent)) setAgent('');
                         setEditing({
                           ...editing,
-                          monitor: {
-                            action: editing.monitor?.action ?? 'notify',
-                            path: e.target.value,
+                          request: {
+                            ...editing.request,
+                            contextSelection: editing.request.contextSelection
+                              ? { memoryOff: editing.request.contextSelection.memoryOff }
+                              : undefined,
                           },
-                        })
-                      }
-                      placeholder="src or package.json; blank watches the whole branch"
-                    />
-                    <span className="task-muted">
-                      Checks committed content on the saved local target branch, without fetching.
-                      The first check records a baseline. Uncommitted edits are excluded.
-                    </span>
-                  </label>
-                )}
-                {!monitorOnly && (
-                  <label className="block" htmlFor="schedule-agent">
-                    Agent
-                    <Select
-                      id="schedule-agent"
-                      value={agent}
-                      onValueChange={setAgent}
-                      aria-label="Schedule agent"
-                      placeholder="Choose an agent"
-                      disabled={monitorOnly}
+                        });
+                      }}
+                      aria-label="Schedule project"
+                      placeholder="Choose a project"
                     >
-                      {runners.map((r) => (
-                        <SelectItem
-                          key={r.id}
-                          value={r.id}
-                          disabled={
-                            !r.available || !project || !isAgentAllowedForProject(project, r.id)
-                          }
-                        >
-                          {r.name}
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
                         </SelectItem>
                       ))}
                     </Select>
                   </label>
-                )}
-                <label className="block" htmlFor="schedule-timing">
-                  Timing
-                  <Input
-                    id="schedule-timing"
-                    required
-                    value={editing.expression}
-                    onChange={(e) => setEditing({ ...editing, expression: e.target.value })}
-                  />
-                  <span className="task-muted">
-                    Minute, hour, day, month, weekday. Weekdays at 9:00: 0 9 * * 1-5.
-                  </span>
-                </label>
-                <label className="block" htmlFor="schedule-timezone">
-                  Timezone
-                  <Input
-                    id="schedule-timezone"
-                    required
-                    value={editing.timezone}
-                    onChange={(e) => setEditing({ ...editing, timezone: e.target.value })}
-                    placeholder="America/Denver"
-                  />
-                </label>
-                <label className="block" htmlFor="schedule-missed">
-                  After missed runs
-                  <Select
-                    id="schedule-missed"
-                    value={editing.missed}
-                    onValueChange={(missed) =>
-                      setEditing({ ...editing, missed: missed as 'skip' | 'once' })
-                    }
-                    aria-label="Missed runs"
-                  >
-                    <SelectItem value="skip">Skip to the next occurrence</SelectItem>
-                    <SelectItem value="once">Catch up once when available</SelectItem>
-                  </Select>
-                </label>
-                {!monitorOnly && (
-                  <label className="block" htmlFor="schedule-instructions">
-                    Instructions
-                    <textarea
-                      id="schedule-instructions"
-                      className="task-input w-full"
-                      required={!monitorOnly}
-                      disabled={monitorOnly}
-                      maxLength={24000}
-                      rows={4}
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                    />
-                  </label>
-                )}
-                {project && !monitorOnly && (
-                  <TaskKnowledge
-                    key={project.id}
-                    projectId={project.id}
-                    projectPath={project.path}
-                    prompt={finalPrompt}
-                    selection={editing.request.contextSelection}
-                    onChange={(contextSelection) =>
-                      setEditing({ ...editing, request: { ...editing.request, contextSelection } })
-                    }
-                  />
-                )}
-                <p className="task-muted">
-                  Target:{' '}
-                  {project?.preferences?.baseBranch || project?.gitBranch || 'Choose a project'}.
-                  {!monitorOnly &&
-                    "Account and verification use the selected project's preferences when saved."}
-                </p>
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="schedule-enabled"
-                    label={monitorOnly ? 'Enable local checks' : 'Enable automatic runs'}
-                    checked={editing.enabled}
-                    onCheckedChange={(enabled) => setEditing({ ...editing, enabled })}
-                  />
-                  <label htmlFor="schedule-enabled">
-                    {monitorOnly ? 'Enable local checks' : 'Enable automatic runs'}
+                  {!monitorOnly && (
+                    <label className="block" htmlFor="schedule-agent">
+                      Agent
+                      <Select
+                        id="schedule-agent"
+                        value={agent}
+                        onValueChange={setAgent}
+                        aria-label="Schedule agent"
+                        placeholder="Choose an agent"
+                        disabled={monitorOnly}
+                      >
+                        {runners.map((r) => (
+                          <SelectItem
+                            key={r.id}
+                            value={r.id}
+                            disabled={
+                              !r.available || !project || !isAgentAllowedForProject(project, r.id)
+                            }
+                          >
+                            {r.name}
+                          </SelectItem>
+                        ))}
+                      </Select>
+                    </label>
+                  )}
+                  <label className="block" htmlFor="schedule-preset">
+                    Repeat
+                    <Select
+                      id="schedule-preset"
+                      aria-label="Repeat schedule"
+                      value={
+                        ['0 9 * * 1-5', '0 9 * * 1', '0 9 * * *'].includes(editing.expression)
+                          ? editing.expression
+                          : 'custom'
+                      }
+                      onValueChange={(expression) => {
+                        if (expression !== 'custom') setEditing({ ...editing, expression });
+                        else setAdvancedOpen(true);
+                      }}
+                    >
+                      <SelectItem value="0 9 * * 1-5">Weekdays at 9:00</SelectItem>
+                      <SelectItem value="0 9 * * 1">Mondays at 9:00</SelectItem>
+                      <SelectItem value="0 9 * * *">Every day at 9:00</SelectItem>
+                      <SelectItem value="custom">Custom timing…</SelectItem>
+                    </Select>
                   </label>
                 </div>
-                <p className="task-muted">
-                  {monitorOnly
-                    ? 'Enable to check locally and notify on changes, with zero model tokens.'
-                    : 'Enable to authorize agent runs with these instructions and selected workflow. Matching saved project lessons and enabled connections are available to each run.'}{' '}
-                  Leave off to save paused.
-                </p>
+                {!monitorOnly && (
+                  <>
+                    {template && (
+                      <label className="block" htmlFor="schedule-template-context">
+                        Project context (optional)
+                        <textarea
+                          id="schedule-template-context"
+                          className="task-input w-full"
+                          rows={2}
+                          maxLength={4000}
+                          value={templateContext}
+                          onChange={(event) => setTemplateContext(event.target.value)}
+                          placeholder={template.contextHint}
+                        />
+                      </label>
+                    )}
+                    <details
+                      className="schedule-disclosure"
+                      open={instructionsOpen}
+                      onToggle={(event) => setInstructionsOpen(event.currentTarget.open)}
+                    >
+                      <summary>Review and edit instructions</summary>
+                      <label className="block" htmlFor="schedule-instructions">
+                        Instructions
+                        <textarea
+                          id="schedule-instructions"
+                          className="task-input w-full"
+                          onInvalid={(event) => {
+                            event.preventDefault();
+                            const input = event.currentTarget;
+                            setInstructionsOpen(true);
+                            requestAnimationFrame(() => input.focus());
+                          }}
+                          required={!monitorOnly}
+                          disabled={monitorOnly}
+                          maxLength={24000}
+                          rows={8}
+                          value={prompt}
+                          onChange={(e) => setPrompt(e.target.value)}
+                        />
+                      </label>
+                    </details>
+                  </>
+                )}
+                <details
+                  className="schedule-disclosure"
+                  open={advancedOpen}
+                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                >
+                  <summary>Advanced settings · {editing.timezone}</summary>
+                  <div className="space-y-4 pt-3">
+                    <label className="block" htmlFor="schedule-mode">
+                      Run policy
+                      <Select
+                        id="schedule-mode"
+                        aria-label="Run policy"
+                        value={editing.monitor?.action ?? 'always'}
+                        onValueChange={(value) =>
+                          setEditing({
+                            ...editing,
+                            monitor:
+                              value === 'always'
+                                ? null
+                                : {
+                                    path: editing.monitor?.path ?? '',
+                                    action: value as 'notify' | 'run',
+                                  },
+                          })
+                        }
+                      >
+                        <SelectItem value="always">Run an agent every time</SelectItem>
+                        <SelectItem value="run">Run an agent only after code changes</SelectItem>
+                        <SelectItem value="notify">Notify about code changes · no agent</SelectItem>
+                      </Select>
+                    </label>
+                    {editing.monitor && (
+                      <label className="block" htmlFor="schedule-watch-path">
+                        Tracked path to watch (optional)
+                        <Input
+                          id="schedule-watch-path"
+                          maxLength={500}
+                          value={editing.monitor.path}
+                          onChange={(e) =>
+                            setEditing({
+                              ...editing,
+                              monitor: {
+                                action: editing.monitor?.action ?? 'notify',
+                                path: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="src or package.json; blank watches the whole branch"
+                        />
+                        <span className="task-muted">
+                          Checks committed content on the saved local target branch, without
+                          fetching. The first check records a baseline. Uncommitted edits are
+                          excluded.
+                        </span>
+                      </label>
+                    )}
+                    <div className="schedule-fields">
+                      <label className="block" htmlFor="schedule-timing">
+                        Timing
+                        <Input
+                          id="schedule-timing"
+                          required
+                          onInvalid={(event) => {
+                            event.preventDefault();
+                            const input = event.currentTarget;
+                            setAdvancedOpen(true);
+                            requestAnimationFrame(() => input.focus());
+                          }}
+                          value={editing.expression}
+                          onChange={(e) => setEditing({ ...editing, expression: e.target.value })}
+                        />
+                        <span className="task-muted">
+                          Minute, hour, day, month, weekday. Weekdays at 9:00: 0 9 * * 1-5.
+                        </span>
+                      </label>
+                      <label className="block" htmlFor="schedule-timezone">
+                        Timezone
+                        <Input
+                          id="schedule-timezone"
+                          required
+                          onInvalid={(event) => {
+                            event.preventDefault();
+                            const input = event.currentTarget;
+                            setAdvancedOpen(true);
+                            requestAnimationFrame(() => input.focus());
+                          }}
+                          value={editing.timezone}
+                          onChange={(e) => setEditing({ ...editing, timezone: e.target.value })}
+                          placeholder="America/Denver"
+                        />
+                      </label>
+                      <label className="block" htmlFor="schedule-missed">
+                        After missed runs
+                        <Select
+                          id="schedule-missed"
+                          value={editing.missed}
+                          onValueChange={(missed) =>
+                            setEditing({ ...editing, missed: missed as 'skip' | 'once' })
+                          }
+                          aria-label="Missed runs"
+                        >
+                          <SelectItem value="skip">Skip to the next occurrence</SelectItem>
+                          <SelectItem value="once">Catch up once when available</SelectItem>
+                        </Select>
+                      </label>
+                    </div>
+                    {project && !monitorOnly && (
+                      <TaskKnowledge
+                        key={project.id}
+                        projectId={project.id}
+                        projectPath={project.path}
+                        prompt={finalPrompt}
+                        selection={editing.request.contextSelection}
+                        onChange={(contextSelection) =>
+                          setEditing({
+                            ...editing,
+                            request: { ...editing.request, contextSelection },
+                          })
+                        }
+                      />
+                    )}
+                    <p className="task-muted">
+                      Target:{' '}
+                      {project?.preferences?.baseBranch || project?.gitBranch || 'Choose a project'}
+                      .{' '}
+                      {!monitorOnly &&
+                        "Account and verification use the selected project's preferences when saved."}
+                    </p>
+                  </div>
+                </details>
                 {error && (
                   <p role="alert" className="task-error">
                     {error}
                   </p>
                 )}
-                <Button type="submit" disabled={busy || !project || (!monitorOnly && !agent)}>
-                  {busy ? 'Saving…' : 'Save schedule'}
-                </Button>
+                {!projects.length && (
+                  <p className="task-notice">
+                    Add a project in Projects, then return to configure this schedule.
+                  </p>
+                )}
+                <div className="schedule-editor-actions">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="schedule-enabled"
+                      label={monitorOnly ? 'Enable local checks' : 'Enable automatic runs'}
+                      checked={editing.enabled}
+                      onCheckedChange={(enabled) => setEditing({ ...editing, enabled })}
+                    />
+                    <label htmlFor="schedule-enabled">
+                      {monitorOnly ? 'Enable local checks' : 'Enable automatic runs'}
+                    </label>
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={
+                      busy ||
+                      !project ||
+                      (!monitorOnly && (!agent || !isAgentAllowedForProject(project, agent)))
+                    }
+                  >
+                    {busy ? 'Saving…' : 'Save schedule'}
+                  </Button>
+                </div>
+                <p className="task-muted text-xs">
+                  {monitorOnly
+                    ? 'Local checks use no agent.'
+                    : 'Enabled runs use these instructions, saved context, and project connections. Changes need review.'}{' '}
+                  Leave off to save paused. Keep Jackalope open and this computer awake.
+                </p>
               </form>
             )}
           </Dialog.Content>

@@ -171,7 +171,7 @@ pub async fn pty_spawn(
 /// 4 bytes (the longest possible UTF-8 sequence) means those bytes are
 /// genuinely malformed, not just incomplete — lossy-decode and drop them
 /// rather than buffering invalid data forever.
-fn split_valid_utf8_prefix(bytes: &[u8]) -> (String, Vec<u8>) {
+pub(super) fn split_valid_utf8_prefix(bytes: &[u8]) -> (String, Vec<u8>) {
     match std::str::from_utf8(bytes) {
         Ok(valid) => (valid.to_string(), Vec::new()),
         Err(error) => {

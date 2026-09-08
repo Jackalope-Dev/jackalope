@@ -119,6 +119,8 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | @vitest/snapshot | 4.1.11 | MIT |
 | @vitest/spy | 4.1.11 | MIT |
 | @vitest/utils | 4.1.11 | MIT |
+| @xterm/addon-fit | 0.11.0 | MIT |
+| @xterm/xterm | 6.0.0 | MIT |
 | @xyflow/react | 12.11.6 | MIT |
 | @xyflow/system | 0.0.82 | MIT |
 | aria-hidden | 1.2.6 | MIT |
@@ -157,6 +159,7 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | error-stack-parser-es | 1.0.5 | MIT |
 | es-module-lexer | 2.3.2 | MIT |
 | esbuild | 0.28.1 | MIT |
+| escape-string-regexp | 5.0.0 | MIT |
 | estree-util-is-identifier-name | 3.0.0 | MIT |
 | estree-walker | 3.0.3 | MIT |
 | expect-type | 1.4.0 | Apache-2.0 |
@@ -182,7 +185,15 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | longest-streak | 3.1.0 | MIT |
 | lucide-react | 0.475.0 | ISC |
 | magic-string | 0.30.21 | MIT |
+| markdown-table | 3.0.4 | MIT |
+| mdast-util-find-and-replace | 3.0.2 | MIT |
 | mdast-util-from-markdown | 2.0.3 | MIT |
+| mdast-util-gfm | 3.1.0 | MIT |
+| mdast-util-gfm-autolink-literal | 2.0.1 | MIT |
+| mdast-util-gfm-footnote | 2.1.0 | MIT |
+| mdast-util-gfm-strikethrough | 2.0.0 | MIT |
+| mdast-util-gfm-table | 2.0.0 | MIT |
+| mdast-util-gfm-task-list-item | 2.0.0 | MIT |
 | mdast-util-mdx-expression | 2.0.1 | MIT |
 | mdast-util-mdx-jsx | 3.2.0 | MIT |
 | mdast-util-mdxjs-esm | 2.0.1 | MIT |
@@ -192,6 +203,13 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | mdast-util-to-string | 4.0.0 | MIT |
 | micromark | 4.0.2 | MIT |
 | micromark-core-commonmark | 2.0.3 | MIT |
+| micromark-extension-gfm | 3.0.0 | MIT |
+| micromark-extension-gfm-autolink-literal | 2.1.0 | MIT |
+| micromark-extension-gfm-footnote | 2.1.0 | MIT |
+| micromark-extension-gfm-strikethrough | 2.1.0 | MIT |
+| micromark-extension-gfm-table | 2.1.1 | MIT |
+| micromark-extension-gfm-tagfilter | 2.0.0 | MIT |
+| micromark-extension-gfm-task-list-item | 2.1.0 | MIT |
 | micromark-factory-destination | 2.0.1 | MIT |
 | micromark-factory-label | 2.0.1 | MIT |
 | micromark-factory-space | 2.0.1 | MIT |
@@ -223,6 +241,7 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | pathe | 2.0.3 | MIT |
 | picocolors | 1.1.1 | ISC |
 | picomatch | 4.0.7 | MIT |
+| playwright-core | 1.63.0 | Apache-2.0 |
 | postcss | 8.5.28 | MIT |
 | property-information | 7.2.0 | MIT |
 | react | 19.2.8 | MIT |
@@ -231,8 +250,10 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | react-remove-scroll | 2.7.2 | MIT |
 | react-remove-scroll-bar | 2.3.8 | MIT |
 | react-style-singleton | 2.2.3 | MIT |
+| remark-gfm | 4.0.1 | MIT |
 | remark-parse | 11.0.0 | MIT |
 | remark-rehype | 11.1.2 | MIT |
+| remark-stringify | 11.0.0 | MIT |
 | rolldown | 1.2.7 | MIT |
 | scheduler | 0.27.0 | MIT |
 | semver | 7.8.5 | ISC |

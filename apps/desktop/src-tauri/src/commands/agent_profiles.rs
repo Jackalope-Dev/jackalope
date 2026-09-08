@@ -51,13 +51,12 @@ pub fn env_var_for(adapter: &str) -> Option<&'static str> {
     }
 }
 
-fn login_args(adapter: &str) -> &'static [&'static str] {
+pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
     match adapter {
         "codex" => &["login"],
         "grok" => &["login"],
         "opencode" => &["auth", "login"],
-        // Claude Code has no separate login subcommand; launching it plain
-        // prompts sign-in interactively when its redirected profile is empty.
+        "claude" => &["auth", "login"],
         _ => &[],
     }
 }
@@ -201,6 +200,11 @@ pub fn bind_account(
 }
 
 pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBinding) {
+    if binding.profile_id.is_some() {
+        for name in credential_env_vars(&binding.adapter) {
+            command.env_remove(name);
+        }
+    }
     if let Some(name) = env_var_for(&binding.adapter) {
         command.env(name, &binding.directory);
     }
@@ -216,6 +220,7 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
 }
 
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
+    super::agent_sign_in::ensure_idle(binding)?;
     if binding.adapter == "antigravity" {
         let current = bind_account(root, &binding.adapter, binding.profile_id.as_deref())?;
         if current.directory != binding.directory {
@@ -271,9 +276,6 @@ pub fn agent_profile_create(
         name: name.to_string(),
     };
     entry.profiles.push(profile.clone());
-    if entry.active.is_none() {
-        entry.active = Some(id.clone());
-    }
     fs::create_dir_all(dir_for(&root, &agent, &id)).map_err(|e| e.to_string())?;
     save(&root, &manifest)?;
     Ok(profile)
@@ -292,6 +294,7 @@ pub fn agent_profile_rename(
     }
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
+    super::agent_sign_in::ensure_idle(&bind_account(&root, &agent, Some(&id))?)?;
     let mut manifest = load_checked(&root)?;
     let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
     let profile = entry
@@ -329,6 +332,7 @@ pub fn agent_profile_delete(
     if !entry.profiles.iter().any(|p| p.id == id) {
         return Err("Unknown account".into());
     }
+    super::agent_sign_in::ensure_idle(&bind_account(&root, &agent, Some(&id))?)?;
     let directory = dir_for(&root, &agent, &id);
     if directory.exists() {
         let canonical = fs::canonicalize(&directory).map_err(|e| e.to_string())?;
@@ -370,44 +374,13 @@ pub fn agent_profile_set_active(
     save(&root, &manifest)
 }
 
-/// Opens a real, visible console window running the agent's own sign-in flow
-/// (or, for Claude, the plain interactive session) with its config directory
-/// redirected to this profile — so completing the CLI's normal browser/device
-/// login there populates only this account, leaving every other profile and
-/// the CLI's default location untouched. Jackalope does not read this
-/// window's output; it is the same interactive login the user would run
-/// themselves, just pointed at an isolated directory.
-#[tauri::command]
-pub fn agent_profile_sign_in(
-    runtime: State<'_, TaskRuntime>,
-    agent: String,
-    id: String,
-) -> Result<(), String> {
-    let env_name =
-        env_var_for(&agent).ok_or("This agent has no known config-directory override.")?;
-    let root = runtime.profiles_root();
-    let manifest = load(&root);
-    let entry = manifest.agents.get(&agent).ok_or("Unknown account")?;
-    if !entry.profiles.iter().any(|p| p.id == id) {
-        return Err("Unknown account".into());
+pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
+    match adapter {
+        "codex" => &["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN"],
+        "claude" => &["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"],
+        "grok" => &["XAI_API_KEY", "GROK_API_KEY"],
+        _ => &[],
     }
-    let dir = dir_for(&root, &agent, &id);
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let executable = super::tasks::executable(&agent)?;
-    let mut command = std::process::Command::new(executable);
-    command.args(login_args(&agent)).env(env_name, &dir);
-    apply_binding(&mut command, &bind_account(&root, &agent, Some(&id))?);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // CREATE_NEW_CONSOLE: a real, visible window, unlike Jackalope's other
-        // background probes which deliberately hide theirs.
-        command.creation_flags(0x00000010);
-    }
-    command
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| format!("Could not open {agent} to sign in: {e}"))
 }
 
 #[cfg(test)]
