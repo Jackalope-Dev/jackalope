@@ -246,6 +246,9 @@ export function ConnectedDesktops() {
   }, []);
   useEffect(() => {
     void load();
+    const refresh = () => void load();
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
   }, [load]);
   async function revoke(id: string) {
     if (busy) return;
