@@ -143,38 +143,80 @@
   gap: 4px;
 }
 .task-welcome {
-  padding: 36px 0;
+  display: grid;
+  grid-template-columns: minmax(200px, 0.85fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: 40px;
+  padding: 24px 0;
   border-top: 1px solid var(--color-border-subtle);
 }
-.task-welcome > h2 {
+.task-welcome-intro > h2 {
   font-size: var(--text-xl);
   margin-bottom: 8px;
 }
-.task-welcome-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px;
-  margin-top: 36px;
+.task-welcome-intro > button {
+  margin-top: 20px;
 }
-.task-welcome-steps li {
-  display: flex;
-  align-items: flex-start;
+.task-welcome-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-.task-welcome-steps svg {
-  color: var(--color-text-muted);
-  flex-shrink: 0;
-  margin-top: 2px;
+.task-welcome-links button {
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  align-content: start;
+  gap: 12px;
+  min-height: 124px;
+  padding: 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 55%, transparent);
+  text-align: left;
 }
-.task-welcome-steps h3 {
+.task-welcome-links button:hover {
+  background: var(--color-surface-hover);
+}
+.task-welcome-links button:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.task-welcome-links button > span {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+}
+.task-welcome-links button > svg:last-child {
+  grid-column: 3;
+  grid-row: 1;
+}
+.task-welcome-links svg {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.task-welcome-links strong {
+  display: block;
   font-size: var(--text-sm);
   font-weight: 500;
 }
-.task-welcome-steps p {
-  margin-top: 8px;
-  font-size: var(--text-sm);
+.task-welcome-links small {
+  display: block;
+  margin-top: 3px;
   color: var(--color-text-secondary);
-  line-height: 1.6;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+@media (max-width: 760px) {
+  .task-welcome {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+}
+@media (max-width: 440px) {
+  .task-welcome-links {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .capture-dialog .task-composer-note {
   padding-top: 12px;
@@ -190,12 +232,6 @@
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   margin-bottom: 8px;
-}
-@media (max-width: 700px) {
-  .task-welcome-steps {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
 }
 .task-dialog.task-tools-dialog {
   width: min(960px, calc(100vw - 48px));

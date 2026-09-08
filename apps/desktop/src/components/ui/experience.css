@@ -360,6 +360,41 @@ button:disabled {
 .project-switcher:hover {
   background: var(--color-surface-hover);
 }
+.command-trigger.command-jump {
+  width: clamp(200px, 23vw, 320px);
+  border: 1px solid var(--color-header-search-border);
+  background: color-mix(
+    in srgb,
+    var(--color-header-search, var(--color-surface-sunken)) 55%,
+    transparent
+  );
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-header-search);
+}
+.command-trigger.command-jump kbd {
+  margin-left: auto;
+  display: block;
+}
+.command-trigger.command-jump:hover {
+  background: color-mix(
+    in srgb,
+    var(--color-header-search, var(--color-surface-sunken)) 75%,
+    transparent
+  );
+}
+.workspace-tooltip {
+  z-index: 120;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 .quiet-icon,
 .appearance-trigger {
   width: 44px;
@@ -483,6 +518,10 @@ button:disabled {
   gap: 16px;
 }
 @media (max-width: 700px) {
+  .command-trigger.command-jump {
+    width: auto;
+    min-width: 44px;
+  }
   .workspace-chrome {
     height: auto;
     min-height: 64px;
@@ -491,6 +530,9 @@ button:disabled {
     max-width: 180px;
   }
   .command-trigger kbd {
+    display: none;
+  }
+  .command-trigger.command-jump kbd {
     display: none;
   }
   .workspace-navigation {

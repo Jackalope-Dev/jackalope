@@ -10,6 +10,7 @@ import {
   GitBranch,
   Layers3,
   LifeBuoy,
+  Palette,
   Plug,
   Search,
   ShieldCheck,
@@ -46,14 +47,19 @@ function getCategoryIcon(name: string) {
       return <Wrench size={16} />;
     case 'ShieldCheck':
       return <ShieldCheck size={16} />;
+    case 'Palette':
+      return <Palette size={16} />;
     default:
       return <Sparkles size={16} />;
   }
 }
 
-export function KnowledgebasePage() {
+export function KnowledgebasePage({ dark = false }: { dark?: boolean }) {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<KnowledgeCategory | 'all'>('all');
+  const [activeShowcaseTab, setActiveShowcaseTab] = useState<'tasks' | 'review' | 'agents'>(
+    'tasks',
+  );
   const [openItems, setOpenItems] = useState<Set<string>>(
     () => new Set(['qs-first-project', 'routing-quota-handoff', 'trouble-cli-not-found']),
   );
@@ -552,6 +558,121 @@ export function KnowledgebasePage() {
         </div>
       </section>
 
+      {/* Visual Workflow Showcase */}
+      <section
+        className="knowledge-showcase-section"
+        aria-label="Desktop app workflow visual showcase"
+      >
+        <div className="knowledge-showcase-header">
+          <div>
+            <span className="knowledge-diagrams-pill">App Workflows</span>
+            <h2>Visual Interface Tour</h2>
+            <p className="knowledge-lede">
+              Explore how Jackalope coordinates isolated Git worktrees, unified Pierre diffs, and
+              multi-agent lineups in a single native desktop window.
+            </p>
+          </div>
+          <div className="knowledge-showcase-tabs" role="tablist" aria-label="Workflow previews">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeShowcaseTab === 'tasks'}
+              className={`knowledge-showcase-tab ${activeShowcaseTab === 'tasks' ? 'active' : ''}`}
+              onClick={() => setActiveShowcaseTab('tasks')}
+            >
+              <GitBranch size={16} /> Parallel Tasks
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeShowcaseTab === 'review'}
+              className={`knowledge-showcase-tab ${activeShowcaseTab === 'review' ? 'active' : ''}`}
+              onClick={() => setActiveShowcaseTab('review')}
+            >
+              <CheckCheck size={16} /> Diff Review
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeShowcaseTab === 'agents'}
+              className={`knowledge-showcase-tab ${activeShowcaseTab === 'agents' ? 'active' : ''}`}
+              onClick={() => setActiveShowcaseTab('agents')}
+            >
+              <Bot size={16} /> Multi-Agent Hub
+            </button>
+          </div>
+        </div>
+
+        <div className="knowledge-showcase-window">
+          {activeShowcaseTab === 'tasks' && (
+            <div className="knowledge-showcase-content">
+              <div className="knowledge-showcase-frame">
+                <img
+                  src={`/media/tasks${dark ? '' : '-light'}.png`}
+                  alt="Jackalope parallel tasks interface showing running agent jobs in separate worktrees"
+                  width="1440"
+                  height="840"
+                  loading="lazy"
+                />
+              </div>
+              <div className="knowledge-showcase-caption">
+                <strong>Isolated Task Execution</strong>
+                <p>
+                  Every task receives a unique worktree directory under{' '}
+                  <code>.worktrees/&lt;task-id&gt;</code> with dedicated Git index and terminal
+                  process. You can switch between active agents without any file collisions or lost
+                  editor context.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeShowcaseTab === 'review' && (
+            <div className="knowledge-showcase-content">
+              <div className="knowledge-showcase-frame">
+                <img
+                  src={`/media/review${dark ? '' : '-light'}.png`}
+                  alt="Jackalope code review view featuring Pierre unified diffs and hunk acceptance"
+                  width="1440"
+                  height="840"
+                  loading="lazy"
+                />
+              </div>
+              <div className="knowledge-showcase-caption">
+                <strong>Guarded Multi-File Diff Review</strong>
+                <p>
+                  Powered by high-performance Pierre diffing. Inspect color-coded additions,
+                  deletions, and syntax highlights. Stash, discard, or accept individual hunks
+                  before squashing or merging into your working branch.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeShowcaseTab === 'agents' && (
+            <div className="knowledge-showcase-content">
+              <div className="knowledge-showcase-frame">
+                <img
+                  src={`/media/agents${dark ? '' : '-light'}.png`}
+                  alt="Jackalope agent management screen showing configured CLI adapters and sign-in profiles"
+                  width="1440"
+                  height="840"
+                  loading="lazy"
+                />
+              </div>
+              <div className="knowledge-showcase-caption">
+                <strong>Bring Your Own Agent CLIs</strong>
+                <p>
+                  Connect Codex, Claude Code, Grok, OpenCode, and local LLMs. Create independent
+                  work and personal sign-in profiles, set per-project agent permissions, and
+                  configure automatic quota handoff rules.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Main Knowledgebase Accordion List */}
       <section aria-label="Knowledgebase articles and guides">
         <div className="knowledge-list-header">
@@ -560,9 +681,29 @@ export function KnowledgebasePage() {
               ? 'All Articles & Guides'
               : knowledgeCategories.find((c) => c.id === activeCategory)?.name}
           </h2>
-          <span className="knowledge-list-count">
-            Showing {filteredItems.length} {filteredItems.length === 1 ? 'topic' : 'topics'}
-          </span>
+          <div className="knowledge-list-controls">
+            <span className="knowledge-list-count">
+              Showing {filteredItems.length} {filteredItems.length === 1 ? 'topic' : 'topics'}
+            </span>
+            {filteredItems.length > 0 && (
+              <button
+                type="button"
+                className="knowledge-toggle-all-btn"
+                onClick={() => {
+                  const allOpen = filteredItems.every((item) => openItems.has(item.id));
+                  if (allOpen) {
+                    setOpenItems(new Set());
+                  } else {
+                    setOpenItems(new Set(filteredItems.map((item) => item.id)));
+                  }
+                }}
+              >
+                {filteredItems.every((item) => openItems.has(item.id))
+                  ? 'Collapse all'
+                  : 'Expand all'}
+              </button>
+            )}
+          </div>
         </div>
 
         {filteredItems.length === 0 ? (

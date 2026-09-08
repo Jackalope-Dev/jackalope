@@ -1,5 +1,40 @@
 [
   {
+    "id": "actionable-task-welcome",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A useful place to start",
+    "description": "An empty Tasks view offers clear next steps.",
+    "items": [
+      "Start a task, then use the shortcut grid to explore the codebase, choose agents, connect tools or schedule recurring work."
+    ],
+    "note": "Actions open the existing workspace flows without starting work automatically."
+  },
+  {
+    "id": "knowledgebase-and-diagnostics",
+    "date": "2026-09-08",
+    "status": "Website",
+    "title": "Knowledgebase, architecture guides, and in-app help",
+    "description": "A clean, searchable Knowledgebase on the marketing website covers common questions, architecture guides, and troubleshooting recipes, with direct access from the desktop app.",
+    "items": [
+      "Search guides, visual architecture diagrams, and troubleshooting recipes across nine feature categories.",
+      "Access the Knowledgebase directly from the desktop shell using the new header life preserver shortcut, the Command Palette, or Settings."
+    ],
+    "note": "Structured Schema.org FAQ data and AI search engine files (llms.txt) provide comprehensive discovery."
+  },
+  {
+    "id": "softer-workspace-controls",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "More room to jump around",
+    "description": "Workspace navigation feels more at home in your theme.",
+    "items": [
+      "A wider command control uses neutral light/dark glass and a subtle inset shadow.",
+      "Help, settings, appearance and task shortcuts use themed tooltips with keyboard support."
+    ],
+    "note": "Available in the development build."
+  },
+  {
     "id": "honest-workspace-preparation",
     "date": "2026-09-08",
     "status": "In development",

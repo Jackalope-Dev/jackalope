@@ -1,6 +1,16 @@
 import './core-workflow.css';
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { Bot, Check, FolderOpen, MoreHorizontal, Plus, Workflow } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Bot,
+  CalendarClock,
+  FolderOpen,
+  MoreHorizontal,
+  Network,
+  Plug,
+  Plus,
+  Workflow,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
 import { collectWork } from '../../lib/task-collection';
@@ -8,6 +18,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -19,9 +30,11 @@ import { TaskDetail } from './TaskDetail';
 export function TaskWorkspace({
   onCapture,
   onSchedule,
+  onOpenProject,
 }: {
   onCapture: (ideaId?: string) => void;
   onSchedule: (runId: string) => void;
+  onOpenProject: () => void;
 }) {
   const { projects, activeProjectId } = useProjectStore();
   const { runs, runners, selectedId, select, loading, error } = useExecutionStore();
@@ -190,28 +203,55 @@ export function TaskWorkspace({
         />
       ) : !loading && !error ? (
         <div className="task-welcome">
-          <h2>What would you like to work on?</h2>
-
-          <ol className="task-welcome-steps">
-            <li>
-              <FolderOpen size={20} />
-              <div>
-                <h3>Choose a project</h3>
-              </div>
-            </li>
-            <li>
+          <div className="task-welcome-intro">
+            <h2>What will you build next?</h2>
+            <p className="task-muted">Give Jackalope something to build, fix, or explore.</p>
+            <Button onClick={() => onCapture()}>
+              <Plus size={18} />
+              Start a task
+            </Button>
+          </div>
+          <nav className="task-welcome-links" aria-label="Get started">
+            <button
+              type="button"
+              onClick={() => (project ? navigateWorkspace('topology') : onOpenProject())}
+            >
+              {project ? <Network size={20} /> : <FolderOpen size={20} />}
+              <span>
+                <strong>{project ? 'Explore your codebase' : 'Add a project'}</strong>
+                <small>
+                  {project
+                    ? 'See how files and dependencies fit together.'
+                    : 'Choose a repository or start something new.'}
+                </small>
+              </span>
+              <ArrowUpRight size={16} />
+            </button>
+            <button type="button" onClick={() => navigateWorkspace('agents')}>
               <Bot size={20} />
-              <div>
-                <h3>Let an agent work</h3>
-              </div>
-            </li>
-            <li>
-              <Check size={20} />
-              <div>
-                <h3>Review the result</h3>
-              </div>
-            </li>
-          </ol>
+              <span>
+                <strong>Choose your agents</strong>
+                <small>Manage the agents and accounts you work with.</small>
+              </span>
+              <ArrowUpRight size={16} />
+            </button>
+            <button type="button" onClick={() => navigateWorkspace('mcps')}>
+              <Plug size={20} />
+              <span>
+                <strong>Connect your tools</strong>
+                <small>Give agents access to the services you use.</small>
+              </span>
+              <ArrowUpRight size={16} />
+            </button>
+            <button type="button" onClick={() => navigateWorkspace('schedules')}>
+              <CalendarClock size={20} />
+              <span>
+                <strong>Schedule work</strong>
+                <small>Make room for tasks that repeat.</small>
+              </span>
+              <ArrowUpRight size={16} />
+            </button>
+          </nav>
         </div>
       ) : null}
     </section>

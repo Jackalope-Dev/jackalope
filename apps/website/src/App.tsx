@@ -227,7 +227,7 @@ export function App({ path = '/' }: { path?: string }) {
       ) : path === '/access/' ? (
         <AccessPage />
       ) : path === '/knowledge/' ? (
-        <KnowledgebasePage />
+        <KnowledgebasePage dark={dark} />
       ) : path === '/privacy/' || path === '/terms/' ? (
         <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
       ) : marketingPage ? (

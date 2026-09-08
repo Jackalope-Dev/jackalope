@@ -4,6 +4,7 @@ import { RotateCcw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useThemeStore } from '../../stores/themeStore';
 import { Button } from '../ui/button';
+import { Tooltip } from '../ui/Tooltip';
 import { ThemeEditor } from './ThemeEditor';
 
 export function ArcColorPicker() {
@@ -25,24 +26,25 @@ export function ArcColorPicker() {
         setOpen(next);
       }}
     >
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className="appearance-trigger"
-          aria-label="Personalize your workspace"
-          title="Personalize your workspace"
-          onClick={() => {
-            if (open) setTheme(draft);
-          }}
-        >
-          <span
-            className="size-5 rounded-full"
-            style={{
-              background: 'var(--color-palette-gradient)',
+      <Tooltip content="Personalize your workspace">
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            className="appearance-trigger"
+            aria-label="Personalize your workspace"
+            onClick={() => {
+              if (open) setTheme(draft);
             }}
-          />
-        </button>
-      </Popover.Trigger>
+          >
+            <span
+              className="size-5 rounded-full"
+              style={{
+                background: 'var(--color-palette-gradient)',
+              }}
+            />
+          </button>
+        </Popover.Trigger>
+      </Tooltip>
       <Popover.Portal>
         <Popover.Content
           side="bottom"

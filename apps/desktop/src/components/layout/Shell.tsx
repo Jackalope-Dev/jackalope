@@ -26,6 +26,7 @@ import { ProjectSetup } from '../tasks/ProjectSetup';
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { Tooltip } from '../ui/Tooltip';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
@@ -229,46 +230,51 @@ export function Shell({
         </div>
         <div className="flex items-center gap-3">
           {(activeTab !== 'kanban' || selectedTaskId) && (
+            <Tooltip content="New task (Ctrl+Shift+N)">
+              <button
+                type="button"
+                className="command-trigger"
+                onClick={() => setCapture({})}
+                aria-label="Capture a task"
+              >
+                <Plus size={16} />
+                <span>New task</span>
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip content={`Search commands (${shortcut})`}>
             <button
               type="button"
-              className="command-trigger"
-              onClick={() => setCapture({})}
-              aria-label="Capture a task"
-              title="New task (Ctrl+Shift+N)"
+              onClick={() => setCommandsOpen(true)}
+              className="command-trigger command-jump"
+              aria-label="Search commands"
             >
-              <Plus size={16} />
-              <span>New task</span>
+              <Search className="size-3.5" />
+              <span className="hidden sm:inline">Jump to…</span>
+              <kbd>{shortcut}</kbd>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setCommandsOpen(true)}
-            className="command-trigger"
-            aria-label="Search commands"
-          >
-            <Search className="size-3.5" />
-            <span className="hidden sm:inline">Jump to…</span>
-            <kbd>{shortcut}</kbd>
-          </button>
+          </Tooltip>
           <ArcColorPicker />
-          <button
-            type="button"
-            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
-            className="quiet-icon"
-            aria-label="Help and knowledgebase"
-            title="Help & Knowledgebase"
-          >
-            <LifeBuoy className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="quiet-icon"
-            aria-label="Settings and preferences"
-            title="Settings (Ctrl+,)"
-          >
-            <Settings2 className="size-4" />
-          </button>
+          <Tooltip content="Help Center">
+            <button
+              type="button"
+              onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
+              className="quiet-icon"
+              aria-label="Help and knowledgebase"
+            >
+              <LifeBuoy className="size-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Settings (Ctrl+,)">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="quiet-icon"
+              aria-label="Settings and preferences"
+            >
+              <Settings2 className="size-4" />
+            </button>
+          </Tooltip>
         </div>
       </header>
       <div className="workspace-navigation">
@@ -343,6 +349,7 @@ export function Shell({
         >
           {activeTab === 'kanban' && (
             <TaskWorkspace
+              onOpenProject={() => setSetupOpen(true)}
               onCapture={(ideaId) => setCapture({ ideaId })}
               onSchedule={(id) => {
                 const run = useExecutionStore.getState().runs.find((r) => r.id === id);

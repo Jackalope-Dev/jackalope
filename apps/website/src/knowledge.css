@@ -207,6 +207,118 @@
   overflow-x: auto;
 }
 
+/* Visual Interface Tour Showcase */
+.knowledge-showcase-section {
+  margin-bottom: 56px;
+  border-radius: 18px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  padding: 32px;
+}
+
+.knowledge-showcase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.knowledge-showcase-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-block: 8px 6px;
+}
+
+.knowledge-showcase-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.knowledge-showcase-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--motion-fast);
+}
+
+.knowledge-showcase-tab:hover {
+  border-color: var(--color-accent-ink);
+  color: var(--color-text-primary);
+}
+
+.knowledge-showcase-tab.active {
+  background: var(--color-accent-ink);
+  border-color: var(--color-accent-ink);
+  color: #fff;
+  font-weight: 600;
+}
+
+.knowledge-showcase-window {
+  border-radius: 14px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-elevated);
+  overflow: hidden;
+  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.08);
+}
+
+.knowledge-showcase-frame {
+  width: 100%;
+  aspect-ratio: 1440 / 840;
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.knowledge-showcase-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.knowledge-showcase-caption {
+  padding: 18px 24px;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-elevated);
+}
+
+.knowledge-showcase-caption strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.knowledge-showcase-caption p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.knowledge-showcase-caption code {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-surface-sunken);
+}
+
 /* Accordion Items List */
 .knowledge-list-header {
   display: flex;
@@ -215,6 +327,30 @@
   margin-bottom: 24px;
   border-bottom: 1px solid var(--color-border-subtle);
   padding-bottom: 14px;
+}
+
+.knowledge-list-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.knowledge-toggle-all-btn {
+  background: none;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--motion-fast);
+}
+
+.knowledge-toggle-all-btn:hover {
+  border-color: var(--color-accent-ink);
+  color: var(--color-text-primary);
+  background: var(--color-surface-sunken);
 }
 
 .knowledge-list-count {
@@ -486,6 +622,17 @@
 }
 
 @media (max-width: 768px) {
+  .knowledge-showcase-section {
+    padding: 20px 14px;
+    border-radius: 14px;
+  }
+  .knowledge-showcase-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .knowledge-showcase-caption {
+    padding: 14px 16px;
+  }
   .knowledge-card-summary {
     padding: 16px;
   }

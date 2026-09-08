@@ -20,7 +20,8 @@ export type KnowledgeCategory =
   | 'mcp'
   | 'usage'
   | 'troubleshooting'
-  | 'security';
+  | 'security'
+  | 'experience';
 
 export interface CategoryMeta {
   id: KnowledgeCategory;
@@ -40,7 +41,7 @@ export const knowledgeCategories: CategoryMeta[] = [
     id: 'agents',
     name: 'Agents & Accounts',
     shortDescription:
-      'Configuring Codex, Claude Code, Grok, OpenCode, and multiple account profiles.',
+      'Configuring Codex, Claude Code, Grok, OpenCode, local LLMs, and account profiles.',
     iconName: 'Bot',
   },
   {
@@ -85,6 +86,12 @@ export const knowledgeCategories: CategoryMeta[] = [
     name: 'FAQ & Local Security Perimeter',
     shortDescription: 'Code privacy, local SQLite persistence, offline behavior, and licensing.',
     iconName: 'ShieldCheck',
+  },
+  {
+    id: 'experience',
+    name: 'Atmosphere & Companion',
+    shortDescription: 'Theme harmonies, 64-step atmosphere, mascot reactions, and shortcuts.',
+    iconName: 'Palette',
   },
 ];
 
@@ -138,6 +145,21 @@ export const knowledgeItems: KnowledgeItem[] = [
     ],
     tags: ['new task', 'composer', 'effort tier', 'parallel execution', 'start task'],
   },
+  {
+    id: 'qs-keyboard-shortcuts',
+    category: 'quickstart',
+    title: 'What keyboard shortcuts are available in the desktop app?',
+    summary:
+      'Jackalope provides fast keyboard shortcuts for command palette jumping, task creation, settings, and tab switching.',
+    details: [
+      'Use Ctrl+K (⌘K on macOS) to open the Command Palette and jump directly to any view, theme, or settings category.',
+      'Use Ctrl+Shift+N (⌘ Shift N) from anywhere in the app to capture a new task immediately without leaving your current screen.',
+      'Use Ctrl+, (⌘,) to access Preferences & Settings, and Escape to dismiss open overlays, modals, and palettes.',
+    ],
+    command: 'Ctrl + K (Jump) | Ctrl + Shift + N (New task) | Ctrl + , (Settings)',
+    tags: ['shortcuts', 'hotkeys', 'keyboard', 'command palette', 'accessibility'],
+    isFaq: true,
+  },
 
   // --- Agents & Multi-Account Profiles ---
   {
@@ -185,6 +207,32 @@ export const knowledgeItems: KnowledgeItem[] = [
     ],
   },
   {
+    id: 'agents-local-llms',
+    category: 'agents',
+    title: 'How does Jackalope discover and connect to local LLMs?',
+    summary:
+      'Jackalope automatically detects local inference servers including Ollama, LM Studio, and llama.cpp on their standard local ports.',
+    details: [
+      'When you open the Local Models & Ambient Keys scanner in Settings → Agents, Jackalope tests loopback connectivity on standard local ports (Ollama on 11434, LM Studio on 1234, llama.cpp on 8080).',
+      'Detected local models can be registered directly as OpenCode or custom endpoints, enabling 100% private, zero-cost, offline agent workflows.',
+    ],
+    command: 'ollama list || curl http://127.0.0.1:11434/api/tags',
+    tags: ['local llm', 'ollama', 'lm studio', 'llama.cpp', 'offline models', 'private inference'],
+    isFaq: true,
+  },
+  {
+    id: 'agents-cross-model-review',
+    category: 'agents',
+    title: 'What is Cross-Model Peer Review?',
+    summary:
+      'Cross-Model Review allows a second, distinct AI model (e.g., Claude Code reviewing a patch written by Codex) to provide a neutral critique before code integration.',
+    details: [
+      'Single-model self-review often suffers from blind spots. Jackalope can submit the generated patch and task brief to an alternative configured model.',
+      'The reviewing model evaluates syntax correctness, security implications, edge cases, and documentation fidelity, surfacing categorized findings and an approval verdict directly in the review panel.',
+    ],
+    tags: ['cross-model review', 'second opinion', 'peer review', 'code quality', 'audit'],
+  },
+  {
     id: 'agents-custom-flags',
     category: 'agents',
     title: 'Can I specify custom CLI flags or model overrides?',
@@ -222,6 +270,18 @@ export const knowledgeItems: KnowledgeItem[] = [
     ],
     tags: ['cleanup', 'archive', 'data protection', 'unmerged commits', 'locked worktree'],
   },
+  {
+    id: 'worktrees-branch-management',
+    category: 'worktrees',
+    title: 'How are branch pointers and target commits managed during parallel runs?',
+    summary:
+      'Each task resolves against an explicit target commit. Dependent tasks in a parallel plan wait until prerequisite tasks are integrated before dispatching.',
+    details: [
+      'When tasks are part of a decomposed parallel feature plan, Jackalope coordinates their execution graph. Independent tasks run simultaneously; dependent tasks remain queued.',
+      'Before integration, Jackalope validates that the target branch has not moved unexpectedly, ensuring deterministic verification.',
+    ],
+    tags: ['branches', 'dependencies', 'dag', 'target branch', 'fast-forward'],
+  },
 
   // --- Routing & Quota Handoff ---
   {
@@ -256,6 +316,18 @@ export const knowledgeItems: KnowledgeItem[] = [
     ],
     tags: ['429 rate limit', 'quota handoff', 'automatic failover', 'fallback', 'resilience'],
     isFaq: true,
+  },
+  {
+    id: 'routing-windows',
+    category: 'routing',
+    title: 'How does Jackalope track rolling 5-hour quota windows?',
+    summary:
+      'For providers with short rolling windows (such as Codex), Jackalope monitors reported quota consumption and blocks preflight dispatch if the window is exhausted.',
+    details: [
+      'Rather than launching a task only to fail thirty seconds later on an exhausted quota, Jackalope’s capacity client reads reported window metrics.',
+      'If a provider reports 100% consumption on its rolling window, the coordinator skips it during preflight and routes to an alternate available agent.',
+    ],
+    tags: ['5-hour window', 'rolling quota', 'preflight blocking', 'rate limit'],
   },
 
   // --- Task Workflow & Review ---
@@ -303,6 +375,30 @@ export const knowledgeItems: KnowledgeItem[] = [
     ],
     isFaq: true,
   },
+  {
+    id: 'tasks-repo-todos',
+    category: 'tasks',
+    title: 'How do Repo TODOs work?',
+    summary:
+      'Jackalope can parse repository TODO comments, markdown task lists, and roadmap items into structured, ready-to-run agent briefs.',
+    details: [
+      'In the Repo TODOs view (accessible via the Project tab or Ctrl+K), Jackalope discovers uncompleted TODOs while preserving markdown formatting, CRLF line endings, and code fence blocks.',
+      'You can click any TODO item to convert it into a pre-populated Task Composer brief with attached context.',
+    ],
+    tags: ['repo todos', 'todo comments', 'backlog intake', 'markdown tasks'],
+  },
+  {
+    id: 'tasks-windows-desktop-control',
+    category: 'tasks',
+    title: 'How does native Windows desktop window control work?',
+    summary:
+      'Active tasks can be granted temporary, explicit control of a specific Windows desktop window for screenshots, clicks, keystrokes, and UI testing.',
+    details: [
+      'On Windows, Jackalope allows users to explicitly delegate one window to an active task. The agent can capture window snapshots, send literal keyboard input, and perform mouse clicks.',
+      'Access is strictly human-granted for that specific attempt and can be revoked instantly with the Stop button or when the task completes.',
+    ],
+    tags: ['windows control', 'ui testing', 'desktop automation', 'window capture', 'clicks'],
+  },
 
   // --- MCP Hub & Tool Integration ---
   {
@@ -335,6 +431,18 @@ export const knowledgeItems: KnowledgeItem[] = [
     ],
     tags: ['browser automation', 'screenshots', 'web testing', 'evidence', 'headless engine'],
   },
+  {
+    id: 'mcp-marketplace-privacy',
+    category: 'mcp',
+    title: 'How does MCP Marketplace privacy and opt-out work?',
+    summary:
+      'The MCP Marketplace allows discovering pre-vetted MCP servers. You can completely disable marketplace network queries in Settings → Privacy.',
+    details: [
+      'If you prefer not to fetch external catalog lists or are working in an air-gapped environment, toggle off "Enable MCP Marketplace" in Settings → Privacy.',
+      'When disabled, all external searches and detail fetches are blocked, and you retain full ability to add custom local stdio or HTTP MCP tools manually.',
+    ],
+    tags: ['mcp marketplace', 'privacy opt-out', 'network policy', 'air gap'],
+  },
 
   // --- Usage & Rate Limits ---
   {
@@ -349,6 +457,18 @@ export const knowledgeItems: KnowledgeItem[] = [
     ],
     tags: ['usage dashboard', 'token tracking', 'quota windows', 'costs', 'csv export'],
     isFaq: true,
+  },
+  {
+    id: 'usage-attribution',
+    category: 'usage',
+    title: 'Are coordinator routing calls counted separately from worker attempts?',
+    summary:
+      'Yes. Jackalope separates routing evaluation tokens from task execution tokens so your metrics accurately reflect implementation costs.',
+    details: [
+      'When an automatic task is analyzed by the default agent for routing, the decision tokens are recorded under a dedicated routing attribution record.',
+      'If a task is handed off after an interruption, previous worker tokens and fallback worker tokens are preserved without duplicating the initial decision totals.',
+    ],
+    tags: ['attribution', 'decision receipts', 'routing tokens', 'audit log'],
   },
 
   // --- Troubleshooting Playbook ---
@@ -414,6 +534,33 @@ git worktree prune`,
     ],
     command: 'curl -I http://127.0.0.1:3000/sse',
     tags: ['mcp error', 'connection refused', 'timeout', 'port', 'stdio crash'],
+  },
+  {
+    id: 'trouble-git-line-endings',
+    category: 'troubleshooting',
+    title: 'Windows Git CRLF vs LF line-ending warnings',
+    summary:
+      'Configure Git core.autocrlf to preserve consistent line endings and prevent unnecessary diff churn across worktrees.',
+    details: [
+      'On Windows, Git may convert line endings to CRLF, causing cross-platform diff noise or test failures in POSIX-standard tools.',
+      'Run the command below to configure Git to checkout Windows-style but commit LF-style, or add a `.gitattributes` file with `* text=auto`.',
+    ],
+    command: 'git config --global core.autocrlf true',
+    codeSnippet: `# .gitattributes recommended rule
+* text=auto eol=lf`,
+    tags: ['crlf', 'line endings', 'git config', 'windows diff', 'formatting'],
+  },
+  {
+    id: 'trouble-history-recovery',
+    category: 'troubleshooting',
+    title: 'How do I recover from an interrupted task or unexpected shutdown?',
+    summary:
+      'Jackalope never drops interrupted work; it preserves partial diffs, output journals, and worktrees with a visible recovery banner.',
+    details: [
+      'If the app terminates during an active task, Jackalope quarantines unreadable files and displays an "Interrupted Task" notice on next launch.',
+      'Click "Inspect recovery" to review what was written. You can choose to continue the task with feedback, archive the worktree patch, or discard the attempt safely.',
+    ],
+    tags: ['interrupted task', 'crash recovery', 'unsaved changes', 'quarantine', 'continuity'],
   },
   {
     id: 'trouble-diagnostics-report',
@@ -482,5 +629,56 @@ git worktree prune`,
     ],
     tags: ['offline', 'local models', 'airplane mode', 'no internet'],
     isFaq: true,
+  },
+  {
+    id: 'faq-data-reset',
+    category: 'security',
+    title: 'How can I back up or completely reset my local data?',
+    summary:
+      'Use Settings → Data & reset to export your configuration or perform an atomic factory reset.',
+    details: [
+      'Click "Export configuration" to copy your non-sensitive project settings, themes, and agent preferences to your clipboard.',
+      'If you wish to wipe local databases, task histories, and saved worktrees, the "Reset all local data" option performs an atomic wipe and returns Jackalope to first-time setup.',
+    ],
+    tags: ['backup', 'export', 'factory reset', 'wipe', 'data management'],
+  },
+
+  // --- Atmosphere & Companion ---
+  {
+    id: 'exp-theme-harmonies',
+    category: 'experience',
+    title: 'How do Single, Duo, and Trio color harmonies work?',
+    summary:
+      'Jackalope generates balanced companion hues and live gradients across your workspace from a single primary color.',
+    details: [
+      'Click the ArcColorPicker in the header chrome to open the Theme Editor. Choose Single for a pure monochrome accent, Duo for a complementary pairing, or Trio for an energetic triadic harmony.',
+      'All action buttons maintain high contrast (contrast-safe 4.5:1 ratios) regardless of the chosen hue, ensuring full accessibility across both light and dark modes.',
+    ],
+    tags: ['theme', 'harmonies', 'single duo trio', 'color picker', 'arc inspired', 'contrast'],
+    isFaq: true,
+  },
+  {
+    id: 'exp-atmosphere-slider',
+    category: 'experience',
+    title: 'What does the Atmosphere slider control?',
+    summary:
+      'Atmosphere controls surface tint depth across your workspace, reaching up to 64 for rich ambient color.',
+    details: [
+      'Atmosphere tints cards, sidebars, and title chrome with a wash of your chosen harmony colors.',
+      'The slider features a tactile 44px vertical pill handle with fluid drag responsiveness. Status indicators (like git diffs and error badges) automatically adapt their brightness when high atmosphere is active to preserve contrast.',
+    ],
+    tags: ['atmosphere', 'tint', 'ambient', 'slider', 'surfaces'],
+  },
+  {
+    id: 'exp-mascot-moods',
+    category: 'experience',
+    title: 'How does the Jackalope companion mascot behave?',
+    summary:
+      'The bottom-right mascot companion reflects real app activity across five distinct moods and idle gestures.',
+    details: [
+      'The five activity moods are: idle (grounded resting pose), thinking (analyzing or planning), working (executing task), inquiring (awaiting your answer), and celebrating (task passed checks).',
+      'When idle, the companion blinks occasionally and follows pointer movement. When reduced motion is preferred by your operating system, pointer gaze and playful animations pause immediately while keeping status expressions clear.',
+    ],
+    tags: ['mascot', 'companion', 'moods', 'gestures', 'reduced motion', 'notifications'],
   },
 ];

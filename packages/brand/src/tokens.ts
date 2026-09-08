@@ -177,7 +177,9 @@ export function themeTokens(theme: ThemePalette) {
   set('--color-surface-hover', tone(dark ? 13 : 93, atmosphere + 2));
   set('--color-surface-elevated', tone(dark ? 15 : 100, atmosphere + 4));
   set('--color-surface-sunken', tone(dark ? 5 : 94));
-  set('--color-header-search', tone(dark ? 5 : 86, atmosphere + 8));
+  set('--color-header-search', `hsl(0 0% ${dark ? 8 : 100}%)`);
+  set('--color-header-search-border', `hsl(0 0% ${dark ? 100 : 0}% / 0.08)`);
+  set('--shadow-header-search', `inset 0 1px 3px hsl(0 0% 0% / ${dark ? 0.24 : 0.09})`);
   set('--color-border', tone(dark ? 19 : 80));
   set('--color-border-subtle', tone(dark ? 14 : 88));
   set('--color-text-primary', tone(dark ? 96 : 13, 10));

@@ -456,6 +456,10 @@ async function _verifyOnboarding(page) {
   await page
     .getByRole('heading', { name: 'Workspace checks need attention', exact: true })
     .waitFor();
+  assert(
+    await page.getByRole('button', { name: 'Open workspace', exact: true }).isDisabled(),
+    'Error recovery still respects the minimum',
+  );
   await page.evaluate(async () => {
     const { useExecutionStore: execution } = await import(
       performance
@@ -518,15 +522,99 @@ async function _verifyOnboarding(page) {
     .getByRole('textbox', { name: 'Your first task (optional)', exact: true })
     .fill('Review the existing project.');
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  const entryStarted = Date.now();
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();
   await page
     .getByRole('dialog', { name: 'What do you want to accomplish?', exact: true })
-    .waitFor({ timeout: 1000 });
+    .waitFor({ timeout: 8000 });
+  assert(
+    Date.now() - entryStarted >= 5000,
+    'Reduced motion preserves the five-second preparation minimum',
+  );
   assert(
     await page.evaluate(
       () => !window.onboardingFixture.calls.some((call) => call.command === 'task_start'),
     ),
     'Setup never starts a task',
+  );
+  await page.getByRole('button', { name: 'Close capture', exact: true }).click();
+  for (const width of [1280, 960]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    for (const isDark of [false, true]) {
+      await page.evaluate(async (isDark) => {
+        const { useThemeStore } = await import(
+          performance
+            .getEntriesByType('resource')
+            .find((r) => r.name.includes('/src/stores/themeStore.ts')).name
+        );
+        useThemeStore
+          .getState()
+          .setTheme({ ...useThemeStore.getState().currentTheme, appearance: 'manual', isDark });
+      }, isDark);
+      const search = page.getByRole('button', { name: 'Search commands', exact: true });
+      assert(
+        (await search.boundingBox()).width >= 200,
+        'Jump to has room for its label and shortcut',
+      );
+      const help = page.getByRole('button', { name: 'Help and knowledgebase', exact: true });
+      assert((await help.getAttribute('title')) === null, 'Help uses the in-app tooltip');
+      await help.hover();
+      await page.getByRole('tooltip', { name: 'Help Center', exact: true }).waitFor();
+      await page.screenshot({
+        path: `output/playwright/shell-search-${isDark ? 'dark' : 'light'}-${width}.png`,
+      });
+      await page.keyboard.press('Escape');
+      await page.mouse.move(0, 0);
+      await help.focus();
+      await page.getByRole('tooltip', { name: 'Help Center', exact: true }).waitFor();
+      await page.keyboard.press('Escape');
+      await search.click();
+      await page.getByRole('dialog', { name: 'Jump to a view or theme', exact: true }).waitFor();
+      await page.keyboard.press('Escape');
+      assert(
+        await search.evaluate((element) => element === document.activeElement),
+        'Closing search returns keyboard focus',
+      );
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        'Wider search fits the shell',
+      );
+    }
+  }
+  await page.getByRole('button', { name: 'Start a task', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'What do you want to accomplish?', exact: true })
+    .waitFor();
+  await page.getByRole('button', { name: 'Close capture', exact: true }).click();
+  await page.evaluate(() => {
+    window.welcomeDestinations = [];
+    window.captureWelcomeNavigation = (event) => {
+      window.welcomeDestinations.push(event.detail);
+    };
+    window.addEventListener('jackalope:navigate', window.captureWelcomeNavigation, true);
+  });
+  for (const name of [
+    'Explore your codebase',
+    'Choose your agents',
+    'Connect your tools',
+    'Schedule work',
+  ]) {
+    const action = page.getByRole('button', { name: new RegExp(name) });
+    await action.focus();
+    await page.keyboard.press('Enter');
+    await page
+      .getByRole('navigation', { name: 'Workspace', exact: true })
+      .getByRole('button', { name: 'Tasks', exact: true })
+      .click();
+  }
+  assert(
+    await page.evaluate(
+      () => window.welcomeDestinations.join(',') === 'topology,agents,mcps,schedules',
+    ),
+    'Welcome shortcuts request the correct workspace destinations',
+  );
+  await page.evaluate(() =>
+    window.removeEventListener('jackalope:navigate', window.captureWelcomeNavigation, true),
   );
   assert(errors.length === 0, errors.join('\n'));
   return {
