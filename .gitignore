@@ -22,6 +22,39 @@ dist-ssr/
 .env
 .env.*
 !.env.example
+.envrc
+.direnv/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.npmrc
+.netrc
+.pypirc
+.cargo/credentials
+.cargo/credentials.toml
+
+# Local service state and diagnostics
+.wrangler/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backups/
+exports/
+secrets/
+.private/
+docs/internal/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.bak
+*.dump
+*.log
+*.har
+*.trace
+*.dmp
 
 # IDE & Editor
 .vscode/*
@@ -53,6 +86,17 @@ tmp/
 *.pem
 *.p12
 *.pfx
+*.cer
+*.crt
+*.der
+*.jks
+*.keystore
+*.kdbx
+*.mobileprovision
+*.ovpn
+*.p7b
+*.p7c
+*.p7s
 !*.pub
 # Public/test certificates may be explicitly allowlisted beside their fixture.
 wrangler.deploy.jsonc
