@@ -5,10 +5,8 @@ import { type PointerEvent, useEffect, useId, useState } from 'react';
 export function ThemeEditor({
   value,
   onChange,
-  compact = false,
 }: {
   value: ThemePalette;
-  compact?: boolean;
   onChange: (theme: ThemePalette) => void;
 }) {
   const [hex, setHex] = useState(value.accentHex);
@@ -207,7 +205,7 @@ export function ThemeEditor({
           Light from 7 AM to 7 PM, dark overnight. Uses your device’s local time.
         </p>
       )}
-      {!compact && colorField}
+      {colorField}
       <fieldset
         className="flex items-center justify-between gap-2 border-0 p-0"
         aria-label="Theme presets"
@@ -242,17 +240,7 @@ export function ThemeEditor({
           </button>
         ))}
       </fieldset>
-      {compact ? (
-        <details className="onboarding-advanced">
-          <summary>Customize palette</summary>
-          <div className="space-y-5">
-            {colorField}
-            {colorControls}
-          </div>
-        </details>
-      ) : (
-        colorControls
-      )}
+      {colorControls}
     </div>
   );
 }

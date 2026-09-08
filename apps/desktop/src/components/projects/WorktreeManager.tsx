@@ -54,8 +54,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const refreshButton = useRef<HTMLButtonElement>(null);
   projectId.current = activeProjectId;
   useEffect(() => {
-    if (!loading && !removing && feedback.startsWith('Removed ')) refreshButton.current?.focus();
-  }, [feedback, loading, removing]);
+    if (!loading && !pending && feedback.startsWith('Removed ')) refreshButton.current?.focus();
+  }, [feedback, loading, pending]);
   const branchName = branch ?? `feat/${slug.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const desktop = isTauriEnvironment();
   useEffect(() => {

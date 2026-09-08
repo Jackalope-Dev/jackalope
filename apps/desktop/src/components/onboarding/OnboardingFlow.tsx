@@ -183,7 +183,7 @@ export function OnboardingFlow({
               <p className="onboarding-description">
                 Choose an appearance and palette for your workspace. You can change them anytime.
               </p>
-              <ThemeEditor value={themeDraft} onChange={setThemeDraft} compact />
+              <ThemeEditor value={themeDraft} onChange={setThemeDraft} />
               <details className="onboarding-privacy-panel">
                 <summary>
                   <ShieldCheck size={20} aria-hidden="true" />

@@ -32,12 +32,14 @@ export function CompanionSources() {
       if (opening || !alive) return;
       opening = true;
       try {
-        const id = await nativeTask<string | null>('notification_take_open');
-        if (!id || !alive) return;
-        await useExecutionStore.getState().refresh();
-        const run = useExecutionStore.getState().runs.find((run) => run.id === id);
-        if (alive && run) openCompanionTask(run);
-        else if (alive) navigateWorkspace('kanban');
+        while (alive) {
+          const id = await nativeTask<string | null>('notification_take_open');
+          if (!id || !alive) return;
+          await useExecutionStore.getState().refresh();
+          const run = useExecutionStore.getState().runs.find((run) => run.id === id);
+          if (alive && run) openCompanionTask(run);
+          else if (alive) navigateWorkspace('kanban');
+        }
       } catch (error) {
         if (alive) useNotificationStore.setState({ error: String(error) });
       } finally {

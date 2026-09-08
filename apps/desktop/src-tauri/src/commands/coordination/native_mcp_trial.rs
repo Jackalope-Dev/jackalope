@@ -132,7 +132,8 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                             message.text.contains("agent-bridge-trial")
                                 && !message.acknowledged_by.is_empty()
                                 && message.task_id == run.task_id
-                                && message.recipient_task_id.as_deref() == Some(run.task_id.as_str())
+                                && message.recipient_task_id.as_deref()
+                                    == Some(run.task_id.as_str())
                         }))
                 {
                     failures.push(format!("{agent} did not complete the question, validation and directed messaging round trip"));

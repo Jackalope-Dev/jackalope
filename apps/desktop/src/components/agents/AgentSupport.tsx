@@ -7,8 +7,14 @@ export function AgentSupport({ adapter }: { adapter: string }) {
   const rows = [
     ['Project context, task awareness & messages', 'Available'],
     [
-      'User questions, browser & validation',
+      'User questions & validation',
       support.bridge === 'mcp' ? 'Built-in tools' : 'Through permitted shell/network tools',
+    ],
+    [
+      'Browser evidence & interaction',
+      adapter === 'codex'
+        ? 'Read tools; actions may require permission'
+        : 'Subject to CLI permissions',
     ],
     [
       'Selected project connections',
