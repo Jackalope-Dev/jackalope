@@ -1,9 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
-
 import { Check, Circle, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
-
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type AccountStatus,
   type AgentProfile,
@@ -17,19 +14,15 @@ import {
   setActiveAgentProfile,
   setAgentProfileGroup,
 } from '../../lib/agent-profiles';
-
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
-
 import { Button } from '../ui/button';
-
 import { ConfirmAction } from '../ui/ConfirmAction';
-
 import { Select, SelectItem } from '../ui/Select';
+import { useDialogFocus } from '../ui/useDialogFocus';
 
 const AgentSignIn = lazy(() =>
   import('./AgentSignIn').then((module) => ({ default: module.AgentSignIn })),
 );
-
 function AccountGroup({
   value,
   onChange,
@@ -51,7 +44,6 @@ function AccountGroup({
     </Select>
   );
 }
-
 function EditAccount({
   profile,
   onSave,
@@ -61,14 +53,11 @@ function EditAccount({
   onSave: (name: string, group: AgentProfile['group']) => Promise<void>;
   onClose: () => void;
 }) {
+  const dialogFocus = useDialogFocus();
   const [name, setName] = useState(profile.name);
-
   const [group, setGroup] = useState(profile.group);
-
   const [busy, setBusy] = useState(false);
-
   const [error, setError] = useState('');
-
   return (
     <Dialog.Root
       open
@@ -78,7 +67,10 @@ function EditAccount({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content className="task-dialog appearance-panel confirm-action-dialog">
+        <Dialog.Content
+          {...dialogFocus}
+          className="task-dialog appearance-panel confirm-action-dialog"
+        >
           <Dialog.Title className="text-xl font-medium">Edit account</Dialog.Title>
           <Dialog.Description className="task-muted mt-2">
             Group accounts to choose Work or Personal across agents in Project settings.
@@ -130,52 +122,35 @@ function EditAccount({
     </Dialog.Root>
   );
 }
-
 export function AgentAccounts({ agentId, agentName }: { agentId: string; agentName: string }) {
   const [view, setView] = useState<AgentProfilesView>();
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState('');
-
   const [name, setName] = useState('');
-
   const [group, setGroup] = useState<AgentProfile['group']>('work');
-
   const [busy, setBusy] = useState('');
-
   const [statuses, setStatuses] = useState<Record<string, AccountStatus | undefined>>({});
-
   const [signIn, setSignIn] = useState<AgentProfile>();
-
+  const signInOpener = useRef<HTMLElement | null>(null);
   const [editing, setEditing] = useState<AgentProfile>();
-
   const desktop = isTauriEnvironment();
-
   const load = useCallback(async () => {
     setLoading(true);
-
     try {
       setView(await listAgentProfiles(agentId));
     } finally {
       setLoading(false);
     }
   }, [agentId]);
-
   useEffect(() => {
     let cancelled = false;
-
     setView(undefined);
-
     setStatuses({});
-
     if (!desktop) {
       setLoading(false);
       return;
     }
-
     setLoading(true);
-
     void listAgentProfiles(agentId)
       .then((view) => {
         if (!cancelled) {
@@ -189,16 +164,13 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
     return () => {
       cancelled = true;
     };
   }, [agentId, desktop]);
-
   const action = async (id: string, run: () => Promise<void>) => {
     setBusy(id);
     setError('');
-
     try {
       await run();
     } catch (e) {
@@ -207,17 +179,12 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
       setBusy('');
     }
   };
-
   const check = async (profile: AgentProfile) => {
     setStatuses((old) => ({ ...old, [profile.id]: undefined }));
-
     const status = await checkAgentProfile(agentId, profile.id);
-
     setStatuses((old) => ({ ...old, [profile.id]: status }));
   };
-
   if (!desktop) return <p className="task-muted">Accounts are available in the desktop app.</p>;
-
   if (!view)
     return (
       <div>
@@ -235,7 +202,6 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
         )}
       </div>
     );
-
   if (!view.envVar)
     return (
       <p className="task-muted">
@@ -244,9 +210,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
           : `Separate accounts are not available for ${agentName}.`}
       </p>
     );
-
   const locked = !!busy || loading;
-
   return (
     <div className="agent-accounts">
       <p className="task-muted">Keep separate sign-ins for work and personal projects.</p>
@@ -270,9 +234,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
       <ul className="agent-accounts-list">
         {view.profiles.map((profile) => {
           const status = statuses[profile.id];
-
           const active = profile.id === view.activeId;
-
           return (
             <li key={profile.id} className="agent-accounts-row">
               <button
@@ -320,7 +282,14 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
                 )}
               </div>
               <div className="agent-accounts-actions">
-                <Button variant="outline" disabled={locked} onClick={() => setSignIn(profile)}>
+                <Button
+                  variant="outline"
+                  disabled={locked}
+                  onClick={(event) => {
+                    signInOpener.current = event.currentTarget;
+                    setSignIn(profile);
+                  }}
+                >
                   Sign in
                 </Button>
                 <Button
@@ -363,14 +332,15 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
         className="agent-account-add"
         onSubmit={(e) => {
           e.preventDefault();
-
+          signInOpener.current =
+            (e.nativeEvent as SubmitEvent).submitter ??
+            (document.activeElement instanceof HTMLElement ? document.activeElement : null);
           void action('add', async () => {
             const profile = await createAgentProfile(
               agentId,
               name.trim() || (group === 'personal' ? 'Personal' : 'Work'),
               group,
             );
-
             setName('');
             await load();
             setSignIn(profile);
@@ -412,6 +382,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
             agentName={agentName}
             profileId={signIn.id}
             profileName={signIn.name}
+            returnFocus={signInOpener.current}
             onClose={() => setSignIn(undefined)}
             onStatus={(status) => setStatuses((old) => ({ ...old, [signIn.id]: status }))}
           />

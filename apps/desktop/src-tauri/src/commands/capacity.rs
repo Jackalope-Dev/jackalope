@@ -169,9 +169,8 @@ async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, S
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
-    if let Some(dir) = super::agent_profiles::active_profile_dir(profiles_root, "codex") {
-        command.env("CODEX_HOME", dir);
-    }
+    let binding = super::agent_profiles::bind_account(profiles_root, "codex", None)?;
+    super::agent_profiles::apply_binding(command.as_std_mut(), &binding);
     #[cfg(windows)]
     command.creation_flags(0x08000000);
     let mut child = command

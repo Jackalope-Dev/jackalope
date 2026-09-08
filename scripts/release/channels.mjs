@@ -1,3 +1,5 @@
+import { isCloudEndpoint } from './crabnebula-config.mjs';
+
 export function channelConfig(channel, values = {}) {
   if (!['stable', 'beta'].includes(channel)) throw new Error('Unknown release channel');
   const config = { channel };
@@ -14,7 +16,16 @@ export function channelConfig(channel, values = {}) {
     )
       continue;
     const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash)
+    const updateChannel = key === 'stableEndpoint' ? 'stable' : 'beta';
+    const cloud =
+      ['stableEndpoint', 'betaEndpoint'].includes(key) && isCloudEndpoint(value, updateChannel);
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      (url.search && !cloud) ||
+      url.hash
+    )
       throw new Error(
         'Channel services must use trusted HTTPS URLs without credentials, queries or fragments',
       );
@@ -22,6 +33,7 @@ export function channelConfig(channel, values = {}) {
       throw new Error('Service URL must be an origin');
     if (
       ['stableEndpoint', 'betaEndpoint'].includes(key) &&
+      !cloud &&
       !url.pathname.endsWith(`/updates/${key === 'stableEndpoint' ? 'stable' : 'beta'}/latest.json`)
     )
       throw new Error('Update endpoint does not match its channel');

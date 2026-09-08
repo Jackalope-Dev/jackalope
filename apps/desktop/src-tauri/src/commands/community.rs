@@ -94,13 +94,28 @@ pub fn build_channel(app: &AppHandle) -> ReleaseChannel {
 pub fn configured_url(app: &AppHandle, key: &str) -> Option<reqwest::Url> {
     let config = app.config();
     let value = config.plugins.0.get("jackalope")?.get(key)?.as_str()?;
+    parse_configured_url(value, key)
+}
+fn parse_configured_url(value: &str, key: &str) -> Option<reqwest::Url> {
     let url = reqwest::Url::parse(value).ok()?;
+    let cloud_channel = match key {
+        "stableEndpoint" => Some("stable"),
+        "betaEndpoint" => Some("beta"),
+        _ => None,
+    };
+    let cloud = cloud_channel.is_some_and(|channel| {
+        let expected = format!(
+            "https://cdn.crabnebula.app/update/jackalope-digital/jackalope/\
+             {{{{target}}}}-{{{{arch}}}}/{{{{current_version}}}}?channel={channel}"
+        );
+        reqwest::Url::parse(&expected).ok().as_ref() == Some(&url)
+    });
     (url.scheme() == "https"
         && url.username().is_empty()
         && url.password().is_none()
         && url.fragment().is_none()
-        && url.query().is_none())
-    .then_some(url)
+        && (url.query().is_none() || cloud))
+        .then_some(url)
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -320,6 +335,27 @@ pub async fn app_submit_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cloud_update_channels_allow_only_the_exact_trusted_query() {
+        let endpoint = "https://cdn.crabnebula.app/update/jackalope-digital/jackalope/{{target}}-{{arch}}/{{current_version}}?channel=beta";
+        assert!(parse_configured_url(endpoint, "betaEndpoint").is_some());
+        assert!(parse_configured_url(endpoint, "stableEndpoint").is_none());
+        assert!(parse_configured_url(endpoint, "accountServiceUrl").is_none());
+        for invalid in [
+            format!("{endpoint}&token=secret"),
+            endpoint.replace("cdn.crabnebula.app", "evil.example"),
+            endpoint.replace("/jackalope/", "/another-app/"),
+            endpoint.replace("https:", "http:"),
+            endpoint.replace(".app/", ".app:444/"),
+        ] {
+            assert!(parse_configured_url(&invalid, "betaEndpoint").is_none());
+        }
+        assert!(parse_configured_url(
+            "https://api.jackalope.dev/updates/stable/latest.json",
+            "stableEndpoint"
+        )
+        .is_some());
+    }
     #[test]
     fn metrics_reject_content_and_unknown_dimensions() {
         assert!(serde_json::from_value::<Metric>(

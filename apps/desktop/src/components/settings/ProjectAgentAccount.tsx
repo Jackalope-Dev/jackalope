@@ -1,17 +1,10 @@
 import * as Dialog from '@radix-ui/react-dialog';
-
 import { useEffect, useState } from 'react';
-
 import { type AgentProfilesView, listAgentProfiles } from '../../lib/agent-profiles';
-
 import { AgentAccounts } from '../agents/AgentAccounts';
-
 import { Button } from '../ui/button';
-
 import { Select, SelectItem } from '../ui/Select';
-
 import '../agents/agent-manager.css';
-
 export function ProjectAgentAccount({
   agentId,
   agentName,
@@ -23,22 +16,16 @@ export function ProjectAgentAccount({
   agentName: string;
   projectName: string;
   value: string | undefined;
-
   onChange: (id: string | undefined) => void;
 }) {
   const [view, setView] = useState<AgentProfilesView>();
-
   const [error, setError] = useState('');
-
   const [refresh, setRefresh] = useState(0);
-
   const [open, setOpen] = useState(false);
-
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reload after managing accounts or retrying a failed read.
   useEffect(() => {
     let cancelled = false;
-
     setError('');
-
     void listAgentProfiles(agentId)
       .then((view) => {
         if (!cancelled) setView(view);
@@ -46,18 +33,13 @@ export function ProjectAgentAccount({
       .catch((e) => {
         if (!cancelled) setError(String(e));
       });
-
     return () => {
       cancelled = true;
     };
   }, [agentId, refresh]);
-
   if (view && !view.envVar && !value) return null;
-
   const missing = value && view && !view.profiles.some((p) => p.id === value);
-
   const active = view?.profiles.find((p) => p.id === view.activeId)?.name ?? 'normal CLI sign-in';
-
   return (
     <div className="project-agent-account">
       <span className="task-muted text-xs">

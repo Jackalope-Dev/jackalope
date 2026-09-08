@@ -123,3 +123,35 @@ test('queue dispatch publishes current policy before invoking the queue and stop
     globalThis.window = originalWindow;
   }
 });
+
+test('account groups preserve explicit selections and expose missing or ambiguous matches', async () => {
+  const { accountGroupChoices } = await import('../src/lib/account-groups.ts');
+  const entries = [
+    {
+      agent: 'codex',
+      profiles: [
+        { id: 'work-codex', name: 'Office', group: 'work' },
+        { id: 'personal-codex', name: 'Home', group: 'personal' },
+      ],
+    },
+    { agent: 'claude', profiles: [{ id: 'old', name: 'Work' }] },
+    {
+      agent: 'grok',
+      profiles: [
+        { id: 'g1', group: 'work' },
+        { id: 'g2', group: 'work' },
+      ],
+    },
+  ];
+  const result = accountGroupChoices(entries, 'work');
+  assert.deepEqual(result.assignments, { codex: 'work-codex' });
+  assert.deepEqual(result.missing, ['claude']);
+  assert.deepEqual(result.ambiguous, ['grok']);
+  assert.deepEqual(
+    { claude: 'saved-claude', grok: 'saved-grok', ...result.assignments },
+    { codex: 'work-codex', claude: 'saved-claude', grok: 'saved-grok' },
+  );
+  assert.deepEqual(accountGroupChoices(entries, 'personal').assignments, {
+    codex: 'personal-codex',
+  });
+});

@@ -120,6 +120,7 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | @vitest/spy | 4.1.11 | MIT |
 | @vitest/utils | 4.1.11 | MIT |
 | @xterm/addon-fit | 0.11.0 | MIT |
+| @xterm/addon-web-links | 0.12.0 | MIT |
 | @xterm/xterm | 6.0.0 | MIT |
 | @xyflow/react | 12.11.6 | MIT |
 | @xyflow/system | 0.0.82 | MIT |

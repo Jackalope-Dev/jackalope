@@ -161,6 +161,31 @@ pub async fn agent_profile_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    #[ignore = "Reads installed CLI account status in empty isolated profiles; no login or model request"]
+    async fn isolated_installed_account_status_trial() {
+        for agent in ["codex", "claude"] {
+            let directory = std::env::temp_dir()
+                .join(format!("jackalope-account-check-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&directory).unwrap();
+            let result = check(AccountBinding {
+                adapter: agent.into(),
+                profile_id: Some("trial".into()),
+                directory: directory.clone(),
+                label: "Isolated trial".into(),
+            })
+            .await
+            .unwrap();
+            assert_eq!(
+                result.state, "signedOut",
+                "An empty {agent} profile must not inherit another account"
+            );
+            assert!(result.identity.is_none());
+            std::fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
     #[test]
     fn account_identity_comes_only_from_provider_fields() {
         assert_eq!(parse_codex(&json!({"account":{"type":"chatgpt","email":"work@example.test","accessToken":"secret"}})).identity.as_deref(), Some("work@example.test"));

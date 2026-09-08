@@ -1,0 +1,108 @@
+name: Cloud release rehearsal
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Rehearsal is unsigned; candidate signs locally; draft also uploads without publishing
+        type: choice
+        options: [rehearsal, candidate, draft]
+        default: rehearsal
+        required: true
+      channel:
+        type: choice
+        options: [beta, stable]
+        default: beta
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: cloud-release-${{ inputs.channel }}
+  cancel-in-progress: false
+jobs:
+  windows:
+    if: github.ref == 'refs/heads/master'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    environment: cloud-${{ inputs.channel }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RUST_TEST_THREADS: '2'
+      RELEASE_CHANNEL: ${{ inputs.channel }}
+      CLOUD_MODE: ${{ inputs.mode == 'rehearsal' && 'rehearsal' || 'candidate' }}
+      CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check release setup
+        shell: pwsh
+        env:
+          CN_APPLICATION: ${{ vars.CN_APPLICATION }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+          CLOUD_DRAFT_UPLOAD_ENABLED: ${{ vars.CLOUD_DRAFT_UPLOAD_ENABLED }}
+        run: |
+          if ($env:CN_APPLICATION -ne 'jackalope-digital/jackalope') { throw 'Set CN_APPLICATION to jackalope-digital/jackalope.' }
+          if ($env:CLOUD_MODE -eq 'candidate' -and $env:CLOUD_SIGNING_READY -ne 'true') { throw 'Complete Azure signing setup before requesting a candidate.' }
+          if ($env:REQUESTED_MODE -eq 'draft' -and $env:CLOUD_DRAFT_UPLOAD_ENABLED -ne 'true') { throw 'Configure Cloud draft access before requesting an upload.' }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+      - run: rustup override set 1.98.1
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: cloud-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            cloud-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
+      - run: pnpm verify
+      - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features beta-access execution_access
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        if: env.CLOUD_MODE == 'candidate'
+        with:
+          dotnet-version: '8.0.x'
+      - name: Install pinned signing and Cloud tools
+        if: env.CLOUD_MODE == 'candidate'
+        shell: pwsh
+        run: ./scripts/release/cloud-tools.ps1 -Azure
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6
+        if: env.CLOUD_MODE == 'candidate'
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build installer
+        id: package
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.mode != 'rehearsal' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.mode != 'rehearsal' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: ./scripts/release/cloud-build.ps1 -Mode $env:CLOUD_MODE -Channel $env:RELEASE_CHANNEL
+      - name: Upload candidate to unpublished draft
+        if: inputs.mode == 'draft'
+        shell: pwsh
+        env:
+          CLOUD_PACKAGE_DIRECTORY: ${{ steps.package.outputs.directory }}
+          CN_API_KEY: ${{ secrets.CN_API_KEY }}
+          CLOUD_DRAFT_UPLOAD_ENABLED: ${{ vars.CLOUD_DRAFT_UPLOAD_ENABLED }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node scripts/release/cloud-upload.mjs $env:CLOUD_PACKAGE_DIRECTORY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && steps.package.outcome == 'success'
+        with:
+          name: cloud-windows-${{ inputs.channel }}-${{ inputs.mode }}
+          path: ${{ steps.package.outputs.directory }}
+          if-no-files-found: error
+          retention-days: 14

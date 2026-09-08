@@ -387,3 +387,97 @@ pub fn agent_profile_sign_in_stop(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn binding() -> AccountBinding {
+        AccountBinding {
+            adapter: "test".into(),
+            profile_id: Some("test".into()),
+            directory: std::env::temp_dir()
+                .join(format!("jackalope-signin-{}", uuid::Uuid::new_v4())),
+            label: "Test".into(),
+        }
+    }
+    #[test]
+    fn sign_in_excludes_launch_and_duplicate_sign_in_until_released() {
+        let binding = binding();
+        let lease = Lease::acquire(binding.directory.clone()).unwrap();
+        assert!(ensure_idle(&binding).is_err());
+        assert!(Lease::acquire(binding.directory.clone()).is_err());
+        drop(lease);
+        assert!(ensure_idle(&binding).is_ok());
+    }
+    #[test]
+    fn terminal_uses_the_same_isolation_as_tasks() {
+        let mut binding = binding();
+        for agent in ["codex", "claude", "grok", "opencode"] {
+            binding.adapter = agent.into();
+            let command = login_command(&binding, std::path::Path::new("test"));
+            assert_eq!(
+                command.get_env(agent_profiles::env_var_for(agent).unwrap()),
+                Some(binding.directory.as_os_str())
+            );
+            for variable in agent_profiles::credential_env_vars(agent) {
+                assert!(command.get_env(variable).is_none());
+            }
+        }
+        assert_eq!(agent_profiles::login_args("claude"), &["auth", "login"]);
+    }
+    #[test]
+    #[cfg(windows)]
+    fn owned_terminal_streams_output_and_cancel_releases_the_profile() {
+        let binding = binding();
+        std::fs::create_dir_all(&binding.directory).unwrap();
+        let session = spawn_session(binding.clone(), PathBuf::from("cmd.exe"), 80, 16).unwrap();
+        session
+            .lock()
+            .unwrap()
+            .terminal
+            .as_mut()
+            .unwrap()
+            .writer
+            .write_all(b"echo jackalope-signin-ready\r\n")
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if session
+                .lock()
+                .unwrap()
+                .output
+                .iter()
+                .any(|chunk| chunk.data.contains("jackalope-signin-ready"))
+            {
+                break;
+            }
+            assert!(Instant::now() < deadline, "terminal output did not arrive");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(ensure_idle(&binding).is_err());
+        {
+            let mut session = session.lock().unwrap();
+            for _ in 0..100 {
+                session.append("x".repeat(4096));
+            }
+            assert!(session.bytes <= OUTPUT_LIMIT);
+            assert!(session.output.front().unwrap().sequence > 1);
+            session.stop("cancelled");
+            assert!(session.terminal.is_none());
+            assert!(session.tree.is_none());
+            assert!(session.lease.is_none());
+        }
+        assert!(ensure_idle(&binding).is_ok());
+        drop(session);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            match std::fs::remove_dir_all(&binding.directory) {
+                Ok(()) => break,
+                Err(error) if Instant::now() >= deadline => {
+                    panic!("Sign-in directory remained in use: {error}")
+                }
+                Err(_) => std::thread::sleep(Duration::from_millis(50)),
+            }
+        }
+    }
+}

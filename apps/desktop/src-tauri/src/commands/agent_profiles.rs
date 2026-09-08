@@ -440,6 +440,21 @@ mod tests {
     }
 
     #[test]
+    fn legacy_profiles_keep_their_identity_when_grouping_is_added() {
+        let profile: AgentProfile =
+            serde_json::from_str(r#"{"id":"old-id","name":"Work"}"#).unwrap();
+        assert_eq!(profile.group, None);
+        let grouped = AgentProfile {
+            group: Some("work".into()),
+            ..profile
+        };
+        assert_eq!(grouped.id, "old-id");
+        assert_eq!(serde_json::to_value(&grouped).unwrap()["group"], "work");
+        assert!(validate_group(Some("personal")).is_ok());
+        assert!(validate_group(Some("invalid")).is_err());
+    }
+
+    #[test]
     fn env_var_mapping_matches_verified_cli_overrides() {
         assert_eq!(env_var_for("codex"), Some("CODEX_HOME"));
         assert_eq!(env_var_for("claude"), Some("CLAUDE_CONFIG_DIR"));

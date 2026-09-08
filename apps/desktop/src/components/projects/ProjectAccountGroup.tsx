@@ -1,11 +1,7 @@
 import { useState } from 'react';
-
 import { accountGroupChoices } from '../../lib/account-groups';
-
 import { listAgentProfiles } from '../../lib/agent-profiles';
-
 import { Button } from '../ui/button';
-
 export function ProjectAccountGroup({
   agents,
   value,
@@ -13,20 +9,14 @@ export function ProjectAccountGroup({
 }: {
   agents: { id: string; name: string }[];
   value: Record<string, string>;
-
   onChange: (value: Record<string, string>) => void;
 }) {
   const [choice, setChoice] = useState<'work' | 'personal'>();
-
   const [preview, setPreview] = useState<ReturnType<typeof accountGroupChoices>>();
-
   const [busy, setBusy] = useState(false);
-
   const [error, setError] = useState('');
-
   const names = (ids: string[]) =>
     ids.map((id) => agents.find((a) => a.id === id)?.name ?? id).join(', ');
-
   const load = async (group: 'work' | 'personal') => {
     const entries = await Promise.all(
       agents
@@ -36,16 +26,13 @@ export function ProjectAccountGroup({
           profiles: (await listAgentProfiles(agent.id)).profiles,
         })),
     );
-
     return accountGroupChoices(entries, group);
   };
-
   const select = async (group: 'work' | 'personal') => {
     setBusy(true);
     setError('');
     setChoice(group);
     setPreview(undefined);
-
     try {
       setPreview(await load(group));
     } catch {
@@ -54,9 +41,8 @@ export function ProjectAccountGroup({
       setBusy(false);
     }
   };
-
   return (
-    <div className="settings-group">
+    <div className="settings-group p-5">
       <h2 className="text-base font-medium">Accounts for this project</h2>
       <p className="task-muted mt-2">
         Choose a group across agents, or select individual accounts below.
@@ -113,19 +99,15 @@ export function ProjectAccountGroup({
               disabled={busy || !Object.keys(preview.assignments).length}
               onClick={async () => {
                 if (!choice) return;
-
                 setBusy(true);
                 setError('');
-
                 try {
                   const latest = await load(choice);
-
                   if (JSON.stringify(latest) !== JSON.stringify(preview)) {
                     setPreview(latest);
                     setError('Accounts changed. Review the updated choices and apply again.');
                     return;
                   }
-
                   onChange({ ...value, ...latest.assignments });
                   setPreview(undefined);
                   setChoice(undefined);
@@ -136,7 +118,8 @@ export function ProjectAccountGroup({
                 }
               }}
             >
-              Apply {Object.keys(preview.assignments).length} account choices
+              Apply {Object.keys(preview.assignments).length} account
+              {Object.keys(preview.assignments).length === 1 ? '' : 's'}
             </Button>
           </div>
         </div>
