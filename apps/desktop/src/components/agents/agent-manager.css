@@ -109,8 +109,11 @@
 .agent-accounts-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .agent-account-select {
@@ -164,3 +167,12 @@
   color: var(--color-text-secondary);
   margin: 0;
 }
+
+.agent-account-identity { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.agent-account-add { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.agent-account-add > input { flex: 1 1 160px; min-width: 0; }
+.agent-account-add > [role="combobox"] { flex: 0 1 150px; }
+.agent-sign-in-dialog { width: min(800px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); overflow-y: auto; }
+.agent-sign-in-terminal { height: clamp(160px, 35dvh, 320px); padding: 12px; margin-top: 16px; background: var(--color-surface-sunken); border: 1px solid var(--color-border); border-radius: 8px; }
+.agent-sign-in-terminal:focus-within { outline: 2px solid var(--color-accent-ink); outline-offset: 2px; }
+.agent-account-status { overflow-wrap: anywhere; margin-top: 8px; }

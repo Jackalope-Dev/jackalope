@@ -157,6 +157,14 @@ export function AgentManager() {
               <AgentSupport
                 adapter={('adapter' in agent ? agent.adapter : undefined) ?? agent.id}
               />
+              {!('isCustom' in agent) && (
+                <section aria-label="Agent accounts">
+                  <h3 className="text-base font-medium mt-6">Accounts</h3>
+                  <div className="agent-config-fields">
+                    <AgentAccounts key={agent.id} agentId={agent.id} agentName={agent.name} />
+                  </div>
+                </section>
+              )}
               <section aria-label="Models and executable">
                 <h3 className="text-base font-medium mt-4">Models & executable</h3>
                 <div className="agent-config-fields">
@@ -202,14 +210,7 @@ export function AgentManager() {
                   </p>
                 </div>
               </section>
-              {!('isCustom' in agent) && (
-                <section aria-label="Agent accounts">
-                  <h3 className="text-base font-medium mt-6">Accounts</h3>
-                  <div className="agent-config-fields">
-                    <AgentAccounts agentId={agent.id} agentName={agent.name} />
-                  </div>
-                </section>
-              )}
+
             </section>
           );
         })}
