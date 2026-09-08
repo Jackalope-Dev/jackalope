@@ -40,7 +40,6 @@ tree-sitter-rust = "0.24"
 petgraph = "0.8"
 cron = "0.17"
 chrono-tz = "0.10"
-headless_chrome = "1"
 dunce = "1"
 oxc_resolver = "11"
 

@@ -61,6 +61,7 @@ try {
     $target = if ($env:CARGO_TARGET_DIR) { [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR) } else { Join-Path $repoRoot 'apps/desktop/src-tauri/target' }
     $configuration = if ($Mode -eq 'rehearsal') { 'debug' } else { 'release' }
     Copy-Item -LiteralPath (Join-Path $target "$configuration/jackalope-desktop.exe") -Destination $stage
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'apps/desktop/src-tauri/resources') -Destination (Join-Path $stage 'resources') -Recurse
     foreach ($icon in @('StoreLogo.png', 'Square44x44Logo.png', 'Square150x150Logo.png')) {
         Copy-Item -LiteralPath (Join-Path $repoRoot "apps/desktop/src-tauri/icons/$icon") -Destination (Join-Path $stage 'Assets')
     }

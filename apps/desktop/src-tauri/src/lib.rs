@@ -35,6 +35,7 @@ pub fn run() {
         .manage(SignInService::default())
         .manage(CapacityService::default())
         .setup(move |app| {
+            commands::browser::set_resource_directory(app.path().resource_dir()?);
             let directory = profile
                 .clone()
                 .unwrap_or(app.path().app_data_dir()?)

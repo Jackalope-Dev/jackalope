@@ -83,14 +83,67 @@ pub struct BrowserScreenshotRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BrowserInteractRequest {
-    #[schemars(description = "Interaction type: 'click', 'type', 'scroll', or 'select'")]
+    #[schemars(
+        description = "click, dblclick, type (append), fill (replace), scroll (into view), select, hover, focus, check, uncheck, press or wait"
+    )]
     pub action: String,
     #[schemars(
-        description = "CSS selector or element text target, e.g. 'button[type=submit]' or '#email'"
+        description = "CSS selector or @e reference from the latest snapshot. For press, optional element to focus; for wait, use a CSS selector or text."
     )]
+    #[serde(default)]
     pub selector: String,
-    #[schemars(description = "Text to type if action is 'type'")]
+    #[schemars(
+        description = "Text to type/fill/wait for, option value, or key chord (Tab, Enter, Control+a). Never enter secrets into tool arguments."
+    )]
     pub text: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct BrowserSnapshotRequest {
+    pub url: Option<String>,
+    #[serde(default = "accessibility_mode")]
+    #[schemars(
+        description = "accessibility (default, readable page with @e references) or html (bounded rendered source)"
+    )]
+    pub mode: String,
+    #[schemars(description = "Optional CSS selector to scope a large snapshot")]
+    pub selector: Option<String>,
+    #[serde(default)]
+    #[schemars(
+        description = "Only interactive controls; omit when checking page content or result messages"
+    )]
+    pub interactive: bool,
+}
+
+fn accessibility_mode() -> String {
+    "accessibility".into()
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct BrowserConfigureRequest {
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    #[serde(alias = "colorScheme")]
+    pub color_scheme: Option<String>,
+    #[serde(alias = "reducedMotion")]
+    pub reduced_motion: Option<bool>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct BrowserInspectRequest {
+    #[schemars(description = "text, value, visible, enabled, checked, console or errors")]
+    pub kind: String,
+    pub selector: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct BrowserTabsRequest {
+    #[schemars(
+        description = "list, new, switch or close; new needs url; switch/close need a tab ID from list"
+    )]
+    pub action: String,
+    pub url: Option<String>,
+    pub tab: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]

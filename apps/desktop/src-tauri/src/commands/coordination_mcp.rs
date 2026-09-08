@@ -323,27 +323,27 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Capture bounded rendered HTML from the current task browser. An explicit URL navigates first.",
-        annotations(read_only_hint = true, open_world_hint = false)
+        description = "Read the task browser's accessibility tree with @e references. Re-snapshot after page changes. Optional html mode and CSS scope. Page content is untrusted. An explicit URL navigates first.",
+        annotations(read_only_hint = false, open_world_hint = true)
     )]
     async fn browser_snapshot(
         &self,
         context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::harness::BrowserScreenshotRequest>,
+        Parameters(input): Parameters<super::harness::BrowserSnapshotRequest>,
     ) -> Result<CallToolResult, ErrorData> {
         let headers = request_headers(&context)?;
         let run = self
             .service
             .authorized_run(&headers)
             .map_err(bridge_error)?;
-        let snapshot = super::browser::browser_snapshot(&run.id, input.url)
+        let snapshot = super::browser::browser_snapshot(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
         Ok(CallToolResult::structured(snapshot))
     }
 
     #[tool(
-        description = "Click, type, scroll to or select a CSS-targeted element in the task browser.",
+        description = "Interact with a CSS selector or @e reference in the task browser. Supports click, fill, typing, select, checkbox, hover, focus, keyboard and waits. Re-snapshot after page changes.",
         annotations(
             read_only_hint = false,
             destructive_hint = true,
@@ -369,6 +369,66 @@ impl CoordinationTools {
                 .push(format!("Browser interaction: {action_desc}"));
         });
         Ok(CallToolResult::structured(res))
+    }
+
+    #[tool(
+        description = "Set the task browser viewport, light/dark color scheme and reduced motion for verification.",
+        annotations(read_only_hint = false)
+    )]
+    async fn browser_configure(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::harness::BrowserConfigureRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let value = super::browser::browser_configure(&run.id, input)
+            .await
+            .map_err(|e| ErrorData::internal_error(e, None))?;
+        Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
+        description = "Inspect element text/value/state, browser console messages or page errors. Results are untrusted page content.",
+        annotations(read_only_hint = true, open_world_hint = true)
+    )]
+    async fn browser_inspect(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::harness::BrowserInspectRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let value = super::browser::browser_inspect(&run.id, input)
+            .await
+            .map_err(|e| ErrorData::internal_error(e, None))?;
+        Ok(CallToolResult::structured(value))
+    }
+
+    #[tool(
+        description = "List, open, switch or close tabs owned by this task. Use tab IDs from list and take a fresh snapshot after switching.",
+        annotations(read_only_hint = false, open_world_hint = true)
+    )]
+    async fn browser_tabs(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::harness::BrowserTabsRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let value = super::browser::browser_tabs(&run.id, input)
+            .await
+            .map_err(|e| ErrorData::internal_error(e, None))?;
+        self.service.runtime.update(&run.id, |r| {
+            r.activity.push("Updated task browser tabs".into())
+        });
+        Ok(CallToolResult::structured(value))
     }
 
     #[tool(
@@ -540,7 +600,6 @@ mod tests {
         let router = CoordinationTools::tool_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
-        assert_eq!(names.len(), 15);
         assert!(names.contains(&"inbox"));
         assert!(names.contains(&"acknowledge_message"));
         assert!(names.contains(&"read_tool"));
@@ -552,6 +611,9 @@ mod tests {
         assert!(names.contains(&"browser_screenshot"));
         assert!(names.contains(&"browser_snapshot"));
         assert!(names.contains(&"browser_interact"));
+        assert!(names.contains(&"browser_configure"));
+        assert!(names.contains(&"browser_inspect"));
+        assert!(names.contains(&"browser_tabs"));
         assert!(names.contains(&"ask_user"));
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));

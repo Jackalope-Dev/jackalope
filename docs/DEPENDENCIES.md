@@ -11,6 +11,8 @@ The application code uses [Apache-2.0](../LICENSE). Shared vector branding is in
 their full license texts are included in both apps' `public/licenses` directories.
 Website screenshots and walkthroughs use explicit fictional sample data.
 Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
+The desktop bundles agent-browser's native executable, Apache-2.0 license and
+embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
 ## JavaScript packages
 
@@ -124,6 +126,7 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | @xterm/xterm | 6.0.0 | MIT |
 | @xyflow/react | 12.11.6 | MIT |
 | @xyflow/system | 0.0.82 | MIT |
+| agent-browser | 0.37.1 | Apache-2.0 |
 | aria-hidden | 1.2.6 | MIT |
 | assertion-error | 2.0.1 | MIT |
 | bail | 2.0.2 | MIT |
@@ -322,7 +325,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | atk | 0.18.2 | MIT |
 | atk-sys | 0.18.2 | MIT |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
-| auto_generate_cdp | 0.4.6 | Unspecified |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT |
 | aws-lc-rs | 1.18.1 | ISC AND (Apache-2.0 OR ISC) |
 | aws-lc-sys | 0.45.0 | ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) |
@@ -364,7 +366,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | cmake | 0.1.58 | MIT OR Apache-2.0 |
 | combine | 4.6.8 | MIT |
 | compact_str | 0.10.0 | MIT |
-| convert_case | 0.8.0 | MIT |
 | cookie | 0.18.2 | MIT OR Apache-2.0 |
 | core-foundation | 0.9.4 | MIT OR Apache-2.0 |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 |
@@ -384,26 +385,19 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | cssparser-macros | 0.6.1 | MPL-2.0 |
 | ctor | 0.8.0 | Apache-2.0 OR MIT |
 | ctor-proc-macro | 0.0.7 | Apache-2.0 OR MIT |
-| darling | 0.20.11 | MIT |
 | darling | 0.23.0 | MIT |
 | darling | 0.24.1 | MIT |
-| darling_core | 0.20.11 | MIT |
 | darling_core | 0.23.0 | MIT |
 | darling_core | 0.24.1 | MIT |
-| darling_macro | 0.20.11 | MIT |
 | darling_macro | 0.23.0 | MIT |
 | darling_macro | 0.24.1 | MIT |
 | dashmap | 6.2.1 | MIT |
-| data-encoding | 2.11.1 | MIT |
 | dbus | 0.9.12 | Apache-2.0/MIT |
 | defmt | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-macros | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-parser | 1.0.0 | MIT OR Apache-2.0 |
 | deranged | 0.5.8 | MIT OR Apache-2.0 |
 | derive_arbitrary | 1.4.2 | MIT OR Apache-2.0 |
-| derive_builder | 0.20.2 | MIT OR Apache-2.0 |
-| derive_builder_core | 0.20.2 | MIT OR Apache-2.0 |
-| derive_builder_macro | 0.20.2 | MIT OR Apache-2.0 |
 | derive_more | 2.1.1 | MIT |
 | derive_more-impl | 2.1.1 | MIT |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
@@ -483,7 +477,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | hashbrown | 0.15.5 | MIT OR Apache-2.0 |
 | hashbrown | 0.16.1 | MIT OR Apache-2.0 |
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 |
-| headless_chrome | 1.0.22 | MIT |
 | heck | 0.4.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
 | hex | 0.4.3 | MIT OR Apache-2.0 |
@@ -624,7 +617,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | portable-pty | 0.8.1 | MIT |
 | potential_utf | 0.1.6 | Unicode-3.0 |
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 |
-| ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 |
 | precomputed-hash | 0.1.1 | MIT |
 | proc-macro-crate | 1.3.1 | MIT OR Apache-2.0 |
 | proc-macro-crate | 2.0.2 | MIT OR Apache-2.0 |
@@ -641,11 +633,8 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | rand | 0.8.8 | MIT OR Apache-2.0 |
-| rand | 0.9.5 | MIT OR Apache-2.0 |
 | rand | 0.10.2 | MIT OR Apache-2.0 |
-| rand_chacha | 0.9.0 | MIT OR Apache-2.0 |
 | rand_core | 0.6.4 | MIT OR Apache-2.0 |
-| rand_core | 0.9.5 | MIT OR Apache-2.0 |
 | rand_core | 0.10.1 | MIT OR Apache-2.0 |
 | rand_pcg | 0.10.2 | MIT OR Apache-2.0 |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
@@ -706,7 +695,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
 | servo_arc | 0.4.3 | MIT OR Apache-2.0 |
-| sha1 | 0.10.7 | MIT OR Apache-2.0 |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | shared_child | 1.1.2 | MIT |
 | shared_library | 0.1.9 | Apache-2.0/MIT |
@@ -723,7 +711,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | slab | 0.4.12 | MIT |
 | smallvec | 1.16.0 | MIT OR Apache-2.0 |
 | socket2 | 0.6.5 | MIT OR Apache-2.0 |
-| socks | 0.3.4 | MIT/Apache-2.0 |
 | softbuffer | 0.4.8 | MIT OR Apache-2.0 |
 | soup3 | 0.5.0 | MIT |
 | soup3-sys | 0.5.0 | MIT |
@@ -805,7 +792,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | tree-sitter-rust | 0.24.2 | MIT |
 | tree-sitter-typescript | 0.23.2 | MIT |
 | try-lock | 0.2.5 | MIT |
-| tungstenite | 0.29.0 | MIT OR Apache-2.0 |
 | typeid | 1.0.3 | MIT OR Apache-2.0 |
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
 | unic-char-property | 0.9.0 | MIT/Apache-2.0 |
@@ -816,12 +802,9 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
 | untrusted | 0.9.0 | ISC |
-| ureq | 3.4.1 | MIT OR Apache-2.0 |
-| ureq-proto | 0.6.2 | MIT OR Apache-2.0 |
 | url | 2.5.8 | MIT OR Apache-2.0 |
 | urlpattern | 0.3.0 | MIT |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
-| utf8-zero | 0.8.1 | MIT OR Apache-2.0 |
 | uuid | 1.26.0 | Apache-2.0 OR MIT |
 | value-trait | 0.12.2 | Apache-2.0/MIT |
 | version_check | 0.9.5 | MIT/Apache-2.0 |
@@ -844,11 +827,9 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | webkit2gtk | 2.0.2 | MIT |
 | webkit2gtk-sys | 2.0.2 | MIT |
 | webpki-root-certs | 1.0.9 | CDLA-Permissive-2.0 |
-| webpki-roots | 1.0.9 | CDLA-Permissive-2.0 |
 | webview2-com | 0.38.2 | MIT |
 | webview2-com-macros | 0.8.1 | MIT |
 | webview2-com-sys | 0.38.2 | MIT |
-| which | 8.0.6 | MIT |
 | winapi | 0.3.9 | MIT/Apache-2.0 |
 | winapi-i686-pc-windows-gnu | 0.4.0 | MIT/Apache-2.0 |
 | winapi-util | 0.1.11 | Unlicense OR MIT |
@@ -912,7 +893,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | winnow | 1.0.4 | MIT |
 | winreg | 0.10.1 | MIT |
 | winreg | 0.55.0 | MIT |
-| winreg | 0.56.0 | MIT |
 | wit-bindgen | 0.57.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | writeable | 0.6.4 | Unicode-3.0 |
 | wry | 0.55.1 | Apache-2.0 OR MIT |
@@ -921,8 +901,6 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | xattr | 1.6.1 | MIT OR Apache-2.0 |
 | yoke | 0.8.3 | Unicode-3.0 |
 | yoke-derive | 0.8.2 | Unicode-3.0 |
-| zerocopy | 0.8.56 | BSD-2-Clause OR Apache-2.0 OR MIT |
-| zerocopy-derive | 0.8.56 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | zerofrom | 0.1.8 | Unicode-3.0 |
 | zerofrom-derive | 0.1.7 | Unicode-3.0 |
 | zeroize | 1.9.0 | Apache-2.0 OR MIT |

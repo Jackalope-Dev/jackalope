@@ -51,6 +51,8 @@ The application code uses [Apache-2.0](../LICENSE). Shared vector branding is in
 their full license texts are included in both apps' \`public/licenses\` directories.
 Website screenshots and walkthroughs use explicit fictional sample data.
 Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
+The desktop bundles agent-browser's native executable, Apache-2.0 license and
+embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
 ## JavaScript packages
 

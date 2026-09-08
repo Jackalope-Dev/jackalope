@@ -10,6 +10,7 @@ pnpm-debug.log*
 target/
 src-tauri/target/
 **/gen/schemas/
+apps/desktop/src-tauri/resources/agent-browser/agent-browser*
 *.pdb
 
 # Build outputs

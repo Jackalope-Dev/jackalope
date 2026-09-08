@@ -29,6 +29,7 @@
     }
   },
   "bundle": {
+    "resources": ["resources/agent-browser/"],
     "active": true,
     "targets": "all",
     "windows": {
