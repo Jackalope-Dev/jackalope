@@ -49,19 +49,21 @@ function view(row: Campaign | null, now: number, claimed = false) {
     nextPromptAt: row?.next_prompt_at ?? 0,
     promptCount: row?.prompt_count ?? 0,
     eligible:
-      !row || (
-      row.prompts_enabled === 1 &&
-      row.completed_at === null &&
-      (row.enabled === 0 || (row.active_days === 2 && JSON.parse(row.results).length === 2)) &&
-      row.next_prompt_at <= now &&
-      row.prompt_count < 2),
+      !row ||
+      (row.prompts_enabled === 1 &&
+        row.completed_at === null &&
+        (row.enabled === 0 || (row.active_days === 2 && JSON.parse(row.results).length === 2)) &&
+        row.next_prompt_at <= now &&
+        row.prompt_count < 2),
     claimed,
   };
 }
 export async function memberFeedback(env: Env, member: string, input: unknown, now = Date.now()) {
   const action = feedbackAction.parse(input);
   if (action.action === 'stop' || action.action === 'completed') {
-    await env.DB.prepare('INSERT OR IGNORE INTO access_feedback(member_id,updated_at) VALUES(?,?)').bind(member, now).run();
+    await env.DB.prepare('INSERT OR IGNORE INTO access_feedback(member_id,updated_at) VALUES(?,?)')
+      .bind(member, now)
+      .run();
   }
   if (action.action === 'preferences') {
     await env.DB.prepare(`INSERT INTO access_feedback(member_id,enabled,prompts_enabled,consent_at,next_prompt_at,updated_at,prompt_count) VALUES(?,?,?,?,?,?,?)

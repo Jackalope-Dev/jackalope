@@ -200,7 +200,9 @@ pub async fn app_account_feedback(
         return Err("Connect your Jackalope account first.".into());
     }
     let mut claimed = false;
-    if matches!(action, Action::Activity { .. }) { record.feedback.activity(now, task.clone()); }
+    if matches!(action, Action::Activity { .. }) {
+        record.feedback.activity(now, task.clone());
+    }
     match &action {
         Action::Preferences {
             enabled,
@@ -209,25 +211,19 @@ pub async fn app_account_feedback(
             record.feedback.enabled = *enabled;
             record.feedback.prompts_enabled = *prompts_enabled;
             record.feedback.linked = true;
-            if record.feedback.linked {
-                record.feedback.pending = Some(action.clone());
-            }
+            record.feedback.pending = Some(action.clone());
         }
         Action::Stop => {
             record.feedback.linked = true;
             record.feedback.enabled = false;
             record.feedback.prompts_enabled = false;
-            if record.feedback.linked {
-                record.feedback.pending = Some(action.clone());
-            }
+            record.feedback.pending = Some(action.clone());
         }
         Action::Completed => {
             record.feedback.linked = true;
             record.feedback.completed = true;
             record.feedback.enabled = false;
-            if record.feedback.linked {
-                record.feedback.pending = Some(action.clone());
-            }
+            record.feedback.pending = Some(action.clone());
         }
         Action::Later { id } if record.feedback.prompt_id.as_ref() == Some(id) => {
             record.feedback.next_prompt_at = record.feedback.next_prompt_at.max(now + 14 * DAY);
@@ -258,13 +254,27 @@ pub async fn app_account_feedback(
     let mut remote_view = None;
     if !record.feedback.linked {
         let view = remote(&api, &record, serde_json::json!({"action":"status"})).await?;
-        if view.linked { record.feedback.linked = true; merge(&mut record.feedback, &view); }
+        if view.linked {
+            record.feedback.linked = true;
+            merge(&mut record.feedback, &view);
+        }
         remote_view = Some(view);
     }
+    if matches!(action, Action::Claim { .. }) && !record.feedback.eligible(now) {
+        state.save(&record)?;
+        return Ok(record.feedback.view(now, false));
+    }
     if matches!(action, Action::Claim { .. }) && !record.feedback.linked {
-        if !record.feedback.eligible(now) { return Ok(record.feedback.view(now, false)); }
-        let preferences = Action::Preferences { enabled: false, prompts_enabled: record.feedback.prompts_enabled };
-        let view = remote(&api, &record, remote_action(&preferences, &record.feedback, now)?).await?;
+        let preferences = Action::Preferences {
+            enabled: false,
+            prompts_enabled: record.feedback.prompts_enabled,
+        };
+        let view = remote(
+            &api,
+            &record,
+            remote_action(&preferences, &record.feedback, now)?,
+        )
+        .await?;
         record.feedback.linked = true;
         merge(&mut record.feedback, &view);
         state.save(&record)?;
@@ -293,13 +303,8 @@ pub async fn app_account_feedback(
         remote_view = Some(view);
     }
     match action {
-        Action::Activity { .. } => {},
+        Action::Activity { .. } => {}
         Action::Claim { id } => {
-            if !record.feedback.linked && record.feedback.eligible(now) {
-                record.feedback.prompt_count += 1;
-                record.feedback.next_prompt_at = now + 7 * DAY;
-                claimed = true;
-            }
             if claimed {
                 record.feedback.prompt_id = Some(id);
             }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isActive } from '../../lib/task-runtime';
-import { useExecutionStore } from '../../stores/executionStore';
 import { useCommunityStore } from '../../stores/communityStore';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 import { openSettings } from '../layout/navigation';
 import { FeedbackForm } from '../settings/FeedbackForm';
@@ -25,7 +25,10 @@ export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: b
       threshold: 0.5,
     });
     if (slot.current) observer.observe(slot.current);
-    return () => { mounted.current = false; observer.disconnect(); };
+    return () => {
+      mounted.current = false;
+      observer.disconnect();
+    };
   }, []);
   useEffect(() => {
     if (paused || working) return;
@@ -50,7 +53,8 @@ export function FeedbackTouchpoint({ runId, paused }: { runId: string; paused: b
   }, [runId, paused, working, request]);
   useEffect(() => {
     if (
-      !configured || !view?.eligible ||
+      !configured ||
+      !view?.eligible ||
       !visible ||
       paused ||
       working ||

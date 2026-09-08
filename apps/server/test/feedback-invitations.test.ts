@@ -6,6 +6,7 @@ import {
   feedbackMailAllowed,
   feedbackResponse,
   memberFeedback,
+  pruneFeedbackInvitations,
   queueFeedbackMail,
 } from '../src/access/feedback';
 import { deliverAccessMail } from '../src/access/mail';
@@ -292,4 +293,55 @@ it('uses the same provider idempotency key after an uncertain response, with mar
   expect(headers).toHaveLength(2);
   expect(headers[0]).toBe(headers[1]);
   expect(headers[0]).toMatch(/^feedback:/);
+});
+
+it('carries local invitation limits and the full snooze into enrollment without uploading local usage', async () => {
+  const owner = await member();
+  const state = await memberFeedback(
+    bindings,
+    owner.id,
+    {
+      action: 'preferences',
+      enabled: true,
+      promptsEnabled: true,
+      promptCount: 2,
+      nextPromptAt: start + 14 * day,
+    },
+    start,
+  );
+  expect(state.promptCount).toBe(2);
+  expect(state.nextPromptAt).toBe(start + 14 * day);
+  const row = await env.DB.prepare('SELECT active_days,results FROM access_feedback').first();
+  expect(row).toMatchObject({ active_days: 0, results: '[]' });
+  await qualify(owner.id);
+  await queueFeedbackMail(bindings, start + 3 * day);
+  expect(await env.DB.prepare('SELECT * FROM access_mail').first()).toBeNull();
+});
+
+it('retains cross-device suppression without email enrollment and expires old activity and response tokens', async () => {
+  const owner = await member();
+  await memberFeedback(bindings, owner.id, { action: 'stop' }, start);
+  expect(await memberFeedback(bindings, owner.id, { action: 'status' }, start + day)).toMatchObject(
+    { linked: true, enabled: false, promptsEnabled: false, eligible: false },
+  );
+  const another = await member();
+  await qualify(another.id);
+  await queueFeedbackMail(bindings, start + 3 * day);
+  const queued = await mail();
+  await pruneFeedbackInvitations(bindings, start + 95 * day);
+  await expect(
+    feedbackResponse(bindings, { action: 'status', token: queued.token }, start + 95 * day),
+  ).rejects.toMatchObject({ code: 'feedback_link_expired' });
+  const row = await env.DB.prepare(
+    'SELECT enabled,active_days,results,email_id,token_hash FROM access_feedback WHERE member_id=?',
+  )
+    .bind(another.id)
+    .first();
+  expect(row).toMatchObject({
+    enabled: 0,
+    active_days: 0,
+    results: '[]',
+    email_id: queued.id,
+    token_hash: null,
+  });
 });

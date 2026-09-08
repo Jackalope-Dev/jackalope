@@ -4,13 +4,19 @@ import { chromium } from 'playwright-core';
 
 const html = 'apps/desktop/.feedback-fixture.html';
 const entry = 'apps/desktop/.feedback-fixture.tsx';
-if (existsSync(html) || existsSync(entry)) throw Error('A feedback fixture already exists. Inspect it before retrying.');
+if (existsSync(html) || existsSync(entry))
+  throw Error('A feedback fixture already exists. Inspect it before retrying.');
 mkdirSync('output/feedback-invitations', { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const errors = [];
 try {
-  writeFileSync(html, '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/.feedback-fixture.tsx"></script></body></html>');
-  writeFileSync(entry, `import React from 'react';
+  writeFileSync(
+    html,
+    '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/.feedback-fixture.tsx"></script></body></html>',
+  );
+  writeFileSync(
+    entry,
+    `import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {FeedbackTouchpoint} from './src/components/tasks/FeedbackTouchpoint';
 import {FeedbackPreferences} from './src/components/settings/FeedbackPreferences';
@@ -42,85 +48,137 @@ window.fixtureTheme=useThemeStore;
 window.fixtureFeedback=useFeedbackStore;
 window.fixtureExecution=useExecutionStore;
 document.body.style.cssText='background:var(--color-bg);color:var(--color-text-primary);padding:32px';
-createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,margin:'auto'}}><h1 style={{fontSize:28}}>Task result · browser fixture</h1><p style={{margin:'24px 0'}}>A finished result with recorded checks. This fixture does not execute a task.</p><FeedbackTouchpoint runId="fixture-result" paused={false}/><div style={{marginTop:40}}><FeedbackPreferences/></div></div>);`);
-  for (const viewport of [{width:1280,height:840},{width:960,height:640}]) {
-    const context = await browser.newContext({viewport, reducedMotion:'reduce'});
+createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,margin:'auto'}}><h1 style={{fontSize:28}}>Task result · browser fixture</h1><p style={{margin:'24px 0'}}>A finished result with recorded checks. This fixture does not execute a task.</p><FeedbackTouchpoint runId="fixture-result" paused={false}/><div style={{marginTop:40}}><FeedbackPreferences/></div></div>);`,
+  );
+  for (const viewport of [
+    { width: 1280, height: 840 },
+    { width: 960, height: 640 },
+  ]) {
+    const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
     const page = await context.newPage();
-    page.on('pageerror', error => errors.push(error.message));
+    page.on('pageerror', (error) => errors.push(error.message));
     await page.clock.install();
     await page.goto('http://127.0.0.1:5297/.feedback-fixture.html');
-    await page.getByRole('heading', {name:'Help shape Jackalope'}).waitFor();
+    await page.getByRole('heading', { name: 'Help shape Jackalope' }).waitFor();
     await page.clock.fastForward(16000);
-    await page.getByRole('button', {name:'Share thoughts', exact:true}).waitFor();
-    assert.equal(await page.getByRole('dialog').count(),0);
-    for(const dark of [false,true]) {
-      await page.evaluate(dark => {const s=window.fixtureTheme;s.getState().setTheme({...s.getState().currentTheme,isDark:dark,appearance:'manual'});},dark);
-      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-      await page.screenshot({path:`output/feedback-invitations/desktop-${viewport.width}-${dark?'dark':'light'}.png`,fullPage:true});
+    await page.getByRole('button', { name: 'Share thoughts', exact: true }).waitFor();
+    assert.equal(await page.getByRole('dialog').count(), 0);
+    for (const dark of [false, true]) {
+      await page.evaluate((dark) => {
+        const s = window.fixtureTheme;
+        s.getState().setTheme({ ...s.getState().currentTheme, isDark: dark, appearance: 'manual' });
+      }, dark);
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.screenshot({
+        path: `output/feedback-invitations/desktop-${viewport.width}-${dark ? 'dark' : 'light'}.png`,
+        fullPage: true,
+      });
     }
-    const share=page.getByRole('button',{name:'Share thoughts',exact:true});
+    const share = page.getByRole('button', { name: 'Share thoughts', exact: true });
     await share.focus();
-    assert.notEqual(await share.evaluate(el=>getComputedStyle(el).outlineStyle),'none');
+    assert.notEqual(await share.evaluate((el) => getComputedStyle(el).outlineStyle), 'none');
     await page.keyboard.press('Enter');
-    await page.getByRole('textbox',{name:'What would you like us to know?'}).fill('Review is useful. I would like clearer recovery steps.');
-    const kind=page.getByRole('combobox');
+    await page
+      .getByRole('textbox', { name: 'What would you like us to know?' })
+      .fill('Review is useful. I would like clearer recovery steps.');
+    const kind = page.getByRole('combobox');
     await kind.focus();
     await page.keyboard.press('Enter');
     await page.keyboard.press('Escape');
     await page.clock.runFor(100);
-    assert(await kind.evaluate(el=>el===document.activeElement));
-    await page.getByRole('button',{name:'Review submission'}).click();
-    await page.getByRole('button',{name:'Send to Jackalope',exact:true}).click();
+    assert(await kind.evaluate((el) => el === document.activeElement));
+    await page.getByRole('button', { name: 'Review submission' }).click();
+    await page.getByRole('button', { name: 'Send to Jackalope', exact: true }).click();
     await page.getByText('Thanks. Your feedback is in our private inbox.').waitFor();
-    const calls=await page.evaluate(()=>window.calls);
-    assert.equal(calls.filter(call=>call.command==='app_submit_feedback').length,1);
-    assert(calls.some(call=>call.args?.action?.action==='completed'));
+    const calls = await page.evaluate(() => window.calls);
+    assert.equal(calls.filter((call) => call.command === 'app_submit_feedback').length, 1);
+    assert(calls.some((call) => call.args?.action?.action === 'completed'));
     await context.close();
   }
-  for(const viewport of [{width:1280,height:840},{width:960,height:640},{width:390,height:844}]) {
-    const context=await browser.newContext({viewport,reducedMotion:'reduce'});
-    const page=await context.newPage();
-    page.on('pageerror',error=>errors.push(error.message));
-    let completed=false,unsubscribed=false,attempts=0;
-    const requests=[];
-    await page.route('https://feedback-fixture.invalid/v1/access/feedback',async route=>{
-      if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:{'access-control-allow-origin':'http://127.0.0.1:5296','access-control-allow-credentials':'true','access-control-allow-headers':'content-type','access-control-allow-methods':'POST,OPTIONS'}});
-      const body=route.request().postDataJSON();requests.push(body);
-      const headers={'access-control-allow-origin':'http://127.0.0.1:5296','access-control-allow-credentials':'true'};
-      if(body.action==='submit'){attempts++;if(attempts===1)return route.fulfill({status:503,headers,json:{error:'fixture_outage'}});completed=true;}
-      if(body.action==='unsubscribe')unsubscribed=true;
-      return route.fulfill({headers,json:{completed,unsubscribed}});
+  for (const viewport of [
+    { width: 1280, height: 840 },
+    { width: 960, height: 640 },
+    { width: 390, height: 844 },
+  ]) {
+    const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
+    const page = await context.newPage();
+    page.on('pageerror', (error) => errors.push(error.message));
+    let completed = false,
+      unsubscribed = false,
+      attempts = 0;
+    const requests = [];
+    await page.route('https://feedback-fixture.invalid/v1/access/feedback', async (route) => {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({
+          status: 204,
+          headers: {
+            'access-control-allow-origin': 'http://127.0.0.1:5296',
+            'access-control-allow-credentials': 'true',
+            'access-control-allow-headers': 'content-type',
+            'access-control-allow-methods': 'POST,OPTIONS',
+          },
+        });
+      const body = route.request().postDataJSON();
+      requests.push(body);
+      const headers = {
+        'access-control-allow-origin': 'http://127.0.0.1:5296',
+        'access-control-allow-credentials': 'true',
+      };
+      if (body.action === 'submit') {
+        attempts++;
+        if (attempts === 1)
+          return route.fulfill({ status: 503, headers, json: { error: 'fixture_outage' } });
+        completed = true;
+      }
+      if (body.action === 'unsubscribe') unsubscribed = true;
+      return route.fulfill({ headers, json: { completed, unsubscribed } });
     });
     await page.goto(`http://127.0.0.1:5296/feedback/#token=${'a'.repeat(64)}`);
-    await page.getByRole('textbox',{name:'What would you like us to know?'}).waitFor();
+    await page.getByRole('textbox', { name: 'What would you like us to know?' }).waitFor();
     assert(!page.url().includes('#'));
-    assert.equal(requests.filter(r=>r.action==='submit'||r.action==='unsubscribe').length,0);
-    for(const dark of [false,true]){
-      const button=page.getByRole('button',{name:`Switch to ${dark?'dark':'light'} appearance`});
-      if(await button.count())await button.click();
-      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-      await page.screenshot({path:`output/feedback-invitations/web-${viewport.width}-${dark?'dark':'light'}.png`,fullPage:true});
+    assert.equal(
+      requests.filter((r) => r.action === 'submit' || r.action === 'unsubscribe').length,
+      0,
+    );
+    for (const dark of [false, true]) {
+      const button = page.getByRole('button', {
+        name: `Switch to ${dark ? 'dark' : 'light'} appearance`,
+      });
+      if (await button.count()) await button.click();
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.screenshot({
+        path: `output/feedback-invitations/web-${viewport.width}-${dark ? 'dark' : 'light'}.png`,
+        fullPage: true,
+      });
     }
-    await page.getByRole('textbox',{name:'What would you like us to know?'}).fill('Please make task recovery clearer. <script>Never execute feedback</script>');
-    await page.getByRole('button',{name:'Review feedback',exact:true}).click();
-    await page.getByRole('button',{name:'Send to Jackalope',exact:true}).click();
+    await page
+      .getByRole('textbox', { name: 'What would you like us to know?' })
+      .fill('Please make task recovery clearer. <script>Never execute feedback</script>');
+    await page.getByRole('button', { name: 'Review feedback', exact: true }).click();
+    await page.getByRole('button', { name: 'Send to Jackalope', exact: true }).click();
     await page.getByRole('alert').waitFor();
-    await page.getByRole('button',{name:'Send to Jackalope',exact:true}).click();
-    await page.getByRole('heading',{name:'Thanks for helping shape Jackalope.'}).waitFor();
-    const sent=requests.filter(r=>r.action==='submit');assert.equal(sent.length,2);assert.equal(sent[0].id,sent[1].id);
+    await page.getByRole('button', { name: 'Send to Jackalope', exact: true }).click();
+    await page.getByRole('heading', { name: 'Thanks for helping shape Jackalope.' }).waitFor();
+    const sent = requests.filter((r) => r.action === 'submit');
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0].id, sent[1].id);
     await page.goto(`http://127.0.0.1:5296/feedback/#unsubscribe=${'a'.repeat(64)}`);
-    const stop=page.getByRole('button',{name:'Stop feedback emails',exact:true});
-    await stop.waitFor();await stop.focus();await page.keyboard.press('Enter');
-    await page.getByRole('status').filter({hasText:'Feedback emails are off.'}).waitFor();
+    const stop = page.getByRole('button', { name: 'Stop feedback emails', exact: true });
+    await stop.waitFor();
+    await stop.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('status').filter({ hasText: 'Feedback emails are off.' }).waitFor();
     await context.close();
   }
-  assert.deepEqual(errors,[]);
-  const admin=readFileSync('apps/server/src/access/admin-page.ts','utf8');
-  const script=admin.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
-  if(script)new Function(script);
-  console.log('Feedback fixtures passed: desktop 1280/960, website 1280/960/390, light/dark, reduced motion, keyboard/focus, safe preview, retry idempotency, explicit unsubscribe, and overflow. No native execution or email delivery claimed.');
+  assert.deepEqual(errors, []);
+  const admin = readFileSync('apps/server/src/access/admin-page.ts', 'utf8');
+  const script = admin.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
+  if (script) new Function(script);
+  console.log(
+    'Feedback fixtures passed: desktop 1280/960, website 1280/960/390, light/dark, reduced motion, keyboard/focus, safe preview, retry idempotency, explicit unsubscribe, and overflow. No native execution or email delivery claimed.',
+  );
 } finally {
   await browser.close();
-  if(existsSync(html))unlinkSync(html);
-  if(existsSync(entry))unlinkSync(entry);
+  if (existsSync(html)) unlinkSync(html);
+  if (existsSync(entry)) unlinkSync(entry);
 }

@@ -47,8 +47,9 @@ export function FeedbackPreferences() {
         task contents or project details are shared. Anonymous usage sharing stays separate.
       </p>
       <p className="settings-row-description">
-        At most two in-app invitations and one email, at least seven days apart. Later pauses
-        requests for 14 days. Sending feedback ends this round of invitations.
+        Invitation preferences and responses sync with your account to avoid repeat requests across
+        desktops. At most two in-app invitations and one email, at least seven days apart. Later
+        pauses requests for 14 days. Sending feedback ends this round of invitations.
       </p>
       {view?.completed && (
         <p role="status" className="settings-row-description">

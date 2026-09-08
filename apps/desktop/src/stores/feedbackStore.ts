@@ -32,6 +32,23 @@ export const useFeedbackStore = create<State>((set) => ({
     if (!isTauriEnvironment()) return Promise.resolve(null);
     pending++;
     set({ busy: true });
+    if (
+      action.action === 'preferences' ||
+      action.action === 'stop' ||
+      action.action === 'completed'
+    ) {
+      set((state) => ({
+        view: state.view
+          ? {
+              ...state.view,
+              eligible: false,
+              enabled: action.action === 'preferences' && action.enabled,
+              promptsEnabled: action.action === 'preferences' && action.promptsEnabled,
+              completed: state.view.completed || action.action === 'completed',
+            }
+          : null,
+      }));
+    }
     const result = queue.then(async () => {
       try {
         const view = await nativeTask<FeedbackView>('app_account_feedback', { action });

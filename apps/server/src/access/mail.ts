@@ -69,6 +69,13 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
           return;
         }
         stage = 'render';
+        if (mail.kind === 'feedback_request') {
+          await env.DB.prepare(
+            'UPDATE access_feedback SET next_prompt_at=max(next_prompt_at,?) WHERE email_id=?',
+          )
+            .bind(now + 7 * 86400000, id)
+            .run();
+        }
         const content = accessEmail(mail, env.ACCESS_WEB_ORIGIN);
         stage = 'request';
         const response = await request('https://api.sequenzy.com/api/v1/transactional/send', {
