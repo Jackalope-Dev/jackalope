@@ -378,21 +378,18 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 );
               })
           )}
-          <details className="supporting-details">
-            <summary>Workspace and dispatch rules</summary>
-            <p>
-              Tasks start from committed {project.preferences?.baseBranch || project.gitBranch}.
-              Commit any local changes the agents need. Restarting Jackalope pauses dispatch.
-              Pausing leaves current work running.
-            </p>
-          </details>
-          <details className="queue-coordination">
-            <summary className="task-summary">
+          <p className="task-muted text-sm my-4">
+            Tasks start from committed {project.preferences?.baseBranch || project.gitBranch}.
+            Commit any local changes the agents need. Restarting Jackalope pauses dispatch. Pausing
+            leaves current work running.
+          </p>
+          <section className="queue-coordination">
+            <h2 className="text-base font-medium">
               Coordination & handoffs
               {queue.messages.filter((m) => m.projectId === project.id).length
                 ? ` · ${queue.messages.filter((m) => m.projectId === project.id).length} messages`
                 : ''}
-            </summary>
+            </h2>
             <p className="task-muted mt-4">
               {queue.bridgeUrl
                 ? 'Local bridge is available. Each running task receives temporary access to this project’s assignments and messages.'
@@ -412,7 +409,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                   <p>{m.text}</p>
                 </div>
               ))}
-          </details>
+          </section>
         </>
       )}
       {importing && (

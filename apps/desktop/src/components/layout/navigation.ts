@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Bot,
   CalendarClock,
   ChartNoAxesColumn,
@@ -23,7 +24,7 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'topology',
-    label: 'Projects',
+    label: 'Project',
     description: 'Explore codebase dependencies and project worktrees.',
     icon: Network,
     group: 'project',
@@ -35,12 +36,20 @@ export const WORKSPACE_VIEWS = [
     description: 'Manage runners, accounts and configuration.',
     icon: Bot,
     group: 'agents',
-    primary: false,
+    primary: true,
   },
   {
     id: 'mcps',
-    label: 'Connections',
+    label: 'MCP',
     description: 'Install and configure MCP tools.',
+    icon: Plug,
+    group: 'connections',
+    primary: true,
+  },
+  {
+    id: 'mcp-marketplace',
+    label: 'Marketplace',
+    description: 'MCP: discover and install tools and services.',
     icon: Plug,
     group: 'connections',
     primary: false,
@@ -56,9 +65,9 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'repo-todos',
     label: 'Repo TODOs',
-    description: 'Tasks: view, edit and create repository TODOs and roadmaps.',
+    description: 'Project: view, edit and create repository TODOs and roadmaps.',
     icon: ListTodo,
-    group: 'tasks',
+    group: 'project',
     primary: false,
   },
   {
@@ -86,8 +95,16 @@ export const WORKSPACE_VIEWS = [
     primary: false,
   },
   {
+    id: 'project-knowledge',
+    label: 'Context',
+    description: 'Project: repository context, saved lessons and workflows.',
+    icon: BookOpen,
+    group: 'project',
+    primary: false,
+  },
+  {
     id: 'project-settings',
-    label: 'Project context',
+    label: 'Project settings',
     description: 'Repository preferences, instructions and verification.',
     icon: Settings2,
     group: 'project',

@@ -21,7 +21,7 @@ import { type CodebaseReference, type CodebaseSnapshot, scanCodebase } from '../
 import { dependencyCycles, directoryOf, GRAPH_LIMIT, mapGraph } from '../../lib/codebase-graph';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Project } from '../../stores/projectStore';
-import { CodebaseMemoryBar } from '../tasks/CodebaseMemoryBar';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
@@ -554,7 +554,9 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
           </details>
         </>
       )}
-      <CodebaseMemoryBar project={project} />
+      <Button variant="ghost" onClick={() => navigateWorkspace('project-knowledge')}>
+        Open project context
+      </Button>
     </div>
   );
 }

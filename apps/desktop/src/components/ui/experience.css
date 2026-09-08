@@ -678,6 +678,7 @@ button:disabled {
   background: var(--color-accent-subtle);
 }
 .workspace-page {
+  width: 100%;
   padding: 32px;
   max-width: 1200px;
   margin-inline: auto;

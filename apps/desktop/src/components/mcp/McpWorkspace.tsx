@@ -39,7 +39,13 @@ const CATEGORIES = [
   { id: 'communication', label: '💬 Team Chat' },
 ];
 
-export function McpWorkspace() {
+export function McpWorkspace({
+  view,
+  onViewChange,
+}: {
+  view?: 'configured' | 'marketplace';
+  onViewChange?: (view: 'configured' | 'marketplace') => void;
+} = {}) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const project = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
   const {
@@ -64,7 +70,12 @@ export function McpWorkspace() {
 
   const { useMcpMarketplace, setUseMcpMarketplace } = useSettingsStore();
 
-  const [activeTab, setActiveTab] = useState<'configured' | 'marketplace'>('configured');
+  const [localTab, setLocalTab] = useState<'configured' | 'marketplace'>('configured');
+  const activeTab = view ?? localTab;
+  const setActiveTab = (next: 'configured' | 'marketplace') => {
+    setLocalTab(next);
+    onViewChange?.(next);
+  };
   const [scopeFilter, setScopeFilter] = useState('all');
   const [configuredSearch, setConfiguredSearch] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -136,8 +147,12 @@ export function McpWorkspace() {
   return (
     <div className="mcp-workspace">
       <WorkspaceHeading
-        title="Connections"
-        description="Give your agents access to tools and services through MCP. Check each connection before using it."
+        title={activeTab === 'configured' ? 'MCP connections' : 'MCP marketplace'}
+        description={
+          activeTab === 'configured'
+            ? 'Connect tools and services for your agents.'
+            : 'Find tools to add to your workspace.'
+        }
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -172,29 +187,31 @@ export function McpWorkspace() {
       )}
 
       {/* Main Tabs */}
-      <div className="mcp-tabs">
-        <button
-          type="button"
-          onClick={() => setActiveTab('configured')}
-          aria-pressed={activeTab === 'configured'}
-          className={`mcp-tab-btn ${activeTab === 'configured' ? 'active' : ''}`}
-        >
-          <Server size={17} />
-          <span>Your connections</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
-            {servers.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('marketplace')}
-          aria-pressed={activeTab === 'marketplace'}
-          className={`mcp-tab-btn ${activeTab === 'marketplace' ? 'active' : ''}`}
-        >
-          <Globe size={17} />
-          <span>Discover tools</span>
-        </button>
-      </div>
+      {!view && (
+        <nav className="mcp-tabs" aria-label="MCP views">
+          <button
+            type="button"
+            onClick={() => setActiveTab('configured')}
+            aria-pressed={activeTab === 'configured'}
+            className={`mcp-tab-btn ${activeTab === 'configured' ? 'active' : ''}`}
+          >
+            <Server size={17} />
+            <span>Connections</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
+              {servers.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('marketplace')}
+            aria-pressed={activeTab === 'marketplace'}
+            className={`mcp-tab-btn ${activeTab === 'marketplace' ? 'active' : ''}`}
+          >
+            <Globe size={17} />
+            <span>Marketplace</span>
+          </button>
+        </nav>
+      )}
 
       {/* Tab 1: Configured MCPs */}
       {activeTab === 'configured' && (
@@ -289,7 +306,7 @@ export function McpWorkspace() {
                       <Plus size={15} /> Add Custom
                     </Button>
                     <Button onClick={() => setActiveTab('marketplace')}>
-                      <Globe size={15} /> Browse Marketplace
+                      <Globe size={15} /> Browse marketplace
                     </Button>
                   </div>
                 ) : undefined
@@ -391,10 +408,8 @@ export function McpWorkspace() {
                           )}
 
                           {probe.ok && probe.tools.length > 0 && (
-                            <details>
-                              <summary className="min-h-11 py-3">
-                                Inspect {probe.tools.length} tools
-                              </summary>
+                            <section aria-label={`${server.name} tools`}>
+                              <h3 className="text-sm font-medium mt-3">Available tools</h3>
                               <div className="mcp-tools-list">
                                 {probe.tools
                                   .filter(
@@ -416,7 +431,7 @@ export function McpWorkspace() {
                                     </div>
                                   ))}
                               </div>
-                            </details>
+                            </section>
                           )}
                         </div>
                       )}
@@ -458,6 +473,7 @@ export function McpWorkspace() {
                             setCustomModalOpen(true);
                           }}
                           title="Edit server"
+                          aria-label={`Edit ${server.name}`}
                         >
                           <Pencil size={13} />
                         </Button>

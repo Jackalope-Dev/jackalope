@@ -224,22 +224,6 @@ export function McpAddCustomModal({
               </div>
             </div>
 
-            <details>
-              <summary className="task-summary">Advanced connection fields</summary>
-              <label className="task-label">
-                Headers and client options (JSON object)
-                <textarea
-                  className="task-input"
-                  rows={4}
-                  value={extraJson}
-                  onChange={(e) => setExtraJson(e.target.value)}
-                />
-              </label>
-              <p className="task-muted">
-                Preserves existing authentication and tool options. Use headers for HTTP
-                authentication; credentials remain in the agent configuration file.
-              </p>
-            </details>
             {/* Transport type */}
             <div>
               <p className="block font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
@@ -423,6 +407,22 @@ export function McpAddCustomModal({
                 ))}
               </div>
             </div>
+
+            <section aria-label="Additional connection options">
+              <label className="task-label">
+                Headers and client options (JSON object)
+                <textarea
+                  className="task-input"
+                  rows={4}
+                  value={extraJson}
+                  onChange={(e) => setExtraJson(e.target.value)}
+                />
+              </label>
+              <p className="task-muted">
+                Preserves existing authentication and tool options. Use headers for HTTP
+                authentication; credentials remain in the agent configuration file.
+              </p>
+            </section>
 
             {error && (
               <p role="alert" className="task-error text-xs">

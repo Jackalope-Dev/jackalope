@@ -215,12 +215,6 @@
     gap: 24px;
   }
 }
-.workspace-navigation .workspace-nav-support {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 .task-dialog.task-tools-dialog {
   width: min(960px, calc(100vw - 48px));
 }

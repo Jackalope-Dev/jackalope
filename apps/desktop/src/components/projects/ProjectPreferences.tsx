@@ -1,42 +1,25 @@
 import { builtinAgents } from '../../lib/agent-catalog';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
-import { KnowledgeLibrary } from '../knowledge/KnowledgeLibrary';
 import { ProjectAgentAccount } from '../settings/ProjectAgentAccount';
 import { Setting } from '../settings/Setting';
-import { CodebaseMemoryBar } from '../tasks/CodebaseMemoryBar';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import '../settings/settings.css';
 export function ProjectPreferences() {
   const agents = useAgentConfigStore();
-  const { projects, activeProjectId, selectProject, updateProject, updateProjectPreferences } =
-    useProjectStore();
+  const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
   const project = projects.find((p) => p.id === activeProjectId);
   return (
     <section className="workspace-page">
-      <h1 className="text-2xl">Project context</h1>
-      {project && <CodebaseMemoryBar project={project} initiallyExpanded />}{' '}
-      {project && <KnowledgeLibrary key={project.id} project={project} />}
+      <h1 className="text-2xl">Project settings</h1>
+      {project && <p className="task-muted mt-2">{project.name}</p>}
       {!project ? (
         <p className="settings-section-subtitle mt-4">
           Open a repository to configure project preferences.
         </p>
       ) : (
         <>
-          <div className="my-6">
-            <Select
-              aria-label="Project to configure"
-              value={project.id}
-              onValueChange={selectProject}
-            >
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
           <div className="settings-group">
             <Setting title="Project name" description="Label shown in the project switcher.">
               <input
@@ -76,7 +59,7 @@ export function ProjectPreferences() {
           <div className="settings-group">
             <Setting
               title="Agents available here"
-              description="Restrict which agents can be picked for this project's tasks — handy for keeping work projects on one agent and personal ones on another. Leave every agent on to allow all app-enabled agents."
+              description="Choose which enabled agents this project can use."
             />
             {[...builtinAgents, ...agents.customAgents].map((a) => {
               const allIds = [

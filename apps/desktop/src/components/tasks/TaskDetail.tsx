@@ -86,6 +86,26 @@ export function TaskDetail({
       run.projectPath.replaceAll('\\', '/').toLowerCase();
   const finished = !active && ['review', 'reviewed'].includes(run.status);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
+
+  useEffect(() => {
+    if (tab !== 'context' || !isLatest || connections !== null) return;
+    let alive = true;
+    void listMcpServers(run.projectId)
+      .then((servers) => {
+        if (alive)
+          setConnections(
+            servers.filter(
+              (server) => server.enabled !== false && server.scope === `project:${run.projectId}`,
+            ),
+          );
+      })
+      .catch((cause) => {
+        if (alive) setError(String(cause));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [tab, isLatest, connections, run.projectId]);
   const act = async (command: string) => {
     if (acting) return;
     setActing(true);
@@ -315,7 +335,7 @@ export function TaskDetail({
       )}
       <Tabs.Root value={tab} onValueChange={setTab}>
         <Tabs.List className="result-tabs" aria-label="Task sections">
-          {['result', 'changes', 'evidence', 'activity'].map((value) => (
+          {['result', 'changes', 'evidence', 'activity', 'context'].map((value) => (
             <Tabs.Trigger key={value} value={value}>
               {value === 'result'
                 ? 'Result'
@@ -323,7 +343,9 @@ export function TaskDetail({
                   ? 'Changes & checks'
                   : value === 'evidence'
                     ? 'Evidence'
-                    : 'Activity'}
+                    : value === 'activity'
+                      ? 'Activity'
+                      : 'Context'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -423,6 +445,118 @@ export function TaskDetail({
           <Tabs.Content value="activity">
             <TaskActivity entries={run.activity} active={active} />
           </Tabs.Content>
+          <Tabs.Content value="context">
+            {' '}
+            <section className="task-environment" aria-label="Context, history and usage">
+              <TaskLearning key={`knowledge:${run.id}`} run={run} />
+              <p className="task-muted">
+                {run.agent} · {run.model || 'Agent-configured model'} · {run.account} · This
+                computer
+              </p>
+              <p className="task-path">
+                {run.workspace || (active ? 'Workspace being prepared' : 'No workspace recorded')} ·{' '}
+                {run.branch || 'No branch recorded'} · Target: {run.targetBranch || 'Not recorded'}
+              </p>
+              {attempts.length > 1 && (
+                <label className="task-attempt-picker" htmlFor="attempt-history">
+                  Attempt
+                  <Select
+                    id="attempt-history"
+                    aria-label="Attempt history"
+                    value={run.id}
+                    onValueChange={(id) => useExecutionStore.getState().select(id)}
+                  >
+                    {attempts.map((attempt, index) => (
+                      <SelectItem key={attempt.id} value={attempt.id}>
+                        {index + 1} · {statusLabel[attempt.status]}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </label>
+              )}
+              <section className="my-4">
+                <h3 className="text-base font-medium">Instruction for this attempt</h3>
+                <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
+              </section>
+              {run.prompts
+                ?.filter((p) => p.status === 'answered')
+                .map((p) => (
+                  <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
+                ))}
+              <p className="task-muted mt-3">
+                Reported usage:{' '}
+                {run.usage.reported
+                  ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output · ${run.usage.cacheRead.toLocaleString()} cached input (included)`
+                  : 'Unavailable for this attempt'}
+              </p>
+              {run.mcpUsage && (
+                <details className="my-3">
+                  <summary>
+                    Tool discovery · {run.mcpUsage.calls}{' '}
+                    {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
+                  </summary>
+                  <p className="task-muted mt-2">
+                    Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools} ·
+                    Failed calls: {run.mcpUsage.failures}
+                  </p>
+                  <p className="task-muted">
+                    {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB of tool definitions
+                    returned across searches. Full catalog:{' '}
+                    {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB. These are schema bytes, not
+                    billed tokens or measured savings.
+                  </p>
+                </details>
+              )}
+              {!!run.diagnostics.length && (
+                <details>
+                  <summary>Agent diagnostics</summary>
+                  <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
+                </details>
+              )}
+            </section>
+            {isLatest && (
+              <section className="mt-6" aria-label="Connections for the next step">
+                <h3 className="text-base font-medium mb-3">Connections for the next step</h3>
+                <p className="task-muted">
+                  These choices apply when you continue. The active attempt keeps its existing tools
+                  and account.
+                </p>
+                {connections?.map((server) => (
+                  <label key={server.id} className="flex items-center gap-3 min-h-11">
+                    <input
+                      type="checkbox"
+                      checked={(
+                        drafts[key]?.connectionIds ??
+                        run.connectionIds ??
+                        connections.map((s) => s.id)
+                      ).includes(server.id)}
+                      onChange={(event) => {
+                        const ids =
+                          drafts[key]?.connectionIds ??
+                          run.connectionIds ??
+                          connections.map((s) => s.id);
+                        draft(key, {
+                          connectionIds: event.target.checked
+                            ? [...ids, server.id]
+                            : ids.filter((id) => id !== server.id),
+                        });
+                      }}
+                    />
+                    {server.name}
+                  </label>
+                ))}
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    useProjectStore.getState().selectProject(run.projectId);
+                    setToolsOpen(true);
+                  }}
+                >
+                  Manage task connections
+                </Button>
+              </section>
+            )}
+          </Tabs.Content>
         </div>
       </Tabs.Root>
       {isLatest && (
@@ -499,125 +633,6 @@ export function TaskDetail({
             </p>
           )}
         </div>
-      )}
-      <details className="supporting-details task-environment">
-        <summary>Context, history & usage</summary>
-        <TaskLearning key={`knowledge:${run.id}`} run={run} />
-        <p className="task-muted">
-          {run.agent} · {run.model || 'Agent-configured model'} · {run.account} · This computer
-        </p>
-        <p className="task-path">
-          {run.workspace || (active ? 'Workspace being prepared' : 'No workspace recorded')} ·{' '}
-          {run.branch || 'No branch recorded'} · Target: {run.targetBranch || 'Not recorded'}
-        </p>
-        {attempts.length > 1 && (
-          <label className="task-attempt-picker" htmlFor="attempt-history">
-            Attempt
-            <Select
-              id="attempt-history"
-              aria-label="Attempt history"
-              value={run.id}
-              onValueChange={(id) => useExecutionStore.getState().select(id)}
-            >
-              {attempts.map((attempt, index) => (
-                <SelectItem key={attempt.id} value={attempt.id}>
-                  {index + 1} · {statusLabel[attempt.status]}
-                </SelectItem>
-              ))}
-            </Select>
-          </label>
-        )}
-        <details>
-          <summary>Instruction for this attempt</summary>
-          <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
-        </details>
-        {run.prompts
-          ?.filter((p) => p.status === 'answered')
-          .map((p) => (
-            <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
-          ))}
-        <p className="task-muted mt-3">
-          Reported usage:{' '}
-          {run.usage.reported
-            ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output · ${run.usage.cacheRead.toLocaleString()} cached input (included)`
-            : 'Unavailable for this attempt'}
-        </p>
-        {run.mcpUsage && (
-          <details className="my-3">
-            <summary>
-              Tool discovery · {run.mcpUsage.calls} {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
-            </summary>
-            <p className="task-muted mt-2">
-              Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools} ·
-              Failed calls: {run.mcpUsage.failures}
-            </p>
-            <p className="task-muted">
-              {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB of tool definitions returned
-              across searches. Full catalog: {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB.
-              These are schema bytes, not billed tokens or measured savings.
-            </p>
-          </details>
-        )}
-        {!!run.diagnostics.length && (
-          <details>
-            <summary>Agent diagnostics</summary>
-            <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
-          </details>
-        )}
-      </details>
-      {isLatest && (
-        <details
-          className="supporting-details"
-          onToggle={(event) => {
-            if (event.currentTarget.open && connections === null)
-              void listMcpServers(run.projectId)
-                .then((servers) =>
-                  setConnections(
-                    servers.filter(
-                      (s) => s.enabled !== false && s.scope === `project:${run.projectId}`,
-                    ),
-                  ),
-                )
-                .catch((cause) => setError(String(cause)));
-          }}
-        >
-          <summary>Connections for the next step</summary>
-          <p className="task-muted">
-            These choices apply when you continue. The active attempt keeps its existing tools and
-            account.
-          </p>
-          {connections?.map((server) => (
-            <label key={server.id} className="flex items-center gap-3 min-h-11">
-              <input
-                type="checkbox"
-                checked={(
-                  drafts[key]?.connectionIds ??
-                  run.connectionIds ??
-                  connections.map((s) => s.id)
-                ).includes(server.id)}
-                onChange={(event) => {
-                  const ids =
-                    drafts[key]?.connectionIds ?? run.connectionIds ?? connections.map((s) => s.id);
-                  draft(key, {
-                    connectionIds: event.target.checked
-                      ? [...ids, server.id]
-                      : ids.filter((id) => id !== server.id),
-                  });
-                }}
-              />
-              {server.name}
-            </label>
-          ))}
-          <Button
-            variant="ghost"
-            onClick={() => {
-              useProjectStore.getState().selectProject(run.projectId);
-              setToolsOpen(true);
-            }}
-          >
-            Manage task connections
-          </Button>
-        </details>
       )}
       {toolsOpen && (
         <Suspense fallback={null}>

@@ -8,22 +8,17 @@ export function TaskActivity({ entries, active }: { entries: string[]; active: b
   const id = useId();
   const [query, setQuery] = useState('');
   const [limit, setLimit] = useState(20);
-  const [expanded, setExpanded] = useState(active);
   const matching = entries
     .map((text, index) => ({ text, index }))
     .filter(({ text }) => text.toLowerCase().includes(query.trim().toLowerCase()));
   const visible = matching.slice(-limit);
   return (
-    <details
-      className="task-activity"
-      open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
-    >
-      <summary className="task-experience-summary">
+    <section className="task-activity" aria-label="Task activity">
+      <div className="task-experience-summary">
         <ListFilter size={18} aria-hidden="true" />
         <span>Activity</span>
         <span className="task-experience-meta">{entries.length} retained entries</span>
-      </summary>
+      </div>
       <div className="task-activity-body">
         <label className="task-activity-search" htmlFor={id}>
           <Search size={16} aria-hidden="true" />
@@ -73,6 +68,6 @@ export function TaskActivity({ entries, active }: { entries: string[]; active: b
           </p>
         )}
       </div>
-    </details>
+    </section>
   );
 }

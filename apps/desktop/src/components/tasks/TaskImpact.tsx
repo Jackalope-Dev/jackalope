@@ -43,8 +43,8 @@ export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
         </p>
       )}
       {affected && (
-        <details open className="mt-3">
-          <summary>{affected.length} files depend on these changes</summary>
+        <section className="mt-3">
+          <h3 className="text-base font-medium">{affected.length} files depend on these changes</h3>
           <p className="task-muted">
             Based on supported imports in this task's workspace at{' '}
             {new Date(time).toLocaleTimeString()}. Deleted modules, dynamic links and runtime
@@ -58,7 +58,7 @@ export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
           {affected.length > 200 && (
             <p className="task-muted">Showing the first 200 affected files.</p>
           )}
-        </details>
+        </section>
       )}
     </section>
   );

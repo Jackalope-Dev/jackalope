@@ -54,10 +54,10 @@ export function ReleaseSupport() {
         </Button>
         {diagnostics && (
           <>
-            <details open>
-              <summary className="task-summary">Report contents</summary>
+            <section aria-label="Support report contents">
+              <h3 className="text-base font-medium">Report contents</h3>
               <pre className="task-output mt-3">{JSON.stringify(diagnostics, null, 2)}</pre>
-            </details>
+            </section>
             <label htmlFor="support-feedback" className="block text-sm font-medium">
               What were you trying to do, and what happened?
             </label>

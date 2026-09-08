@@ -69,9 +69,8 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
         </div>
       </div>
       <p className="task-muted">
-        Keep useful decisions and repeatable procedures with this project, across agents. Matching
-        lessons appear in task context; workflows are selected in the composer. Nothing is learned
-        or rewritten in the background.
+        Save lessons for matching tasks and workflows you can reuse. Nothing is learned
+        automatically.
       </p>
       {!desktop && <p className="task-notice">Open the desktop app to manage saved knowledge.</p>}
       {loading && <p role="status">Loading saved knowledge…</p>}
@@ -137,15 +136,12 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
               />
             </div>
           </div>
-          <details className="mt-2">
-            <summary className="min-h-11 py-3">
-              View {entry.kind === 'memory' ? 'lesson and matching phrases' : 'procedure'}
-            </summary>
+          <div className="mt-2">
             <p className="whitespace-pre-wrap break-words">{entry.content}</p>
             {entry.keywords.length > 0 && (
               <p className="task-muted mt-2">Matches: {entry.keywords.join(', ')}</p>
             )}
-          </details>
+          </div>
           {entry.sourceRunId && (
             <Button
               variant="ghost"
@@ -173,8 +169,8 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
           )}
         </article>
       ))}
-      <details>
-        <summary className="min-h-11 py-3">Find a decision in past tasks</summary>
+      <section aria-label="Search past decisions">
+        <h3 className="text-base font-medium">Find a decision in past tasks</h3>
         <form
           className="flex gap-2 my-3"
           onSubmit={async (e) => {
@@ -213,7 +209,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
           </div>
         ))}
         {matches?.length === 0 && <p role="status">No matching tasks.</p>}
-      </details>
+      </section>
       {editing && (
         <KnowledgeEditor
           key={editing.id}

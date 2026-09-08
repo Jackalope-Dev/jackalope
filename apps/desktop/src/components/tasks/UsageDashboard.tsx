@@ -221,15 +221,12 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
               </p>
             </div>
           </div>
-          <details className="supporting-details">
-            <summary>What’s included</summary>
-            <p>
-              Reported attempts, including retries and follow-ups. Cached input is counted once.
-              Missing and in-progress reports are excluded, not counted as zero. Account profiles
-              identify the configured CLI, not a verified person. Child message observations are
-              partial and never added to attempt totals.
-            </p>
-          </details>
+          <p className="task-muted text-sm my-4">
+            Reported attempts, including retries and follow-ups. Cached input is counted once.
+            Missing and in-progress reports are excluded, not counted as zero. Account profiles
+            identify the configured CLI, not a verified person. Child message observations are
+            partial and never added to attempt totals.
+          </p>
         </>
       )}
       {error && (

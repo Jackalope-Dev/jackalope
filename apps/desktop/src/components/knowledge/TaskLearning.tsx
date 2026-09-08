@@ -19,11 +19,11 @@ export function TaskLearning({ run }: { run: TaskRun }) {
         </p>
       )}
       {!!context?.entries.length && (
-        <details>
-          <summary className="min-h-11 py-3">
+        <section>
+          <h3 className="text-base font-medium">
             Saved context used · {context.entries.length}{' '}
             {context.entries.length === 1 ? 'entry' : 'entries'}
-          </summary>
+          </h3>
           <p className="task-muted">
             {context.bytes.toLocaleString()} bytes supplied at the first attempt. Continuations
             reuse their agent session; this context is not appended again.
@@ -36,7 +36,7 @@ export function TaskLearning({ run }: { run: TaskRun }) {
               <p className="whitespace-pre-wrap break-words mt-2">{entry.content}</p>
             </div>
           ))}
-        </details>
+        </section>
       )}
       {run.status === 'reviewed' && (
         <>

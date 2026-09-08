@@ -132,13 +132,10 @@ export function CapacityPanel() {
           Refresh available in {Math.ceil((nextRefresh - now) / 1000)}s.
         </p>
       )}
-      <details className="supporting-details">
-        <summary>About account limits</summary>
-        <p>
-          Includes work outside Jackalope. Missing or stale snapshots cannot establish available
-          budget.
-        </p>
-      </details>
+      <p className="task-muted text-sm mt-4">
+        Includes work outside Jackalope. Missing or stale snapshots cannot establish available
+        budget.
+      </p>
     </section>
   );
 }

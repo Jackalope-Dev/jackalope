@@ -65,14 +65,13 @@ export function ResultReview({ run }: { run: TaskRun }) {
           ) : (
             <p className="task-muted">No changed files found.</p>
           )}
-          <details className="supporting-details">
-            <summary>Explore affected code</summary>
+          <section aria-label="Affected code">
             <TaskImpact
               key={`${run.id}:${JSON.stringify(review.files)}`}
               run={run}
               files={review.files}
             />
-          </details>
+          </section>
           {review.diff && <PatchPreview key={review.diff} patch={review.diff} />}
         </div>
       )}

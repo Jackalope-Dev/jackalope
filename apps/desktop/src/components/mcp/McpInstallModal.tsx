@@ -155,19 +155,6 @@ export function McpInstallModal({
             connection test starts them.
           </p>
           <div className="space-y-4 text-sm">
-            <details>
-              <summary className="task-summary">Advanced connection fields</summary>
-              <label className="task-label" htmlFor="marketplace-connection-fields">
-                Authentication headers and additional client options (JSON)
-              </label>
-              <textarea
-                id="marketplace-connection-fields"
-                className="task-input w-full font-mono"
-                rows={4}
-                value={extraJson}
-                onChange={(event) => setExtraJson(event.target.value)}
-              />
-            </details>
             {/* Target Scope */}
             <div>
               <p className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
@@ -273,6 +260,19 @@ export function McpInstallModal({
                 </div>
               </div>
             )}
+
+            <section aria-label="Additional connection options">
+              <label className="task-label" htmlFor="marketplace-connection-fields">
+                Authentication headers and additional client options (JSON)
+              </label>
+              <textarea
+                id="marketplace-connection-fields"
+                className="task-input w-full font-mono"
+                rows={4}
+                value={extraJson}
+                onChange={(event) => setExtraJson(event.target.value)}
+              />
+            </section>
 
             {error && (
               <p role="alert" className="task-error text-xs">

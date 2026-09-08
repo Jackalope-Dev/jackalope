@@ -48,6 +48,9 @@ const AgentManager = lazy(() =>
 const McpWorkspace = lazy(() =>
   import('../mcp/McpWorkspace').then((m) => ({ default: m.McpWorkspace })),
 );
+const ProjectContext = lazy(() =>
+  import('../projects/ProjectContext').then((m) => ({ default: m.ProjectContext })),
+);
 const ProjectPreferences = lazy(() =>
   import('../projects/ProjectPreferences').then((m) => ({ default: m.ProjectPreferences })),
 );
@@ -85,6 +88,7 @@ export function Shell({
       topology: 'codebase',
       agents: 'agents',
       mcps: 'connections',
+      'mcp-marketplace': 'connections',
       usage: 'usage',
       browser: 'browser',
       schedules: 'schedules',
@@ -255,73 +259,6 @@ export function Shell({
             </button>
           ))}
         </nav>
-        <div className="workspace-nav-support">
-          {view.group === 'tasks' && (
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <button type="button" className="workspace-nav-item" aria-label="Task tools">
-                  {activeTab === 'kanban' ? 'Task tools' : view.label}
-                  <ChevronDown size={14} />
-                </button>
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Content
-                  className="workspace-menu"
-                  align="end"
-                  sideOffset={8}
-                  collisionPadding={12}
-                >
-                  {WORKSPACE_VIEWS.filter((item) => item.group === 'tasks' && !item.primary).map(
-                    (item) => (
-                      <Menu.Item
-                        key={item.id}
-                        className="workspace-menu-item"
-                        onSelect={() => navigate(item.id)}
-                      >
-                        <item.icon size={16} />
-                        {item.label}
-                        {activeTab === item.id && <Check size={14} />}
-                      </Menu.Item>
-                    ),
-                  )}
-                </Menu.Content>
-              </Menu.Portal>
-            </Menu.Root>
-          )}
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <button
-                type="button"
-                className="workspace-nav-item"
-                aria-label="Agents and connections"
-              >
-                Agents & connections
-                <ChevronDown size={14} />
-              </button>
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content
-                className="workspace-menu"
-                align="end"
-                sideOffset={8}
-                collisionPadding={12}
-              >
-                {WORKSPACE_VIEWS.filter((item) => ['agents', 'mcps'].includes(item.id)).map(
-                  (item) => (
-                    <Menu.Item
-                      key={item.id}
-                      className="workspace-menu-item"
-                      onSelect={() => navigate(item.id)}
-                    >
-                      <item.icon size={16} />
-                      {item.label}
-                    </Menu.Item>
-                  ),
-                )}
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
-        </div>
       </div>
       <main
         ref={canvas}
@@ -330,32 +267,35 @@ export function Shell({
         className="workspace-canvas"
         aria-label={view.label}
       >
-        {view.group !== 'tasks' &&
-          WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
-            <div>
-              <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
-                {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    aria-current={activeTab === item.id ? 'page' : undefined}
-                    onClick={() => navigate(item.id)}
-                    className="workspace-nav-item"
-                  >
-                    {item.id === 'kanban'
-                      ? 'Work'
-                      : item.id === 'topology'
-                        ? 'Codebase'
-                        : item.id === 'agents'
-                          ? 'Runners'
-                          : item.id === 'agent-settings'
-                            ? 'Configuration'
-                            : item.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
-          )}
+        {WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
+          <div>
+            <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
+              {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  aria-current={activeTab === item.id ? 'page' : undefined}
+                  onClick={() => navigate(item.id)}
+                  className="workspace-nav-item"
+                >
+                  {item.id === 'kanban'
+                    ? 'Work'
+                    : item.id === 'topology'
+                      ? 'Codebase'
+                      : item.id === 'agents'
+                        ? 'Runners'
+                        : item.id === 'agent-settings'
+                          ? 'Configuration'
+                          : item.id === 'mcps'
+                            ? 'Connections'
+                            : item.id === 'project-settings'
+                              ? 'Settings'
+                              : item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
         <Suspense
           fallback={
             <p className="workspace-page" role="status">
@@ -404,7 +344,13 @@ export function Shell({
             </section>
           )}
           {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
-          {activeTab === 'mcps' && <McpWorkspace />}
+          {activeTab === 'project-knowledge' && <ProjectContext key={activeProjectId} />}
+          {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
+            <McpWorkspace
+              view={activeTab === 'mcps' ? 'configured' : 'marketplace'}
+              onViewChange={(next) => navigate(next === 'configured' ? 'mcps' : 'mcp-marketplace')}
+            />
+          )}
           {activeTab === 'schedules' && (
             <ScheduleManager
               key={activeProjectId}
