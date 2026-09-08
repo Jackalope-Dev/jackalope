@@ -91,6 +91,10 @@ pub struct CoordinationMessage {
     pub kind: String,
     pub text: String,
     pub created_at: String,
+    #[serde(default)]
+    pub recipient_task_id: Option<String>,
+    #[serde(default)]
+    pub acknowledged_by: Vec<String>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]

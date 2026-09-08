@@ -211,6 +211,8 @@ impl Coordinator {
                         .route("/v1/tools/execute", post(bridge_tool_execute))
                         .route("/v1/tools/read", post(bridge_tool_read))
                         .route("/v1/messages", post(bridge_message))
+                        .route("/v1/messages", get(inbox::bridge_inbox))
+                        .route("/v1/messages/ack", post(inbox::bridge_ack))
                         .route("/v1/browser/navigate", post(bridge_browser_navigate))
                         .route("/v1/browser/screenshot", post(bridge_browser_screenshot))
                         .route("/v1/browser/snapshot", post(bridge_browser_snapshot))
@@ -370,7 +372,7 @@ impl Coordinator {
                     .find(|r| r.id == run_id)
                     .ok_or(StatusCode::UNAUTHORIZED)?;
                 QueueItem {
-                    id: run.id.clone(),
+                    id: run.task_id.clone(),
                     project_id: run.project_id.clone(),
                     project_name: run.project_name.clone(),
                     project_path: run.project_path.clone(),

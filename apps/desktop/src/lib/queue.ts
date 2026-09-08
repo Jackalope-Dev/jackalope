@@ -20,6 +20,8 @@ export interface QueueMessage {
   kind: string;
   text: string;
   createdAt: string;
+  recipientTaskId?: string | null;
+  acknowledgedBy?: string[];
 }
 export interface QueueView {
   items: QueueItem[];

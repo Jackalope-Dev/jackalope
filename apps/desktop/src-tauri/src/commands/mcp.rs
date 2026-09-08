@@ -746,18 +746,13 @@ pub(super) fn project_delivery(
             let server = parse_server_spec(id, value, &scope);
             validate(&server)?;
             selected.insert(id.clone());
-            if adapter == "opencode" {
-                return Err("OpenCode does not support project-selected MCP connections yet. Use its own CLI configuration or choose another agent.".into());
-            }
             if server.discovery {
                 optimized.push(server);
                 continue;
             }
-            if adapter == "antigravity" {
-                return Err("Antigravity supports project connections through on-demand discovery. Enable on-demand discovery for this connection, use its own CLI MCP configuration, or choose another agent.".into());
-            }
-            if adapter == "grok" || (adapter == "codex" && server.transport == "sse") {
-                return Err("This agent does not support the selected project MCP transport. Choose Claude or a compatible Codex connection.".into());
+            let capabilities: Value = serde_json::from_str(include_str!("../../../src/lib/agent-capabilities.json")).map_err(|e| e.to_string())?;
+            if !capabilities[adapter]["direct"].as_array().is_some_and(|transports| transports.contains(&json!(server.transport))) {
+                return Err("This agent requires on-demand discovery for this project connection. Enable on-demand tools, or choose an agent supporting its direct transport.".into());
             }
             result.insert(id.clone(), spec(&server, adapter));
         }

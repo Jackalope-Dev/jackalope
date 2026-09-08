@@ -1,15 +1,5 @@
-import * as Menu from '@radix-ui/react-dropdown-menu';
 import * as Tabs from '@radix-ui/react-tabs';
-import {
-  ArrowLeft,
-  ArrowRight,
-  CalendarClock,
-  Check,
-  Copy,
-  GitMerge,
-  MoreHorizontal,
-  Square,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
@@ -304,33 +294,16 @@ export function TaskDetail({
               Mark reviewed
             </Button>
           )}
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button variant="ghost">
-                <MoreHorizontal size={16} />
-                More
-              </Button>
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content
-                className="workspace-menu"
-                align="end"
-                sideOffset={8}
-                collisionPadding={12}
-              >
-                {!!run.result && (
-                  <Menu.Item className="workspace-menu-item" onSelect={() => void copyResult()}>
-                    <Copy size={16} />
-                    Copy result
-                  </Menu.Item>
-                )}
-                <Menu.Item className="workspace-menu-item" onSelect={onSchedule}>
-                  <CalendarClock size={16} />
-                  Make recurring
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
+          {!!run.result && (
+            <Button variant="ghost" onClick={() => void copyResult()}>
+              <Copy size={16} />
+              Copy result
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onSchedule}>
+            <CalendarClock size={16} />
+            Make recurring
+          </Button>
         </div>
       )}
       <Tabs.Root value={tab} onValueChange={setTab}>

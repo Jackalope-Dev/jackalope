@@ -300,7 +300,7 @@ impl TaskRuntime {
             self.mcp_broker
                 .prepare(id, discovered_mcp, PathBuf::from(&workspace), account)?;
         }
-        if adapter == "codex" && has_discovery {
+        if adapter == "codex" && req.coordination.is_some() {
             let context = req.coordination.as_ref().unwrap();
             project_mcp.insert("jackalope".into(), serde_json::json!({"url":format!("{}/mcp",context.endpoint),"bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN"}));
         }

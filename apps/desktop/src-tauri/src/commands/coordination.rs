@@ -1,4 +1,5 @@
 mod models;
+pub(super) mod inbox;
 use models::Ledger;
 pub use models::{CoordinationMessage, PlanEntry, PlanRequest, QueueItem, QueueRequest, QueueView};
 mod eligibility;
@@ -78,13 +79,22 @@ pub(super) async fn bridge_project(
         .runtime
         .integration_runs()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tasks: Vec<_> = view.items.iter().filter(|i| i.project_id == item.project_id).map(|i| {
+    let mut tasks: Vec<_> = view.items.iter().filter(|i| i.project_id == item.project_id).map(|i| {
         let original = runs.iter().find(|r| Some(&r.id) == i.run_id.as_ref());
         let latest = original.and_then(|original| runs.iter().filter(|r| r.task_id == original.task_id).max_by(|a,b| a.started_at.cmp(&b.started_at)));
         serde_json::json!({"id":i.id,"title":i.title,"agent":i.agent,"scopes":i.scopes,"dependencies":i.dependencies,"runId":latest.map(|r| &r.id),"status": if i.canceled { "canceled" } else if i.run_id.as_ref().is_some_and(|id| view.merged_run_ids.contains(id)) { "merged" } else { latest.map_or("queued", |r| r.status.as_str()) }})
     }).collect();
+    let queued_tasks: HashSet<_> = view.items.iter().filter(|i| i.project_id == item.project_id)
+        .filter_map(|i| runs.iter().find(|r| Some(&r.id) == i.run_id.as_ref()).map(|r| r.task_id.clone())).collect();
+    let mut manual = HashMap::new();
+    for run in runs.iter().filter(|r| r.project_id == item.project_id && !queued_tasks.contains(&r.task_id)) {
+        let previous: &mut &super::tasks::TaskRun = manual.entry(&run.task_id).or_insert(run);
+        if run.started_at > previous.started_at { *previous = run; }
+    }
+    tasks.extend(manual.values().map(|r| serde_json::json!({"id":r.task_id,"title":r.prompt.lines().next().unwrap_or("Task").chars().take(160).collect::<String>(),"agent":r.agent,"scopes":[],"scopeKnown":false,"dependencies":[],"runId":r.id,"status":r.status,"manual":true})));
+    tasks.sort_by(|a,b| a["id"].as_str().cmp(&b["id"].as_str()));
     Ok(Json(
-        serde_json::json!({"assignedTaskId":item.id,"tasks":tasks,"messages":view.messages.iter().filter(|m| m.project_id == item.project_id).collect::<Vec<_>>()}),
+        serde_json::json!({"assignedTaskId":item.id,"tasks":tasks,"messages":view.messages.iter().filter(|m| inbox::visible(m, &item)).collect::<Vec<_>>(),"capabilities":{"version":1,"project":true,"messages":true,"directedMessages":true,"acknowledgments":true,"userQuestions":true,"browser":true,"validation":true,"automaticWake":false},"inventory":"Loaded task history and queued work; archived runs are excluded. Unknown scopes are not permission to overlap."}),
     ))
 }
 
@@ -92,6 +102,8 @@ pub(super) async fn bridge_project(
 pub(super) struct MessageRequest {
     pub kind: String,
     pub text: String,
+    #[serde(default, rename = "recipientTaskId", alias = "recipient_task_id")]
+    pub recipient_task_id: Option<String>,
 }
 
 pub(super) async fn bridge_message(
@@ -107,6 +119,11 @@ pub(super) async fn bridge_message(
         return Err(StatusCode::BAD_REQUEST);
     }
     let mut inner = service.inner.lock().unwrap();
+    if let Some(recipient) = &req.recipient_task_id {
+        let queued = inner.ledger.items.iter().any(|i| i.project_id == item.project_id && &i.id == recipient && !i.canceled);
+        let manual = service.runtime.integration_runs().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.iter().any(|r| r.project_id == item.project_id && &r.task_id == recipient);
+        if !queued && !manual { return Err(StatusCode::BAD_REQUEST); }
+    }
     let message = CoordinationMessage {
         id: Uuid::new_v4().to_string(),
         task_id: item.id,
@@ -114,6 +131,8 @@ pub(super) async fn bridge_message(
         kind: req.kind,
         text: req.text,
         created_at: Utc::now().to_rfc3339(),
+        recipient_task_id: req.recipient_task_id,
+        acknowledged_by: vec![],
     };
     let mut ledger = inner.ledger.clone();
     ledger.messages.push(message.clone());
