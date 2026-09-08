@@ -1,3 +1,5 @@
+import { growthPages } from './growth-content.ts';
+
 export type MarketingPage = {
   path: string;
   kind: string;
@@ -16,6 +18,7 @@ export type MarketingPage = {
 };
 
 export const marketingPages: MarketingPage[] = [
+  ...growthPages,
   {
     path: '/parallel-coding-agents/',
     kind: 'Product guide',
@@ -23,7 +26,7 @@ export const marketingPages: MarketingPage[] = [
     description:
       'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees while Jackalope keeps project context, progress, and review together.',
     headline: 'Run coding agents in parallel. Keep the work coherent.',
-    lede: 'Jackalope is a Windows desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, and OpenCode, following their progress, and reviewing the combined result before integration.',
+    lede: 'Jackalope is a cross-platform workspace for assigning focused tasks to Codex, Claude Code, Grok, and OpenCode, following their progress, and reviewing the combined result before integration.',
     image: 'tasks',
     signals: [
       'Multiple agents',
@@ -55,7 +58,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Return to one review queue.',
         paragraphs: [
           'A finished response is not the finish line. Jackalope keeps the result, patch, reported checks, evidence, and attempt history together. When several tasks belong together, review preparation checks their current source state and produces a combined result without silently modifying your main checkout.',
-          'Jackalope is in prerelease. The website tour uses fictional Atlas project data, and public Windows release acceptance is still in progress.',
+          'Jackalope is in prerelease. The website tour uses fictional Atlas project data, and cross-platform release acceptance is still in progress.',
         ],
       },
     ],

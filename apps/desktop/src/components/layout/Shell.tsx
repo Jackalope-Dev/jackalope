@@ -1,5 +1,5 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
+import { Check, ChevronDown, GitBranch, Plus, Search, Settings2, UsersRound } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
@@ -266,6 +266,17 @@ export function Shell({
             </button>
           ))}
         </nav>
+        <button
+          type="button"
+          className="workspace-nav-item workspace-invitations"
+          onClick={() => {
+            setSettingsCategory('Invitations');
+            setSettingsOpen(true);
+          }}
+        >
+          <UsersRound className="size-3.5" />
+          <span>Invitations</span>
+        </button>
       </div>
       <main
         ref={canvas}

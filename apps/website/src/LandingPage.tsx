@@ -329,14 +329,14 @@ export function LandingPage({
             <div className="hero-poster">
               <HeroMark />
               <h1 id="hero-title">
-                <span>Run coding agents in parallel.</span> <span>Keep the work coherent.</span>
+                <span>Your agents. Side by side.</span> <span>Your final say.</span>
               </h1>
             </div>
             <p className="hero-description">
-              A Windows desktop workspace for{' '}
-              <strong>Codex, Claude Code, Grok, and OpenCode</strong>, with project context,
-              isolated Git worktrees, and review before integration.
+              A cross-platform workspace for <strong>Codex, Claude Code, Grok, and OpenCode</strong>
+              , with project context, isolated Git worktrees, and one place to review the result.
             </p>
+            <p className="hero-launch">One workspace. Planned for macOS, Windows, and Linux.</p>
             <div className="hero-conversion">
               {available ? (
                 <div className="hero-actions">
@@ -360,7 +360,7 @@ export function LandingPage({
               <span className="availability">
                 {available
                   ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
-                  : 'Windows prerelease · No payment to join'}
+                  : 'macOS · Windows · Linux at launch · No payment to join'}
               </span>
             </div>
           </div>
@@ -369,11 +369,11 @@ export function LandingPage({
               type="button"
               className="hero-window"
               onClick={onPlay}
-              aria-label="Play the 33-second Jackalope app tour"
+              aria-label="Play the 40-second Jackalope app tour"
             >
               <span className="hero-window-meta">
                 <span>ACTUAL APP / ATLAS SAMPLE PROJECT</span>
-                <span>01 / TASKS</span>
+                <span>BRIEF → WORK → REVIEW</span>
               </span>
               <img
                 src={`/media/tasks${dark ? '' : '-light'}.png`}
@@ -478,6 +478,51 @@ export function LandingPage({
         </div>
       </section>
 
+      <section className="landing-width early-access-story" aria-labelledby="early-access-title">
+        <div>
+          <h2 id="early-access-title">Build the next chapter with us.</h2>
+          <p>
+            We’re shaping a workspace for people who already build with coding agents. Join early,
+            tell us what gets in your way, and help decide what comes next.
+          </p>
+          <a href="/#newsletter" className="button button-primary">
+            Join the waitlist <ArrowRight size={17} />
+          </a>
+        </div>
+        <ol>
+          <li>
+            <strong>Tell us what you use.</strong>
+            <p>
+              Email first. Then optional platform, agent, and workflow preferences to guide our
+              plans.
+            </p>
+          </li>
+          <li>
+            <strong>Get an invitation.</strong>
+            <p>
+              We’ll email when your access is ready. A direct invitation skips the waitlist after
+              email verification.
+            </p>
+          </li>
+          <li>
+            <strong>Bring your people.</strong>
+            <p>
+              Once approved, you get five invitations to share. Each person who joins can invite
+              five more.
+            </p>
+          </li>
+        </ol>
+      </section>
+      <section className="landing-width comparison-teaser">
+        <h2>Find your way to work.</h2>
+        <p>
+          Comparing agent workspaces? Start with the workflow you need: local review, shared
+          sessions, remote hosts, or a complete editor.
+        </p>
+        <a href="/compare/">
+          Compare Jackalope and other workspaces <ArrowRight size={17} />
+        </a>
+      </section>
       <Workbench />
 
       <section

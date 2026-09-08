@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { randomToken } from './crypto';
 import { browserDeviceAction } from './devices';
+import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
 import { syncNewsletter } from './newsletter';
 import {
@@ -114,15 +116,24 @@ export async function accessRoutes(
         .strictObject({
           email: emailSchema,
           newsletter: z.boolean().default(false),
+          campaign: campaignSchema.optional(),
           source: z.enum(['inline', 'popup']).default('inline'),
           website: z.string().max(200).default(''),
         })
         .parse(await readJson(request));
+      let surveyToken = randomToken();
       if (!body.website) {
-        await register(env, body.email, body.newsletter, body.source);
+        surveyToken = await register(env, body.email, body.newsletter, body.source, body.campaign);
         if (ctx) ctx.waitUntil(deliverAccessMail(env));
         if (ctx && body.newsletter) ctx.waitUntil(syncNewsletter(env));
       }
+      return json({ success: true, surveyToken }, 202);
+    }
+    if (request.method === 'POST' && path === '/v1/access/preferences') {
+      const body = z
+        .strictObject({ token: tokenSchema, preferences: preferencesSchema })
+        .parse(await readJson(request));
+      await savePreferences(env, body.token, body.preferences);
       return json({ success: true }, 202);
     }
     if (request.method === 'POST' && path === '/v1/access/link') {

@@ -55,9 +55,12 @@ const privacy: Section[] = [
       <>
         <p>
           When you join, we record your email address, signup source and time, access status, and
-          optional newsletter choice. We also keep verification, session, invitation, and delivery
-          records to provide access, prevent repeated emails, and enforce invitation limits. We do
-          not collect payment details for the waitlist.
+          optional newsletter choice. If you choose to answer our follow-up survey, we store your
+          preferred operating systems, agents, and workflows with your signup to guide product
+          plans. We record campaign labels and the signup page, without advertising cookies or
+          cross-site tracking. We also keep verification, session, invitation, and delivery records
+          to provide access, prevent repeated emails, and enforce invitation limits. We do not
+          collect payment details for the waitlist.
         </p>
         <p>
           We send signup confirmations and the access or invitation messages needed to handle your

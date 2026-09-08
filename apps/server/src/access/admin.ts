@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { accessAdminPage } from './admin-page';
 import { randomToken } from './crypto';
+import { waitlistInsights } from './insights';
 import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
 import { installerKey, storeUrl } from './routes';
@@ -81,12 +82,14 @@ export async function accessAdmin(
     });
   }
   try {
+    if (request.method === 'GET' && url.pathname === '/admin/api/access/insights')
+      return json(await waitlistInsights(env));
     if (request.method === 'GET' && url.pathname === '/admin/api/access/readiness')
       return json(await accessReadiness(env));
     if (request.method === 'GET' && url.pathname === '/admin/api/access/member') {
       const id = z.uuid().parse(url.searchParams.get('id'));
       const member = await env.DB.prepare(
-        'SELECT id,email,status,created_at,approved_at,verified_at,source,newsletter,newsletter_synced_at,newsletter_attempts,invite_limit FROM access_members WHERE id=?',
+        'SELECT id,email,status,created_at,approved_at,verified_at,source,newsletter,newsletter_synced_at,newsletter_attempts,invite_limit,preferences,campaign FROM access_members WHERE id=?',
       )
         .bind(id)
         .first<{ email: string }>();
@@ -119,6 +122,12 @@ export async function accessAdmin(
       const status = url.searchParams.get('status') ?? 'waiting';
       const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
       const query = (url.searchParams.get('query') ?? '').trim().toLowerCase();
+      const platform = z
+        .enum(['all', 'macos', 'windows', 'linux'])
+        .parse(url.searchParams.get('platform') ?? 'all');
+      const stage = z
+        .enum(['all', 'not-signed-in', 'not-connected', 'connected', 'email-failed'])
+        .parse(url.searchParams.get('stage') ?? 'all');
       if (
         !['waiting', 'approved', 'revoked', 'all'].includes(status) ||
         !Number.isSafeInteger(before) ||
@@ -127,9 +136,22 @@ export async function accessAdmin(
       )
         return json({ error: 'invalid_filter' }, 400);
       const members = await env.DB.prepare(
-        "SELECT m.rowid AS cursor,m.id,m.email,m.status,m.created_at,m.approved_at,m.verified_at,m.invite_limit,(SELECT count(*) FROM access_devices WHERE member_id=m.id AND expires_at>?) AS devices,(SELECT count(*) FROM access_invites WHERE owner_id=m.id AND status='accepted') AS accepted,a.kind AS mail_kind,a.state AS mail_state,a.attempts AS mail_attempts,a.next_at AS mail_next_at,a.created_at AS mail_created_at,a.delivery_status FROM access_members m LEFT JOIN access_mail a ON a.rowid=(SELECT rowid FROM access_mail WHERE email=m.email ORDER BY created_at DESC,rowid DESC LIMIT 1) WHERE (?='all' OR m.status=?) AND m.rowid<? AND instr(m.email,?)>0 ORDER BY m.rowid DESC LIMIT 51",
+        "SELECT m.rowid AS cursor,m.id,m.email,m.status,m.created_at,m.approved_at,m.verified_at,m.invite_limit,m.preferences,m.first_desktop_at,(SELECT count(*) FROM access_devices WHERE member_id=m.id AND expires_at>?) AS devices,(SELECT count(*) FROM access_invites WHERE owner_id=m.id AND status='accepted') AS accepted,a.kind AS mail_kind,a.state AS mail_state,a.attempts AS mail_attempts,a.next_at AS mail_next_at,a.created_at AS mail_created_at,a.delivery_status FROM access_members m LEFT JOIN access_mail a ON a.rowid=(SELECT rowid FROM access_mail WHERE email=m.email ORDER BY created_at DESC,rowid DESC LIMIT 1) WHERE (?='all' OR m.status=?) AND m.rowid<? AND instr(m.email,?)>0 AND (?='all' OR EXISTS(SELECT 1 FROM json_each(m.preferences,'$.platforms') WHERE value=?)) AND (?='all' OR (?='not-signed-in' AND m.status='approved' AND m.verified_at IS NULL) OR (?='not-connected' AND m.status='approved' AND m.verified_at IS NOT NULL AND m.first_desktop_at IS NULL) OR (?='connected' AND m.first_desktop_at IS NOT NULL) OR (?='email-failed' AND (a.state='failed' OR a.delivery_status IN ('bounced','failed','complained')))) ORDER BY m.rowid DESC LIMIT 51",
       )
-        .bind(Date.now(), status, status, before, query)
+        .bind(
+          Date.now(),
+          status,
+          status,
+          before,
+          query,
+          platform,
+          platform,
+          stage,
+          stage,
+          stage,
+          stage,
+          stage,
+        )
         .all();
       const counts = await env.DB.prepare(
         'SELECT status,count(*) AS count FROM access_members GROUP BY status',

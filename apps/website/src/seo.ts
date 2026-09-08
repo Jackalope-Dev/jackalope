@@ -26,7 +26,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       url: origin,
       description: pages[0].description,
       logo: `${origin}/icon-256.png`,
-      sameAs: ['https://github.com/Jackalope-Dev/jackalope'],
+      sameAs: ['https://x.com/JackalopeDotDev'],
       parentOrganization: { '@type': 'Organization', name: company.name, url: company.url },
     },
     {
@@ -79,7 +79,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       name: 'Jackalope',
       url: origin,
       applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'Windows',
+      operatingSystem: 'macOS, Windows, Linux (planned launch)',
       description,
       image: `${origin}/social-preview.png`,
       featureList: [
@@ -141,7 +141,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       description: tour.description,
       thumbnailUrl: `${origin}/media/tasks-light.png`,
       uploadDate: tour.published,
-      duration: 'PT33S',
+      duration: 'PT40S',
       contentUrl: `${origin}/media/walkthrough.webm`,
       transcript: tour.transcript,
       inLanguage: 'en',
@@ -192,9 +192,9 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
 
 export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
   const availability = releaseVersion
-    ? `Windows x64 version ${releaseVersion} is available at ${origin}/#download. macOS and Linux are planned.`
-    : 'Coming soon. Join the waitlist for early-access news. No public release date or price has been announced.';
-  const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use fictional Atlas sample data and do not prove real agent execution.\n\n`;
+    ? `Windows x64 version ${releaseVersion} is available at ${origin}/#download. The first full launch is planned across macOS, Windows, and Linux.`
+    : 'First launch planned for macOS, Windows, and Linux. Join the waitlist for early-access news. No public release date or price has been announced.';
+  const intro = `# Jackalope\n\n> A cross-platform workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use fictional Atlas sample data and do not prove real agent execution.\n\n`;
   const publicPages = pages.filter((page) => page.path !== '/access/');
   const links = publicPages
     .map((page) => `- [${page.title}](${origin}${page.path}): ${page.description}`)

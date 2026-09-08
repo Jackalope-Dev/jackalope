@@ -66,7 +66,7 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
           <p className="article-deck">
             From an idea to a patch you can review. See how the workspace feels.
           </p>
-          <p className="article-byline">33 seconds · No audio · Illustrative Atlas project</p>
+          <p className="article-byline">40 seconds · No audio · Illustrative Atlas project</p>
         </header>
         <video
           className="tour-player"

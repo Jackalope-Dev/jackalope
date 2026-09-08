@@ -2,6 +2,7 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { unseal } from '../src/access/crypto';
+import { waitlistInsights } from '../src/access/insights';
 import {
   type AccessMail,
   accessEmail,
@@ -121,6 +122,84 @@ it('normalizes waitlist emails, keeps approval private and makes approval idempo
   expect(response.status).toBe(200);
   expect(response.headers.get('set-cookie')).toContain('HttpOnly; Secure; SameSite=Lax');
   expect((await request('accept', { token })).status).toBe(410);
+});
+it('saves optional multi-select insights once without granting access or allowing email-based overwrite', async () => {
+  const campaign = { source: 'dev', medium: 'article', campaign: 'launch', landing: '/compare/' };
+  const signup = await (
+    await request('waitlist', { email: 'insights@example.com', campaign })
+  ).json<{ surveyToken: string }>();
+  const preferences = {
+    platforms: ['macos', 'linux', 'linux'],
+    agents: ['codex', 'claude'],
+    priorities: ['review'],
+  };
+  expect(
+    await (await request('preferences', { token: signup.surveyToken, preferences })).json(),
+  ).toEqual({ success: true });
+  const saved = await env.DB.prepare(
+    'SELECT status,preferences,campaign,survey_hash FROM access_members',
+  ).first<{ status: string; preferences: string; campaign: string; survey_hash: string | null }>();
+  expect(saved?.status).toBe('waiting');
+  expect(JSON.parse(required(saved).preferences).platforms).toEqual(['macos', 'linux']);
+  expect(JSON.parse(required(saved).campaign)).toEqual(campaign);
+  expect(saved?.survey_hash).toBeNull();
+  const duplicate = await (await request('waitlist', { email: 'insights@example.com' })).json<{
+    surveyToken: string;
+  }>();
+  expect(
+    await (
+      await request('preferences', {
+        token: duplicate.surveyToken,
+        preferences: { ...preferences, agents: ['other'] },
+      })
+    ).json(),
+  ).toEqual({ success: true });
+  expect(
+    await (await request('preferences', { token: signup.surveyToken, preferences })).json(),
+  ).toEqual({ success: true });
+  expect(
+    (
+      await request('preferences', {
+        token: signup.surveyToken,
+        preferences: { ...preferences, platforms: ['invalid'] },
+      })
+    ).status,
+  ).toBe(400);
+  const insights = await waitlistInsights(bindings);
+  expect(insights.platforms).toEqual([
+    { label: 'linux', count: 1 },
+    { label: 'macos', count: 1 },
+  ]);
+  expect(insights.sources).toEqual([{ label: 'dev', count: 1 }]);
+  expect(insights.totals).toMatchObject({ requested: 1, responded: 1, approved: 0 });
+});
+it('expires survey capabilities and never creates a member for the honeypot', async () => {
+  const preferences = { platforms: ['windows'], agents: [], priorities: [] };
+  const signup = await (await request('waitlist', { email: 'expired@example.com' })).json<{
+    surveyToken: string;
+  }>();
+  await env.DB.prepare('UPDATE access_members SET survey_expires_at=0').run();
+  expect(
+    await (await request('preferences', { token: signup.surveyToken, preferences })).json(),
+  ).toMatchObject({ success: true });
+  const trapped = await (
+    await request('waitlist', { email: 'bot@example.com', website: 'spam' })
+  ).json<{ surveyToken: string }>();
+  expect(trapped.surveyToken).toHaveLength(64);
+  expect(
+    await (await request('preferences', { token: trapped.surveyToken, preferences })).json(),
+  ).toMatchObject({ success: true });
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_members').first()).toEqual({
+    n: 1,
+  });
+  expect(
+    (
+      await request('waitlist', {
+        email: 'bad@example.com',
+        campaign: { landing: '/', source: '<script>' },
+      })
+    ).status,
+  ).toBe(400);
 });
 it('confirms a new signup once under contention, without issuing access or requiring newsletter consent', async () => {
   await Promise.all(

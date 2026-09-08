@@ -2,9 +2,10 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, expect, it } from 'vitest';
 import { accessReadiness } from '../src/access/admin';
+import { savePreferences } from '../src/access/insights';
 import { deliverAccessMail } from '../src/access/mail';
 import { checkMailDelivery } from '../src/access/mail-status';
-import { approve, memberInsert } from '../src/access/service';
+import { approve, memberInsert, register } from '../src/access/service';
 import { adminRoutes } from '../src/admin';
 import worker from '../src/index';
 
@@ -83,6 +84,47 @@ it('recognizes a configured Store listing and approves without a private install
   });
   const id = await person();
   expect((await call('', { id, action: 'approve' })).status).toBe(200);
+});
+it('segments onboarding by self-reported platform and observed milestones, preserving unknown preferences', async () => {
+  const token = await register(bindings, 'mac@example.invalid', false, 'inline');
+  await savePreferences(bindings, token, {
+    platforms: ['macos'],
+    agents: ['codex'],
+    priorities: ['review'],
+  });
+  await person('unknown@example.invalid');
+  const mac = await env.DB.prepare('SELECT id FROM access_members WHERE email=?')
+    .bind('mac@example.invalid')
+    .first<{ id: string }>();
+  if (!mac) throw new Error('Missing member');
+  await approve(bindings, mac.id);
+  const response = await (await call('?status=all&platform=macos&stage=not-signed-in')).json<{
+    members: { email: string }[];
+  }>();
+  expect(response.members.map((member) => member.email)).toEqual(['mac@example.invalid']);
+  expect(await (await call('?status=all&platform=linux')).json()).toMatchObject({ members: [] });
+  await env.DB.prepare('UPDATE access_members SET verified_at=1,first_desktop_at=2 WHERE id=?')
+    .bind(mac.id)
+    .run();
+  expect(await (await call('?status=all&stage=not-connected')).json()).toMatchObject({
+    members: [],
+  });
+  expect(await (await call('?status=all&stage=connected')).json()).toMatchObject({
+    members: [{ email: 'mac@example.invalid' }],
+  });
+  const insights = await (await call('/insights')).json();
+  expect(insights).toMatchObject({
+    totals: { requested: 2, responded: 1, approved: 1, connected: 1 },
+  });
+  expect(JSON.stringify(insights)).not.toContain('@');
+  expect(
+    (
+      await worker.fetch(
+        new Request('https://api.jackalope.dev/admin/api/access/insights'),
+        bindings,
+      )
+    ).status,
+  ).toBe(403);
 });
 it('requires acknowledgement without a download, reports cooldown truthfully and rejects stale actions', async () => {
   const id = await person();

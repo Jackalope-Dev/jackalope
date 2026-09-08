@@ -1,10 +1,10 @@
 # Jackalope
 
-Jackalope brings coding agents, tasks, Git worktrees and review into one desktop
+Jackalope brings coding agents, tasks, Git worktrees and review into one cross-platform
 workspace. Use your installed agent CLIs and existing sign-ins, keep changes
 isolated, and review the result before integrating it.
 
-**Prerelease.** Windows is the current native release target. Signed update,
+**Prerelease.** The first launch is planned for macOS, Windows, and Linux. Signed update,
 clean-profile and external beta acceptance remain in progress; see the
 [current status](docs/STATUS.md) and [release gates](docs/RELEASE.md).
 

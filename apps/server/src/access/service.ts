@@ -27,13 +27,29 @@ export function memberInsert(
     'INSERT INTO access_members(id,email,created_at,source,share_code,newsletter) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET newsletter=max(newsletter,excluded.newsletter)',
   ).bind(id, email, now, source, randomToken(), Number(newsletter));
 }
-export async function register(env: Env, email: string, newsletter: boolean, source: string) {
+export async function register(
+  env: Env,
+  email: string,
+  newsletter: boolean,
+  source: string,
+  campaign?: unknown,
+) {
   const id = crypto.randomUUID();
   const now = Date.now();
+  const surveyToken = randomToken();
   await env.DB.batch([
     memberInsert(env, email, source, newsletter, now, id),
+    env.DB.prepare(
+      'UPDATE access_members SET survey_hash=?,survey_expires_at=?,campaign=? WHERE id=?',
+    ).bind(
+      await tokenHash(surveyToken),
+      now + 3600000,
+      campaign ? JSON.stringify(campaign) : null,
+      id,
+    ),
     await waitlistMailStatement(env, email, id, now),
   ]);
+  return surveyToken;
 }
 const cooldown =
   "NOT EXISTS(SELECT 1 FROM access_mail WHERE email=? AND kind!='waitlist' AND created_at>?) AND (SELECT count(*) FROM access_mail WHERE email=? AND kind!='waitlist' AND created_at>?)<10";
@@ -301,6 +317,9 @@ export async function changeInvite(
 }
 export async function pruneAccess(env: Env, now = Date.now()) {
   await env.DB.batch([
+    env.DB.prepare(
+      'UPDATE access_members SET survey_hash=NULL,survey_expires_at=NULL WHERE survey_expires_at<=?',
+    ).bind(now),
     env.DB.prepare('DELETE FROM access_sessions WHERE expires_at<=?').bind(now),
     env.DB.prepare('DELETE FROM access_device_links WHERE expires_at<=?').bind(now),
     env.DB.prepare('DELETE FROM access_devices WHERE expires_at<=?').bind(now),

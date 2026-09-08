@@ -113,6 +113,26 @@ export function TaskCollection({
   };
   return (
     <div className="task-collection">
+      {items.length > 0 && (
+        <fieldset className="work-priorities" aria-label="Focus your work">
+          {workStages
+            .filter((stage) => stage.id !== 'finished')
+            .map((stage) => {
+              const count = items.filter((item) => item.stage === stage.id).length;
+              return (
+                <button
+                  key={stage.id}
+                  type="button"
+                  aria-pressed={filter === stage.id}
+                  onClick={() => setFilter(filter === stage.id ? 'all' : stage.id)}
+                >
+                  <strong>{count}</strong>
+                  <span>{stage.label}</span>
+                </button>
+              );
+            })}
+        </fieldset>
+      )}
       <div className="work-toolbar">
         {scope}
         <label className="work-search">

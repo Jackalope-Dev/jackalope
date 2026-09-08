@@ -1,6 +1,53 @@
 .task-collection {
   margin-top: 24px;
 }
+.work-priorities {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--color-surface-sunken);
+}
+.work-priorities button {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 18px;
+  min-height: 44px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text-secondary);
+}
+.work-priorities button:hover,
+.work-priorities button[aria-pressed="true"] {
+  background: var(--color-surface-elevated);
+  color: var(--color-accent-ink);
+  box-shadow: 0 4px 16px var(--color-accent-glow);
+}
+.work-priorities button[aria-pressed="true"] {
+  outline: 1px solid var(--color-accent-ink);
+}
+.work-priorities strong {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.work-priorities span {
+  font-size: var(--text-xs);
+}
+.workspace-invitations {
+  margin-left: auto;
+}
+@media (max-width: 1000px) {
+  .work-priorities button {
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+  }
+}
 .work-toolbar,
 .work-layout,
 .work-search {

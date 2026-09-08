@@ -36,7 +36,7 @@ interface Membership {
 }
 
 const invitationMessage =
-  'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an early-access invitation if you want to try it.';
+  'I have an invitation to Jackalope: one cross-platform workspace for coding agents, Git worktrees, and review. Join me in early access.';
 
 export function AccessPage() {
   const [member, setMember] = useState<Membership | null>(null);
@@ -253,9 +253,14 @@ export function AccessPage() {
               Sign out <LogOut size={14} />
             </button>
           </div>
-          <section className="access-card access-download">
+          <nav className="member-navigation" aria-label="Your account">
+            <a href="#setup">Get started</a>
+            <a href="#invitations">Invitations</a>
+            <a href="#desktops">Connected desktops</a>
+          </nav>
+          <section id="setup" className="access-card access-download">
             <div>
-              <h2>Download Jackalope</h2>
+              <h2>Make room for your first task.</h2>
               {member.download ? (
                 <a
                   className="button button-primary button-download"
@@ -274,15 +279,13 @@ export function AccessPage() {
                   <div>
                     <strong>No download available yet</strong>
                     <p>
-                      Your access is approved. The Windows installer will appear here when it’s
-                      ready.
+                      Your access is approved. Downloads will appear here when they’re ready. Our
+                      first launch is planned for macOS, Windows, and Linux.
                     </p>
                   </div>
                 </div>
               )}
-              <small>
-                Windows x64 · Requires a supported coding agent and its provider account.
-              </small>
+              <small>Bring a supported coding agent and its provider account.</small>
             </div>
             <ol className="access-steps">
               <li>
@@ -320,8 +323,8 @@ export function AccessPage() {
               <div>
                 <h2 id="invite-heading">Invite people</h2>
                 <p>
-                  Invite up to {member.limit} people to early access. Each person who accepts gets
-                  five invitations of their own.
+                  Invite up to {member.limit} people to early access. They skip the waitlist after
+                  email verification, then get five invitations of their own.
                 </p>
               </div>
               <div className="access-places">
@@ -507,7 +510,9 @@ export function AccessPage() {
               </div>
             )}
           </section>
-          <ConnectedDesktops />
+          <div id="desktops">
+            <ConnectedDesktops />
+          </div>
         </>
       ) : (
         <section className="access-card access-entry">

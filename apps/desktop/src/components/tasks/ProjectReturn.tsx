@@ -40,8 +40,10 @@ export function ProjectReturn({
   }, [project.path]);
   if (!unfinished.length && !entries.length) return null;
   return (
-    <details className="project-return my-5" open>
-      <summary className="min-h-11 py-3 font-medium">Pick up in {project.name}</summary>
+    <details className="project-return my-5">
+      <summary className="min-h-11 py-3 font-medium">
+        Pick up in {project.name} · {unfinished.length} unfinished
+      </summary>
       <div className="space-y-3">
         {unfinished.slice(0, 3).map((run) => (
           <div key={run.id} className="flex flex-wrap justify-between gap-3 items-center">

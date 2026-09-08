@@ -1,5 +1,28 @@
 [
   {
+    "id": "a-cross-platform-workspace",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A cross-platform workspace.",
+    "description": "Jackalope's public copy and launch assets now describe a cross-platform workspace for coding agents.",
+    "items": [
+      "The launch film, submission images, captions and outreach copy use a shared early-access invitation."
+    ],
+    "note": "Development milestone, not a public release. The first launch is planned for macOS, Windows, and Linux."
+  },
+  {
+    "id": "a-clearer-path-into-jackalope",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A clearer path into Jackalope.",
+    "description": "Explore the current workspace and help shape our first cross-platform launch.",
+    "items": [
+      "Optional signup preferences and admin insights guide onboarding.",
+      "Find invitations, compare workflows, and watch the updated app tour."
+    ],
+    "note": "Development milestone. Deployment and cross-platform installed acceptance remain pending."
+  },
+  {
     "id": "newsletter-artwork-stays-behind-the-signup",
     "date": "2026-09-08",
     "status": "In development",

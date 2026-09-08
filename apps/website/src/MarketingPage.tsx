@@ -16,8 +16,8 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
             <h1>{page.headline}</h1>
             <p className="acquisition-lede">{page.lede}</p>
             <div className="acquisition-actions">
-              <a className="button button-primary" href="/#download">
-                Get early access <ArrowRight size={16} />
+              <a className="button button-primary" href="/#newsletter">
+                Join the waitlist <ArrowRight size={16} />
               </a>
               <a className="acquisition-text-link" href="/tour/">
                 <Play size={14} fill="currentColor" /> Watch the app
@@ -27,7 +27,7 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
           <div className="acquisition-proof">
             <div className="acquisition-proof-label">
               <span>JACKALOPE / ACTUAL APP</span>
-              <span>WINDOWS PRERELEASE</span>
+              <span>DEVELOPMENT PREVIEW</span>
             </div>
             <img
               src={`/media/${page.image}${dark ? '' : '-light'}.png`}
@@ -79,8 +79,8 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
             </a>
           ))}
           <span>
-            Jackalope is in prerelease. Public Windows availability and installed-app acceptance
-            remain in progress.
+            Jackalope is in prerelease. Our first launch is planned for macOS, Windows, and Linux.
+            Join the waitlist for availability.
           </span>
         </aside>
       </div>

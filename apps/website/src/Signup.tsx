@@ -5,9 +5,11 @@ import { ArrowRight, Check, GitBranch, Layers3, LoaderCircle, X } from 'lucide-r
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { BrandMark } from './BrandMark';
 import { signupActions } from './signup-config';
+import { signupCampaign, WaitlistPreferences } from './WaitlistPreferences';
 
 export function Signup({ popup = false }: { popup?: boolean }) {
   const id = useId();
+  const [surveyToken, setSurveyToken] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const request = useRef<AbortController | null>(null);
@@ -36,13 +38,18 @@ export function Signup({ popup = false }: { popup?: boolean }) {
             credentials: 'omit',
           });
       const result = accessOrigin
-        ? await accessRequest<{ success: boolean; optIn?: { required: boolean } }>(
+        ? await accessRequest<{
+            success: boolean;
+            surveyToken?: string;
+            optIn?: { required: boolean };
+          }>(
             'waitlist',
             {
               email: String(data.get('email') || '').trim(),
               website: String(data.get('website') || ''),
               newsletter: data.get('newsletter') === 'on',
               source: popup ? 'popup' : 'inline',
+              campaign: signupCampaign(),
             },
             controller.signal,
           )
@@ -57,6 +64,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
         return;
       }
       setState('success');
+      setSurveyToken(result.surveyToken ?? '');
       setMessage(
         accessOrigin
           ? 'You’re on the waitlist. Look out for a signup confirmation, then a separate invitation when your access is ready. Product notes have their own confirmation if you opted in.'
@@ -80,12 +88,15 @@ export function Signup({ popup = false }: { popup?: boolean }) {
   return (
     <div className="signup">
       {state === 'success' ? (
-        <div className="signup-success" role="status" aria-live="polite">
-          <Check size={24} />
-          <div>
-            <h3>You’re on your way.</h3>
-            <p>{message}</p>
+        <div>
+          <div className="signup-success" role="status" aria-live="polite">
+            <Check size={24} />
+            <div>
+              <h3>You’re on your way.</h3>
+              <p>{message}</p>
+            </div>
           </div>
+          {surveyToken && <WaitlistPreferences token={surveyToken} />}
         </div>
       ) : (
         <form
@@ -133,8 +144,8 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           <p id={`${id}-consent`} className="signup-consent">
             {accessOrigin ? (
               <>
-                We’ll email you about your access request. Product notes are optional.{' '}
-                <a href="/privacy/">Privacy</a>.
+                We’ll email you about your access request. Product notes are optional. Campaign
+                source helps us understand how you found us. <a href="/privacy/">Privacy</a>.
               </>
             ) : (
               <>
@@ -186,7 +197,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
       <Dialog.Trigger
         className={`button button-primary button-download ${compact ? 'button-compact' : ''}`}
       >
-        <span>{label || (compact ? 'Join waitlist' : 'Get early access')}</span>
+        <span>{label || (compact ? 'Join waitlist' : 'Join the waitlist')}</span>
         <ArrowRight size={16} />
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -219,7 +230,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
           <div className="waitlist-body">
             <Dialog.Title>Join the Jackalope waitlist</Dialog.Title>
             <Dialog.Description>
-              Coming soon. Join the waitlist for early-access news.
+              Planned for macOS, Windows, and Linux. Join for early-access news.
             </Dialog.Description>
             <ul className="waitlist-perks">
               <li>

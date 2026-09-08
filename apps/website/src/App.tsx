@@ -32,7 +32,7 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
 const faqs = [
   [
     'What is Jackalope?',
-    'Jackalope is a desktop workspace for agent-assisted development. It keeps your projects, ideas, agent tasks, isolated Git worktrees, and code review together, so you can follow work from intent to result.',
+    'Jackalope is a cross-platform workspace for agent-assisted development. It keeps your projects, ideas, agent tasks, isolated Git worktrees, and code review together, so you can follow work from intent to result.',
   ],
   [
     'Do I need an AI subscription?',
@@ -53,6 +53,14 @@ const faqs = [
   [
     'What can I see across my accounts?',
     'Follow task progress and review changes in one workspace. In Usage, filter Jackalope attempts by project and account, inspect reported token usage, and export the selected records. Missing reports remain unavailable; this is not a complete provider billing history or a record of work done outside Jackalope.',
+  ],
+  [
+    'Which platforms are planned?',
+    'Our first launch is planned for macOS, Windows, and Linux. We are preparing and testing the builds together. Join the waitlist to hear when access opens.',
+  ],
+  [
+    'Do direct invitations skip the waitlist?',
+    'Yes. A valid direct invitation grants early access after you verify your email, while the inviter has capacity. There is no second manual approval. Approved access and download availability are separate.',
   ],
   ['When will Jackalope be available?', 'Coming soon. Join the waitlist for early-access news.'],
   [
@@ -95,7 +103,7 @@ export function App({ path = '/' }: { path?: string }) {
           </a>
           <nav className="desktop-nav" aria-label="Main navigation">
             <a href={home ? '#inside' : '/#inside'}>Product</a>
-            <a href="/parallel-coding-agents/">Parallel agents</a>
+            <a href="/compare/">Compare</a>
             <a href="/agents/" aria-current={path.startsWith('/agents/') ? 'page' : undefined}>
               Agents
             </a>
@@ -104,6 +112,11 @@ export function App({ path = '/' }: { path?: string }) {
             </a>
           </nav>
           <div className="header-actions">
+            {path !== '/access/' && (
+              <a className="member-entry" href="/access/">
+                Member access
+              </a>
+            )}
             <button
               className="icon-button appearance-toggle"
               type="button"
@@ -137,6 +150,8 @@ export function App({ path = '/' }: { path?: string }) {
                   collisionPadding={16}
                 >
                   {[
+                    ['Member access', '/access/'],
+                    ['Compare workflows', '/compare/'],
                     ['Product tour', '/#inside'],
                     ['Parallel coding agents', '/parallel-coding-agents/'],
                     ['Git worktrees for agents', '/git-worktrees-for-ai-agents/'],

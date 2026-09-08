@@ -275,7 +275,7 @@ export function ConnectedDesktops() {
       {devices?.map((device) => (
         <div key={device.id} className="desktop-device-row">
           <div>
-            <strong>Windows desktop</strong>
+            <strong>Connected desktop</strong>
             <p>Connected {new Date(device.createdAt).toLocaleString()}</p>
           </div>
           <div className="desktop-connection-actions">

@@ -1,4 +1,5 @@
 import updates from './changelog.json' with { type: 'json' };
+import { growthPost } from './growth-content.ts';
 import { marketingPages } from './marketing-content.ts';
 
 export const siteOrigin = 'https://jackalope.dev';
@@ -7,13 +8,14 @@ export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.
 export const tour = {
   title: 'A little look around Jackalope.',
   description:
-    'Watch the Jackalope desktop workspace: draft a task, inspect a patch, explore coding agents, and change the theme. A 33-second interface tour with fictional Atlas project data.',
-  published: '2026-09-06T23:18:00Z',
+    'Follow tasks, focus your review queue, inspect a question and result, and explore agents in light and dark. A 40-second interface tour with fictional Atlas project data.',
+  published: '2026-09-08T21:45:00Z',
   transcript:
-    'Switch between task views. Open a new task, type a brief, and choose an agent. Inspect a code patch and its checks. Explore the configured agents, then drag the color palette and switch between light and dark appearances. This recording uses fictional Atlas project data and does not launch an agent task. There is no audio.',
+    'Start in Tasks with one question, one result ready to review, one working task, and one saved idea. Focus the review queue, then switch to the board. Open the navigation task to inspect its question. Return to the keyboard-search task and read its result before integration. Explore the agent roster and switch from light to dark. This recording shows current app components with fictional Atlas project data; no native agent tasks run. There is no audio.',
 };
 
 export const posts = [
+  growthPost,
   {
     slug: 'work-and-personal-accounts',
     title: 'Work and personal accounts, with room for both.',
@@ -27,7 +29,7 @@ export const posts = [
         title: 'One workspace, deliberate account choices.',
         paragraphs: [
           'A client repository and a weekend project can call for different accounts, instructions, and tools. Jackalope brings their tasks into one workspace while giving you explicit choices about which agent and account each project uses.',
-          'Separate account profiles are implemented for the built-in Codex, Claude Code, Grok, and OpenCode adapters. Custom agents without a supported profile mechanism do not get this capability. Windows release acceptance, including real multiple-account provider lifecycle trials, is still in progress.',
+          'Separate account profiles are implemented for the built-in Codex, Claude Code, Grok, and OpenCode adapters. Custom agents without a supported profile mechanism do not get this capability. Cross-platform release acceptance, including real multiple-account provider lifecycle trials, is still in progress.',
         ],
       },
       {
@@ -74,7 +76,7 @@ export const posts = [
         title: 'The task is bigger than the prompt.',
         paragraphs: [
           'A good prompt is a beginning. There is still a project to understand, a branch to work from, progress to follow, and a change to review. When that context lives across several terminals and tabs, keeping track becomes its own job.',
-          'Jackalope brings that surrounding work into one desktop workspace. It is a product of Jackalope Digital LLC, built around the idea that your tools should give you room to think.',
+          'Jackalope brings that surrounding work into one cross-platform workspace. It is a product of Jackalope Digital LLC, built around the idea that your tools should give you room to think.',
         ],
       },
       {
@@ -135,7 +137,7 @@ export const posts = [
         paragraphs: [
           'Inspect the patch and the agent’s summary. Run the checks appropriate to your project, and try the behavior that changed. Recorded checks refer to a particular file snapshot; changes after that point need another check.',
           'Ask for another iteration when necessary. Review the combined result before integrating work from multiple tasks. Each task can pass on its own while the combination still needs attention.',
-          'This describes the current development workflow. Public Windows release acceptance is still in progress; follow the changelog for availability.',
+          'This describes the current development workflow. Cross-platform release acceptance is still in progress; follow the changelog for availability.',
         ],
       },
     ],
@@ -149,7 +151,7 @@ export const pages = [
     path: '/',
     title: 'Jackalope: Run Codex, Claude Code & coding agents in parallel',
     description:
-      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Keep project context, agent coordination, evidence, and code review in one Windows desktop workspace.',
+      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Keep project context, agent coordination, evidence, and code review in one cross-platform workspace.',
   },
   {
     path: '/tour/',
