@@ -8,7 +8,7 @@ export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.
 export const tour = {
   title: 'A little look around Jackalope.',
   description:
-    'See parallel coding agents, isolated Git worktrees, and review before integration in a 32-second animated app preview with sample project data.',
+    'See how tasks, coding agents, and code review come together in a 32-second app tour with sample project data.',
   video: '/media/launch-v3-720p.mp4',
   poster: '/media/launch-v3-poster.png',
   captions: '/media/launch-v3.vtt',
@@ -32,7 +32,7 @@ export const posts = [
         title: 'One workspace, deliberate account choices.',
         paragraphs: [
           'A client repository and a weekend project can call for different accounts, instructions, and tools. Jackalope brings their tasks into one workspace while giving you explicit choices about which agent and account each project uses.',
-          'Separate account profiles are implemented for the built-in Codex, Claude Code, Grok, and OpenCode adapters. Custom agents without a supported profile mechanism do not get this capability. Cross-platform release acceptance, including real multiple-account provider lifecycle trials, is still in progress.',
+          'Create separate account profiles for Codex, Claude Code, Grok, and OpenCode. Give each sign-in a useful name, then choose which projects use it.',
         ],
       },
       {
@@ -79,7 +79,7 @@ export const posts = [
         title: 'The task is bigger than the prompt.',
         paragraphs: [
           'A good prompt is a beginning. There is still a project to understand, a branch to work from, progress to follow, and a change to review. When that context lives across several terminals and tabs, keeping track becomes its own job.',
-          'Jackalope brings that surrounding work into one cross-platform workspace. It is a product of Jackalope Digital LLC, built around the idea that your tools should give you room to think.',
+          'Jackalope brings that surrounding work into one desktop workspace. It is a product of Jackalope Digital LLC, built around the idea that your tools should give you room to think.',
         ],
       },
       {
@@ -99,7 +99,7 @@ export const posts = [
       {
         title: 'Growing in the open.',
         paragraphs: [
-          'Jackalope is coming soon. The website tour uses fictional project data to show the interface; it is not evidence of real agent execution.',
+          'Join the waitlist to hear when early access opens. The app tour gives you a look at the workspace using sample project data.',
           'We will share development notes and public release announcements here. Join the waitlist for early-access news.',
         ],
       },
@@ -140,7 +140,6 @@ export const posts = [
         paragraphs: [
           'Inspect the patch and the agent’s summary. Run the checks appropriate to your project, and try the behavior that changed. Recorded checks refer to a particular file snapshot; changes after that point need another check.',
           'Ask for another iteration when necessary. Review the combined result before integrating work from multiple tasks. Each task can pass on its own while the combination still needs attention.',
-          'This describes the current development workflow. Cross-platform release acceptance is still in progress; follow the changelog for availability.',
         ],
       },
     ],
@@ -154,7 +153,7 @@ export const pages = [
     path: '/',
     title: 'Jackalope: Run Codex, Claude Code & coding agents in parallel',
     description:
-      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Keep project context, agent coordination, evidence, and code review in one cross-platform workspace.',
+      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Keep project context, agent coordination, evidence, and code review in one desktop workspace.',
   },
   {
     path: '/tour/',
@@ -172,6 +171,12 @@ export const pages = [
     title: 'Changelog | Jackalope',
     description:
       'Follow Jackalope development milestones, website updates, and future public releases.',
+  },
+  {
+    path: '/knowledge/',
+    title: 'Knowledgebase: Guides, Architecture & Diagnostics | Jackalope',
+    description:
+      'Explore official guides, parallel worktree architecture, multi-account setup, automatic quota handoff, and troubleshooting recipes for Jackalope.',
   },
   {
     path: '/privacy/',

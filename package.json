@@ -12,6 +12,8 @@
     "check": "biome check . --error-on-warnings",
     "check:write": "biome check --write .",
     "typecheck": "pnpm --filter @jackalope/desktop --filter @jackalope/website typecheck",
+    "test": "pnpm test:release && pnpm --filter @jackalope/desktop --filter @jackalope/server test",
+    "test:release": "node --test \"scripts/release/*.test.mjs\"",
     "dev:website": "pnpm --filter @jackalope/website dev",
     "build:website": "pnpm --filter @jackalope/website build",
     "verify": "node scripts/verify.mjs",

@@ -6,22 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:lab": "vite build --mode lab --outDir dist-lab",
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
-    "test:agent-routing": "node --test scripts/agent-routing.test.mjs",
-    "test:task-decomposition": "node --test scripts/task-decomposition.test.mjs",
-    "test:visual-state": "node --test scripts/visual-state.test.mjs",
-    "test:skills": "node --test scripts/skills.test.mjs",
-    "test:settings": "node --test scripts/settings.test.mjs",
-    "test:planning": "node --test scripts/planning.test.mjs",
-    "test:onboarding": "node --test scripts/onboarding.test.mjs",
-    "test:mcp": "node --test scripts/mcp.test.mjs",
+    "test": "node --test \"scripts/*.test.mjs\" ../../scripts/release-config.test.mjs ../../scripts/update-manifest.test.mjs",
+    "test:file": "node --test",
     "brand:generate": "node scripts/generate-brand.mjs && tauri icon src-tauri/icons/source-icon.svg --ios-color \"#1d1a18\" && node scripts/generate-brand.mjs --copy-icon && pnpm brand:installer",
-    "brand:installer": "node scripts/generate-installer-brand.mjs",
-    "test": "node --test scripts/agent-routing.test.mjs scripts/task-decomposition.test.mjs scripts/rich-content.test.mjs scripts/visual-state.test.mjs scripts/skills.test.mjs scripts/settings.test.mjs scripts/planning.test.mjs scripts/schedule-templates.test.mjs scripts/workflow.test.mjs scripts/outcomes.test.mjs scripts/onboarding.test.mjs scripts/mcp.test.mjs scripts/data-integrity.test.mjs scripts/codebase.test.mjs ../../scripts/release-config.test.mjs scripts/updates.test.mjs ../../scripts/update-manifest.test.mjs scripts/discovery.test.mjs scripts/telemetry.test.mjs scripts/companion.test.mjs",
-    "test:discovery": "node --test scripts/discovery.test.mjs",
-    "build:lab": "vite build --mode lab --outDir dist-lab"
+    "brand:installer": "node scripts/generate-installer-brand.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

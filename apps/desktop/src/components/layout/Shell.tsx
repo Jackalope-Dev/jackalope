@@ -1,6 +1,16 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, GitBranch, Plus, Search, Settings2, UsersRound } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  GitBranch,
+  LifeBuoy,
+  Plus,
+  Search,
+  Settings2,
+  UsersRound,
+} from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { openExternalUrl } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -241,6 +251,15 @@ export function Shell({
             <kbd>{shortcut}</kbd>
           </button>
           <ArcColorPicker />
+          <button
+            type="button"
+            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
+            className="quiet-icon"
+            aria-label="Help and knowledgebase"
+            title="Help & Knowledgebase"
+          >
+            <LifeBuoy className="size-4" />
+          </button>
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}

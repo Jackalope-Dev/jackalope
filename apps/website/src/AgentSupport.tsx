@@ -12,7 +12,7 @@ const agents = [
     name: 'Claude Code',
     mark: '✳',
     url: 'https://code.claude.com/docs/en/overview',
-    note: 'Your Claude workflow, with connected tools and in-app questions through the task bridge.',
+    note: 'Use Claude Code with connected tools and answer its questions in Jackalope.',
     connections: 'stdio · HTTP · SSE',
   },
   {
@@ -96,16 +96,15 @@ export function AgentSupport() {
           </table>
         </section>
         <p>
-          Jackalope is in prerelease. These adapters use each agent’s installed CLI and permission
-          rules. Connections configured inside a CLI remain subject to that CLI’s settings; project
-          connections support Codex and Claude Code, with on-demand discovery for Grok. Usage shows
-          what an agent reports, not complete provider billing. Profiles organize sign-ins; they are
-          not a security sandbox.
+          Jackalope uses each agent’s installed CLI and permission rules. Connections configured
+          inside a CLI remain subject to that CLI’s settings; project connections support Codex and
+          Claude Code, with on-demand discovery for Grok and OpenCode. Usage shows what an agent
+          reports, not complete provider billing. Profiles organize sign-ins; they are not a
+          security sandbox.
         </p>
         <p>
-          Gemini CLI is being evaluated. We’ll list further agents here as their integrations are
-          verified. Model access, subscription requirements, and availability belong to the
-          provider.
+          Model access and subscription requirements depend on your provider. See the{' '}
+          <a href="/roadmap/">roadmap</a> for upcoming agent support.
         </p>
       </details>
     </section>

@@ -268,9 +268,13 @@ async function _verifyOnboarding(page) {
   const rescan = page.getByRole('button', { name: 'Re-scan agents', exact: true });
   await rescan.focus();
   await page.keyboard.press('Enter');
+  const installSummary = page.locator('.onboarding-install-catalog > summary');
+  await installSummary.focus();
+  await page.keyboard.press('Enter');
   for (const [width, height] of [
     [1280, 840],
     [960, 640],
+    [600, 640],
   ]) {
     await page.setViewportSize({ width, height });
     for (const isDark of [false, true]) {
@@ -299,8 +303,26 @@ async function _verifyOnboarding(page) {
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         'Agent setup fits the viewport',
       );
+      await page.locator('.onboarding-catalog-card').last().scrollIntoViewIfNeeded();
+      assert(
+        await page
+          .locator('.onboarding-content')
+          .evaluate((pane) =>
+            [
+              pane,
+              ...pane.querySelectorAll(
+                '.onboarding-catalog-grid, .onboarding-catalog-card, .onboarding-command-box',
+              ),
+            ].every((element) => element.scrollWidth <= element.clientWidth + 1),
+          ),
+        'Expanded install commands fit the pane without horizontal overflow',
+      );
+      await page.screenshot({
+        path: `output/playwright/onboarding-install-${isDark ? 'dark' : 'light'}-${width}.png`,
+      });
     }
   }
+  await installSummary.click();
   assert((await page.locator('.onboarding-privacy-panel').count()) === 0, 'Agent hides privacy');
   assert(
     await page.evaluate(

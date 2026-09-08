@@ -35,7 +35,9 @@ public static class JackalopeDesktop {
     [DllImport("user32.dll")] static extern uint SendInput(uint count, Input[] inputs, int size);
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr handle, IntPtr dc, uint flags);
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr context);
-    public static void Dpi() { SetProcessDpiAwarenessContext(new IntPtr(-4)); }
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] static extern IntPtr GetWindowDpiAwarenessContext(IntPtr handle);
+    public static void Dpi() { SetProcessDpiAwarenessContext(new IntPtr(-4)); SetThreadDpiAwarenessContext(new IntPtr(-4)); }
     public static long[] Windows() {
         var list = new List<long>();
         EnumWindows(delegate(IntPtr handle, IntPtr state) {
@@ -91,13 +93,18 @@ public static class JackalopeDesktop {
     public static void Capture(IntPtr handle,string path) {
         var bounds=Bounds(handle);
         if((long)bounds[2]*bounds[3]>16777216) throw new Exception("Window is too large to capture.");
-        using(var bitmap=new Bitmap(bounds[2],bounds[3],PixelFormat.Format32bppArgb))
-        using(var graphics=Graphics.FromImage(bitmap)) {
-            var dc=graphics.GetHdc(); bool copied;
-            try { copied=PrintWindow(handle,dc,2); } finally { graphics.ReleaseHdc(dc); }
-            if(!copied) throw new Exception("This application cannot provide a window capture.");
-            bitmap.Save(path,ImageFormat.Png);
-        }
+        var previous=SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(handle));
+        if(previous==IntPtr.Zero) throw new Exception("Window DPI context is unavailable.");
+        try {
+            var source=Bounds(handle);
+            using(var bitmap=new Bitmap(source[2],source[3],PixelFormat.Format32bppArgb))
+            using(var graphics=Graphics.FromImage(bitmap)) {
+                var dc=graphics.GetHdc(); bool copied;
+                try { copied=PrintWindow(handle,dc,2); } finally { graphics.ReleaseHdc(dc); }
+                if(!copied) throw new Exception("This application cannot provide a window capture.");
+                using(var scaled=new Bitmap(bitmap,bounds[2],bounds[3])) scaled.Save(path,ImageFormat.Png);
+            }
+        } finally { SetThreadDpiAwarenessContext(previous); }
     }
 }
 '@

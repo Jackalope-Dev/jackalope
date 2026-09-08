@@ -1,7 +1,8 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Plus, Search, Settings2 } from 'lucide-react';
+import { LifeBuoy, Plus, Search, Settings2 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useThemeStore } from '../../stores/themeStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 
@@ -28,6 +29,10 @@ export function CommandPalette({
       .split(' ')
       .some((kw) => kw.includes(search)) ||
       'settings & preferences'.includes(search));
+  const showHelp =
+    'help docs documentation knowledgebase faq troubleshooting guides'
+      .split(' ')
+      .some((kw) => kw.includes(search)) || search.includes('help');
   const views = WORKSPACE_VIEWS.filter((item) =>
     `${item.label} ${item.description}`.toLowerCase().includes(search),
   );
@@ -120,6 +125,20 @@ export function CommandPalette({
               >
                 <Settings2 className="size-4 text-[var(--color-accent-ink)]" />
                 <span>Settings & Preferences</span>
+              </button>
+            )}
+            {showHelp && (
+              <button
+                data-command
+                type="button"
+                className="workspace-menu-item w-full text-left hover:bg-[var(--color-surface-hover)]"
+                onClick={() => {
+                  onClose();
+                  void openExternalUrl('https://jackalope.dev/knowledge/');
+                }}
+              >
+                <LifeBuoy className="size-4 text-[var(--color-accent-ink)]" />
+                <span>Help & Knowledgebase</span>
               </button>
             )}
             {views.map((item) => (

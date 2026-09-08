@@ -34,6 +34,22 @@ development is independent and requires no Cloudflare login; see its
 
 ## Checks
 
+Use `pnpm test` for the release, desktop JavaScript and server suites. Desktop
+tests are discovered from `apps/desktop/scripts/*.test.mjs`; new suites do not
+need a package script entry. Desktop tests also retain the shared release-config
+and update-manifest checks used by release builds.
+
+For a single suite or test name, pass Node test-runner arguments to `test:file`:
+
+```powershell
+pnpm --filter @jackalope/desktop test:file scripts/onboarding.test.mjs
+pnpm --filter @jackalope/desktop test:file --test-name-pattern="privacy" scripts/onboarding.test.mjs
+pnpm --filter @jackalope/server test
+pnpm test:release
+```
+
+Run the full verification gate before submitting changes:
+
 ```powershell
 pnpm verify
 pnpm check:secrets

@@ -26,31 +26,31 @@ export const marketingPages: MarketingPage[] = [
     description:
       'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees while Jackalope keeps project context, progress, and review together.',
     headline: 'Run coding agents in parallel. Keep the work coherent.',
-    lede: 'Jackalope is a cross-platform workspace for assigning focused tasks to Codex, Claude Code, Grok, and OpenCode, following their progress, and reviewing the combined result before integration.',
+    lede: 'Jackalope is a desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, and OpenCode, following their progress, and reviewing the combined result before integration.',
     image: 'tasks',
     signals: [
       'Multiple agents',
       'Isolated worktrees',
       'Shared project context',
-      'Explicit integration',
+      'Review before merge',
     ],
     sections: [
       {
         title: 'Parallel work needs more than extra terminals.',
         paragraphs: [
-          'Opening several coding-agent sessions is easy. Keeping their briefs, dependencies, questions, changes, and decisions aligned is the harder part. Jackalope turns each outcome into a durable task and keeps related work visible at the project level.',
+          'Opening several coding-agent sessions is easy. Keeping their briefs, dependencies, questions, changes, and decisions aligned is the harder part. Jackalope turns each outcome into a task and keeps related work visible at the project level.',
           'A parallel plan can define focused tasks, file scopes, dependencies, assigned agents, and a concurrency limit. Independent tasks can run at the same time; dependent work waits for the changes it needs to be explicitly integrated.',
         ],
       },
       {
         title: 'Separate the files. Coordinate the decisions.',
         paragraphs: [
-          'Each parallel task can receive its own Git worktree and branch, preventing two agents from editing the same checkout. Jackalope also delivers a bounded project briefing and relevant coordination messages so agents can understand related work without treating another task’s message as permission or proof.',
+          'Each parallel task can receive its own Git worktree and branch, preventing two agents from editing the same checkout. Project instructions and relevant updates keep each agent informed about related work.',
         ],
         bullets: [
           'Choose Codex, Claude Code, Grok, or OpenCode per task.',
           'Keep task questions and follow-up attempts attached to the original outcome.',
-          'Pause dispatch without pretending already-running work has stopped.',
+          'Pause new tasks while active tasks continue.',
           'Inspect each result and the combined patch before changing the target branch.',
         ],
       },
@@ -58,7 +58,6 @@ export const marketingPages: MarketingPage[] = [
         title: 'Return to one review queue.',
         paragraphs: [
           'A finished response is not the finish line. Jackalope keeps the result, patch, reported checks, evidence, and attempt history together. When several tasks belong together, review preparation checks their current source state and produces a combined result without silently modifying your main checkout.',
-          'Jackalope is in prerelease. The website tour uses fictional Atlas project data, and cross-platform release acceptance is still in progress.',
         ],
       },
     ],
@@ -78,7 +77,7 @@ export const marketingPages: MarketingPage[] = [
     description:
       'Learn how Jackalope uses isolated Git worktrees to run AI coding agents in parallel and guards review, integration, recovery, and cleanup.',
     headline: 'Give every coding-agent task its own Git worktree.',
-    lede: 'Worktrees let several coding agents work on one repository without sharing a working directory. Jackalope adds task ownership, review, recovery, and guarded integration around that Git primitive.',
+    lede: 'Worktrees let several coding agents work on one repository without sharing a working directory. Jackalope keeps each worktree connected to its task, history, and review.',
     image: 'review',
     signals: [
       'One task per checkout',
@@ -95,21 +94,21 @@ export const marketingPages: MarketingPage[] = [
         ],
       },
       {
-        title: 'Jackalope owns the task lifecycle around Git.',
+        title: 'Keep the worktree and its task together.',
         paragraphs: [
-          'Jackalope starts from a resolved target commit, records which attempt owns the worktree, and protects active or interrupted work from cleanup. Review preparation rechecks the task source, current changes, target branch, and worktree state before producing an integration result.',
+          'Jackalope creates each task worktree from your chosen branch. Return to its history, review its changes, and keep active or interrupted work safe from cleanup. Before merging, Jackalope checks that the source files and target branch still match your review.',
         ],
         bullets: [
-          'Dependencies wait for integrated changes, not a successful process exit.',
-          'Integration uses explicit review and a fast-forward-only target update.',
-          'Dirty or diverged state stops the operation instead of being hidden by an automatic stash or reset.',
-          'Recoverable work can be archived before removal when cleanup is explicitly chosen.',
+          'Dependent tasks wait until the changes they need have been merged.',
+          'Review the combined patch before updating your target branch.',
+          'If the branch has changed, resolve the difference before merging. Your unrelated edits stay intact.',
+          'Archive work you want to keep before removing its worktree.',
         ],
       },
       {
-        title: 'Use worktrees as a boundary, not a guarantee.',
+        title: 'Know what a worktree separates.',
         paragraphs: [
-          'File scopes help schedule work and explain ownership, but they are not a filesystem sandbox. Agents still operate under their CLI permissions, and generated code still needs project checks and human review. Jackalope makes those boundaries visible instead of presenting isolation as automatic correctness.',
+          'Worktrees separate working directories. They do not restrict an agent’s access to other local files. Your agent permissions still apply; review the code and run project checks before merging.',
         ],
       },
     ],
@@ -136,26 +135,26 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'One workspace does not mean one provider.',
         paragraphs: [
-          'Different tasks benefit from different agents, models, accounts, and tools. Jackalope keeps the task identity stable while allowing each new task to use the configured runner that fits the work.',
-          'Agent capabilities are presented explicitly. Codex and Claude Code receive the richest project-connection delivery; Grok supports on-demand discovery through the project bridge; OpenCode uses its own CLI configuration.',
+          'Different tasks benefit from different agents, models, accounts, and tools. Jackalope keeps the task identity stable while allowing each new task to use the agent that fits the work.',
+          'Connect project tools directly to Codex and Claude Code. Grok and OpenCode can discover supported project tools on demand.',
         ],
       },
       {
-        title: 'Common workflow, honest capability differences.',
+        title: 'Tasks, accounts, and review in one place.',
         paragraphs: [
-          'All four built-in adapters participate in tasks, follow-up attempts, review, account profiles, and reported task usage where the CLI exposes it. Provider subscriptions, limits, permissions, and data policies still apply.',
+          'All four agents support tasks, follow-ups, review, and account profiles. Usage appears when the agent reports it. Provider subscriptions, limits, permissions, and data policies still apply.',
         ],
         bullets: [
           'Use named work and personal sign-in profiles for supported agents.',
-          'Choose allowed runners and default accounts per project.',
+          'Choose allowed agents and default accounts per project.',
           'Keep continuations on the account that started the attempt.',
-          'Treat missing usage reports as unknown, never zero.',
+          'See reported usage for each task.',
         ],
       },
       {
-        title: 'Choose depth over a logo wall.',
+        title: 'Start with your existing setup.',
         paragraphs: [
-          'Jackalope focuses on four verified native adapters instead of claiming universal compatibility. Gemini CLI is being evaluated and will not be listed as supported until its integration is verified.',
+          'Install and sign in to Codex, Claude Code, Grok, or OpenCode, then choose your agent in Jackalope. You keep your existing provider account and permissions.',
         ],
       },
     ],
@@ -187,13 +186,13 @@ export const marketingPages: MarketingPage[] = [
         ],
       },
       {
-        title: 'Keep accounts and attempts attributable.',
+        title: 'Use the right account for the project.',
         paragraphs: [
-          'Create named Codex sign-in profiles, select one for a project, and keep continuations on the account that began the work. Jackalope can display supported account capacity windows and reported task usage without reading private credential files.',
+          'Create named Codex sign-in profiles, select one for a project, and keep continuations on the account that began the work. See available account limits and reported task usage in one place.',
         ],
         bullets: [
           'Run one task directly or assign Codex inside a parallel plan.',
-          'Receive project coordination messages during bridged work.',
+          'Receive updates from related project tasks.',
           'Inspect the result, patch, evidence, and attempt history together.',
           'Export reported usage by project and account profile.',
         ],
@@ -226,7 +225,7 @@ export const marketingPages: MarketingPage[] = [
     signals: ['Installed Claude Code', 'Project MCP', 'In-app questions', 'Account profiles'],
     sections: [
       {
-        title: 'Move from prompt to durable task.',
+        title: 'Move from prompt to task.',
         paragraphs: [
           'A Jackalope task can launch Claude Code with selected project instructions and tools, surface questions while it runs, and retain follow-up attempts under the same outcome. The task remains understandable after the terminal session ends.',
           'Claude Code supports project-selected stdio, HTTP, and SSE connections through Jackalope. Existing Claude configuration and provider permissions remain in effect.',
@@ -240,7 +239,7 @@ export const marketingPages: MarketingPage[] = [
         bullets: [
           'Create separate named sign-in profiles for work and personal projects.',
           'Keep task continuation tied to its original account profile.',
-          'Read reported usage with explicit missing-data coverage.',
+          'See task usage when Claude Code reports it.',
           'Review the combined patch before integrating related tasks.',
         ],
       },
@@ -264,27 +263,27 @@ export const marketingPages: MarketingPage[] = [
     description:
       'Run Grok coding-agent tasks in isolated Git worktrees with project context, on-demand HTTP tool discovery, task history, and review in Jackalope.',
     headline: 'Give Grok focused work without losing the project around it.',
-    lede: 'Use your installed Grok CLI and xAI access while Jackalope keeps the task brief, isolated worktree, selected context, result, and review in one durable workspace.',
+    lede: 'Use your installed Grok CLI and xAI access while Jackalope keeps the task brief, isolated worktree, selected context, result, and review in one workspace.',
     image: 'agents',
     signals: ['Installed Grok CLI', 'HTTP tool discovery', 'Isolated attempts', 'Review history'],
     sections: [
       {
-        title: 'Keep Grok work bounded and attributable.',
+        title: 'Keep Grok work connected to the task.',
         paragraphs: [
           'Assign Grok a focused outcome inside a standalone task or a parallel plan. Jackalope prepares the worktree, records the selected project context, and keeps follow-up attempts attached to the original request.',
-          'Supported HTTP project tools can be discovered on demand. Jackalope does not claim stdio tool delivery, provider usage reporting, or the same account workflow available for every adapter.',
+          'Grok can discover supported HTTP project tools on demand. Use your Grok configuration for other tools and your provider account for billing details.',
         ],
       },
       {
-        title: 'Use the same review boundary across different agents.',
+        title: 'Review every agent in one place.',
         paragraphs: [
-          'A Grok result returns to the same task-aware review flow as Codex, Claude Code, and OpenCode work. You can inspect the exact patch and combine related results deliberately instead of treating a completed process as an accepted change.',
+          'Review Grok results alongside your other agents. Inspect each patch, ask for changes, and combine related results before you merge.',
         ],
         bullets: [
           'Run work in a project-owned Git worktree.',
           'Keep task attempts and corrections together.',
           'Coordinate discoveries with related project tasks.',
-          'Review before an explicit integration action.',
+          'Review the changes before merging.',
         ],
       },
       {
@@ -306,7 +305,7 @@ export const marketingPages: MarketingPage[] = [
     title: 'Run OpenCode tasks in isolated Git worktrees | Jackalope',
     description:
       'Run OpenCode tasks in isolated Git worktrees with project context, task history, coordination, and review while retaining OpenCode CLI configuration.',
-    headline: 'Put OpenCode inside a durable project workflow.',
+    headline: 'Put OpenCode inside a project workflow.',
     lede: 'Use your installed OpenCode CLI while Jackalope gives each task a focused worktree and keeps its context, attempts, result, and review attached to the project.',
     image: 'agents',
     signals: [
@@ -320,7 +319,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Add structure around the agent session.',
         paragraphs: [
           'Launch OpenCode for one task or assign it beside other agents in a plan. Jackalope owns the worktree and task lifecycle while OpenCode continues to use its own CLI configuration and permissions.',
-          'Project-selected MCP delivery is not currently enabled for OpenCode. The capability boundary is shown explicitly so adapter breadth does not get confused with feature parity.',
+          'Choose project connections in Jackalope for on-demand tool discovery. Tools configured in OpenCode remain subject to its own CLI settings.',
         ],
       },
       {
@@ -345,7 +344,7 @@ export const marketingPages: MarketingPage[] = [
     related: [
       { href: '/agents/', label: 'Compare supported coding agents' },
       { href: '/git-worktrees-for-ai-agents/', label: 'How task worktrees work' },
-      { href: '/features/project-context-for-coding-agents/', label: 'Project context boundaries' },
+      { href: '/features/project-context-for-coding-agents/', label: 'Project context and tools' },
     ],
   },
   {
@@ -401,7 +400,12 @@ export const marketingPages: MarketingPage[] = [
     headline: 'Review the outcome, the evidence, and the exact code together.',
     lede: 'Agent output can sound complete while the code is stale, incomplete, or incompatible with another patch. Jackalope organizes review around the task and the snapshot that produced its evidence.',
     image: 'review',
-    signals: ['Original intent', 'Snapshot-bound checks', 'Visible patch', 'Explicit decision'],
+    signals: [
+      'Original intent',
+      'Checks for the current code',
+      'Visible patch',
+      'Explicit decision',
+    ],
     sections: [
       {
         title: 'Begin with the promised outcome.',
@@ -423,7 +427,7 @@ export const marketingPages: MarketingPage[] = [
         ],
       },
       {
-        title: 'Review integrations as their own artifact.',
+        title: 'Check how the changes work together.',
         paragraphs: [
           'Independent patches can conflict semantically even when Git can combine them. Jackalope prepares a combined review from the selected task results and rechecks the source and target state before an explicit integration action.',
         ],
@@ -443,7 +447,7 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Feature',
     title: 'Project context for AI coding agents | Jackalope',
     description:
-      'Give coding-agent tasks selected project instructions, lessons, reusable workflows, history, and MCP tools while retaining an inspectable context receipt.',
+      'Give coding-agent tasks selected project instructions, lessons, reusable workflows, history, and MCP tools and inspect what each task receives.',
     headline: 'Carry project knowledge forward without copying it into every prompt.',
     lede: 'Jackalope keeps project instructions, learned constraints, reusable workflows, relevant task history, and supported connections close to the task that needs them.',
     image: 'tasks',
@@ -452,8 +456,8 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Context belongs to the project and the task.',
         paragraphs: [
-          'Save stable project guidance once, then decide what a new task should receive. Jackalope creates a bounded context receipt so you can inspect the instructions, history, knowledge, and tools that accompanied an attempt.',
-          'This is deliberate context assembly, not an unlimited memory claim. Search results and historical material remain bounded, and selected connections are additional to whatever the agent CLI already exposes globally.',
+          'Save stable project guidance once, then decide what a new task should receive. You can inspect the instructions, history, lessons, and tools included with each task.',
+          'Select the context relevant to the work. Your agent may also have tools configured outside Jackalope; review those in its CLI settings.',
         ],
       },
       {
@@ -469,9 +473,9 @@ export const marketingPages: MarketingPage[] = [
         ],
       },
       {
-        title: 'Connections remain capability-aware.',
+        title: 'Connect tools to the agents that use them.',
         paragraphs: [
-          'Codex and Claude Code support direct project connection delivery. Grok can discover supported HTTP tools on demand, while OpenCode continues to use its own CLI configuration. Jackalope exposes those differences rather than promising identical support.',
+          'Codex and Claude Code support direct project connection delivery. Grok and OpenCode support on-demand tool discovery. See the agent guide for setup details.',
         ],
       },
     ],
@@ -488,14 +492,14 @@ export const marketingPages: MarketingPage[] = [
     description:
       'Schedule recurring coding-agent work with its project, account, context, missed-run policy, isolated worktree, result, and review history intact.',
     headline: 'Repeat the work. Keep every run reviewable.',
-    lede: 'Jackalope recurring tasks preserve the project setup around a task and record each occurrence as its own result instead of hiding repeated work behind a cron expression.',
+    lede: 'Jackalope recurring tasks preserve the project setup around a task and record each occurrence as its own result so you can review each run.',
     image: 'tasks',
     signals: ['Paused by default', 'Project-bound', 'Run history', 'Review-ready notifications'],
     sections: [
       {
-        title: 'A schedule should not erase task ownership.',
+        title: 'Set the schedule and the project.',
         paragraphs: [
-          'Choose the project, agent, account, execution target, timezone, and missed-run policy for recurring work. Each occurrence uses the guarded task launcher and receives its own attempt, worktree, result, and history.',
+          'Choose the project, agent, account, execution target, timezone, and missed-run policy for recurring work. Each run keeps its result and history with the task.',
           'New schedules begin paused. Jackalope does not wake a closed app or sleeping computer, and it does not silently replay interrupted dispatch after a restart.',
         ],
       },
@@ -508,13 +512,13 @@ export const marketingPages: MarketingPage[] = [
           'Skip or catch up one missed occurrence according to the saved policy.',
           'Prevent a schedule from overlapping its own active or interrupted run.',
           'Link failure and review-ready notifications to the actual occurrence.',
-          'Retain reviewed history on disk with bounded loading and restore controls.',
+          'Return to previous results and restore archived work.',
         ],
       },
       {
-        title: 'Automation remains a proposal for review.',
+        title: 'Review scheduled work, too.',
         paragraphs: [
-          'A scheduled agent response does not prove the result is correct or integrated. Jackalope preserves the same review boundaries used by manually launched tasks.',
+          'Open a scheduled result, inspect its changes and checks, and ask for corrections when needed. You decide when it is ready to merge.',
         ],
       },
     ],

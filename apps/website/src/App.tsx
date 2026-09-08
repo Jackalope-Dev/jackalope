@@ -8,13 +8,15 @@ import { BrandMark } from './BrandMark';
 import { tour } from './content';
 import { FeedbackPage } from './Feedback';
 import { JournalPage } from './Journal';
+import { KnowledgebasePage } from './Knowledgebase';
 import { LandingPage } from './LandingPage';
 import { LegalPage } from './Legal';
 import { MarketingPage } from './MarketingPage';
 import { marketingPages } from './marketing-content';
 import { waitlistReferral } from './referral';
-import { Newsletter, WaitlistButton } from './Signup';
+import { Newsletter, Signup, WaitlistButton } from './Signup';
 import { WaitlistPage } from './Waitlist';
+import './knowledge.css';
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
 const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
@@ -35,45 +37,36 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
 const faqs = [
   [
     'What is Jackalope?',
-    'Jackalope is a cross-platform workspace for agent-assisted development. It keeps your projects, ideas, agent tasks, isolated Git worktrees, and code review together, so you can follow work from intent to result.',
+    'A desktop workspace for Codex, Claude Code, Grok, and OpenCode. Run tasks in parallel, keep their project context together, and review the changes in one place.',
+  ],
+  [
+    'Why use it instead of more terminal tabs?',
+    'Each task keeps its brief, agent, account, worktree, questions, and result together. You can see what needs attention and review related changes as one combined patch.',
   ],
   [
     'Do I need an AI subscription?',
-    'Bring Codex, Claude Code, Grok, or OpenCode. Jackalope uses their installed command-line interfaces; see the agent section for connection and sign-in differences. Provider account requirements, subscriptions, and usage limits still apply. Jackalope does not include model access.',
+    'Bring a supported agent CLI and its provider account. Jackalope does not include model access. Subscription requirements, usage limits, and charges depend on your provider.',
   ],
   [
     'Does my code stay on my computer?',
-    'Your repositories and task workspaces live on your computer. When you run an agent, it may send code and context to its provider under your account settings. Any connected tools also have their own data policies.',
-  ],
-  [
-    'Can agents work on different tasks at once?',
-    'Yes. Parallel tasks can use isolated Git worktrees, with scopes and dependencies to coordinate the work. You can inspect the proposed changes and checks before explicitly applying an integration.',
+    'Repositories and task workspaces live on your computer. Agents may send code and context to their providers under your account settings. Connected tools have their own data policies.',
   ],
   [
     'Can I keep work and personal accounts separate?',
-    'Yes. Create separate sign-in profiles for supported agents such as Codex and Claude Code, then choose an account and allowed agents for each project. Task continuations keep their original account. Profiles organize sign-ins and project context; they are not a security sandbox. Provider settings, connected tools, and local file permissions still apply.',
+    'Yes. Create named sign-in profiles and choose an account for each project. Task continuations keep their original account. Profiles organize sign-ins; they do not isolate local file access.',
   ],
   [
-    'What can I see across my accounts?',
-    'Follow task progress and review changes in one workspace. In Usage, filter Jackalope attempts by project and account, inspect reported token usage, and export the selected records. Missing reports remain unavailable; this is not a complete provider billing history or a record of work done outside Jackalope.',
+    'What happens after I join?',
+    'Verify your email to confirm your place and get your referral link. Each verified new signup through your link earns one day of priority. Approved members receive five Instant Access Passes to share. No payment is needed to join.',
   ],
   [
-    'Which platforms are planned?',
-    'Our first launch is planned for macOS, Windows, and Linux. We are preparing and testing the builds together. Join the waitlist to hear when access opens.',
-  ],
-  [
-    'Do direct invitations skip the waitlist?',
-    'Yes. A valid direct invitation grants early access after you verify your email, while the inviter has capacity. There is no second manual approval. Approved access and download availability are separate.',
-  ],
-  ['When will Jackalope be available?', 'Coming soon. Join the waitlist for early-access news.'],
-  [
-    'Does Jackalope automatically choose the best agent, model, and account?',
-    'Automatic tasks ask your configured default agent to choose an allowed agent, configured model, and permitted account. Jackalope validates project restrictions and tool compatibility, considers available capacity reports, and can hand off recognized quota failures to an eligible alternative while preserving the work. Explicit assignments remain available. “Best” depends on your setup and the evidence available; unknown quota stays unknown. This prerelease implementation has passed simulated handoff tests; live model-selection and cross-provider handoff acceptance are still pending.',
+    'Can Jackalope choose an agent, model, and account?',
+    'Automatic tasks ask your configured default agent to choose an allowed agent, configured model, and permitted account. Jackalope validates project restrictions and tool compatibility, considers available capacity reports, and can hand off recognized quota failures to an eligible alternative while preserving the work. Explicit assignments remain available. Routing depends on your configured agents and available usage reports.',
     'routing-question',
   ],
   [
     'Which tools does Jackalope give agents?',
-    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. Stop revokes access. It operates your live desktop under existing OS permissions; macOS and Linux native window control are not yet supported. Windows fixture testing has passed; installed-agent acceptance is still pending.',
+    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. Stop revokes access. It operates your live desktop under existing OS permissions; macOS and Linux native window control are not yet supported.',
     'tools-question',
   ],
   [
@@ -82,14 +75,14 @@ const faqs = [
     'coordination-question',
   ],
   [
-    'What happens after I join the waitlist?',
-    'Verify your email to see your place and share a personal link. Waitlist referrals are unlimited; each verified new signup earns one day of priority. After acceptance, you get five Instant Access Passes for people to skip the line. No payment is needed to join, and there is no confirmed public launch date or price yet. Your coding agent’s own subscription and usage charges still apply.',
+    'Can I download Jackalope now?',
+    downloadUrl
+      ? 'The Windows release is available below. Bring a local Git project and a supported, signed-in coding agent.'
+      : 'Public downloads are not open yet. Join the waitlist and we’ll email you when access is ready.',
   ],
   [
-    'Can I download it today?',
-    downloadUrl
-      ? `The Windows release is available below. Bring a local Git repository and a supported, signed-in coding agent to get started.`
-      : 'Jackalope is in early development, and the first public download is being prepared. Join the waitlist for access news. The interactive demo uses sample tasks; the app walkthrough shows the current interface with sample project data.',
+    'Does an invitation include a download?',
+    'A valid direct invitation skips the waitlist after you verify your email, while the inviter has capacity. Your account shows downloads when a build is available.',
   ],
 ];
 
@@ -126,6 +119,9 @@ export function App({ path = '/' }: { path?: string }) {
             <a href="/compare/">Compare</a>
             <a href="/agents/" aria-current={path.startsWith('/agents/') ? 'page' : undefined}>
               Agents
+            </a>
+            <a href="/knowledge/" aria-current={path.startsWith('/knowledge') ? 'page' : undefined}>
+              Knowledgebase
             </a>
             <a href="/blog/" aria-current={path.startsWith('/blog/') ? 'page' : undefined}>
               Field notes
@@ -177,6 +173,7 @@ export function App({ path = '/' }: { path?: string }) {
                     ['Member access', '/access/'],
                     ['Compare workflows', '/compare/'],
                     ['Product tour', '/#inside'],
+                    ['Knowledgebase & Guides', '/knowledge/'],
                     ['Parallel coding agents', '/parallel-coding-agents/'],
                     ['Git worktrees for agents', '/git-worktrees-for-ai-agents/'],
                     ['Supported agents', '/agents/'],
@@ -184,6 +181,7 @@ export function App({ path = '/' }: { path?: string }) {
                     ['Make it yours', '/#atmosphere'],
                     ['Questions', '/#questions'],
                     ['Changelog', '/changelog/'],
+                    ['Roadmap', '/roadmap/'],
                     ['Field notes', '/blog/'],
                   ].map(([label, href]) => (
                     <Menu.Item key={href} asChild>
@@ -208,7 +206,7 @@ export function App({ path = '/' }: { path?: string }) {
                 Download for Windows <ArrowDownToLine size={18} />
               </a>
             ) : (
-              <WaitlistButton />
+              <Signup />
             )
           }
           dark={dark}
@@ -228,6 +226,8 @@ export function App({ path = '/' }: { path?: string }) {
         <WaitlistPage />
       ) : path === '/access/' ? (
         <AccessPage />
+      ) : path === '/knowledge/' ? (
+        <KnowledgebasePage />
       ) : path === '/privacy/' || path === '/terms/' ? (
         <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
       ) : marketingPage ? (
@@ -253,7 +253,9 @@ export function App({ path = '/' }: { path?: string }) {
           <a href="/parallel-coding-agents/">Parallel agents</a>
           <a href="/git-worktrees-for-ai-agents/">Git worktrees</a>
           <a href="/agents/">Agents</a>
+          <a href="/knowledge/">Knowledgebase</a>
           <a href="/changelog/">Changelog</a>
+          <a href="/roadmap/">Roadmap</a>
           <a href="/blog/">Field notes</a>
           <a href="https://x.com/JackalopeDotDev" rel="me">
             Follow on X

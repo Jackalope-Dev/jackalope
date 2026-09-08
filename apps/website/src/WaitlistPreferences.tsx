@@ -120,9 +120,9 @@ export function WaitlistPreferences({ token }: { token: string }) {
             </fieldset>
           ))}
           <p className="signup-consent">
-            These preferences guide our plans; they aren’t promised integrations. Answers are stored
-            with new signups; existing preferences aren’t replaced.{' '}
-            <a href="/privacy/#access">Privacy</a>.
+            Tell us what you use today. See <a href="/agents/">current agent support</a> and our{' '}
+            <a href="/roadmap/">roadmap</a>. Answers are saved with new signups; existing
+            preferences stay unchanged. <a href="/privacy/#access">Privacy</a>.
           </p>
           <div className="preference-actions">
             <button type="submit" className="button button-primary" disabled={state === 'saving'}>

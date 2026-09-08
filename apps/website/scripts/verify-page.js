@@ -136,7 +136,7 @@ async function _verifyPage(page) {
       throw new Error('Waitlist dialog did not return focus to its header trigger.');
     }
   });
-  const play = page.getByRole('button', { name: 'Watch the app', exact: true });
+  const play = page.getByRole('button', { name: 'Watch the 32-second tour', exact: true });
   await play.click();
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 1);
   const media = await page.locator('video').evaluate(async (video) => {
@@ -148,7 +148,9 @@ async function _verifyPage(page) {
   });
   assert(media.playing, 'Video playback');
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => document.activeElement?.textContent === 'Watch the app');
+  await page.waitForFunction(
+    () => document.activeElement?.textContent === 'Watch the 32-second tour',
+  );
   await page.route('**/media/launch-v3-720p.mp4', (route) => route.abort());
   await play.click();
   await page.getByText('The walkthrough couldn’t load.', { exact: false }).waitFor();
@@ -175,7 +177,7 @@ async function _verifyPage(page) {
     (await page.locator('.echo-art button').count()) === 0,
     'No manual logo animation control',
   );
-  await page.locator('#features').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
+  await page.locator('#workflow').evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
   await page.waitForFunction(
     () => document.querySelector('.echo-art .brand-echo').dataset.animated === 'false',
   );

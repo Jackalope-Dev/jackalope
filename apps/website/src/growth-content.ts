@@ -2,55 +2,138 @@ import type { MarketingPage } from './marketing-content.ts';
 
 export const growthPages: MarketingPage[] = [
   {
-    path: '/compare/',
-    kind: 'Workspace comparison',
-    title: 'Compare coding-agent workspaces | Jackalope',
+    path: '/roadmap/',
+    kind: 'Roadmap',
+    title: 'Jackalope roadmap | What comes next',
     description:
-      'Compare Jackalope, Braid, Emdash, Worktree, and Codius by the workflow you need: local review, GitHub, shared sessions, or remote work.',
-    headline: 'More agents is the beginning. What happens next?',
-    lede: 'Choose a workspace around how you work, where your projects run, and how you review the result. Here is where Jackalope fits alongside other coding-agent tools.',
-    image: 'review',
-    signals: [
-      'Local project ownership',
-      'Task context',
-      'Combined review',
-      'Cross-platform launch planned',
-    ],
+      'Follow plans for Jackalope desktop releases, coding-agent support, project tools, and remote work.',
+    headline: 'Where we go next.',
+    lede: 'Our priorities for Jackalope. In development means work is underway; planned and exploring items are not available features or promised release dates.',
+    image: 'tasks',
+    signals: ['In development', 'Planned', 'Exploring'],
     sections: [
       {
-        title: 'Choose the workflow, then the workspace.',
+        title: 'In development: the desktop launch.',
         paragraphs: [
-          'Jackalope focuses on the path from a task brief to reviewed changes: project context, bounded coordination updates, snapshot-bound evidence, and an explicit combined integration decision. We are preparing our first launch for macOS, Windows, and Linux.',
-          'These comparisons summarize public product descriptions checked September 8, 2026. They are not performance benchmarks or independent product tests. Capabilities change; check the linked official sources before choosing.',
+          'We are preparing Jackalope for macOS, Windows, and Linux, including installation, updates, agent sign-in, and recovery of saved work. Public downloads are not yet open; join the waitlist for an invitation when access is ready.',
+        ],
+      },
+      {
+        title: 'Planned: more agents and richer project tools.',
+        paragraphs: [
+          'We want to expand agent support beyond Codex, Claude Code, Grok, and OpenCode, and improve tool connections and usage reporting. Gemini CLI is under evaluation. Goose and Aider execution support is on the backlog.',
         ],
         bullets: [
-          'Braid: consider it when integrated terminals, an editor, and GitHub PR/CI controls are central to your workflow.',
-          'Emdash: consider it for a broad agent catalog, parallel development, and a larger developer-tool surface.',
-          'Worktree: consider it when shared workspaces and collaborative agent sessions matter.',
-          'Codius: consider it when you need desktop, web, and phone access to coding agents on hosts you control.',
+          'More agent-specific tools, questions, and account controls.',
+          'GitHub pull requests, CI checks, and issue intake.',
+          'Better project understanding and guidance on usage and capacity.',
         ],
       },
       {
-        title: 'Where Jackalope fits.',
+        title: 'Exploring: work beyond your desktop.',
         paragraphs: [
-          'You want to run independent tasks with your own coding-agent accounts and return to a clear review queue. Project instructions and selected tools travel with each task. Dependencies wait for integrated changes, and changed source files can make previous evidence stale.',
-          'Separate Git worktrees are useful, but they are not a security sandbox or proof that two changes work together. Jackalope makes the combined review an explicit step.',
+          'Remote hosts, phone access, and shared team workspaces are future work. We are exploring ways to steer and review tasks across machines while keeping control of projects and connected services clear.',
         ],
       },
       {
-        title: 'Be clear about the gaps.',
+        title: 'Follow the progress.',
         paragraphs: [
-          'Jackalope is in prerelease. Deep GitHub PR/CI workflows, issue-tracker intake, remote hosts, phone control, and shared human-team workspaces are future work. If these are essential today, evaluate tools that already offer them.',
-          'Bring your own supported coding agents and accounts. Provider charges still apply. There is no confirmed public release date or price.',
+          'The changelog records completed development milestones. This roadmap records intent and may change as we learn from early users. We have not announced a public launch date or price.',
         ],
       },
     ],
     related: [
-      { href: 'https://getbraid.dev/', label: 'Braid: official product' },
-      { href: 'https://emdash.com/', label: 'Emdash: official product' },
-      { href: 'https://tryworktree.com/', label: 'Worktree: official product' },
-      { href: 'https://codius.ai/', label: 'Codius: official product' },
-      { href: '/compare/terminal-tabs/', label: 'Jackalope and terminal tabs' },
+      {
+        href: '/changelog/',
+        label: 'Read the changelog',
+      },
+      {
+        href: '/agents/',
+        label: 'Current agent compatibility',
+      },
+      {
+        href: '/tour/',
+        label: 'Watch the app tour',
+      },
+    ],
+  },
+  {
+    path: '/compare/',
+    kind: 'Workspace comparison',
+    title: 'Compare coding-agent workspaces | Jackalope',
+    description:
+      'Compare Jackalope with Superset, Orca, Conductor, Emdash, Braid, Worktree, Codius, and Hermes by the workflow you want.',
+    headline: 'Your agents are a choice. So is your workspace.',
+    lede: 'Choose a workspace around the way you brief agents, follow parallel work, and review changes. Here is how Jackalope fits.',
+    image: 'review',
+    signals: ['Your agent accounts', 'Project context', 'Parallel worktrees', 'Combined review'],
+    sections: [
+      {
+        title: 'Keep the whole task together.',
+        paragraphs: [
+          'Jackalope brings project instructions, agent accounts, independent tasks, and combined code review into one desktop workspace. Give each task the context it needs, follow questions and results, and decide which changes to bring together.',
+        ],
+      },
+      {
+        title: 'Find the workflow that fits.',
+        paragraphs: [
+          'These summaries reflect official product pages reviewed September 8, 2026. Follow the sources below for current availability and details.',
+        ],
+        bullets: [
+          'Superset: a workspace for different coding agents, parallel tasks, recurring work, and remote hosts.',
+          'Orca: an agent workspace with terminals, browser tools, diffs, and a mobile companion.',
+          'Conductor: parallel coding agents with cloud workspaces and shared sessions.',
+          'Emdash: parallel agents, scheduled work, an in-app browser, and reusable prompts and tools.',
+          'Braid: parallel agent sessions with integrated terminals, editing, and GitHub review controls.',
+          'Worktree: shared agent conversations and code review for human teams.',
+          'Codius: desktop, web, and phone access to coding agents on hosts you control.',
+          'Hermes by Nous Research: an agent with persistent memory and automation, rather than a workspace primarily for supervising different coding agents.',
+        ],
+      },
+      {
+        title: 'See Jackalope in action.',
+        paragraphs: [
+          'Watch the app tour, explore agent compatibility, or join the early-access waitlist. Use the roadmap to follow plans for additional platforms, integrations, and remote work.',
+        ],
+      },
+    ],
+    related: [
+      {
+        href: 'https://superset.sh/',
+        label: 'Superset',
+      },
+      {
+        href: 'https://www.onorca.dev/',
+        label: 'Orca',
+      },
+      {
+        href: 'https://www.conductor.build/',
+        label: 'Conductor',
+      },
+      {
+        href: 'https://emdash.com/',
+        label: 'Emdash',
+      },
+      {
+        href: 'https://getbraid.dev/',
+        label: 'Braid',
+      },
+      {
+        href: 'https://tryworktree.com/',
+        label: 'Worktree',
+      },
+      {
+        href: 'https://codius.ai/',
+        label: 'Codius',
+      },
+      {
+        href: 'https://hermes-agent.nousresearch.com/',
+        label: 'Hermes by Nous Research',
+      },
+      {
+        href: '/compare/terminal-tabs/',
+        label: 'Jackalope and terminal tabs',
+      },
     ],
   },
   {
@@ -114,8 +197,8 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Inspect the interface as part of the work.',
         paragraphs: [
-          'The native browser tools support navigation, accessibility snapshots, form and keyboard actions, screenshots, and viewport or theme changes. Sessions belong to a task so its browser work can stay bounded and cancellable.',
-          'Agents use the tools their adapter and task configuration expose. Tool availability is not a guarantee that the agent exercised every state.',
+          'Let an agent navigate pages, fill forms, use the keyboard, and capture screenshots at different sizes and themes. Browser sessions stay with their task, and you can stop them when needed.',
+          'Choose the tools available to the task, then include the states you want the agent to check in your brief.',
         ],
       },
       {
@@ -132,7 +215,7 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Evidence supports a decision.',
         paragraphs: [
-          'A browser screenshot shows a captured state. It does not establish native window behavior, installed-app acceptance, or a complete accessibility audit. Keep those checks separate and explicit.',
+          'Review the states that matter: keyboard navigation, small screens, and error recovery. A screenshot shows one moment; try the changed behavior before accepting the work.',
         ],
       },
     ],
@@ -151,12 +234,12 @@ export const growthPost = {
   date: '2026-09-08',
   readingTime: '2 min read',
   description:
-    'Our first launch is planned for macOS, Windows, and Linux. Tell us which agents and workflows matter to you, then bring other developers into early access.',
+    'Tell us which agents and workflows matter to you, and bring other developers into early access.',
   sections: [
     {
-      title: 'One launch, three platforms.',
+      title: 'A workspace for the way you build.',
       paragraphs: [
-        'We are planning our first launch across macOS, Windows, and Linux. The goal is a familiar Jackalope workspace wherever you build. Platform packaging, sign-in, and installed-app testing are part of that work; we have not announced a launch date.',
+        'Your projects, agent accounts, and review habits shape how you work. Share the parts that take too much effort today so we can focus on what helps.',
       ],
     },
     {

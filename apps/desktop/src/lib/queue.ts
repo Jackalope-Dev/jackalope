@@ -10,6 +10,7 @@ export interface QueueItem {
   title: string;
   prompt: string;
   agent: string;
+  account?: string | null;
   scopes: string[];
   dependencies: string[];
   runId: string | null;

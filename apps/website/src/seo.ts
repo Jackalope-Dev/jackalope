@@ -1,4 +1,5 @@
 import { company, normalizePath, pages, posts, siteOrigin, tour, updates } from './content.ts';
+import { knowledgeItems } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
 
 const escapeHtml = (value: string) =>
@@ -41,7 +42,10 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
         ? 'BlogPosting'
         : normalized.startsWith('/guides/')
           ? 'TechArticle'
-          : normalized === '/blog/' || normalized === '/changelog/' || normalized === '/agents/'
+          : normalized === '/blog/' ||
+              normalized === '/changelog/' ||
+              normalized === '/agents/' ||
+              normalized === '/knowledge/'
             ? 'CollectionPage'
             : 'WebPage',
       '@id': url,
@@ -149,6 +153,22 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     });
     graph[2].mainEntity = { '@id': `${url}#video` };
   }
+  if (normalized === '/knowledge/') {
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${url}#faq`,
+      mainEntity: knowledgeItems
+        .filter((item) => item.isFaq || item.category === 'troubleshooting')
+        .map((item) => ({
+          '@type': 'Question',
+          name: item.title,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: `${item.summary} ${item.details.join(' ')}${item.command ? ` Command: ${item.command}` : ''}`,
+          },
+        })),
+    });
+  }
   const head = [
     `<title>${escapeHtml(title)}</title>`,
     `<meta name="description" content="${escapeHtml(description)}" />`,
@@ -192,9 +212,9 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
 
 export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
   const availability = releaseVersion
-    ? `Windows x64 version ${releaseVersion} is available at ${origin}/#download. The first full launch is planned across macOS, Windows, and Linux.`
-    : 'First launch planned for macOS, Windows, and Linux. Join the waitlist for early-access news. No public release date or price has been announced.';
-  const intro = `# Jackalope\n\n> A cross-platform workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use fictional Atlas sample data and do not prove real agent execution.\n\n`;
+    ? `Windows x64 version ${releaseVersion} is available at ${origin}/#download. See ${origin}/roadmap/ for platform plans.`
+    : 'Public downloads are not open yet. Join the waitlist for early-access news. See the roadmap for platform plans.';
+  const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use Atlas sample project data.\n\n`;
   const publicPages = pages.filter(
     (page) => !['/access/', '/waitlist/', '/feedback/'].includes(page.path),
   );
@@ -203,9 +223,9 @@ export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
     .join('\n');
   return {
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
-    'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${posts.find((post) => page.path === `/blog/${post.slug}/`) ? `<lastmod>${posts.find((post) => page.path === `/blog/${post.slug}/`)?.date}</lastmod>` : marketingPages.some((entry) => entry.path === page.path) || page.path === '/' ? '<lastmod>2026-09-08</lastmod>' : ''}</url>`).join('')}</urlset>`,
-    'llms.txt': `${intro}## Agent support\n\nNative adapters: Codex, Claude Code, Grok Build, and OpenCode. Tasks, session continuation, managed account profiles, and reported task usage are implemented. Project-selected MCP connections are delivered to Codex and Claude Code; Grok supports on-demand discovery through the HTTP bridge. OpenCode uses its own CLI configuration. Grok and OpenCode validate provider access on launch. Gemini CLI is under evaluation, not supported yet. See ${origin}/#agents for coverage and limits.\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
-    'llms-full.txt': `${intro}${marketingPages.map((page) => `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${page.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.bullets ? `\n\n${section.bullets.map((item) => `- ${item}`).join('\n')}` : ''}`).join('\n\n')}`).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${post.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note}`).join('\n\n')}\n`,
+    'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${posts.find((post) => page.path === `/blog/${post.slug}/`) ? `<lastmod>${posts.find((post) => page.path === `/blog/${post.slug}/`)?.date}</lastmod>` : marketingPages.some((entry) => entry.path === page.path) || page.path === '/' || page.path === '/knowledge/' ? '<lastmod>2026-09-08</lastmod>' : ''}</url>`).join('')}</urlset>`,
+    'llms.txt': `${intro}## Agent support\n\nNative adapters: Codex, Claude Code, Grok Build, and OpenCode. Tasks, session continuation, managed account profiles, and reported task usage are implemented. Project-selected MCP connections are delivered to Codex and Claude Code; Grok supports on-demand discovery through the HTTP bridge. OpenCode supports on-demand tool discovery. Grok and OpenCode validate provider access on launch. Gemini CLI is under evaluation, not supported yet. See ${origin}/#agents for coverage and limits.\n\n## Knowledgebase & Diagnostics\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: 5-hour quota windows, preflight headroom admission, and 3-attempt failover\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
+    'llms-full.txt': `${intro}${marketingPages.map((page) => `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${page.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.bullets ? `\n\n${section.bullets.map((item) => `- ${item}`).join('\n')}` : ''}`).join('\n\n')}`).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeItems.map((item) => `## ${item.title}\nCategory: ${item.category}\n\n${item.summary}\n\n${item.details.join('\n\n')}${item.command ? `\n\nTerminal command:\n\`\`\`bash\n${item.command}\n\`\`\`` : ''}${item.codeSnippet ? `\n\nConfiguration:\n\`\`\`\n${item.codeSnippet}\n\`\`\`` : ''}`).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${post.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note}`).join('\n\n')}\n`,
     'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
     'site.webmanifest': JSON.stringify({
       name: 'Jackalope',

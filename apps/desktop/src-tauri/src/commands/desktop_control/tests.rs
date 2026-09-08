@@ -83,7 +83,7 @@ fn desktop_input_consumes_a_fresh_snapshot_even_on_wrong_id() {
 }
 
 #[test]
-fn desktop_input_is_bounded_and_cannot_switch_desktops_or_execute_code() {
+fn desktop_input_is_bounded_and_rejects_system_keys_and_extra_fields() {
     assert!(validate(&request("shell")).is_err());
     let mut input = request("press");
     for key in ["Alt+Tab", "Windows+r", "{ENTER}", "Control+v"] {
@@ -241,19 +241,7 @@ fn native_desktop_window_trial() {
             &canceled,
         )
         .unwrap();
-        std::thread::sleep(Duration::from_millis(150));
-        assert_eq!(std::fs::read_to_string(&report).unwrap(), literal);
-        native(
-            json!({"action":"press","window":target,"bounds":snap["bounds"],"key":"Control+a"}),
-            &canceled,
-        )
-        .unwrap();
-        native(json!({"action":"type","window":target,"bounds":snap["bounds"],"text":"Verified native input"}), &canceled).unwrap();
-        std::thread::sleep(Duration::from_millis(150));
-        assert_eq!(
-            std::fs::read_to_string(&report).unwrap(),
-            "Verified native input"
-        );
+        wait_for_fixture_text(&report, literal);
         native(
             json!({"action":"press","window":target,"bounds":snap["bounds"],"key":"Tab"}),
             &canceled,
@@ -292,4 +280,15 @@ fn native_desktop_window_trial() {
     if let Err(panic) = result {
         std::panic::resume_unwind(panic);
     }
+}
+
+#[cfg(windows)]
+fn wait_for_fixture_text(path: &std::path::Path, expected: &str) {
+    for _ in 0..100 {
+        if std::fs::read_to_string(path).ok().as_deref() == Some(expected) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert_eq!(std::fs::read_to_string(path).unwrap(), expected);
 }

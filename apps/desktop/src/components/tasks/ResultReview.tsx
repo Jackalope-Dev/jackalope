@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { CrossModelReviewPanel } from './CrossModelReviewPanel';
 import { PatchPreview } from './PatchPreview';
 import { ProjectVerification } from './ProjectVerification';
 import { TaskImpact } from './TaskImpact';
@@ -72,6 +73,9 @@ export function ResultReview({ run }: { run: TaskRun }) {
               files={review.files}
             />
           </section>
+          {review.diff && (
+            <CrossModelReviewPanel run={run} files={review.files} diff={review.diff} />
+          )}
           {review.diff && <PatchPreview key={review.diff} patch={review.diff} />}
         </div>
       )}

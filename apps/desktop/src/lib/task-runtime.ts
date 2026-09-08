@@ -91,6 +91,7 @@ export interface TaskRun {
     | 'reviewed';
   startedAt: string;
   endedAt: string | null;
+  durationMs?: number;
   sessionId: string | null;
   result: string;
   detailsOmitted?: boolean;

@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Circle, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Circle, KeyRound, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type AccountStatus,
@@ -20,6 +20,7 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { DetectedKeysModal } from './DetectedKeysModal';
 
 const AgentSignIn = lazy(() =>
   import('./AgentSignIn').then((module) => ({ default: module.AgentSignIn })),
@@ -142,6 +143,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
   const [name, setName] = useState('');
   const [group, setGroup] = useState<AgentProfile['group']>('work');
   const [busy, setBusy] = useState('');
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [statuses, setStatuses] = useState<Record<string, AccountStatus | undefined>>({});
   const [signIn, setSignIn] = useState<AgentProfile>();
   const signInOpener = useRef<HTMLElement | null>(null);
@@ -268,6 +270,15 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
         >
           <Plus size={15} />
           Import system CLI login as profile
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={locked}
+          onClick={() => setKeyModalOpen(true)}
+        >
+          <KeyRound size={15} />
+          Scan Local Models & Keys
         </Button>
       </div>
       <ul className="agent-accounts-list">
@@ -433,6 +444,11 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
           />
         </Suspense>
       )}
+      <DetectedKeysModal
+        open={keyModalOpen}
+        onOpenChange={setKeyModalOpen}
+        onImported={() => void load()}
+      />
     </div>
   );
 }

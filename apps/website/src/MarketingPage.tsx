@@ -1,5 +1,6 @@
 import { ArrowRight, Check, Play } from 'lucide-react';
 import type { MarketingPage as MarketingPageContent } from './marketing-content';
+import { WaitlistButton } from './Signup';
 
 export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark: boolean }) {
   return (
@@ -12,13 +13,10 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
               <span aria-hidden="true">/</span>
               <span>{page.kind}</span>
             </nav>
-            <p className="acquisition-kind">{page.kind}</p>
             <h1>{page.headline}</h1>
             <p className="acquisition-lede">{page.lede}</p>
             <div className="acquisition-actions">
-              <a className="button button-primary" href="/#newsletter">
-                Join the waitlist <ArrowRight size={16} />
-              </a>
+              <WaitlistButton />
               <a className="acquisition-text-link" href="/tour/">
                 <Play size={14} fill="currentColor" /> Watch the app
               </a>
@@ -26,8 +24,8 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
           </div>
           <div className="acquisition-proof">
             <div className="acquisition-proof-label">
-              <span>JACKALOPE / ACTUAL APP</span>
-              <span>DEVELOPMENT PREVIEW</span>
+              <span>Jackalope workspace</span>
+              <span>Atlas sample project</span>
             </div>
             <img
               src={`/media/${page.image}${dark ? '' : '-light'}.png`}
@@ -78,10 +76,9 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
               {link.label} <ArrowRight size={15} />
             </a>
           ))}
-          <span>
-            Jackalope is in prerelease. Our first launch is planned for macOS, Windows, and Linux.
-            Join the waitlist for availability.
-          </span>
+          <a href="/roadmap/">
+            Roadmap <ArrowRight size={15} />
+          </a>
         </aside>
       </div>
     </main>

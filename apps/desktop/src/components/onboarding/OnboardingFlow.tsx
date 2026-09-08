@@ -10,7 +10,6 @@ import {
   FolderPlus,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
@@ -501,15 +500,6 @@ export function OnboardingFlow({
                 multiple agents and accounts per project. It chooses among enabled agents,
                 configured models and accounts based on the task and reported quota headroom.
               </p>
-              <div className="onboarding-agent-summary">
-                <span className="onboarding-agent-badge">
-                  <Sparkles size={14} />
-                  {execution.runners.filter((r) => r.available).length === 0
-                    ? 'No agents detected yet'
-                    : `${execution.runners.filter((r) => r.available).length} ${execution.runners.filter((r) => r.available).length === 1 ? 'agent' : 'agents'} detected (${execution.runners.filter((r) => r.available && r.signedIn).length} ready)`}
-                </span>
-              </div>
-
               <fieldset className="onboarding-runner-list" aria-label="Choose your default agent">
                 {execution.runners.map((item) => {
                   const workerOnly = !['codex', 'claude', 'grok', 'opencode'].includes(
@@ -532,9 +522,7 @@ export function OnboardingFlow({
                       <div className="onboarding-runner-info">
                         <div className="onboarding-runner-header">
                           <strong>{item.name}</strong>
-                          {meta?.vendor && (
-                            <span className="onboarding-vendor-pill">{meta.vendor}</span>
-                          )}
+                          {meta?.vendor && <span className="onboarding-vendor">{meta.vendor}</span>}
                         </div>
                         <small>
                           {workerOnly
@@ -547,15 +535,6 @@ export function OnboardingFlow({
                                   ? 'Installed · sign-in detected'
                                   : 'Installed · sign-in not confirmed'}
                         </small>
-                        {meta?.strengths && meta.strengths.length > 0 && (
-                          <div className="onboarding-strengths-row">
-                            {meta.strengths.slice(0, 3).map((st) => (
-                              <span key={st} className="onboarding-strength-tag">
-                                {st}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                         <small>{item.detail}</small>
                       </div>
                     </button>
@@ -630,7 +609,7 @@ export function OnboardingFlow({
                           <div className="onboarding-catalog-head">
                             <div>
                               <strong>{b.name}</strong>
-                              <span className="onboarding-vendor-pill">{b.vendor}</span>
+                              <span className="onboarding-vendor">{b.vendor}</span>
                             </div>
                             <a
                               href={b.installUrl}

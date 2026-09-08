@@ -92,7 +92,6 @@ export function FeedbackPage() {
   };
   return (
     <main id="main" className="feedback-page">
-      <p className="eyebrow">YOUR EXPERIENCE / JACKALOPE</p>
       <h1>
         {unsubscribe
           ? 'Feedback emails are your choice.'

@@ -27,6 +27,7 @@ import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { AddWork } from './AddWork';
+import { FeatureGraphView } from './FeatureGraphView';
 import { FeaturePlanner } from './FeaturePlanner';
 import { MergeReview } from './MergeReview';
 import { PlanImport } from './PlanImport';
@@ -192,6 +193,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
         <button aria-pressed={tab === 'plan'} type="button" onClick={() => setTab('plan')}>
           Plan & progress
         </button>
+        <button aria-pressed={tab === 'graph'} type="button" onClick={() => setTab('graph')}>
+          Execution graph
+        </button>
         <button aria-pressed={tab === 'review'} type="button" onClick={() => setTab('review')}>
           Review & merge
           {items.filter((i) => state(i) === 'review').length > 0 && (
@@ -217,6 +221,14 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           items={items}
           merged={queue.mergedRunIds}
           onChanged={load}
+        />
+      ) : tab === 'graph' ? (
+        <FeatureGraphView
+          items={items}
+          mergedRunIds={queue.mergedRunIds}
+          onSelectRun={(runId) => {
+            select(runId);
+          }}
         />
       ) : (
         <>

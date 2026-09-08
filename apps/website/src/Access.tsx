@@ -280,10 +280,7 @@ export function AccessPage() {
                   <ArrowDownToLine size={22} />
                   <div>
                     <strong>No download available yet</strong>
-                    <p>
-                      Your access is approved. Downloads will appear here when they’re ready. Our
-                      first launch is planned for macOS, Windows, and Linux.
-                    </p>
+                    <p>Your access is approved. We’ll email you when your download is ready.</p>
                   </div>
                 </div>
               )}

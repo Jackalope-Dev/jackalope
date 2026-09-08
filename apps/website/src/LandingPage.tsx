@@ -5,15 +5,19 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
+  BookOpen,
+  CalendarClock,
   Check,
   GitBranch,
   GitMerge,
   Moon,
   Play,
+  Plug,
   Plus,
   ScanSearch,
   Sparkles,
   Sun,
+  Users,
 } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
@@ -25,7 +29,7 @@ function HeroMark() {
   const [visible, setVisible] = useState(true);
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
-    if (root.current) observer.observe(root.current);
+    if (root.current) observer.observe(root.current.closest('.landing-hero') ?? root.current);
     return () => observer.disconnect();
   }, []);
   return (
@@ -69,7 +73,6 @@ const examples = [
     id: 'feature',
     label: 'Build a feature',
     index: '01',
-    kicker: 'Ship a feature',
     prompt: 'Add keyboard search and polish the settings.',
     tasks: ['Build keyboard search', 'Polish the settings'],
     agents: ['Codex', 'Claude Code'],
@@ -82,7 +85,6 @@ const examples = [
     id: 'bug',
     label: 'Find a stubborn bug',
     index: '02',
-    kicker: 'Trace a regression',
     prompt: 'Find why drafts disappear. Check for related regressions.',
     tasks: ['Investigate lost drafts', 'Check draft recovery'],
     agents: ['Claude Code', 'Codex'],
@@ -95,7 +97,6 @@ const examples = [
     id: 'idea',
     label: 'Explore a new direction',
     index: '03',
-    kicker: 'Explore two directions',
     prompt: 'Try a simpler navigation and a new settings layout.',
     tasks: ['Explore navigation', 'Rethink settings'],
     agents: ['OpenCode', 'Grok'],
@@ -111,7 +112,6 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
     return (
       <div className="case-stage case-stage-feature">
         <div className="case-copy">
-          <small>{item.kicker}</small>
           <p>“{item.prompt}”</p>
           <span>{item.context}</span>
         </div>
@@ -162,7 +162,6 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
     return (
       <div className="case-stage case-stage-bug">
         <div className="case-copy">
-          <small>{item.kicker}</small>
           <p>“{item.prompt}”</p>
           <span>{item.context}</span>
         </div>
@@ -199,7 +198,6 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
   return (
     <div className="case-stage case-stage-idea">
       <div className="case-copy">
-        <small>{item.kicker}</small>
         <p>“{item.prompt}”</p>
         <span>{item.context}</span>
       </div>
@@ -242,6 +240,63 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
   );
 }
 
+const features = [
+  {
+    icon: GitBranch,
+    title: 'Give every agent room to work.',
+    description: 'Run independent tasks side by side in separate Git worktrees.',
+    detail:
+      'Assign Codex, Claude Code, Grok, or OpenCode to each task. Set dependencies when one change needs another, and follow progress without checking a pile of terminals.',
+    href: '/parallel-coding-agents/',
+    link: 'Explore parallel work',
+  },
+  {
+    icon: BookOpen,
+    title: 'Brief once. Build on it.',
+    description: 'Carry project instructions and lessons into the next task.',
+    detail:
+      'Save the conventions, decisions, and workflows your agents need. Choose the context for each task and see exactly what the agent received.',
+    href: '/features/project-context-for-coding-agents/',
+    link: 'Explore project context',
+  },
+  {
+    icon: GitMerge,
+    title: 'Your project. Your final say.',
+    description: 'Review the changes and checks together before you merge.',
+    detail:
+      'Read each result beside its original brief. Combine related patches for review, ask for another pass, and decide what enters your project. Checks stay tied to the code they tested.',
+    href: '/guides/review-ai-generated-code/',
+    link: 'Explore code review',
+  },
+  {
+    icon: Users,
+    title: 'Work and personal, sorted.',
+    description: 'Use the right agent account for every project.',
+    detail:
+      'Create named sign-in profiles and choose project defaults. Track reported task usage by project and account. Profiles organize sign-ins; your provider policies and local file permissions still apply.',
+    href: '/blog/work-and-personal-accounts/',
+    link: 'Explore accounts and usage',
+  },
+  {
+    icon: Plug,
+    title: 'Bring the tools your task needs.',
+    description: 'Choose project connections from one place.',
+    detail:
+      'Connect MCP tools for Codex and Claude Code, and let Grok discover supported HTTP tools. OpenCode uses its own tool configuration. Choose the connections relevant to each task.',
+    href: '/agents/',
+    link: 'See agent compatibility',
+  },
+  {
+    icon: CalendarClock,
+    title: 'Put repeat work on repeat.',
+    description: 'Schedule checks and chores, with a result for every run.',
+    detail:
+      'Keep the project, agent, account, and instructions with recurring work. Review each run in its own history. Schedules run while Jackalope is open and your computer is awake.',
+    href: '/features/recurring-coding-agent-tasks/',
+    link: 'Explore recurring tasks',
+  },
+];
+
 function Workbench() {
   return (
     <section
@@ -276,9 +331,7 @@ function Workbench() {
         {examples.map((item) => (
           <Tabs.Content key={item.id} value={item.id}>
             <UseCaseVisual item={item} />
-            <p className="example-note">
-              Illustrated workflow · No agents are running in this demo
-            </p>
+            <p className="example-note">Illustrated workflow</p>
           </Tabs.Content>
         ))}
       </Tabs.Root>
@@ -334,27 +387,25 @@ export function LandingPage({
           <div className="hero-copy">
             <div className="hero-poster">
               <h1 id="hero-title">
-                <span>Your agents.</span> <span>Side by side.</span> <span>Your final say.</span>
+                <span>More agents.</span> <span>Less juggling.</span>
               </h1>
             </div>
             <p className="hero-description">
-              The desktop workspace for <strong>Codex, Claude Code, Grok, and OpenCode</strong>.
-              Bring your work and personal accounts. Run tasks in parallel with shared tools,
-              project context, and cross-agent coordination.
+              Run <strong>Codex, Claude Code, Grok, and OpenCode</strong> side by side. One desktop
+              workspace for your projects, parallel tasks, and code review.
             </p>
-            <p className="hero-launch">One workspace. Planned for macOS, Windows, and Linux.</p>
             <div className="hero-conversion">
               <div className="hero-actions">
                 {action}
                 <button type="button" onClick={onPlay} className="landing-text-button">
                   <Play size={15} fill="currentColor" />
-                  Watch the app
+                  Watch the 32-second tour
                 </button>
               </div>
               <span className="availability">
                 {available
                   ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
-                  : 'In development · No payment to join'}
+                  : 'Early access waitlist · No payment to join'}
               </span>
             </div>
           </div>
@@ -366,8 +417,8 @@ export function LandingPage({
               aria-label="Play the 32-second Jackalope app tour"
             >
               <span className="hero-window-meta">
-                <span>JACKALOPE / TASKS</span>
-                <span>ATLAS SAMPLE PROJECT</span>
+                <span>Tasks, together.</span>
+                <span>Atlas sample project</span>
               </span>
               <img
                 src={`/media/tasks${dark ? '' : '-light'}.png`}
@@ -392,35 +443,56 @@ export function LandingPage({
               </span>
             </div>
           </div>
-          <div className="agent-line">
-            <p>
-              Codex <i>/</i> Claude Code <i>/</i> Grok <i>/</i> OpenCode
-            </p>
-            <a href="#inside" aria-label="Explore inside the app">
-              <ArrowDown size={20} />
-            </a>
-          </div>
         </div>
       </section>
 
-      <section className="landing-width journey-rail" aria-label="From idea to reviewed work">
-        {[
-          [
-            'Brief with context.',
-            'Your project knowledge and tools, ready for the next task.',
-            '#features',
-          ],
-          ['Work in parallel.', 'Independent agents, each with room to work.', '#workflow'],
-          ['Review together.', 'The patch, checks, and final decision in one place.', '#inside'],
-        ].map(([label, description, href]) => (
-          <a key={label} href={href}>
-            <strong>
-              {label}
-              <ArrowRight size={20} />
-            </strong>
-            <span>{description}</span>
-          </a>
-        ))}
+      <section
+        className="feature-section"
+        id="features"
+        aria-labelledby="features-title"
+        data-reveal=""
+      >
+        <div className="landing-width">
+          <div className="feature-heading">
+            <h2 id="features-title">
+              A lot going on.
+              <br />
+              All in one place.
+            </h2>
+            <p>
+              From the first brief to the final diff.
+              <br />
+              Keep the work moving, and the decisions yours.
+            </p>
+          </div>
+          <div className="feature-grid">
+            {features.map(({ icon: Icon, ...feature }) => (
+              <details className="feature-item" key={feature.title}>
+                <summary>
+                  <Icon className="feature-icon" size={28} aria-hidden="true" />
+                  <span>
+                    <span className="feature-title">{feature.title}</span>
+                    <span className="feature-description">{feature.description}</span>
+                  </span>
+                  <Plus className="feature-toggle" size={22} aria-hidden="true" />
+                </summary>
+                <div className="feature-detail">
+                  <p>{feature.detail}</p>
+                  <a href={feature.href}>
+                    {feature.link}
+                    <ArrowUpRight size={16} aria-hidden="true" />
+                  </a>
+                </div>
+              </details>
+            ))}
+          </div>
+          <div className="feature-next">
+            {action}
+            <a href="#workflow">
+              See how it comes together <ArrowDown size={17} />
+            </a>
+          </div>
+        </div>
       </section>
 
       <ConnectedWorkspace />
@@ -435,15 +507,11 @@ export function LandingPage({
       >
         <div className="landing-width">
           <div className="workspace-heading">
-            <h2 id="inside-title">
-              Less window juggling.
-              <br />
-              More forward motion.
-            </h2>
+            <h2 id="inside-title">Meet your new workspace.</h2>
             <p>
               Your tasks, agents, and changes share one workspace.
               <br />
-              Take a look inside the actual app.
+              Choose a view to take a closer look.
             </p>
           </div>
           <Tabs.Root defaultValue="tasks" className="product-explorer">
@@ -489,124 +557,6 @@ export function LandingPage({
         </div>
       </section>
 
-      <section className="landing-width early-access-story" aria-labelledby="early-access-title">
-        <div>
-          <h2 id="early-access-title">Build the next chapter with us.</h2>
-          <p>
-            We’re shaping a workspace for people who already build with coding agents. Join early,
-            tell us what gets in your way, and help decide what comes next.
-          </p>
-          <a href="/#newsletter" className="button button-primary">
-            Join the waitlist <ArrowRight size={17} />
-          </a>
-        </div>
-        <ol>
-          <li>
-            <strong>Tell us what you use.</strong>
-            <p>
-              Email first. Then optional platform, agent, and workflow preferences to guide our
-              plans.
-            </p>
-          </li>
-          <li>
-            <strong>Get an invitation.</strong>
-            <p>
-              We’ll email when your access is ready. A direct invitation skips the waitlist after
-              email verification.
-            </p>
-          </li>
-          <li>
-            <strong>Bring your people.</strong>
-            <p>
-              Once approved, you get five Instant Access Passes to share. Each person who joins can
-              invite five more.
-            </p>
-          </li>
-        </ol>
-      </section>
-      <section className="landing-width comparison-teaser">
-        <h2>Find your way to work.</h2>
-        <p>
-          Comparing agent workspaces? Start with the workflow you need: local review, shared
-          sessions, remote hosts, or a complete editor.
-        </p>
-        <a href="/compare/">
-          Compare Jackalope and other workspaces <ArrowRight size={17} />
-        </a>
-      </section>
-
-      <section
-        className="landing-section landing-width capabilities"
-        id="features"
-        aria-labelledby="features-title"
-        data-reveal=""
-      >
-        <div className="section-lead">
-          <h2 id="features-title">Keep context across tasks.</h2>
-        </div>
-        <div className="capability-row">
-          <div className="capability-art context-stack" aria-hidden="true">
-            <span>INSTRUCTIONS</span>
-            <span>LESSONS</span>
-            <span>WORKFLOWS</span>
-            <b>
-              Next task <ArrowRight size={25} />
-            </b>
-          </div>
-          <div>
-            <h3>Project knowledge & tools</h3>
-            <p>
-              Save project instructions, lessons, and reusable workflows. Manage connections
-              centrally, then choose the knowledge and tools each task needs. Inspect the context an
-              agent received.
-            </p>
-            <small>Connected tool support varies by agent.</small>
-          </div>
-        </div>
-        <div className="capability-row">
-          <div className="capability-art account-ledger" aria-hidden="true">
-            <div>
-              <span>CLIENT WORK</span>
-              <b>Studio / Codex</b>
-            </div>
-            <div>
-              <span>SIDE PROJECT</span>
-              <b>Personal / Claude Code</b>
-            </div>
-          </div>
-          <div>
-            <h3>Accounts & usage</h3>
-            <p>
-              Choose agent accounts and allowed runners per project. Follow tasks and reported usage
-              across client work and personal projects, with the right setup attached to each.
-            </p>
-            <a href="/blog/work-and-personal-accounts/" className="landing-link">
-              How account profiles work <ArrowRight size={16} />
-            </a>
-          </div>
-        </div>
-        <div className="capability-row">
-          <div className="capability-art calendar-art" aria-hidden="true">
-            <div>
-              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day, index) => (
-                <span key={day} className={index === 2 ? 'calendar-selected' : ''}>
-                  {day[0]}
-                </span>
-              ))}
-            </div>
-            <span>Weekly schedule</span>
-          </div>
-          <div>
-            <h3>Recurring tasks</h3>
-            <p>
-              Schedule recurring tasks with their project context intact. Each run keeps its own
-              result and history, ready for you to inspect.
-            </p>
-            <small>Runs while Jackalope and your computer are awake.</small>
-          </div>
-        </div>
-      </section>
-
       <section
         className="atmosphere-section"
         id="atmosphere"
@@ -616,14 +566,14 @@ export function LandingPage({
         <div className="landing-width atmosphere-layout">
           <div>
             <h2 id="atmosphere-title">
-              Serious work.
+              Make room.
               <br />
-              Your kind of space.
+              Make it yours.
             </h2>
             <p>
               Try a palette. The whole page comes along.
               <br />
-              Preview the desktop themes in light or dark.
+              Pick your kind of light or dark.
             </p>
             <fieldset className="landing-palettes" aria-label="Try a color palette">
               {PRESET_THEMES.slice(0, 4).map((theme, index) => (
@@ -689,6 +639,14 @@ export function LandingPage({
         </div>
       </section>
       <div className="landing-width support-disclosure">
+        <p className="landing-further">
+          <a href="/compare/">
+            Compare workspaces <ArrowUpRight size={16} />
+          </a>
+          <a href="/roadmap/">
+            Explore the roadmap <ArrowUpRight size={16} />
+          </a>
+        </p>
         <details>
           <summary>
             Agent support & compatibility
@@ -700,7 +658,7 @@ export function LandingPage({
 
       <section className="landing-finale" id="download" aria-labelledby="download-title">
         <div className="landing-width">
-          <div className="finale-top">
+          <div className="finale-top" id="newsletter">
             <div>
               <h2 id="download-title">{available ? 'Download Jackalope.' : 'Get early access.'}</h2>
               <p>

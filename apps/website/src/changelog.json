@@ -1,5 +1,44 @@
 [
   {
+    "id": "calmer-agent-setup",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A clearer agent setup",
+    "description": "Agent setup is easier to scan and fits smaller windows.",
+    "items": [
+      "Removed detected counts and skill badges, with company names shown as subtle text.",
+      "Expanded installation commands wrap within the setup pane."
+    ],
+    "note": "In development."
+  },
+  {
+    "id": "multi-agent-intelligence-dag-insights",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Local LLM discovery, cross-model review, visual DAG and insights",
+    "description": "Orchestrate multi-agent teams with zero-latency local model discovery, privacy-preserving API key detection, peer code reviews, visual dependency graphs, and an actionable insights dashboard.",
+    "items": [
+      "Discover running local inference servers (Ollama, LM Studio, llama.cpp) and ambient environment API keys with local-only privacy guarantees and opt-in import.",
+      "Request independent cross-model peer reviews on workspace diffs before merging, surfacing security and correctness advisories.",
+      "Visualize feature subtasks, dependencies, agent avatars, and active parallel execution in an interactive DAG graph.",
+      "Explore speed, cost, and token performance comparisons across agents, with mascot-delivered workflow optimization tips and quota rescue analytics."
+    ],
+    "note": "Available in the local development build; native agent and live provider acceptance remain pending."
+  },
+  {
+    "id": "more-agents-less-juggling",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "More agents. Less juggling.",
+    "description": "Explore Jackalope with a clearer overview and features that open in place.",
+    "items": [
+      "A bolder landing page puts the app preview and six expandable features up front.",
+      "Join the waitlist directly from product pages or the homepage form.",
+      "A dedicated roadmap keeps future plans together while product guides focus on the current workflow."
+    ],
+    "note": "Development milestone; public downloads are not open yet."
+  },
+  {
     "id": "connected-agents-native-windows",
     "date": "2026-09-08",
     "status": "In development",

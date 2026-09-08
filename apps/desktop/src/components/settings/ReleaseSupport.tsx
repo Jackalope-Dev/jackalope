@@ -1,6 +1,7 @@
+import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { FeedbackForm } from './FeedbackForm';
 import { UpdateSettings } from './UpdateSettings';
@@ -34,6 +35,20 @@ export function ReleaseSupport() {
     <div className="space-y-6">
       <UpdateSettings />
       <FeedbackForm />
+      <section className="space-y-3" aria-label="Documentation and knowledgebase">
+        <h3 className="text-base font-medium">Documentation & Guides</h3>
+        <p className="settings-row-description">
+          Read architecture guides, agent configuration instructions, worktree workflows, and
+          troubleshooting recipes in the online Knowledgebase.
+        </p>
+        <Button
+          variant="outline"
+          onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
+        >
+          <LifeBuoy className="size-4 mr-2" />
+          Browse Knowledgebase
+        </Button>
+      </section>
       <section className="space-y-3" aria-label="Support report">
         <h3 className="text-base font-medium">Prepare a local support report</h3>
         <p className="settings-row-description">

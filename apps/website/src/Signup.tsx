@@ -69,7 +69,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
       setSurveyToken(result.surveyToken ?? '');
       setMessage(
         accessOrigin
-          ? 'Your place is saved. Check your email to verify it, see your number, and get your unlimited referral link. Product notes have their own confirmation if you opted in.'
+          ? 'Check your email to confirm your place and get your referral link. If you chose product notes, confirm that subscription separately.'
           : result.optIn?.required
             ? 'Check your inbox to confirm your email and finish joining the list.'
             : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',
@@ -151,8 +151,8 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           <p id={`${id}-consent`} className="signup-consent">
             {accessOrigin ? (
               <>
-                We’ll email you about your access request. Product notes are optional. Campaign
-                source helps us understand how you found us. <a href="/privacy/">Privacy</a>.
+                We’ll email you about your access request. Product notes are optional.{' '}
+                <a href="/privacy/">Privacy</a>.
               </>
             ) : (
               <>
@@ -232,12 +232,11 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
               A little structure.
               <br />A lot of possibility.
             </span>
-            <span className="waitlist-art-label">JACKALOPE / EARLY DAYS</span>
           </div>
           <div className="waitlist-body">
             <Dialog.Title>Join the Jackalope waitlist</Dialog.Title>
             <Dialog.Description>
-              Planned for macOS, Windows, and Linux. Join for early-access news.
+              Get an email when your access is ready. No payment to join.
             </Dialog.Description>
             <ul className="waitlist-perks">
               <li>
@@ -259,12 +258,8 @@ export function Newsletter() {
   return (
     <section id="newsletter" className="newsletter page-width" aria-labelledby="newsletter-title">
       <div>
-        <h2 id="newsletter-title">
-          The next chapter,
-          <br />
-          in your inbox.
-        </h2>
-        <p>Get early-access news. Bring your next big idea.</p>
+        <h2 id="newsletter-title">Get early access.</h2>
+        <p>Join the waitlist. We’ll email you when access opens.</p>
       </div>
       <Signup />
     </section>

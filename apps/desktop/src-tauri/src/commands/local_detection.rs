@@ -90,7 +90,8 @@ pub async fn system_detect_local_llms() -> Result<Vec<LocalLlmEndpoint>, String>
                 if let Ok(body) = fetch_json_tag_names("http://127.0.0.1:11434/api/tags").await {
                     models = body;
                 }
-            } else if let Ok(body) = fetch_openai_model_ids(&format!("{endpoint}/v1/models")).await {
+            } else if let Ok(body) = fetch_openai_model_ids(&format!("{endpoint}/v1/models")).await
+            {
                 models = body;
             }
         }
@@ -207,10 +208,7 @@ pub fn agent_import_detected_key(
     }
 
     let default_name = format!("{} (Imported Key)", key_name);
-    let name = profile_name
-        .unwrap_or(default_name)
-        .trim()
-        .to_string();
+    let name = profile_name.unwrap_or(default_name).trim().to_string();
 
     let root = runtime.profiles_root();
     // Create profile
