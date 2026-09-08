@@ -442,3 +442,35 @@
   overflow-wrap: anywhere;
   margin-top: 4px;
 }
+@media (max-height: 740px) {
+  .onboarding-topbar {
+    padding-block: 8px;
+  }
+  .onboarding-content {
+    padding: 20px;
+  }
+  .onboarding-progress {
+    margin-bottom: 8px;
+  }
+  .onboarding-privacy-panel {
+    margin-top: 12px;
+  }
+  .onboarding-privacy-panel summary {
+    padding: 10px 14px;
+  }
+  .onboarding-description {
+    margin: 12px 0 16px;
+  }
+  .onboarding-project-options {
+    margin-bottom: 16px;
+  }
+  .onboarding-project-location,
+  .onboarding-note {
+    margin-top: 12px;
+  }
+  .onboarding-actions {
+    margin-top: 16px;
+    padding-block: 8px;
+    bottom: -8px;
+  }
+}

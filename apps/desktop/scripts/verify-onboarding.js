@@ -11,10 +11,14 @@ async function _verifyOnboarding(page) {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.getByRole('heading', { name: 'Set up Jackalope', exact: true }).waitFor();
   assert(
-    await page.evaluate(
-      () => document.documentElement.style.getPropertyValue('--accent-h') === '245',
-    ),
-    'New profile uses Indigo',
+    (await page
+      .getByRole('button', { name: /Skip setup|Capture an idea first|Finish without a task/ })
+      .count()) === 0,
+    'Onboarding has no bypass actions',
+  );
+  assert(
+    (await page.locator('.onboarding-privacy-panel').getAttribute('open')) === null,
+    'Privacy is collapsed by default',
   );
   await page.getByRole('button', { name: 'Personalize your workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
@@ -23,7 +27,7 @@ async function _verifyOnboarding(page) {
     await page.evaluate(
       () => document.documentElement.style.getPropertyValue('--accent-h') === '245',
     ),
-    'Cancel theme preview preserves Indigo',
+    'Theme preview rolls back',
   );
   await page.getByRole('button', { name: 'Personalize your workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
@@ -33,165 +37,272 @@ async function _verifyOnboarding(page) {
     await page.evaluate(
       () => document.documentElement.style.getPropertyValue('--accent-h') === '24',
     ),
-    'Saved theme survives new default',
+    'Saved theme survives reload',
   );
   await page.evaluate(async () => {
-    const { useThemeStore } = await import('/src/stores/themeStore.ts');
-    useThemeStore.getState().setTheme(useThemeStore.getInitialState().currentTheme);
-  });
-  await page.getByRole('button', { name: 'Skip setup for now', exact: true }).click();
-  await page.getByRole('heading', { name: 'Opening your workspace', exact: true }).waitFor();
-  await page.screenshot({ path: 'output/playwright/desktop-transition.png' });
-  assert(
-    await page
-      .locator('.brand-echo-line')
-      .first()
-      .evaluate((el) => getComputedStyle(el).animationPlayState === 'running'),
-    'Transition loop',
-  );
-  await page.locator('#workspace-content').waitFor();
-  assert(
-    await page.locator('#workspace-content').evaluate((el) => el === document.activeElement),
-    'Workspace receives focus',
-  );
-  const reopen = async () =>
-    page.evaluate(async () => {
-      const { useOnboardingStore } = await import('/src/stores/onboardingStore.ts');
-      useOnboardingStore.getState().begin();
-    });
-  await reopen();
-  await page.getByRole('button', { name: 'Skip setup for now', exact: true }).click();
-  await page.getByRole('button', { name: 'Back to setup', exact: true }).click();
-  await page.getByRole('heading', { name: 'Set up Jackalope', exact: true }).waitFor();
-  await page.waitForTimeout(1800);
-  assert(
-    await page.getByRole('heading', { name: 'Set up Jackalope', exact: true }).isVisible(),
-    'Back cancels pending completion',
-  );
-  await page.getByRole('button', { name: 'Capture an idea first', exact: true }).click();
-  await page
-    .getByRole('dialog', { name: 'What do you want to accomplish?', exact: true })
-    .waitFor();
-  await page.getByRole('button', { name: 'Close capture', exact: true }).click();
-  await reopen();
-  await page.evaluate(async () => {
-    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
-    window.restoreRefresh = useExecutionStore.getState().refresh;
-    useExecutionStore.setState({
-      refresh: async () => {
-        useExecutionStore.setState({ error: 'Simulated history read failure' });
+    const module = (name) =>
+      import(
+        performance
+          .getEntriesByType('resource')
+          .find((r) => r.name.includes(`/src/stores/${name}.ts`)).name
+      );
+    const { useExecutionStore: execution } = await module('executionStore');
+    const { useContextMemoryStore: memory } = await module('contextMemoryStore');
+    const { useCommunityStore: community } = await module('communityStore');
+    window.onboardingFixture = { calls: [], collision: true, selectedFolder: null };
+    window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+    window.__TAURI_INTERNALS__ = {
+      metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
+      transformCallback: () => 0,
+      invoke: async (command, args) => {
+        const fixture = window.onboardingFixture;
+        fixture.calls.push({ command, args });
+        if (command === 'mcp_list_servers' || command === 'knowledge_list') return [];
+        if (command === 'schedule_list') return { schedules: [] };
+        if (command === 'task_history_recovery') return { directory: 'fixture', entries: [] };
+        if (command === 'task_project_directory') return 'C:/fixture/Projects';
+        if (command === 'task_pick_project') return fixture.selectedFolder;
+        if (command === 'task_create_project') {
+          if (fixture.collision)
+            throw new Error(
+              'That folder already exists. Choose another name or open it as an existing project.',
+            );
+          return {
+            path: `${args.parentPath ?? 'C:/fixture/Projects'}/${args.name}`,
+            name: args.name,
+            branch: 'main',
+          };
+        }
+        if (command === 'task_validate_project')
+          return { path: args.path, name: 'Existing project', branch: 'main' };
+        if (command === 'app_community_settings' || command === 'app_community_configure') {
+          return {
+            reviewed: true,
+            telemetry: false,
+            errors: false,
+            configured: false,
+            buildChannel: 'stable',
+          };
+        }
+        return null;
+      },
+    };
+    memory.setState({ refreshMemory: async () => {} });
+    community.setState({
+      settings: {
+        reviewed: true,
+        telemetry: false,
+        errors: false,
+        configured: false,
+        buildChannel: 'stable',
       },
     });
+    execution.setState({
+      refresh: async () => execution.setState({ error: null }),
+      discover: async () =>
+        execution.setState({
+          runners: [
+            {
+              id: 'codex',
+              name: 'Codex',
+              available: true,
+              signedIn: true,
+              account: 'fixture',
+              detail: 'Browser state only; no native tasks launched',
+            },
+          ],
+        }),
+    });
   });
-  await page.getByRole('button', { name: 'Skip setup for now', exact: true }).click();
+  await page.getByRole('button', { name: 'Create new project', exact: true }).click();
+  const create = page.getByRole('button', { name: 'Create project and continue', exact: true });
+  assert(await create.isDisabled(), 'A project name is required');
+  await page.getByRole('textbox', { name: 'Project name', exact: true }).fill('My new project');
+  await page.getByRole('button', { name: 'Change folder', exact: true }).click();
+  await page.getByText('C:/fixture/Projects', { exact: true }).waitFor();
+  await create.click();
+  await page.getByRole('alert').filter({ hasText: 'That folder already exists' }).waitFor();
+  assert(
+    (await page.getByRole('textbox', { name: 'Project name', exact: true }).inputValue()) ===
+      'My new project',
+    'Creation failure preserves the name',
+  );
+  await page.evaluate(() => {
+    window.onboardingFixture.selectedFolder = 'C:/fixture/Custom';
+    window.onboardingFixture.collision = false;
+  });
+  await page.getByRole('button', { name: 'Change folder', exact: true }).click();
+  await page.getByRole('button', { name: 'Open existing', exact: true }).click();
+  await page.getByRole('button', { name: 'Create new project', exact: true }).click();
+  assert(
+    (await page.getByRole('textbox', { name: 'Project name', exact: true }).inputValue()) ===
+      'My new project',
+    'Changing project mode preserves the draft',
+  );
+  for (const [width, height] of [
+    [1280, 840],
+    [960, 640],
+  ]) {
+    await page.setViewportSize({ width, height });
+    for (const isDark of [false, true]) {
+      await page.evaluate(async (isDark) => {
+        const { useThemeStore: theme } = await import(
+          performance
+            .getEntriesByType('resource')
+            .find((r) => r.name.includes('/src/stores/themeStore.ts')).name
+        );
+        theme
+          .getState()
+          .setTheme({ ...theme.getState().currentTheme, appearance: 'manual', isDark });
+      }, isDark);
+      await page.waitForTimeout(200);
+      await page.getByRole('textbox', { name: 'Project name', exact: true }).focus();
+      await page.screenshot({
+        path: `output/playwright/onboarding-new-project-${isDark ? 'dark' : 'light'}-${width}.png`,
+      });
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        'No horizontal overflow',
+      );
+    }
+  }
+  await create.click();
+  await page.getByRole('heading', { name: 'Choose an agent', exact: true }).waitFor();
+  assert(
+    await page.evaluate(() => {
+      const calls = window.onboardingFixture.calls.filter(
+        (call) => call.command === 'task_create_project',
+      );
+      return (
+        calls.length === 2 &&
+        calls[0].args.parentPath === null &&
+        calls[1].args.parentPath === 'C:/fixture/Custom'
+      );
+    }),
+    'Default and custom project locations reach native creation',
+  );
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('heading', { name: 'Describe your first task', exact: true }).waitFor();
+  const prompt = page.getByRole('textbox', { name: 'Your first task', exact: true });
+  assert(
+    (await prompt.inputValue()).includes('plan what to build'),
+    'New project offers a first-task draft',
+  );
+  await prompt.fill('');
+  assert(
+    await page.getByRole('button', { name: 'Review first task', exact: true }).isDisabled(),
+    'A first task is required',
+  );
+  await prompt.fill('Build the first milestone in this project.');
+  await page.evaluate(() => {
+    window.onboardingNativeFixture = window.__TAURI_INTERNALS__;
+  });
+  await page.getByRole('button', { name: 'Review first task', exact: true }).click();
+  await page.getByRole('heading', { name: 'Opening your workspace', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Back to setup', exact: true }).click();
+  await page.getByRole('heading', { name: 'Describe your first task', exact: true }).waitFor();
+  await page.waitForTimeout(1800);
+  assert(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem('jackalope-onboarding-v1')).state.status === 'active',
+    ),
+    'Returning from the transition leaves onboarding active',
+  );
+  await page.evaluate(async () => {
+    const { useExecutionStore: execution } = await import(
+      performance
+        .getEntriesByType('resource')
+        .find((r) => r.name.includes('/src/stores/executionStore.ts')).name
+    );
+    execution.setState({
+      refresh: async () => execution.setState({ error: 'Simulated history read failure' }),
+    });
+  });
+  await page.getByRole('button', { name: 'Review first task', exact: true }).click();
   await page
     .getByRole('heading', { name: 'Workspace checks need attention', exact: true })
     .waitFor();
   await page.evaluate(async () => {
-    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
-    useExecutionStore.setState({ refresh: window.restoreRefresh });
+    const { useExecutionStore: execution } = await import(
+      performance
+        .getEntriesByType('resource')
+        .find((r) => r.name.includes('/src/stores/executionStore.ts')).name
+    );
+    execution.setState({
+      refresh: async () => execution.setState({ error: null }),
+      discovering: true,
+    });
   });
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await page.locator('#workspace-content').waitFor();
-  await reopen();
-  await page.evaluate(async () => {
-    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
-    useExecutionStore.setState({ discovering: true });
-  });
-  await page.getByRole('button', { name: 'Skip setup for now', exact: true }).click();
-  await page.setViewportSize({ width: 960, height: 640 });
-  await page.screenshot({ path: 'output/playwright/desktop-transition-960.png' });
-  assert(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-    'Transition fits 960 width',
-  );
   await page
     .getByRole('button', { name: 'Open workspace', exact: true })
     .waitFor({ timeout: 10000 });
   await page.getByRole('button', { name: 'Open workspace', exact: true }).click();
-  await page.locator('#workspace-content').waitFor();
-  await page.evaluate(async () => {
-    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
-    useExecutionStore.setState({ discovering: false });
-  });
-  await reopen();
-  await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/projectStore.ts');
-    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
-    const { useOnboardingStore } = await import('/src/stores/onboardingStore.ts');
-    useProjectStore.setState({
-      projects: [
-        {
-          id: 'onboarding-fixture',
-          name: 'Onboarding fixture',
-          path: 'C:/fixture',
-          gitBranch: 'main',
-          worktrees: [],
-          agentProvider: 'codex',
-        },
-      ],
-      activeProjectId: 'onboarding-fixture',
-    });
-    useExecutionStore.setState({
-      runners: [
-        {
-          id: 'codex',
-          name: 'Codex',
-          available: true,
-          signedIn: true,
-          account: 'fixture',
-          detail: 'UI fixture only',
-        },
-      ],
-    });
-    useExecutionStore.getState().draft('onboarding-fixture', {
-      agent: 'codex',
-      prompt: 'Review this fixture without executing any task.',
-    });
-    useOnboardingStore.getState().go('task');
-  });
-  await page.getByRole('button', { name: 'Review first task', exact: true }).click();
   await page
     .getByRole('dialog', { name: 'What do you want to accomplish?', exact: true })
     .waitFor();
   assert(
+    (await page.getByRole('dialog').locator('textarea').inputValue()) ===
+      'Build the first milestone in this project.',
+    'First-task draft reaches the workspace',
+  );
+  assert(
     await page.evaluate(
       () => JSON.parse(localStorage.getItem('jackalope-onboarding-v1')).state.status === 'complete',
     ),
-    'Finishing first task completes onboarding',
-  );
-  assert(
-    (await page.getByRole('dialog').locator('textarea').inputValue()) ===
-      'Review this fixture without executing any task.',
-    'First-task draft retained',
-  );
-  assert(
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem('jackalope-execution-ui-v1')).state.drafts.capture
-          .prompt === '',
-    ),
-    'Earlier capture draft preserved',
+    'Workspace entry completes onboarding',
   );
   await page.getByRole('button', { name: 'Close capture', exact: true }).click();
-  await reopen();
+  await page.evaluate(async () => {
+    const module = (name) =>
+      import(
+        performance
+          .getEntriesByType('resource')
+          .find((r) => r.name.includes(`/src/stores/${name}.ts`)).name
+      );
+    const { useOnboardingStore: onboarding } = await module('onboardingStore');
+    const { useExecutionStore: execution } = await module('executionStore');
+    execution.setState({ discovering: false });
+    window.__TAURI_INTERNALS__ = window.onboardingNativeFixture;
+    onboarding.getState().begin();
+  });
+  await page
+    .getByRole('textbox', { name: 'Repository folder', exact: true })
+    .fill('C:/fixture/Existing');
+  await page.getByRole('button', { name: 'Continue with this project', exact: true }).click();
+  await page.getByRole('heading', { name: 'Choose an agent', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Your first task', exact: true })
+    .fill('Review the existing project.');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.reload();
-  await page.getByRole('button', { name: 'Skip setup for now', exact: true }).click();
-  await page.locator('#workspace-content').waitFor({ timeout: 1000 });
+  await page.getByRole('button', { name: 'Review first task', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'What do you want to accomplish?', exact: true })
+    .waitFor({ timeout: 1000 });
+  assert(
+    await page.evaluate(
+      () => !window.onboardingFixture.calls.some((call) => call.command === 'task_start'),
+    ),
+    'Setup never starts a task',
+  );
   assert(errors.length === 0, errors.join('\n'));
   return {
-    defaultTheme: true,
-    savedTheme: true,
-    previewRollback: true,
-    skip: true,
-    capture: true,
+    requiredSetup: true,
+    collapsedPrivacy: true,
+    createProject: true,
+    creationRecovery: true,
+    existingProject: true,
+    defaultAndCustomFolder: true,
+    requiredFirstTask: true,
+    firstTaskDraft: true,
     back: true,
     retry: true,
     slowRecovery: true,
-    firstTaskDraft: true,
     reducedMotion: true,
-    fixtures: 'Browser state only; no native tasks launched',
+    themePersistence: true,
+    themeRollback: true,
     errors,
+    fixtures: 'Browser state only; no native tasks launched',
   };
 }

@@ -202,7 +202,7 @@ export function OnboardingFlow({
               </p>
               <fieldset className="onboarding-project-options" aria-label="Project setup">
                 <Button
-                  variant={projectMode === 'existing' ? 'default' : 'outline'}
+                  variant={projectMode === 'existing' ? 'primary' : 'outline'}
                   aria-pressed={projectMode === 'existing'}
                   disabled={busy}
                   onClick={() => {
@@ -214,7 +214,7 @@ export function OnboardingFlow({
                   Open existing
                 </Button>
                 <Button
-                  variant={projectMode === 'new' ? 'default' : 'outline'}
+                  variant={projectMode === 'new' ? 'primary' : 'outline'}
                   aria-pressed={projectMode === 'new'}
                   disabled={busy}
                   onClick={() => {
@@ -297,8 +297,7 @@ export function OnboardingFlow({
                       </p>
                     )}
                     <p className="onboarding-note">
-                      Creates a new folder with Git ready for your first task. Existing folders stay
-                      untouched.
+                      Creates a new folder with Git ready for your first task.
                     </p>
                   </>
                 ) : (
