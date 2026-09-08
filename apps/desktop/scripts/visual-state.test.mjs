@@ -5,7 +5,9 @@ import {
   hslToHex,
   isDarkAtTime,
   PRESET_THEMES,
+  paletteColors,
   startThemeClock,
+  themeTokens,
 } from '@jackalope/brand/theme';
 import { useMascotStore } from '../src/stores/mascotStore.ts';
 
@@ -91,36 +93,45 @@ test('both appearances keep text readable across tinted surfaces and custom acce
     documentElement: { style: { setProperty: (key, value) => tokens.set(key, value) } },
   };
   for (const isDark of [true, false]) {
-    for (const atmosphere of [0, 12, 32]) {
+    for (const atmosphere of [0, 12, 32, 48, 64]) {
       for (let accentHue = 0; accentHue < 360; accentHue += 30) {
         for (const accentLight of [0, 25, 50, 75, 100]) {
-          const theme = { ...PRESET_THEMES[0], isDark, atmosphere, accentHue, accentLight };
-          applyThemeTokens(theme);
-          for (const foreground of [
-            'text-primary',
-            'text-secondary',
-            'text-muted',
-            'accent-ink',
-            'success',
-            'warning',
-            'danger',
-          ]) {
-            for (const surface of [
-              'bg',
-              'surface',
-              'surface-elevated',
-              'surface-sunken',
-              'surface-hover',
-              'shell',
-              'shell-end',
+          for (const harmony of ['single', 'duo', 'trio']) {
+            const theme = {
+              ...PRESET_THEMES[0],
+              isDark,
+              atmosphere,
+              accentHue,
+              accentLight,
+              harmony,
+            };
+            applyThemeTokens(theme);
+            for (const foreground of [
+              'text-primary',
+              'text-secondary',
+              'text-muted',
+              'accent-ink',
+              'success',
+              'warning',
+              'danger',
             ]) {
-              const a = luminance(tokens.get(`--color-${foreground}`));
-              const b = luminance(tokens.get(`--color-${surface}`));
-              const contrast = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-              assert.ok(
-                contrast >= 4.5,
-                `${foreground}/${surface}: ${contrast} (${JSON.stringify(theme)})`,
-              );
+              for (const surface of [
+                'bg',
+                'surface',
+                'surface-elevated',
+                'surface-sunken',
+                'surface-hover',
+                'shell',
+                'shell-end',
+              ]) {
+                const a = luminance(tokens.get(`--color-${foreground}`));
+                const b = luminance(tokens.get(`--color-${surface}`));
+                const contrast = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+                assert.ok(
+                  contrast >= 4.5,
+                  `${foreground}/${surface}: ${contrast} (${JSON.stringify(theme)})`,
+                );
+              }
             }
           }
         }
@@ -196,4 +207,90 @@ test('button labels keep at least 4.5:1 contrast across the custom color field',
       assert.ok(contrast >= 4.5, `Contrast ${contrast} at hue ${hue}, lightness ${light}`);
     }
   }
+});
+
+test('generated palettes wrap hue, preserve the primary and keep legacy themes single', () => {
+  const legacy = { ...PRESET_THEMES[0], accentHue: 350 };
+  assert.deepEqual(themeTokens(legacy), themeTokens({ ...legacy, harmony: 'single' }));
+  assert.deepEqual(
+    paletteColors({ ...legacy, harmony: 'duo' }).map((c) => c.hue),
+    [350, 170],
+  );
+  assert.deepEqual(
+    paletteColors({ ...legacy, harmony: 'trio' }).map((c) => c.hue),
+    [350, 110, 230],
+  );
+  for (const harmony of ['single', 'duo', 'trio']) {
+    const theme = { ...legacy, harmony };
+    const tokens = themeTokens(theme);
+    assert.equal(tokens['--color-accent'], themeTokens(legacy)['--color-accent']);
+    for (const gradient of ['--color-shell-gradient', '--color-onboarding-gradient']) {
+      const resolved = tokens[gradient].replace(/var\(([^)]+)\)/g, (_, key) => tokens[key]);
+      for (const [background] of resolved.matchAll(/hsl\([\d.]+ [\d.]+% [\d.]+%\)/g)) {
+        for (const role of ['text-primary', 'text-secondary', 'text-muted', 'accent-ink']) {
+          const a = luminance(tokens[`--color-${role}`]);
+          const b = luminance(background);
+          assert.ok(
+            (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 4.5,
+            `${role} on ${gradient}, ${harmony}`,
+          );
+        }
+      }
+    }
+  }
+});
+
+test('accent text stays readable on normal and hovered fills, including low-saturation colors', () => {
+  for (let hue = 0; hue < 360; hue += 15) {
+    for (const saturation of [0, 20, 50, 80, 100]) {
+      for (let light = 0; light <= 100; light += 2) {
+        const tokens = themeTokens({
+          ...PRESET_THEMES[0],
+          accentHue: hue,
+          accentSat: saturation,
+          accentLight: light,
+        });
+        const foreground = luminance(tokens['--color-on-accent']);
+        for (const fill of ['--color-accent', '--color-accent-hover']) {
+          const background = luminance(tokens[fill]);
+          const ratio =
+            (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+          assert.ok(ratio >= 4.5, `${fill} ${hue}/${saturation}/${light}: ${ratio}`);
+        }
+      }
+    }
+  }
+});
+
+test('action fills prefer white with bounded deepening and keep contrast on hover', () => {
+  const contrast = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  for (let hue = 0; hue < 360; hue += 15) {
+    for (const saturation of [0, 20, 50, 80, 100]) {
+      for (let light = 0; light <= 100; light += 2) {
+        const theme = {
+          ...PRESET_THEMES[0],
+          accentHue: hue,
+          accentSat: saturation,
+          accentLight: light,
+        };
+        const tokens = themeTokens(theme);
+        const ink = luminance(tokens['--color-on-action']);
+        for (const fill of ['--color-action', '--color-action-hover']) {
+          assert.ok(
+            contrast(ink, luminance(tokens[fill])) >= 4.5,
+            `${fill} ${hue}/${saturation}/${light}`,
+          );
+        }
+        const actionLight = Number(tokens['--color-action'].match(/([\d.]+)%\)$/)[1]);
+        assert.ok(actionLight <= light && actionLight >= Math.max(0, light - 12));
+        assert.equal(tokens['--color-accent'], `hsl(${hue} ${saturation}% ${light}%)`);
+      }
+    }
+  }
+  const rose = themeTokens(PRESET_THEMES.find((theme) => theme.id === 'zen-rose'));
+  assert.equal(rose['--color-on-action'], '#ffffff');
+  assert.notEqual(rose['--color-action'], rose['--color-accent']);
+  const yellow = themeTokens(PRESET_THEMES.find((theme) => theme.id === 'neon-amber'));
+  assert.equal(yellow['--color-on-action'], '#000000');
+  assert.equal(yellow['--color-action'], yellow['--color-accent']);
 });

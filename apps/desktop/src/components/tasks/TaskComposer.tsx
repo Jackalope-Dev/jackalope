@@ -250,7 +250,7 @@ export function TaskComposer({
                         <strong>Let Jackalope choose</strong>
                         <span>
                           {automaticAgent
-                            ? `Recommended · ${automaticAgent}${automaticRationale ? ` · ${automaticRationale}` : ''}`
+                            ? `${automaticAgent} selects an agent, model and account for this task and its quota needs.`
                             : 'Connect an agent to get started'}
                         </span>
                       </span>
@@ -271,29 +271,33 @@ export function TaskComposer({
                       </button>
                     ))}
                   </div>
-                  <div className="composer-section-heading mt-4">
-                    <span>Model</span>
-                    <Cpu size={16} aria-hidden="true" />
-                  </div>
-                  <div className="composer-models">
-                    <button
-                      type="button"
-                      aria-pressed={!current.model}
-                      onClick={() => onChange({ model: undefined })}
-                    >
-                      {defaultModel ? `Default · ${defaultModel}` : 'Agent default'}
-                    </button>
-                    {models.map((model) => (
-                      <button
-                        key={model}
-                        type="button"
-                        aria-pressed={current.model === model}
-                        onClick={() => onChange({ model })}
-                      >
-                        {model}
-                      </button>
-                    ))}
-                  </div>
+                  {current.agent && (
+                    <>
+                      <div className="composer-section-heading mt-4">
+                        <span>Model</span>
+                        <Cpu size={16} aria-hidden="true" />
+                      </div>
+                      <div className="composer-models">
+                        <button
+                          type="button"
+                          aria-pressed={!current.model}
+                          onClick={() => onChange({ model: undefined })}
+                        >
+                          {defaultModel ? `Default · ${defaultModel}` : 'Agent default'}
+                        </button>
+                        {models.map((model) => (
+                          <button
+                            key={model}
+                            type="button"
+                            aria-pressed={current.model === model}
+                            onClick={() => onChange({ model })}
+                          >
+                            {model}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               {id === 'workspace' && (

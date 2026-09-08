@@ -27,6 +27,9 @@ pub(super) fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str
         return;
     };
     let kind = event["type"].as_str().unwrap_or("");
+    if let Some(failure) = super::routing::quota_failure(&event) {
+        run.quota_failure = Some(failure);
+    }
     if adapter == "opencode" {
         consume_opencode_event(run, &event, kind);
         return;

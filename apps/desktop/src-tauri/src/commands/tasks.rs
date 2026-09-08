@@ -2,6 +2,7 @@ mod antigravity;
 mod events;
 mod models;
 mod project_setup;
+mod routing;
 mod runners;
 mod runtime;
 mod storage;

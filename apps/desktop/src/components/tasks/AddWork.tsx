@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
 import type { QueueItem } from '../../lib/queue';
 import { queueCommand } from '../../lib/queue';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
@@ -27,7 +26,6 @@ export function AddWork({
 }) {
   const dialogFocus = useDialogFocus();
   const { runners } = useExecutionStore();
-  const agentConfig = useAgentConfigStore();
   const key = `jackalope-plan-draft:${project.id}`;
   const [draft, setDraft] = useState(() => {
     try {
@@ -35,13 +33,13 @@ export function AddWork({
         JSON.parse(localStorage.getItem(key) || 'null') ?? {
           title: '',
           prompt: '',
-          agent: agentConfig.defaultMetaAgent,
+          agent: 'auto',
           scopes: '',
           dependencies: [],
         }
       );
     } catch {
-      return { title: '', prompt: '', agent: 'codex', scopes: '', dependencies: [] };
+      return { title: '', prompt: '', agent: 'auto', scopes: '', dependencies: [] };
     }
   });
   const [busy, setBusy] = useState(false);
@@ -138,6 +136,7 @@ export function AddWork({
                   value={draft.agent}
                   onValueChange={(value) => update({ agent: value })}
                 >
+                  <SelectItem value="auto">Let Jackalope choose</SelectItem>
                   {builtinAgents.map(({ id, name }) => (
                     <SelectItem key={id} value={id}>
                       {name}

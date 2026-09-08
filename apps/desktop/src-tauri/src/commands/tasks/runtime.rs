@@ -123,6 +123,42 @@ impl TaskRuntime {
         req: &RunRequest,
         previous: Option<TaskRun>,
     ) -> Result<(), String> {
+        self.prepare_workspace(id, req, previous.clone())?;
+        let mut request = req.clone();
+        let mut resume = previous;
+        loop {
+            if !self.is_running(id) {
+                self.update(id, |run| {
+                    run.status = "stopped".into();
+                    run.ended_at = Some(Utc::now().to_rfc3339());
+                });
+                return Ok(());
+            }
+            if request.agent == "auto" {
+                self.route(&mut request)?;
+            }
+            self.execute_agent(id, &request, resume.take())?;
+            let run = self
+                .inner
+                .lock()
+                .unwrap()
+                .runs
+                .get(id)
+                .cloned()
+                .ok_or("Attempt not found")?;
+            if run.status != "starting" || run.routing.is_none() || run.quota_failure.is_none() {
+                return Ok(());
+            }
+            request = self.handoff(req, &run)?;
+        }
+    }
+
+    fn prepare_workspace(
+        &self,
+        id: &str,
+        req: &RunRequest,
+        previous: Option<TaskRun>,
+    ) -> Result<(), String> {
         let root = git(&req.project_path, &["rev-parse", "--show-toplevel"])?;
         let base_ref = format!(
             "refs/heads/{}",
@@ -216,9 +252,66 @@ impl TaskRuntime {
                 }
             }
         }
+        Ok(())
+    }
+
+    fn execute_agent(
+        &self,
+        id: &str,
+        req: &RunRequest,
+        previous: Option<TaskRun>,
+    ) -> Result<(), String> {
+        let workspace = self
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .get(id)
+            .ok_or("Attempt not found")?
+            .workspace
+            .clone();
         let policy = self.policy()?;
         let (adapter, executable) = policy.resolve(&req.agent)?;
         let selected_model = policy.model(&req.agent, req.model.as_deref())?;
+        if self
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .get(id)
+            .is_some_and(|run| run.routing.is_some())
+        {
+            let project = policy
+                .projects
+                .get(&req.project_id)
+                .cloned()
+                .unwrap_or_default();
+            if project
+                .allowed_agents
+                .as_ref()
+                .is_some_and(|allowed| !allowed.contains(&req.agent))
+            {
+                return Err(
+                    "Project agent permissions changed before launch. Retry routing.".into(),
+                );
+            }
+            if let Some(profile) = project
+                .agent_accounts
+                .get(&adapter)
+                .or_else(|| project.agent_accounts.get(&req.agent))
+            {
+                if req
+                    .account_binding
+                    .as_ref()
+                    .and_then(|binding| binding.profile_id.as_ref())
+                    != Some(profile)
+                {
+                    return Err(
+                        "Project account selection changed before launch. Retry routing.".into(),
+                    );
+                }
+            }
+        }
         let mut cmd = command(executable);
         if let Some(binding) = &req.account_binding {
             crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
@@ -475,6 +568,7 @@ impl TaskRuntime {
         });
         let started = std::time::Instant::now();
         let mut timed_out = false;
+        let mut quota_stopped = false;
         let exit = loop {
             if let Some(exit) = process
                 .lock()
@@ -491,6 +585,19 @@ impl TaskRuntime {
                 let _ = process.lock().unwrap().kill();
             }
             std::thread::sleep(Duration::from_millis(100));
+            if !quota_stopped
+                && self
+                    .inner
+                    .lock()
+                    .unwrap()
+                    .runs
+                    .get(id)
+                    .is_some_and(|run| run.routing.is_some() && run.quota_failure.is_some())
+            {
+                quota_stopped = true;
+                tree.terminate();
+                let _ = process.lock().unwrap().kill();
+            }
         };
         tree.terminate();
         let _ = reader.join();
@@ -518,14 +625,12 @@ impl TaskRuntime {
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
             r.finishing = false; r.exit_code = exit.code(); r.ended_at = Some(Utc::now().to_rfc3339());
-            r.status = if canceled || r.status == "stopping" { "stopped" } else if exit.success() && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
+            r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if exit.success() && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
             if r.status == "failed" && r.error.is_none() { r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit.code().map_or("no exit code".into(), |c| c.to_string()))); }
         });
         Ok(())
     }
 }
-
-impl TaskRuntime {}
 
 impl TaskRuntime {
     pub(in crate::commands) fn record_prompt(
@@ -673,13 +778,19 @@ impl TaskRuntime {
         };
         self.apply_policy(&mut request)?;
         let previous;
-        let (adapter, _) = self.policy()?.resolve(&request.agent)?;
+        let policy = self.policy()?;
+        let (adapter, _) = policy.resolve(if request.agent == "auto" {
+            &policy.default_meta_agent
+        } else {
+            &request.agent
+        })?;
         {
             let mut inner = self.inner.lock().unwrap();
             if let Some(existing) = inner.runs.get(&request.id) {
                 if existing.prompt == request.prompt
                     && existing.project_id == request.project_id
-                    && existing.agent == request.agent
+                    && (existing.agent == request.agent
+                        || (request.agent == "auto" && existing.routing.is_some()))
                 {
                     return Ok(request.id);
                 }
@@ -779,6 +890,8 @@ impl TaskRuntime {
                 )?
             };
             let run = TaskRun {
+                routing: (request.agent == "auto").then(super::routing::RoutingHistory::default),
+                quota_failure: None,
                 contract,
                 monitor_change: previous
                     .as_ref()
@@ -840,7 +953,21 @@ impl TaskRuntime {
                     inner.processes.remove(&request.id);
                     inner.canceled.remove(&request.id);
                 }
-                runtime.fail(&request.id, error);
+                if runtime
+                    .inner
+                    .lock()
+                    .unwrap()
+                    .runs
+                    .get(&request.id)
+                    .is_some_and(|run| run.status == "stopping")
+                {
+                    runtime.update(&request.id, |run| {
+                        run.status = "stopped".into();
+                        run.ended_at = Some(Utc::now().to_rfc3339());
+                    });
+                } else {
+                    runtime.fail(&request.id, error);
+                }
             }
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);

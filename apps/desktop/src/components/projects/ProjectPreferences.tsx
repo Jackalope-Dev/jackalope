@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
-import { useAgentConfigStore } from '../../stores/agentConfigStore';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
 import { ProjectAgentAccount } from '../settings/ProjectAgentAccount';
 import { Setting } from '../settings/Setting';
@@ -9,11 +11,34 @@ import { ProjectAccountGroup } from './ProjectAccountGroup';
 import '../settings/settings.css';
 export function ProjectPreferences() {
   const agents = useAgentConfigStore();
-  const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
+  const {
+    projects,
+    activeProjectId,
+    updateProject,
+    updateProjectPreferences: savePreferences,
+  } = useProjectStore();
+  const [syncError, setSyncError] = useState('');
+  const updateProjectPreferences: typeof savePreferences = (id, prefs) => {
+    savePreferences(id, prefs);
+    if (
+      isTauriEnvironment() &&
+      ['allowedAgents', 'agentAccounts', 'preferredRunner'].some((key) => key in prefs)
+    ) {
+      setSyncError('');
+      void syncAgentConfig().catch((cause) =>
+        setSyncError(`Routing settings could not be saved: ${String(cause)}`),
+      );
+    }
+  };
   const project = projects.find((p) => p.id === activeProjectId);
   return (
     <section className="workspace-page">
       <h1 className="text-2xl">Project settings</h1>
+      {syncError && (
+        <p role="alert" className="task-error">
+          {syncError}
+        </p>
+      )}
       {project && <p className="task-muted mt-2">{project.name}</p>}
       {!project ? (
         <p className="settings-section-subtitle mt-4">
@@ -31,15 +56,18 @@ export function ProjectPreferences() {
               />
             </Setting>
             <Setting title="Repository path" description={project.path} />
-            <Setting title="Default task agent">
+            <Setting
+              title="Preferred task agent"
+              description="A preference for automatic routing; task fit and available quota can select another enabled agent."
+            >
               <Select
-                aria-label="Default task agent"
+                aria-label="Preferred task agent"
                 value={project.preferences?.preferredRunner ?? 'inherit'}
                 onValueChange={(value) =>
                   updateProjectPreferences(project.id, { preferredRunner: value })
                 }
               >
-                <SelectItem value="inherit">App default</SelectItem>
+                <SelectItem value="inherit">Let Jackalope choose</SelectItem>
                 {[...builtinAgents, ...agents.customAgents].map((a) => (
                   <SelectItem
                     key={a.id}

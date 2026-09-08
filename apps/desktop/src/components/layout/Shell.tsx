@@ -75,8 +75,9 @@ export function Shell({
 } = {}) {
   const canvas = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (focusOnMount && !initialTaskAgent && !initialCapture) canvas.current?.focus();
-  }, [focusOnMount, initialTaskAgent, initialCapture]);
+    if (focusOnMount && !initialDraftKey && !initialTaskAgent && !initialCapture)
+      canvas.current?.focus();
+  }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
   const [setupOpen, setSetupOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
@@ -115,7 +116,7 @@ export function Shell({
     agent?: string;
     draftKey?: string;
   } | null>(
-    initialTaskAgent
+    initialDraftKey || initialTaskAgent
       ? { agent: initialTaskAgent, draftKey: initialDraftKey }
       : initialCapture
         ? {}

@@ -1,7 +1,9 @@
 use super::*;
 
-fn sample(agent: &str) -> TaskRun {
+pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {
+        routing: None,
+        quota_failure: None,
         contract: Default::default(),
         monitor_change: None,
         context_receipt: Default::default(),

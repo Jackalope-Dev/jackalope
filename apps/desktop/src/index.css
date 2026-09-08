@@ -101,7 +101,7 @@ body {
   padding: 0 12px 12px;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(145deg, var(--color-shell), var(--color-shell-end));
+  background: var(--color-shell-gradient);
 }
 
 /* Custom window chrome — replaces the OS titlebar (decorations: false in
@@ -368,10 +368,24 @@ body {
 }
 .theme-range {
   appearance: none;
-  height: 5px;
-  border-radius: 8px;
+  height: 44px;
+  background: transparent;
+  cursor: ew-resize;
+  border-radius: 12px;
+}
+.theme-range:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.theme-range::-webkit-slider-runnable-track {
+  height: 20px;
+  border-radius: 999px;
   background: linear-gradient(90deg, var(--color-border), var(--color-accent));
-  cursor: pointer;
+}
+.theme-range::-moz-range-track {
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-border), var(--color-accent));
 }
 .appearance-mode {
   display: flex;
@@ -400,7 +414,7 @@ body {
 .appearance-mode-option input:checked + span {
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
-  box-shadow: var(--shadow-flat);
+  box-shadow: var(--shadow-selection);
 }
 .appearance-mode-option input:focus-visible + span {
   outline: 2px solid var(--color-accent-ink);
@@ -408,12 +422,22 @@ body {
 }
 .theme-range::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 12px;
+  height: 24px;
+  margin-top: -2px;
+  border-radius: 999px;
   background: var(--color-text-primary);
-  border: 3px solid var(--color-surface-elevated);
-  box-shadow: 0 0 0 1px var(--color-border);
+  border: 2px solid var(--color-surface-elevated);
+  box-shadow: var(--shadow-selection);
+}
+.theme-range::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 12px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--color-text-primary);
+  border: 2px solid var(--color-surface-elevated);
+  box-shadow: var(--shadow-selection);
 }
 .theme-swatch[aria-pressed="true"] {
   outline: 1px solid var(--color-text-secondary);

@@ -98,6 +98,7 @@ export function PrivacySettings() {
         <p role="alert">
           {community.error}{' '}
           <Button
+            type="button"
             variant="ghost"
             onClick={() =>
               void (community.settings ? community.save(usage, errors) : community.load())

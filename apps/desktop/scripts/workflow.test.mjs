@@ -4,6 +4,7 @@ import { waitForStoppedAttempt } from '../src/lib/continue-task.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { collectWork } from '../src/lib/task-collection.ts';
 import { latestAttempt, safeResultLink, taskNextAction } from '../src/lib/task-workflow.ts';
+import { usageEntries } from '../src/lib/usage-entries.ts';
 
 const run = {
   id: 'run',
@@ -138,4 +139,38 @@ test('saved ideas restore knowledge selection together with connection scope', (
   const draft = planningDraft({ rawPrompt: 'Keep this', connectionIds: [], contextSelection });
   assert.deepEqual(draft.connectionIds, []);
   assert.deepEqual(draft.contextSelection, contextSelection);
+});
+
+test('routing and interrupted workers retain separate account usage without duplicate decision totals', () => {
+  const usage = { reported: true, input: 10, output: 5 };
+  const binding = { adapter: 'codex', profileId: 'account-a', label: 'A' };
+  const run = {
+    id: 'task',
+    agent: 'claude',
+    account: 'B',
+    usage,
+    routing: {
+      decisions: [{ usage }, { usage }],
+      handoffs: [{ agent: 'codex', binding, usage, recordedAt: '2026-09-08' }],
+      attempts: [{ agent: 'codex', binding, usage, error: null, recordedAt: '2026-09-08' }],
+    },
+  };
+  const entries = usageEntries([run]);
+  assert.equal(entries.length, 3);
+  assert.equal(
+    entries.reduce((sum, entry) => sum + entry.usage.input + entry.usage.output, 0),
+    45,
+  );
+  assert.equal(
+    entries.filter((entry) => entry.accountBinding?.profileId === 'account-a').length,
+    2,
+  );
+  assert.equal(new Set(entries.map((entry) => entry.usageKey)).size, 3);
+  assert.equal(usageEntries([{ ...run, routing: undefined }]).length, 1);
+  assert.equal(
+    usageEntries([
+      { ...run, routing: { decisions: [], handoffs: [], attempts: run.routing.attempts } },
+    ]).length,
+    1,
+  );
 });

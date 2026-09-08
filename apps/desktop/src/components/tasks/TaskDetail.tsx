@@ -63,6 +63,7 @@ export function TaskDetail({
   const key = `reply:${run.taskId}`;
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
+  const routing = run.routing;
   const attempts = runs
     .filter((r) => r.taskId === run.taskId)
     .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
@@ -501,6 +502,46 @@ export function TaskDetail({
                 <h3 className="text-base font-medium">Instruction for this attempt</h3>
                 <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
               </section>
+              {routing && (
+                <section className="my-4" aria-label="Automatic routing">
+                  <h3 className="text-base font-medium">Agent selection and handoffs</h3>
+                  {!routing.decisions.length && (
+                    <p className="task-muted">
+                      Checking available agents, models and account quotas.
+                    </p>
+                  )}
+                  <ol className="space-y-3 mt-3">
+                    {routing.decisions.map((decision, index) => (
+                      <li key={decision.checkedAt}>
+                        <p>
+                          {decision.agent} · {decision.model || 'CLI default model'} ·{' '}
+                          {decision.account}
+                        </p>
+                        <p className="task-muted">{decision.reason}</p>
+                        <p className="task-muted">
+                          Selected by {decision.orchestrator} ·{' '}
+                          {decision.remainingPercent === null
+                            ? 'Quota unknown'
+                            : `${Math.round(decision.remainingPercent)}% headroom after local reservations at selection`}{' '}
+                          · Routing usage:{' '}
+                          {decision.usage.reported
+                            ? `${(decision.usage.input + decision.usage.output).toLocaleString()} tokens`
+                            : 'not reported'}
+                        </p>
+                        {routing.handoffs[index] && (
+                          <p className="task-muted">
+                            Quota handoff · {routing.handoffs[index].failure.message} · Worker
+                            usage:{' '}
+                            {routing.handoffs[index].usage.reported
+                              ? `${(routing.handoffs[index].usage.input + routing.handoffs[index].usage.output).toLocaleString()} tokens`
+                              : 'not reported'}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )}
               {run.prompts
                 ?.filter((p) => p.status === 'answered')
                 .map((p) => (

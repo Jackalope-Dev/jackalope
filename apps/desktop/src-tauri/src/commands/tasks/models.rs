@@ -25,6 +25,10 @@ pub struct UsageObservation {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]
+    pub routing: Option<super::routing::RoutingHistory>,
+    #[serde(default)]
+    pub quota_failure: Option<super::routing::QuotaFailure>,
+    #[serde(default)]
     pub contract: crate::commands::outcomes::TaskContract,
     #[serde(default)]
     pub monitor_change: Option<crate::commands::monitors::MonitorChange>,

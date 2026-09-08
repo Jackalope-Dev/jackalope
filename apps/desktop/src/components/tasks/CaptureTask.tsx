@@ -2,12 +2,11 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { connectionSupport } from '../../lib/agent-capabilities';
-import { routeTaskToBestAgent } from '../../lib/agent-routing';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt } from '../../lib/skills/context-assembler';
 import { ideaStageLabels } from '../../lib/task-collection';
-import { effortPrompt, suggestedRunner } from '../../lib/task-effort';
+import { effortPrompt } from '../../lib/task-effort';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
@@ -77,23 +76,10 @@ export function CaptureTask({
   const allowed = runners.filter(
     (r) => config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
-  const preferred = project?.preferences?.preferredRunner;
-  const routing = useMemo(
-    () =>
-      routeTaskToBestAgent({
-        prompt: current.prompt,
-        effort: current.effort,
-        availableRunners: allowed,
-        preferredRunner: preferred,
-      }),
-    [current.prompt, current.effort, allowed, preferred],
-  );
-  const defaultAgent =
-    (allowed.some((r) => r.id === routing.agentId) ? routing.agentId : '') ||
-    (suggestedRunner(allowed, preferred, config.defaultMetaAgent)?.id ?? '');
+  const defaultAgent = config.defaultMetaAgent;
   const currentAgent = current.agent || defaultAgent;
+  const runner = (current.agent ? allowed : runners).find((r) => r.id === currentAgent);
   const [splitOpen, setSplitOpen] = useState(false);
-  const runner = allowed.find((r) => r.id === currentAgent);
   const modelOptions = config.runnerOptions[currentAgent];
   const defaultModel =
     modelOptions?.defaultModel ||
@@ -114,7 +100,7 @@ export function CaptureTask({
       (!modelOptions?.restrictModels || modelOptions.models.includes(model)),
   );
   const modelError =
-    current.model && !models.includes(current.model)
+    current.agent && current.model && !models.includes(current.model)
       ? 'The selected model is no longer allowed. Choose another model or use the agent default.'
       : '';
   const [error, setError] = useState('');
@@ -129,7 +115,9 @@ export function CaptureTask({
   const adapter = config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
   const connectionIssues = Object.fromEntries(
     connections.flatMap((server) => {
-      const reason = connectionSupport(adapter, server.transport, server.discovery === true);
+      const reason = current.agent
+        ? connectionSupport(adapter, server.transport, server.discovery === true)
+        : null;
       return reason ? [[server.id, reason]] : [];
     }),
   );
@@ -242,9 +230,9 @@ export function CaptureTask({
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
-        agent: currentAgent,
-        model: current.model,
-        agentProfileId: agentAccountFor(project, adapter),
+        agent: current.agent ? currentAgent : 'auto',
+        model: current.agent ? current.model : undefined,
+        agentProfileId: current.agent ? agentAccountFor(project, adapter) : undefined,
         targetBranch: project.preferences?.baseBranch || project.gitBranch,
         verifyCommand: project.preferences?.verifyCommand,
         prepareCommand: project.preferences?.prepareCommand,
@@ -364,8 +352,7 @@ export function CaptureTask({
             current={current}
             models={models}
             defaultModel={defaultModel}
-            automaticAgent={allowed.find((r) => r.id === defaultAgent)?.name}
-            automaticRationale={routing?.rationale}
+            automaticAgent={runners.find((r) => r.id === defaultAgent)?.name}
             onSplitTask={project ? () => setSplitOpen(true) : undefined}
             runner={runner}
             allowedRunners={allowed}

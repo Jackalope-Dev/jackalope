@@ -1,6 +1,7 @@
 import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useState } from 'react';
 import { taskTitle } from '../../lib/task-title';
+import { usageEntries } from '../../lib/usage-entries';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -8,23 +9,23 @@ import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { CapacityPanel } from './CapacityPanel';
-
 export function UsageDashboard({ onTask }: { onTask: () => void }) {
   const { runs, select, loading, error } = useExecutionStore();
   const { projects, selectProject } = useProjectStore();
   const [project, setProject] = useState('all');
   const [period, setPeriod] = useState('30');
   const [account, setAccount] = useState('all');
-  const accountKey = (r: (typeof runs)[number]) =>
+  const entries = usageEntries(runs);
+  const accountKey = (r: (typeof entries)[number]) =>
     `${r.accountBinding?.adapter ?? r.agent}:${r.accountBinding?.profileId ?? 'cli-default'}`;
-  const accounts = new Map(runs.map((r) => [accountKey(r), `${r.agent} · ${r.account}`]));
+  const accounts = new Map(entries.map((r) => [accountKey(r), `${r.agent} · ${r.account}`]));
   const [sort, setSort] = useState('tokens');
   const projectNames = new Map([
     ...projects.map((p) => [p.id, p.name] as const),
     ...runs.map((r) => [r.projectId, r.projectName] as const),
   ]);
   const cutoff = period === 'all' ? 0 : Date.now() - Number(period) * 86400000;
-  const filtered = runs.filter(
+  const filtered = entries.filter(
     (r) =>
       (project === 'all' || r.projectId === project) &&
       (account === 'all' || accountKey(r) === account) &&
@@ -49,6 +50,8 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
       ({
         id,
         taskId,
+        purpose,
+        usageKey,
         projectId,
         projectName,
         agent,
@@ -62,6 +65,8 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
       }) => ({
         id,
         taskId,
+        purpose,
+        usageKey,
         projectId,
         projectName,
         agent,
@@ -85,7 +90,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         [
           JSON.stringify(
             {
-              schema: 1,
+              schema: 2,
               coverage: 'Jackalope attempts only; missing usage is unavailable',
               attempts: data,
             },
@@ -216,12 +221,13 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                 </>
               )}
               <p className="task-muted">
-                {reported.length} of {filtered.length} attempts reported usage
+                {reported.length} of {filtered.length} worker and routing calls reported usage
               </p>
             </div>
           </div>
           <p className="task-muted text-sm my-4">
-            Reported usage only; missing reports are excluded. Cached input is counted once.
+            Includes routing and workers interrupted by quota. Missing reports are excluded; cached
+            input is counted once.
           </p>
         </>
       )}
@@ -258,7 +264,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
             </thead>
             <tbody>
               {sorted.map((run) => (
-                <tr key={run.id}>
+                <tr key={run.usageKey}>
                   <td>
                     <button
                       type="button"
@@ -276,7 +282,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
                     </span>
                   </td>
                   <td>
-                    {run.agent}
+                    {run.agent} · {run.purpose}
                     <span className="task-muted text-xs block mt-1">
                       {run.model || 'Not reported'}
                     </span>
@@ -301,7 +307,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
           {filtered
             .filter((r) => r.usageObservations?.length)
             .map((r) => (
-              <details key={r.id} className="mt-4">
+              <details key={r.usageKey} className="mt-4">
                 <summary>
                   {taskTitle(r.prompt)} · {r.usageObservations?.length} messages
                 </summary>

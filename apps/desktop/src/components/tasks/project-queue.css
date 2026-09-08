@@ -11,22 +11,25 @@
 }
 .queue-tabs {
   display: flex;
-  gap: 28px;
-  border-bottom: 1px solid var(--color-border-subtle);
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px;
   margin: 32px 0 28px;
 }
 .queue-tabs button {
-  padding: 13px 0;
+  padding: 10px 14px;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-  border-bottom: 2px solid transparent;
+  border: 0;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   gap: 9px;
 }
 .queue-tabs button[aria-pressed="true"] {
-  color: var(--color-accent-ink);
-  border-bottom-color: var(--color-accent-ink);
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-selection);
 }
 .queue-tabs span {
   background: var(--color-accent-subtle);

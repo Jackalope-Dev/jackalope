@@ -161,9 +161,17 @@ fn parse_grok(value: &Value, account: Option<String>) -> CapacityRecord {
     result
 }
 
+#[cfg(test)]
 pub(super) async fn read_claude(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
-    let mut client = Client::spawn(
-        "claude",
+    let binding = super::super::agent_profiles::bind_account(profiles_root, "claude", None)?;
+    read_claude_bound(&binding).await
+}
+
+pub(super) async fn read_claude_bound(
+    binding: &super::super::agent_profiles::AccountBinding,
+) -> Result<CapacityRecord, String> {
+    let mut client = Client::spawn_bound(
+        binding,
         &[
             "--print",
             "--verbose",
@@ -175,7 +183,6 @@ pub(super) async fn read_claude(profiles_root: &std::path::Path) -> Result<Capac
             "--safe-mode",
             "--strict-mcp-config",
         ],
-        profiles_root,
     )?;
     let result = timeout(Duration::from_secs(20), async {
         let init = client.request(json!({"type":"control_request","request_id":"init","request":{"subtype":"initialize","hooks":{}}})).await?;
@@ -190,8 +197,16 @@ pub(super) async fn read_claude(profiles_root: &std::path::Path) -> Result<Capac
     result
 }
 
+#[cfg(test)]
 pub(super) async fn read_grok(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
-    let mut client = Client::spawn("grok", &["agent", "--no-leader", "stdio"], profiles_root)?;
+    let binding = super::super::agent_profiles::bind_account(profiles_root, "grok", None)?;
+    read_grok_bound(&binding).await
+}
+
+pub(super) async fn read_grok_bound(
+    binding: &super::super::agent_profiles::AccountBinding,
+) -> Result<CapacityRecord, String> {
+    let mut client = Client::spawn_bound(binding, &["agent", "--no-leader", "stdio"])?;
     let result = timeout(Duration::from_secs(20), async {
         client.request(json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{},"clientInfo":{"name":"jackalope","version":env!("CARGO_PKG_VERSION")}}})).await?;
         let auth = client.request(json!({"jsonrpc":"2.0","id":1,"method":"_x.ai/auth/info","params":{}})).await?;

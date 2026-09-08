@@ -1,5 +1,70 @@
 [
   {
+    "id": "quota-aware-task-routing",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Task routing with quota awareness",
+    "description": "Jackalope's default agent can select an enabled agent, configured model and account for automatic tasks.",
+    "items": [
+      "Uses reported quota headroom and local active-work reservations when admitting work.",
+      "Hands quota-interrupted tasks to an eligible fallback in the same workspace with progress and usage retained.",
+      "Shows routing decisions and attributes routing and worker usage separately."
+    ],
+    "note": "In development. Missing quota remains unknown; live provider handoff acceptance is still pending. Explicit assignments remain pinned."
+  },
+  {
+    "id": "a-more-expressive-companion",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A more expressive companion",
+    "description": "Jackalope adds small character reactions and more tactile theme controls.",
+    "items": [
+      "The idle companion blinks occasionally and gently follows the mouse, with activity expressions taking priority.",
+      "Successful setup steps get a quick nod before advancing. Reduced motion skips these gestures.",
+      "Atmosphere reaches a richer maximum of 64 and uses a thicker vertical pill handle with a generous drag area."
+    ],
+    "note": "Available in the local development build; native release acceptance is still pending."
+  },
+  {
+    "id": "clearer-button-and-tab-states",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Clearer button and tab states.",
+    "description": "Primary buttons favor readable white labels, and selected tabs use subtle elevation.",
+    "items": [
+      "Borderline action fills deepen slightly while preserving the chosen theme color elsewhere.",
+      "Selected theme, task, queue and MCP tabs use a shared shadow instead of a bottom-edge highlight."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "palettes-that-follow-your-color",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Palettes that follow your color.",
+    "description": "Choose Single, Duo or Trio to build a coordinated theme from one primary color.",
+    "items": [
+      "Companion colors and workspace gradients update as you explore the color picker.",
+      "Palette previews preserve cancel, reset and saved themes, with readable action labels on hover.",
+      "Atmosphere has a richer high end while keeping existing saved themes unchanged.",
+      "Choosing automatic appearance keeps the theme picker layout steady."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "a-focused-start-to-setup",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A focused start to setup.",
+    "description": "Choose your theme first, then review privacy choices when setting up a project.",
+    "items": [
+      "Privacy choices appear only on step two, with saved opt-outs preserved.",
+      "Agent setup saves your app-wide default and points to Settings for more customization.",
+      "Re-scan agents is easy to find at the top right of the setup pane."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "a-closer-look-at-jackalope",
     "date": "2026-09-08",
     "status": "In development",

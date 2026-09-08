@@ -16,10 +16,7 @@ async function _verifyOnboarding(page) {
       .count()) === 0,
     'Onboarding has no bypass actions',
   );
-  assert(
-    (await page.locator('.onboarding-privacy-panel').getAttribute('open')) === null,
-    'Privacy is collapsed by default',
-  );
+  assert((await page.locator('.onboarding-privacy-panel').count()) === 0, 'Theme hides privacy');
   await page.getByRole('heading', { name: 'Choose your theme', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
   await page.getByRole('button', { name: 'Reset preview', exact: true }).click();
@@ -30,7 +27,11 @@ async function _verifyOnboarding(page) {
     'Inline theme preview resets',
   );
   await page.getByRole('button', { name: 'Keep theme and continue', exact: true }).click();
-  assert((await page.locator('.onboarding-privacy-panel').count()) === 0, 'Project hides privacy');
+  await page.getByRole('heading', { name: 'Choose a project', exact: true }).waitFor();
+  assert(
+    (await page.locator('.onboarding-privacy-panel').getAttribute('open')) === null,
+    'Project privacy is collapsed by default',
+  );
   await page.getByRole('button', { name: 'Personalize your workspace', exact: true }).click();
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
   await page.getByRole('button', { name: 'Cancel theme preview', exact: true }).click();
@@ -68,6 +69,8 @@ async function _verifyOnboarding(page) {
       invoke: async (command, args) => {
         const fixture = window.onboardingFixture;
         fixture.calls.push({ command, args });
+        if (command === 'agent_save_policy' && fixture.policyFailure)
+          throw new Error('Agent settings could not be saved. Please retry.');
         if (command === 'mcp_list_servers' || command === 'knowledge_list') return [];
         if (command === 'schedule_list') return { schedules: [] };
         if (command === 'task_history_recovery') return { directory: 'fixture', entries: [] };
@@ -121,11 +124,38 @@ async function _verifyOnboarding(page) {
               account: 'fixture',
               detail: 'Browser state only; no native tasks launched',
             },
+            {
+              id: 'claude',
+              name: 'Claude',
+              available: true,
+              signedIn: true,
+              detail: 'Browser state only; no native tasks launched',
+            },
           ],
         }),
     });
   });
   await page.getByRole('button', { name: 'Back', exact: true }).click();
+  for (const [width, height] of [
+    [1280, 840],
+    [960, 640],
+  ]) {
+    await page.setViewportSize({ width, height });
+    for (const mode of ['Light', 'Dark']) {
+      await page.getByRole('radio', { name: mode, exact: true }).focus();
+      await page.keyboard.press('Space');
+      assert(
+        (await page.locator('.onboarding-privacy-panel').count()) === 0,
+        'Theme hides privacy',
+      );
+      await page.screenshot({ path: `output/playwright/onboarding-theme-${mode}-${width}.png` });
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        'Theme fits viewport',
+      );
+    }
+  }
+  await page.getByRole('button', { name: 'Keep theme and continue', exact: true }).click();
   await page.locator('.onboarding-privacy-panel summary').focus();
   await page.keyboard.press('Enter');
   assert(
@@ -135,41 +165,13 @@ async function _verifyOnboarding(page) {
     'Saved opt-out remains off',
   );
   await page.getByRole('switch', { name: 'Allow MCP marketplace', exact: true }).click();
-  for (const [width, height] of [
-    [1280, 840],
-    [960, 640],
-  ]) {
-    await page.setViewportSize({ width, height });
-    for (const mode of ['Light', 'Dark']) {
-      await page.getByRole('radio', { name: mode, exact: true }).focus();
-      await page.keyboard.press('Space');
-      await page.locator('.onboarding-privacy-panel summary').click();
-      await page
-        .getByRole('heading', { name: 'Choose your theme', exact: true })
-        .scrollIntoViewIfNeeded();
-      await page.screenshot({ path: `output/playwright/onboarding-theme-${mode}-${width}.png` });
-      assert(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        'Theme fits viewport',
-      );
-      await page.locator('.onboarding-privacy-panel summary').click();
-    }
-  }
-  await page.getByRole('button', { name: 'Keep theme and continue', exact: true }).click();
-  assert(
-    await page.evaluate(
-      () =>
-        !window.onboardingFixture.calls.some((call) => call.command === 'app_community_configure'),
-    ),
-    'Reviewed privacy is not approved again',
-  );
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.evaluate(async () => {
     const module = (name) =>
       import(
         performance
           .getEntriesByType('resource')
-          .find((r) => r.name.includes(`/src/stores/${name}.ts`)).name
+          .find((resource) => resource.name.includes(`/src/stores/${name}.ts`)).name
       );
     const { useCommunityStore: community } = await module('communityStore');
     const { useSettingsStore: settings } = await module('settingsStore');
@@ -178,32 +180,18 @@ async function _verifyOnboarding(page) {
   });
   await page.getByRole('button', { name: 'Keep theme and continue', exact: true }).click();
   assert(
-    await page.evaluate(() => {
-      const calls = window.onboardingFixture.calls.filter(
-        (call) => call.command === 'app_community_configure',
-      );
-      return (
-        calls.length === 1 && calls[0].args.telemetry === false && calls[0].args.errors === false
-      );
-    }),
-    'First-step approval saves existing opt-outs',
+    await page.evaluate(
+      () =>
+        !window.onboardingFixture.calls.some((call) => call.command === 'app_community_configure'),
+    ),
+    'Theme continuation does not approve privacy',
   );
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.locator('.onboarding-privacy-panel summary').click();
   assert(
     (await page
       .getByRole('switch', { name: 'Allow MCP marketplace', exact: true })
       .getAttribute('aria-checked')) === 'false',
     'Marketplace opt-out survives navigation',
-  );
-  await page.getByRole('button', { name: 'Keep theme and continue', exact: true }).click();
-  assert(
-    await page.evaluate(
-      () =>
-        window.onboardingFixture.calls.filter((call) => call.command === 'app_community_configure')
-          .length === 1,
-    ),
-    'Returning does not repeat approval',
   );
   await page.getByRole('button', { name: 'Create new project', exact: true }).click();
   const create = page.getByRole('button', { name: 'Create project and continue', exact: true });
@@ -213,6 +201,17 @@ async function _verifyOnboarding(page) {
   await page.getByText('C:/fixture/Projects', { exact: true }).waitFor();
   await create.click();
   await page.getByRole('alert').filter({ hasText: 'That folder already exists' }).waitFor();
+  assert(
+    await page.evaluate(() => {
+      const calls = window.onboardingFixture.calls.filter(
+        (call) => call.command === 'app_community_configure',
+      );
+      return (
+        calls.length === 1 && calls[0].args.telemetry === false && calls[0].args.errors === false
+      );
+    }),
+    `Project continuation saves existing opt-outs: ${JSON.stringify(await page.evaluate(() => window.onboardingFixture.calls.filter((call) => call.command === 'app_community_configure')))}`,
+  );
   assert(
     (await page.getByRole('textbox', { name: 'Project name', exact: true }).inputValue()) ===
       'My new project',
@@ -258,8 +257,59 @@ async function _verifyOnboarding(page) {
     }
   }
   await create.click();
-  await page.getByRole('heading', { name: 'Choose an agent', exact: true }).waitFor();
+  await page
+    .getByRole('heading', { name: 'Choose a default agent for Jackalope', exact: true })
+    .waitFor();
+  assert(
+    (await page.locator('.onboarding-advanced').count()) === 0,
+    'Advanced controls stay out of setup',
+  );
+  await page.getByText('Settings → Agents', { exact: true }).waitFor();
+  const rescan = page.getByRole('button', { name: 'Re-scan agents', exact: true });
+  await rescan.focus();
+  await page.keyboard.press('Enter');
+  for (const [width, height] of [
+    [1280, 840],
+    [960, 640],
+  ]) {
+    await page.setViewportSize({ width, height });
+    for (const isDark of [false, true]) {
+      await page.evaluate(async (isDark) => {
+        const { useThemeStore: theme } = await import(
+          performance
+            .getEntriesByType('resource')
+            .find((r) => r.name.includes('/src/stores/themeStore.ts')).name
+        );
+        theme
+          .getState()
+          .setTheme({ ...theme.getState().currentTheme, appearance: 'manual', isDark });
+      }, isDark);
+      await rescan.scrollIntoViewIfNeeded();
+      const control = await rescan.boundingBox();
+      const progress = await page.locator('.onboarding-progress').boundingBox();
+      assert(
+        control.x > progress.x + progress.width &&
+          Math.abs(control.y + control.height / 2 - progress.y - progress.height / 2) < 2,
+        'Re-scan sits at the top right beside progress',
+      );
+      await page.screenshot({
+        path: `output/playwright/onboarding-agent-${isDark ? 'dark' : 'light'}-${width}.png`,
+      });
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        'Agent setup fits the viewport',
+      );
+    }
+  }
   assert((await page.locator('.onboarding-privacy-panel').count()) === 0, 'Agent hides privacy');
+  assert(
+    await page.evaluate(
+      () =>
+        window.onboardingFixture.calls.filter((call) => call.command === 'app_community_configure')
+          .length === 1,
+    ),
+    'Retry does not repeat privacy approval',
+  );
   assert(
     await page.evaluate(() => {
       const calls = window.onboardingFixture.calls.filter(
@@ -273,10 +323,48 @@ async function _verifyOnboarding(page) {
     }),
     'Default and custom project locations reach native creation',
   );
+  await page.getByRole('button', { name: /^Claude Installed/ }).click();
+  await page.evaluate(() => {
+    window.onboardingFixture.policyFailure = true;
+  });
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'Agent settings could not be saved' }).waitFor();
+  assert(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('jackalope-agent-config-v1')).state.defaultMetaAgent ===
+        'codex',
+    ),
+    'A failed policy save restores the previous default',
+  );
+  assert(
+    (await page.locator('[data-nodding]').count()) === 0,
+    'Failed steps do not nod or advance',
+  );
+  await page.evaluate(() => {
+    window.onboardingFixture.policyFailure = false;
+  });
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('heading', { name: 'Describe your first task', exact: true }).waitFor();
+  assert(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('jackalope-agent-config-v1')).state.defaultMetaAgent ===
+        'claude',
+    ),
+    'Choosing a default persists it beyond the first task',
+  );
+  assert(
+    await page.evaluate(() =>
+      window.onboardingFixture.calls.some(
+        (call) =>
+          call.command === 'agent_save_policy' && call.args.policy.defaultMetaAgent === 'claude',
+      ),
+    ),
+    'The chosen default reaches native policy',
+  );
   assert((await page.locator('.onboarding-privacy-panel').count()) === 0, 'Task hides privacy');
-  const prompt = page.getByRole('textbox', { name: 'Your first task', exact: true });
+  const prompt = page.getByRole('textbox', { name: 'Your first task (optional)', exact: true });
   assert(
     (await prompt.inputValue()).includes('plan what to build'),
     'New project offers a first-task draft',
@@ -364,10 +452,12 @@ async function _verifyOnboarding(page) {
     .getByRole('textbox', { name: 'Repository folder', exact: true })
     .fill('C:/fixture/Existing');
   await page.getByRole('button', { name: 'Continue with this project', exact: true }).click();
-  await page.getByRole('heading', { name: 'Choose an agent', exact: true }).waitFor();
+  await page
+    .getByRole('heading', { name: 'Choose a default agent for Jackalope', exact: true })
+    .waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page
-    .getByRole('textbox', { name: 'Your first task', exact: true })
+    .getByRole('textbox', { name: 'Your first task (optional)', exact: true })
     .fill('Review the existing project.');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();

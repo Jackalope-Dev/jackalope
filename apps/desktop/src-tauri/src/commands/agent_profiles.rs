@@ -130,6 +130,30 @@ pub struct AccountBinding {
     pub label: String,
 }
 
+pub(in crate::commands) fn routing_accounts(
+    root: &Path,
+    adapter: &str,
+    explicit: Option<&str>,
+) -> Result<Vec<AccountBinding>, String> {
+    let _guard = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    if explicit.is_some() || adapter == "antigravity" {
+        return Ok(vec![bind_account(root, adapter, explicit)?]);
+    }
+    let manifest = load_checked(root)?;
+    let mut bindings = vec![bind_account(root, adapter, None)?];
+    if let Some(entry) = manifest.agents.get(adapter) {
+        for profile in &entry.profiles {
+            if !bindings
+                .iter()
+                .any(|binding| binding.profile_id.as_ref() == Some(&profile.id))
+            {
+                bindings.push(bind_account(root, adapter, Some(&profile.id))?);
+            }
+        }
+    }
+    Ok(bindings)
+}
+
 pub fn bind_account(
     root: &Path,
     adapter: &str,

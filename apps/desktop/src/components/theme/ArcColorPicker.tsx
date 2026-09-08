@@ -38,7 +38,7 @@ export function ArcColorPicker() {
           <span
             className="size-5 rounded-full"
             style={{
-              background: 'linear-gradient(135deg, var(--color-text-primary), var(--color-accent))',
+              background: 'var(--color-palette-gradient)',
             }}
           />
         </button>

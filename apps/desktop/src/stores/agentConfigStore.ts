@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { BuiltinAgentId } from '../lib/agent-catalog';
 import { nativeTask } from '../lib/task-runtime.ts';
+import { useProjectStore } from './projectStore.ts';
 
 const memoryStore: Record<string, string> = {};
 const safeStorage = createJSONStorage(() => ({
@@ -166,11 +167,29 @@ export const useAgentConfigStore = create<AgentConfigState>()(
   ),
 );
 
-export async function syncAgentConfig() {
+let policySync: Promise<void> = Promise.resolve();
+export function syncAgentConfig() {
+  policySync = policySync.catch(() => {}).then(syncAgentConfigNow);
+  return policySync;
+}
+
+async function syncAgentConfigNow() {
   const { enabledAgents, allowedModels, defaultMetaAgent, customAgents, runnerOptions } =
     useAgentConfigStore.getState();
+  const effectiveOptions = { ...runnerOptions };
+  for (const custom of customAgents) {
+    const options = effectiveOptions[custom.id];
+    effectiveOptions[custom.id] = {
+      ...options,
+      models: options?.restrictModels
+        ? options.models
+        : [...(options?.models ?? []), ...custom.models.map((model) => model.id)],
+      restrictModels: options?.restrictModels ?? false,
+      defaultModel: options?.defaultModel ?? '',
+    };
+  }
   const normalizedOptions = Object.fromEntries(
-    Object.entries(runnerOptions).map(([id, options]) => [
+    Object.entries(effectiveOptions).map(([id, options]) => [
       id,
       {
         ...options,
@@ -187,6 +206,16 @@ export async function syncAgentConfig() {
       defaultMetaAgent,
       customAgents,
       runnerOptions: normalizedOptions,
+      projects: Object.fromEntries(
+        useProjectStore.getState().projects.map((project) => [
+          project.id,
+          {
+            allowedAgents: project.preferences?.allowedAgents,
+            agentAccounts: project.preferences?.agentAccounts ?? {},
+            preferredRunner: project.preferences?.preferredRunner,
+          },
+        ]),
+      ),
     },
   });
 }

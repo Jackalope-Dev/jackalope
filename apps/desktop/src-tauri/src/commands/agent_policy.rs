@@ -33,6 +33,15 @@ pub struct AgentPolicy {
     pub default_meta_agent: String,
     pub custom_agents: Vec<CustomAgent>,
     pub runner_options: HashMap<String, RunnerOptions>,
+    pub projects: HashMap<String, ProjectAgentPolicy>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProjectAgentPolicy {
+    pub allowed_agents: Option<Vec<String>>,
+    pub agent_accounts: HashMap<String, String>,
+    pub preferred_runner: Option<String>,
 }
 
 impl AgentPolicy {
@@ -129,6 +138,20 @@ impl TaskRuntime {
     }
     pub(super) fn apply_policy(&self, request: &mut RunRequest) -> Result<(), String> {
         let policy = self.policy()?;
+        if request.agent == "auto" {
+            if request.previous_run_id.is_some()
+                || request.agent_profile_id.is_some()
+                || request.model.is_some()
+            {
+                return Err("Automatic routing cannot override a pinned account, model or existing session.".into());
+            }
+            let (adapter, _) = policy.resolve(&policy.default_meta_agent)?;
+            if !matches!(adapter.as_str(), "codex" | "claude" | "grok" | "opencode") {
+                return Err("Choose Codex, Claude, Grok or OpenCode as the default orchestrator in Settings → Agents. Antigravity is available as a worker.".into());
+            }
+            policy.model(&policy.default_meta_agent, None)?;
+            return Ok(());
+        }
         if request.agent == "default" {
             if policy.default_meta_agent.is_empty() {
                 return Err("Choose a default agent in Agents first.".into());
@@ -152,6 +175,7 @@ pub async fn agent_save_policy(
         if agent.id.is_empty()
             || super::tasks::BUILTIN_AGENTS.contains(&agent.id.as_str())
             || agent.id == "default"
+            || agent.id == "auto"
             || !ids.insert(&agent.id)
         {
             return Err("Custom agents need unique IDs distinct from built-in agents.".into());

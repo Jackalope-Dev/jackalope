@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
 import { createProject, openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
@@ -35,36 +35,30 @@ import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import './onboarding.css';
 
-const AgentManager = lazy(() =>
-  import('../agents/AgentManager').then((m) => ({ default: m.AgentManager })),
-);
-
 const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'theme', label: 'Theme' },
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agent' },
   { id: 'task', label: 'First task' },
 ];
-
 const setupTips: Record<OnboardingStep, string[]> = {
   theme: [
     'Theme changes are a preview until you choose Keep theme and continue.',
-    'Open Manage privacy settings to review usage sharing before continuing.',
+    'Try a palette, then adjust its accent and atmosphere to make it yours.',
   ],
   project: [
     'Choose the Git repository your agent will work in, or create a new project.',
-    'Creating a project? Check its name and folder before continuing.',
+    'Open Manage privacy settings to review usage sharing before continuing.',
   ],
   agent: [
-    'Choose an installed agent and sign in to its account before starting a task.',
-    'If you just installed or signed in to an agent, refresh the list.',
+    'Your default is the starting choice for new tasks. Projects and tasks can use another agent.',
+    'Add agents, supported accounts and models later in Settings → Agents.',
   ],
   task: [
     'Describe the result you want, relevant files, and how to check the work.',
     'Your first task opens as a draft. Review it in the workspace before starting.',
   ],
 };
-
 export function OnboardingFlow({
   onFinish,
   onSkip,
@@ -93,7 +87,11 @@ export function OnboardingFlow({
   const [agent, setAgent] = useState(
     (project && execution.drafts[project.id]?.agent) || config.defaultMetaAgent,
   );
-  const [busy, setBusy] = useState(false);
+  const [working, setBusy] = useState(false);
+  const [nodding, setNodding] = useState(false);
+  const pendingAdvance = useRef<(() => void) | null>(null);
+  const attempting = useRef(false);
+  const busy = working || nodding;
   const [error, setError] = useState('');
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const copyToClipboard = (text: string) => {
@@ -112,11 +110,13 @@ export function OnboardingFlow({
   const available = (id: string) => {
     const options = config.runnerOptions[id];
     return (
+      ['codex', 'claude', 'grok', 'opencode'].includes(
+        config.customAgents.find((custom) => custom.id === id)?.adapter ?? id,
+      ) &&
       config.isAgentEnabled(id) &&
       !(options?.restrictModels && !options.models.some((model) => model.trim()))
     );
   };
-
   useEffect(() => {
     if (step === 'theme') setThemeDraft(useThemeStore.getState().currentTheme);
   }, [step]);
@@ -125,7 +125,6 @@ export function OnboardingFlow({
     applyThemeTokens(themeDraft);
     return () => applyThemeTokens(useThemeStore.getState().currentTheme);
   }, [step, themeDraft]);
-
   useEffect(() => {
     if (!desktop || projectMode !== 'new') return;
     void nativeTask<string>('task_project_directory')
@@ -135,7 +134,6 @@ export function OnboardingFlow({
       })
       .catch(() => setDirectoryError('Choose a folder for your new project.'));
   }, [desktop, projectMode]);
-
   useEffect(() => {
     if (heading.current?.dataset.step === step) heading.current.focus();
     setError('');
@@ -146,9 +144,26 @@ export function OnboardingFlow({
   useEffect(() => {
     if (error) errorMessage.current?.focus();
   }, [error]);
-
+  const advance = (action: () => void) => {
+    if (pendingAdvance.current) return;
+    pendingAdvance.current = action;
+    setNodding(true);
+  };
+  const completeNod = useCallback(() => {
+    const action = pendingAdvance.current;
+    pendingAdvance.current = null;
+    setNodding(false);
+    action?.();
+  }, []);
+  useEffect(
+    () => () => {
+      pendingAdvance.current = null;
+    },
+    [],
+  );
   const attempt = async (action: () => Promise<void>) => {
-    if (busy) return;
+    if (attempting.current || pendingAdvance.current) return;
+    attempting.current = true;
     setBusy(true);
     setError('');
     try {
@@ -156,6 +171,7 @@ export function OnboardingFlow({
     } catch (cause) {
       setError(String(cause));
     } finally {
+      attempting.current = false;
       setBusy(false);
     }
   };
@@ -170,11 +186,10 @@ export function OnboardingFlow({
       return;
     }
     if (!draft.trim()) return;
-    execution.draft(project.id, { agent, projectId: project.id });
+    execution.draft(project.id, { agent: '', projectId: project.id });
     execution.select(null);
-    onFinish(agent, project.id);
+    advance(() => onFinish('', project.id));
   };
-
   return (
     <div className="onboarding-shell">
       <ResizeHandles />
@@ -192,7 +207,9 @@ export function OnboardingFlow({
             size="md"
             className="w-fit"
             bubbleAlign="start"
-            overrideMood={busy ? 'thinking' : 'idle'}
+            overrideMood={working && !nodding ? 'thinking' : 'idle'}
+            nodding={nodding}
+            onNodComplete={completeNod}
             label="Show setup tip"
             onActivate={() => {
               const tips = setupTips[step];
@@ -213,59 +230,34 @@ export function OnboardingFlow({
           </ol>
         </aside>
         <section className="onboarding-content" aria-labelledby="onboarding-heading">
-          <p className="onboarding-progress">
-            Step {index + 1} of {steps.length}
-          </p>
+          <div className="onboarding-step-meta">
+            <p className="onboarding-progress">
+              Step {index + 1} of {steps.length}
+            </p>
+            {step === 'agent' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy || execution.discovering || !desktop}
+                onClick={() => void refresh()}
+              >
+                <RefreshCw size={15} />
+                {execution.discovering ? 'Scanning agents…' : 'Re-scan agents'}
+              </Button>
+            )}
+          </div>
           <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
             {step === 'theme'
               ? 'Choose your theme'
               : step === 'project'
                 ? 'Choose a project'
                 : step === 'agent'
-                  ? 'Choose an agent'
+                  ? 'Choose a default agent for Jackalope'
                   : 'Describe your first task'}
           </h2>
           {step === 'theme' && (
             <>
               <ThemeEditor value={themeDraft} onChange={setThemeDraft} />
-              <details className="onboarding-privacy-panel">
-                <summary>
-                  <ShieldCheck size={20} aria-hidden="true" />
-                  <span>
-                    <strong>Manage privacy settings</strong>
-                    <small>
-                      {community.error
-                        ? 'Usage sharing is paused. Review your settings.'
-                        : sharing
-                          ? 'Anonymous usage sharing is on by default. Opt out here.'
-                          : 'Anonymous usage sharing is off.'}
-                    </small>
-                  </span>
-                  <ChevronDown
-                    size={18}
-                    className="onboarding-privacy-chevron"
-                    aria-hidden="true"
-                  />
-                </summary>
-                <div className="onboarding-privacy-controls">
-                  <PrivacySettings />
-                  <div className="onboarding-privacy">
-                    <div>
-                      <label htmlFor="onboarding-marketplace">Community tools</label>
-                      <p>
-                        Allow browsing the MCP marketplace at allmcps.com. Your source code and
-                        prompts aren’t sent to the marketplace.
-                      </p>
-                    </div>
-                    <Switch
-                      id="onboarding-marketplace"
-                      label="Allow MCP marketplace"
-                      checked={settings.useMcpMarketplace}
-                      onCheckedChange={settings.setUseMcpMarketplace}
-                    />
-                  </div>
-                </div>
-              </details>
               <div className="onboarding-actions">
                 <Button
                   variant="ghost"
@@ -275,17 +267,11 @@ export function OnboardingFlow({
                   Reset preview
                 </Button>
                 <Button
-                  disabled={busy || community.busy}
+                  disabled={busy}
                   onClick={() =>
                     void attempt(async () => {
-                      await community.applyDefaults();
-                      const privacy = useCommunityStore.getState();
-                      if (desktop && (!privacy.settings?.reviewed || privacy.error))
-                        throw new Error(
-                          privacy.error ?? 'Privacy settings could not be saved. Please retry.',
-                        );
                       theme.setTheme(themeDraft);
-                      onboarding.go('project');
+                      advance(() => onboarding.go('project'));
                     })
                   }
                 >
@@ -331,7 +317,14 @@ export function OnboardingFlow({
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
+                  if (community.busy) return;
                   void attempt(async () => {
+                    await community.applyDefaults();
+                    const privacy = useCommunityStore.getState();
+                    if (desktop && (!privacy.settings?.reviewed || privacy.error))
+                      throw new Error(
+                        privacy.error ?? 'Privacy settings could not be saved. Please retry.',
+                      );
                     const opened =
                       projectMode === 'new'
                         ? await createProject(projectName, parentPath)
@@ -344,8 +337,8 @@ export function OnboardingFlow({
                           'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.',
                       });
                     }
-                    onboarding.go('agent');
                     await execution.discover();
+                    advance(() => onboarding.go('agent'));
                   });
                 }}
               >
@@ -429,6 +422,44 @@ export function OnboardingFlow({
                     </div>
                   </>
                 )}
+                <details className="onboarding-privacy-panel">
+                  <summary>
+                    <ShieldCheck size={20} aria-hidden="true" />
+                    <span>
+                      <strong>Manage privacy settings</strong>
+                      <small>
+                        {community.error
+                          ? 'Usage sharing is paused. Review your settings.'
+                          : sharing
+                            ? 'Anonymous usage sharing is on by default. Opt out here.'
+                            : 'Anonymous usage sharing is off.'}
+                      </small>
+                    </span>
+                    <ChevronDown
+                      size={18}
+                      className="onboarding-privacy-chevron"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div className="onboarding-privacy-controls">
+                    <PrivacySettings />
+                    <div className="onboarding-privacy">
+                      <div>
+                        <label htmlFor="onboarding-marketplace">Community tools</label>
+                        <p>
+                          Allow browsing the MCP marketplace at allmcps.com. Your source code and
+                          prompts aren’t sent to the marketplace.
+                        </p>
+                      </div>
+                      <Switch
+                        id="onboarding-marketplace"
+                        label="Allow MCP marketplace"
+                        checked={settings.useMcpMarketplace}
+                        onCheckedChange={settings.setUseMcpMarketplace}
+                      />
+                    </div>
+                  </div>
+                </details>
                 <div className="onboarding-actions">
                   <Button
                     type="button"
@@ -444,6 +475,7 @@ export function OnboardingFlow({
                     disabled={
                       !desktop ||
                       busy ||
+                      community.busy ||
                       (projectMode === 'new'
                         ? !projectName.trim() || (!parentPath && !defaultDirectory)
                         : !path.trim())
@@ -465,7 +497,9 @@ export function OnboardingFlow({
           {step === 'agent' && (
             <>
               <p className="onboarding-description">
-                Choose an agent for <strong>{project?.name}</strong>.
+                Your default agent coordinates Jackalope’s automatic task routing. You can configure
+                multiple agents and accounts per project. It chooses among enabled agents,
+                configured models and accounts based on the task and reported quota headroom.
               </p>
               <div className="onboarding-agent-summary">
                 <span className="onboarding-agent-badge">
@@ -474,21 +508,14 @@ export function OnboardingFlow({
                     ? 'No agents detected yet'
                     : `${execution.runners.filter((r) => r.available).length} ${execution.runners.filter((r) => r.available).length === 1 ? 'agent' : 'agents'} detected (${execution.runners.filter((r) => r.available && r.signedIn).length} ready)`}
                 </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy || execution.discovering || !desktop}
-                  onClick={() => void refresh()}
-                >
-                  <RefreshCw size={13} className={execution.discovering ? 'animate-spin' : ''} />
-                  {execution.discovering ? 'Detecting…' : 'Scan system'}
-                </Button>
               </div>
 
-              <fieldset className="onboarding-runner-list" aria-label="Choose your agent">
+              <fieldset className="onboarding-runner-list" aria-label="Choose your default agent">
                 {execution.runners.map((item) => {
-                  const enabled = available(item.id);
+                  const workerOnly = !['codex', 'claude', 'grok', 'opencode'].includes(
+                    config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id,
+                  );
+                  const enabled = available(item.id) && !workerOnly;
                   const meta = getAgentMetadata(item.id);
                   return (
                     <button
@@ -510,13 +537,15 @@ export function OnboardingFlow({
                           )}
                         </div>
                         <small>
-                          {!enabled
-                            ? 'Disabled in agent or model settings'
-                            : !item.available
-                              ? 'Not installed or not found'
-                              : item.signedIn
-                                ? 'Installed · sign-in detected'
-                                : 'Installed · sign-in not confirmed'}
+                          {workerOnly
+                            ? 'Routing coordinator not supported'
+                            : !enabled
+                              ? 'Disabled in agent or model settings'
+                              : !item.available
+                                ? 'Not installed or not found'
+                                : item.signedIn
+                                  ? 'Installed · sign-in detected'
+                                  : 'Installed · sign-in not confirmed'}
                         </small>
                         {meta?.strengths && meta.strengths.length > 0 && (
                           <div className="onboarding-strengths-row">
@@ -536,7 +565,7 @@ export function OnboardingFlow({
                   <p className="task-muted" role="status">
                     {execution.discovering
                       ? 'Looking for installed agents…'
-                      : 'No agents found yet. Install and sign in to your preferred agent, or configure its command below.'}
+                      : 'No agents found yet. Install and sign in to your preferred agent, then re-scan agents.'}
                   </p>
                 )}
               </fieldset>
@@ -545,6 +574,11 @@ export function OnboardingFlow({
                   {execution.error}
                 </p>
               )}
+              <p className="onboarding-note">
+                Add more agents, supported accounts and models in <strong>Settings → Agents</strong>
+                . Choose the agents and accounts each project uses in{' '}
+                <strong>Project settings</strong>.
+              </p>
 
               {runner && !runner.signedIn && runner.available && (
                 <div className="onboarding-signin-tip">
@@ -637,13 +671,6 @@ export function OnboardingFlow({
                 </details>
               )}
 
-              <details className="onboarding-advanced">
-                <summary>Agent commands, models & manual setup</summary>
-                <Suspense fallback={<p className="task-muted">Loading agent setup…</p>}>
-                  <AgentManager />
-                </Suspense>
-              </details>
-
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('project')}>
                   <ArrowLeft size={16} />
@@ -655,9 +682,17 @@ export function OnboardingFlow({
                   }
                   onClick={() =>
                     void attempt(async () => {
-                      await syncAgentConfig();
-                      if (project) execution.draft(project.id, { agent });
-                      onboarding.go('task');
+                      const previousDefault = useAgentConfigStore.getState().defaultMetaAgent;
+                      config.setDefaultMetaAgent(agent);
+                      try {
+                        await syncAgentConfig();
+                      } catch (cause) {
+                        if (useAgentConfigStore.getState().defaultMetaAgent === agent)
+                          useAgentConfigStore.setState({ defaultMetaAgent: previousDefault });
+                        throw cause;
+                      }
+                      if (project) execution.draft(project.id, { agent: '' });
+                      advance(() => onboarding.go('task'));
                     })
                   }
                 >
@@ -680,12 +715,14 @@ export function OnboardingFlow({
                 className="task-input onboarding-prompt"
                 placeholder="What would you like to build, fix or understand?"
                 value={draft}
+                disabled={busy}
                 onChange={(event) => {
                   if (project) execution.draft(project.id, { prompt: event.target.value });
                 }}
               />
               <Button
                 variant="ghost"
+                disabled={busy}
                 onClick={() => {
                   if (project)
                     execution.draft(project.id, {
@@ -696,16 +733,15 @@ export function OnboardingFlow({
               >
                 Start with a codebase walkthrough
               </Button>
-
               <div className="onboarding-actions">
-                <Button variant="ghost" onClick={() => onboarding.go('agent')}>
+                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('agent')}>
                   <ArrowLeft size={16} />
                   Back
                 </Button>
-                <Button variant="outline" onClick={onSkip}>
+                <Button variant="outline" disabled={busy} onClick={() => advance(onSkip)}>
                   Skip for now
                 </Button>
-                <Button disabled={!draft.trim()} onClick={finish}>
+                <Button disabled={busy || !draft.trim()} onClick={finish}>
                   Review first task
                   <ArrowRight size={16} />
                 </Button>

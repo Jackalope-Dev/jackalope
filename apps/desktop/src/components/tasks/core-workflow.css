@@ -44,20 +44,23 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--color-border);
+  padding: 4px;
 }
 .result-tabs button {
   min-height: 44px;
   padding: 10px 14px;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
-  border-bottom: 2px solid transparent;
+  border: 0;
+  border-radius: 10px;
 }
-.result-tabs button[data-state="active"] {
-  color: var(--color-accent-ink);
-  border-bottom-color: var(--color-accent-ink);
+.result-tabs button[data-state="active"],
+.result-tabs button[aria-current] {
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-selection);
 }
-.result-tabs button:hover {
+.result-tabs button:not([data-state="active"]):not([aria-current]):hover {
   background: var(--color-surface-hover);
 }
 .result-canvas {

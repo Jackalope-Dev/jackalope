@@ -122,7 +122,13 @@ export function AgentManager() {
                   <Button
                     type="button"
                     variant="ghost"
-                    disabled={!enabled || !runner?.available}
+                    disabled={
+                      !enabled ||
+                      !runner?.available ||
+                      !['codex', 'claude', 'grok', 'opencode'].includes(
+                        ('adapter' in agent ? agent.adapter : undefined) ?? agent.id,
+                      )
+                    }
                     onClick={() => {
                       config.setDefaultMetaAgent(agent.id);
                       setSaved(false);

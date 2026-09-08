@@ -14,15 +14,6 @@ pub(crate) struct Client {
 }
 
 impl Client {
-    pub(crate) fn spawn(
-        agent: &str,
-        args: &[&str],
-        profiles_root: &std::path::Path,
-    ) -> Result<Self, String> {
-        let binding = super::super::agent_profiles::bind_account(profiles_root, agent, None)?;
-        Self::spawn_bound(&binding, args)
-    }
-
     pub(crate) fn spawn_bound(
         binding: &super::super::agent_profiles::AccountBinding,
         args: &[&str],

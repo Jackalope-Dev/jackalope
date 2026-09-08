@@ -151,6 +151,7 @@ export function CommandPalette({
                     isDark: current.isDark,
                     appearance: current.appearance,
                     atmosphere: current.atmosphere,
+                    harmony: current.harmony,
                   });
                   onClose();
                 }}

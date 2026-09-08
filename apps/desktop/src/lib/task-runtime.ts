@@ -17,6 +17,40 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  routing?: {
+    attempts?: {
+      agent: string;
+      model: string | null;
+      binding: { adapter: string; profileId: string | null; directory: string; label: string };
+      usage: RunUsage;
+      error: string | null;
+      recordedAt: string;
+    }[];
+    decisions: {
+      orchestrator: string;
+      orchestratorModel: string | null;
+      orchestratorAccount: string;
+      agent: string;
+      model: string | null;
+      account: string;
+      profileId: string | null;
+      reason: string;
+      remainingPercent: number | null;
+      expectedUsagePercent: number | null;
+      checkedAt: string;
+      usage: RunUsage;
+    }[];
+    handoffs: {
+      agent: string;
+      model: string | null;
+      binding: { adapter: string; profileId: string | null; directory: string; label: string };
+      sessionId: string | null;
+      result: string;
+      usage: RunUsage;
+      failure: { modelOnly: boolean; message: string };
+      recordedAt: string;
+    }[];
+  } | null;
   contract?: import('./task-outcomes').TaskContract;
   monitorChange?: { before: string; after: string; path: string; branch: string } | null;
   contextReceipt?: import('./knowledge').ContextReceipt;

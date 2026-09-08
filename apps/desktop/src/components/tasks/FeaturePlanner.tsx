@@ -57,10 +57,7 @@ export function FeaturePlanner({
     return {
       featureId: crypto.randomUUID(),
       goal: '',
-      agent:
-        available.find((r) => r.id === project.preferences?.preferredRunner)?.id ??
-        available[0]?.id ??
-        '',
+      agent: 'auto',
       steps: [],
     };
   });
@@ -144,6 +141,7 @@ export function FeaturePlanner({
                 value={draft.agent}
                 onValueChange={(agent) => update({ agent })}
               >
+                <SelectItem value="auto">Let Jackalope choose</SelectItem>
                 {available.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.name}
@@ -153,7 +151,10 @@ export function FeaturePlanner({
             </label>
             <div className="flex flex-wrap gap-2">
               <Button
-                disabled={!draft.goal.trim() || !available.some((r) => r.id === draft.agent)}
+                disabled={
+                  !draft.goal.trim() ||
+                  (draft.agent !== 'auto' && !available.some((r) => r.id === draft.agent))
+                }
                 onClick={() =>
                   void act(async () => {
                     const runId = await start(
@@ -162,7 +163,10 @@ export function FeaturePlanner({
                         projectName: project.name,
                         projectPath: project.path,
                         agent: draft.agent,
-                        agentProfileId: agentAccountFor(project, draft.agent),
+                        agentProfileId:
+                          draft.agent === 'auto'
+                            ? undefined
+                            : agentAccountFor(project, draft.agent),
                         targetBranch: project.preferences?.baseBranch || project.gitBranch,
                         isolated: true,
                         prompt: featurePlanningPrompt(draft.goal),

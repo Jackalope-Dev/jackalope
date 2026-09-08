@@ -160,7 +160,15 @@ async fn response<R: AsyncRead + Unpin>(
     }
 }
 
+#[cfg(test)]
 async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, String> {
+    let binding = super::agent_profiles::bind_account(profiles_root, "codex", None)?;
+    read_codex_bound(&binding).await
+}
+
+async fn read_codex_bound(
+    binding: &super::agent_profiles::AccountBinding,
+) -> Result<CapacityRecord, String> {
     let executable = super::tasks::executable("codex")?;
     let mut command = Command::new(executable);
     command
@@ -169,8 +177,7 @@ async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, S
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
-    let binding = super::agent_profiles::bind_account(profiles_root, "codex", None)?;
-    super::agent_profiles::apply_binding(command.as_std_mut(), &binding);
+    super::agent_profiles::apply_binding(command.as_std_mut(), binding);
     #[cfg(windows)]
     command.creation_flags(0x08000000);
     let mut child = command
@@ -189,6 +196,60 @@ async fn read_codex(profiles_root: &std::path::Path) -> Result<CapacityRecord, S
     let _ = child.start_kill();
     let _ = timeout(Duration::from_secs(2), child.wait()).await;
     result
+}
+
+async fn account_snapshot(root: &std::path::Path, adapter: &str) -> Result<CapacityRecord, String> {
+    let binding = super::agent_profiles::bind_account(root, adapter, None)?;
+    Ok(routing_snapshot(&binding).await)
+}
+
+pub(in crate::commands) async fn routing_snapshot(
+    binding: &super::agent_profiles::AccountBinding,
+) -> CapacityRecord {
+    type RoutingCache =
+        std::collections::HashMap<(String, std::path::PathBuf), (Instant, CapacityRecord)>;
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<RoutingCache>> = std::sync::OnceLock::new();
+    let cache = CACHE.get_or_init(Default::default);
+    let key = (binding.adapter.clone(), binding.directory.clone());
+    {
+        let values = cache.lock().unwrap();
+        if let Some((checked, record)) = values
+            .get(&key)
+            .filter(|(checked, _)| checked.elapsed() < Duration::from_secs(60))
+        {
+            let _ = checked;
+            return current_snapshot(record.clone(), Utc::now().timestamp());
+        }
+    }
+    let result = match binding.adapter.as_str() {
+        "codex" => read_codex_bound(binding).await,
+        "claude" => connected::read_claude_bound(binding).await,
+        "grok" => connected::read_grok_bound(binding).await,
+        _ => {
+            return unavailable(
+                &binding.adapter,
+                "unsupported",
+                "This provider does not report quota headroom.",
+                None,
+            )
+        }
+    };
+    let record = result
+        .map(|record| current_snapshot(record, Utc::now().timestamp()))
+        .unwrap_or_else(|_| {
+            unavailable(
+                &binding.adapter,
+                "unavailable",
+                "Quota could not be refreshed. Remaining capacity is unknown.",
+                None,
+            )
+        });
+    let mut values = cache.lock().unwrap();
+    if values.len() >= 256 {
+        values.clear();
+    }
+    values.insert(key, (Instant::now(), record.clone()));
+    record
 }
 
 fn failed_refresh(previous: Option<&CapacityRecord>, message: &str) -> CapacityRecord {
@@ -255,9 +316,9 @@ pub async fn capacity_snapshot(
     if should_refresh {
         let profiles_root = runtime.profiles_root();
         let (codex, claude, grok) = tokio::join!(
-            read_codex(&profiles_root),
-            connected::read_claude(&profiles_root),
-            connected::read_grok(&profiles_root)
+            account_snapshot(&profiles_root, "codex"),
+            account_snapshot(&profiles_root, "claude"),
+            account_snapshot(&profiles_root, "grok")
         );
         cache.codex = Some(match codex {
             Ok(record) => record,

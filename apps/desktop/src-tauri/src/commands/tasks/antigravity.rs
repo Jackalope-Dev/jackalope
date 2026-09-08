@@ -178,6 +178,9 @@ impl Stream {
                     let message = result["error"]
                         .as_str()
                         .unwrap_or("The task did not complete successfully");
+                    run.quota_failure = super::routing::quota_failure(
+                        &serde_json::json!({"type":"error","message":message}),
+                    );
                     run.error.get_or_insert_with(|| {
                         format!(
                             "Antigravity {status}: {}",

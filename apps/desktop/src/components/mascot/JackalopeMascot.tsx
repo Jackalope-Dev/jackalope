@@ -1,7 +1,9 @@
 import { characterPaths as paths } from '@jackalope/brand/character';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useId, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { useReducedMotionPreference } from '../../hooks/useReducedMotionPreference';
 import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
+import { useMascotIdle } from './useMascotIdle';
 
 interface JackalopeMascotProps {
   size?: 'sm' | 'md' | 'lg';
@@ -16,9 +18,18 @@ interface JackalopeMascotProps {
   buttonId?: string;
   expanded?: boolean;
   controls?: string;
+  nodding?: boolean;
+  onNodComplete?: () => void;
 }
 
 const mascotMotion = {
+  nod: {
+    y: [0, 2, 0],
+    scaleY: [1, 0.97, 1],
+    rotate: [0, 7, 0],
+    opacity: 1,
+    transition: { duration: 0.38, times: [0, 0.45, 1] },
+  },
   idle: {
     y: 0,
     scaleY: 1,
@@ -69,17 +80,26 @@ export function JackalopeMascot({
   buttonId,
   expanded,
   controls,
+  nodding = false,
+  onNodComplete,
 }: JackalopeMascotProps) {
   const { mood, message, pet } = useMascotStore();
   const faceMask = useId();
+  const button = useRef<HTMLButtonElement>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const currentMood = overrideMood ?? mood;
-  const systemReducedMotion = useReducedMotion();
-  const reduceMotion = forceReducedMotion || systemReducedMotion;
+  const systemReducedMotion = useReducedMotionPreference();
+  const reduceMotion = forceReducedMotion || !!systemReducedMotion;
   const dim = size === 'sm' ? 40 : size === 'md' ? 88 : 152;
   const resting = currentMood === 'sleep';
   const attentive = (hovered || focused) && !resting;
+  const idleMotion = useMascotIdle(
+    button,
+    currentMood === 'idle' && !nodding,
+    attentive,
+    reduceMotion,
+  );
   const delighted = currentMood === 'success';
   const mouth = delighted
     ? 'M117 88 Q122 94 128 88'
@@ -87,6 +107,10 @@ export function JackalopeMascot({
       ? 'M118 89 Q123 93 127 88'
       : 'M120 90 Q123 91 126 89';
   const staticPose = { y: 0, scaleY: 1, rotate: 0, opacity: resting ? 0.7 : 1 };
+
+  useEffect(() => {
+    if (nodding && reduceMotion) onNodComplete?.();
+  }, [nodding, reduceMotion, onNodComplete]);
 
   return (
     <div className={`relative flex items-center select-none ${className}`}>
@@ -108,6 +132,7 @@ export function JackalopeMascot({
         )}
       </AnimatePresence>
       <motion.button
+        ref={button}
         type="button"
         onClick={onActivate ?? pet}
         onPointerEnter={() => setHovered(true)}
@@ -120,6 +145,7 @@ export function JackalopeMascot({
         aria-controls={controls}
         aria-haspopup={expanded === undefined ? undefined : 'dialog'}
         data-mood={currentMood}
+        data-nodding={nodding || undefined}
         title={label ?? 'Pet Jackalope'}
         whileHover={reduceMotion ? undefined : { scale: 1.04 }}
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
@@ -139,26 +165,26 @@ export function JackalopeMascot({
                 animate={{ x: attentive ? 0.8 : 0, y: attentive ? -0.5 : 0 }}
                 transition={{ duration: reduceMotion ? 0 : 0.2 }}
               >
-                {resting || delighted ? (
-                  <path
-                    d={resting ? 'M100 73 Q103 76 106 73' : 'M100 73 Q103 69 106 73'}
-                    fill="none"
-                    stroke="black"
-                    strokeWidth="2.4"
-                    strokeLinecap="round"
-                  />
-                ) : (
-                  <motion.ellipse
-                    cx="103"
-                    cy="73"
-                    rx="2.5"
-                    ry="3.3"
-                    fill="black"
-                    animate={{ scaleY: attentive && !reduceMotion ? [1, 0.12, 1] : 1 }}
-                    transition={{ duration: reduceMotion ? 0 : 0.24, times: [0, 0.45, 1] }}
-                    style={{ transformOrigin: '103px 73px' }}
-                  />
-                )}
+                <motion.g style={{ x: idleMotion.eyeX, y: idleMotion.eyeY }}>
+                  {resting || delighted ? (
+                    <path
+                      d={resting ? 'M100 73 Q103 76 106 73' : 'M100 73 Q103 69 106 73'}
+                      fill="none"
+                      stroke="black"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                    />
+                  ) : (
+                    <motion.ellipse
+                      cx="103"
+                      cy="73"
+                      rx="2.5"
+                      ry="3.3"
+                      fill="black"
+                      style={{ scaleY: idleMotion.eyeOpen, transformOrigin: '103px 73px' }}
+                    />
+                  )}
+                </motion.g>
               </motion.g>
               <motion.path
                 d={mouth}
@@ -174,35 +200,48 @@ export function JackalopeMascot({
           </defs>
           <motion.g
             variants={mascotMotion}
-            animate={reduceMotion ? staticPose : currentMood}
+            animate={reduceMotion ? staticPose : nodding ? 'nod' : currentMood}
+            onAnimationComplete={(animation) => {
+              if (animation === 'nod' && nodding) onNodComplete?.();
+            }}
             style={{ transformOrigin: '89px 100px' }}
           >
-            <path d={paths.antler} />
-            <motion.path
-              d={paths.farEar}
-              animate={{ rotate: resting ? 10 : 0 }}
-              transition={{ duration: reduceMotion ? 0 : 0.5 }}
-              style={{ transformOrigin: '89px 62px' }}
-            />
-            <motion.path
-              d={paths.nearEar}
-              animate={{
-                rotate: resting
-                  ? -10
-                  : !reduceMotion && currentMood === 'working'
-                    ? [0, -4, 0]
-                    : currentMood === 'thinking'
-                      ? -5
-                      : 0,
+            <motion.g
+              data-mascot-gaze=""
+              style={{
+                x: idleMotion.headX,
+                y: idleMotion.headY,
+                rotate: idleMotion.headRotate,
+                transformOrigin: '89px 100px',
               }}
-              transition={
-                !reduceMotion && currentMood === 'working'
-                  ? { duration: 2.8, repeat: Infinity, repeatDelay: 1 }
-                  : { duration: reduceMotion ? 0 : 0.5 }
-              }
-              style={{ transformOrigin: '83px 63px' }}
-            />
-            <path d={paths.head} mask={`url(#${faceMask})`} />
+            >
+              <path d={paths.antler} />
+              <motion.path
+                d={paths.farEar}
+                animate={{ rotate: resting ? 10 : 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.5 }}
+                style={{ transformOrigin: '89px 62px' }}
+              />
+              <motion.path
+                d={paths.nearEar}
+                animate={{
+                  rotate: resting
+                    ? -10
+                    : !reduceMotion && currentMood === 'working'
+                      ? [0, -4, 0]
+                      : currentMood === 'thinking'
+                        ? -5
+                        : 0,
+                }}
+                transition={
+                  !reduceMotion && currentMood === 'working'
+                    ? { duration: 2.8, repeat: Infinity, repeatDelay: 1 }
+                    : { duration: reduceMotion ? 0 : 0.5 }
+                }
+                style={{ transformOrigin: '83px 63px' }}
+              />
+              <path d={paths.head} mask={`url(#${faceMask})`} />
+            </motion.g>
           </motion.g>
         </svg>
       </motion.button>

@@ -12,7 +12,6 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
   padding-bottom: 0.75rem;
   margin-bottom: 1.5rem;
 }
@@ -39,9 +38,9 @@
 }
 
 .mcp-tab-btn.active {
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-  border-color: var(--color-accent-subtle);
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-selection);
 }
 
 .mcp-scope-filters {
@@ -334,8 +333,9 @@
   cursor: pointer;
 }
 .mcp-detail-tab-list button[data-state="active"] {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-ink);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-selection);
 }
 .mcp-detail-tab-list button:focus-visible {
   outline: 2px solid var(--color-accent-ink);

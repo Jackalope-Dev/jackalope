@@ -39,7 +39,6 @@ export function ProjectAgentAccount({
   }, [agentId, refresh]);
   if (view && !view.envVar && !value) return null;
   const missing = value && view && !view.profiles.some((p) => p.id === value);
-  const active = view?.profiles.find((p) => p.id === view.activeId)?.name ?? 'normal CLI sign-in';
   return (
     <div className="project-agent-account">
       <span className="task-muted text-xs">
@@ -60,13 +59,17 @@ export function ProjectAgentAccount({
           The selected account was removed. Choose another account before starting work.
         </p>
       )}
+      <p className="task-muted text-xs">
+        Automatic tasks choose an account by task fit and quota. A specific selection limits this
+        agent to that account; manually assigned tasks use its active account when set to automatic.
+      </p>
       {view && (
         <Select
           aria-label={`${agentName} account for ${projectName}`}
           value={value ?? 'inherit'}
           onValueChange={(next) => onChange(next === 'inherit' ? undefined : next)}
         >
-          <SelectItem value="inherit">Follow agent default · {active}</SelectItem>
+          <SelectItem value="inherit">Automatic · all configured accounts</SelectItem>
           {missing && (
             <SelectItem value={value} disabled>
               Removed account

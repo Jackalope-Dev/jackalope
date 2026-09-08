@@ -123,7 +123,7 @@ export function ScheduleManager(props: {
     setImporting(planId);
     const project = projects.find((p) => p.id === (value?.request.projectId ?? activeProjectId));
     setProjectId(project?.id ?? '');
-    setAgent(value?.request.agent ?? '');
+    setAgent(value?.request.agent ?? 'auto');
     setPrompt(value?.rawPrompt ?? value?.request.prompt ?? '');
     setEditing(
       value ?? {
@@ -141,16 +141,12 @@ export function ScheduleManager(props: {
     const target =
       projects.find((item) => item.id === activeProjectId) ??
       (projects.length === 1 ? projects[0] : undefined);
-    const allowed = runners.filter(
-      (runner) => runner.available && target && isAgentAllowedForProject(target, runner.id),
-    );
-    const preferred = allowed.find((runner) => runner.id === target?.preferences?.preferredRunner);
     open(
       scheduleTemplateDraft(selected, {
         id: crypto.randomUUID(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         projectId: target?.id ?? '',
-        agent: preferred?.id ?? (allowed.length === 1 ? allowed[0].id : ''),
+        agent: 'auto',
       }),
     );
     setTemplate(selected);
@@ -176,7 +172,7 @@ export function ScheduleManager(props: {
     scheduleOpener.current = null;
     setImporting(null);
     setProjectId(run.projectId);
-    setAgent(run.agent);
+    setAgent(run.routing ? 'auto' : run.agent);
     const original = useTaskStore
       .getState()
       .tasks.find(
@@ -207,7 +203,7 @@ export function ScheduleManager(props: {
   const save = () =>
     act(async () => {
       if (!editing || !project) return;
-      if (!monitorOnly && !isAgentAllowedForProject(project, agent))
+      if (!monitorOnly && agent !== 'auto' && !isAgentAllowedForProject(project, agent))
         throw new Error('This agent is not allowed for the selected project.');
       await syncAgentConfig();
       const adapter =
@@ -225,7 +221,7 @@ export function ScheduleManager(props: {
             agent,
             prompt: finalPrompt,
             isolated: true,
-            agentProfileId: agentAccountFor(project, adapter),
+            agentProfileId: agent === 'auto' ? undefined : agentAccountFor(project, adapter),
             targetBranch: project.preferences?.baseBranch || project.gitBranch,
             verifyCommand: project.preferences?.verifyCommand,
             prepareCommand: project.preferences?.prepareCommand,
@@ -517,7 +513,8 @@ export function ScheduleManager(props: {
                       onValueChange={(value) => {
                         setProjectId(value);
                         const nextProject = projects.find((item) => item.id === value);
-                        if (!isAgentAllowedForProject(nextProject, agent)) setAgent('');
+                        if (agent !== 'auto' && !isAgentAllowedForProject(nextProject, agent))
+                          setAgent('auto');
                         setEditing({
                           ...editing,
                           request: {
@@ -549,6 +546,7 @@ export function ScheduleManager(props: {
                         placeholder="Choose an agent"
                         disabled={monitorOnly}
                       >
+                        <SelectItem value="auto">Let Jackalope choose</SelectItem>
                         {runners.map((r) => (
                           <SelectItem
                             key={r.id}
@@ -786,7 +784,8 @@ export function ScheduleManager(props: {
                     disabled={
                       busy ||
                       !project ||
-                      (!monitorOnly && (!agent || !isAgentAllowedForProject(project, agent)))
+                      (!monitorOnly &&
+                        (!agent || (agent !== 'auto' && !isAgentAllowedForProject(project, agent))))
                     }
                   >
                     {busy ? 'Saving…' : 'Save schedule'}
