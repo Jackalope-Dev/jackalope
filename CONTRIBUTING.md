@@ -64,7 +64,7 @@ changes, exercise keyboard/focus behavior, light/dark appearance, reduced motion
 960×640 and 1280×840 layouts, theme persistence and preview cancellation. Keep
 fixtures separate from real execution and state which checks used fixtures.
 Native execution changes need disposable-repository tests and relevant actual
-app checks. The four opt-in native trials are excluded from the ordinary suite.
+app checks. Opt-in native trials are excluded from the ordinary suite.
 
 ## Pull requests and reports
 
