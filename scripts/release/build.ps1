@@ -44,7 +44,7 @@ try {
         plugins = @{ updater = @{ pubkey = $env:TAURI_UPDATER_PUBLIC_KEY; endpoints = @("$baseUrl/updates/$Channel/latest.json"); windows = @{ installMode = 'passive' } } }
     }
     $updaterConfig.plugins.jackalope = $communityConfig | ConvertFrom-Json
-    if ($Mode -eq 'rehearsal') { $updaterConfig.plugins.jackalope = @{ channel = $Channel } }
+    if ($Mode -eq 'rehearsal') { $updaterConfig.plugins.jackalope = @{ channel = $Channel; accountServiceUrl = $updaterConfig.plugins.jackalope.accountServiceUrl; accountWebUrl = $updaterConfig.plugins.jackalope.accountWebUrl } }
     if ($Mode -eq 'publish') {
         $updaterConfig.bundle.windows = @{ certificateThumbprint = $importedCertificate.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = $env:WINDOWS_TIMESTAMP_URL; tsp = $true }
     }

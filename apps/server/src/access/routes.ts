@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { browserDeviceAction } from './devices';
 import { deliverAccessMail } from './mail';
 import { syncNewsletter } from './newsletter';
 import {
@@ -128,6 +129,25 @@ export async function accessRoutes(
     }
     const member = await sessionMember(request, env);
     if (!member) throw new AccessError(401, 'access_sign_in_required');
+    if (request.method === 'POST' && path.startsWith('/v1/access/desktop/'))
+      return json(
+        await browserDeviceAction(
+          env,
+          member,
+          path.slice('/v1/access/desktop/'.length),
+          await readJson(request),
+        ),
+      );
+    if (request.method === 'GET' && path === '/v1/access/devices')
+      return json(
+        (
+          await env.DB.prepare(
+            'SELECT id,created_at AS createdAt,expires_at AS expiresAt FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 10',
+          )
+            .bind(member.id, Date.now())
+            .all()
+        ).results,
+      );
     if (request.method === 'GET' && path === '/v1/access/me') {
       const key = installerKey(env);
       const installer = key ? await env.RELEASES.head(key) : null;

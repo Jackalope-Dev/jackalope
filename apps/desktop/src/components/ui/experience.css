@@ -606,9 +606,6 @@ button:disabled {
   min-height: 0;
   padding: 32px var(--workspace-gutter, 32px) 24px;
 }
-.planning-dialog {
-  width: 640px;
-}
 .evidence-dialog {
   width: 880px;
 }

@@ -18,6 +18,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ArchivedHistory } from './ArchivedHistory';
+import { JackalopeAccount } from './JackalopeAccount';
 import { PrivacySettings } from './PrivacySettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { Setting } from './Setting';
@@ -34,6 +35,7 @@ interface SettingsDialogProps {
 }
 const categories = [
   'General',
+  'Jackalope account',
   'Appearance',
   'Agents',
   'Privacy',
@@ -75,6 +77,8 @@ export function SettingsDialog({
       c,
       {
         System: 'device computer operating system architecture git',
+        'Jackalope account':
+          'connect sign in email membership early access invitations disconnect device',
         Diagnostics: 'activity log routing events errors codebase',
         General:
           'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
@@ -214,6 +218,7 @@ export function SettingsDialog({
                       </p>
                     )}
                   </header>
+                  {c === 'Jackalope account' && <JackalopeAccount />}
                   {c === 'General' && (
                     <>
                       <Setting

@@ -10,66 +10,47 @@ export interface ScheduledTask {
   assignedAgentProvider: string;
   prompt: string;
   enabled: boolean;
-  lastRun?: {
-    timestamp: string;
-    status: 'success' | 'failed' | 'running';
-    durationSeconds: number;
-    summary: string;
-  };
-  nextRun: string;
+  importId?: string;
 }
 
 interface ScheduleState {
   schedules: ScheduledTask[];
-  toggleSchedule: (id: string) => void;
-  addSchedule: (schedule: Omit<ScheduledTask, 'id' | 'nextRun'>) => void;
+  prepareImport: (id: string) => string;
   deleteSchedule: (id: string) => void;
-  updateSchedule: (id: string, value: Partial<Omit<ScheduledTask, 'id'>>) => void;
 }
 
 export const useScheduleStore = create<ScheduleState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       schedules: [],
-
-      toggleSchedule: (id) => {
-        set((state) => ({
-          schedules: state.schedules.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)),
-        }));
-      },
-
-      addSchedule: (sch) => {
-        const id = `sched-${crypto.randomUUID()}`;
-        const newSchedule: ScheduledTask = {
-          ...sch,
-          id,
-          nextRun: 'Automatic execution unavailable',
-        };
-        set((state) => ({ schedules: [...state.schedules, newSchedule] }));
-      },
-
-      deleteSchedule: (id) => {
-        set((state) => ({
-          schedules: state.schedules.filter((s) => s.id !== id),
-        }));
-      },
-      updateSchedule: (id, value) =>
-        set((state) => ({
-          schedules: state.schedules.map((schedule) =>
-            schedule.id === id ? { ...schedule, ...value } : schedule,
+      prepareImport: (id) => {
+        const plan = get().schedules.find((schedule) => schedule.id === id);
+        if (!plan) throw new Error('This saved plan is no longer available.');
+        const importId = plan.importId ?? crypto.randomUUID();
+        // Persist the destination before saving natively so retries reuse the same schedule.
+        set({
+          schedules: get().schedules.map((schedule) =>
+            schedule.id === id ? { ...schedule, importId } : schedule,
           ),
-        })),
+        });
+        return importId;
+      },
+      deleteSchedule: (id) =>
+        set((state) => ({ schedules: state.schedules.filter((schedule) => schedule.id !== id) })),
     }),
     {
       name: 'jackalope-schedules',
-      version: 2,
+      version: 3,
       migrate: (persisted) => ({
-        schedules: ((persisted as { schedules?: ScheduledTask[] }).schedules ?? [])
+        schedules: (
+          (
+            persisted as {
+              schedules?: (ScheduledTask & { lastRun?: unknown; nextRun?: unknown })[];
+            }
+          ).schedules ?? []
+        )
           .filter((schedule) => !['sched-1', 'sched-2', 'sched-3'].includes(schedule.id))
-          .map(({ lastRun: _lastRun, ...schedule }) => ({
-            ...schedule,
-            nextRun: 'Automatic execution unavailable',
-          })),
+          .map(({ lastRun: _lastRun, nextRun: _nextRun, ...schedule }) => schedule),
       }),
       partialize: (state) => ({ schedules: state.schedules }),
     },

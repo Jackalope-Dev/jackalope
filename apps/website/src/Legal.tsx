@@ -101,6 +101,14 @@ const privacy: Section[] = [
           sandboxes. Review the permissions and policies of each service you use.
         </p>
         <p>
+          If you choose to connect your Jackalope membership to the desktop, we store a device
+          identifier, a hash of its credential, your membership association, and connection and
+          expiry times. Connection requests expire after ten minutes; device credentials expire
+          after 90 days and can be revoked from the app or your account page. The Windows app
+          encrypts its local credential using Windows user protection. Connecting does not upload
+          your local projects or link your agent-provider credentials to your Jackalope membership.
+        </p>
+        <p>
           Update checks and downloads contact the configured release service and expose the network
           information needed to deliver those requests. Local data, backups, and exported reports
           remain under your control; uninstalling the app may leave saved data behind.

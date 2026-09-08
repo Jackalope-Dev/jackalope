@@ -292,6 +292,8 @@ export async function changeInvite(
 export async function pruneAccess(env: Env, now = Date.now()) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM access_sessions WHERE expires_at<=?').bind(now),
+    env.DB.prepare('DELETE FROM access_device_links WHERE expires_at<=?').bind(now),
+    env.DB.prepare('DELETE FROM access_devices WHERE expires_at<=?').bind(now),
     env.DB.prepare('DELETE FROM access_tokens WHERE expires_at<=? OR used_at<?').bind(
       now,
       now - day,

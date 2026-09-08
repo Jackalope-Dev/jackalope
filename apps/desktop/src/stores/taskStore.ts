@@ -27,19 +27,15 @@ export interface TaskTicket {
 
 interface TaskState {
   tasks: TaskTicket[];
-  activeModalTaskId: string | null;
   addTask: (task: Omit<TaskTicket, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateTask: (id: string, updates: Partial<TaskTicket>) => void;
   deleteTask: (id: string) => void;
-  moveTaskStatus: (id: string, newStatus: TaskStatus) => void;
-  openTaskModal: (id: string | null) => void;
 }
 
 export const useTaskStore = create<TaskState>()(
   persist(
     (set) => ({
       tasks: [],
-      activeModalTaskId: null,
 
       addTask: (taskData) => {
         const id = `task-${crypto.randomUUID()}`;
@@ -64,19 +60,8 @@ export const useTaskStore = create<TaskState>()(
       deleteTask: (id) => {
         set((state) => ({
           tasks: state.tasks.filter((t) => t.id !== id),
-          activeModalTaskId: state.activeModalTaskId === id ? null : state.activeModalTaskId,
         }));
       },
-
-      moveTaskStatus: (id, newStatus) => {
-        set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.id === id ? { ...t, status: newStatus, updatedAt: new Date().toISOString() } : t,
-          ),
-        }));
-      },
-
-      openTaskModal: (id) => set({ activeModalTaskId: id }),
     }),
     {
       name: 'jackalope-tasks',

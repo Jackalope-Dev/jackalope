@@ -366,3 +366,39 @@
   color: var(--color-text-primary);
   cursor: pointer;
 }
+
+.desktop-connection-code {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  letter-spacing: 0.12em;
+}
+.access-card .desktop-code-confirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin: 16px 0;
+}
+.access-card .desktop-code-confirm input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+.desktop-connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+.desktop-connection-actions .text-link {
+  margin: 0;
+  min-height: 44px;
+}
+.desktop-device-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 0;
+  border-top: 1px solid var(--color-border);
+}

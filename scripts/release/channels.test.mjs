@@ -57,6 +57,9 @@ test('local builds have no community transport; trusted endpoints must match bot
     { serviceUrl: 'http://api.example' },
     { serviceUrl: 'https://secret@api.example' },
     { serviceUrl: 'https://api.example?secret=x' },
+    { accountServiceUrl: 'http://api.example' },
+    { accountWebUrl: 'https://example.com/access/' },
+    { accountServiceUrl: 'https://secret@api.example' },
     { stableEndpoint: endpoints.betaEndpoint },
     { stableEndpoint: endpoints.stableEndpoint },
   ])

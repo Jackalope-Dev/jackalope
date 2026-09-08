@@ -96,7 +96,7 @@ test('schedule migration keeps definitions but drops synthetic execution history
   assert.equal(schedules.length, 1);
   assert.equal(schedules[0].prompt, 'Check builds');
   assert.equal(schedules[0].lastRun, undefined);
-  assert.equal(schedules[0].nextRun, 'Automatic execution unavailable');
+  assert.equal(schedules[0].nextRun, undefined);
 });
 
 test('new profiles begin with empty planning and schedule lists', () => {

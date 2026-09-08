@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Plus, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { type ScheduleDefinition as Definition, savedPlanDraft } from '../../lib/schedules';
 import { nativeTask, type RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -10,7 +11,7 @@ import {
   isAgentAllowedForProject,
   useProjectStore,
 } from '../../stores/projectStore';
-import { useScheduleStore } from '../../stores/scheduleStore';
+import { type ScheduledTask, useScheduleStore } from '../../stores/scheduleStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
@@ -20,19 +21,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
-import { SchedulePlans } from './SchedulePlans';
 
-interface Definition {
-  monitor?: { path: string; action: 'notify' | 'run' } | null;
-  id: string;
-  name: string;
-  expression: string;
-  timezone: string;
-  rawPrompt?: string;
-  missed: 'skip' | 'once';
-  enabled: boolean;
-  request: RunRequest;
-}
 interface SavedSchedule {
   localChecks?: number;
   quietChecks?: number;
@@ -64,11 +53,21 @@ export function ScheduleManager(props: {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Definition | null>(null);
+  const [importing, setImporting] = useState<string | null>(null);
   const [projectId, setProjectId] = useState(activeProjectId ?? '');
   const [agent, setAgent] = useState('');
   const [prompt, setPrompt] = useState('');
   const [changePreview, setChangePreview] = useState<{ title: string; text: string } | null>(null);
   const focus = useDialogFocus();
+  const newSchedule = useRef<HTMLButtonElement>(null);
+  const imported = useRef(false);
+  const importFocusPending = useRef(false);
+  useEffect(() => {
+    if (importFocusPending.current && !busy && !editing) {
+      newSchedule.current?.focus();
+      importFocusPending.current = false;
+    }
+  }, [busy, editing]);
   const desktop = isTauriEnvironment();
   const refresh = async () => setLedger(await nativeTask<Ledger>('schedule_list'));
   useEffect(() => {
@@ -102,7 +101,9 @@ export function ScheduleManager(props: {
       setBusy(false);
     }
   };
-  const open = (value?: Definition) => {
+  const open = (value?: Definition, planId: string | null = null) => {
+    imported.current = false;
+    setImporting(planId);
     const project = projects.find((p) => p.id === (value?.request.projectId ?? activeProjectId));
     setProjectId(project?.id ?? '');
     setAgent(value?.request.agent ?? '');
@@ -119,10 +120,21 @@ export function ScheduleManager(props: {
       },
     );
   };
+  const reviewPlan = (plan: ScheduledTask) => {
+    try {
+      const id = useScheduleStore.getState().prepareImport(plan.id);
+      const saved = ledger?.schedules.find((schedule) => schedule.definition.id === id);
+      open(saved?.definition ?? savedPlanDraft(plan, id, runners), plan.id);
+    } catch (cause) {
+      setError(String(cause));
+    }
+  };
   useEffect(() => {
     if (!props.sourceRunId) return;
     const run = useExecutionStore.getState().runs.find((r) => r.id === props.sourceRunId);
     if (!run) return;
+    imported.current = false;
+    setImporting(null);
     setProjectId(run.projectId);
     setAgent(run.agent);
     const original = useTaskStore
@@ -178,7 +190,13 @@ export function ScheduleManager(props: {
           },
         },
       });
+      if (importing) {
+        useScheduleStore.getState().deleteSchedule(importing);
+        imported.current = true;
+        importFocusPending.current = true;
+      }
       setEditing(null);
+      setImporting(null);
     });
   const visible =
     ledger?.schedules.filter(
@@ -191,6 +209,7 @@ export function ScheduleManager(props: {
         description="Schedule agent work or watch code changes locally while Jackalope is open, including in the system tray."
         action={
           <Button
+            ref={newSchedule}
             disabled={!desktop || busy}
             onClick={() => (projects.length ? open() : props.onOpenProject())}
           >
@@ -332,8 +351,38 @@ export function ScheduleManager(props: {
       </p>
       {legacy.length > 0 && (
         <details className="mt-6">
-          <summary>Saved plans from earlier versions ({legacy.length})</summary>
-          <SchedulePlans {...props} />
+          <summary>Recover saved schedule plans ({legacy.length})</summary>
+          <p className="task-muted my-3">
+            These plans have never run automatically. Review their project, agent and timing to save
+            them as real schedules. Recovered schedules start paused.
+          </p>
+          <div className="schedule-list">
+            {legacy.map((plan) => (
+              <article className="schedule-row" key={plan.id}>
+                <h3>{plan.name}</h3>
+                <p className="task-muted">
+                  {projects.find((item) => item.id === plan.targetProjectId)?.name ??
+                    'Choose a replacement project'}{' '}
+                  · {plan.cronExpression}
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Button disabled={!desktop || busy || !ledger} onClick={() => reviewPlan(plan)}>
+                    Review plan
+                  </Button>
+                  <ConfirmAction
+                    title="Delete saved plan?"
+                    description="This removes the saved instructions and timing. Existing tasks and native schedules are kept."
+                    onConfirm={() => useScheduleStore.getState().deleteSchedule(plan.id)}
+                    trigger={
+                      <Button variant="ghost" disabled={busy}>
+                        Delete plan
+                      </Button>
+                    }
+                  />
+                </div>
+              </article>
+            ))}
+          </div>
         </details>
       )}
       <Dialog.Root
@@ -371,7 +420,17 @@ export function ScheduleManager(props: {
       >
         <Dialog.Portal>
           <Dialog.Overlay className="task-dialog-overlay" />
-          <Dialog.Content {...focus} className="task-dialog appearance-panel">
+          <Dialog.Content
+            {...focus}
+            onCloseAutoFocus={(event) => {
+              if (imported.current) {
+                event.preventDefault();
+                newSchedule.current?.focus();
+                imported.current = false;
+              } else focus.onCloseAutoFocus(event);
+            }}
+            className="task-dialog appearance-panel"
+          >
             <Dialog.Close className="task-close" disabled={busy} aria-label="Close schedule">
               <X size={18} />
             </Dialog.Close>
@@ -405,6 +464,7 @@ export function ScheduleManager(props: {
                     value={projectId}
                     onValueChange={setProjectId}
                     aria-label="Schedule project"
+                    placeholder="Choose a project"
                   >
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
@@ -489,6 +549,7 @@ export function ScheduleManager(props: {
                       value={agent}
                       onValueChange={setAgent}
                       aria-label="Schedule agent"
+                      placeholder="Choose an agent"
                       disabled={monitorOnly}
                     >
                       {runners.map((r) => (

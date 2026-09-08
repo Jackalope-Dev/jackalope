@@ -54,6 +54,10 @@
     ]
   },
   "plugins": {
+    "jackalope": {
+      "accountServiceUrl": "https://api.jackalope.dev",
+      "accountWebUrl": "https://jackalope.dev"
+    },
     "shell": {
       "open": true
     },

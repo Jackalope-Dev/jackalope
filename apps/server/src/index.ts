@@ -1,3 +1,4 @@
+import { deviceRoutes } from './access/devices';
 import { deliverAccessMail } from './access/mail';
 import { syncNewsletter } from './access/newsletter';
 import { accessRoutes } from './access/routes';
@@ -151,6 +152,10 @@ export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
+      if (url.pathname.startsWith('/v1/desktop/'))
+        return await deviceRoutes(request, env, readJson, (creating) =>
+          limit(request, env, creating),
+        );
       if (url.pathname.startsWith('/v1/access/'))
         return await accessRoutes(request, env, readJson, (mail) => limit(request, env, mail), ctx);
       if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {

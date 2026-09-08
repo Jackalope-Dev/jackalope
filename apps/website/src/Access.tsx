@@ -1,6 +1,7 @@
 import { ArrowDownToLine, ArrowRight, Check, Copy, LoaderCircle, LogOut, Mail } from 'lucide-react';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
+import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import './access.css';
 
 interface Invitation {
@@ -30,6 +31,14 @@ export function AccessPage() {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [sent, setSent] = useState(false);
   const pending = useRef(false);
+  const refreshMembership = useCallback(() => {
+    void accessRequest<Membership>('me')
+      .then((value) => {
+        setMember(value);
+        setError('');
+      })
+      .catch(() => undefined);
+  }, []);
   useEffect(() => {
     const url = new URL(window.location.href);
     const share = url.searchParams.get('invite');
@@ -168,7 +177,9 @@ export function AccessPage() {
         <div className="access-loading" role="status">
           <LoaderCircle className="signup-spinner" size={22} /> Loading…
         </div>
-      ) : !accessOrigin ? (
+      ) : null}
+      <DesktopConnection email={member?.email ?? null} refreshMembership={refreshMembership} />
+      {loading ? null : !accessOrigin ? (
         <section className="access-card access-entry">
           <h2>Join the waitlist</h2>
           <p>Sign-in is not available yet. Join the waitlist to hear when early access opens.</p>
@@ -370,6 +381,7 @@ export function AccessPage() {
               </div>
             )}
           </section>
+          <ConnectedDesktops />
         </>
       ) : (
         <section className="access-card access-entry">

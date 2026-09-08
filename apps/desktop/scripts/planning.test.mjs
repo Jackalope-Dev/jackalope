@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isCronExpression, planningDraft, scheduleProject } from '../src/lib/planning.ts';
+import { planningDraft } from '../src/lib/planning.ts';
+import { savedPlanDraft } from '../src/lib/schedules.ts';
 import { VETTED_SKILLS } from '../src/lib/skills/catalog.ts';
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 
@@ -45,37 +46,30 @@ test('prepared ideas restore editable guidelines without nesting prompts or losi
   assert.equal(custom.isolated, false);
 });
 
-test('schedule timing validates field bounds, lists, ranges, and steps', () => {
-  for (const value of ['0 9 * * 1-5', '*/15 9-17 * * 1,3,5', '59 23 31 12 7', '0 0 1 */2 *'])
-    assert.equal(isCronExpression(value), true, value);
-  for (const value of [
-    '',
-    '0 9 * *',
-    '60 9 * * *',
-    '0 24 * * *',
-    '0 0 0 * *',
-    '0 0 * 13 *',
-    '0 0 * * 8',
-    '*/0 * * * *',
-    '*/61 * * * *',
-    '0 9 * * 5-1',
-    '0, 9 * * *',
-    '0 9 * * MON',
-  ])
-    assert.equal(isCronExpression(value), false, value);
+test('recovered plans retain intent and project, resolve runners, and never inherit automatic execution', () => {
+  const plan = {
+    id: 'old',
+    name: 'Review changes',
+    prompt: 'Check coverage',
+    description: 'Keep this note',
+    targetProjectId: 'removed-project',
+    assignedAgentProvider: 'Claude Code',
+    cronExpression: '0 9 * * 1-5',
+    enabled: true,
+  };
+  const draft = savedPlanDraft(plan, 'destination', [{ id: 'claude', name: 'Claude Code' }]);
+  assert.equal(draft.enabled, false);
+  assert.equal(draft.missed, 'skip');
+  assert.equal(draft.request.isolated, true);
+  assert.equal(draft.request.projectId, 'removed-project');
+  assert.equal(draft.request.projectPath, '');
+  assert.equal(draft.request.agent, 'claude');
+  assert.equal(draft.rawPrompt, 'Check coverage\n\nKeep this note');
+  assert.equal(draft.expression, plan.cronExpression);
+  assert.equal(savedPlanDraft(plan, 'destination', []).request.agent, '');
 });
 
-test('schedule resolves its saved project without falling back when unavailable', () => {
-  const projects = [
-    { id: 'active', name: 'Active checkout' },
-    { id: 'target', name: 'Scheduled project' },
-  ];
-  assert.equal(scheduleProject({ targetProjectId: 'target' }, projects), projects[1]);
-  assert.equal(scheduleProject({ targetProjectId: 'removed' }, projects), undefined);
-  assert.equal(scheduleProject({ targetProjectId: '' }, projects), undefined);
-});
-
-test('rapidly created ideas and plans remain distinct through edits, deletion and hydration', async () => {
+test('ideas remain distinct and recovered plans reuse their destination through failed saves and reloads', async () => {
   const values = new Map();
   globalThis.localStorage = {
     getItem: (key) => values.get(key) ?? null,
@@ -86,16 +80,17 @@ test('rapidly created ideas and plans remain distinct through edits, deletion an
   const { useTaskStore: tasks } = await import('../src/stores/taskStore.ts');
   const { useScheduleStore: schedules } = await import('../src/stores/scheduleStore.ts');
   const plan = {
+    id: 'saved-plan',
     name: 'Review changes',
     description: 'Keep this note',
     targetProjectId: 'target',
     cronExpression: '0 9 * * *',
     assignedAgentProvider: 'codex',
     prompt: 'Check coverage',
-    enabled: false,
+    enabled: true,
   };
+  schedules.setState({ schedules: [plan] });
   for (let index = 0; index < 20; index++) {
-    schedules.getState().addSchedule(plan);
     tasks.getState().addTask({
       projectId: 'target',
       title: plan.name,
@@ -103,20 +98,26 @@ test('rapidly created ideas and plans remain distinct through edits, deletion an
       status: 'backlog',
     });
   }
-  assert.equal(new Set(schedules.getState().schedules.map((item) => item.id)).size, 20);
   assert.equal(new Set(tasks.getState().tasks.map((item) => item.id)).size, 20);
-  const id = schedules.getState().schedules[0].id;
-  schedules.getState().updateSchedule(id, { name: 'Updated review', targetProjectId: 'other' });
+  const destination = schedules.getState().prepareImport(plan.id);
+  assert.match(destination, /^[0-9a-f-]{36}$/);
+  assert.equal(schedules.getState().prepareImport(plan.id), destination);
   const saved = values.get('jackalope-schedules');
   schedules.setState({ schedules: [] });
   values.set('jackalope-schedules', saved);
   await schedules.persist.rehydrate();
-  assert.equal(schedules.getState().schedules[0].name, 'Updated review');
-  assert.equal(schedules.getState().schedules[0].targetProjectId, 'other');
-  assert.equal(schedules.getState().schedules[0].enabled, false);
-  assert.equal(schedules.getState().schedules[0].description, 'Keep this note');
-  schedules.getState().deleteSchedule(id);
-  assert.equal(schedules.getState().schedules.length, 19);
+  assert.deepEqual(schedules.getState().schedules[0], { ...plan, importId: destination });
+  assert.equal(schedules.getState().prepareImport(plan.id), destination);
+  const write = globalThis.localStorage.setItem;
+  globalThis.localStorage.setItem = () => {
+    throw new Error('Storage full');
+  };
+  assert.throws(() => schedules.getState().prepareImport(plan.id), /Storage full/);
+  globalThis.localStorage.setItem = write;
+  assert.equal(schedules.getState().schedules[0].id, plan.id);
+  schedules.getState().deleteSchedule(plan.id);
+  assert.equal(schedules.getState().schedules.length, 0);
+  assert.throws(() => schedules.getState().prepareImport(plan.id), /no longer available/);
   assert.equal(tasks.getState().tasks.length, 20);
 });
 

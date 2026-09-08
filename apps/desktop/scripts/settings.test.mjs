@@ -5,7 +5,6 @@ test('settingsStore defaults, updates, and export formatting', async () => {
   // Test default settings invariants
   const { DEFAULT_SETTINGS } = await import('../src/stores/settingsStore.ts');
 
-  assert.equal(DEFAULT_SETTINGS.experienceMode, 'simple');
   assert.equal(DEFAULT_SETTINGS.defaultRunner, 'codex');
   assert.equal(DEFAULT_SETTINGS.concurrencyLimit, 2);
   assert.equal(DEFAULT_SETTINGS.telemetryEnabled, true); // Opt-out per docs/BACKEND.md
@@ -54,7 +53,7 @@ test('projectStore preferences structure and overrides', async () => {
   assert.equal(deleted, undefined);
 });
 
-test('legacy routing preferences retire without losing supported settings', async () => {
+test('obsolete preferences retire without losing supported settings or saved opt-outs', async () => {
   const { useSettingsStore: store } = await import('../src/stores/settingsStore.ts');
   const options = store.persist.getOptions();
   await options.storage.setItem(options.name, {
@@ -66,6 +65,15 @@ test('legacy routing preferences retire without losing supported settings', asyn
       autoFailoverEnabled: true,
       routingPreference: 'quality',
       maxFailoverRetries: 5,
+      experienceMode: 'advanced',
+      soundAlerts: true,
+      pruneWorktreeOnMerge: true,
+      debugLogging: true,
+      codebaseDiscoveryEnabled: false,
+      discoveryRefreshCadence: 'hourly',
+      maxDiscoveryTokens: 1200,
+      telemetryEnabled: false,
+      crashReportingEnabled: false,
     },
   });
   await store.persist.rehydrate();
@@ -74,6 +82,20 @@ test('legacy routing preferences retire without losing supported settings', asyn
   assert.equal(store.getState().customRunnerPaths.codex, '/tools/codex');
   assert.equal('autoFailoverEnabled' in store.getState(), false);
   assert.equal('routingPreference' in JSON.parse(store.getState().exportSettings()), false);
+  for (const key of [
+    'experienceMode',
+    'soundAlerts',
+    'pruneWorktreeOnMerge',
+    'debugLogging',
+    'codebaseDiscoveryEnabled',
+    'discoveryRefreshCadence',
+    'maxDiscoveryTokens',
+  ]) {
+    assert.equal(key in store.getState(), false, key);
+    assert.equal(key in JSON.parse(store.getState().exportSettings()), false, key);
+  }
+  assert.equal(store.getState().telemetryEnabled, false);
+  assert.equal(store.getState().crashReportingEnabled, false);
   store.getState().resetAll();
 });
 

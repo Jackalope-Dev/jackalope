@@ -10,7 +10,7 @@ type SelectProps = Pick<
   Pick<
     ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>,
     'id' | 'aria-label' | 'aria-labelledby' | 'aria-describedby' | 'aria-invalid' | 'className'
-  >;
+  > & { placeholder?: string };
 
 export function Select({
   value,
@@ -20,6 +20,7 @@ export function Select({
   required,
   children,
   className = '',
+  placeholder,
   ...triggerProps
 }: SelectProps) {
   return (
@@ -31,7 +32,7 @@ export function Select({
       required={required}
     >
       <SelectPrimitive.Trigger {...triggerProps} className={`themed-select ${className}`}>
-        <SelectPrimitive.Value />
+        <SelectPrimitive.Value placeholder={placeholder} />
         <SelectPrimitive.Icon asChild>
           <ChevronDown size={16} aria-hidden="true" />
         </SelectPrimitive.Icon>

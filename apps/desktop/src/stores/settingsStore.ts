@@ -2,15 +2,12 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { BuiltinAgentId } from '../lib/agent-catalog';
 
-export type ExperienceMode = 'simple' | 'advanced' | 'essential';
 export type DefaultRunnerId = BuiltinAgentId;
 export type NotificationLevel = 'all' | 'failures-only' | 'none';
 
 export interface SettingsState {
   // Experience & appearance
-  experienceMode: ExperienceMode;
   mascotReactions: boolean;
-  soundAlerts: boolean;
   notifications: NotificationLevel;
 
   // Runners & execution
@@ -24,21 +21,14 @@ export interface SettingsState {
   branchPrefix: string;
   baseBranch: string;
   worktreeParentDir: string;
-  pruneWorktreeOnMerge: boolean;
 
   // Privacy, Telemetry & Marketplace
   useMcpMarketplace: boolean;
   telemetryEnabled: boolean;
   crashReportingEnabled: boolean;
-  debugLogging: boolean;
 
   // Custom runner paths
   customRunnerPaths: Record<string, string>;
-
-  // Codebase Context Discovery & Memory
-  codebaseDiscoveryEnabled: boolean;
-  discoveryRefreshCadence: 'manual' | 'startup' | 'hourly' | 'daily';
-  maxDiscoveryTokens: number;
 
   // Actions
   setUseMcpMarketplace: (enabled: boolean) => void;
@@ -55,9 +45,7 @@ export const DEFAULT_SETTINGS: Omit<
   SettingsState,
   'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
 > = {
-  experienceMode: 'simple',
   mascotReactions: true,
-  soundAlerts: true,
   notifications: 'all' as const,
 
   defaultRunner: 'codex' as const,
@@ -69,22 +57,16 @@ export const DEFAULT_SETTINGS: Omit<
   branchPrefix: 'jackalope/',
   baseBranch: 'auto',
   worktreeParentDir: '.worktrees',
-  pruneWorktreeOnMerge: false,
 
   useMcpMarketplace: true,
   telemetryEnabled: true, // on by default (opt-out), per docs/BACKEND.md
   crashReportingEnabled: true,
-  debugLogging: false,
 
   customRunnerPaths: {
     codex: '',
     claude: '',
     grok: '',
   },
-
-  codebaseDiscoveryEnabled: true,
-  discoveryRefreshCadence: 'startup' as const,
-  maxDiscoveryTokens: 500,
 };
 
 const memoryStore: Record<string, string> = {};

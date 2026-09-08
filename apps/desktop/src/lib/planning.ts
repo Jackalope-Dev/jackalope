@@ -38,35 +38,3 @@ export function planningDraft(
     connectionIds: task.connectionIds,
   };
 }
-
-export function isCronExpression(value: string): boolean {
-  const fields = value.trim().split(/\s+/);
-  const limits = [
-    [0, 59],
-    [0, 23],
-    [1, 31],
-    [1, 12],
-    [0, 7],
-  ];
-  return (
-    fields.length === 5 &&
-    fields.every((field, index) =>
-      field.split(',').every((part) => {
-        const match = /^(\*|\d+(?:-\d+)?)(?:\/(\d+))?$/.exec(part);
-        if (!match) return false;
-        const [min, max] = limits[index];
-        if (match[2] && (Number(match[2]) < 1 || Number(match[2]) > max - min + 1)) return false;
-        if (match[1] === '*') return true;
-        const [start, end = start] = match[1].split('-').map(Number);
-        return start >= min && end <= max && start <= end;
-      }),
-    )
-  );
-}
-
-export function scheduleProject<T extends { id: string }>(
-  schedule: { targetProjectId: string },
-  projects: T[],
-): T | undefined {
-  return projects.find((project) => project.id === schedule.targetProjectId);
-}
