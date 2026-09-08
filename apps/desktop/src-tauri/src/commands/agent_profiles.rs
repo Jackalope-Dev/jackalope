@@ -14,6 +14,8 @@ static PROFILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 pub struct AgentProfile {
     pub id: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -258,7 +260,9 @@ pub fn agent_profile_create(
     runtime: State<'_, TaskRuntime>,
     agent: String,
     name: String,
+    group: Option<String>,
 ) -> Result<AgentProfile, String> {
+    validate_group(group.as_deref())?;
     env_var_for(&agent).ok_or(
         "This agent has no known config-directory override; Jackalope cannot isolate its sign-in.",
     )?;
@@ -274,11 +278,33 @@ pub fn agent_profile_create(
     let profile = AgentProfile {
         id: id.clone(),
         name: name.to_string(),
+        group,
     };
     entry.profiles.push(profile.clone());
     fs::create_dir_all(dir_for(&root, &agent, &id)).map_err(|e| e.to_string())?;
     save(&root, &manifest)?;
     Ok(profile)
+}
+
+fn validate_group(group: Option<&str>) -> Result<(), String> {
+    if group.is_some_and(|g| !["work", "personal"].contains(&g)) {
+        return Err("Choose Work, Personal or Ungrouped.".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn agent_profile_set_group(
+    runtime: State<'_, TaskRuntime>, agent: String, id: String, group: Option<String>,
+) -> Result<(), String> {
+    validate_group(group.as_deref())?;
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let root = runtime.profiles_root();
+    let mut manifest = load_checked(&root)?;
+    let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
+    let profile = entry.profiles.iter_mut().find(|p| p.id == id).ok_or("Unknown account")?;
+    profile.group = group;
+    save(&root, &manifest)
 }
 
 #[tauri::command]
@@ -377,7 +403,11 @@ pub fn agent_profile_set_active(
 pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
     match adapter {
         "codex" => &["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN"],
-        "claude" => &["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"],
+        "claude" => &[
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+        ],
         "grok" => &["XAI_API_KEY", "GROK_API_KEY"],
         _ => &[],
     }

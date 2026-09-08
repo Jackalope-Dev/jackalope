@@ -13,7 +13,7 @@ use tokio::{
     time::timeout,
 };
 
-mod client;
+pub(crate) mod client;
 mod connected;
 
 #[derive(Clone, Debug, Serialize)]

@@ -6,7 +6,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 
-pub(super) struct Client {
+pub(crate) struct Client {
     child: Child,
     input: ChildStdin,
     output: BufReader<ChildStdout>,
@@ -14,12 +14,20 @@ pub(super) struct Client {
 }
 
 impl Client {
-    pub(super) fn spawn(
+    pub(crate) fn spawn(
         agent: &str,
         args: &[&str],
         profiles_root: &std::path::Path,
     ) -> Result<Self, String> {
-        let mut command = Command::new(super::super::tasks::executable(agent)?);
+        let binding = super::super::agent_profiles::bind_account(profiles_root, agent, None)?;
+        Self::spawn_bound(&binding, args)
+    }
+
+    pub(crate) fn spawn_bound(
+        binding: &super::super::agent_profiles::AccountBinding,
+        args: &[&str],
+    ) -> Result<Self, String> {
+        let mut command = Command::new(super::super::tasks::executable(&binding.adapter)?);
         command
             .args(args)
             .current_dir(std::env::temp_dir())
@@ -27,13 +35,7 @@ impl Client {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true);
-        if let Some(env_name) = super::super::agent_profiles::env_var_for(agent) {
-            if let Some(dir) =
-                super::super::agent_profiles::active_profile_dir(profiles_root, agent)
-            {
-                command.env(env_name, dir);
-            }
-        }
+        super::super::agent_profiles::apply_binding(command.as_std_mut(), binding);
         #[cfg(windows)]
         command.creation_flags(0x08000000);
         let mut child = command
@@ -49,7 +51,14 @@ impl Client {
         })
     }
 
-    pub(super) async fn request(&mut self, request: Value) -> Result<Value, String> {
+    pub(crate) async fn notify(&mut self, value: Value) -> Result<(), String> {
+        self.input
+            .write_all(format!("{value}\n").as_bytes())
+            .await
+            .map_err(|_| "Could not notify the CLI".into())
+    }
+
+    pub(crate) async fn request(&mut self, request: Value) -> Result<Value, String> {
         self.input
             .write_all(format!("{request}\n").as_bytes())
             .await
@@ -57,7 +66,7 @@ impl Client {
         read_response(&mut self.output, &request, &mut self.bytes).await
     }
 
-    pub(super) async fn close(mut self) {
+    pub(crate) async fn close(mut self) {
         let _ = self.child.start_kill();
         let _ = timeout(Duration::from_secs(2), self.child.wait()).await;
     }
