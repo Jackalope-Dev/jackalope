@@ -118,6 +118,8 @@ pub fn run() {
             commands::repo_todos::repo_todos_save,
             task_pick_project,
             task_validate_project,
+            task_project_directory,
+            task_create_project,
             task_runs,
             task_history_recovery,
             task_retry_save,

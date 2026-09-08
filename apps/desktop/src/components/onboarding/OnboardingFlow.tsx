@@ -1,9 +1,18 @@
-import { ArrowLeft, ArrowRight, Check, FolderOpen, RefreshCw } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  FolderOpen,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useCommunityStore } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -11,6 +20,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
+import { PrivacySettings } from '../settings/PrivacySettings';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
@@ -39,6 +49,10 @@ export function OnboardingFlow({
   const execution = useExecutionStore();
   const config = useAgentConfigStore();
   const settings = useSettingsStore();
+  const community = useCommunityStore();
+  const sharing = community.settings?.reviewed
+    ? community.settings.telemetry
+    : settings.telemetryEnabled;
   const [path, setPath] = useState(project?.path ?? '');
   const [agent, setAgent] = useState(
     (project && execution.drafts[project.id]?.agent) || config.defaultMetaAgent,
@@ -132,6 +146,40 @@ export function OnboardingFlow({
                 ? 'Choose an agent'
                 : 'Describe your first task'}
           </h2>
+          <details className="onboarding-privacy-panel">
+            <summary>
+              <ShieldCheck size={20} aria-hidden="true" />
+              <span>
+                <strong>Manage privacy settings</strong>
+                <small>
+                  {community.error
+                    ? 'Usage sharing is paused. Review your settings.'
+                    : sharing
+                      ? 'Anonymous usage sharing is on by default. Opt out here.'
+                      : 'Anonymous usage sharing is off.'}
+                </small>
+              </span>
+              <ChevronDown size={18} className="onboarding-privacy-chevron" aria-hidden="true" />
+            </summary>
+            <div className="onboarding-privacy-controls">
+              <PrivacySettings />
+              <div className="onboarding-privacy">
+                <div>
+                  <label htmlFor="onboarding-marketplace">Community tools</label>
+                  <p>
+                    Allow browsing the MCP marketplace at allmcps.com. Your source code and prompts
+                    aren’t sent to the marketplace.
+                  </p>
+                </div>
+                <Switch
+                  id="onboarding-marketplace"
+                  label="Allow MCP marketplace"
+                  checked={settings.useMcpMarketplace}
+                  onCheckedChange={settings.setUseMcpMarketplace}
+                />
+              </div>
+            </div>
+          </details>
           {step === 'project' && (
             <>
               <p className="onboarding-description">
@@ -181,21 +229,6 @@ export function OnboardingFlow({
                     <FolderOpen size={16} />
                     Browse
                   </Button>
-                </div>
-                <div className="onboarding-privacy">
-                  <div>
-                    <label htmlFor="onboarding-marketplace">Community tools</label>
-                    <p>
-                      Allow browsing the MCP marketplace at allmcps.com. Your source code and
-                      prompts aren’t sent to the marketplace.
-                    </p>
-                  </div>
-                  <Switch
-                    id="onboarding-marketplace"
-                    label="Allow MCP marketplace"
-                    checked={settings.useMcpMarketplace}
-                    onCheckedChange={settings.setUseMcpMarketplace}
-                  />
                 </div>
                 <p className="onboarding-note">
                   Opening a project does not start an agent or change your files.

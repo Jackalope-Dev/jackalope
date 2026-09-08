@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Shell } from './components/layout/Shell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { WorkspaceTransition } from './components/onboarding/WorkspaceTransition';
-import { PrivacyGate } from './components/settings/PrivacySettings';
 import { observeTelemetry } from './lib/observe-telemetry';
 import { nativeTask } from './lib/task-runtime';
+import { useCommunityStore } from './stores/communityStore';
 import { observeExecution } from './stores/executionStore';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { useProjectStore } from './stores/projectStore';
@@ -29,6 +29,7 @@ export default function App() {
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const completeEntry = useCallback(() => {
     if (!entry) return;
+    void useCommunityStore.getState().applyDefaults();
     setInitialTaskAgent(entry.agent);
     setInitialDraftKey(entry.draftKey);
     setInitialCapture(Boolean(entry.capture));
@@ -42,7 +43,10 @@ export default function App() {
       useOnboardingStore.getState().initialize(useProjectStore.getState().projects.length > 0);
   }, [ready]);
   useEffect(() => {
-    if (ready) return observeExecution();
+    if (ready) {
+      void useCommunityStore.getState().load();
+      return observeExecution();
+    }
     nativeTask('app_finish_reset')
       .then(() => setReady(true))
       .catch((error) => setResetError(String(error)));
@@ -61,23 +65,21 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <PrivacyGate>
-        {entry ? (
-          <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
-        ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
-          <OnboardingFlow
-            onCapture={() => setEntry({ capture: true })}
-            onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}
-          />
-        ) : (
-          <Shell
-            initialTaskAgent={initialTaskAgent}
-            initialCapture={initialCapture}
-            initialDraftKey={initialDraftKey}
-            focusOnMount={focusWorkspace}
-          />
-        )}
-      </PrivacyGate>
+      {entry ? (
+        <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
+      ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
+        <OnboardingFlow
+          onCapture={() => setEntry({ capture: true })}
+          onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}
+        />
+      ) : (
+        <Shell
+          initialTaskAgent={initialTaskAgent}
+          initialCapture={initialCapture}
+          initialDraftKey={initialDraftKey}
+          focusOnMount={focusWorkspace}
+        />
+      )}
     </MotionConfig>
   );
 }

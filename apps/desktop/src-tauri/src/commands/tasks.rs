@@ -1,5 +1,6 @@
 mod events;
 mod models;
+mod project_setup;
 mod runners;
 mod runtime;
 mod storage;
@@ -8,6 +9,7 @@ mod tests;
 
 use events::*;
 pub use models::*;
+pub use project_setup::*;
 use runners::discover_runner;
 pub(super) use runners::executable;
 pub(super) use runners::BUILTIN_AGENTS;
@@ -220,7 +222,7 @@ pub async fn task_read_context(
     Ok(Some(text))
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ProjectInfo {
     pub path: String,
     pub name: String,

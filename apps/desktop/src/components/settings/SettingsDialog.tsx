@@ -201,7 +201,19 @@ export function SettingsDialog({
               {!visible.length && <p>No settings match “{query}”.</p>}
               {visible.map((c) => (
                 <section key={c} className="settings-section">
-                  <h2 className="settings-section-title">{c}</h2>
+                  <header className="settings-section-header">
+                    <h2 className="settings-section-title">{c}</h2>
+                    {c === 'Appearance' && (
+                      <p className="settings-section-subtitle">
+                        Changes save immediately and apply throughout Jackalope.
+                      </p>
+                    )}
+                    {c === 'Data & reset' && (
+                      <p className="settings-section-subtitle">
+                        Manage this Jackalope profile on this computer.
+                      </p>
+                    )}
+                  </header>
                   {c === 'General' && (
                     <>
                       <Setting
@@ -251,9 +263,6 @@ export function SettingsDialog({
                   )}
                   {c === 'Appearance' && (
                     <>
-                      <p className="settings-section-subtitle mb-6">
-                        Changes save immediately and apply throughout Jackalope.
-                      </p>
                       <ThemeEditor value={currentTheme} onChange={setTheme} />
                       <div className="settings-companion-box mt-6">
                         <div className="settings-companion-avatar">
@@ -332,9 +341,6 @@ export function SettingsDialog({
                   {c === 'Updates & support' && <ReleaseSupport />}
                   {c === 'Data & reset' && (
                     <>
-                      <p className="settings-section-subtitle mb-6">
-                        Manage this Jackalope profile on this computer.
-                      </p>
                       <Button variant="outline" onClick={() => void exportConfig()}>
                         Copy preferences to clipboard
                       </Button>

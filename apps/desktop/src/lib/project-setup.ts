@@ -3,12 +3,28 @@ import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { useProjectStore } from '../stores/projectStore';
 import { nativeTask } from './task-runtime';
 
+interface ProjectInfo {
+  path: string;
+  name: string;
+  branch: string;
+}
+
 export async function openProject(path: string) {
   await syncAgentConfig();
-  const info = await nativeTask<{ path: string; name: string; branch: string }>(
-    'task_validate_project',
-    { path: path.trim() },
-  );
+  const info = await nativeTask<ProjectInfo>('task_validate_project', { path: path.trim() });
+  return registerProject(info);
+}
+
+export async function createProject(name: string, parentPath: string | null) {
+  await syncAgentConfig();
+  const info = await nativeTask<ProjectInfo>('task_create_project', {
+    name: name.trim(),
+    parentPath,
+  });
+  return registerProject(info);
+}
+
+async function registerProject(info: ProjectInfo) {
   const store = useProjectStore.getState();
   const normalize = (value: string) => value.replaceAll('\\', '/').toLowerCase();
   const existing = store.projects.find(

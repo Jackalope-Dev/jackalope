@@ -17,6 +17,7 @@ interface State {
   busy: boolean;
   error: string | null;
   load: () => Promise<void>;
+  applyDefaults: () => Promise<void>;
   save: (usage: boolean, errors: boolean) => Promise<void>;
 }
 let loaded: Promise<void> | undefined;
@@ -47,6 +48,13 @@ export const useCommunityStore = create<State>((set, get) => ({
     })();
     await loaded;
     loaded = undefined;
+  },
+  applyDefaults: async () => {
+    await get().load();
+    const { settings, busy, error } = get();
+    if (!settings || settings.reviewed || busy || error) return;
+    const legacy = useSettingsStore.getState();
+    await get().save(legacy.telemetryEnabled, legacy.crashReportingEnabled);
   },
   save: async (usage, errors) => {
     if (get().busy) return;
