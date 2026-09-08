@@ -5,8 +5,10 @@ import { type PointerEvent, useEffect, useId, useState } from 'react';
 export function ThemeEditor({
   value,
   onChange,
+  compact = false,
 }: {
   value: ThemePalette;
+  compact?: boolean;
   onChange: (theme: ThemePalette) => void;
 }) {
   const [hex, setHex] = useState(value.accentHex);
@@ -38,156 +40,85 @@ export function ThemeEditor({
     custom(hue, saturation);
   };
 
-  return (
-    <div className="space-y-5">
-      <fieldset className="appearance-mode" aria-label="Appearance">
-        {[
-          { dark: false, label: 'Light', Icon: Sun },
-          { dark: true, label: 'Dark', Icon: Moon },
-          { dark: value.isDark, label: 'Auto', Icon: Clock3 },
-        ].map(({ dark, label, Icon }) => (
-          <label key={label} className="appearance-mode-option">
-            <input
-              type="radio"
-              name={`${inputId}-appearance`}
-              value={label}
-              checked={appearance === label}
-              aria-describedby={
-                label === 'Auto' && appearance === 'Auto' ? `${inputId}-schedule` : undefined
-              }
-              onChange={() =>
-                onChange({
-                  ...value,
-                  isDark: dark,
-                  appearance: label === 'Auto' ? 'automatic' : 'manual',
-                })
-              }
-              className="sr-only"
-            />
-            <span>
-              <Icon className="size-3.5" aria-hidden="true" />
-              {label}
-            </span>
-          </label>
-        ))}
-      </fieldset>
-      {appearance === 'Auto' && (
-        <p
-          id={`${inputId}-schedule`}
-          className="text-xs leading-relaxed text-[var(--color-text-secondary)]"
-        >
-          Light from 7 AM to 7 PM, dark overnight. Uses your device’s local time.
-        </p>
-      )}
-      <div>
-        <div className="flex items-center justify-between text-xs mb-3">
-          <span className="font-medium">{value.name}</span>
-        </div>
-        <div
-          role="slider"
-          tabIndex={0}
-          aria-label="Color field"
-          aria-valuemin={0}
-          aria-valuemax={360}
-          aria-valuenow={value.accentHue}
-          aria-valuetext={`Hue ${value.accentHue} degrees, saturation ${value.accentSat} percent`}
-          aria-describedby={`${inputId}-help`}
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            moveColor(event);
-          }}
-          onPointerMove={(event) => {
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) moveColor(event);
-          }}
-          onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
-          onKeyDown={(event) => {
-            const step = event.shiftKey ? 10 : 1;
-            if (
-              ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)
-            ) {
-              event.preventDefault();
-              const hue =
-                event.key === 'Home'
-                  ? 0
-                  : event.key === 'End'
-                    ? 360
-                    : Math.max(
-                        0,
-                        Math.min(
-                          360,
-                          value.accentHue +
-                            (event.key === 'ArrowRight'
-                              ? step
-                              : event.key === 'ArrowLeft'
-                                ? -step
-                                : 0),
-                        ),
-                      );
-              const saturation = Math.max(
-                20,
-                Math.min(
-                  100,
-                  value.accentSat +
-                    (event.key === 'ArrowUp' ? step : event.key === 'ArrowDown' ? -step : 0),
-                ),
-              );
-              custom(hue, saturation);
-            }
-          }}
-          className="color-field relative h-44 rounded-[20px] cursor-crosshair touch-none"
-          style={{
-            background:
-              'linear-gradient(to top, var(--color-surface-elevated), transparent), var(--color-spectrum)',
-          }}
-        >
-          <span
-            className="absolute size-5 rounded-full border-[3px] border-[var(--color-text-primary)] shadow-lg pointer-events-none -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${value.accentHue / 3.6}%`,
-              top: `${(100 - Math.max(20, value.accentSat)) / 0.8}%`,
-              background: value.accentHex,
-            }}
-          />
-        </div>
-        <p id={`${inputId}-help`} className="sr-only">
-          Drag to explore. Left and right change hue; up and down change saturation. Hold Shift for
-          larger steps.
-        </p>
+  const colorField = (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-3">
+        <span className="font-medium">{value.name}</span>
       </div>
-      <fieldset
-        className="flex items-center justify-between gap-2 border-0 p-0"
-        aria-label="Theme presets"
+      <div
+        role="slider"
+        tabIndex={0}
+        aria-label="Color field"
+        aria-valuemin={0}
+        aria-valuemax={360}
+        aria-valuenow={value.accentHue}
+        aria-valuetext={`Hue ${value.accentHue} degrees, saturation ${value.accentSat} percent`}
+        aria-describedby={`${inputId}-help`}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          moveColor(event);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) moveColor(event);
+        }}
+        onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+        onKeyDown={(event) => {
+          const step = event.shiftKey ? 10 : 1;
+          if (
+            ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)
+          ) {
+            event.preventDefault();
+            const hue =
+              event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? 360
+                  : Math.max(
+                      0,
+                      Math.min(
+                        360,
+                        value.accentHue +
+                          (event.key === 'ArrowRight'
+                            ? step
+                            : event.key === 'ArrowLeft'
+                              ? -step
+                              : 0),
+                      ),
+                    );
+            const saturation = Math.max(
+              20,
+              Math.min(
+                100,
+                value.accentSat +
+                  (event.key === 'ArrowUp' ? step : event.key === 'ArrowDown' ? -step : 0),
+              ),
+            );
+            custom(hue, saturation);
+          }
+        }}
+        className="color-field relative h-44 rounded-[20px] cursor-crosshair touch-none"
+        style={{
+          background:
+            'linear-gradient(to top, var(--color-surface-elevated), transparent), var(--color-spectrum)',
+        }}
       >
-        {PRESET_THEMES.map((theme) => (
-          <button
-            key={theme.id}
-            type="button"
-            onClick={() =>
-              onChange({
-                ...theme,
-                isDark: value.isDark,
-                appearance: value.appearance,
-                atmosphere: value.atmosphere,
-              })
-            }
-            aria-label={theme.name}
-            aria-pressed={value.id === theme.id}
-            title={theme.name}
-            className="theme-swatch size-9 rounded-full flex items-center justify-center transition-transform hover:scale-110"
-            style={{
-              background: `linear-gradient(140deg, hsl(${theme.accentHue} ${theme.accentSat}% 80%), ${theme.accentHex})`,
-            }}
-          >
-            {value.id === theme.id && (
-              <Check
-                aria-hidden="true"
-                className="size-4"
-                style={{ color: `hsl(${theme.accentHue} 70% 15%)` }}
-              />
-            )}
-          </button>
-        ))}
-      </fieldset>
+        <span
+          className="absolute size-5 rounded-full border-[3px] border-[var(--color-text-primary)] shadow-lg pointer-events-none -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left: `${value.accentHue / 3.6}%`,
+            top: `${(100 - Math.max(20, value.accentSat)) / 0.8}%`,
+            background: value.accentHex,
+          }}
+        />
+      </div>
+      <p id={`${inputId}-help`} className="sr-only">
+        Drag to explore. Left and right change hue; up and down change saturation. Hold Shift for
+        larger steps.
+      </p>
+    </div>
+  );
+  const colorControls = (
+    <>
       <label className="block text-xs space-y-2">
         <span className="flex justify-between">
           <span>Atmosphere</span>
@@ -232,6 +163,96 @@ export function ThemeEditor({
           className="w-24 rounded-lg bg-[var(--color-surface-sunken)] px-3 py-2 text-center font-mono text-[var(--color-text-primary)]"
         />
       </div>
+    </>
+  );
+
+  return (
+    <div className="space-y-5">
+      <fieldset className="appearance-mode" aria-label="Appearance">
+        {[
+          { dark: false, label: 'Light', Icon: Sun },
+          { dark: true, label: 'Dark', Icon: Moon },
+          { dark: value.isDark, label: 'Auto', Icon: Clock3 },
+        ].map(({ dark, label, Icon }) => (
+          <label key={label} className="appearance-mode-option">
+            <input
+              type="radio"
+              name={`${inputId}-appearance`}
+              value={label}
+              checked={appearance === label}
+              aria-describedby={
+                label === 'Auto' && appearance === 'Auto' ? `${inputId}-schedule` : undefined
+              }
+              onChange={() =>
+                onChange({
+                  ...value,
+                  isDark: dark,
+                  appearance: label === 'Auto' ? 'automatic' : 'manual',
+                })
+              }
+              className="sr-only"
+            />
+            <span>
+              <Icon className="size-3.5" aria-hidden="true" />
+              {label}
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      {appearance === 'Auto' && (
+        <p
+          id={`${inputId}-schedule`}
+          className="text-xs leading-relaxed text-[var(--color-text-secondary)]"
+        >
+          Light from 7 AM to 7 PM, dark overnight. Uses your device’s local time.
+        </p>
+      )}
+      {!compact && colorField}
+      <fieldset
+        className="flex items-center justify-between gap-2 border-0 p-0"
+        aria-label="Theme presets"
+      >
+        {PRESET_THEMES.map((theme) => (
+          <button
+            key={theme.id}
+            type="button"
+            onClick={() =>
+              onChange({
+                ...theme,
+                isDark: value.isDark,
+                appearance: value.appearance,
+                atmosphere: value.atmosphere,
+              })
+            }
+            aria-label={theme.name}
+            aria-pressed={value.id === theme.id}
+            title={theme.name}
+            className="theme-swatch size-9 rounded-full flex items-center justify-center transition-transform hover:scale-110"
+            style={{
+              background: `linear-gradient(140deg, hsl(${theme.accentHue} ${theme.accentSat}% 80%), ${theme.accentHex})`,
+            }}
+          >
+            {value.id === theme.id && (
+              <Check
+                aria-hidden="true"
+                className="size-4"
+                style={{ color: `hsl(${theme.accentHue} 70% 15%)` }}
+              />
+            )}
+          </button>
+        ))}
+      </fieldset>
+      {compact ? (
+        <details className="onboarding-advanced">
+          <summary>Customize palette</summary>
+          <div className="space-y-5">
+            {colorField}
+            {colorControls}
+          </div>
+        </details>
+      ) : (
+        colorControls
+      )}
     </div>
   );
 }

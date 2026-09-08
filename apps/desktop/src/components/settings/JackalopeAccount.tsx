@@ -1,3 +1,4 @@
+import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -9,7 +10,11 @@ interface AccountStatus {
   userCode: string | null;
   expiresAt: number | null;
 }
-export function JackalopeAccount() {
+export function JackalopeAccount({
+  presentation = 'settings',
+}: {
+  presentation?: 'settings' | 'welcome';
+}) {
   const [account, setAccount] = useState<AccountStatus | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -72,12 +77,15 @@ export function JackalopeAccount() {
     }
   }
   const connected = account?.state === 'connected' || account?.state === 'offline';
+  const welcome = presentation === 'welcome';
   return (
-    <div className="space-y-6">
-      <p className="settings-row-description">
-        Connect the account you use for early access and invitations. Beta builds require approved
-        access to start new work. Your projects and agent accounts stay on this computer.
-      </p>
+    <div className={welcome ? 'access-account' : 'space-y-6'}>
+      {!welcome && (
+        <p className="settings-row-description">
+          Connect the account you use for early access and invitations. Beta builds require approved
+          access to start new work. Your projects and agent accounts stay on this computer.
+        </p>
+      )}
       {!account && !error && <p role="status">Reading account connection…</p>}
       {account?.state === 'unavailable' && (
         <p>Open a supported Windows desktop build to connect your Jackalope account.</p>
@@ -93,29 +101,25 @@ export function JackalopeAccount() {
         </div>
       )}
       {account?.state === 'pending' && (
-        <div className="space-y-4">
-          <p role="status">Finish connecting in your browser.</p>
-          <p className="settings-row-description">
-            Only approve if the browser shows this same code:
-          </p>
-          <p className="font-mono text-xl tracking-widest">
+        <div className={welcome ? 'access-pairing' : 'space-y-4'}>
+          <p role="status">Continue in your browser</p>
+          <p className="settings-row-description">Only approve if this code matches:</p>
+          <p className={welcome ? 'access-code' : 'font-mono text-xl tracking-widest'}>
             {account.userCode?.slice(0, 4)}–{account.userCode?.slice(4)}
           </p>
           <p className="settings-row-description">
-            Sign in with your invited email, then confirm this desktop. This request expires after
-            10 minutes.
+            Use your approved email. This code expires in 10 minutes.
           </p>
         </div>
       )}
       {account?.state === 'expired' && (
-        <p role="status">
-          This connection request expired or was canceled. Start a new request to try again.
-        </p>
+        <p role="status">Your connection request ended. Connect again to try once more.</p>
       )}
-      <div className="flex flex-wrap gap-3">
+      <div className={welcome ? 'access-account-actions' : 'flex flex-wrap gap-3'}>
         {(account?.state === 'disconnected' || account?.state === 'expired') && (
           <Button disabled={busy} onClick={() => void act('app_account_connect')}>
             {busy ? 'Connecting…' : 'Connect account'}
+            {welcome && !busy && <ArrowUpRight size={18} aria-hidden="true" />}
           </Button>
         )}
         {account?.state === 'pending' && (

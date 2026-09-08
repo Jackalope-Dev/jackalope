@@ -14,6 +14,8 @@ test('first launch resumes after opening a project, including across hydration',
   store.setState({ status: 'new', step: 'project' });
   store.getState().initialize(false);
   assert.equal(store.getState().status, 'active');
+  assert.equal(store.getState().step, 'theme');
+  store.getState().go('project');
   store.getState().go('agent');
   const saved = values.get('jackalope-onboarding-v1');
   store.setState({ status: 'new', step: 'project' });
@@ -38,7 +40,7 @@ test('legacy skipped profiles stay compatible, and guided setup can be completed
   assert.equal(store.getState().status, 'skipped');
   store.getState().begin();
   assert.equal(store.getState().status, 'active');
-  assert.equal(store.getState().step, 'project');
+  assert.equal(store.getState().step, 'theme');
   store.getState().finish();
   assert.equal(store.getState().status, 'complete');
 });

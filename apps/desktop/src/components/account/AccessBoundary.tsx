@@ -1,3 +1,5 @@
+import { EchoMark } from '@jackalope/brand/echo';
+import { ArrowRight, FolderOpen } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -70,33 +72,54 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
       <ResizeHandles />
       <TitleBar />
       <main className="access-page">
-        <section className="mx-auto max-w-xl space-y-6 py-8" aria-labelledby="access-heading">
-          <h1 id="access-heading" className="text-2xl font-semibold">
-            Welcome to Jackalope early access
-          </h1>
-          <p>
-            Sign in with the email approved from the waitlist to start working with your agents.
-          </p>
-          {!access && !error ? <p role="status">Checking access…</p> : <JackalopeAccount />}
-          {error && (
-            <p role="alert">
-              Access could not be checked. Retry the account connection or open your saved work.
-            </p>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => {
-              setReviewing(true);
-              setConnecting(false);
-            }}
-          >
-            Open saved work
-          </Button>
-          <p className="settings-row-description">
-            Already approved? Use the same email you used on the website. New work requires
-            approval; your existing files stay on this computer.
-          </p>
+        <div className="access-atmosphere" aria-hidden="true">
+          <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none">
+            <title>Decorative background</title>
+            {[0, 1, 2, 3, 4, 5, 6].map((line) => (
+              <path
+                key={line}
+                d="M-240 890C140 920 90 350 550 580S1100 140 1630 100"
+                transform={`translate(0 ${line * 24})`}
+              />
+            ))}
+          </svg>
+        </div>
+        <section className="access-welcome" aria-labelledby="access-heading">
+          <header className="access-intro">
+            <EchoMark animated={false} className="access-mark" />
+            <h1 id="access-heading">Welcome to Jackalope.</h1>
+            <p>Sign in with your approved email to get started.</p>
+          </header>
+          <div className="access-connection">
+            {!access && !error ? (
+              <p className="access-checking" role="status">
+                Checking access…
+              </p>
+            ) : (
+              <JackalopeAccount presentation="welcome" />
+            )}
+            {error && (
+              <p className="access-error" role="alert">
+                We couldn’t check your access. Retry or open your saved work.
+              </p>
+            )}
+          </div>
+          <footer className="access-footer">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setReviewing(true);
+                setConnecting(false);
+              }}
+            >
+              <FolderOpen size={16} aria-hidden="true" />
+              Open saved work
+              <ArrowRight size={14} aria-hidden="true" />
+            </Button>
+            <p>Your projects stay on this computer.</p>
+          </footer>
         </section>
+        <p className="access-caption">Jackalope · Early access</p>
       </main>
     </div>
   );

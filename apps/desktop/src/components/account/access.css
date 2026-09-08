@@ -6,9 +6,195 @@
   background: var(--color-surface);
 }
 .access-page {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-height: 0;
   overflow: auto;
-  padding: 24px 32px;
+  padding: 40px 32px 20px;
+  background: linear-gradient(155deg, var(--color-surface), var(--color-surface-sunken));
+}
+.access-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(transparent, #000 20%, #000 85%, transparent);
+}
+.access-atmosphere::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(
+      ellipse at 18% 64%,
+      color-mix(in srgb, var(--color-accent) 13%, transparent),
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 85% 25%,
+      color-mix(in srgb, var(--color-accent) 9%, transparent),
+      transparent 42%
+    );
+  animation: access-atmosphere-drift 24s ease-in-out infinite alternate;
+}
+.access-atmosphere svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  stroke: var(--color-accent-ink);
+  stroke-width: 0.7;
+  opacity: 0.12;
+  mask-image: linear-gradient(90deg, #000, transparent 38%, transparent 62%, #000);
+}
+.access-welcome {
+  width: min(100%, 480px);
+  margin: auto;
+  padding: 20px 0 36px;
+  text-align: center;
+}
+.access-intro .access-mark {
+  width: 116px;
+  height: 116px;
+  margin: 0 auto 28px;
+  color: var(--color-accent-ink);
+}
+.access-intro h1 {
+  font-size: var(--text-4xl);
+  line-height: var(--text-4xl--line-height);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.access-intro > p {
+  margin: 16px auto 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  text-wrap: balance;
+}
+.access-connection {
+  margin: 32px auto 0;
+  width: min(100%, 340px);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+.access-account {
+  display: grid;
+  gap: 20px;
+}
+.access-account .settings-row-description,
+.access-checking {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+.access-account-actions {
+  display: grid;
+  gap: 10px;
+}
+.access-account-actions:empty {
+  display: none;
+}
+.access-account-actions > button {
+  min-height: 48px;
+  border-radius: 12px;
+}
+.access-pairing {
+  display: grid;
+  gap: 10px;
+}
+.access-pairing > [role="status"] {
+  font-weight: 600;
+}
+.access-code {
+  padding: 14px 16px;
+  margin: 4px 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  letter-spacing: 0.16em;
+}
+.access-error,
+.access-account [role="alert"] {
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
+}
+.access-error {
+  margin-top: 16px;
+}
+.access-footer {
+  margin: 24px auto 0;
+}
+.access-footer > p,
+.access-caption {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.65;
+}
+.access-footer > p {
+  margin-top: 8px;
+}
+.access-caption {
+  flex-shrink: 0;
+  text-align: center;
+}
+.access-welcome:has(.access-pairing) .access-intro > p {
+  display: none;
+}
+@keyframes access-atmosphere-drift {
+  from {
+    transform: translate(-2%, 2%) scale(1);
+  }
+  to {
+    transform: translate(3%, -3%) scale(1.08);
+  }
+}
+@media (max-height: 740px) {
+  .access-page {
+    padding-top: 20px;
+  }
+  .access-welcome {
+    padding: 12px 0 24px;
+  }
+  .access-intro .access-mark {
+    width: 76px;
+    height: 76px;
+    margin-bottom: 20px;
+  }
+  .access-intro h1 {
+    font-size: var(--text-2xl);
+  }
+  .access-connection {
+    margin-top: 24px;
+  }
+  .access-footer {
+    margin-top: 16px;
+  }
+  .access-welcome:has(.access-pairing) .access-mark {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+  }
+  .access-pairing {
+    gap: 6px;
+  }
+  .access-account:has(.access-pairing) {
+    gap: 12px;
+  }
+  .access-code {
+    padding: 10px 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .access-atmosphere::before {
+    animation: none;
+  }
 }
 .access-frame > .app-titlebar {
   margin: 0;

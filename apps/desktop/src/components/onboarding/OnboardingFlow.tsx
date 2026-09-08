@@ -1,3 +1,4 @@
+import { applyThemeTokens } from '@jackalope/brand/theme';
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,11 +19,13 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { PrivacySettings } from '../settings/PrivacySettings';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import './onboarding.css';
@@ -32,6 +35,7 @@ const AgentManager = lazy(() =>
 );
 
 const steps: { id: OnboardingStep; label: string }[] = [
+  { id: 'theme', label: 'Theme' },
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agent' },
   { id: 'task', label: 'First task' },
@@ -49,6 +53,8 @@ export function OnboardingFlow({
   const config = useAgentConfigStore();
   const settings = useSettingsStore();
   const community = useCommunityStore();
+  const theme = useThemeStore();
+  const [themeDraft, setThemeDraft] = useState(theme.currentTheme);
   const sharing = community.settings?.reviewed
     ? community.settings.telemetry
     : settings.telemetryEnabled;
@@ -66,7 +72,7 @@ export function OnboardingFlow({
   const heading = useRef<HTMLHeadingElement>(null);
   const errorMessage = useRef<HTMLParagraphElement>(null);
   const desktop = isTauriEnvironment();
-  const step = !project ? 'project' : onboarding.step;
+  const step = onboarding.step === 'theme' ? 'theme' : !project ? 'project' : onboarding.step;
   const index = steps.findIndex((item) => item.id === step);
   const draft = project ? (execution.drafts[project.id]?.prompt ?? '') : '';
   const runner = execution.runners.find((item) => item.id === agent);
@@ -77,6 +83,15 @@ export function OnboardingFlow({
       !(options?.restrictModels && !options.models.some((model) => model.trim()))
     );
   };
+
+  useEffect(() => {
+    if (step === 'theme') setThemeDraft(useThemeStore.getState().currentTheme);
+  }, [step]);
+  useEffect(() => {
+    if (step !== 'theme') return;
+    applyThemeTokens(themeDraft);
+    return () => applyThemeTokens(useThemeStore.getState().currentTheme);
+  }, [step, themeDraft]);
 
   useEffect(() => {
     if (!desktop || projectMode !== 'new') return;
@@ -133,7 +148,7 @@ export function OnboardingFlow({
           <img src="/mascot.svg" alt="" />
           Jackalope
         </span>
-        <ArcColorPicker />
+        {step !== 'theme' && <ArcColorPicker />}
       </header>
       <main className="onboarding-layout">
         <aside className="onboarding-intro" aria-label="Setup progress">
@@ -155,46 +170,87 @@ export function OnboardingFlow({
             Step {index + 1} of {steps.length}
           </p>
           <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
-            {step === 'project'
-              ? 'Choose a project'
-              : step === 'agent'
-                ? 'Choose an agent'
-                : 'Describe your first task'}
+            {step === 'theme'
+              ? 'Choose your theme'
+              : step === 'project'
+                ? 'Choose a project'
+                : step === 'agent'
+                  ? 'Choose an agent'
+                  : 'Describe your first task'}
           </h2>
-          <details className="onboarding-privacy-panel">
-            <summary>
-              <ShieldCheck size={20} aria-hidden="true" />
-              <span>
-                <strong>Manage privacy settings</strong>
-                <small>
-                  {community.error
-                    ? 'Usage sharing is paused. Review your settings.'
-                    : sharing
-                      ? 'Anonymous usage sharing is on by default. Opt out here.'
-                      : 'Anonymous usage sharing is off.'}
-                </small>
-              </span>
-              <ChevronDown size={18} className="onboarding-privacy-chevron" aria-hidden="true" />
-            </summary>
-            <div className="onboarding-privacy-controls">
-              <PrivacySettings />
-              <div className="onboarding-privacy">
-                <div>
-                  <label htmlFor="onboarding-marketplace">Community tools</label>
-                  <p>
-                    Allow browsing the MCP marketplace at allmcps.com. Your source code and prompts
-                    aren’t sent to the marketplace.
-                  </p>
+          {step === 'theme' && (
+            <>
+              <p className="onboarding-description">
+                Choose an appearance and palette for your workspace. You can change them anytime.
+              </p>
+              <ThemeEditor value={themeDraft} onChange={setThemeDraft} compact />
+              <details className="onboarding-privacy-panel">
+                <summary>
+                  <ShieldCheck size={20} aria-hidden="true" />
+                  <span>
+                    <strong>Manage privacy settings</strong>
+                    <small>
+                      {community.error
+                        ? 'Usage sharing is paused. Review your settings.'
+                        : sharing
+                          ? 'Anonymous usage sharing is on by default. Opt out here.'
+                          : 'Anonymous usage sharing is off.'}
+                    </small>
+                  </span>
+                  <ChevronDown
+                    size={18}
+                    className="onboarding-privacy-chevron"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div className="onboarding-privacy-controls">
+                  <PrivacySettings />
+                  <div className="onboarding-privacy">
+                    <div>
+                      <label htmlFor="onboarding-marketplace">Community tools</label>
+                      <p>
+                        Allow browsing the MCP marketplace at allmcps.com. Your source code and
+                        prompts aren’t sent to the marketplace.
+                      </p>
+                    </div>
+                    <Switch
+                      id="onboarding-marketplace"
+                      label="Allow MCP marketplace"
+                      checked={settings.useMcpMarketplace}
+                      onCheckedChange={settings.setUseMcpMarketplace}
+                    />
+                  </div>
                 </div>
-                <Switch
-                  id="onboarding-marketplace"
-                  label="Allow MCP marketplace"
-                  checked={settings.useMcpMarketplace}
-                  onCheckedChange={settings.setUseMcpMarketplace}
-                />
+              </details>
+              <div className="onboarding-actions">
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setThemeDraft(theme.currentTheme)}
+                >
+                  Reset preview
+                </Button>
+                <Button
+                  disabled={busy || community.busy}
+                  onClick={() =>
+                    void attempt(async () => {
+                      await community.applyDefaults();
+                      const privacy = useCommunityStore.getState();
+                      if (desktop && (!privacy.settings?.reviewed || privacy.error))
+                        throw new Error(
+                          privacy.error ?? 'Privacy settings could not be saved. Please retry.',
+                        );
+                      theme.setTheme(themeDraft);
+                      onboarding.go('project');
+                    })
+                  }
+                >
+                  {busy ? 'Saving…' : 'Keep theme and continue'}
+                  <ArrowRight size={16} />
+                </Button>
               </div>
-            </div>
-          </details>
+            </>
+          )}
           {step === 'project' && (
             <>
               <p className="onboarding-description">
@@ -336,6 +392,15 @@ export function OnboardingFlow({
                   </>
                 )}
                 <div className="onboarding-actions">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => onboarding.go('theme')}
+                  >
+                    <ArrowLeft size={16} />
+                    Back
+                  </Button>
                   <Button
                     type="submit"
                     disabled={
