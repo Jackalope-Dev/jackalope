@@ -40,6 +40,10 @@
   min-height: 0;
   align-items: center;
 }
+.onboarding-intro {
+  padding: 80px 6px 6px;
+  margin-inline: -6px;
+}
 .onboarding-intro h1 {
   font-size: var(--text-4xl);
   font-weight: 500;

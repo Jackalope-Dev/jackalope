@@ -16,6 +16,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -40,6 +41,25 @@ const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'agent', label: 'Agent' },
   { id: 'task', label: 'First task' },
 ];
+
+const setupTips: Record<OnboardingStep, string[]> = {
+  theme: [
+    'Theme changes are a preview until you choose Keep theme and continue.',
+    'Open Manage privacy settings to review usage sharing before continuing.',
+  ],
+  project: [
+    'Choose the Git repository your agent will work in, or create a new project.',
+    'Creating a project? Check its name and folder before continuing.',
+  ],
+  agent: [
+    'Choose an installed agent and sign in to its account before starting a task.',
+    'If you just installed or signed in to an agent, refresh the list.',
+  ],
+  task: [
+    'Describe the result you want, relevant files, and how to check the work.',
+    'Your first task opens as a draft. Review it in the workspace before starting.',
+  ],
+};
 
 export function OnboardingFlow({
   onFinish,
@@ -71,6 +91,7 @@ export function OnboardingFlow({
   const [error, setError] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const errorMessage = useRef<HTMLParagraphElement>(null);
+  const tipIndex = useRef(0);
   const desktop = isTauriEnvironment();
   const step = onboarding.step === 'theme' ? 'theme' : !project ? 'project' : onboarding.step;
   const index = steps.findIndex((item) => item.id === step);
@@ -106,6 +127,9 @@ export function OnboardingFlow({
   useEffect(() => {
     if (heading.current?.dataset.step === step) heading.current.focus();
     setError('');
+    tipIndex.current = 0;
+    useMascotStore.getState().clearMessage();
+    return () => useMascotStore.getState().clearMessage();
   }, [step]);
   useEffect(() => {
     if (error) errorMessage.current?.focus();
@@ -152,7 +176,18 @@ export function OnboardingFlow({
       </header>
       <main className="onboarding-layout">
         <aside className="onboarding-intro" aria-label="Setup progress">
-          <JackalopeMascot size="md" overrideMood={busy ? 'thinking' : 'idle'} />
+          <JackalopeMascot
+            size="md"
+            className="w-fit"
+            bubbleAlign="start"
+            overrideMood={busy ? 'thinking' : 'idle'}
+            label="Show setup tip"
+            onActivate={() => {
+              const tips = setupTips[step];
+              useMascotStore.getState().say(tips[tipIndex.current % tips.length]);
+              tipIndex.current += 1;
+            }}
+          />
           <h1>Set up Jackalope</h1>
           <ol className="onboarding-steps">
             {steps.map((item, itemIndex) => (
