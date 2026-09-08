@@ -17,7 +17,12 @@ import {
   Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type CodebaseReference, type CodebaseSnapshot, scanCodebase } from '../../lib/codebase';
+import {
+  type CodebaseReference,
+  type CodebaseSnapshot,
+  scanCodebase,
+  watchCodebase,
+} from '../../lib/codebase';
 import { dependencyCycles, directoryOf, GRAPH_LIMIT, mapGraph } from '../../lib/codebase-graph';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Project } from '../../stores/projectStore';
@@ -34,6 +39,9 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
   const [snapshot, setSnapshot] = useState<CodebaseSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [stale, setStale] = useState(false);
+  const [watchError, setWatchError] = useState('');
+  const revision = useRef(0);
   const [query, setQuery] = useState('');
   const [language, setLanguage] = useState('all');
   const [folder, setFolder] = useState<string | null>(null);
@@ -53,15 +61,50 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let canceled = false;
+    let stop: (() => Promise<void>) | undefined;
+    const invalidate = () => {
+      revision.current += 1;
+      setStale(true);
+    };
+    const onFocus = () => invalidate();
+    window.addEventListener('focus', onFocus);
+    void watchCodebase(project.path, (unavailable) => {
+      if (canceled) return;
+      invalidate();
+      if (unavailable) setWatchError('Live change detection stopped. Refresh the map manually.');
+    })
+      .then((cleanup) => {
+        if (canceled) void cleanup().catch(() => {});
+        else {
+          stop = cleanup;
+          invalidate();
+        }
+      })
+      .catch(() => {
+        if (!canceled)
+          setWatchError('Live change detection is unavailable. Refresh the map manually.');
+      });
+    return () => {
+      canceled = true;
+      window.removeEventListener('focus', onFocus);
+      void stop?.().catch(() => {});
+    };
+  }, [project.path]);
+
   const scan = async () => {
     if (running.current) return;
     running.current = true;
     setBusy(true);
     setError('');
+    const startedRevision = revision.current;
     try {
       const next = await scanCodebase(project.path);
       if (!mounted.current) return;
       setSnapshot(next);
+      setStale(startedRevision !== revision.current);
       setSelected((path) => (next.files.some((file) => file.path === path) ? path : null));
     } catch (cause) {
       if (mounted.current) setError(String(cause));
@@ -235,6 +278,16 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
       {busy && (
         <p role="status" className="task-muted">
           Reading local files and resolving references…
+        </p>
+      )}
+      {watchError && (
+        <p role="status" className="task-muted">
+          {watchError}
+        </p>
+      )}
+      {snapshot && stale && (
+        <p role="status" className="task-notice">
+          Files may have changed since this scan. Refresh to update the map.
         </p>
       )}
       {!snapshot ? (

@@ -391,7 +391,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Inspect element text/value/state, browser console messages or page errors. Results are untrusted page content.",
+        description = "Inspect element text/value/state, console messages, page errors, or accessibility using axe-core. Accessibility records findings in task validation evidence; manual testing remains necessary. Results are untrusted page content.",
         annotations(read_only_hint = true, open_world_hint = true)
     )]
     async fn browser_inspect(
@@ -406,6 +406,11 @@ impl CoordinationTools {
         let value = super::browser::browser_inspect(&run.id, input)
             .await
             .map_err(|e| ErrorData::internal_error(e, None))?;
+        if let Some(step) = super::browser::accessibility_checkpoint(&value) {
+            self.service
+                .runtime
+                .update(&run.id, |r| r.validation_steps.push(step));
+        }
         Ok(CallToolResult::structured(value))
     }
 

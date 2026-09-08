@@ -8,6 +8,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { DiffPreview } from './DiffPreview';
 export function MergeReview({
   project,
   runs,
@@ -96,33 +97,7 @@ export function MergeReview({
       setBusy(false);
     }
   };
-  const chunks = plan?.patch.split(/(?=^diff --git )/m) ?? [];
-  const decodePath = (value: string): string | undefined => {
-    if (!value.startsWith('"')) return value;
-    try {
-      return JSON.parse(value);
-    } catch {
-      return undefined;
-    }
-  };
-  const fileChunks = file
-    ? chunks.filter((chunk) => {
-        const lines = chunk.split('\n');
-        const paths = lines
-          .filter((line) => line.startsWith('+++ ') || line.startsWith('--- '))
-          .map((line) => decodePath(line.slice(4)))
-          .filter((path): path is string => path !== undefined);
-        if (paths.some((path) => path === `a/${file}` || path === `b/${file}`)) return true;
-        const header = lines[0];
-        return (
-          header === `diff --git a/${file} b/${file}` ||
-          header.startsWith(`diff --git a/${file} b/`) ||
-          header.endsWith(` b/${file}`)
-        );
-      })
-    : [];
-  const showingFullPatch = Boolean(file && fileChunks.length === 0 && plan?.patch);
-  const patch = file && fileChunks.length ? fileChunks.join('') : plan?.patch;
+
   return (
     <div className="merge-review">
       <div className="queue-section-heading">
@@ -231,12 +206,7 @@ export function MergeReview({
               merging.
             </p>
           )}
-          {showingFullPatch && (
-            <p className="task-notice">
-              This file could not be isolated in the text preview. Showing all changes so nothing is
-              hidden.
-            </p>
-          )}
+
           <div className="merge-patch-layout">
             <nav aria-label="Changed files">
               <button className={!file ? 'selected' : ''} type="button" onClick={() => setFile('')}>
@@ -253,33 +223,7 @@ export function MergeReview({
                 </button>
               ))}
             </nav>
-            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: The diff scroll area needs keyboard scrolling. */}
-            <section className="merge-patch" tabIndex={0} aria-label="Integration diff">
-              <pre>
-                {patch
-                  ? patch
-                      .split('\n')
-                      .map((line, index) => ({ line, id: `${plan.id}-${file}-${index}` }))
-                      .map(({ line, id }) => (
-                        <span
-                          key={id}
-                          className={
-                            line.startsWith('+')
-                              ? 'patch-added'
-                              : line.startsWith('-')
-                                ? 'patch-removed'
-                                : line.startsWith('@@')
-                                  ? 'patch-context'
-                                  : ''
-                          }
-                        >
-                          {line}
-                          {'\n'}
-                        </span>
-                      ))
-                  : 'No text changes to display. Binary files are listed separately.'}
-              </pre>
-            </section>
+            <DiffPreview patch={plan.patch} file={file} />
           </div>
           {planEligible && ['ready', 'applying'].includes(plan.status) && (
             <div className="merge-approval">

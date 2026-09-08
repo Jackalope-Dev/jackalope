@@ -1,5 +1,6 @@
 pub mod capacity;
 pub mod codebase;
+pub mod codebase_watch;
 pub mod coordination;
 pub mod coordination_mcp;
 pub mod git;

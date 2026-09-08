@@ -88,7 +88,7 @@ pub struct BrowserInteractRequest {
     )]
     pub action: String,
     #[schemars(
-        description = "CSS selector or @e reference from the latest snapshot. For press, optional element to focus; for wait, use a CSS selector or text."
+        description = "CSS selector or @e reference from the latest snapshot. For press, optional element to focus. For wait on page text, leave selector empty and put the expected text in the text field; use selector alone to wait for an element."
     )]
     #[serde(default)]
     pub selector: String,
@@ -131,7 +131,9 @@ pub struct BrowserConfigureRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BrowserInspectRequest {
-    #[schemars(description = "text, value, visible, enabled, checked, console or errors")]
+    #[schemars(
+        description = "text, value, visible, enabled, checked, console, errors or accessibility. Accessibility runs axe-core on the current page (optional CSS selector scope) and records an automated validation checkpoint. Element inspections require a selector or @e reference."
+    )]
     pub kind: String,
     pub selector: Option<String>,
 }

@@ -251,10 +251,15 @@ pub(super) async fn bridge_browser_inspect(
             Json(serde_json::json!({"error":"Task authorization required"})),
         )
     })?;
-    super::browser::browser_inspect(&run.id, req)
+    let value = super::browser::browser_inspect(&run.id, req)
         .await
-        .map(Json)
-        .map_err(browser_error)
+        .map_err(browser_error)?;
+    if let Some(step) = super::browser::accessibility_checkpoint(&value) {
+        service
+            .runtime
+            .update(&run.id, |r| r.validation_steps.push(step));
+    }
+    Ok(Json(value))
 }
 
 pub(super) async fn bridge_browser_tabs(
