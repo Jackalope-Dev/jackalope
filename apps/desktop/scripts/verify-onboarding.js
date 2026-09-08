@@ -323,7 +323,10 @@ async function _verifyOnboarding(page) {
     }),
     'Default and custom project locations reach native creation',
   );
-  await page.getByRole('button', { name: /^Claude Installed/ }).click();
+  await page
+    .locator('.onboarding-runner')
+    .filter({ has: page.getByText('Claude', { exact: true }) })
+    .click();
   await page.evaluate(() => {
     window.onboardingFixture.policyFailure = true;
   });

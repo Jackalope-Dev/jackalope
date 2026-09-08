@@ -1,5 +1,17 @@
 [
   {
+    "id": "connected-agents-native-windows",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Your agents, accounts, and tools together",
+    "description": "A clearer landing-page overview of project agent lineups, routing, tool discovery, and cross-agent coordination, plus explicit Windows desktop window access.",
+    "items": [
+      "See how work and personal accounts, project agent restrictions, automatic routing, MCP discovery, and agent messages fit together.",
+      "Grant one Windows window to an active task for snapshots, captures, focus, clicks, literal typing, and scrolling; Stop or release revokes access."
+    ],
+    "note": "Native window control is Windows-only and requires a human window choice for each attempt. Live routing and installed-agent desktop acceptance remain pending."
+  },
+  {
     "id": "quota-aware-task-routing",
     "date": "2026-09-08",
     "status": "In development",

@@ -18,6 +18,7 @@ import {
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
+import { ConnectedWorkspace } from './ConnectedWorkspace';
 
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
@@ -241,33 +242,6 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
   );
 }
 
-const differentiators = [
-  {
-    title: 'Agents receive the project, not an empty prompt.',
-    description:
-      'Deliver bounded instructions, lessons, relevant history, workflows, tools, and coordination updates with an inspectable context receipt.',
-    href: '/features/project-context-for-coding-agents/',
-  },
-  {
-    title: 'Evidence stays attached to the code that produced it.',
-    description:
-      'Keep checks, previews, outcomes, and corrections tied to an exact task snapshot so stale proof cannot quietly look current.',
-    href: '/guides/review-ai-generated-code/',
-  },
-  {
-    title: 'The combination gets its own review.',
-    description:
-      'Prepare a combined patch, recheck every source and the target branch, and integrate only after an explicit decision.',
-    href: '/git-worktrees-for-ai-agents/',
-  },
-  {
-    title: 'Repeatable work keeps its memory and boundaries.',
-    description:
-      'Turn good outcomes into workflows or recurring tasks with inputs, gates, accounts, missed-run rules, and review history intact.',
-    href: '/features/recurring-coding-agent-tasks/',
-  },
-];
-
 function Workbench() {
   return (
     <section
@@ -364,8 +338,9 @@ export function LandingPage({
               </h1>
             </div>
             <p className="hero-description">
-              The desktop workspace for <strong>Codex, Claude Code, Grok, and OpenCode</strong>. Run
-              tasks in parallel. Keep the context. Review the results in one place.
+              The desktop workspace for <strong>Codex, Claude Code, Grok, and OpenCode</strong>.
+              Bring your work and personal accounts. Run tasks in parallel with shared tools,
+              project context, and cross-agent coordination.
             </p>
             <p className="hero-launch">One workspace. Planned for macOS, Windows, and Linux.</p>
             <div className="hero-conversion">
@@ -448,6 +423,8 @@ export function LandingPage({
         ))}
       </section>
 
+      <ConnectedWorkspace />
+
       <Workbench />
 
       <section
@@ -509,32 +486,6 @@ export function LandingPage({
               </Tabs.Content>
             ))}
           </Tabs.Root>
-        </div>
-      </section>
-
-      <section
-        className="landing-width differentiators"
-        aria-labelledby="different-title"
-        data-reveal=""
-      >
-        <div className="differentiators-heading">
-          <h2 id="different-title">Worktrees separate files. Jackalope keeps the work together.</h2>
-          <p>
-            Parallel sessions are only the beginning. Jackalope preserves the decisions, evidence,
-            and project relationships around every task.
-          </p>
-        </div>
-        <div className="differentiator-list">
-          {differentiators.map((item, index) => (
-            <div className="differentiator-row" key={item.title}>
-              <span className="differentiator-index">0{index + 1}</span>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              <a href={item.href} aria-label={`Learn more: ${item.title}`}>
-                <ArrowRight size={18} />
-              </a>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -726,8 +677,8 @@ export function LandingPage({
           <h2 id="questions-title">Questions</h2>
         </div>
         <div className="faq-list">
-          {faqs.map(([question, answer]) => (
-            <details key={question}>
+          {faqs.map(([question, answer, id]) => (
+            <details key={question} id={id}>
               <summary>
                 {question}
                 <Plus size={18} />

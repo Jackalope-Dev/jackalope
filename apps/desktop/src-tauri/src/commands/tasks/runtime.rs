@@ -95,6 +95,7 @@ impl TaskRuntime {
         };
         self.mcp_broker.close(id);
         crate::commands::browser::close(id);
+        crate::commands::desktop_control::close(id);
         if let Some(process) = process {
             let mut child = process.lock().unwrap();
             if child.try_wait().map_err(|e| e.to_string())?.is_none() {
@@ -444,7 +445,7 @@ impl TaskRuntime {
                     "--mcp-config",
                     &config.to_string(),
                     "--allowedTools",
-                    "mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__project,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify",
+                    "mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__project,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__browser_configure,mcp__jackalope__browser_inspect,mcp__jackalope__browser_tabs,mcp__jackalope__desktop_control,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify",
                 ]);
                 input.push_str("\nClaude harness tools: You have access to in-app browser automation, interactive user questions, and structured verification via provided mcp__jackalope__* tools (browser_navigate, browser_screenshot, browser_snapshot, browser_interact, browser_configure, browser_inspect, browser_tabs, ask_user, record_validation_step, computer_verify). If testing UI changes or onboarding flows, proactively use browser_screenshot and record_validation_step to provide verifiable evidence, and ask_user if you need test data or confirmation. If a question returns pending, use user_response with its ID to read the saved answer.\n");
             }
@@ -971,6 +972,7 @@ impl TaskRuntime {
             }
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
+            crate::commands::desktop_control::close(&request.id);
         });
         Ok(id)
     }

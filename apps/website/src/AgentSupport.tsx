@@ -27,7 +27,7 @@ const agents = [
     mark: '[ ]',
     url: 'https://opencode.ai/docs/',
     note: 'Choose your OpenCode provider and model, including available free or local options.',
-    connections: 'CLI configuration only',
+    connections: 'On-demand discovery',
   },
 ];
 

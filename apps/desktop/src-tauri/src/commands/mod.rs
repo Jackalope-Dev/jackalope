@@ -17,6 +17,7 @@ pub mod worktree_cleanup;
 pub mod agent_policy;
 pub mod agent_profiles;
 pub mod agent_sign_in;
+pub mod local_detection;
 
 pub mod history;
 pub mod reset;
@@ -35,6 +36,7 @@ pub mod readiness;
 pub mod schedules;
 
 pub mod browser;
+pub mod desktop_control;
 
 mod resolver_fs;
 

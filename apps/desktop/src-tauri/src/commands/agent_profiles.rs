@@ -249,6 +249,23 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
             command.env(name, binding.directory.join(folder));
         }
     }
+    if binding.profile_id.is_some() {
+        if let Ok(content) = fs::read_to_string(binding.directory.join(".env")) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    continue;
+                }
+                if let Some((k, v)) = trimmed.split_once('=') {
+                    let k = k.trim();
+                    let v = v.trim();
+                    if !k.is_empty() && !v.is_empty() {
+                        command.env(k, v);
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {

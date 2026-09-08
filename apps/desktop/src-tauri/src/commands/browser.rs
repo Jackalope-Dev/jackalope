@@ -20,6 +20,7 @@ pub(super) fn codex_tool_policy() -> serde_json::Value {
         "browser_configure",
         "browser_inspect",
         "browser_tabs",
+        "desktop_control",
     ]
     .into_iter()
     .map(|name| (name.into(), serde_json::json!({"approval_mode":"approve"})))

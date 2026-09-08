@@ -67,6 +67,21 @@ const faqs = [
   ],
   ['When will Jackalope be available?', 'Coming soon. Join the waitlist for early-access news.'],
   [
+    'Does Jackalope automatically choose the best agent, model, and account?',
+    'Automatic tasks ask your configured default agent to choose an allowed agent, configured model, and permitted account. Jackalope validates project restrictions and tool compatibility, considers available capacity reports, and can hand off recognized quota failures to an eligible alternative while preserving the work. Explicit assignments remain available. “Best” depends on your setup and the evidence available; unknown quota stays unknown. This prerelease implementation has passed simulated handoff tests; live model-selection and cross-provider handoff acceptance are still pending.',
+    'routing-question',
+  ],
+  [
+    'Which tools does Jackalope give agents?',
+    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. Stop revokes access. It operates your live desktop under existing OS permissions; macOS and Linux native window control are not yet supported. Windows fixture testing has passed; installed-agent acceptance is still pending.',
+    'tools-question',
+  ],
+  [
+    'How do different agents communicate and stay up to date?',
+    'Tasks share a project inventory with ownership, scopes, dependencies, and messages. Agents can send direct task messages or project broadcasts. Jackalope supplies a bounded briefing at launch and continuation, then attaches relevant updates to its own tool responses. Agents can check the durable inbox between those checkpoints. Delivery does not guarantee that an agent has read or acted on an update, and messages do not automatically wake agents, approve changes, or merge work.',
+    'coordination-question',
+  ],
+  [
     'What happens after I join the waitlist?',
     'Verify your email to see your place and share a personal link. Waitlist referrals are unlimited; each verified new signup earns one day of priority. After acceptance, you get five Instant Access Passes for people to skip the line. No payment is needed to join, and there is no confirmed public launch date or price yet. Your coding agent’s own subscription and usage charges still apply.',
   ],

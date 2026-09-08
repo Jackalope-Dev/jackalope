@@ -190,6 +190,9 @@ pub fn run() {
             agent_profile_sign_in_resize,
             agent_profile_sign_in_stop,
             agent_profile_status,
+            commands::local_detection::system_detect_local_llms,
+            commands::local_detection::system_detect_env_keys,
+            commands::local_detection::agent_import_detected_key,
         ])
         .build(context)
         .expect("error while building jackalope application")
