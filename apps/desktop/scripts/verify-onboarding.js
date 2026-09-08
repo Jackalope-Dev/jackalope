@@ -89,6 +89,17 @@ async function _verifyOnboarding(page) {
         }
         if (command === 'task_validate_project')
           return { path: args.path, name: 'Existing project', branch: 'main' };
+        if (command === 'codebase_scan')
+          return {
+            root: args.repoPath,
+            files: [],
+            references: [],
+            cycles: [],
+            diagnostics: [],
+            truncated: false,
+            scannedAt: new Date().toISOString(),
+            durationMs: 1,
+          };
         if (command === 'app_community_settings' || command === 'app_community_configure') {
           return {
             reviewed: true,
@@ -404,7 +415,20 @@ async function _verifyOnboarding(page) {
     window.onboardingNativeFixture = window.__TAURI_INTERNALS__;
   });
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();
-  await page.getByRole('heading', { name: 'Opening your workspace', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'You’re all set', exact: true }).waitFor();
+  await page.waitForTimeout(1800);
+  assert(
+    await page.getByRole('heading', { name: 'You’re all set', exact: true }).isVisible(),
+    'Workspace remains visible after real checks complete until the five-second minimum',
+  );
+  assert(
+    (await page
+      .getByRole('list', { name: 'Workspace preparation' })
+      .getByText('Done', { exact: true })
+      .count()) === 5,
+    'All local preparation jobs complete',
+  );
+  await page.screenshot({ path: 'output/playwright/onboarding-setup-preview.png' });
   await page.getByRole('button', { name: 'Back to setup', exact: true }).click();
   await page.getByRole('heading', { name: 'Describe your first task', exact: true }).waitFor();
   await page.waitForTimeout(1800);
@@ -421,7 +445,11 @@ async function _verifyOnboarding(page) {
         .find((r) => r.name.includes('/src/stores/executionStore.ts')).name
     );
     execution.setState({
-      refresh: async () => execution.setState({ error: 'Simulated history read failure' }),
+      refresh: async () =>
+        execution.setState({
+          error: 'Simulated history read failure',
+          historyError: 'Simulated history read failure',
+        }),
     });
   });
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();
@@ -434,9 +462,13 @@ async function _verifyOnboarding(page) {
         .getEntriesByType('resource')
         .find((r) => r.name.includes('/src/stores/executionStore.ts')).name
     );
+    window.normalDiscovery = execution.getState().discover;
     execution.setState({
-      refresh: async () => execution.setState({ error: null }),
-      discovering: true,
+      refresh: async () => execution.setState({ error: null, historyError: null }),
+      discover: () =>
+        new Promise((resolve) => {
+          window.finishSlowDiscovery = resolve;
+        }),
     });
   });
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
@@ -460,6 +492,7 @@ async function _verifyOnboarding(page) {
   );
   await page.getByRole('button', { name: 'Close capture', exact: true }).click();
   await page.evaluate(async () => {
+    window.finishSlowDiscovery();
     const module = (name) =>
       import(
         performance
@@ -468,7 +501,7 @@ async function _verifyOnboarding(page) {
       );
     const { useOnboardingStore: onboarding } = await module('onboardingStore');
     const { useExecutionStore: execution } = await module('executionStore');
-    execution.setState({ discovering: false });
+    execution.setState({ discovering: false, discover: window.normalDiscovery });
     window.__TAURI_INTERNALS__ = window.onboardingNativeFixture;
     onboarding.getState().begin();
   });

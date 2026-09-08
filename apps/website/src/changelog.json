@@ -1,5 +1,17 @@
 [
   {
+    "id": "honest-workspace-preparation",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A prepared workspace from the start",
+    "description": "A friendly welcome gives Jackalope time to prepare your workspace.",
+    "items": [
+      "Setup refreshes history and agents, checks the project, reads repository context and prepares a reusable local codebase map.",
+      "Preparation stays visible for at least five seconds, with accurate progress and recovery for slow or failed checks."
+    ],
+    "note": "Preparation runs locally without launching agent tasks or installing dependencies."
+  },
+  {
     "id": "calmer-agent-setup",
     "date": "2026-09-08",
     "status": "In development",
@@ -7,7 +19,8 @@
     "description": "Agent setup is easier to scan and fits smaller windows.",
     "items": [
       "Removed detected counts and skill badges, with company names shown as subtle text.",
-      "Expanded installation commands wrap within the setup pane."
+      "Expanded installation commands wrap within the setup pane.",
+      "A subtle border separates the floating step actions from scrolling content."
     ],
     "note": "In development."
   },

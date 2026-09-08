@@ -43,7 +43,7 @@ For a single suite or test name, pass Node test-runner arguments to `test:file`:
 
 ```powershell
 pnpm --filter @jackalope/desktop test:file scripts/onboarding.test.mjs
-pnpm --filter @jackalope/desktop test:file --test-name-pattern="privacy" scripts/onboarding.test.mjs
+pnpm --filter @jackalope/desktop test:file --test-name-pattern="first launch" scripts/onboarding.test.mjs
 pnpm --filter @jackalope/server test
 pnpm test:release
 ```
@@ -81,6 +81,11 @@ changes, exercise keyboard/focus behavior, light/dark appearance, reduced motion
 fixtures separate from real execution and state which checks used fixtures.
 Native execution changes need disposable-repository tests and relevant actual
 app checks. Opt-in native trials are excluded from the ordinary suite.
+
+Cargo defaults to two concurrent native tests through `.cargo/config.toml`.
+The subprocess and Git fixtures share execution guards and write durable history;
+CPU-count concurrency can exhaust their deadlines on busy Windows machines.
+Set `RUST_TEST_THREADS` or pass `-- --test-threads=N` to override this for stress runs.
 
 ## Pull requests and reports
 

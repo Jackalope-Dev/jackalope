@@ -1113,6 +1113,7 @@
   }
   .atmosphere-canvas {
     min-height: 245px;
+    padding: 28px 20px 36px;
   }
   .landing-questions {
     grid-template-columns: 1fr;

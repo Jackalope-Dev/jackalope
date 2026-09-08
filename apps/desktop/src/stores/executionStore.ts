@@ -33,6 +33,8 @@ interface ExecutionState {
   runners: Runner[];
   selectedId: string | null;
   error: string | null;
+  historyError: string | null;
+  discoveryError: string | null;
   loading: boolean;
   discovering: boolean;
   submitting: boolean;
@@ -44,6 +46,7 @@ interface ExecutionState {
   start: (request: Omit<RunRequest, 'id'>, options?: { background?: boolean }) => Promise<string>;
 }
 let refreshing: Promise<void> | undefined;
+let discovering: Promise<void> | undefined;
 export const useExecutionStore = create<ExecutionState>()(
   persist(
     (set, get) => ({
@@ -51,6 +54,8 @@ export const useExecutionStore = create<ExecutionState>()(
       runners: [],
       selectedId: null,
       error: null,
+      historyError: null,
+      discoveryError: null,
       loading: true,
       discovering: false,
       submitting: false,
@@ -63,16 +68,24 @@ export const useExecutionStore = create<ExecutionState>()(
         set((state) => ({
           drafts: { ...state.drafts, [key]: { ...emptyDraft, ...state.drafts[key], ...value } },
         })),
-      discover: async () => {
-        if (get().discovering) return;
-        set({ discovering: true });
-        try {
-          set({ runners: await nativeTask<Runner[]>('task_runners'), error: null });
-        } catch (error) {
-          set({ error: String(error) });
-        } finally {
-          set({ discovering: false });
-        }
+      discover: () => {
+        if (discovering) return discovering;
+        set({ discovering: true, discoveryError: null });
+        discovering = Promise.resolve().then(async () => {
+          try {
+            set({
+              runners: await nativeTask<Runner[]>('task_runners'),
+              error: null,
+              discoveryError: null,
+            });
+          } catch (error) {
+            set({ error: String(error), discoveryError: String(error) });
+          } finally {
+            discovering = undefined;
+            set({ discovering: false });
+          }
+        });
+        return discovering;
       },
       refresh: () => {
         if (refreshing) return refreshing;
@@ -84,11 +97,11 @@ export const useExecutionStore = create<ExecutionState>()(
               : [];
             const working = runs.some(isActive);
             const wasWorking = get().runs.some(isActive);
-            set({ runs, loading: false, error: null });
+            set({ runs, loading: false, error: null, historyError: null });
             if (working !== wasWorking)
               useMascotStore.getState().setMood(working ? 'working' : 'idle');
           } catch (error) {
-            set({ error: String(error), loading: false });
+            set({ error: String(error), historyError: String(error), loading: false });
           } finally {
             refreshing = undefined;
             if (get().selectedId !== detailId) queueMicrotask(() => void get().refresh());

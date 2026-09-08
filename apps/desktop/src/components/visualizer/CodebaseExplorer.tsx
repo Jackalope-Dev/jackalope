@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type CodebaseReference,
   type CodebaseSnapshot,
+  preparedCodebase,
   scanCodebase,
   watchCodebase,
 } from '../../lib/codebase';
@@ -60,6 +61,30 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
       mounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    let canceled = false;
+    const prepared = preparedCodebase(project.path);
+    if (prepared) {
+      setBusy(true);
+      void prepared
+        .then((value) => {
+          if (!canceled) {
+            setSnapshot(value);
+            setStale(true);
+          }
+        })
+        .catch((cause) => {
+          if (!canceled) setError(String(cause));
+        })
+        .finally(() => {
+          if (!canceled) setBusy(false);
+        });
+    }
+    return () => {
+      canceled = true;
+    };
+  }, [project.path]);
 
   useEffect(() => {
     if (!isTauriEnvironment()) return;

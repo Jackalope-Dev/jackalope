@@ -43,3 +43,9 @@ preview cancellation and persistence. For runtime changes, exercise setup, a rea
 agent, questions, stop, checks, review and restart in a disposable repository.
 Label browser fixtures as fixtures. pnpm verify does not prove native window,
 provider sign-in or installed-upgrade acceptance; see [RELEASE.md](RELEASE.md).
+
+Workspace entry stays visible for at least five seconds, including with reduced
+motion enabled. It refreshes history and agents, validates the selected project,
+reads repository context and prepares its local codebase map. Completed checks
+are labeled Done; errors can be retried and slow checks can continue in the background.
+Settings → General → Open guided setup replays onboarding without clearing saved data.

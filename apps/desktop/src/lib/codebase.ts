@@ -28,10 +28,30 @@ export interface CodebaseSnapshot {
   truncated: boolean;
 }
 
-export async function scanCodebase(repoPath: string): Promise<CodebaseSnapshot> {
-  if (!isTauriEnvironment()) throw new Error('Open the desktop app to analyze local files.');
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<CodebaseSnapshot>('codebase_scan', { repoPath });
+const scans = new Map<string, Promise<CodebaseSnapshot>>();
+let prepared: { path: string; result: Promise<CodebaseSnapshot> } | undefined;
+
+export function scanCodebase(repoPath: string): Promise<CodebaseSnapshot> {
+  const pending = scans.get(repoPath);
+  if (pending) return pending;
+  if (prepared?.path === repoPath) prepared = undefined;
+  const result = (async () => {
+    if (!isTauriEnvironment()) throw new Error('Open the desktop app to analyze local files.');
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke<CodebaseSnapshot>('codebase_scan', { repoPath });
+  })().finally(() => scans.delete(repoPath));
+  scans.set(repoPath, result);
+  return result;
+}
+
+export function prepareCodebase(repoPath: string): Promise<CodebaseSnapshot> {
+  const result = scanCodebase(repoPath);
+  prepared = { path: repoPath, result };
+  return result;
+}
+
+export function preparedCodebase(repoPath: string): Promise<CodebaseSnapshot> | undefined {
+  return prepared?.path === repoPath ? prepared.result : undefined;
 }
 
 export async function watchCodebase(repoPath: string, onChange: (unavailable: boolean) => void) {
