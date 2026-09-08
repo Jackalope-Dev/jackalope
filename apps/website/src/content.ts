@@ -8,10 +8,13 @@ export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.
 export const tour = {
   title: 'A little look around Jackalope.',
   description:
-    'Follow tasks, focus your review queue, inspect a question and result, and explore agents in light and dark. A 40-second interface tour with fictional Atlas project data.',
+    'See parallel coding agents, isolated Git worktrees, and review before integration in a 32-second animated app preview with sample project data.',
+  video: '/media/launch-v3-720p.mp4',
+  poster: '/media/launch-v3-poster.png',
+  captions: '/media/launch-v3.vtt',
   published: '2026-09-08T21:45:00Z',
   transcript:
-    'Start in Tasks with one question, one result ready to review, one working task, and one saved idea. Focus the review queue, then switch to the board. Open the navigation task to inspect its question. Return to the keyboard-search task and read its result before integration. Explore the agent roster and switch from light to dark. This recording shows current app components with fictional Atlas project data; no native agent tasks run. There is no audio.',
+    'One workspace. More possibilities. A cross-platform workspace for coding agents. Run coding agents in parallel Git worktrees. Bring Codex, Claude Code, Grok or OpenCode. Inspect the result before applying changes. Your agents. Parallel work. One place to review. Get early access to Jackalope: join the waitlist. This animated preview uses the light-theme app with fictional Atlas project data and instrumental music; no agent task is launched.',
 };
 
 export const posts = [
@@ -191,6 +194,11 @@ export const pages = [
     path: '/access/',
     title: 'Your early access | Jackalope',
     description: 'Your private Jackalope downloads and invitations.',
+  },
+  {
+    path: '/feedback/',
+    title: 'Share your experience | Jackalope',
+    description: 'Share private feedback about your experience with Jackalope.',
   },
   ...marketingPages.map((page) => ({
     path: page.path,

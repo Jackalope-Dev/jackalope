@@ -102,4 +102,4 @@ tmp/
 wrangler.deploy.jsonc
 dist-lab/
 
-/marketing-assets/submissions/*.zip
+/marketing-assets/

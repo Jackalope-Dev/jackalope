@@ -14,6 +14,7 @@ import { useTaskStore } from '../../stores/taskStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
+import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview } from './ResultReview';
 import { RunStatus } from './RunStatus';
 import { ScreenshotPreview } from './ScreenshotPreview';
@@ -428,6 +429,13 @@ export function TaskDetail({
                       ? 'Checks need attention.'
                       : 'No checks recorded.'}
               </p>
+            )}
+            {!active && !run.detailsOmitted && (
+              <FeedbackTouchpoint
+                key={run.id}
+                runId={run.id}
+                paused={acting || integrating || !!reply.trim() || pending.length > 0}
+              />
             )}
           </Tabs.Content>
           {((!active && run.workspace) || tab === 'changes') && (

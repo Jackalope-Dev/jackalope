@@ -154,6 +154,24 @@ const privacy: Section[] = [
           not include passwords, access tokens, confidential code, or other people’s personal
           information. Copying a local support report does not itself send it to us.
         </p>
+        <p>
+          Quiet feedback invitations use progress stored on your desktop. An optional email
+          follow-up is off by default. If you enable it in Jackalope account settings, we link
+          active days, up to two opaque result receipts, invitation preferences and response status
+          to your membership. These milestones do not include task contents, project details or
+          agent-provider credentials, and remain separate from anonymous usage reports. Turning the
+          email choice off stops new milestone uploads and cancels unsent invitations; a message
+          already handed to the email provider may still arrive.
+        </p>
+        <p>
+          This feedback round has at most one email and two in-app invitations, with shared
+          cooldowns for connected participants. A private email feedback link lasts 90 days and
+          permits only responding or stopping feedback emails. Submitting through it records that
+          you responded; the feedback inbox receives your message without your account email unless
+          you include it. Milestones expire after 90 days without activity. We retain minimal
+          invitation and suppression records with your membership to avoid asking again. You can use
+          Don’t ask again in the app or Stop feedback emails in the invitation.
+        </p>
       </>
     ),
   },

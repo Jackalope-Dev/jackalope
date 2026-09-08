@@ -65,4 +65,16 @@ export const feedbackSchema = z.strictObject({
     .optional(),
 });
 export type Telemetry = z.infer<typeof telemetrySchema>;
-export type Feedback = z.infer<typeof feedbackSchema>;
+export type Feedback =
+  | z.infer<typeof feedbackSchema>
+  | {
+      schemaVersion: 2;
+      id: string;
+      kind: 'idea';
+      message: string;
+      source: 'email';
+      appVersion?: never;
+      os?: never;
+      channel?: never;
+      diagnostics?: never;
+    };

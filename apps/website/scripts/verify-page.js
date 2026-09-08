@@ -143,12 +143,12 @@ async function _verifyPage(page) {
   assert(media.playing, 'Video playback');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.activeElement?.textContent === 'Watch the app');
-  await page.route('**/media/walkthrough.webm', (route) => route.abort());
+  await page.route('**/media/launch-v3-720p.mp4', (route) => route.abort());
   await play.click();
   await page.getByText('The walkthrough couldn’t load.', { exact: false }).waitFor();
   await page.getByRole('button', { name: 'Explore the workspace', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.unroute('**/media/walkthrough.webm');
+  await page.unroute('**/media/launch-v3-720p.mp4');
   assert(
     await page
       .locator('.workbench [role="tabpanel"][data-state="active"]')

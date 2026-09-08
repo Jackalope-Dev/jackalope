@@ -369,7 +369,7 @@ export function LandingPage({
               type="button"
               className="hero-window"
               onClick={onPlay}
-              aria-label="Play the 40-second Jackalope app tour"
+              aria-label="Play the 32-second Jackalope app tour"
             >
               <span className="hero-window-meta">
                 <span>ACTUAL APP / ATLAS SAMPLE PROJECT</span>

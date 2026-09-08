@@ -1,4 +1,5 @@
 import { randomToken, seal, tokenHash, unseal } from './crypto';
+import { feedbackMailAllowed, queueFeedbackMail } from './feedback';
 import { queueGrowthMail } from './growth-mail';
 import { type AccessMail, accessEmail, type Mail } from './mail-templates';
 import { providerJson } from './provider';
@@ -42,6 +43,7 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
   if (env.EARLY_ACCESS_ENABLED !== 'true' || !env.SEQUENZY_API_KEY || !env.ACCESS_EMAIL_FROM)
     return;
   await queueGrowthMail(env, now);
+  await queueFeedbackMail(env, now);
   const rows = await env.DB.prepare(
     "SELECT id FROM access_mail WHERE state!='queued' AND attempts<5 AND next_at<=? AND created_at>? ORDER BY created_at LIMIT 5",
   )
@@ -60,6 +62,12 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
       let providerStatus: number | null = null;
       try {
         const mail = await unseal<Mail>(row.payload, env.ACCESS_SECRET);
+        if (mail.kind === 'feedback_request' && !(await feedbackMailAllowed(env, id, now))) {
+          await env.DB.prepare('DELETE FROM access_mail WHERE id=? AND lease=?')
+            .bind(id, lease)
+            .run();
+          return;
+        }
         stage = 'render';
         const content = accessEmail(mail, env.ACCESS_WEB_ORIGIN);
         stage = 'request';
@@ -70,9 +78,11 @@ export async function deliverAccessMail(env: Env, request = fetch, now = Date.no
           headers: {
             Authorization: `Bearer ${env.SEQUENZY_API_KEY}`,
             'content-type': 'application/json',
+            ...(mail.kind === 'feedback_request' ? { 'Idempotency-Key': `feedback:${id}` } : {}),
           },
           body: JSON.stringify({
             to: mail.to,
+            ...(mail.kind === 'feedback_request' ? { emailType: 'marketing' } : {}),
             from: env.ACCESS_EMAIL_FROM,
             replyTo: env.ACCESS_EMAIL_REPLY_TO,
             subject: content.subject,

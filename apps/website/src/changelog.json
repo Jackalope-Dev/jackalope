@@ -1,5 +1,27 @@
 [
   {
+    "id": "feedback-after-you-have-tried-jackalope",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Feedback after you have tried Jackalope",
+    "description": "Share thoughts after reviewing real task results, with optional email follow-up and quiet in-app invitations.",
+    "items": [
+      "Control invitations, snooze requests, and stop this feedback round after responding."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "a-new-look-at-jackalope-in-motion",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "A new look at Jackalope in motion.",
+    "description": "Watch our 32-second launch film from the landing page or app tour.",
+    "items": [
+      "See parallel agent work, the agent roster, and review in a light-theme animated preview with music and captions."
+    ],
+    "note": "The preview uses sample project data. Join the waitlist for early access."
+  },
+  {
     "id": "agent-ecosystem-and-multi-agent-routing",
     "date": "2026-09-08",
     "status": "In development",

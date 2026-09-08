@@ -7,6 +7,7 @@ use std::{path::PathBuf, time::Duration};
 use tauri::Manager;
 use tauri::{AppHandle, State};
 use tauri_plugin_shell::ShellExt;
+pub mod feedback;
 
 pub struct AccountService {
     path: PathBuf,
@@ -48,6 +49,8 @@ struct SavedAccount {
     email: Option<String>,
     #[serde(default)]
     verified_at: i64,
+    #[serde(default)]
+    feedback: feedback::LocalFeedback,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -392,6 +395,7 @@ pub async fn app_account_connect(
         expires_at,
         email: None,
         verified_at: 0,
+        feedback: feedback::LocalFeedback::default(),
     };
     state.save(&record)?;
     let url = web
@@ -593,6 +597,7 @@ mod tests {
             expires_at: 1,
             email: None,
             verified_at: 0,
+            feedback: feedback::LocalFeedback::default(),
         };
         let result = serde_json::to_string(&status("pending", Some(&record))).unwrap();
         assert!(!result.contains(&record.secret));
@@ -610,6 +615,7 @@ mod tests {
             expires_at: 1,
             email: None,
             verified_at: 0,
+            feedback: feedback::LocalFeedback::default(),
         };
         assert!(bound(
             &record,

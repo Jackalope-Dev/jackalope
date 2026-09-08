@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
+import { FeedbackPreferences } from './FeedbackPreferences';
 
 interface AccountStatus {
   state: 'unavailable' | 'disconnected' | 'pending' | 'connected' | 'offline' | 'expired';
@@ -171,6 +172,7 @@ export function JackalopeAccount({
           {error}
         </p>
       )}
+      {connected && <FeedbackPreferences />}
     </div>
   );
 }

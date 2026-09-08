@@ -55,19 +55,22 @@ export async function saveTelemetry(env: Env, data: Telemetry, now = Date.now())
   await env.DB.batch(statements);
   return { accepted: data.events.length };
 }
-export async function saveFeedback(env: Env, data: Feedback, now = Date.now()) {
+export async function feedbackStatements(env: Env, data: Feedback, now = Date.now()) {
   const payload = JSON.stringify(canonical(data));
-  await env.DB.prepare(
-    'INSERT INTO feedback(id,received_at,expires_at,hash,payload) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET hash=excluded.hash WHERE hash<>excluded.hash',
-  )
-    .bind(
+  return [
+    env.DB.prepare(
+      'INSERT INTO feedback(id,received_at,expires_at,hash,payload) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET hash=excluded.hash WHERE hash<>excluded.hash',
+    ).bind(
       data.id,
       now,
       now + retentionDays(env.FEEDBACK_DAYS) * 86400000,
       await digest(payload),
       payload,
-    )
-    .run();
+    ),
+  ];
+}
+export async function saveFeedback(env: Env, data: Feedback, now = Date.now()) {
+  await env.DB.batch(await feedbackStatements(env, data, now));
   return { accepted: true, id: data.id };
 }
 export async function prune(env: Env, now = Date.now()) {

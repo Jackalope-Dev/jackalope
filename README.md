@@ -20,9 +20,10 @@ clean-profile and external beta acceptance remain in progress; see the
 - Light/dark/automatic appearance, shared theme controls and local fonts.
 
 Remote execution, automatic failover and budget-aware routing remain planned.
-The desktop does not send telemetry or feedback; support reports are previewed
-and copied locally. The separate optional service supports ingestion and update
-hosting. Read [feature coverage](docs/FEATURE-COMPLETION.md) for adapter limits.
+Developer builds have no configured reporting endpoint. Official builds can
+configure opt-out usage reporting and explicit feedback through the optional
+service; see [monitoring and privacy](docs/BETA-MONITORING.md).
+Read [feature coverage](docs/FEATURE-COMPLETION.md) for adapter limits.
 Worktrees isolate Git changes, not the privileges of an agent or its tools.
 
 ## Run from source
@@ -44,8 +45,6 @@ The website statically prerenders the product tour plus focused discovery pages 
 parallel coding agents, Git worktrees, Codex, Claude Code, Grok, OpenCode, project
 context, recurring tasks and agent-code review. Route metadata, structured data,
 the sitemap, RSS and LLM-readable indexes are generated from the same content map.
-See the [marketing growth brief](docs/MARKETING-GROWTH.md) for claim boundaries,
-competitor research, product gaps and the next search opportunities.
 
 Run pnpm verify for formatting/lint, documentation links, frontend builds,
 server checks and native unit tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for

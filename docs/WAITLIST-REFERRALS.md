@@ -64,21 +64,20 @@ and outstanding tokens. Newsletter double opt-in remains independent.
 Apply `0008_waitlist_referrals.sql` and `0009_waitlist_join_time.sql` after all earlier
 migrations, then deploy the matching Worker and website together. Migration 0008
 remains unchanged for existing deployments; 0009 adds the explicit join time,
-backfills existing signups and rebuilds the priority index. Both staging and
-production are verified through 0009 on September 8, 2026. Do not serve these routes
+backfills existing signups and rebuilds the priority index. Do not serve these routes
 against an unmigrated database. Keep the new tables and columns during rollback;
 old approval, session, invitation and encrypted mail data remain readable.
 
 Run `pnpm verify`. The focused service suite covers attribution, verification,
 ranking, revocation, access isolation, capacity and durable email events. The UI
-fixture command is `node scripts/marketing/verify-waitlist.mjs`; it expects a website
+fixture command is `node scripts/verification/verify-waitlist.mjs`; it expects a website
 Vite server at `127.0.0.1:5198` with `VITE_ACCESS_API=https://api.jackalope.test`.
 It intercepts that test API and writes screenshots and email HTML under
 `output/waitlist-referrals/`. Fixtures do not establish live delivery or native
 acceptance.
 
 Build the website first to generate the email logo used by those previews. Run
-`node scripts/marketing/verify-passes-desktop.mjs` against a desktop Vite server at
+`node scripts/verification/verify-passes-desktop.mjs` against a desktop Vite server at
 `127.0.0.1:5199` for the pass view. That test creates and removes its own temporary
 fixture entry, uses a fake native response, and checks theme persistence and
 keyboard copy without connecting an account or executing a task.

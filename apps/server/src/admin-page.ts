@@ -184,9 +184,9 @@ async function inbox(append = false) {
     h.textContent =
       (report.kind || 'feedback') +
       ' · ' +
-      report.appVersion +
+      (report.appVersion || 'Email response') +
       ' / ' +
-      (report.channel || 'legacy');
+      (report.channel || (report.source === 'email' ? 'private invitation' : 'legacy'));
     meta.textContent =
       row.id +
       ' · ' +

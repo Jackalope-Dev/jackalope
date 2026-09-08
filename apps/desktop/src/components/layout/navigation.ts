@@ -139,6 +139,8 @@ export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
 export function navigateWorkspace(tab: ActiveTab) {
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));
 }
-export function openSettings(category: 'General' | 'System' | 'Diagnostics' | 'Invitations') {
+export function openSettings(
+  category: 'General' | 'System' | 'Diagnostics' | 'Invitations' | 'Updates & support',
+) {
   window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: category }));
 }

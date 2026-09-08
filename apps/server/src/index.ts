@@ -1,4 +1,5 @@
 import { deviceRoutes } from './access/devices';
+import { pruneFeedbackInvitations } from './access/feedback';
 import { deliverAccessMail } from './access/mail';
 import { syncNewsletter } from './access/newsletter';
 import { accessRoutes } from './access/routes';
@@ -226,6 +227,7 @@ export default {
       if (env.EARLY_ACCESS_ENABLED === 'true') {
         await Promise.all([deliverAccessMail(env), syncNewsletter(env)]);
         await pruneAccess(env);
+        await pruneFeedbackInvitations(env);
       }
       await deliverFeedback(env);
       console.log(JSON.stringify({ event: 'retention_complete', ...(await prune(env)) }));

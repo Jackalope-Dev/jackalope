@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { deliverFeedback } from '../feedback-mail';
 import { randomToken } from './crypto';
 import { browserDeviceAction } from './devices';
+import { feedbackResponse } from './feedback';
 import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
 import { syncNewsletter } from './newsletter';
@@ -108,8 +110,18 @@ export async function accessRoutes(
     if (request.method === 'POST' && !allowed) throw new AccessError(403, 'origin_required');
     await limit(
       request.method === 'POST' &&
-        ['/v1/access/waitlist', '/v1/access/link', '/v1/access/waitlist/link'].includes(path),
+        [
+          '/v1/access/waitlist',
+          '/v1/access/link',
+          '/v1/access/waitlist/link',
+          '/v1/access/feedback',
+        ].includes(path),
     );
+    if (request.method === 'POST' && path === '/v1/access/feedback') {
+      const result = await feedbackResponse(env, await readJson(request));
+      if (ctx && result.completed) ctx.waitUntil(deliverFeedback(env));
+      return json(result);
+    }
     if (request.method === 'GET' && path.startsWith('/v1/access/invitation/')) {
       const code = tokenSchema.parse(path.slice('/v1/access/invitation/'.length));
       const owner = await env.DB.prepare(

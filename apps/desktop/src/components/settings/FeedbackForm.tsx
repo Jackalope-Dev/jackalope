@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useCommunityStore } from '../../stores/communityStore';
+import { useFeedbackStore } from '../../stores/feedbackStore';
 import { Button } from '../ui/button';
+import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 
 type Counts = { attempts: number; reviewed: number; failed: number; historySaveFailures: number };
@@ -12,9 +14,19 @@ type Report = {
   message: string;
   diagnostics?: Counts;
 };
-export function FeedbackForm() {
+export function FeedbackForm({
+  invited = false,
+  onSubmitted,
+}: {
+  invited?: boolean;
+  onSubmitted?: () => void;
+}) {
   const settings = useCommunityStore((s) => s.settings);
-  const [kind, setKind] = useState<Report['kind']>('bug');
+  const [kind, setKind] = useState<Report['kind']>(invited ? 'idea' : 'bug');
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (invited) messageInput.current?.focus();
+  }, [invited]);
   const [message, setMessage] = useState('');
   const [include, setInclude] = useState(false);
   const [preview, setPreview] = useState<Report | null>(null);
@@ -56,6 +68,8 @@ export function FeedbackForm() {
   const send = async () => {
     if (!preview) return;
     await nativeTask('app_submit_feedback', { request: preview });
+    void useFeedbackStore.getState().request({ action: 'completed' });
+    onSubmitted?.();
     setPreview(null);
     setMessage('');
     setStatus(
@@ -64,7 +78,11 @@ export function FeedbackForm() {
   };
   return (
     <section className="space-y-3" aria-label="Send feedback">
-      <h3 className="text-base font-medium">Send a bug, feature request, or idea</h3>
+      <h3 className="text-base font-medium">
+        {invited
+          ? 'What’s useful, and what could feel better?'
+          : 'Send a bug, feature request, or idea'}
+      </h3>
       <p className="settings-row-description">
         Your message goes to Jackalope’s private dashboard and contact@jackalope.dev. App version,
         installed channel, and operating system are included. Leave out secrets and personal
@@ -105,21 +123,22 @@ export function FeedbackForm() {
           <label htmlFor="feedback-kind" className="block text-sm font-medium">
             Type
           </label>
-          <select
+          <Select
             id="feedback-kind"
             className="settings-input"
             disabled={busy}
             value={kind}
-            onChange={(e) => setKind(e.target.value as Report['kind'])}
+            onValueChange={(value) => setKind(value as Report['kind'])}
           >
-            <option value="bug">Bug report</option>
-            <option value="feature">Feature request</option>
-            <option value="idea">Idea</option>
-          </select>
+            <SelectItem value="bug">Bug report</SelectItem>
+            <SelectItem value="feature">Feature request</SelectItem>
+            <SelectItem value="idea">Idea</SelectItem>
+          </Select>
           <label htmlFor="feedback-message" className="block text-sm font-medium">
             What would you like us to know?
           </label>
           <textarea
+            ref={messageInput}
             id="feedback-message"
             className="settings-textarea"
             rows={5}
@@ -127,7 +146,11 @@ export function FeedbackForm() {
             value={message}
             disabled={busy}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="For a bug, include what you expected, what happened, and the steps to reproduce it."
+            placeholder={
+              invited
+                ? 'Tell us what helped, what got in your way, or what you’d change.'
+                : 'For a bug, include what you expected, what happened, and the steps to reproduce it.'
+            }
           />
           <div className="flex items-center justify-between gap-4">
             <span className="text-sm">Include task outcome counts (preview before sending)</span>

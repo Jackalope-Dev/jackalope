@@ -67,18 +67,20 @@ export async function accessAdmin(
   if (request.method === 'GET' && url.pathname === '/admin/access/email-preview') {
     const kind = url.searchParams.get('kind');
     const mail: Mail =
-      kind === 'waitlist'
-        ? { to: 'preview@example.invalid', kind: 'waitlist', token: 'preview-only' }
-        : kind === 'referral' ||
-            kind === 'passes_ready' ||
-            kind === 'pass_claimed' ||
-            kind === 'pass_expired'
-          ? { to: 'preview@example.invalid', kind, total: 5 }
-          : {
-              to: 'preview@example.invalid',
-              kind: kind === 'invite' ? 'invite' : kind === 'login' ? 'login' : 'welcome',
-              token: 'preview-only',
-            };
+      kind === 'feedback_request'
+        ? { to: 'preview@example.invalid', kind: 'feedback_request', token: 'preview-only' }
+        : kind === 'waitlist'
+          ? { to: 'preview@example.invalid', kind: 'waitlist', token: 'preview-only' }
+          : kind === 'referral' ||
+              kind === 'passes_ready' ||
+              kind === 'pass_claimed' ||
+              kind === 'pass_expired'
+            ? { to: 'preview@example.invalid', kind, total: 5 }
+            : {
+                to: 'preview@example.invalid',
+                kind: kind === 'invite' ? 'invite' : kind === 'login' ? 'login' : 'welcome',
+                token: 'preview-only',
+              };
     return new Response(accessEmail(mail, env.ACCESS_WEB_ORIGIN).body, {
       headers: {
         ...headers,
@@ -101,7 +103,7 @@ export async function accessAdmin(
         .bind(id)
         .first<{ email: string }>();
       if (!member) return json({ error: 'member_not_found' }, 404);
-      const [mail, devices, invites] = await Promise.all([
+      const [mail, devices, invites, feedback] = await Promise.all([
         env.DB.prepare(
           'SELECT id,kind,state,created_at,attempts,next_at,provider_send_id IS NOT NULL AS can_check,delivery_status,delivery_checked_at FROM access_mail WHERE email=? ORDER BY created_at DESC,rowid DESC LIMIT 10',
         )
@@ -117,12 +119,18 @@ export async function accessAdmin(
         )
           .bind(id, Date.now())
           .all(),
+        env.DB.prepare(
+          'SELECT enabled,prompts_enabled,consent_at,first_active_at,last_active_day,active_days,json_array_length(results) AS opened_results,prompt_count,next_prompt_at,completed_at,email_id IS NOT NULL AS email_requested FROM access_feedback WHERE member_id=?',
+        )
+          .bind(id)
+          .first(),
       ]);
       return json({
         member,
         mail: mail.results,
         devices: devices.results,
         invites: invites.results,
+        feedback,
       });
     }
     if (request.method === 'GET' && url.pathname === '/admin/api/access') {

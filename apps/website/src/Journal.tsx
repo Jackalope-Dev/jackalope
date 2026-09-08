@@ -52,7 +52,7 @@ export function JournalTeaser() {
   );
 }
 
-export function JournalPage({ path, dark = false }: { path: string; dark?: boolean }) {
+export function JournalPage({ path }: { path: string }) {
   if (path === '/tour/')
     return (
       <main id="main" className="article page-width">
@@ -66,24 +66,19 @@ export function JournalPage({ path, dark = false }: { path: string; dark?: boole
           <p className="article-deck">
             From an idea to a patch you can review. See how the workspace feels.
           </p>
-          <p className="article-byline">40 seconds · No audio · Illustrative Atlas project</p>
+          <p className="article-byline">32 seconds · Animated app preview · Sample data · Music</p>
         </header>
         <video
           className="tour-player"
           controls
           playsInline
           preload="metadata"
-          poster={`/media/tasks${dark ? '' : '-light'}.png`}
+          poster={tour.poster}
           aria-label="Jackalope desktop app tour"
         >
-          <source src="/media/walkthrough.webm" type="video/webm" />
-          <track
-            kind="captions"
-            src="/media/walkthrough.vtt"
-            srcLang="en"
-            label="English descriptions"
-          />
-          <a href="/media/walkthrough.webm">Watch the tour recording</a>
+          <source src={tour.video} type="video/mp4" />
+          <track kind="captions" src={tour.captions} srcLang="en" label="English descriptions" />
+          <a href={tour.video}>Watch the launch film</a>
         </video>
         <div className="article-body">
           <section>

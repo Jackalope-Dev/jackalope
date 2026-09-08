@@ -7,7 +7,8 @@ export type GrowthMail = {
   kind: 'referral' | 'passes_ready' | 'pass_claimed' | 'pass_expired';
   total: number;
 };
-export type Mail = AccessMail | WaitlistMail | GrowthMail;
+export type FeedbackMail = { to: string; kind: 'feedback_request'; token: string };
+export type Mail = AccessMail | WaitlistMail | GrowthMail | FeedbackMail;
 const escapeHtml = (value: string) =>
   value.replace(
     /[&<>"']/g,
@@ -18,6 +19,16 @@ const escapeHtml = (value: string) =>
 export function accessEmail(mail: Mail, origin: string) {
   const colors = themeTokens({ ...PRESET_THEMES[0], isDark: false });
   const copy = {
+    feedback_request: {
+      subject: 'How is Jackalope working for you?',
+      title: 'What could feel better?',
+      intro:
+        'You’ve had some time with Jackalope. How has it fit into your workflow? What’s useful, and what’s getting in your way?',
+      action: 'Share a thought',
+      detail:
+        'A sentence or two is plenty. Good experiences, rough edges, and ideas are all welcome. Your feedback goes directly to the people building Jackalope.',
+      stamp: 'EARLY ACCESS / YOUR EXPERIENCE',
+    },
     waitlist: {
       subject: 'You’re on the Jackalope waitlist',
       title: 'Your next hop starts here.',
@@ -95,13 +106,15 @@ export function accessEmail(mail: Mail, origin: string) {
     },
   }[mail.kind];
   const link =
-    mail.kind === 'waitlist'
-      ? `${origin}/waitlist/${mail.token ? `#token=${mail.token}` : ''}`
-      : 'token' in mail
-        ? `${origin}/access/#token=${mail.token}`
-        : mail.kind === 'referral'
-          ? `${origin}/waitlist/`
-          : `${origin}/access/#invitations`;
+    mail.kind === 'feedback_request'
+      ? `${origin}/feedback/#token=${mail.token}`
+      : mail.kind === 'waitlist'
+        ? `${origin}/waitlist/${mail.token ? `#token=${mail.token}` : ''}`
+        : 'token' in mail
+          ? `${origin}/access/#token=${mail.token}`
+          : mail.kind === 'referral'
+            ? `${origin}/waitlist/`
+            : `${origin}/access/#invitations`;
   const expiry =
     mail.kind === 'invite' || mail.kind === 'welcome'
       ? 'This private link expires in 7 days. Request a fresh link on the website if needed.'
@@ -109,10 +122,16 @@ export function accessEmail(mail: Mail, origin: string) {
         ? 'This is a private, single-use link. If it expires, request another from your waitlist page.'
         : '';
   const footer =
-    'If you did not expect this email, you can ignore it. Reply if you need help or want your account removed.';
+    mail.kind === 'feedback_request'
+      ? `You enabled a feedback follow-up in Jackalope. This is a one-time invitation, with no reminders. Stop feedback emails: ${origin}/feedback/#unsubscribe=${mail.token}`
+      : 'If you did not expect this email, you can ignore it. Reply if you need help or want your account removed.';
+  const footerHtml =
+    mail.kind === 'feedback_request'
+      ? `You enabled a feedback follow-up in Jackalope. This is a one-time invitation, with no reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
+      : footer;
   const text = `${copy.title}\n\n${copy.intro}\n\n${copy.action}: ${link}\n\n${copy.detail}\n\n${expiry}\n\n${footer}\n\nJackalope Digital LLC · https://jackalope.digital\nPrivacy: ${origin}/privacy/`;
   const ink = colors['--color-text-primary'];
   const muted = colors['--color-text-secondary'];
-  const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.subject)}</title><style>@media(max-width:480px){.note-title{font-size:40px!important}.note-content{padding:24px 20px!important}}</style></head><body style="margin:0;background:${colors['--color-bg']};color:${ink};font-family:Arial,Helvetica,sans-serif"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${escapeHtml(copy.intro)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 0"><table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px"><tr><td class="note-content" style="padding:32px"><table role="presentation" width="100%"><tr><td style="padding-bottom:24px;border-bottom:2px solid ${ink};font-size:22px;font-weight:700">Jackalope</td><td align="right" style="padding-bottom:24px;border-bottom:2px solid ${ink}"><img src="${escapeHtml(origin)}/icon-128.png" width="40" height="40" alt="" style="display:block"></td></tr></table><h1 class="note-title" style="font-size:52px;line-height:1.05;letter-spacing:-2px;margin:36px 0 24px">${escapeHtml(copy.title)}</h1><p style="font-size:16px;line-height:1.8;color:${muted}">${escapeHtml(copy.intro)}</p><table role="presentation" width="100%" style="margin:28px 0;border:1px solid ${colors['--color-border']};border-left:4px solid ${colors['--color-accent']};border-radius:12px;background:${colors['--color-surface']}"><tr><td style="padding:22px"><p style="margin:0 0 20px;font-size:11px;letter-spacing:1.5px;color:${muted}">${escapeHtml(copy.stamp)}</p><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 18px;border-radius:8px;background:${colors['--color-accent']};color:${colors['--color-on-accent']};font-size:16px;font-weight:700;text-decoration:none">${escapeHtml(copy.action)} →</a></td></tr></table><p style="font-size:15px;line-height:1.8;color:${muted}">${escapeHtml(copy.detail)}</p>${expiry ? `<p style="font-size:12px;line-height:1.8;color:${muted}">${escapeHtml(expiry)} Keep this link private.</p>` : ''}<p style="margin:28px 0;font-size:15px;line-height:1.8">See you in there,<br><strong>Jackalope</strong></p><p style="padding-top:20px;border-top:1px solid ${colors['--color-border']};font-size:11px;line-height:1.8;color:${muted}">${footer}<br><br>Jackalope Digital LLC · <a href="https://jackalope.digital" style="color:inherit">jackalope.digital</a> · <a href="${escapeHtml(origin)}/privacy/" style="color:inherit">Privacy</a></p></td></tr></table></td></tr></table></body></html>`;
+  const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.subject)}</title><style>@media(max-width:480px){.note-title{font-size:40px!important}.note-content{padding:24px 20px!important}}</style></head><body style="margin:0;background:${colors['--color-bg']};color:${ink};font-family:Arial,Helvetica,sans-serif"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${escapeHtml(copy.intro)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 0"><table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px"><tr><td class="note-content" style="padding:32px"><table role="presentation" width="100%"><tr><td style="padding-bottom:24px;border-bottom:2px solid ${ink};font-size:22px;font-weight:700">Jackalope</td><td align="right" style="padding-bottom:24px;border-bottom:2px solid ${ink}"><img src="${escapeHtml(origin)}/icon-128.png" width="40" height="40" alt="" style="display:block"></td></tr></table><h1 class="note-title" style="font-size:52px;line-height:1.05;letter-spacing:-2px;margin:36px 0 24px">${escapeHtml(copy.title)}</h1><p style="font-size:16px;line-height:1.8;color:${muted}">${escapeHtml(copy.intro)}</p><table role="presentation" width="100%" style="margin:28px 0;border:1px solid ${colors['--color-border']};border-left:4px solid ${colors['--color-accent']};border-radius:12px;background:${colors['--color-surface']}"><tr><td style="padding:22px"><p style="margin:0 0 20px;font-size:11px;letter-spacing:1.5px;color:${muted}">${escapeHtml(copy.stamp)}</p><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 18px;border-radius:8px;background:${colors['--color-accent']};color:${colors['--color-on-accent']};font-size:16px;font-weight:700;text-decoration:none">${escapeHtml(copy.action)} →</a></td></tr></table><p style="font-size:15px;line-height:1.8;color:${muted}">${escapeHtml(copy.detail)}</p>${expiry ? `<p style="font-size:12px;line-height:1.8;color:${muted}">${escapeHtml(expiry)} Keep this link private.</p>` : ''}<p style="margin:28px 0;font-size:15px;line-height:1.8">See you in there,<br><strong>Jackalope</strong></p><p style="padding-top:20px;border-top:1px solid ${colors['--color-border']};font-size:11px;line-height:1.8;color:${muted}">${footerHtml}<br><br>Jackalope Digital LLC · <a href="https://jackalope.digital" style="color:inherit">jackalope.digital</a> · <a href="${escapeHtml(origin)}/privacy/" style="color:inherit">Privacy</a></p></td></tr></table></td></tr></table></body></html>`;
   return { subject: copy.subject, preview: copy.intro, text, body };
 }

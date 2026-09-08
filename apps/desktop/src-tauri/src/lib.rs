@@ -120,6 +120,7 @@ pub fn run() {
             commands::community::app_release_channel,
             commands::community::app_telemetry,
             commands::community::app_submit_feedback,
+            commands::account::feedback::app_account_feedback,
             commands::release::app_release_status,
             commands::release::app_install_update,
             system_get_info,

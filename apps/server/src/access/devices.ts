@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { randomToken, tokenHash } from './crypto';
+import { memberFeedback } from './feedback';
 import { AccessError, invitations, type Member, tokenSchema } from './service';
 
 const lifetime = 90 * 86400000;
@@ -54,6 +55,11 @@ export async function deviceRoutes(
     const token = request.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
     if (!token) throw new AccessError(401, 'device_sign_in_required');
     const hash = await tokenHash(token);
+    if (request.method === 'POST' && url.pathname === '/v1/desktop/feedback') {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      return json(await memberFeedback(env, member.memberId, await readJson(request), now));
+    }
     if (request.method === 'DELETE' && url.pathname === '/v1/desktop/session') {
       await env.DB.batch([
         env.DB.prepare('DELETE FROM access_devices WHERE hash=?').bind(hash),

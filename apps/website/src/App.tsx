@@ -5,6 +5,8 @@ import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'luc
 import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
 import { BrandMark } from './BrandMark';
+import { tour } from './content';
+import { FeedbackPage } from './Feedback';
 import { JournalPage } from './Journal';
 import { LandingPage } from './LandingPage';
 import { LegalPage } from './Legal';
@@ -16,7 +18,6 @@ import { WaitlistPage } from './Waitlist';
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
 const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
-const asset = (name: string) => `/media/${name}`;
 
 function DownloadButton({ compact = false }: { compact?: boolean }) {
   if (!downloadUrl) return <WaitlistButton compact={compact} />;
@@ -89,7 +90,6 @@ export function App({ path = '/' }: { path?: string }) {
   );
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const screenshot = (name: string) => asset(dark ? name : name.replace('.png', '-light.png'));
   const videoTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
     applyThemeTokens({ ...PRESET_THEMES[palette], isDark: dark, atmosphere: 18 });
@@ -130,7 +130,7 @@ export function App({ path = '/' }: { path?: string }) {
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            {path === '/access/' ? (
+            {path === '/access/' || path === '/feedback/' ? (
               <a className="text-link" href="/tour/">
                 Take a look around <ArrowRight size={15} />
               </a>
@@ -207,6 +207,8 @@ export function App({ path = '/' }: { path?: string }) {
           }}
           faqs={faqs}
         />
+      ) : path === '/feedback/' ? (
+        <FeedbackPage />
       ) : path === '/waitlist/' ? (
         <WaitlistPage />
       ) : path === '/access/' ? (
@@ -216,10 +218,12 @@ export function App({ path = '/' }: { path?: string }) {
       ) : marketingPage ? (
         <MarketingPage page={marketingPage} dark={dark} />
       ) : (
-        <JournalPage path={path} dark={dark} />
+        <JournalPage path={path} />
       )}
 
-      {!['/', '/privacy/', '/terms/', '/access/', '/waitlist/'].includes(path) && <Newsletter />}
+      {!['/', '/privacy/', '/terms/', '/access/', '/waitlist/', '/feedback/'].includes(path) && (
+        <Newsletter />
+      )}
 
       <footer className={`site-footer ${home ? 'landing-footer' : 'page-width'}`}>
         <a href="/" className="wordmark">
@@ -261,7 +265,7 @@ export function App({ path = '/' }: { path?: string }) {
               <div>
                 <Dialog.Title>Jackalope walkthrough</Dialog.Title>
                 <Dialog.Description>
-                  The actual app, with an illustrative Atlas project. No audio.
+                  32 seconds · Animated app preview · Sample data · Music
                 </Dialog.Description>
               </div>
               <Dialog.Close className="icon-button" aria-label="Close walkthrough">
@@ -288,27 +292,20 @@ export function App({ path = '/' }: { path?: string }) {
                 controls
                 playsInline
                 preload="metadata"
-                poster={screenshot('tasks.png')}
+                poster={tour.poster}
+                aria-label="Jackalope launch film"
                 onError={() => setVideoError(true)}
               >
-                <source
-                  src={asset('walkthrough.webm')}
-                  type="video/webm"
-                  onError={() => setVideoError(true)}
-                />
+                <source src={tour.video} type="video/mp4" onError={() => setVideoError(true)} />
                 <track
                   kind="captions"
-                  src={asset('walkthrough.vtt')}
+                  src={tour.captions}
                   srcLang="en"
                   label="English descriptions"
                 />
               </video>
             )}
-            <p className="video-transcript">
-              The tour: switch views, draft a task, inspect a code patch and its checks, meet your
-              agents, then try a different palette and appearance. Sample data illustrates the
-              workflow; no task is launched in this recording.
-            </p>
+            <p className="video-transcript">{tour.transcript}</p>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
