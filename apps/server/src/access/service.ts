@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { ServiceError as AccessError } from '../errors';
 import { randomToken, tokenHash } from './crypto';
-import { mailStatements, waitlistMailStatement } from './mail';
+import { mailStatements } from './mail';
+import { waitlistMailStatements } from './waitlist';
 
 export { ServiceError as AccessError } from '../errors';
 export const emailSchema = z.string().trim().toLowerCase().max(254).email();
@@ -33,6 +34,7 @@ export async function register(
   newsletter: boolean,
   source: string,
   campaign?: unknown,
+  referral?: string,
 ) {
   const id = crypto.randomUUID();
   const now = Date.now();
@@ -47,7 +49,8 @@ export async function register(
       campaign ? JSON.stringify(campaign) : null,
       id,
     ),
-    await waitlistMailStatement(env, email, id, now),
+    env.DB.prepare("UPDATE access_members SET waitlist_referrer_id=(SELECT id FROM access_members WHERE share_code=? AND id!=? AND status!='revoked' AND waitlist_verified_at IS NOT NULL) WHERE id=?").bind(referral ?? '', id, id),
+    ...(await waitlistMailStatements(env, email, id, now, true)),
   ]);
   return surveyToken;
 }
@@ -183,6 +186,7 @@ export async function acceptToken(env: Env, raw: string, now = Date.now()) {
   const session = randomToken();
   const sessionHash = await tokenHash(session);
   statements.push(
+    env.DB.prepare(`UPDATE access_members SET waitlist_verified_at=coalesce(waitlist_verified_at,?) WHERE email=? AND status='approved' AND ${active}`).bind(now, token.email, hash, now),
     env.DB.prepare(
       `UPDATE access_members SET verified_at=coalesce(verified_at,?) WHERE email=? AND status='approved' AND ${active}`,
     ).bind(now, token.email, hash, now),
@@ -317,6 +321,8 @@ export async function changeInvite(
 }
 export async function pruneAccess(env: Env, now = Date.now()) {
   await env.DB.batch([
+    env.DB.prepare('DELETE FROM access_waitlist_tokens WHERE expires_at<=? OR used_at<?').bind(now, now - day),
+    env.DB.prepare('DELETE FROM access_waitlist_sessions WHERE expires_at<=?').bind(now),
     env.DB.prepare(
       'UPDATE access_members SET survey_hash=NULL,survey_expires_at=NULL WHERE survey_expires_at<=?',
     ).bind(now),

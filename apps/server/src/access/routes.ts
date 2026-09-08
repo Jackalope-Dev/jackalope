@@ -4,6 +4,7 @@ import { browserDeviceAction } from './devices';
 import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
 import { syncNewsletter } from './newsletter';
+import { acceptWaitlistToken, requestWaitlistLink, waitlistCookie, waitlistLogout, waitlistStatus } from './waitlist';
 import {
   AccessError,
   acceptToken,
@@ -100,7 +101,7 @@ export async function accessRoutes(
     const path = url.pathname;
     if (request.method === 'POST' && !allowed) throw new AccessError(403, 'origin_required');
     await limit(
-      request.method === 'POST' && ['/v1/access/waitlist', '/v1/access/link'].includes(path),
+      request.method === 'POST' && ['/v1/access/waitlist', '/v1/access/link', '/v1/access/waitlist/link'].includes(path),
     );
     if (request.method === 'GET' && path.startsWith('/v1/access/invitation/')) {
       const code = tokenSchema.parse(path.slice('/v1/access/invitation/'.length));
@@ -117,17 +118,35 @@ export async function accessRoutes(
           email: emailSchema,
           newsletter: z.boolean().default(false),
           campaign: campaignSchema.optional(),
+          referral: tokenSchema.optional(),
           source: z.enum(['inline', 'popup']).default('inline'),
           website: z.string().max(200).default(''),
         })
         .parse(await readJson(request));
       let surveyToken = randomToken();
       if (!body.website) {
-        surveyToken = await register(env, body.email, body.newsletter, body.source, body.campaign);
+        surveyToken = await register(env, body.email, body.newsletter, body.source, body.campaign, body.referral);
         if (ctx) ctx.waitUntil(deliverAccessMail(env));
         if (ctx && body.newsletter) ctx.waitUntil(syncNewsletter(env));
       }
       return json({ success: true, surveyToken }, 202);
+    }
+    if (request.method === 'GET' && path === '/v1/access/waitlist/me') return json(await waitlistStatus(request, env));
+    if (request.method === 'POST' && path === '/v1/access/waitlist/link') {
+      const body = z.strictObject({email: emailSchema, website:z.string().max(200).default('')}).parse(await readJson(request));
+      if (!body.website) await requestWaitlistLink(env, body.email);
+      if (ctx) ctx.waitUntil(deliverAccessMail(env));
+      return json({success:true},202);
+    }
+    if (request.method === 'POST' && path === '/v1/access/waitlist/accept') {
+      const body = z.strictObject({token:tokenSchema}).parse(await readJson(request));
+      const session = await acceptWaitlistToken(env, body.token);
+      if (ctx) ctx.waitUntil(deliverAccessMail(env));
+      return json({success:true},200,{'set-cookie':waitlistCookie(session)});
+    }
+    if (request.method === 'POST' && path === '/v1/access/waitlist/logout') {
+      await waitlistLogout(request,env);
+      return json({success:true},200,{'set-cookie':waitlistCookie('',true)});
     }
     if (request.method === 'POST' && path === '/v1/access/preferences') {
       const body = z
