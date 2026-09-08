@@ -241,6 +241,19 @@ export function CaptureTask({
             Describe the outcome. Your draft stays here when you close this window.
           </Dialog.Description>
           <TaskComposer
+            setup={
+              <Button
+                type="button"
+                variant="ghost"
+                className="mt-3"
+                onClick={() => {
+                  if (project) selectProject(project.id);
+                  setToolsOpen(true);
+                }}
+              >
+                Set up agents, connections & checks
+              </Button>
+            }
             projectId={project?.id ?? ''}
             projectPath={project?.path ?? ''}
             executionReady={!!project}
@@ -271,6 +284,7 @@ export function CaptureTask({
                     ))}
                   </Select>
                   <Button
+                    type="button"
                     variant="ghost"
                     onClick={() => {
                       setSetupProject(activeProjectId);
@@ -283,16 +297,11 @@ export function CaptureTask({
                 </div>
                 <p className="task-muted mb-4">
                   {project
-                    ? `${project.name} · This computer · ${project.preferences?.agentAccounts?.[config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent] ? 'Saved project account' : 'Agent’s current account'}`
+                    ? `${project.preferences?.agentAccounts?.[config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent] ? 'Uses the saved project account.' : 'Uses the agent’s current account.'}${project.preferences?.autoVerify && project.preferences.verifyCommand ? ' Project checks run automatically.' : ''}`
                     : current.projectId
                       ? 'The saved project is unavailable. Choose a destination or keep this as an idea.'
                       : 'No project required to save. Choose one before starting work.'}
                 </p>
-                {project?.preferences?.autoVerify && project.preferences.verifyCommand && (
-                  <p className="task-muted mb-4">
-                    Project checks will run automatically before review.
-                  </p>
-                )}
               </>
             }
             current={{ ...current, agent: currentAgent }}
@@ -325,16 +334,6 @@ export function CaptureTask({
               onClose();
             }}
           />
-          <Button
-            variant="ghost"
-            className="mt-3"
-            onClick={() => {
-              if (project) selectProject(project.id);
-              setToolsOpen(true);
-            }}
-          >
-            Set up agents, connections & checks
-          </Button>
           {idea && (
             <details className="mt-4">
               <summary>Idea details</summary>

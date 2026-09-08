@@ -1,4 +1,5 @@
 import {
+  Archive,
   Check,
   Copy,
   FolderGit2,
@@ -10,9 +11,16 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { cleanupWorktree, isTauriEnvironment, type WorktreeEntry } from '../../lib/tauri-bridge';
+import {
+  archiveWorktree,
+  cleanupWorktree,
+  isTauriEnvironment,
+  pruneWorktrees,
+  type WorktreeEntry,
+} from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
 import { Select, SelectItem } from '../ui/Select';
@@ -87,6 +95,44 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     } finally {
       if (projectId.current === id) await loadWorktreesForActiveProject(targetBranch);
       setRemoving(null);
+    }
+  };
+  const archive = async (worktree: WorktreeEntry) => {
+    if (!project) return;
+    const id = project.id;
+    setRemoving(worktree.path);
+    setError('');
+    setFeedback('');
+    try {
+      const location = await archiveWorktree(project.path, worktree);
+      if (projectId.current === id)
+        setFeedback(`Archived to ${location}, then removed the worktree.`);
+    } finally {
+      // The confirm dialog surfaces any error; just refresh the list either way.
+      if (projectId.current === id) await loadWorktreesForActiveProject(targetBranch);
+      setRemoving(null);
+    }
+  };
+  const prune = async () => {
+    if (pending || !project) return;
+    const id = project.id;
+    setBusy(true);
+    setError('');
+    setFeedback('');
+    try {
+      const dropped = await pruneWorktrees(project.path);
+      if (projectId.current === id)
+        setFeedback(
+          dropped > 0
+            ? `Pruned ${dropped} worktree ${dropped === 1 ? 'registration' : 'registrations'} whose folder was gone.`
+            : 'No missing worktree registrations to prune.',
+        );
+    } catch (cause) {
+      if (projectId.current === id)
+        setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (projectId.current === id) await loadWorktreesForActiveProject(targetBranch);
+      setBusy(false);
     }
   };
   const copy = async (path: string) => {
@@ -169,8 +215,16 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               <SelectItem value="main">main</SelectItem>
               <SelectItem value="master">master</SelectItem>
             </Select>
+            <Button
+              variant="ghost"
+              disabled={pending || loading || !desktop}
+              onClick={() => void prune()}
+            >
+              Prune missing worktrees
+            </Button>
             <p className="task-muted">
-              Uses local branches. Cleanup removes the folder; keeps the branch and task history.
+              Uses local branches. Clean up removes a merged, clean folder and keeps its branch and
+              task history. Archive & remove saves a blocked worktree's recoverable content first.
             </p>
           </div>
           {creating && (
@@ -262,6 +316,25 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     <Trash2 size={18} aria-hidden="true" />
                     {removing === wt.path ? 'Cleaning up…' : 'Clean up'}
                   </Button>
+                )}
+                {wt.cleanup?.recoverable && (
+                  <ConfirmAction
+                    title="Archive and remove this worktree?"
+                    description="Its commits, uncommitted changes and untracked files are saved to .worktrees/.archive first (ignored files such as build output and dependencies are not). The folder is then force-removed and any jackalope/ branch deleted. Restore later with git from the saved bundle."
+                    label="Archive & remove"
+                    busyLabel="Archiving…"
+                    onConfirm={() => archive(wt)}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        disabled={loading || pending || !desktop}
+                        aria-label={`Archive and remove ${wt.branch || wt.path}`}
+                      >
+                        <Archive size={18} aria-hidden="true" />
+                        {removing === wt.path ? 'Archiving…' : 'Archive & remove'}
+                      </Button>
+                    }
+                  />
                 )}
                 <Button
                   variant="ghost"

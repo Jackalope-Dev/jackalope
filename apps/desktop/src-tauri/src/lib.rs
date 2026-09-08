@@ -91,6 +91,8 @@ pub fn run() {
             git_list_worktrees,
             git_create_worktree,
             commands::worktree_cleanup::git_cleanup_worktree,
+            commands::worktree_cleanup::git_archive_worktree,
+            commands::worktree_cleanup::git_prune_worktrees,
             commands::release::app_diagnostics,
             commands::community::app_community_settings,
             commands::community::app_community_configure,

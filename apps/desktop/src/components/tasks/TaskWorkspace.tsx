@@ -1,6 +1,7 @@
 import './core-workflow.css';
-import { FolderOpen, Plus, Workflow } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import * as Menu from '@radix-ui/react-dropdown-menu';
+import { Bot, Check, FolderOpen, MoreHorizontal, Plus, Workflow } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
 import { collectWork } from '../../lib/task-collection';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -8,6 +9,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { Button } from '../ui/button';
+import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { ProjectQueue } from './ProjectQueue';
 import { TaskCollection, type TaskCollectionView } from './TaskCollection';
@@ -31,6 +33,14 @@ export function TaskWorkspace({
     query: '',
   });
   const [integratedIds, setIntegratedIds] = useState<string[]>([]);
+  const lastOpened = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedId || !lastOpened.current) return;
+    const row = document.getElementById(`work-item-${lastOpened.current}`);
+    const group = row?.closest('details');
+    if (group) group.open = true;
+    row?.focus();
+  }, [selectedId]);
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let alive = true;
@@ -81,47 +91,51 @@ export function TaskWorkspace({
         <div>
           <h1 className="task-hero-title">Tasks</h1>
           <p className="task-muted mt-3">
-            {needsInput
-              ? `${needsInput} ${needsInput === 1 ? 'task needs' : 'tasks need'} you.`
-              : ready
-                ? `${ready} ${ready === 1 ? 'result is' : 'results are'} ready to review.`
-                : items.length
-                  ? 'Pick up a result, follow your progress, or start something new.'
-                  : 'Save an idea or start an agent task.'}
+            {needsInput || ready
+              ? [
+                  needsInput
+                    ? `${needsInput} ${needsInput === 1 ? 'task needs' : 'tasks need'} you`
+                    : '',
+                  ready ? `${ready} ready to review` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : projectFilter === 'all'
+                ? 'Work across all your projects.'
+                : projectFilter === 'unassigned'
+                  ? 'Ideas without a project.'
+                  : `Work in ${project?.name ?? 'this project'}.`}
           </p>
         </div>
-        <Button onClick={() => onCapture()}>
-          <Plus size={18} />
-          New task
-        </Button>
-      </div>
-      <div className="work-scope">
-        <Select
-          aria-label="Filter by project"
-          value={projectFilter}
-          onValueChange={setProjectFilter}
-        >
-          <SelectItem value="all">All projects</SelectItem>
-          <SelectItem value="unassigned">No project yet</SelectItem>
-          {projects.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.name}
-            </SelectItem>
-          ))}
-        </Select>
-        {project && (
-          <Button variant="ghost" onClick={() => setParallel(true)}>
-            <Workflow size={16} />
-            Organize parallel work · {project.name}
+        <div className="task-home-actions">
+          <Button onClick={() => onCapture()}>
+            <Plus size={18} />
+            New task
           </Button>
-        )}
+          {project && (
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button variant="ghost" aria-label="More task actions">
+                  <MoreHorizontal size={18} />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Content
+                  className="workspace-menu"
+                  align="end"
+                  sideOffset={8}
+                  collisionPadding={12}
+                >
+                  <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
+                    <Workflow size={16} />
+                    Organize parallel work · {project.name}
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu.Root>
+          )}
+        </div>
       </div>
-      {!projects.length && (
-        <p className="task-muted mb-5 flex items-center gap-2">
-          <FolderOpen size={18} />
-          Save ideas freely. Choose a repository when you’re ready to run one.
-        </p>
-      )}
       {loading && (
         <p role="status" className="task-muted">
           Loading task history…
@@ -132,18 +146,76 @@ export function TaskWorkspace({
           {error}
         </p>
       )}
-      {items.length > 0 && (
+      {runs.length > 0 || ideas.length > 0 ? (
         <TaskCollection
+          scope={
+            <Select
+              aria-label="Filter by project"
+              value={projectFilter}
+              onValueChange={setProjectFilter}
+            >
+              <SelectItem value="all">All projects</SelectItem>
+              <SelectItem value="unassigned">No project yet</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </Select>
+          }
+          emptyState={
+            <EmptyState
+              icon={FolderOpen}
+              title="No tasks in this project"
+              description="Choose another project to find your work, or create a new task."
+              action={
+                <Button variant="outline" onClick={() => setProjectFilter('all')}>
+                  Show all projects
+                </Button>
+              }
+            />
+          }
           view={view}
           onViewChange={setView}
           items={items}
           runners={runners}
           onOpen={(item) => {
+            lastOpened.current = item.id;
             if (item.run) select(item.run.id);
             else if (item.idea) onCapture(item.idea.id);
           }}
         />
-      )}
+      ) : !loading && !error ? (
+        <div className="task-welcome">
+          <h2>What would you like to work on?</h2>
+          <p className="task-muted">
+            Use New task to describe an outcome. Start with an agent, or save the idea for later.
+          </p>
+          <ol className="task-welcome-steps">
+            <li>
+              <FolderOpen size={20} />
+              <div>
+                <h3>Choose a project</h3>
+                <p>Give the work a home when you’re ready to start.</p>
+              </div>
+            </li>
+            <li>
+              <Bot size={20} />
+              <div>
+                <h3>Let an agent work</h3>
+                <p>Follow progress and answer questions here.</p>
+              </div>
+            </li>
+            <li>
+              <Check size={20} />
+              <div>
+                <h3>Review the result</h3>
+                <p>Inspect the changes and decide what happens next.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      ) : null}
     </section>
   );
 }

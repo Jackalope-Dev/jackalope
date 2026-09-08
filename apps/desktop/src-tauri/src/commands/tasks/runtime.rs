@@ -1,5 +1,33 @@
 use super::*;
 
+/// Launch the agent, retrying a transient failure (an antivirus or indexer lock
+/// on the executable, `ETXTBSY` just after a write) a bounded number of times.
+/// A missing executable is not retried. Returns the child and the attempt count.
+pub(super) fn spawn_agent(
+    cmd: &mut Command,
+    agent: &str,
+) -> Result<(std::process::Child, u32), String> {
+    let mut last: Option<std::io::Error> = None;
+    for attempt in 1..=3u32 {
+        match cmd.spawn() {
+            Ok(child) => return Ok((child, attempt)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(format!("Could not launch {agent}: {error}"));
+            }
+            Err(error) => {
+                last = Some(error);
+                if attempt < 3 {
+                    std::thread::sleep(Duration::from_millis(150));
+                }
+            }
+        }
+    }
+    Err(format!(
+        "Could not launch {agent} after 3 attempts: {}",
+        last.map_or_else(String::new, |error| error.to_string())
+    ))
+}
+
 impl TaskRuntime {
     pub(super) fn fail(&self, id: &str, error: String) {
         self.update(id, |run| {
@@ -330,9 +358,7 @@ impl TaskRuntime {
                     .into(),
             );
         }
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("Could not launch {}: {e}", req.agent))?;
+        let (mut child, spawn_attempts) = spawn_agent(&mut cmd, &req.agent)?;
         let tree = match crate::commands::process_control::ProcessTree::attach(&child) {
             Ok(tree) => tree,
             Err(error) => {
@@ -351,6 +377,12 @@ impl TaskRuntime {
             r.process_contained = cfg!(windows);
             if r.status == "starting" {
                 r.status = "running".into();
+            }
+            if spawn_attempts > 1 {
+                activity(
+                    r,
+                    &format!("The agent process started after {spawn_attempts} attempts."),
+                );
             }
         })?;
         let input_result = if adapter == "grok" {

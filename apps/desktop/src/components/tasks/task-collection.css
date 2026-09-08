@@ -1,5 +1,5 @@
 .task-collection {
-  margin-top: 28px;
+  margin-top: 24px;
 }
 .work-toolbar,
 .work-layout,
@@ -9,10 +9,13 @@
   gap: 8px;
 }
 .work-toolbar {
-  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.work-toolbar > [role="combobox"] {
+  width: auto;
+  max-width: 220px;
 }
 .work-layout {
   gap: 2px;
@@ -38,10 +41,12 @@
   box-shadow: 0 2px 6px var(--color-accent-glow);
 }
 .work-search {
+  flex: 1 1 180px;
   color: var(--color-text-muted);
   padding: 0 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  margin-bottom: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  min-width: 0;
 }
 .work-search input {
   flex: 1;
@@ -56,7 +61,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 18px 14px;
+  padding: 14px;
   width: 100%;
   min-width: 0;
   text-align: left;
@@ -85,6 +90,7 @@
   margin-top: 4px;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+  overflow-wrap: anywhere;
 }
 .work-idea-status {
   display: inline-flex;
@@ -97,9 +103,18 @@
 .work-idea-status {
   flex-shrink: 0;
 }
+.work-item-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.work-board .work-item-status {
+  align-items: flex-start;
+}
 .work-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -135,6 +150,36 @@
 }
 .work-list .work-item + .work-item {
   border-top: 1px solid var(--color-border-subtle);
+}
+.work-group + .work-group {
+  margin-top: 16px;
+}
+.work-group h2,
+.work-finished > summary {
+  min-height: 44px;
+  padding: 12px 14px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.work-group h2 span,
+.work-finished > summary span {
+  margin-left: 10px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.work-finished > summary {
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.work-filter-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
 }
 @media (max-width: 1050px) {
   .work-board {

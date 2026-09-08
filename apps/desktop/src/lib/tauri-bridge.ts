@@ -9,6 +9,8 @@ export interface WorktreeEntry {
     target_head: string | null;
     merged: boolean | null;
     blocked_reason: string | null;
+    /** Blocked only by recoverable content — archive-and-remove is available. */
+    recoverable?: boolean;
   } | null;
 }
 
@@ -48,6 +50,28 @@ export async function cleanupWorktree(repoPath: string, worktree: WorktreeEntry)
     expectedHead: worktree.head,
     expectedTargetHead: status.target_head,
   });
+}
+
+export async function archiveWorktree(repoPath: string, worktree: WorktreeEntry): Promise<string> {
+  if (!isTauriEnvironment()) throw new Error('Open the desktop app to archive a worktree.');
+  const status = worktree.cleanup;
+  if (!status?.recoverable || !status.target_branch || !status.target_head) {
+    throw new Error('Refresh and review this worktree before archiving.');
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<string>('git_archive_worktree', {
+    repoPath,
+    worktreePath: worktree.path,
+    targetBranch: status.target_branch,
+    expectedHead: worktree.head,
+    expectedTargetHead: status.target_head,
+  });
+}
+
+export async function pruneWorktrees(repoPath: string): Promise<number> {
+  if (!isTauriEnvironment()) throw new Error('Open the desktop app to prune worktrees.');
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<number>('git_prune_worktrees', { repoPath });
 }
 
 export async function createWorktree(

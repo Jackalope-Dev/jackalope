@@ -10,6 +10,7 @@ import { TaskContextPanel } from './TaskContextPanel';
 
 interface Props {
   context?: ReactNode;
+  setup?: ReactNode;
   executionReady?: boolean;
   projectId: string;
   projectPath: string;
@@ -33,6 +34,7 @@ interface Props {
 
 export function TaskComposer({
   context,
+  setup,
   executionReady = true,
   projectId,
   projectPath,
@@ -90,44 +92,16 @@ export function TaskComposer({
           }}
         />
         {context}
-        {projectId && projectPath && (
-          <TaskKnowledge
-            key={projectId}
-            projectId={projectId}
-            projectPath={projectPath}
-            prompt={finalPrompt}
-            selection={current.contextSelection}
-            onChange={(contextSelection) => onChange({ contextSelection })}
-          />
-        )}
-        <div className="task-composer-footer">
-          <span className="task-muted">
-            {executionReady
-              ? `${runner?.name || 'Choose an agent'} · ${current.isolated ? 'Separate workspace' : 'Current checkout'}`
-              : 'Pick this up whenever you’re ready.'}
-          </span>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant={executionReady ? 'ghost' : 'primary'}
-              disabled={!current.prompt.trim() || submitting}
-              onClick={onSave}
-            >
-              {editingIdea ? 'Save idea' : 'Save for later'}
-            </Button>
-            {executionReady && (
-              <Button
-                type="submit"
-                disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
-              >
-                {submitting ? 'Starting…' : 'Start task'}
-                <ArrowRight size={15} />
-              </Button>
-            )}
-          </div>
-        </div>
         <details className="capture-options">
-          <summary>Agent, workspace & context</summary>
+          <summary>
+            Task options
+            {executionReady && (
+              <span className="capture-options-summary">
+                {runner?.name || 'Choose an agent'} ·{' '}
+                {current.isolated ? 'Separate workspace' : 'Current checkout'}
+              </span>
+            )}
+          </summary>
           <div className="task-context-controls">
             <label htmlFor="taskworkspace-field-2" className="task-context-chip">
               <Bot size={18} aria-hidden="true" />
@@ -159,6 +133,16 @@ export function TaskComposer({
               </Select>
             </label>
           </div>
+          {projectId && projectPath && (
+            <TaskKnowledge
+              key={projectId}
+              projectId={projectId}
+              projectPath={projectPath}
+              prompt={finalPrompt}
+              selection={current.contextSelection}
+              onChange={(contextSelection) => onChange({ contextSelection })}
+            />
+          )}
           <TaskContextPanel
             selected={activeSkills}
             suggested={suggestedSkills}
@@ -198,6 +182,7 @@ export function TaskComposer({
               ))}
             </details>
           )}
+          {setup}
         </details>
         {executionReady && (
           <p className="task-composer-note">
@@ -211,6 +196,27 @@ export function TaskComposer({
               : 'This agent is not available yet.'}
           </p>
         )}
+        <div className="task-composer-footer">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={executionReady ? 'ghost' : 'primary'}
+              disabled={!current.prompt.trim() || submitting}
+              onClick={onSave}
+            >
+              {editingIdea ? 'Save idea' : 'Save for later'}
+            </Button>
+            {executionReady && (
+              <Button
+                type="submit"
+                disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
+              >
+                {submitting ? 'Starting…' : 'Start task'}
+                <ArrowRight size={15} />
+              </Button>
+            )}
+          </div>
+        </div>
       </fieldset>
     </form>
   );

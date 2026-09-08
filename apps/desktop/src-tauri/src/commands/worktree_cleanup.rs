@@ -15,7 +15,16 @@ pub struct CleanupStatus {
     pub target_head: Option<String>,
     pub merged: Option<bool>,
     pub blocked_reason: Option<String>,
+    /// The worktree cannot be cleaned plainly, but its only blockers are
+    /// recoverable content (uncommitted changes, untracked files, or commits not
+    /// yet merged). Archive-and-remove is offered for these.
+    #[serde(default)]
+    pub recoverable: bool,
 }
+
+/// Cap on the untracked content an archive will copy before bailing out.
+const ARCHIVE_MAX_BYTES: u64 = 512 * 1024 * 1024;
+const ARCHIVE_MAX_FILES: usize = 20_000;
 
 pub(super) fn command(path: &Path, args: &[&str]) -> Command {
     super::git_command::command(path, args, super::git_command::Policy::Inspection)
@@ -59,7 +68,9 @@ fn target(repo: &Path, requested: Option<&str>) -> Result<(String, String), Stri
     Err("No committed local target branch found. Choose an existing main or master branch.".into())
 }
 
-fn protection(
+/// Immovable reasons a worktree must be kept. `Err` here means neither plain
+/// cleanup nor archive-and-remove is offered.
+fn hard_block(
     repo: &Path,
     entries: &[WorktreeEntry],
     index: usize,
@@ -120,8 +131,14 @@ fn protection(
     if index.split('\0').any(|s| s.starts_with("160000 ")) {
         return Err("Contains submodules; review and remove this worktree manually.".into());
     }
+    Ok(())
+}
+
+/// Recoverable working-tree content: uncommitted changes, untracked or ignored
+/// files. `Some` means archive-and-remove is offered instead of plain cleanup.
+fn dirty_reason(path: &Path) -> Result<Option<String>, String> {
     let status = git(
-        &path,
+        path,
         &[
             "status",
             "--porcelain=v1",
@@ -131,12 +148,10 @@ fn protection(
             "--ignore-submodules=none",
         ],
     )?;
-    if !status.is_empty() {
-        return Err(
-            "Local changes or untracked/ignored files — review or move them before cleanup.".into(),
-        );
-    }
-    Ok(())
+    Ok((!status.is_empty()).then(|| {
+        "Uncommitted changes, untracked or ignored files — archive & remove, or move them out before Clean up."
+            .to_string()
+    }))
 }
 
 pub(super) fn inspect(
@@ -153,6 +168,7 @@ pub(super) fn inspect(
             target_head: None,
             merged: None,
             blocked_reason: None,
+            recoverable: false,
         };
         match &target {
             Ok((branch, head)) => {
@@ -172,8 +188,19 @@ pub(super) fn inspect(
             }
             Err(error) => status.blocked_reason = Some(error.clone()),
         }
-        if let Err(reason) = protection(&repo, &entries, index, runs) {
-            status.blocked_reason = Some(reason);
+        match hard_block(&repo, &entries, index, runs) {
+            Err(reason) => status.blocked_reason = Some(reason),
+            Ok(()) => {
+                let dirty = canonical(&entries[index].path)
+                    .ok()
+                    .and_then(|path| dirty_reason(&path).ok().flatten());
+                if let Some(reason) = dirty {
+                    status.blocked_reason = Some(reason);
+                    status.recoverable = true;
+                } else if status.merged == Some(false) {
+                    status.recoverable = true;
+                }
+            }
         }
         entries[index].cleanup = Some(status);
     }
@@ -217,6 +244,271 @@ fn remove(
         &["worktree", "remove", "--", worktree_path],
     )?;
     Ok(())
+}
+
+fn sanitize_component(value: &str) -> String {
+    let cleaned: String = value
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed = cleaned.trim_matches(['-', '.']);
+    if trimmed.is_empty() {
+        "worktree".into()
+    } else {
+        trimmed.chars().take(60).collect()
+    }
+}
+
+fn abandon(dir: &Path, why: &str) -> String {
+    let _ = std::fs::remove_dir_all(dir);
+    format!("Archive stopped: {why}. Move this worktree's files out manually, then use Clean up.")
+}
+
+/// Save a soft-blocked worktree's recoverable content (commit history as a git
+/// bundle, uncommitted tracked changes as a patch, untracked non-ignored files as
+/// copies, plus a manifest) under `<repo>/.worktrees/.archive/`, then force-remove
+/// the worktree and delete its `jackalope/` branch. Returns the archive path.
+fn archive(
+    repo_path: &str,
+    worktree_path: &str,
+    target_branch: &str,
+    expected_head: &str,
+    expected_target_head: &str,
+    runs: &[TaskRun],
+) -> Result<String, String> {
+    let entries = inspect(repo_path, Some(target_branch), runs)?;
+    let wt = entries
+        .iter()
+        .find(|wt| wt.path == worktree_path)
+        .ok_or("Worktree is no longer registered. Refresh the list.")?;
+    let status = wt.cleanup.as_ref().ok_or("Refresh the worktree status.")?;
+    if wt.head != expected_head || status.target_head.as_deref() != Some(expected_target_head) {
+        return Err(
+            "The worktree or target branch changed. Refresh and review its status again.".into(),
+        );
+    }
+    if !status.recoverable {
+        return Err(status.blocked_reason.clone().unwrap_or_else(|| {
+            "Nothing to archive here — use Clean up for a merged, clean worktree.".into()
+        }));
+    }
+    // Confirm the raw paths still resolve to what Git registered, then keep using
+    // the raw forms: Git rejects the `\\?\` verbatim paths `canonicalize` yields
+    // on Windows for the bundle output.
+    let repo = Path::new(repo_path);
+    let path = Path::new(worktree_path);
+    if canonical(worktree_path)? != canonical(git(path, &["rev-parse", "--show-toplevel"])?.trim())?
+    {
+        return Err("The worktree folder moved. Refresh the list.".into());
+    }
+    if git(path, &["rev-parse", "HEAD"])?.trim() != expected_head {
+        return Err("The worktree changed. Refresh and review its status again.".into());
+    }
+    let branch = wt.branch.clone();
+
+    let label = sanitize_component(if branch.is_empty() {
+        &expected_head[..expected_head.len().min(12)]
+    } else {
+        &branch
+    });
+    let stamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
+    let archive_parent = repo.join(".worktrees").join(".archive");
+    let archive_root = archive_parent.join(format!("{label}-{stamp}"));
+    if archive_root.exists() {
+        return Err("An archive with this name already exists; retry in a moment.".into());
+    }
+    std::fs::create_dir_all(&archive_root).map_err(|e| e.to_string())?;
+    // Keep the archive folder out of the parent repository's status.
+    if let Ok(exclude) = git(
+        repo,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "info/exclude",
+        ],
+    ) {
+        if let Ok(existing) = std::fs::read_to_string(exclude.trim()) {
+            if !existing.contains("/.worktrees/.archive/") {
+                if let Ok(mut file) = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open(exclude.trim())
+                {
+                    let _ = std::io::Write::write_all(&mut file, b"\n/.worktrees/.archive/\n");
+                }
+            }
+        }
+    }
+
+    // Commit history: a thin bundle relative to the target when known, otherwise
+    // the full history reachable from HEAD.
+    let bundle = archive_root.join("branch.bundle");
+    let bundle_str = bundle.to_str().ok_or("Invalid archive path")?;
+    let thin = (!expected_target_head.is_empty())
+        && command(
+            path,
+            &[
+                "bundle",
+                "create",
+                bundle_str,
+                &format!("^{expected_target_head}"),
+                "HEAD",
+            ],
+        )
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false);
+    if !thin {
+        if let Err(error) = git(path, &["bundle", "create", bundle_str, "HEAD"]) {
+            return Err(abandon(
+                &archive_root,
+                &format!("could not bundle commits: {error}"),
+            ));
+        }
+    }
+    let bundle_bytes = std::fs::metadata(&bundle).map(|m| m.len()).unwrap_or(0);
+    if bundle_bytes == 0 {
+        return Err(abandon(&archive_root, "the commit bundle was not written"));
+    }
+    if bundle_bytes > ARCHIVE_MAX_BYTES {
+        return Err(abandon(
+            &archive_root,
+            "the commit history is larger than 512 MB",
+        ));
+    }
+    git(path, &["bundle", "verify", bundle_str]).map_err(|error| {
+        abandon(
+            &archive_root,
+            &format!("bundle verification failed: {error}"),
+        )
+    })?;
+
+    // Uncommitted tracked changes.
+    let diff = output(path, &["diff", "--binary", "HEAD"])?;
+    if !diff.status.success() {
+        return Err(abandon(
+            &archive_root,
+            "could not capture uncommitted changes",
+        ));
+    }
+    std::fs::write(archive_root.join("uncommitted.patch"), &diff.stdout)
+        .map_err(|e| e.to_string())?;
+
+    // Untracked, non-ignored files.
+    let listing = git(path, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+    let mut copied: Vec<String> = Vec::new();
+    let mut bytes = bundle_bytes;
+    for name in listing.split('\0').filter(|s| !s.is_empty()) {
+        if copied.len() >= ARCHIVE_MAX_FILES {
+            return Err(abandon(&archive_root, "there are too many untracked files"));
+        }
+        let src = path.join(name);
+        let Ok(meta) = std::fs::symlink_metadata(&src) else {
+            continue;
+        };
+        if !meta.is_file() {
+            continue;
+        }
+        bytes = bytes.saturating_add(meta.len());
+        if bytes > ARCHIVE_MAX_BYTES {
+            return Err(abandon(
+                &archive_root,
+                "the untracked content is larger than 512 MB",
+            ));
+        }
+        let dest = archive_root.join("untracked").join(name);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::copy(&src, &dest).map_err(|e| e.to_string())?;
+        copied.push(name.to_string());
+    }
+
+    let manifest = serde_json::json!({
+        "format": "jackalope-worktree-archive", "version": 1,
+        "archivedAt": chrono::Utc::now().to_rfc3339(),
+        "repository": repo.to_string_lossy(),
+        "worktreePath": path.to_string_lossy(),
+        "branch": branch,
+        "head": expected_head,
+        "targetBranch": target_branch,
+        "targetHead": expected_target_head,
+        "bundle": "branch.bundle",
+        "bundleIsThin": thin,
+        "uncommittedPatch": "uncommitted.patch",
+        "untrackedFiles": copied,
+        "ignoredFilesArchived": false,
+    });
+    std::fs::write(
+        archive_root.join("manifest.json"),
+        serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Nothing else can be recovered from disk now — take the worktree down.
+    git(
+        repo,
+        &["worktree", "remove", "--force", "--", worktree_path],
+    )?;
+    if branch.starts_with("jackalope/") {
+        let _ = git(repo, &["branch", "-D", &branch]);
+    }
+    Ok(archive_root.to_string_lossy().into_owned())
+}
+
+/// Drop Git's registration for worktrees whose folder is already gone.
+fn prune(repo_path: &str) -> Result<usize, String> {
+    let before = list_worktrees(repo_path)?.len();
+    git(
+        &canonical(repo_path)?,
+        &["worktree", "prune", "--expire=now"],
+    )?;
+    Ok(before.saturating_sub(list_worktrees(repo_path)?.len()))
+}
+
+#[tauri::command]
+pub async fn git_prune_worktrees(repo_path: String) -> Result<usize, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        prune(&repo_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn git_archive_worktree(
+    repo_path: String,
+    worktree_path: String,
+    target_branch: String,
+    expected_head: String,
+    expected_target_head: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        if runs.iter().any(|run| run.persistence_error.is_some()) {
+            return Err("Save pending task history before archiving worktrees.".into());
+        }
+        archive(
+            &repo_path,
+            &worktree_path,
+            &target_branch,
+            &expected_head,
+            &expected_target_head,
+            &runs,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -517,5 +809,106 @@ mod tests {
             &[]
         )
         .is_err());
+    }
+
+    #[test]
+    fn archive_saves_recoverable_content_then_force_removes_a_dirty_unmerged_worktree() {
+        let f = Fixture::new("main");
+        git(&f.worktree, &["branch", "-m", "jackalope/task-1"]).unwrap();
+        f.commit(&f.worktree, "branch work\n");
+        fs::write(f.worktree.join("file.txt"), "uncommitted edit\n").unwrap();
+        fs::write(f.worktree.join("scratch.txt"), "untracked note\n").unwrap();
+        fs::write(f.worktree.join(".env"), "SECRET=1\n").unwrap();
+
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert!(status.recoverable);
+        assert_eq!(status.merged, Some(false));
+
+        let archived = archive(
+            f.repo.to_str().unwrap(),
+            &entry.path,
+            "main",
+            &entry.head,
+            status.target_head.as_deref().unwrap(),
+            &[],
+        )
+        .unwrap();
+        let dir = PathBuf::from(&archived);
+
+        assert!(!f.worktree.exists());
+        assert_eq!(f.entries(&[]).len(), 1);
+        assert!(
+            git(
+                &f.repo,
+                &["show-ref", "--verify", "refs/heads/jackalope/task-1"]
+            )
+            .is_err(),
+            "the jackalope branch is deleted (preserved in the bundle)"
+        );
+
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(dir.join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(manifest["format"], "jackalope-worktree-archive");
+        assert_eq!(
+            manifest["untrackedFiles"],
+            serde_json::json!(["scratch.txt"])
+        );
+        assert!(
+            !dir.join("untracked/.env").exists(),
+            "ignored files stay out"
+        );
+        assert!(fs::read_to_string(dir.join("untracked/scratch.txt"))
+            .unwrap()
+            .contains("untracked note"));
+        assert!(!fs::read(dir.join("uncommitted.patch")).unwrap().is_empty());
+
+        git(
+            &f.repo,
+            &[
+                "fetch",
+                dir.join("branch.bundle").to_str().unwrap(),
+                "HEAD:refs/heads/recovered",
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            git(&f.repo, &["log", "-1", "--format=%s", "recovered"])
+                .unwrap()
+                .trim(),
+            "change"
+        );
+    }
+
+    #[test]
+    fn archive_refuses_a_hard_blocked_worktree_and_leaves_it_in_place() {
+        let f = Fixture::new("main");
+        f.commit(&f.worktree, "unmerged\n");
+        fs::write(f.worktree.join("dirty.txt"), "x").unwrap();
+        let entry = f.entry();
+        let target_head = entry.cleanup.as_ref().unwrap().target_head.clone().unwrap();
+        for status in ["running", "interrupted"] {
+            assert!(archive(
+                f.repo.to_str().unwrap(),
+                &entry.path,
+                "main",
+                &entry.head,
+                &target_head,
+                &[f.run(status)],
+            )
+            .unwrap_err()
+            .contains("active or interrupted"));
+        }
+        assert!(f.worktree.exists());
+        assert!(f.worktree.join("dirty.txt").exists());
+    }
+
+    #[test]
+    fn prune_drops_registrations_for_deleted_worktree_folders() {
+        let f = Fixture::new("main");
+        assert_eq!(f.entries(&[]).len(), 2);
+        fs::remove_dir_all(&f.worktree).unwrap();
+        assert_eq!(prune(f.repo.to_str().unwrap()).unwrap(), 1);
+        assert_eq!(f.entries(&[]).len(), 1);
     }
 }

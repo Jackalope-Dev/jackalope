@@ -7,12 +7,14 @@ export function ConfirmAction({
   title,
   description,
   label = 'Delete',
+  busyLabel = 'Deleting…',
   onConfirm,
 }: {
   trigger: ReactNode;
   title: string;
   description: string;
   label?: string;
+  busyLabel?: string;
   onConfirm: () => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -59,7 +61,7 @@ export function ConfirmAction({
               </Button>
             </Dialog.Close>
             <Button variant="danger" disabled={busy} onClick={() => void confirm()}>
-              {busy ? 'Deleting…' : label}
+              {busy ? busyLabel : label}
             </Button>
           </div>
         </Dialog.Content>

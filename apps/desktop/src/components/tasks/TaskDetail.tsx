@@ -1,4 +1,15 @@
-import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
+import * as Menu from '@radix-ui/react-dropdown-menu';
+import * as Tabs from '@radix-ui/react-tabs';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarClock,
+  Check,
+  Copy,
+  GitMerge,
+  MoreHorizontal,
+  Square,
+} from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
@@ -170,7 +181,7 @@ export function TaskDetail({
       </button>
       <div className="task-detail-heading">
         <div>
-          <p className="task-eyebrow">
+          <p className="task-detail-context">
             {run.projectName} · {run.accountBinding?.label || run.account}
           </p>
           <h1 id="task-heading" tabIndex={-1} className="task-title task-prompt-title">
@@ -180,6 +191,11 @@ export function TaskDetail({
         <div role="status">
           {run.finishing ? (
             <span className="task-status">Checking result</span>
+          ) : integrated ? (
+            <span className="task-status">
+              <Check size={16} />
+              Integrated
+            </span>
           ) : (
             <RunStatus status={run.status} />
           )}
@@ -268,39 +284,51 @@ export function TaskDetail({
               Mark reviewed
             </Button>
           )}
-          <Button variant="ghost" onClick={onSchedule}>
-            <CalendarClock size={16} />
-            Make recurring
-          </Button>
-          {!!run.result && (
-            <Button variant="ghost" onClick={() => void copyResult()}>
-              <Copy size={16} />
-              Copy result
-            </Button>
-          )}
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="ghost">
+                <MoreHorizontal size={16} />
+                More
+              </Button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content
+                className="workspace-menu"
+                align="end"
+                sideOffset={8}
+                collisionPadding={12}
+              >
+                {!!run.result && (
+                  <Menu.Item className="workspace-menu-item" onSelect={() => void copyResult()}>
+                    <Copy size={16} />
+                    Copy result
+                  </Menu.Item>
+                )}
+                <Menu.Item className="workspace-menu-item" onSelect={onSchedule}>
+                  <CalendarClock size={16} />
+                  Make recurring
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
         </div>
       )}
-      <nav className="result-tabs" aria-label="Task sections">
-        {['result', 'changes', 'evidence', 'activity'].map((value) => (
-          <button
-            key={value}
-            type="button"
-            aria-current={tab === value ? 'page' : undefined}
-            onClick={() => setTab(value)}
-          >
-            {value === 'result'
-              ? 'Result'
-              : value === 'changes'
-                ? 'Changes & checks'
-                : value === 'evidence'
-                  ? 'Evidence'
-                  : 'Activity'}
-          </button>
-        ))}
-      </nav>
-      <div className="result-canvas">
-        {tab === 'result' && (
-          <>
+      <Tabs.Root value={tab} onValueChange={setTab}>
+        <Tabs.List className="result-tabs" aria-label="Task sections">
+          {['result', 'changes', 'evidence', 'activity'].map((value) => (
+            <Tabs.Trigger key={value} value={value}>
+              {value === 'result'
+                ? 'Result'
+                : value === 'changes'
+                  ? 'Changes & checks'
+                  : value === 'evidence'
+                    ? 'Evidence'
+                    : 'Activity'}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+        <div className="result-canvas">
+          <Tabs.Content value="result">
             {!!run.screenshots?.length && (
               <figure className="result-preview">
                 <ScreenshotPreview
@@ -316,7 +344,13 @@ export function TaskDetail({
             )}
             {run.result ? (
               <div className="task-result-text">
-                <Suspense fallback={<p>{run.result}</p>}>
+                <Suspense
+                  fallback={
+                    <p role="status" className="task-muted">
+                      Opening result…
+                    </p>
+                  }
+                >
                   <Markdown
                     skipHtml
                     components={{
@@ -358,98 +392,39 @@ export function TaskDetail({
                       : 'No project checks are recorded. Open Changes & checks to verify the result.'}
               </p>
             )}
-          </>
-        )}
-        {((!active && run.workspace) || tab === 'changes') && (
-          <div hidden={tab !== 'changes'}>
-            {!active && run.workspace ? (
-              <ResultReview key={run.id} run={run} />
+          </Tabs.Content>
+          {((!active && run.workspace) || tab === 'changes') && (
+            <Tabs.Content value="changes" forceMount hidden={tab !== 'changes'}>
+              {!active && run.workspace ? (
+                <ResultReview key={run.id} run={run} />
+              ) : (
+                <p className="task-muted">
+                  {active
+                    ? 'Changes become available for review after this attempt stops.'
+                    : 'No workspace was recorded for this attempt. Inspect its result and activity for more detail.'}
+                </p>
+              )}
+              {integrating && finished && isLatest && (
+                <TaskIntegration run={run} onApplied={applied} />
+              )}
+            </Tabs.Content>
+          )}
+          <Tabs.Content value="evidence">
+            {run.validationSteps?.length || run.screenshots?.length ? (
+              <ValidationJourney
+                runId={run.id}
+                steps={run.validationSteps ?? []}
+                screenshots={run.screenshots ?? []}
+              />
             ) : (
-              <p className="task-muted">
-                Changes become available for review after this attempt stops.
-              </p>
+              <p className="task-muted">No evidence has been recorded for this attempt.</p>
             )}
-            {integrating && finished && isLatest && (
-              <TaskIntegration run={run} onApplied={applied} />
-            )}
-          </div>
-        )}
-        {tab === 'evidence' &&
-          (run.validationSteps?.length || run.screenshots?.length ? (
-            <ValidationJourney
-              runId={run.id}
-              steps={run.validationSteps ?? []}
-              screenshots={run.screenshots ?? []}
-            />
-          ) : (
-            <p className="task-muted">No evidence has been recorded for this attempt.</p>
-          ))}
-        {tab === 'activity' && <TaskActivity entries={run.activity} active={active} />}
-      </div>
-      <TaskLearning key={`knowledge:${run.id}`} run={run} />
-      <details className="supporting-details task-environment">
-        <summary>Context, history & usage</summary>
-        <p className="task-muted">
-          {run.agent} · {run.model || 'Agent-configured model'} · {run.account} · This computer
-        </p>
-        <p className="task-path">
-          {run.workspace || 'Workspace being prepared'} · {run.branch} · Target: {run.targetBranch}
-        </p>
-        {attempts.length > 1 && (
-          <label className="task-attempt-picker" htmlFor="attempt-history">
-            Attempt
-            <Select
-              id="attempt-history"
-              aria-label="Attempt history"
-              value={run.id}
-              onValueChange={(id) => useExecutionStore.getState().select(id)}
-            >
-              {attempts.map((attempt, index) => (
-                <SelectItem key={attempt.id} value={attempt.id}>
-                  {index + 1} · {statusLabel[attempt.status]}
-                </SelectItem>
-              ))}
-            </Select>
-          </label>
-        )}
-        <details>
-          <summary>Instruction for this attempt</summary>
-          <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
-        </details>
-        {run.prompts
-          ?.filter((p) => p.status === 'answered')
-          .map((p) => (
-            <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
-          ))}
-        <p className="task-muted mt-3">
-          Reported usage:{' '}
-          {run.usage.reported
-            ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output · ${run.usage.cacheRead.toLocaleString()} cached input (included)`
-            : 'Unavailable for this attempt'}
-        </p>
-        {run.mcpUsage && (
-          <details className="my-3">
-            <summary>
-              Tool discovery · {run.mcpUsage.calls} {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
-            </summary>
-            <p className="task-muted mt-2">
-              Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools} ·
-              Failed calls: {run.mcpUsage.failures}
-            </p>
-            <p className="task-muted">
-              {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB of tool definitions returned
-              across searches. Full catalog: {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB.
-              These are schema bytes, not billed tokens or measured savings.
-            </p>
-          </details>
-        )}
-        {!!run.diagnostics.length && (
-          <details>
-            <summary>Agent diagnostics</summary>
-            <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
-          </details>
-        )}
-      </details>
+          </Tabs.Content>
+          <Tabs.Content value="activity">
+            <TaskActivity entries={run.activity} active={active} />
+          </Tabs.Content>
+        </div>
+      </Tabs.Root>
       {isLatest && (
         <div className="task-next">
           <h2 className="text-base mb-3">
@@ -525,6 +500,71 @@ export function TaskDetail({
           )}
         </div>
       )}
+      <details className="supporting-details task-environment">
+        <summary>Context, history & usage</summary>
+        <TaskLearning key={`knowledge:${run.id}`} run={run} />
+        <p className="task-muted">
+          {run.agent} · {run.model || 'Agent-configured model'} · {run.account} · This computer
+        </p>
+        <p className="task-path">
+          {run.workspace || (active ? 'Workspace being prepared' : 'No workspace recorded')} ·{' '}
+          {run.branch || 'No branch recorded'} · Target: {run.targetBranch || 'Not recorded'}
+        </p>
+        {attempts.length > 1 && (
+          <label className="task-attempt-picker" htmlFor="attempt-history">
+            Attempt
+            <Select
+              id="attempt-history"
+              aria-label="Attempt history"
+              value={run.id}
+              onValueChange={(id) => useExecutionStore.getState().select(id)}
+            >
+              {attempts.map((attempt, index) => (
+                <SelectItem key={attempt.id} value={attempt.id}>
+                  {index + 1} · {statusLabel[attempt.status]}
+                </SelectItem>
+              ))}
+            </Select>
+          </label>
+        )}
+        <details>
+          <summary>Instruction for this attempt</summary>
+          <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
+        </details>
+        {run.prompts
+          ?.filter((p) => p.status === 'answered')
+          .map((p) => (
+            <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
+          ))}
+        <p className="task-muted mt-3">
+          Reported usage:{' '}
+          {run.usage.reported
+            ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output · ${run.usage.cacheRead.toLocaleString()} cached input (included)`
+            : 'Unavailable for this attempt'}
+        </p>
+        {run.mcpUsage && (
+          <details className="my-3">
+            <summary>
+              Tool discovery · {run.mcpUsage.calls} {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
+            </summary>
+            <p className="task-muted mt-2">
+              Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools} ·
+              Failed calls: {run.mcpUsage.failures}
+            </p>
+            <p className="task-muted">
+              {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB of tool definitions returned
+              across searches. Full catalog: {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB.
+              These are schema bytes, not billed tokens or measured savings.
+            </p>
+          </details>
+        )}
+        {!!run.diagnostics.length && (
+          <details>
+            <summary>Agent diagnostics</summary>
+            <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
+          </details>
+        )}
+      </details>
       {isLatest && (
         <details
           className="supporting-details"

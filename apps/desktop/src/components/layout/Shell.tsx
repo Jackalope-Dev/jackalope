@@ -120,6 +120,7 @@ export function Shell({
   );
   const [scheduleRunId, setScheduleRunId] = useState<string>();
   const { projects, activeProjectId, selectProject } = useProjectStore();
+  const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const navigate = useCallback((tab: ActiveTab) => {
@@ -205,16 +206,18 @@ export function Shell({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="command-trigger"
-            onClick={() => setCapture({})}
-            aria-label="Capture a task"
-            title="New task (Ctrl+Shift+N)"
-          >
-            <Plus size={16} />
-            <span>New task</span>
-          </button>
+          {(activeTab !== 'kanban' || selectedTaskId) && (
+            <button
+              type="button"
+              className="command-trigger"
+              onClick={() => setCapture({})}
+              aria-label="Capture a task"
+              title="New task (Ctrl+Shift+N)"
+            >
+              <Plus size={16} />
+              <span>New task</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setCommandsOpen(true)}
@@ -253,6 +256,38 @@ export function Shell({
           ))}
         </nav>
         <div className="workspace-nav-support">
+          {view.group === 'tasks' && (
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <button type="button" className="workspace-nav-item" aria-label="Task tools">
+                  {activeTab === 'kanban' ? 'Task tools' : view.label}
+                  <ChevronDown size={14} />
+                </button>
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Content
+                  className="workspace-menu"
+                  align="end"
+                  sideOffset={8}
+                  collisionPadding={12}
+                >
+                  {WORKSPACE_VIEWS.filter((item) => item.group === 'tasks' && !item.primary).map(
+                    (item) => (
+                      <Menu.Item
+                        key={item.id}
+                        className="workspace-menu-item"
+                        onSelect={() => navigate(item.id)}
+                      >
+                        <item.icon size={16} />
+                        {item.label}
+                        {activeTab === item.id && <Check size={14} />}
+                      </Menu.Item>
+                    ),
+                  )}
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu.Root>
+          )}
           <Menu.Root>
             <Menu.Trigger asChild>
               <button
@@ -295,31 +330,32 @@ export function Shell({
         className="workspace-canvas"
         aria-label={view.label}
       >
-        {WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
-          <div>
-            <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
-              {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  aria-current={activeTab === item.id ? 'page' : undefined}
-                  onClick={() => navigate(item.id)}
-                  className="workspace-nav-item"
-                >
-                  {item.id === 'kanban'
-                    ? 'Work'
-                    : item.id === 'topology'
-                      ? 'Codebase'
-                      : item.id === 'agents'
-                        ? 'Runners'
-                        : item.id === 'agent-settings'
-                          ? 'Configuration'
-                          : item.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        )}
+        {view.group !== 'tasks' &&
+          WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
+            <div>
+              <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
+                {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    aria-current={activeTab === item.id ? 'page' : undefined}
+                    onClick={() => navigate(item.id)}
+                    className="workspace-nav-item"
+                  >
+                    {item.id === 'kanban'
+                      ? 'Work'
+                      : item.id === 'topology'
+                        ? 'Codebase'
+                        : item.id === 'agents'
+                          ? 'Runners'
+                          : item.id === 'agent-settings'
+                            ? 'Configuration'
+                            : item.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          )}
         <Suspense
           fallback={
             <p className="workspace-page" role="status">

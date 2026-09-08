@@ -744,6 +744,32 @@ fn old_task_records_do_not_opt_into_automatic_execution() {
 }
 
 #[test]
+fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
+    // A missing executable fails at once, without spending the retry budget.
+    let started = std::time::Instant::now();
+    let error =
+        super::runtime::spawn_agent(&mut command("jackalope-nonexistent-agent-binary"), "codex")
+            .unwrap_err();
+    assert!(error.contains("Could not launch codex"));
+    assert!(
+        started.elapsed() < Duration::from_millis(120),
+        "a missing binary must not back off"
+    );
+
+    // A real command starts on the first attempt.
+    let mut ok = command(if cfg!(windows) { "cmd" } else { "true" });
+    if cfg!(windows) {
+        ok.args(["/c", "exit", "0"]);
+    }
+    ok.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let (mut child, attempts) = super::runtime::spawn_agent(&mut ok, "codex").unwrap();
+    assert_eq!(attempts, 1);
+    let _ = child.wait();
+}
+
+#[test]
 fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let folder = std::env::temp_dir().join(format!("jackalope-retention-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::new(folder.clone()).unwrap();
