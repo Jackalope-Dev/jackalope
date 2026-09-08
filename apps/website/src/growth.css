@@ -23,7 +23,7 @@
   display: block;
 }
 .hero-poster :where(h1) span:last-child {
-  color: color-mix(in srgb, var(--color-on-accent) 72%, transparent);
+  color: var(--color-accent-ink);
   margin-top: 8px;
   font-size: 0.76em;
 }
@@ -65,7 +65,7 @@
   position: absolute;
   z-index: -1;
   inset: 0;
-  border: 1px solid color-mix(in srgb, var(--color-on-accent) 64%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-ink) 64%, transparent);
   border-radius: inherit;
   content: "";
   pointer-events: none;
@@ -75,7 +75,7 @@
   transform: translate(7px, 3px);
 }
 .hero-inline-signup::after {
-  border-color: color-mix(in srgb, var(--color-on-accent) 34%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent-ink) 34%, transparent);
   transform: translate(14px, 6px);
   animation-name: signup-echo-fold-far;
 }
@@ -137,23 +137,13 @@
   max-width: none;
   padding: 12px 12px 0;
   background: var(--color-bg);
-  border: 1px solid color-mix(in srgb, var(--color-on-accent) 40%, transparent);
+  border: 1px solid var(--color-border);
   border-radius: 18px 18px 0 0;
-  box-shadow: -30px 42px 90px color-mix(in srgb, var(--color-text-primary) 24%, transparent);
-  transform: rotate(-1.5deg);
+  box-shadow: var(--shadow-pop);
 }
 .hero-window::before,
 .hero-window::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 20px -24px -24px 24px;
-  border: 1px solid color-mix(in srgb, var(--color-on-accent) 44%, transparent);
-  border-radius: inherit;
-}
-.hero-window::after {
-  inset: 40px -48px -48px 48px;
-  opacity: 0.45;
+  display: none;
 }
 .hero-window-meta {
   display: flex;
@@ -310,9 +300,8 @@
   padding: 12px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 16px;
-  box-shadow: 30px 34px 0 var(--color-accent-subtle);
-  transform: rotate(1.5deg);
+  border-radius: 18px;
+  box-shadow: var(--shadow-surface);
 }
 .acquisition-proof-label {
   display: flex;
@@ -513,7 +502,6 @@
   }
   .acquisition-proof {
     margin-top: 8px;
-    box-shadow: 14px 16px 0 var(--color-accent-subtle);
   }
   .acquisition-signals {
     margin-top: 48px;
@@ -630,6 +618,7 @@
   border: 1px solid var(--color-border);
   border-top: 0;
   border-radius: 0 0 18px 18px;
+  box-shadow: var(--shadow-surface);
   background:
     linear-gradient(
       90deg,

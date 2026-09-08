@@ -16,9 +16,9 @@
 }
 .landing-header {
   height: 76px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  border-bottom: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: linear-gradient(145deg, var(--color-shell), var(--color-shell-end));
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 .landing-header .header-inner {
   max-width: 1424px;
@@ -27,7 +27,7 @@
   font-size: 20px;
 }
 .landing-header .desktop-nav {
-  color: inherit;
+  color: var(--color-text-secondary);
   font-size: 12px;
   gap: 30px;
 }
@@ -35,17 +35,17 @@
   color: inherit;
 }
 .landing-header .icon-button:hover {
-  color: var(--color-accent);
-  background: var(--color-on-accent);
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
 }
 .landing-header .desktop-nav a:hover {
-  color: inherit;
-  text-decoration: underline;
+  color: var(--color-text-primary);
+  text-decoration: none;
 }
 .landing .button,
 .landing-header .button {
-  border-radius: 6px;
-  box-shadow: none;
+  border-radius: 10px;
+  box-shadow: var(--shadow-flat);
 }
 .landing .button-download::before,
 .landing-header .button-download::before {
@@ -64,8 +64,8 @@
   border-color: var(--color-text-secondary);
 }
 .landing-hero {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: linear-gradient(145deg, var(--color-shell), var(--color-shell-end));
+  color: var(--color-text-primary);
   padding-top: 30px;
   text-align: center;
 }
@@ -85,10 +85,16 @@
   color: inherit;
   display: inline-block;
 }
+.hero-poster :where(h1) span:last-child {
+  color: var(--color-accent-ink);
+}
 .echo-art {
   width: 295px;
   height: 280px;
   color: inherit;
+}
+.hero-poster .echo-art {
+  color: var(--color-accent-ink);
 }
 .echo-art svg {
   width: 100%;
@@ -134,18 +140,19 @@
   color: var(--color-text-secondary);
 }
 .landing-hero .availability {
-  color: inherit;
+  color: var(--color-text-secondary);
 }
 .landing-hero .button,
 .landing-header .button {
-  color: var(--color-accent);
-  background: var(--color-on-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
   border: 0;
+  box-shadow: 0 8px 22px var(--color-accent-glow);
 }
 .landing-hero .button:hover,
 .landing-header .button:hover {
-  color: var(--color-accent);
-  background: var(--color-on-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent-hover);
 }
 .agent-line {
   position: relative;
@@ -174,7 +181,7 @@
 .landing-header :focus-visible,
 .landing-finale :focus-visible,
 .landing-footer :focus-visible {
-  outline-color: var(--color-on-accent);
+  outline-color: var(--color-accent-ink);
 }
 .workspace-section {
   padding-block: 62px 70px;
@@ -199,25 +206,39 @@
 .product-explorer {
   display: grid;
   grid-template-columns: 225px minmax(0, 1fr);
-  gap: 40px;
+  gap: 28px;
   align-items: start;
+  padding: 24px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 18px;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-surface);
 }
 .product-tabs {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
 }
 .product-tabs button {
-  padding: 23px 0;
+  min-height: 48px;
+  padding: 12px;
   display: grid;
   grid-template-columns: 1fr 17px;
   gap: 10px;
   text-align: left;
   border: 0;
-  border-top: 1px solid var(--color-border);
+  border-radius: 9px;
   background: none;
   color: var(--color-text-secondary);
   font-size: 13px;
   line-height: 1.7;
+  transition:
+    color var(--motion-fast),
+    background var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 .product-tabs :where(button) > span {
   font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
@@ -227,7 +248,12 @@
 .product-tabs button[data-state="active"] {
   color: var(--color-text-primary);
   font-weight: 650;
-  border-top-color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-flat);
+}
+.product-tabs button:hover {
+  color: var(--color-text-primary);
+  background: var(--color-accent-subtle);
 }
 .product-tabs :where(button) > svg {
   margin-top: 3px;
@@ -260,9 +286,9 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--color-surface);
-  box-shadow: 0 16px 36px -24px var(--color-text-muted);
+  box-shadow: var(--shadow-surface);
 }
 .product-capture img {
   width: 100%;
@@ -640,9 +666,8 @@
   background: linear-gradient(140deg, var(--color-shell), var(--color-shell-end));
   border: 1px solid var(--color-border);
   padding: 0 12px 12px;
-  border-radius: 14px;
-  box-shadow: 0 30px 70px -40px var(--color-text-muted);
-  transform: rotate(-3deg);
+  border-radius: 18px;
+  box-shadow: var(--shadow-pop);
 }
 .atmosphere-window > div:first-child {
   display: flex;
@@ -949,19 +974,24 @@
   }
   .product-explorer {
     display: block;
+    padding: 14px;
   }
   .product-tabs {
     flex-direction: row;
-    gap: 10px;
+    gap: 4px;
     margin-bottom: 26px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
   }
   .product-tabs button {
     grid-template-columns: 1fr;
     gap: 5px;
-    padding: 12px 0;
+    min-width: 104px;
+    padding: 10px;
     flex: 1;
     font-size: 11px;
     line-height: 1.7;
+    scroll-snap-align: start;
   }
   .product-tabs :where(button) > svg {
     display: none;
