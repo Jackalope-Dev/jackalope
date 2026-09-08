@@ -246,7 +246,7 @@ pub fn agent_profile_list(
     runtime: State<'_, TaskRuntime>,
     agent: String,
 ) -> Result<AgentProfilesView, String> {
-    let manifest = load(&runtime.profiles_root());
+    let manifest = load_checked(&runtime.profiles_root())?;
     let entry = manifest.agents.get(&agent).cloned().unwrap_or_default();
     Ok(AgentProfilesView {
         profiles: entry.profiles,
@@ -295,14 +295,21 @@ fn validate_group(group: Option<&str>) -> Result<(), String> {
 
 #[tauri::command]
 pub fn agent_profile_set_group(
-    runtime: State<'_, TaskRuntime>, agent: String, id: String, group: Option<String>,
+    runtime: State<'_, TaskRuntime>,
+    agent: String,
+    id: String,
+    group: Option<String>,
 ) -> Result<(), String> {
     validate_group(group.as_deref())?;
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
     let mut manifest = load_checked(&root)?;
     let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
-    let profile = entry.profiles.iter_mut().find(|p| p.id == id).ok_or("Unknown account")?;
+    let profile = entry
+        .profiles
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or("Unknown account")?;
     profile.group = group;
     save(&root, &manifest)
 }
@@ -489,10 +496,12 @@ mod tests {
         entry.profiles.push(AgentProfile {
             id: "work".into(),
             name: "Work".into(),
+            group: None,
         });
         entry.profiles.push(AgentProfile {
             id: "personal".into(),
             name: "Personal".into(),
+            group: None,
         });
         entry.active = Some("personal".into());
         save(&root, &manifest).unwrap();
@@ -525,10 +534,12 @@ mod tests {
                     AgentProfile {
                         id: "work".into(),
                         name: "Work".into(),
+                        group: None,
                     },
                     AgentProfile {
                         id: "personal".into(),
                         name: "Personal".into(),
+                        group: None,
                     },
                 ],
                 active: Some("work".into()),
@@ -555,17 +566,19 @@ mod tests {
     }
 
     #[test]
-    fn creating_the_first_profile_activates_it_and_deleting_it_falls_back() {
+    fn deleting_the_active_profile_falls_back() {
         let root = temp_root();
         let mut manifest = Manifest::default();
         let entry = manifest.agents.entry("codex".into()).or_default();
         entry.profiles.push(AgentProfile {
             id: "a".into(),
             name: "Work".into(),
+            group: None,
         });
         entry.profiles.push(AgentProfile {
             id: "b".into(),
             name: "Personal".into(),
+            group: None,
         });
         entry.active = Some("a".into());
         save(&root, &manifest).unwrap();

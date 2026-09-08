@@ -62,7 +62,10 @@ export const resizeSignIn = (sessionId: string, cols: number, rows: number) =>
 export const accountStatusLabel = (status?: AccountStatus) => {
   if (!status) return 'Not checked';
   return {
-    signedIn: 'Signed in', signedOut: 'Sign-in needed', configured: 'Credentials configured',
-    unknown: 'Status unavailable', notInstalled: 'Agent not installed',
+    signedIn: 'Signed in',
+    signedOut: 'Sign-in needed',
+    configured: 'Credentials configured',
+    unknown: 'Status unavailable',
+    notInstalled: 'Agent not installed',
   }[status.state];
 };

@@ -5,6 +5,7 @@ import { ProjectAgentAccount } from '../settings/ProjectAgentAccount';
 import { Setting } from '../settings/Setting';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import { ProjectAccountGroup } from './ProjectAccountGroup';
 import '../settings/settings.css';
 export function ProjectPreferences() {
   const agents = useAgentConfigStore();
@@ -53,6 +54,15 @@ export function ProjectPreferences() {
               </Select>
             </Setting>
           </div>
+          <ProjectAccountGroup
+            key={project.id}
+            agents={builtinAgents.filter(
+              (agent) =>
+                agents.isAgentEnabled(agent.id) && isAgentAllowedForProject(project, agent.id),
+            )}
+            value={project.preferences?.agentAccounts ?? {}}
+            onChange={(agentAccounts) => updateProjectPreferences(project.id, { agentAccounts })}
+          />
           <div className="settings-group">
             <Setting title="Agents available here" />
             {[...builtinAgents, ...agents.customAgents].map((a) => {

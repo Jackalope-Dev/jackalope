@@ -1,6 +1,16 @@
+import * as Dialog from '@radix-ui/react-dialog';
+
 import { useEffect, useState } from 'react';
-import { listAgentProfiles } from '../../lib/agent-profiles';
+
+import { type AgentProfilesView, listAgentProfiles } from '../../lib/agent-profiles';
+
+import { AgentAccounts } from '../agents/AgentAccounts';
+
+import { Button } from '../ui/button';
+
 import { Select, SelectItem } from '../ui/Select';
+
+import '../agents/agent-manager.css';
 
 export function ProjectAgentAccount({
   agentId,
@@ -13,43 +23,116 @@ export function ProjectAgentAccount({
   agentName: string;
   projectName: string;
   value: string | undefined;
+
   onChange: (id: string | undefined) => void;
 }) {
-  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
+  const [view, setView] = useState<AgentProfilesView>();
+
+  const [error, setError] = useState('');
+
+  const [refresh, setRefresh] = useState(0);
+
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    listAgentProfiles(agentId)
+
+    setError('');
+
+    void listAgentProfiles(agentId)
       .then((view) => {
-        if (!cancelled) setProfiles(view.profiles);
+        if (!cancelled) setView(view);
       })
-      .catch(() => {
-        if (!cancelled) setProfiles([]);
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
       });
+
     return () => {
       cancelled = true;
     };
-  }, [agentId]);
+  }, [agentId, refresh]);
 
-  if (profiles.length === 0) return null;
+  if (view && !view.envVar && !value) return null;
+
+  const missing = value && view && !view.profiles.some((p) => p.id === value);
+
+  const active = view?.profiles.find((p) => p.id === view.activeId)?.name ?? 'normal CLI sign-in';
 
   return (
     <div className="project-agent-account">
       <span className="task-muted text-xs">
         {agentName} account for {projectName}
       </span>
-      <Select
-        aria-label={`${agentName} account for ${projectName}`}
-        value={value ?? 'inherit'}
-        onValueChange={(next) => onChange(next === 'inherit' ? undefined : next)}
-      >
-        <SelectItem value="inherit">Whichever account is active</SelectItem>
-        {profiles.map((profile) => (
-          <SelectItem key={profile.id} value={profile.id}>
-            {profile.name}
-          </SelectItem>
-        ))}
-      </Select>
+      {error && (
+        <div>
+          <p role="alert" className="task-error">
+            Could not load accounts. Your saved selection is kept.
+          </p>
+          <Button variant="outline" onClick={() => setRefresh((n) => n + 1)}>
+            Retry accounts
+          </Button>
+        </div>
+      )}
+      {missing && (
+        <p role="alert" className="task-error">
+          The selected account was removed. Choose another account before starting work.
+        </p>
+      )}
+      {view && (
+        <Select
+          aria-label={`${agentName} account for ${projectName}`}
+          value={value ?? 'inherit'}
+          onValueChange={(next) => onChange(next === 'inherit' ? undefined : next)}
+        >
+          <SelectItem value="inherit">Follow agent default · {active}</SelectItem>
+          {missing && (
+            <SelectItem value={value} disabled>
+              Removed account
+            </SelectItem>
+          )}
+          {view.profiles.map((profile) => (
+            <SelectItem key={profile.id} value={profile.id}>
+              {profile.name}
+              {profile.group ? ` · ${profile.group === 'work' ? 'Work' : 'Personal'}` : ''}
+            </SelectItem>
+          ))}
+        </Select>
+      )}
+      {!view && !error && (
+        <p role="status" className="task-muted">
+          Loading accounts…
+        </p>
+      )}
+      {view?.envVar && (
+        <Dialog.Root
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) setRefresh((n) => n + 1);
+          }}
+        >
+          <Dialog.Trigger asChild>
+            <Button variant="ghost">
+              {view.profiles.length ? 'Manage accounts' : 'Add account'}
+            </Button>
+          </Dialog.Trigger>
+          <Dialog.Portal>
+            <Dialog.Overlay className="task-dialog-overlay" />
+            <Dialog.Content className="task-dialog appearance-panel agent-sign-in-dialog">
+              <Dialog.Title className="text-xl font-medium">{agentName} accounts</Dialog.Title>
+              <Dialog.Description className="task-muted mt-2 mb-4">
+                Add an account here, then select it for {projectName}.
+              </Dialog.Description>
+              <AgentAccounts key={agentId} agentId={agentId} agentName={agentName} />
+              <div className="flex justify-end mt-4">
+                <Dialog.Close asChild>
+                  <Button variant="outline">Done</Button>
+                </Dialog.Close>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+      )}
     </div>
   );
 }

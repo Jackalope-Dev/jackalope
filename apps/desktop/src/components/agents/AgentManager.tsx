@@ -210,7 +210,6 @@ export function AgentManager() {
                   </p>
                 </div>
               </section>
-
             </section>
           );
         })}
