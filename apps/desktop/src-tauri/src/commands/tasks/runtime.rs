@@ -302,7 +302,7 @@ impl TaskRuntime {
         }
         if adapter == "codex" && req.coordination.is_some() {
             let context = req.coordination.as_ref().unwrap();
-            project_mcp.insert("jackalope".into(), serde_json::json!({"url":format!("{}/mcp",context.endpoint),"bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN"}));
+            project_mcp.insert("jackalope".into(), serde_json::json!({"url":format!("{}/mcp",context.endpoint),"bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN","tool_timeout_sec":90}));
         }
         if adapter == "codex" {
             for value in crate::commands::mcp::codex_overrides(&project_mcp)? {

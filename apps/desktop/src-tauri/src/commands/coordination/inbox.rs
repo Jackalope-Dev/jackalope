@@ -150,4 +150,120 @@ mod tests {
             serde_json::from_slice(&serde_json::to_vec(&message).unwrap()).unwrap();
         assert_eq!(saved.acknowledged_by, ["reader"]);
     }
+
+    #[tokio::test]
+    async fn authenticated_manual_tasks_share_inventory_and_durable_addressed_receipts() {
+        let directory = std::env::temp_dir().join(format!("jackalope-inbox-{}", Uuid::new_v4()));
+        let history = directory.join("history");
+        std::fs::create_dir_all(&history).unwrap();
+        for (id, project) in [
+            ("sender-run", "p"),
+            ("reader-run", "p"),
+            ("foreign-run", "other"),
+        ] {
+            let record = serde_json::json!({"id":id,"taskId":format!("{id}-task"),"projectId":project,"projectName":"Fixture","projectPath":"","workspace":"","branch":"","baseHead":"","agent":"codex","account":"fixture","model":null,"prompt":"Fixture manual task","status":"review","startedAt":"2026-09-08T00:00:00Z","endedAt":null,"sessionId":null,"result":"","activity":[],"error":null,"persistenceError":null,"exitCode":null,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"reported":false,"estimatedCostUsd":null}});
+            std::fs::write(history.join(format!("{id}.json")), record.to_string()).unwrap();
+        }
+        let runtime = TaskRuntime::new(history).unwrap();
+        let service = Coordinator::new(directory.join("coordination"), runtime.clone()).unwrap();
+        for id in ["sender-run", "reader-run", "foreign-run"] {
+            runtime.update(id, |run| run.status = "running".into());
+            service
+                .inner
+                .lock()
+                .unwrap()
+                .grants
+                .insert(id.into(), (id.into(), id.into()));
+        }
+        let headers = |id: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert("authorization", format!("Bearer {id}").parse().unwrap());
+            headers
+        };
+        let Json(project) = bridge_project(WebState(service.clone()), headers("sender-run"))
+            .await
+            .unwrap();
+        assert_eq!(project["assignedTaskId"], "sender-run-task");
+        assert_eq!(project["tasks"].as_array().unwrap().len(), 2);
+        assert_eq!(project["tasks"][0]["scopeKnown"], false);
+        let request = |recipient: &str| MessageRequest {
+            kind: "handoff".into(),
+            text: "Please inspect the result".into(),
+            recipient_task_id: Some(recipient.into()),
+        };
+        assert_eq!(
+            bridge_message(
+                WebState(service.clone()),
+                headers("sender-run"),
+                Json(request("foreign-run-task"))
+            )
+            .await
+            .err(),
+            Some(StatusCode::BAD_REQUEST)
+        );
+        let Json(message) = bridge_message(
+            WebState(service.clone()),
+            headers("sender-run"),
+            Json(request("reader-run-task")),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            bridge_ack(
+                WebState(service.clone()),
+                headers("foreign-run"),
+                Json(AckInput {
+                    id: message.id.clone()
+                })
+            )
+            .await
+            .err(),
+            Some(StatusCode::NOT_FOUND)
+        );
+        for _ in 0..2 {
+            let Json(ack) = bridge_ack(
+                WebState(service.clone()),
+                headers("reader-run"),
+                Json(AckInput {
+                    id: message.id.clone(),
+                }),
+            )
+            .await
+            .unwrap();
+            assert_eq!(ack.acknowledged_by, ["reader-run-task"]);
+        }
+        let mut origin = headers("reader-run");
+        origin.insert("origin", "https://example.invalid".parse().unwrap());
+        assert_eq!(
+            bridge_inbox(
+                WebState(service.clone()),
+                origin,
+                Query(InboxQuery::default())
+            )
+            .await
+            .err(),
+            Some(StatusCode::FORBIDDEN)
+        );
+        runtime.update("reader-run", |run| run.status = "review".into());
+        assert_eq!(
+            bridge_inbox(
+                WebState(service.clone()),
+                headers("reader-run"),
+                Query(InboxQuery::default())
+            )
+            .await
+            .err(),
+            Some(StatusCode::UNAUTHORIZED)
+        );
+        drop(service);
+        let restored = Coordinator::new(directory.join("coordination"), runtime.clone()).unwrap();
+        assert_eq!(
+            restored.view().unwrap().messages[0].acknowledged_by,
+            ["reader-run-task"]
+        );
+        drop(restored);
+        drop(runtime);
+        assert!(directory.starts_with(std::env::temp_dir()));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

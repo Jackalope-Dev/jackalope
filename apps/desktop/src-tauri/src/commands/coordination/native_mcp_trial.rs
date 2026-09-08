@@ -69,6 +69,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         .split(',')
     {
         let id = uuid::Uuid::new_v4().to_string();
+        println!("Starting {agent} shared-tool trial");
         let transport = if ["grok", "antigravity", "opencode"].contains(&agent) {
             "Use the authenticated HTTP bridge described below: POST /v1/tools/search, then POST /v1/tools/read. HTTP is explicitly authorized for this local echo verification. This adapter does not receive the selected connection through native MCP; do not search its other MCP servers."
         } else {
@@ -130,14 +131,17 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                         || !coordinator.view()?.messages.iter().any(|message| {
                             message.text.contains("agent-bridge-trial")
                                 && !message.acknowledged_by.is_empty()
+                                && message.task_id == run.task_id
+                                && message.recipient_task_id.as_deref() == Some(run.task_id.as_str())
                         }))
                 {
-                    failures.push("Antigravity did not complete the question, validation and messaging round trip".into());
+                    failures.push(format!("{agent} did not complete the question, validation and directed messaging round trip"));
                 }
                 break;
             }
             if started.elapsed() > Duration::from_secs(150) {
                 runtime.stop_all();
+                println!("{agent}: timed out; inspect the retained fixture profile");
                 failures.push(format!("{agent}: timed out"));
                 break;
             }

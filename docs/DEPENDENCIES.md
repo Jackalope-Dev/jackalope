@@ -739,6 +739,7 @@ Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
 | tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |
 | tauri-utils | 2.9.3 | Apache-2.0 OR MIT |
 | tauri-winres | 0.3.6 | MIT |
+| tauri-winrt-notification | 0.8.1 | MIT OR Apache-2.0 |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
 | termios | 0.2.2 | MIT |

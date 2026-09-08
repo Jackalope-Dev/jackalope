@@ -45,6 +45,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const [target, setTarget] = useState('auto');
   const [removing, setRemoving] = useState<string | null>(null);
   const pending = busy || removing !== null;
+  const ready = (project?.worktrees ?? []).filter(
+    (wt) => wt.cleanup?.merged && !wt.cleanup.blocked_reason,
+  );
+  const missing = (project?.worktrees ?? []).filter((wt) => wt.cleanup?.missing && !wt.is_locked);
   const targetBranch = target === 'auto' ? undefined : target;
   const projectId = useRef(activeProjectId);
   const refreshButton = useRef<HTMLButtonElement>(null);
@@ -113,6 +117,32 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       setRemoving(null);
     }
   };
+  const cleanupMerged = async () => {
+    if (pending || !project || !ready.length) return;
+    const id = project.id;
+    const candidates = [...ready];
+    setBusy(true);
+    setError('');
+    setFeedback('');
+    let removed = 0;
+    try {
+      for (const worktree of candidates) {
+        await cleanupWorktree(project.path, worktree);
+        removed++;
+      }
+    } catch (cause) {
+      if (projectId.current === id)
+        setError(`Cleanup stopped. ${cause instanceof Error ? cause.message : String(cause)}`);
+    } finally {
+      if (projectId.current === id) {
+        setFeedback(
+          `Removed ${removed} of ${candidates.length} worktrees. Branches and task history kept.`,
+        );
+        await loadWorktreesForActiveProject(targetBranch);
+      }
+      setBusy(false);
+    }
+  };
   const prune = async () => {
     if (pending || !project) return;
     const id = project.id;
@@ -124,8 +154,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       if (projectId.current === id)
         setFeedback(
           dropped > 0
-            ? `Pruned ${dropped} worktree ${dropped === 1 ? 'registration' : 'registrations'} whose folder was gone.`
-            : 'No missing worktree registrations to prune.',
+            ? `Removed ${dropped} missing worktree ${dropped === 1 ? 'entry' : 'entries'}. No folders or branches were deleted.`
+            : 'No missing worktree entries to remove.',
         );
     } catch (cause) {
       if (projectId.current === id)
@@ -215,16 +245,31 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               <SelectItem value="main">main</SelectItem>
               <SelectItem value="master">master</SelectItem>
             </Select>
-            <Button
-              variant="ghost"
-              disabled={pending || loading || !desktop}
-              onClick={() => void prune()}
-            >
-              Prune missing worktrees
-            </Button>
+            <ConfirmAction
+              title={`Clean up ${ready.length} merged worktrees?`}
+              description={`Removes only clean folders whose commits are merged into the selected local branch. Branches and task history are kept. Each folder is checked again before removal. ${ready.map((wt) => wt.branch || wt.path).join(', ')}`}
+              label="Clean up merged"
+              busyLabel="Cleaning up…"
+              onConfirm={cleanupMerged}
+              trigger={
+                <Button disabled={pending || loading || !desktop || !ready.length}>
+                  <Trash2 size={18} aria-hidden="true" />
+                  Clean up merged ({ready.length})
+                </Button>
+              }
+            />
+            {missing.length > 0 && (
+              <Button
+                variant="outline"
+                disabled={pending || loading || !desktop}
+                onClick={() => void prune()}
+              >
+                Remove missing entries ({missing.length})
+              </Button>
+            )}
             <p className="task-muted">
-              Uses local branches. Clean up removes a merged, clean folder and keeps its branch and
-              task history. Archive & remove saves a blocked worktree's recoverable content first.
+              {ready.length} ready to remove · {missing.length} missing. Worktrees with local
+              changes need review, even when their commits are merged.
             </p>
           </div>
           {creating && (
@@ -292,13 +337,19 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     </span>
                   )}
                   {wt.is_bare && <span>Bare repository</span>}
-                  <span className={wt.cleanup?.merged ? 'text-[var(--color-success)]' : ''}>
+                  <span
+                    className={
+                      wt.cleanup?.merged && !wt.cleanup.missing ? 'text-[var(--color-success)]' : ''
+                    }
+                  >
                     <GitMerge size={14} aria-hidden="true" />
-                    {wt.cleanup?.merged === true
-                      ? `Merged into ${wt.cleanup.target_branch}`
-                      : wt.cleanup?.merged === false
-                        ? `Not merged into ${wt.cleanup.target_branch}`
-                        : 'Merge status unavailable'}
+                    {wt.cleanup?.missing
+                      ? 'Folder missing'
+                      : wt.cleanup?.merged === true
+                        ? `Merged into ${wt.cleanup.target_branch}`
+                        : wt.cleanup?.merged === false
+                          ? `Not merged into ${wt.cleanup.target_branch}`
+                          : 'Merge status unavailable'}
                   </span>
                 </div>
                 {wt.cleanup?.blocked_reason && (
@@ -310,11 +361,11 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   <Button
                     variant="outline"
                     disabled={loading || pending || !desktop}
-                    aria-label={`Clean up ${wt.branch || wt.path}`}
+                    aria-label={`Remove worktree ${wt.branch || wt.path}`}
                     onClick={() => void cleanup(wt)}
                   >
                     <Trash2 size={18} aria-hidden="true" />
-                    {removing === wt.path ? 'Cleaning up…' : 'Clean up'}
+                    {removing === wt.path ? 'Removing…' : 'Remove worktree'}
                   </Button>
                 )}
                 {wt.cleanup?.recoverable && (

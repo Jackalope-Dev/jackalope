@@ -11,6 +11,7 @@ export interface WorktreeEntry {
     blocked_reason: string | null;
     /** Blocked only by recoverable content — archive-and-remove is available. */
     recoverable?: boolean;
+    missing?: boolean;
   } | null;
 }
 

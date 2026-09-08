@@ -20,6 +20,8 @@ pub struct CleanupStatus {
     /// yet merged). Archive-and-remove is offered for these.
     #[serde(default)]
     pub recoverable: bool,
+    #[serde(default)]
+    pub missing: bool,
 }
 
 /// Cap on the untracked content an archive will copy before bailing out.
@@ -44,6 +46,24 @@ fn git(path: &Path, args: &[&str]) -> Result<String, String> {
 
 fn canonical(path: &str) -> Result<PathBuf, String> {
     std::fs::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
+}
+
+// Resolve the existing ancestor so deleted task folders still protect related
+// worktrees without blocking every unrelated worktree in the repository.
+fn task_workspace(path: &Path) -> Result<PathBuf, String> {
+    match std::fs::canonicalize(path) {
+        Ok(path) => Ok(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let parent = path.parent().ok_or("Cannot resolve the task workspace.")?;
+            let name = path
+                .file_name()
+                .ok_or("Cannot resolve the task workspace.")?;
+            Ok(task_workspace(parent)?.join(name))
+        }
+        Err(_) => {
+            Err("Cannot verify a task workspace. Check its folder access before cleanup.".into())
+        }
+    }
 }
 
 fn target(repo: &Path, requested: Option<&str>) -> Result<(String, String), String> {
@@ -86,6 +106,14 @@ fn hard_block(
     if ["main", "master"].contains(&wt.branch.as_str()) {
         return Err("Main branch checkout — kept.".into());
     }
+    if !Path::new(&wt.path)
+        .try_exists()
+        .map_err(|e| e.to_string())?
+    {
+        return Err(
+            "Folder is missing. Remove its stale registration with Remove missing entries.".into(),
+        );
+    }
     let path = canonical(&wt.path)?;
     if repo.starts_with(&path) {
         return Err("Current project folder — kept.".into());
@@ -98,7 +126,7 @@ fn hard_block(
     for run in runs.iter().filter(|run| {
         ["starting", "running", "stopping", "interrupted"].contains(&run.status.as_str())
     }) {
-        let workspace = canonical(&run.workspace)?;
+        let workspace = task_workspace(Path::new(&run.workspace))?;
         if workspace.starts_with(&path) || path.starts_with(&workspace) {
             return Err("In use by an active or interrupted task.".into());
         }
@@ -169,6 +197,9 @@ pub(super) fn inspect(
             merged: None,
             blocked_reason: None,
             recoverable: false,
+            missing: Path::new(&entries[index].path)
+                .try_exists()
+                .is_ok_and(|exists| !exists),
         };
         match &target {
             Ok((branch, head)) => {
@@ -190,17 +221,15 @@ pub(super) fn inspect(
         }
         match hard_block(&repo, &entries, index, runs) {
             Err(reason) => status.blocked_reason = Some(reason),
-            Ok(()) => {
-                let dirty = canonical(&entries[index].path)
-                    .ok()
-                    .and_then(|path| dirty_reason(&path).ok().flatten());
-                if let Some(reason) = dirty {
+            Ok(()) => match canonical(&entries[index].path).and_then(|path| dirty_reason(&path)) {
+                Ok(Some(reason)) => {
                     status.blocked_reason = Some(reason);
                     status.recoverable = true;
-                } else if status.merged == Some(false) {
-                    status.recoverable = true;
                 }
-            }
+                Ok(None) if status.merged == Some(false) => status.recoverable = true,
+                Ok(None) => {}
+                Err(reason) => status.blocked_reason = Some(reason),
+            },
         }
         entries[index].cleanup = Some(status);
     }
@@ -748,6 +777,64 @@ mod tests {
         let runs = [f.run("review")];
         f.remove(&before, &runs).unwrap();
         assert_eq!(runs[0].status, "review");
+    }
+
+    #[test]
+    fn missing_unrelated_task_workspace_does_not_block_merged_cleanup() {
+        let f = Fixture::new("main");
+        let mut run = f.run("interrupted");
+        run.workspace = f
+            .root
+            .join("deleted task")
+            .join("nested")
+            .to_string_lossy()
+            .into();
+        let entries = f.entries(&[run.clone()]);
+        assert_eq!(entries[1].cleanup.as_ref().unwrap().blocked_reason, None);
+        f.remove(&entries[1], &[run]).unwrap();
+        assert!(!f.worktree.exists());
+    }
+
+    #[test]
+    fn missing_task_subdirectory_still_protects_its_worktree() {
+        let f = Fixture::new("main");
+        let mut run = f.run("interrupted");
+        run.workspace = f
+            .worktree
+            .join("deleted subdirectory")
+            .to_string_lossy()
+            .into();
+        assert!(f
+            .remove(&f.entry(), &[run])
+            .unwrap_err()
+            .contains("active or interrupted"));
+        assert!(f.worktree.exists());
+    }
+
+    #[test]
+    fn missing_worktrees_have_actionable_status_and_locked_entries_survive_prune() {
+        let f = Fixture::new("main");
+        git(&f.repo, &["worktree", "lock", f.worktree.to_str().unwrap()]).unwrap();
+        fs::rename(&f.worktree, f.root.join("moved")).unwrap();
+        assert!(f.entry().cleanup.as_ref().unwrap().missing);
+        assert_eq!(prune(f.repo.to_str().unwrap()).unwrap(), 0);
+        git(
+            &f.repo,
+            &["worktree", "unlock", f.worktree.to_str().unwrap()],
+        )
+        .unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert!(status.missing);
+        assert!(!status.recoverable);
+        assert!(status
+            .blocked_reason
+            .as_ref()
+            .unwrap()
+            .contains("Remove missing entries"));
+        assert!(f.remove(&entry, &[]).is_err());
+        assert_eq!(prune(f.repo.to_str().unwrap()).unwrap(), 1);
+        assert!(f.root.join("moved").exists());
     }
 
     #[test]

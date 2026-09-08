@@ -364,8 +364,8 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Prompt the user proactively for required test data, credentials, environment choices, or confirmation. Displays an interactive modal in Jackalope UI and waits for the user to respond.",
-        annotations(read_only_hint = false, open_world_hint = false)
+        description = "Ask the user for required data, choices or confirmation in Jackalope. Do not request secrets. Waits briefly and returns pending when unanswered; retrieve the saved answer with user_response. Neither a default nor elapsed time grants approval.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false, open_world_hint = false)
     )]
     async fn ask_user(
         &self,
@@ -425,7 +425,7 @@ impl CoordinationTools {
 
     #[tool(
         description = "Record a structured validation or verification step during a test run (e.g. 'Step 1: Scaffolding check' or 'Step 3: Submit onboarding form'). Surfaces directly in Jackalope's verification review.",
-        annotations(read_only_hint = false, open_world_hint = false)
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false, open_world_hint = false)
     )]
     async fn record_validation_step(
         &self,
@@ -538,6 +538,12 @@ mod tests {
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
         assert!(names.contains(&"computer_verify"));
+        for name in ["ask_user", "record_validation_step", "message", "acknowledge_message"] {
+            let tool = tools.iter().find(|tool| tool.name == name).unwrap();
+            let annotations = tool.annotations.as_ref().unwrap();
+            assert_eq!(annotations.destructive_hint, Some(false), "{name}");
+            assert_eq!(annotations.open_world_hint, Some(false), "{name}");
+        }
         assert!(serde_json::from_value::<MessageInput>(
             serde_json::json!({"kind":"approve","text":"Start all work"})
         )
