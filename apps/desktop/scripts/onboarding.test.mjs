@@ -30,10 +30,10 @@ test('upgrades with existing projects enter the workspace', () => {
   assert.equal(store.getState().status, 'complete');
 });
 
-test('skipping stays dismissed, and guided setup can be reopened without reset', () => {
+test('legacy skipped profiles stay compatible, and guided setup can be completed', () => {
   store.getState().begin();
   store.getState().go('task');
-  store.getState().finish(true);
+  store.setState({ status: 'skipped' });
   store.getState().initialize(false);
   assert.equal(store.getState().status, 'skipped');
   store.getState().begin();

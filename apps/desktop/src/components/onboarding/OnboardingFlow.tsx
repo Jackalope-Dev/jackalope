@@ -4,11 +4,12 @@ import {
   Check,
   ChevronDown,
   FolderOpen,
+  FolderPlus,
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { openProject } from '../../lib/project-setup';
+import { createProject, openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -38,10 +39,8 @@ const steps: { id: OnboardingStep; label: string }[] = [
 
 export function OnboardingFlow({
   onFinish,
-  onCapture,
 }: {
-  onFinish: (agent?: string, draftKey?: string) => void;
-  onCapture?: () => void;
+  onFinish: (agent: string, draftKey: string) => void;
 }) {
   const onboarding = useOnboardingStore();
   const { projects, activeProjectId } = useProjectStore();
@@ -54,6 +53,11 @@ export function OnboardingFlow({
     ? community.settings.telemetry
     : settings.telemetryEnabled;
   const [path, setPath] = useState(project?.path ?? '');
+  const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
+  const [projectName, setProjectName] = useState('');
+  const [parentPath, setParentPath] = useState<string | null>(null);
+  const [defaultDirectory, setDefaultDirectory] = useState('');
+  const [directoryError, setDirectoryError] = useState('');
   const [agent, setAgent] = useState(
     (project && execution.drafts[project.id]?.agent) || config.defaultMetaAgent,
   );
@@ -73,6 +77,16 @@ export function OnboardingFlow({
       !(options?.restrictModels && !options.models.some((model) => model.trim()))
     );
   };
+
+  useEffect(() => {
+    if (!desktop || projectMode !== 'new') return;
+    void nativeTask<string>('task_project_directory')
+      .then((directory) => {
+        setDefaultDirectory(directory);
+        setDirectoryError('');
+      })
+      .catch(() => setDirectoryError('Choose a folder for your new project.'));
+  }, [desktop, projectMode]);
 
   useEffect(() => {
     if (heading.current?.dataset.step === step) heading.current.focus();
@@ -104,6 +118,7 @@ export function OnboardingFlow({
       onboarding.go('agent');
       return;
     }
+    if (!draft.trim()) return;
     execution.draft(project.id, { agent, projectId: project.id });
     execution.select(null);
     onFinish(agent, project.id);
@@ -183,59 +198,162 @@ export function OnboardingFlow({
           {step === 'project' && (
             <>
               <p className="onboarding-description">
-                Choose a local Git repository. Jackalope keeps its tasks, agent work and changes
-                together.
+                Open a local Git repository or create a new project to start building.
               </p>
+              <fieldset className="onboarding-project-options" aria-label="Project setup">
+                <Button
+                  variant={projectMode === 'existing' ? 'default' : 'outline'}
+                  aria-pressed={projectMode === 'existing'}
+                  disabled={busy}
+                  onClick={() => {
+                    setProjectMode('existing');
+                    setError('');
+                  }}
+                >
+                  <FolderOpen size={16} />
+                  Open existing
+                </Button>
+                <Button
+                  variant={projectMode === 'new' ? 'default' : 'outline'}
+                  aria-pressed={projectMode === 'new'}
+                  disabled={busy}
+                  onClick={() => {
+                    setProjectMode('new');
+                    setError('');
+                  }}
+                >
+                  <FolderPlus size={16} />
+                  Create new project
+                </Button>
+              </fieldset>
               {!desktop && (
                 <p className="task-notice">
-                  Open the desktop app to choose a repository and discover agents. You can still
-                  explore the workspace.
+                  Open the desktop app to create or choose a project and discover agents.
                 </p>
               )}
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
                   void attempt(async () => {
-                    const opened = await openProject(path);
+                    const opened =
+                      projectMode === 'new'
+                        ? await createProject(projectName, parentPath)
+                        : await openProject(path);
                     setPath(opened.path);
+                    setProjectMode('existing');
+                    if (projectMode === 'new') {
+                      execution.draft(opened.id, {
+                        prompt:
+                          'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.',
+                      });
+                    }
                     onboarding.go('agent');
                     await execution.discover();
                   });
                 }}
               >
-                <label className="task-label" htmlFor="onboarding-path">
-                  Repository folder
-                </label>
-                <div className="onboarding-folder">
-                  <input
-                    id="onboarding-path"
-                    className="task-input"
-                    placeholder="Paste a repository path"
-                    value={path}
-                    disabled={!desktop || busy}
-                    onChange={(event) => setPath(event.target.value)}
-                  />
+                {projectMode === 'new' ? (
+                  <>
+                    <label className="task-label" htmlFor="onboarding-project-name">
+                      Project name
+                    </label>
+                    <input
+                      id="onboarding-project-name"
+                      className="task-input onboarding-project-name"
+                      placeholder="My new project"
+                      maxLength={80}
+                      required
+                      value={projectName}
+                      disabled={!desktop || busy}
+                      onChange={(event) => setProjectName(event.target.value)}
+                    />
+                    <div className="onboarding-project-location">
+                      <div>
+                        <span className="task-label">Create in</span>
+                        <p>
+                          {parentPath ?? (defaultDirectory || 'Documents / Jackalope Projects')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!desktop || busy}
+                        onClick={() =>
+                          void attempt(async () => {
+                            const selected = await nativeTask<string | null>('task_pick_project');
+                            if (selected) {
+                              setParentPath(selected);
+                              setDirectoryError('');
+                            }
+                          })
+                        }
+                      >
+                        Change folder
+                      </Button>
+                    </div>
+                    {directoryError && !parentPath && (
+                      <p role="alert" className="task-error">
+                        {directoryError}
+                      </p>
+                    )}
+                    <p className="onboarding-note">
+                      Creates a new folder with Git ready for your first task. Existing folders stay
+                      untouched.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <label className="task-label" htmlFor="onboarding-path">
+                      Repository folder
+                    </label>
+                    <div className="onboarding-folder">
+                      <input
+                        id="onboarding-path"
+                        className="task-input"
+                        placeholder="Paste a repository path"
+                        value={path}
+                        required
+                        disabled={!desktop || busy}
+                        onChange={(event) => setPath(event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!desktop || busy}
+                        onClick={() =>
+                          void attempt(async () => {
+                            const selected = await nativeTask<string | null>('task_pick_project');
+                            if (selected) setPath(selected);
+                          })
+                        }
+                      >
+                        <FolderOpen size={16} />
+                        Browse
+                      </Button>
+                    </div>
+                    <p className="onboarding-note">
+                      Opening a project does not start an agent or change your files.
+                    </p>
+                  </>
+                )}
+                <div className="onboarding-actions">
                   <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!desktop || busy}
-                    onClick={() =>
-                      void attempt(async () => {
-                        const selected = await nativeTask<string | null>('task_pick_project');
-                        if (selected) setPath(selected);
-                      })
+                    type="submit"
+                    disabled={
+                      !desktop ||
+                      busy ||
+                      (projectMode === 'new'
+                        ? !projectName.trim() || (!parentPath && !defaultDirectory)
+                        : !path.trim())
                     }
                   >
-                    <FolderOpen size={16} />
-                    Browse
-                  </Button>
-                </div>
-                <p className="onboarding-note">
-                  Opening a project does not start an agent or change your files.
-                </p>
-                <div className="onboarding-actions">
-                  <Button type="submit" disabled={!desktop || busy || !path.trim()}>
-                    {busy ? 'Checking repository…' : 'Continue with this project'}
+                    {busy
+                      ? projectMode === 'new'
+                        ? 'Creating project…'
+                        : 'Checking repository…'
+                      : projectMode === 'new'
+                        ? 'Create project and continue'
+                        : 'Continue with this project'}
                     <ArrowRight size={16} />
                   </Button>
                 </div>
@@ -389,17 +507,6 @@ export function OnboardingFlow({
           )}
         </section>
       </main>
-      <footer className="onboarding-footer">
-        <span>You can return to guided setup in Settings.</span>
-        {onCapture && (
-          <Button variant="outline" disabled={busy} onClick={onCapture}>
-            Capture an idea first
-          </Button>
-        )}
-        <Button variant="ghost" disabled={busy} onClick={() => onFinish()}>
-          {step === 'task' ? 'Finish without a task' : 'Skip setup for now'}
-        </Button>
-      </footer>
     </div>
   );
 }

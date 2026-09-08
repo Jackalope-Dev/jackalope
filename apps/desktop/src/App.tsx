@@ -19,12 +19,10 @@ export default function App() {
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
-  const [initialCapture, setInitialCapture] = useState(false);
   const [initialDraftKey, setInitialDraftKey] = useState<string>();
   const [entry, setEntry] = useState<{
-    agent?: string;
-    draftKey?: string;
-    capture?: boolean;
+    agent: string;
+    draftKey: string;
   } | null>(null);
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const completeEntry = useCallback(() => {
@@ -32,9 +30,8 @@ export default function App() {
     void useCommunityStore.getState().applyDefaults();
     setInitialTaskAgent(entry.agent);
     setInitialDraftKey(entry.draftKey);
-    setInitialCapture(Boolean(entry.capture));
     setFocusWorkspace(true);
-    useOnboardingStore.getState().finish(!entry.agent);
+    useOnboardingStore.getState().finish();
     setEntry(null);
   }, [entry]);
   const onboarding = useOnboardingStore();
@@ -68,14 +65,10 @@ export default function App() {
       {entry ? (
         <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
       ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
-        <OnboardingFlow
-          onCapture={() => setEntry({ capture: true })}
-          onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}
-        />
+        <OnboardingFlow onFinish={(agent, draftKey) => setEntry({ agent, draftKey })} />
       ) : (
         <Shell
           initialTaskAgent={initialTaskAgent}
-          initialCapture={initialCapture}
           initialDraftKey={initialDraftKey}
           focusOnMount={focusWorkspace}
         />

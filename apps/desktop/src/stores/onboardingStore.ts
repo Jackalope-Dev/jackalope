@@ -10,7 +10,7 @@ interface OnboardingState {
   initialize: (hasProjects: boolean) => void;
   begin: () => void;
   go: (step: OnboardingStep) => void;
-  finish: (skipped?: boolean) => void;
+  finish: () => void;
 }
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -23,7 +23,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       },
       begin: () => set({ status: 'active', step: 'project' }),
       go: (step) => set({ step }),
-      finish: (skipped = false) => set({ status: skipped ? 'skipped' : 'complete' }),
+      finish: () => set({ status: 'complete' }),
     }),
     { name: 'jackalope-onboarding-v1' },
   ),

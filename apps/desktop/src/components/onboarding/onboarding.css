@@ -9,8 +9,7 @@
 .onboarding-shell > .app-titlebar {
   margin: 0;
 }
-.onboarding-topbar,
-.onboarding-footer {
+.onboarding-topbar {
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -139,7 +138,6 @@
 }
 .onboarding-privacy p,
 .onboarding-note,
-.onboarding-footer,
 .onboarding-explanation p {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
@@ -260,8 +258,7 @@
   .onboarding-intro {
     display: none;
   }
-  .onboarding-topbar,
-  .onboarding-footer {
+  .onboarding-topbar {
     padding: 12px 20px;
   }
   .onboarding-folder {
@@ -413,4 +410,35 @@
   padding: 12px;
   background: var(--color-surface-elevated);
   border-radius: 8px;
+}
+
+.onboarding-project-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.onboarding-project-options > button {
+  flex: 1;
+}
+.onboarding-project-name {
+  width: 100%;
+  margin-top: 8px;
+}
+.onboarding-project-location {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.onboarding-project-location > div {
+  flex: 1;
+  min-width: 180px;
+}
+.onboarding-project-location p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  margin-top: 4px;
 }
