@@ -54,16 +54,21 @@
   position: relative;
   isolation: isolate;
   margin-top: 18px;
+  border-radius: 10px;
+}
+.hero-inline-signup > .signup {
+  position: relative;
+  z-index: 1;
   padding: 14px;
   color: var(--color-text-primary);
   background: var(--color-bg);
-  border-radius: 10px;
+  border-radius: inherit;
   box-shadow: 0 18px 42px color-mix(in srgb, var(--color-text-primary) 16%, transparent);
 }
 .hero-inline-signup::before,
 .hero-inline-signup::after {
   position: absolute;
-  z-index: -1;
+  z-index: 0;
   inset: 0;
   border: 1px solid color-mix(in srgb, var(--color-accent-ink) 64%, transparent);
   border-radius: inherit;
@@ -526,6 +531,8 @@
 @media (max-width: 420px) {
   .hero-inline-signup {
     margin-inline: 0;
+  }
+  .hero-inline-signup > .signup {
     padding: 14px;
   }
   .hero-actions,
