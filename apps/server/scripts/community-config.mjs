@@ -6,6 +6,7 @@ export function applyCommunityConfig(settings, environment, source = process.env
     'ACCESS_EMAIL_FROM',
     'ACCESS_EMAIL_REPLY_TO',
     'ACCESS_INSTALLER_KEY',
+    'ACCESS_STORE_URL',
     'ACCESS_NEWSLETTER_FORM',
     'ADMIN_EMAIL',
     'ACCESS_ISSUER',
@@ -31,6 +32,23 @@ export function applyCommunityConfig(settings, environment, source = process.env
     if (value !== undefined) settings.vars[name] = value;
   }
   const vars = settings.vars;
+  if (vars.ACCESS_STORE_URL) {
+    const url = new URL(vars.ACCESS_STORE_URL);
+    const path =
+      url.hostname === 'apps.microsoft.com'
+        ? /^\/detail\/[a-z0-9]{12}\/?$/i
+        : /^\/store\/apps\/[a-z0-9]{12}\/?$/i;
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.port ||
+      url.hash ||
+      !['apps.microsoft.com', 'www.microsoft.com'].includes(url.hostname) ||
+      !path.test(url.pathname)
+    )
+      throw new Error('Store link must be an official Microsoft product URL');
+  }
   vars.EARLY_ACCESS_ENABLED ??= 'false';
   if (!['true', 'false'].includes(vars.EARLY_ACCESS_ENABLED))
     throw new Error('Early access flag must be true or false');

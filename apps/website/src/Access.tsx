@@ -17,7 +17,7 @@ interface Membership {
   remaining: number;
   shareUrl: string;
   invites: Invitation[];
-  download: { url: string; bytes: number } | null;
+  download: { url: string; bytes?: number; kind?: 'store' } | null;
 }
 
 export function AccessPage() {
@@ -215,7 +215,11 @@ export function AccessPage() {
                   className="button button-primary button-download"
                   href={`${accessOrigin}/v1/access/download`}
                 >
-                  <span>Download for Windows</span>
+                  <span>
+                    {member.download.kind === 'store'
+                      ? 'Get it from Microsoft Store'
+                      : 'Download for Windows'}
+                  </span>
                   <ArrowDownToLine size={18} />
                 </a>
               ) : (

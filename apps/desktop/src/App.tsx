@@ -1,6 +1,7 @@
 import { startThemeClock } from '@jackalope/brand/theme';
 import { MotionConfig } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
+import { AccessBoundary } from './components/account/AccessBoundary';
 import { Shell } from './components/layout/Shell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { WorkspaceTransition } from './components/onboarding/WorkspaceTransition';
@@ -62,17 +63,19 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      {entry ? (
-        <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
-      ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
-        <OnboardingFlow onFinish={(agent, draftKey) => setEntry({ agent, draftKey })} />
-      ) : (
-        <Shell
-          initialTaskAgent={initialTaskAgent}
-          initialDraftKey={initialDraftKey}
-          focusOnMount={focusWorkspace}
-        />
-      )}
+      <AccessBoundary>
+        {entry ? (
+          <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
+        ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
+          <OnboardingFlow onFinish={(agent, draftKey) => setEntry({ agent, draftKey })} />
+        ) : (
+          <Shell
+            initialTaskAgent={initialTaskAgent}
+            initialDraftKey={initialDraftKey}
+            focusOnMount={focusWorkspace}
+          />
+        )}
+      </AccessBoundary>
     </MotionConfig>
   );
 }

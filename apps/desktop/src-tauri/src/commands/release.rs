@@ -25,11 +25,15 @@ pub struct ReleaseStatus {
     channel: ReleaseChannel,
     beta_available: bool,
     configured: bool,
+    store_managed: bool,
     available_version: Option<String>,
     notes: Option<String>,
 }
 
 fn configured(app: &AppHandle) -> bool {
+    if cfg!(feature = "store") {
+        return false;
+    }
     let config = app.config();
     let Some(updater) = config.plugins.0.get("updater") else {
         return false;
@@ -79,16 +83,21 @@ pub async fn app_release_status(
     state: State<'_, Community>,
     check: bool,
 ) -> Result<ReleaseStatus, String> {
-    let channel = state
-        .preferences()?
-        .channel
-        .unwrap_or_else(|| community::build_channel(&app));
+    let channel = if cfg!(feature = "store") {
+        community::build_channel(&app)
+    } else {
+        state
+            .preferences()?
+            .channel
+            .unwrap_or_else(|| community::build_channel(&app))
+    };
     let mut status = ReleaseStatus {
         channel,
         beta_available: channel_endpoint(&app, ReleaseChannel::Beta).is_some()
             && channel_endpoint(&app, ReleaseChannel::Stable).is_some(),
         current_version: env!("CARGO_PKG_VERSION").into(),
         configured: configured(&app),
+        store_managed: cfg!(feature = "store"),
         available_version: None,
         notes: None,
     };

@@ -1,18 +1,25 @@
-use super::account_storage;
+use super::{account_storage, execution_access::ExecutionAccess};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::{path::PathBuf, time::Duration};
+use tauri::Manager;
 use tauri::{AppHandle, State};
 use tauri_plugin_shell::ShellExt;
 
 pub struct AccountService {
     path: PathBuf,
+    access: Arc<ExecutionAccess>,
+    restored: AtomicBool,
     operation: tokio::sync::Mutex<()>,
 }
 impl AccountService {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, access: Arc<ExecutionAccess>) -> Self {
         Self {
             path,
+            access,
+            restored: AtomicBool::new(false),
             operation: tokio::sync::Mutex::new(()),
         }
     }
@@ -39,6 +46,8 @@ struct SavedAccount {
     user_code: String,
     expires_at: i64,
     email: Option<String>,
+    #[serde(default)]
+    verified_at: i64,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -142,43 +151,90 @@ pub async fn app_account_status(
     app: AppHandle,
     state: State<'_, AccountService>,
 ) -> Result<AccountStatus, String> {
-    let _guard = state.operation.lock().await;
-    if !cfg!(windows) || endpoints(&app).is_err() {
-        return Ok(status("unavailable", None));
-    }
-    let (api, _) = endpoints(&app)?;
-    let Some(record) = state.read()? else {
-        return Ok(status("disconnected", None));
-    };
-    bound(&record, &api)?;
-    if record.email.is_none() {
-        return Ok(status(
-            if record.expires_at > chrono::Utc::now().timestamp_millis() {
-                "pending"
-            } else {
-                "expired"
-            },
-            Some(&record),
-        ));
-    }
-    match request(
-        &api,
-        "/v1/desktop/me",
-        reqwest::Method::GET,
-        Some(&record.secret),
-        None,
-    )
-    .await
-    {
-        Ok((200, data)) if data["email"].as_str() == record.email.as_deref() => {
-            Ok(status("connected", Some(&record)))
+    state.refresh(&app).await
+}
+impl AccountService {
+    async fn refresh(&self, app: &AppHandle) -> Result<AccountStatus, String> {
+        let _guard = self.operation.lock().await;
+        let result = self.refresh_locked(app).await;
+        if result.is_err() {
+            self.access.revoke();
         }
-        Ok((401, _)) => {
-            account_storage::remove(&state.path)?;
-            Ok(status("disconnected", None))
-        }
-        _ => Ok(status("offline", Some(&record))),
+        result
     }
+
+    async fn refresh_locked(&self, app: &AppHandle) -> Result<AccountStatus, String> {
+        if !cfg!(windows) || endpoints(app).is_err() {
+            self.access.revoke();
+            return Ok(status("unavailable", None));
+        }
+        let (api, _) = endpoints(app)?;
+        let Some(mut record) = self.read()? else {
+            self.access.revoke();
+            return Ok(status("disconnected", None));
+        };
+        bound(&record, &api)?;
+        let now = chrono::Utc::now().timestamp_millis();
+        if record.email.is_none() {
+            self.access.revoke();
+            return Ok(status(
+                if record.expires_at > now {
+                    "pending"
+                } else {
+                    "expired"
+                },
+                Some(&record),
+            ));
+        }
+        // Only a previous server verification can authorize a bounded offline lease.
+        if !self.restored.swap(true, Ordering::SeqCst) {
+            self.access.update(record.verified_at, record.expires_at);
+        }
+        match request(
+            &api,
+            "/v1/desktop/me",
+            reqwest::Method::GET,
+            Some(&record.secret),
+            None,
+        )
+        .await
+        {
+            Ok((200, data))
+                if data["email"].as_str() == record.email.as_deref()
+                    && data["status"] == "approved"
+                    && data["expiresAt"]
+                        .as_i64()
+                        .is_some_and(|expiry| expiry > now) =>
+            {
+                record.verified_at = chrono::Utc::now().timestamp_millis();
+                record.expires_at = data["expiresAt"].as_i64().unwrap();
+                self.save(&record)?;
+                self.access.update(record.verified_at, record.expires_at);
+                Ok(status("connected", Some(&record)))
+            }
+            Ok((401, _)) => {
+                self.access.revoke();
+                account_storage::remove(&self.path)?;
+                Ok(status("disconnected", None))
+            }
+            Ok((200, _)) => {
+                self.access.revoke();
+                record.verified_at = 0;
+                self.save(&record)?;
+                Err("The account service returned an invalid approval. Please retry.".into())
+            }
+            _ => Ok(status("offline", Some(&record))),
+        }
+    }
+}
+
+pub fn launch_refresh(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let _ = app.state::<AccountService>().refresh(&app).await;
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+    });
 }
 #[tauri::command]
 pub async fn app_account_connect(
@@ -237,6 +293,7 @@ pub async fn app_account_connect(
         user_code,
         expires_at,
         email: None,
+        verified_at: 0,
     };
     state.save(&record)?;
     let url = web
@@ -283,7 +340,8 @@ pub async fn app_account_poll(
     };
     bound(&record, &api)?;
     if record.email.is_some() {
-        return Ok(status("connected", Some(&record)));
+        drop(_guard);
+        return state.refresh(&app).await;
     }
     if record.expires_at <= chrono::Utc::now().timestamp_millis() {
         return Ok(status("expired", Some(&record)));
@@ -299,10 +357,14 @@ pub async fn app_account_poll(
     match code {
         202 | 429 => Ok(status("pending", Some(&record))),
         410 | 401 => {
+            state.access.revoke();
             account_storage::remove(&state.path)?;
             Ok(status("expired", None))
         }
         200 => {
+            if data["status"] != "approved" {
+                return Err("Invalid account approval.".into());
+            }
             record.email = Some(
                 data["email"]
                     .as_str()
@@ -312,10 +374,13 @@ pub async fn app_account_poll(
             );
             record.expires_at = data["expiresAt"]
                 .as_i64()
+                .filter(|expiry| *expiry > chrono::Utc::now().timestamp_millis())
                 .ok_or("Invalid account expiry.")?;
+            record.verified_at = chrono::Utc::now().timestamp_millis();
             record.verification.clear();
             record.user_code.clear();
             state.save(&record)?;
+            state.access.update(record.verified_at, record.expires_at);
             Ok(status("connected", Some(&record)))
         }
         _ => Err(failure(code)),
@@ -341,6 +406,7 @@ pub async fn app_account_disconnect(
         if code != 200 && code != 401 {
             return Err(failure(code));
         }
+        state.access.revoke();
         account_storage::remove(&state.path)?;
     }
     Ok(status("disconnected", None))
@@ -350,6 +416,19 @@ pub async fn app_account_disconnect(
 mod tests {
     use super::*;
     #[test]
+    fn legacy_saved_accounts_need_online_verification_before_beta_execution() {
+        let record: SavedAccount = serde_json::from_value(serde_json::json!({
+            "origin": "https://api.jackalope.dev/", "secret": "a".repeat(64),
+            "verification": "", "user_code": "", "expires_at": i64::MAX,
+            "email": "member@example.invalid"
+        }))
+        .unwrap();
+        let access = ExecutionAccess::new(true);
+        access.update(record.verified_at, record.expires_at);
+        assert!(!access.status().allowed);
+        assert_eq!(record.email.as_deref(), Some("member@example.invalid"));
+    }
+    #[test]
     fn renderer_status_never_contains_credentials_or_browser_approval_tokens() {
         let record = SavedAccount {
             origin: "https://api.jackalope.dev/".into(),
@@ -358,6 +437,7 @@ mod tests {
             user_code: "ABCD1234".into(),
             expires_at: 1,
             email: None,
+            verified_at: 0,
         };
         let result = serde_json::to_string(&status("pending", Some(&record))).unwrap();
         assert!(!result.contains(&record.secret));
@@ -374,6 +454,7 @@ mod tests {
             user_code: "ABCD1234".into(),
             expires_at: 1,
             email: None,
+            verified_at: 0,
         };
         assert!(bound(
             &record,

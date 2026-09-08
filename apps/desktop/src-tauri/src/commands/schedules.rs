@@ -321,7 +321,11 @@ impl Scheduler {
                 })
                 .count()
                 >= 3;
-            let skip = overlap || capacity_busy || (late && saved.definition.missed == "skip");
+            let access_denied = self.coordinator.runtime.access.ensure().is_err();
+            let skip = access_denied
+                || overlap
+                || capacity_busy
+                || (late && saved.definition.missed == "skip");
             let mut request = saved.definition.request.clone();
             request.monitor_change = change.clone();
             request.id = uuid::Uuid::new_v4().to_string();
@@ -329,7 +333,9 @@ impl Scheduler {
                 change,
                 due_at: saved.next_at,
                 run_id: (!skip).then(|| request.id.clone()),
-                outcome: if overlap {
+                outcome: if access_denied {
+                    "Skipped: approved Jackalope access is required"
+                } else if overlap {
                     "Skipped: earlier run is active or interrupted"
                 } else if capacity_busy {
                     "Skipped: three tasks already active or interrupted"
@@ -614,6 +620,29 @@ mod tests {
                 account: None,
             });
         (directory, scheduler)
+    }
+    #[test]
+    fn execution_access_denial_skips_the_occurrence_without_creating_a_run() {
+        let (directory, mut scheduler) = fixture("once");
+        scheduler.coordinator.runtime.access =
+            Arc::new(super::super::execution_access::ExecutionAccess::new(true));
+        let now = Utc::now();
+        scheduler.ledger.lock().unwrap().schedules[0].next_at = now;
+        scheduler.tick(now).unwrap();
+        let ledger = scheduler.ledger.lock().unwrap().clone();
+        let schedule = &ledger.schedules[0];
+        assert!(schedule.history[0].outcome.contains("approved Jackalope"));
+        assert!(schedule.history[0].run_id.is_none());
+        assert!(schedule.last_run_id.is_none());
+        assert!(schedule.next_at > now);
+        assert!(scheduler
+            .coordinator
+            .runtime
+            .integration_runs()
+            .unwrap()
+            .is_empty());
+        drop(scheduler);
+        std::fs::remove_dir_all(directory).unwrap();
     }
     #[test]
     #[cfg(windows)]

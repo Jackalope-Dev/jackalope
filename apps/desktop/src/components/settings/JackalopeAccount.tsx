@@ -75,8 +75,8 @@ export function JackalopeAccount() {
   return (
     <div className="space-y-6">
       <p className="settings-row-description">
-        Connect the account you use for early access and invitations. Your projects and agent
-        accounts stay on this computer and work independently of this connection.
+        Connect the account you use for early access and invitations. Beta builds require approved
+        access to start new work. Your projects and agent accounts stay on this computer.
       </p>
       {!account && !error && <p role="status">Reading account connection…</p>}
       {account?.state === 'unavailable' && (
@@ -88,7 +88,7 @@ export function JackalopeAccount() {
           <p role="status" className="settings-row-description">
             {account.state === 'connected'
               ? 'Early access approved'
-              : 'Saved connection · access could not be checked. Retry when online.'}
+              : 'Access could not be checked. Previously verified beta access lasts up to 72 hours offline, or until the connection expires. Retry when online.'}
           </p>
         </div>
       )}

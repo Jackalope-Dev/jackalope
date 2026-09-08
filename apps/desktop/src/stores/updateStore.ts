@@ -7,6 +7,7 @@ export interface ReleaseStatus {
   channel: 'stable' | 'beta';
   betaAvailable: boolean;
   configured: boolean;
+  storeManaged?: boolean;
   availableVersion: string | null;
   notes: string | null;
 }

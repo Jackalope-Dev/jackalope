@@ -3,13 +3,21 @@ import { accessAdminPage } from './admin-page';
 import { randomToken } from './crypto';
 import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
-import { installerKey } from './routes';
+import { installerKey, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
 
 function mailConfigured(env: Env) {
   return !!(env.ACCESS_SECRET?.length >= 32 && env.SEQUENZY_API_KEY && env.ACCESS_EMAIL_FROM);
 }
 export async function accessReadiness(env: Env) {
+  if (storeUrl(env))
+    return {
+      enabled: env.EARLY_ACCESS_ENABLED === 'true',
+      mailConfigured: mailConfigured(env),
+      download: 'available',
+      version: null,
+      distribution: 'store',
+    };
   const key = installerKey(env);
   let download: 'available' | 'missing' | 'unconfigured' | 'unknown' = key
     ? 'unknown'

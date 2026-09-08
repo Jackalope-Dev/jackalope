@@ -554,6 +554,7 @@ impl TaskRuntime {
         &self,
         mut request: RunRequest,
     ) -> Result<String, String> {
+        self.access.ensure()?;
         self.ensure_history_saved()?;
         if crate::commands::release::installing() {
             return Err(

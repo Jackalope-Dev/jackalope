@@ -33,9 +33,11 @@ export function UpdateSettings() {
           ? 'Updates are available in the desktop app.'
           : !release
             ? 'Reading update settings…'
-            : !release.configured
-              ? 'This local build has no configured update service.'
-              : 'Get new improvements without reinstalling manually. You choose when to install; Jackalope closes and reopens.'}
+            : release.storeManaged
+              ? 'Microsoft Store manages updates for this installation. Open Microsoft Store > Library to check for updates.'
+              : !release.configured
+                ? 'This local build has no configured update service.'
+                : 'Get new improvements without reinstalling manually. You choose when to install; Jackalope closes and reopens.'}
       </p>
       {release?.configured && release.betaAvailable && (
         <div className="space-y-2">

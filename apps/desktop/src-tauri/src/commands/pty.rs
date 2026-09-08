@@ -34,6 +34,9 @@ pub async fn pty_spawn(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    app.state::<crate::commands::tasks::TaskRuntime>()
+        .access
+        .ensure()?;
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {

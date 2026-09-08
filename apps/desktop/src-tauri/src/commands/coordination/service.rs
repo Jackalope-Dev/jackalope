@@ -128,6 +128,7 @@ impl Coordinator {
     }
 
     pub(super) fn tick(&self) -> Result<(), String> {
+        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
         let _guard = crate::commands::integration::execution_guard()?;
@@ -251,6 +252,7 @@ impl Coordinator {
     }
 
     pub fn start_manual(&self, mut request: RunRequest) -> Result<String, String> {
+        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
         if let Some(previous_id) = &request.previous_run_id {

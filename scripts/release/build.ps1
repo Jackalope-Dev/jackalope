@@ -52,7 +52,8 @@ try {
     Run-Checked { pnpm build }
     Run-Checked { pnpm --filter '@jackalope/desktop' test }
     Run-Checked { cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features }
-    Run-Checked { pnpm tauri build --config (Join-Path $repoRoot 'output/release/tauri.release.json') --bundles 'nsis,msi' }
+    $releaseFeatures = if ($Channel -eq 'beta') { @('--features', 'beta-access') } else { @() }
+    Run-Checked { pnpm tauri build @releaseFeatures --config (Join-Path $repoRoot 'output/release/tauri.release.json') --bundles 'nsis,msi' }
     $targetRoot = if ($env:CARGO_TARGET_DIR) { [System.IO.Path]::GetFullPath($env:CARGO_TARGET_DIR) } else { Join-Path $repoRoot 'apps/desktop/src-tauri/target' }
     $installers = @(
         (Join-Path $targetRoot "release/bundle/nsis/Jackalope_${releaseVersion}_x64-setup.exe"),

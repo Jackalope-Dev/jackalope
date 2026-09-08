@@ -26,6 +26,26 @@ export function installerKey(env: Env) {
   const key = env.ACCESS_INSTALLER_KEY;
   return /^early-access\/v\d+\.\d+\.\d+\/[a-zA-Z0-9_.-]+\.exe$/.test(key) ? key : null;
 }
+export function storeUrl(env: Env) {
+  try {
+    const url = new URL(env.ACCESS_STORE_URL);
+    const path =
+      url.hostname === 'apps.microsoft.com'
+        ? /^\/detail\/[a-z0-9]{12}\/?$/i
+        : /^\/store\/apps\/[a-z0-9]{12}\/?$/i;
+    return url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      !url.hash &&
+      ['apps.microsoft.com', 'www.microsoft.com'].includes(url.hostname) &&
+      path.test(url.pathname)
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
 export async function accessRoutes(
   request: Request,
   env: Env,
@@ -149,17 +169,26 @@ export async function accessRoutes(
         ).results,
       );
     if (request.method === 'GET' && path === '/v1/access/me') {
+      const store = storeUrl(env);
       const key = installerKey(env);
-      const installer = key ? await env.RELEASES.head(key) : null;
+      const installer = !store && key ? await env.RELEASES.head(key) : null;
       return json({
         email: member.email,
         ...(await invitations(env, member)),
-        download: installer
-          ? { url: `${url.origin}/v1/access/download`, bytes: installer.size }
-          : null,
+        download: store
+          ? { url: `${url.origin}/v1/access/download`, kind: 'store' }
+          : installer
+            ? { url: `${url.origin}/v1/access/download`, bytes: installer.size }
+            : null,
       });
     }
     if (['GET', 'HEAD'].includes(request.method) && path === '/v1/access/download') {
+      const store = storeUrl(env);
+      if (store)
+        return new Response(null, {
+          status: 302,
+          headers: { ...headers, ...cors, location: store },
+        });
       const key = installerKey(env);
       if (!key) throw new AccessError(404, 'download_not_ready');
       const object = await env.RELEASES.get(key);

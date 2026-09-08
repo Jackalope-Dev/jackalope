@@ -18,6 +18,9 @@ impl TaskRuntime {
             .map_err(|e| e.to_string())?;
         owner.try_lock().map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
         let runtime = Self {
+            access: Arc::new(super::super::execution_access::ExecutionAccess::new(cfg!(
+                feature = "beta-access"
+            ))),
             knowledge: super::super::knowledge::KnowledgeStore::new(
                 directory.join("knowledge/entries.json"),
             ),

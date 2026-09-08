@@ -24,6 +24,7 @@ beforeAll(async () =>
   ),
 );
 beforeEach(async () => {
+  bindings.ACCESS_STORE_URL = '';
   bindings.ACCESS_INSTALLER_KEY = '';
   for (const table of [
     'access_invites',
@@ -72,6 +73,16 @@ it('checks the actual private object, distinguishes missing configuration and ne
   expect(JSON.stringify(await accessReadiness(bindings))).not.toContain('fixture.exe');
   expect((await accessReadiness({ ...bindings, SEQUENZY_API_KEY: '' })).mailConfigured).toBe(false);
   await env.RELEASES.delete(bindings.ACCESS_INSTALLER_KEY);
+});
+it('recognizes a configured Store listing and approves without a private installer override', async () => {
+  bindings.ACCESS_STORE_URL = 'https://apps.microsoft.com/detail/9NBLGGH4R315';
+  expect(await accessReadiness(bindings)).toMatchObject({
+    distribution: 'store',
+    download: 'available',
+    version: null,
+  });
+  const id = await person();
+  expect((await call('', { id, action: 'approve' })).status).toBe(200);
 });
 it('requires acknowledgement without a download, reports cooldown truthfully and rejects stale actions', async () => {
   const id = await person();

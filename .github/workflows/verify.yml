@@ -23,9 +23,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
       - run: rustup override set 1.98.1
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: verify-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            verify-windows-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
       - run: pnpm verify
       - run: pnpm tauri build --bundles nsis
+        if: vars.RELEASE_DISTRIBUTION != 'store' || github.event_name == 'workflow_dispatch'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: vars.RELEASE_DISTRIBUTION != 'store' || github.event_name == 'workflow_dispatch'
         with:
           name: windows-trial-installer
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe

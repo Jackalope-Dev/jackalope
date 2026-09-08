@@ -43,6 +43,7 @@ beforeAll(async () => {
   );
 });
 beforeEach(async () => {
+  bindings.ACCESS_STORE_URL = '';
   for (const table of [
     'access_sessions',
     'access_tokens',
@@ -298,6 +299,26 @@ it('requires the exact site origin, gives generic sign-in responses, and protect
   expect((await request('me', undefined, session)).status).toBe(401);
   await env.RELEASES.delete(bindings.ACCESS_INSTALLER_KEY);
   bindings.ACCESS_INSTALLER_KEY = '';
+});
+it('offers an approved member a Store link without a private installer and still rejects signed-out users', async () => {
+  const { session } = await admitted('store-owner@example.com');
+  bindings.ACCESS_STORE_URL = 'https://apps.microsoft.com/detail/9NBLGGH4R315';
+  expect((await request('download')).status).toBe(401);
+  expect(await (await request('me', undefined, session)).json()).toMatchObject({
+    download: { kind: 'store' },
+  });
+  const response = await request('download', undefined, session);
+  expect(response.status).toBe(302);
+  expect(response.headers.get('location')).toBe(bindings.ACCESS_STORE_URL);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  for (const url of [
+    'https://apps.microsoft.com.evil.example/detail/9NBLGGH4R315',
+    'https://evil.example/',
+    'javascript:alert(1)',
+  ]) {
+    bindings.ACCESS_STORE_URL = url;
+    expect((await request('download', undefined, session)).status).toBe(404);
+  }
 });
 it('queues branded transactional mail once with encrypted tokens and retries provider failures', async () => {
   const person = await member('person@example.com');

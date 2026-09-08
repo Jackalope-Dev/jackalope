@@ -47,6 +47,8 @@ oxc_resolver = "11"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+beta-access = []
+store = ["beta-access"]
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading"] }

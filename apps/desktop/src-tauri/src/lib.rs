@@ -45,7 +45,8 @@ pub fn run() {
             let runtime = TaskRuntime::new(directory.clone())?;
             let preferences = directory.join("preferences");
             std::fs::create_dir_all(&preferences)?;
-            app.manage(commands::account::AccountService::new(preferences.join("account.bin")));
+            app.manage(commands::account::AccountService::new(preferences.join("account.bin"), runtime.access.clone()));
+            commands::account::launch_refresh(app.handle().clone());
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));
             app.manage(commands::community::Community::load(preferences.join("community.json")));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
@@ -79,6 +80,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::execution_access::app_execution_access,
             commands::account::app_account_status,
             commands::account::app_account_connect,
             commands::account::app_account_open_browser,
