@@ -16,9 +16,7 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": [
-      "A Follow on X link is available in the shared footer."
-    ],
+    "items": ["A Follow on X link is available in the shared footer."],
     "note": "Website milestone, not a public product release."
   },
   {
