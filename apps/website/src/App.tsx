@@ -210,6 +210,9 @@ export function App({ path = '/' }: { path?: string }) {
           <a href="/agents/">Agents</a>
           <a href="/changelog/">Changelog</a>
           <a href="/blog/">Field notes</a>
+          <a href="https://x.com/JackalopeDotDev" rel="me">
+            Follow on X
+          </a>
           <a href="/access/">Your access</a>
           <a href="/privacy/">Privacy</a>
           <a href="/terms/">Terms</a>

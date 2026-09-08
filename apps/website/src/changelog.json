@@ -1,5 +1,27 @@
 [
   {
+    "id": "newsletter-artwork-stays-behind-the-signup",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Newsletter artwork stays behind the signup.",
+    "description": "The folding Echo outline now remains behind the early-access form as it animates.",
+    "items": [
+      "The signup surface keeps its text and controls clear in light and dark appearances."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "official-x-profile",
+    "date": "2026-09-08",
+    "status": "Website",
+    "title": "Follow Jackalope on X.",
+    "description": "The website now makes Jackalope's official X profile easy to find from every page.",
+    "items": [
+      "A Follow on X link is available in the shared footer."
+    ],
+    "note": "Website milestone, not a public product release."
+  },
+  {
     "id": "parallel-work-visual-language",
     "date": "2026-09-08",
     "status": "Website",

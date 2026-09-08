@@ -16,6 +16,25 @@ async function _verifyPage(page) {
     (await page.locator('.landing-kicker, .hero-edition, .echo-caption').count()) === 0,
     'No redundant eyebrow labels',
   );
+  assert(
+    await page.locator('.hero-inline-signup').evaluate((element) => {
+      const echoLayer = Number.parseInt(getComputedStyle(element, '::before').zIndex, 10);
+      const surfaceLayer = Number.parseInt(
+        getComputedStyle(element.querySelector(':scope > .signup')).zIndex,
+        10,
+      );
+      return echoLayer < surfaceLayer;
+    }),
+    'Signup echo remains behind its surface',
+  );
+  const xLink = page.getByRole('link', { name: 'Follow on X', exact: true });
+  assert(
+    (await xLink.getAttribute('href')) === 'https://x.com/JackalopeDotDev',
+    'Official X profile link',
+  );
+  assert((await xLink.getAttribute('rel')) === 'me', 'X profile relationship');
+  await xLink.focus();
+  assert(await xLink.evaluate((link) => link === document.activeElement), 'X link keyboard focus');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const [width, height] of [
     [1440, 1000],
