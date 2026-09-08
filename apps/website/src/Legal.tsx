@@ -68,9 +68,11 @@ const privacy: Section[] = [
         </p>
         <p>
           Someone may give us your email address to invite you. The inviting member can see the
-          invited email address and invitation status, including acceptance. A shared invitation
-          link reveals your email address to its owner when you accept. You can ignore an invitation
-          or contact us to request removal.
+          invited email address and invitation status, including acceptance, whether you requested a
+          download, and whether you connected a Jackalope desktop. A shared invitation link reveals
+          those milestones to its owner after you accept. It does not reveal your projects, agent
+          accounts, prompts, or task activity. You can ignore an invitation or contact us to request
+          removal.
         </p>
         <p>
           Sequenzy processes recipient addresses, email contents, and delivery information to send
@@ -110,8 +112,10 @@ const privacy: Section[] = [
         </p>
         <p>
           Update checks and downloads contact the configured release service and expose the network
-          information needed to deliver those requests. Local data, backups, and exported reports
-          remain under your control; uninstalling the app may leave saved data behind.
+          information needed to deliver those requests. For invited members, we retain the time of
+          the first authenticated download request and first desktop connection as referral
+          milestones. Local data, backups, and exported reports remain under your control;
+          uninstalling the app may leave saved data behind.
         </p>
       </>
     ),

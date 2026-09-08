@@ -1,4 +1,13 @@
-import { ArrowDownToLine, ArrowRight, Check, Copy, LoaderCircle, LogOut, Mail } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  ArrowRight,
+  Check,
+  Copy,
+  LoaderCircle,
+  LogOut,
+  Mail,
+  Share2,
+} from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
@@ -9,16 +18,25 @@ interface Invitation {
   email: string;
   status: string;
   expires_at: number;
+  accepted_at: number | null;
+  downloaded_at: number | null;
+  connected_at: number | null;
   last_sent: number;
 }
 interface Membership {
   email: string;
   limit: number;
   remaining: number;
+  accepted: number;
+  downloaded: number;
+  connected: number;
   shareUrl: string;
   invites: Invitation[];
   download: { url: string; bytes?: number; kind?: 'store' } | null;
 }
+
+const invitationMessage =
+  'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an early-access invitation if you want to try it.';
 
 export function AccessPage() {
   const [member, setMember] = useState<Membership | null>(null);
@@ -39,6 +57,10 @@ export function AccessPage() {
       })
       .catch(() => undefined);
   }, []);
+  useEffect(() => {
+    if (member && window.location.hash === '#invitations')
+      requestAnimationFrame(() => document.getElementById('invitations')?.scrollIntoView());
+  }, [member]);
   useEffect(() => {
     const url = new URL(window.location.href);
     const share = url.searchParams.get('invite');
@@ -159,10 +181,34 @@ export function AccessPage() {
       );
     });
   }
+  async function share(target: 'native' | 'x' | 'linkedin' | 'bluesky') {
+    if (!member) return;
+    const complete = `${invitationMessage}\n\n${member.shareUrl}`;
+    if (target === 'native' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Jackalope early access',
+          text: invitationMessage,
+          url: member.shareUrl,
+        });
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError'))
+          setError('Could not open sharing. Copy the invitation message instead.');
+      }
+      return;
+    }
+    const url =
+      target === 'x'
+        ? `https://x.com/intent/post?text=${encodeURIComponent(complete)}`
+        : target === 'linkedin'
+          ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(member.shareUrl)}`
+          : `https://bsky.app/intent/compose?text=${encodeURIComponent(complete)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
   return (
     <main id="main" className={`access-page page-width${member ? ' access-page-member' : ''}`}>
       <header className="access-heading">
-        <h1>{member ? 'Your access' : 'Early access'}</h1>
+        <h1>{member ? 'Your access' : invite ? 'You’re invited' : 'Early access'}</h1>
         {member && <p>Download Jackalope and manage your invitations.</p>}
       </header>
       {error && (
@@ -215,7 +261,7 @@ export function AccessPage() {
                   className="button button-primary button-download"
                   href={`${accessOrigin}/v1/access/download`}
                 >
-                  <span>
+                  <span className="access-progress-copy">
                     {member.download.kind === 'store'
                       ? 'Get it from Microsoft Store'
                       : 'Download for Windows'}
@@ -265,7 +311,11 @@ export function AccessPage() {
               </li>
             </ol>
           </section>
-          <section className="access-card access-invitations" aria-labelledby="invite-heading">
+          <section
+            id="invitations"
+            className="access-card access-invitations"
+            aria-labelledby="invite-heading"
+          >
             <div className="access-invite-intro">
               <div>
                 <h2 id="invite-heading">Invite people</h2>
@@ -280,6 +330,12 @@ export function AccessPage() {
                   <span>/{member.limit}</span>
                 </strong>
                 <small>invitations available</small>
+                {!!member.accepted && (
+                  <span>
+                    {member.accepted} accepted · {member.downloaded} downloaded · {member.connected}{' '}
+                    connected
+                  </span>
+                )}
               </div>
             </div>
             <div className="access-invite-options">
@@ -340,7 +396,67 @@ export function AccessPage() {
                 >
                   <Copy size={16} /> Copy invitation link
                 </button>
-                <small>You’ll see the email address of people who accept your invitations.</small>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  disabled={busy || member.remaining === 0}
+                  onClick={() =>
+                    act(async () => {
+                      await navigator.clipboard.writeText(
+                        `${invitationMessage}\n\n${member.shareUrl}`,
+                      );
+                      setNotice('Invitation message copied.');
+                    })
+                  }
+                >
+                  <Copy size={16} /> Copy message
+                </button>
+                <div className="access-share-actions">
+                  {typeof navigator.share === 'function' && (
+                    <button
+                      type="button"
+                      disabled={busy || member.remaining === 0}
+                      onClick={() => void share('native')}
+                    >
+                      <Share2 size={15} /> Share
+                    </button>
+                  )}
+                  <a
+                    aria-disabled={member.remaining === 0}
+                    tabIndex={member.remaining ? undefined : -1}
+                    onClick={(event) => {
+                      if (!member.remaining) event.preventDefault();
+                    }}
+                    href={`mailto:?subject=${encodeURIComponent('Try Jackalope early access')}&body=${encodeURIComponent(`${invitationMessage}\n\n${member.shareUrl}`)}`}
+                  >
+                    Email
+                  </a>
+                  <button
+                    type="button"
+                    disabled={member.remaining === 0}
+                    onClick={() => void share('x')}
+                  >
+                    X
+                  </button>
+                  <button
+                    type="button"
+                    disabled={member.remaining === 0}
+                    onClick={() => void share('linkedin')}
+                  >
+                    LinkedIn
+                  </button>
+                  <button
+                    type="button"
+                    disabled={member.remaining === 0}
+                    onClick={() => void share('bluesky')}
+                  >
+                    Bluesky
+                  </button>
+                </div>
+                <small>
+                  You’ll see who accepts, requests a download, and connects a desktop, not their
+                  projects or task activity.
+                </small>
               </div>
             </div>
             {member.invites.length > 0 && (
@@ -352,14 +468,20 @@ export function AccessPage() {
                       <div>
                         <strong>{item.email}</strong>
                         <small>
-                          {item.status === 'accepted'
-                            ? 'Accepted'
-                            : `Reserved until ${new Date(item.expires_at).toLocaleDateString()}`}
+                          {item.connected_at
+                            ? 'Connected Jackalope'
+                            : item.downloaded_at
+                              ? 'Opened the download'
+                              : item.status === 'accepted'
+                                ? 'Invitation accepted'
+                                : `Reserved until ${new Date(item.expires_at).toLocaleDateString()}`}
                         </small>
                       </div>
                       {item.status === 'accepted' ? (
-                        <span className="access-accepted">
-                          <Check size={16} /> Accepted
+                        <span
+                          className={`access-accepted${item.connected_at ? ' is-connected' : ''}`}
+                        >
+                          <Check size={16} /> {item.connected_at ? 'Connected' : 'Accepted'}
                         </span>
                       ) : (
                         <div className="access-invite-actions">
@@ -432,6 +554,28 @@ export function AccessPage() {
             </>
           ) : (
             <>
+              {invite && (
+                <div className="access-invite-welcome">
+                  <p>
+                    Jackalope brings your installed coding agents, isolated Git worktrees, and
+                    review into one calm desktop workspace.
+                  </p>
+                  <ul>
+                    <li>
+                      <Check className="access-invite-check" size={16} /> Use your existing agent
+                      accounts and local repositories
+                    </li>
+                    <li>
+                      <Check className="access-invite-check" size={16} /> Keep parallel changes
+                      separated until you review them
+                    </li>
+                    <li>
+                      <Check className="access-invite-check" size={16} /> Inspect results before
+                      integrating work
+                    </li>
+                  </ul>
+                </div>
+              )}
               <h2>{invite ? 'Accept an invitation' : 'Sign in'}</h2>
               <p>
                 {invite
@@ -470,8 +614,9 @@ export function AccessPage() {
               </form>
               {invite && (
                 <small>
-                  When you accept, the person who invited you can see your email address and
-                  acceptance status.
+                  When you accept, the person who invited you can see your email address and whether
+                  you request a download or connect a desktop. They cannot see your projects or task
+                  activity.
                 </small>
               )}
               <p className="access-fine">

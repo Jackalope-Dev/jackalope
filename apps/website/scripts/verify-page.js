@@ -25,9 +25,12 @@ async function _verifyPage(page) {
     [320, 720],
   ]) {
     await page.setViewportSize({ width, height });
-    const logo = await page.locator('.echo-art').boundingBox();
-    const center = await page.evaluate(() => document.documentElement.clientWidth / 2);
-    assert(Math.abs(logo.x + logo.width / 2 - center) < 1, `Centered logo at ${width}`);
+    await page.evaluate(() => scrollTo(0, 0));
+    const logo = await page.locator('.hero-poster .echo-art').boundingBox();
+    assert(
+      logo.x >= 0 && logo.x + logo.width <= width && logo.y >= 0,
+      `Visible hero mark at ${width}`,
+    );
     for (const id of ['inside', 'workflow', 'features', 'atmosphere', 'questions', 'download']) {
       await page.locator(`#${id}`).evaluate((el) => el.scrollIntoView({ behavior: 'instant' }));
       assert(
@@ -85,7 +88,7 @@ async function _verifyPage(page) {
     'Continuous footer color',
   );
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await page.getByRole('menuitem', { name: 'How it works' }).waitFor();
+  await page.getByRole('menuitem', { name: 'Product tour' }).waitFor();
   await page.keyboard.press('Escape');
   assert(
     await page
@@ -97,10 +100,17 @@ async function _verifyPage(page) {
   await page.keyboard.press('Enter');
   assert((await page.locator('#questions details[open]').count()) === 1, 'Keyboard FAQ');
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
+  const headerWaitlistButton = page
+    .locator('.landing-header')
+    .getByRole('button', { name: 'Join waitlist', exact: true });
+  await headerWaitlistButton.click();
   await page.getByRole('dialog', { name: 'Join the Jackalope waitlist' }).waitFor();
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => document.activeElement?.textContent === 'Join waitlist');
+  await headerWaitlistButton.evaluate((button) => {
+    if (document.activeElement !== button) {
+      throw new Error('Waitlist dialog did not return focus to its header trigger.');
+    }
+  });
   const play = page.getByRole('button', { name: 'Watch the app', exact: true });
   await play.click();
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 1);

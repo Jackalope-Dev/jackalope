@@ -1,3 +1,5 @@
+import { marketingPages } from './marketing-content.ts';
+
 export const siteOrigin = 'https://jackalope.dev';
 export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.digital' };
 
@@ -173,47 +175,52 @@ export const updates = [
 export const pages = [
   {
     path: '/',
-    title: 'Jackalope — A desktop workspace for coding agents',
+    title: 'Jackalope: Run Codex, Claude Code & coding agents in parallel',
     description:
-      'Manage coding agents, work and personal account profiles, project context, tasks, and reported usage in one desktop workspace. Join the early-access waitlist.',
+      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Keep project context, agent coordination, evidence, and code review in one Windows desktop workspace.',
   },
   {
     path: '/tour/',
-    title: 'Jackalope app tour — Tasks, coding agents & code review',
+    title: 'Jackalope app tour: Tasks, coding agents & code review',
     description: tour.description,
   },
   {
     path: '/blog/',
-    title: 'Field notes — Jackalope',
+    title: 'Field notes | Jackalope',
     description:
       'Notes from the Jackalope studio on building a calmer workspace and working thoughtfully with coding agents.',
   },
   {
     path: '/changelog/',
-    title: 'Changelog — Jackalope',
+    title: 'Changelog | Jackalope',
     description:
       'Follow Jackalope development milestones, website updates, and future public releases.',
   },
   {
     path: '/privacy/',
-    title: 'Privacy policy — Jackalope',
+    title: 'Privacy policy | Jackalope',
     description:
       'How Jackalope handles website, early-access, desktop, feedback, and optional usage information.',
   },
   {
     path: '/terms/',
-    title: 'Terms of service — Jackalope',
+    title: 'Terms of service | Jackalope',
     description:
       'Terms for Jackalope’s website and hosted early-access service, with desktop open-source license information.',
   },
   {
     path: '/access/',
-    title: 'Your early access — Jackalope',
+    title: 'Your early access | Jackalope',
     description: 'Your private Jackalope downloads and invitations.',
   },
+  ...marketingPages.map((page) => ({
+    path: page.path,
+    title: page.title,
+    description: page.description,
+  })),
   ...posts.map((post) => ({
     path: `/blog/${post.slug}/`,
-    title: `${post.title} — Jackalope`,
+    title: `${post.title} | Jackalope`,
     description: post.description,
   })),
 ];

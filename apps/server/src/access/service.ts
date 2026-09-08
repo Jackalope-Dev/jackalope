@@ -197,7 +197,7 @@ export async function acceptToken(env: Env, raw: string, now = Date.now()) {
 }
 export async function invitations(env: Env, member: Member, now = Date.now()) {
   const rows = await env.DB.prepare(
-    "SELECT id,email,status,created_at,expires_at,accepted_at,last_sent FROM access_invites WHERE owner_id=? AND (status='accepted' OR (status='pending' AND expires_at>?)) ORDER BY created_at DESC LIMIT 100",
+    "SELECT i.id,i.email,i.status,i.created_at,i.expires_at,i.accepted_at,i.last_sent,(SELECT invited.first_download_at FROM access_members invited WHERE invited.email=i.email AND invited.invited_by=i.owner_id) AS downloaded_at,(SELECT invited.first_desktop_at FROM access_members invited WHERE invited.email=i.email AND invited.invited_by=i.owner_id) AS connected_at FROM access_invites i WHERE i.owner_id=? AND (i.status='accepted' OR (i.status='pending' AND i.expires_at>?)) ORDER BY i.created_at DESC LIMIT 100",
   )
     .bind(member.id, now)
     .all<{
@@ -206,12 +206,20 @@ export async function invitations(env: Env, member: Member, now = Date.now()) {
       status: string;
       expires_at: number;
       accepted_at: number | null;
+      downloaded_at: number | null;
+      connected_at: number | null;
       last_sent: number;
     }>();
   const used = rows.results.filter((i) => i.status === 'accepted' || i.expires_at > now).length;
+  const accepted = rows.results.filter((i) => i.status === 'accepted').length;
+  const downloaded = rows.results.filter((i) => i.downloaded_at !== null).length;
+  const connected = rows.results.filter((i) => i.connected_at !== null).length;
   return {
     limit: member.invite_limit,
     remaining: Math.max(0, member.invite_limit - used),
+    accepted,
+    downloaded,
+    connected,
     shareUrl: `${env.ACCESS_WEB_ORIGIN}/access/?invite=${member.share_code}`,
     invites: rows.results.map((i) => ({
       ...i,

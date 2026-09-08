@@ -7,6 +7,7 @@ import { normalizePath } from './content';
 import '@jackalope/brand/fonts.css';
 import './styles.css';
 import './launch.css';
+import './growth.css';
 
 applyThemeTokens({ ...DEFAULT_THEME, isDark: false, atmosphere: 18 });
 

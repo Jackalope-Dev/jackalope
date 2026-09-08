@@ -7,7 +7,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
+import { navigateWorkspace, openSettings } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
 
 export function openCompanionTask(run: TaskRun) {
@@ -23,6 +23,20 @@ export function CompanionSources() {
   const error = useExecutionStore((state) => state.error);
   const message = useMascotStore((state) => state.message);
   const [latest, setLatest] = useState<{ id: string; text: string } | null>(null);
+  const [referralAccount, setReferralAccount] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let alive = true;
+    void nativeTask<{ state: string; email: string | null }>('app_account_status')
+      .then((account) => {
+        if (alive && account.state === 'connected' && account.email)
+          setReferralAccount(account.email);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let alive = true;
@@ -106,6 +120,21 @@ export function CompanionSources() {
             detail: latest.text,
             kind: 'info',
             onDismiss: () => setLatest(null),
+          },
+        ]
+      : [],
+  );
+  useCompanionNotices(
+    'referrals',
+    referralAccount
+      ? [
+          {
+            id: `referrals:${referralAccount}`,
+            title: 'Your invitations are ready',
+            detail: 'Invite a few developers to join Jackalope early access.',
+            kind: 'success',
+            actionLabel: 'Open invitations',
+            onOpen: () => openSettings('Invitations'),
           },
         ]
       : [],

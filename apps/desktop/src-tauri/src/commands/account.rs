@@ -57,6 +57,49 @@ pub struct AccountStatus {
     user_code: Option<String>,
     expires_at: Option<i64>,
 }
+#[derive(Deserialize)]
+struct ReferralResponse {
+    limit: u16,
+    remaining: u16,
+    accepted: u16,
+    downloaded: u16,
+    connected: u16,
+    #[serde(rename = "shareUrl")]
+    share_url: String,
+    invites: Vec<ReferralInviteResponse>,
+}
+#[derive(Deserialize)]
+struct ReferralInviteResponse {
+    id: String,
+    email: String,
+    status: String,
+    expires_at: i64,
+    accepted_at: Option<i64>,
+    downloaded_at: Option<i64>,
+    connected_at: Option<i64>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferralView {
+    limit: u16,
+    remaining: u16,
+    accepted: u16,
+    downloaded: u16,
+    connected: u16,
+    share_url: String,
+    invites: Vec<ReferralInvite>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferralInvite {
+    id: String,
+    email: String,
+    status: String,
+    expires_at: i64,
+    accepted_at: Option<i64>,
+    downloaded_at: Option<i64>,
+    connected_at: Option<i64>,
+}
 fn status(state: &'static str, record: Option<&SavedAccount>) -> AccountStatus {
     AccountStatus {
         state,
@@ -90,6 +133,61 @@ fn bound(record: &SavedAccount, api: &reqwest::Url) -> Result<(), String> {
         );
     }
     Ok(())
+}
+fn parse_referrals(data: serde_json::Value, web: &reqwest::Url) -> Result<ReferralView, String> {
+    let response: ReferralResponse = serde_json::from_value(data)
+        .map_err(|_| "The account service returned invalid invitations.")?;
+    let share = reqwest::Url::parse(&response.share_url)
+        .map_err(|_| "The account service returned an invalid invitation link.")?;
+    let query: Vec<_> = share.query_pairs().collect();
+    if share.scheme() != web.scheme()
+        || share.host_str() != web.host_str()
+        || share.port_or_known_default() != web.port_or_known_default()
+        || !share.username().is_empty()
+        || share.password().is_some()
+        || share.path() != "/access/"
+        || share.fragment().is_some()
+        || query.len() != 1
+        || query[0].0 != "invite"
+        || !valid_token(&query[0].1)
+        || response.remaining > response.limit
+        || response.accepted > response.limit
+        || response.downloaded > response.accepted
+        || response.connected > response.accepted
+        || response.invites.len() > 100
+    {
+        return Err("The account service returned invalid invitations.".into());
+    }
+    let mut invites = Vec::with_capacity(response.invites.len());
+    for invite in response.invites {
+        if uuid::Uuid::parse_str(&invite.id).is_err()
+            || invite.email.len() > 254
+            || !invite.email.contains('@')
+            || !matches!(invite.status.as_str(), "pending" | "accepted")
+            || invite.downloaded_at.is_some() && invite.accepted_at.is_none()
+            || invite.connected_at.is_some() && invite.accepted_at.is_none()
+        {
+            return Err("The account service returned invalid invitations.".into());
+        }
+        invites.push(ReferralInvite {
+            id: invite.id,
+            email: invite.email,
+            status: invite.status,
+            expires_at: invite.expires_at,
+            accepted_at: invite.accepted_at,
+            downloaded_at: invite.downloaded_at,
+            connected_at: invite.connected_at,
+        });
+    }
+    Ok(ReferralView {
+        limit: response.limit,
+        remaining: response.remaining,
+        accepted: response.accepted,
+        downloaded: response.downloaded,
+        connected: response.connected,
+        share_url: response.share_url,
+        invites,
+    })
 }
 async fn request(
     api: &reqwest::Url,
@@ -329,6 +427,59 @@ pub async fn app_account_open_browser(
         })
 }
 #[tauri::command]
+pub async fn app_account_referrals(
+    app: AppHandle,
+    state: State<'_, AccountService>,
+) -> Result<ReferralView, String> {
+    let _guard = state.operation.lock().await;
+    let (api, web) = endpoints(&app)?;
+    let record = state
+        .read()?
+        .ok_or("Connect your Jackalope account to view invitations.")?;
+    bound(&record, &api)?;
+    if record.email.is_none() {
+        return Err("Finish connecting your Jackalope account to view invitations.".into());
+    }
+    let (code, data) = request(
+        &api,
+        "/v1/desktop/referrals",
+        reqwest::Method::GET,
+        Some(&record.secret),
+        None,
+    )
+    .await?;
+    if code == 401 {
+        state.access.revoke();
+        account_storage::remove(&state.path)?;
+        return Err("Your account connection expired. Connect again to view invitations.".into());
+    }
+    if code != 200 {
+        return Err(failure(code));
+    }
+    parse_referrals(data, &web)
+}
+#[tauri::command]
+pub async fn app_account_open_referrals(
+    app: AppHandle,
+    state: State<'_, AccountService>,
+) -> Result<(), String> {
+    let _guard = state.operation.lock().await;
+    let (api, web) = endpoints(&app)?;
+    let record = state.read()?.ok_or("Connect your Jackalope account first.")?;
+    bound(&record, &api)?;
+    if record.email.is_none() {
+        return Err("Finish connecting your Jackalope account first.".into());
+    }
+    app.shell()
+        .open(
+            web.join("/access/#invitations")
+                .map_err(|_| "Invalid account page.")?
+                .as_str(),
+            None,
+        )
+        .map_err(|_| "Could not open your browser. Check your default browser and try again.".into())
+}
+#[tauri::command]
 pub async fn app_account_poll(
     app: AppHandle,
     state: State<'_, AccountService>,
@@ -473,6 +624,47 @@ mod tests {
             &"a".repeat(63),
         ] {
             assert!(!valid_token(token));
+        }
+    }
+    #[test]
+    fn referral_responses_are_bounded_to_the_configured_website() {
+        let web = reqwest::Url::parse("https://jackalope.dev/").unwrap();
+        let invitation = uuid::Uuid::new_v4().to_string();
+        let result = parse_referrals(
+            serde_json::json!({
+                "limit": 5,
+                "remaining": 4,
+                "accepted": 1,
+                "downloaded": 1,
+                "connected": 1,
+                "shareUrl": format!("https://jackalope.dev/access/?invite={}", "a".repeat(64)),
+                "invites": [{
+                    "id": invitation,
+                    "email": "friend@example.invalid",
+                    "status": "accepted",
+                    "expires_at": 1,
+                    "accepted_at": 1,
+                    "downloaded_at": 1,
+                    "connected_at": 2
+                }]
+            }),
+            &web,
+        )
+        .unwrap();
+        assert_eq!(result.remaining, 4);
+        for share_url in [
+            format!("https://evil.example/access/?invite={}", "a".repeat(64)),
+            format!("https://jackalope.dev/other/?invite={}", "a".repeat(64)),
+            "https://jackalope.dev/access/?invite=short".into(),
+        ] {
+            assert!(parse_referrals(
+                serde_json::json!({
+                    "limit": 5, "remaining": 5, "accepted": 0, "downloaded": 0, "connected": 0,
+                    "shareUrl": share_url, "invites": []
+                }),
+                &web,
+            )
+            .is_err());
         }
     }
 }

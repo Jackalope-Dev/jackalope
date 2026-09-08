@@ -1,14 +1,18 @@
 import { z } from 'zod';
 import { randomToken, tokenHash } from './crypto';
-import { AccessError, type Member, tokenSchema } from './service';
+import { AccessError, invitations, type Member, tokenSchema } from './service';
 
 const lifetime = 90 * 86400000;
 export async function deviceMember(env: Env, hash: string, now = Date.now()) {
   return env.DB.prepare(
-    "SELECT d.id,d.expires_at AS expiresAt,m.email FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL",
+    "SELECT d.id,d.expires_at AS expiresAt,m.id AS memberId,m.email FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL",
   )
     .bind(hash, now)
-    .first<{ id: string; expiresAt: number; email: string }>();
+    .first<{ id: string; expiresAt: number; memberId: string; email: string }>();
+}
+
+function publicDevice(member: NonNullable<Awaited<ReturnType<typeof deviceMember>>>) {
+  return { id: member.id, expiresAt: member.expiresAt, email: member.email };
 }
 export async function deviceRoutes(
   request: Request,
@@ -60,13 +64,22 @@ export async function deviceRoutes(
     if (request.method === 'GET' && url.pathname === '/v1/desktop/me') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
-      return json({ ...member, status: 'approved' });
+      return json({ ...publicDevice(member), status: 'approved' });
+    }
+    if (request.method === 'GET' && url.pathname === '/v1/desktop/referrals') {
+      const device = await deviceMember(env, hash, now);
+      if (!device) throw new AccessError(401, 'device_sign_in_required');
+      const member = await env.DB.prepare('SELECT * FROM access_members WHERE id=?')
+        .bind(device.memberId)
+        .first<Member>();
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      return json(await invitations(env, member, now));
     }
     if (request.method !== 'POST' || url.pathname !== '/v1/desktop/exchange')
       throw new AccessError(404, 'not_found');
     // The native client keeps this secret, so a lost exchange response can be retried safely.
     const existing = await deviceMember(env, hash, now);
-    if (existing) return json({ ...existing, status: 'approved' });
+    if (existing) return json({ ...publicDevice(existing), status: 'approved' });
     const link = await env.DB.prepare(
       'SELECT member_id,polled_at FROM access_device_links WHERE hash=? AND expires_at>? AND used_at IS NULL',
     )
@@ -88,10 +101,13 @@ export async function deviceRoutes(
       env.DB.prepare(
         'UPDATE access_device_links SET used_at=? WHERE hash=? AND EXISTS(SELECT 1 FROM access_devices WHERE hash=?)',
       ).bind(now, hash, hash),
+      env.DB.prepare(
+        'UPDATE access_members SET first_desktop_at=coalesce(first_desktop_at,?) WHERE id=(SELECT member_id FROM access_devices WHERE hash=?)',
+      ).bind(now, hash),
     ]);
     const connected = await deviceMember(env, hash, now);
     if (!connected) throw new AccessError(410, 'device_link_expired');
-    return json({ ...connected, status: 'approved' });
+    return json({ ...publicDevice(connected), status: 'approved' });
   } catch (error) {
     if (error instanceof AccessError) return json({ error: error.code }, error.status);
     if (error instanceof z.ZodError) return json({ error: 'invalid_request' }, 400);

@@ -61,6 +61,34 @@
 .access-entry .text-link {
   margin-top: 22px;
 }
+.access-invite-welcome {
+  padding: 0 0 28px 20px;
+  margin-bottom: 28px;
+  border-left: 2px solid var(--color-accent-ink);
+  border-bottom: 1px solid var(--color-border);
+}
+.access-invite-welcome p {
+  margin-top: 0;
+  color: var(--color-text-primary);
+}
+.access-invite-welcome ul {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 18px 0 0;
+  list-style: none;
+}
+.access-invite-welcome li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.access-invite-check {
+  flex-shrink: 0;
+  color: var(--color-accent-ink);
+}
 .access-card label {
   display: block;
   font-size: 13px;
@@ -216,6 +244,12 @@
 .access-places small {
   margin-top: 6px;
 }
+.access-progress-copy {
+  display: block;
+  margin-top: 5px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
 .access-invite-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -228,6 +262,34 @@
 }
 .access-invite-options p {
   font-size: 14px;
+}
+.access-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.access-share-actions button,
+.access-share-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 7px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.access-share-actions a[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.55;
 }
 .access-invite-list {
   border-top: 1px solid var(--color-border);
@@ -280,6 +342,9 @@
   color: var(--color-accent-ink);
   font-size: 12px;
   flex-shrink: 0;
+}
+.access-accepted.is-connected {
+  color: var(--color-success);
 }
 .access-fine {
   font-size: 12px;

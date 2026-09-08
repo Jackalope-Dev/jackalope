@@ -5,6 +5,7 @@ import { ArrowDown, ArrowRight, Check, GitBranch, Moon, Play, Plus, Sun } from '
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
+import { Signup } from './Signup';
 
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
@@ -84,6 +85,33 @@ const examples = [
     context: 'Design brief + project instructions',
     file: 'Navigation.tsx',
     diff: '+ <ProjectNavigation />\n+ <QuickActions />',
+  },
+];
+
+const differentiators = [
+  {
+    title: 'Agents receive the project, not an empty prompt.',
+    description:
+      'Deliver bounded instructions, lessons, relevant history, workflows, tools, and coordination updates with an inspectable context receipt.',
+    href: '/features/project-context-for-coding-agents/',
+  },
+  {
+    title: 'Evidence stays attached to the code that produced it.',
+    description:
+      'Keep checks, previews, outcomes, and corrections tied to an exact task snapshot so stale proof cannot quietly look current.',
+    href: '/guides/review-ai-generated-code/',
+  },
+  {
+    title: 'The combination gets its own review.',
+    description:
+      'Prepare a combined patch, recheck every source and the target branch, and integrate only after an explicit decision.',
+    href: '/git-worktrees-for-ai-agents/',
+  },
+  {
+    title: 'Repeatable work keeps its memory and boundaries.',
+    description:
+      'Turn good outcomes into workflows or recurring tasks with inputs, gates, accounts, missed-run rules, and review history intact.',
+    href: '/features/recurring-coding-agent-tasks/',
   },
 ];
 
@@ -184,28 +212,64 @@ export function LandingPage({
   return (
     <main id="main" className="landing">
       <section className="landing-hero" aria-labelledby="hero-title">
-        <div className="landing-width">
-          <div className="hero-poster">
-            <HeroMark />
-            <h1 id="hero-title">
-              <span>Many agents.</span> <span>One workspace.</span>
-            </h1>
-          </div>
-          <p className="hero-description">
-            A desktop app to run coding agents in parallel, manage project context, and review their
-            changes.
-          </p>
-          <div className="hero-conversion">
-            <div className="hero-actions">
-              {action}
-              <button type="button" onClick={onPlay} className="landing-text-button">
-                <Play size={15} fill="currentColor" />
-                Watch the app
-              </button>
+        <div className="landing-width landing-hero-grid">
+          <div>
+            <div className="hero-poster">
+              <HeroMark />
+              <h1 id="hero-title">
+                <span>Run coding agents in parallel.</span> <span>Keep the work coherent.</span>
+              </h1>
             </div>
-            <span className="availability">
-              {available ? `Windows x64 · ${releaseVersion ?? 'Available now'}` : 'Coming soon'}
-            </span>
+            <p className="hero-description">
+              A Windows desktop workspace for{' '}
+              <strong>Codex, Claude Code, Grok, and OpenCode</strong>, with project context,
+              isolated Git worktrees, and review before integration.
+            </p>
+            <div className="hero-conversion">
+              {available ? (
+                <div className="hero-actions">
+                  {action}
+                  <button type="button" onClick={onPlay} className="landing-text-button">
+                    <Play size={15} fill="currentColor" />
+                    Watch the app
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="hero-inline-signup">
+                    <Signup />
+                  </div>
+                  <button type="button" onClick={onPlay} className="landing-text-button">
+                    <Play size={15} fill="currentColor" />
+                    Watch the app
+                  </button>
+                </>
+              )}
+              <span className="availability">
+                {available
+                  ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
+                  : 'Windows prerelease · No payment to join'}
+              </span>
+            </div>
+          </div>
+          <div className="hero-visual">
+            <button
+              type="button"
+              className="hero-window"
+              onClick={onPlay}
+              aria-label="Play the 33-second Jackalope app tour"
+            >
+              <span className="hero-window-meta">
+                <span>ACTUAL APP / ATLAS SAMPLE PROJECT</span>
+                <span>01 / TASKS</span>
+              </span>
+              <img
+                src={`/media/tasks${dark ? '' : '-light'}.png`}
+                width="1440"
+                height="840"
+                alt="Jackalope task board with separate project work ready, running, and under review"
+              />
+            </button>
           </div>
           <div className="agent-line">
             <p>
@@ -216,6 +280,20 @@ export function LandingPage({
             </a>
           </div>
         </div>
+      </section>
+
+      <section className="landing-width evidence-rail" aria-label="Jackalope product principles">
+        {[
+          ['01 / LOCAL', 'Your repositories and task workspaces stay on your computer.'],
+          ['02 / ISOLATED', 'Independent tasks can work in separate Git worktrees.'],
+          ['03 / CONTEXTUAL', 'Project knowledge and selected tools travel with the task.'],
+          ['04 / REVIEWED', 'Integration stays a visible, explicit decision.'],
+        ].map(([label, description]) => (
+          <div key={label}>
+            <small>{label}</small>
+            <strong>{description}</strong>
+          </div>
+        ))}
       </section>
 
       <section className="workspace-section" id="inside" aria-labelledby="inside-title">
@@ -263,6 +341,28 @@ export function LandingPage({
               </Tabs.Content>
             ))}
           </Tabs.Root>
+        </div>
+      </section>
+
+      <section className="landing-width differentiators" aria-labelledby="different-title">
+        <div className="differentiators-heading">
+          <h2 id="different-title">Worktrees separate files. Jackalope keeps the work together.</h2>
+          <p>
+            Parallel sessions are only the beginning. Jackalope preserves the decisions, evidence,
+            and project relationships around every task.
+          </p>
+        </div>
+        <div className="differentiator-list">
+          {differentiators.map((item, index) => (
+            <div className="differentiator-row" key={item.title}>
+              <span className="differentiator-index">0{index + 1}</span>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              <a href={item.href} aria-label={`Learn more: ${item.title}`}>
+                <ArrowRight size={18} />
+              </a>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -374,7 +474,7 @@ export function LandingPage({
             <div>
               <BrandMark />
               <span>Your workspace</span>
-              <span>— &nbsp; □ &nbsp; ×</span>
+              <span>− &nbsp; □ &nbsp; ×</span>
             </div>
             <div className="atmosphere-canvas">
               <BrandMark />

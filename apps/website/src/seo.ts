@@ -1,4 +1,5 @@
 import { company, normalizePath, pages, posts, siteOrigin, tour, updates } from './content.ts';
+import { marketingPages } from './marketing-content.ts';
 
 const escapeHtml = (value: string) =>
   value.replace(
@@ -13,7 +14,8 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   const normalized = normalizePath(path);
   const page = pages.find((item) => item.path === normalized);
   const post = posts.find((item) => normalized === `/blog/${item.slug}/`);
-  const title = page?.title || 'Page not found — Jackalope';
+  const marketingPage = marketingPages.find((item) => item.path === normalized);
+  const title = page?.title || 'Page not found | Jackalope';
   const description = page?.description || 'Find your way back to Jackalope.';
   const url = `${origin}${normalized}`;
   const graph: Record<string, unknown>[] = [
@@ -24,6 +26,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       url: origin,
       description: pages[0].description,
       logo: `${origin}/icon-256.png`,
+      sameAs: ['https://github.com/Jackalope-Dev/jackalope'],
       parentOrganization: { '@type': 'Organization', name: company.name, url: company.url },
     },
     {
@@ -36,9 +39,11 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     {
       '@type': post
         ? 'BlogPosting'
-        : normalized === '/blog/' || normalized === '/changelog/'
-          ? 'CollectionPage'
-          : 'WebPage',
+        : normalized.startsWith('/guides/')
+          ? 'TechArticle'
+          : normalized === '/blog/' || normalized === '/changelog/' || normalized === '/agents/'
+            ? 'CollectionPage'
+            : 'WebPage',
       '@id': url,
       url,
       name: title,
@@ -55,14 +60,57 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
             image: `${origin}/social-preview.png`,
             mainEntityOfPage: url,
           }
-        : {}),
+        : normalized.startsWith('/guides/')
+          ? {
+              datePublished: '2026-09-08',
+              dateModified: '2026-09-08',
+              author: { '@type': 'Organization', name: company.name, url: company.url },
+              publisher: { '@id': `${origin}/#organization` },
+              image: `${origin}/social-preview.png`,
+              mainEntityOfPage: url,
+            }
+          : {}),
     },
   ];
+  if (normalized === '/') {
+    graph.push({
+      '@type': 'SoftwareApplication',
+      '@id': `${origin}/#application`,
+      name: 'Jackalope',
+      url: origin,
+      applicationCategory: 'DeveloperApplication',
+      operatingSystem: 'Windows',
+      description,
+      image: `${origin}/social-preview.png`,
+      featureList: [
+        'Parallel coding-agent tasks',
+        'Isolated Git worktrees',
+        'Project context and MCP connections',
+        'Snapshot-bound code review evidence',
+        'Recurring tasks and reusable workflows',
+        'Agent account profiles and reported usage',
+      ],
+      publisher: { '@id': `${origin}/#organization` },
+    });
+    graph[2].mainEntity = { '@id': `${origin}/#application` };
+  }
   if (page && normalized !== '/') {
     const ancestors = [
       { name: 'Jackalope', item: `${origin}/` },
       ...(post ? [{ name: 'Field notes', item: `${origin}/blog/` }] : []),
-      { name: post?.title || title.replace(/ — Jackalope$/, ''), item: url },
+      ...(marketingPage && normalized !== '/agents/'
+        ? [
+            {
+              name: normalized.startsWith('/agents/')
+                ? 'Agents'
+                : normalized.startsWith('/guides/')
+                  ? 'Guides'
+                  : 'Product',
+              item: normalized.startsWith('/agents/') ? `${origin}/agents/` : `${origin}/`,
+            },
+          ]
+        : []),
+      { name: post?.title || title.replace(/ [|:] Jackalope$/, ''), item: url },
     ];
     graph.push({
       '@type': 'BreadcrumbList',
@@ -115,7 +163,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     `<meta property="og:image" content="${origin}/social-preview.png" />`,
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
-    `<meta property="og:image:alt" content="Jackalope — Big ideas. Room to run. A desktop workspace for coding agents." />`,
+    `<meta property="og:image:alt" content="Jackalope: Many agents. One workspace. Run coding agents in parallel, keep project context, and review changes." />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
@@ -153,9 +201,9 @@ export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
     .join('\n');
   return {
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
-    'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${posts.find((post) => page.path === `/blog/${post.slug}/`) ? `<lastmod>${posts.find((post) => page.path === `/blog/${post.slug}/`)?.date}</lastmod>` : ''}</url>`).join('')}</urlset>`,
+    'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${posts.find((post) => page.path === `/blog/${post.slug}/`) ? `<lastmod>${posts.find((post) => page.path === `/blog/${post.slug}/`)?.date}</lastmod>` : marketingPages.some((entry) => entry.path === page.path) || page.path === '/' ? '<lastmod>2026-09-08</lastmod>' : ''}</url>`).join('')}</urlset>`,
     'llms.txt': `${intro}## Agent support\n\nNative adapters: Codex, Claude Code, Grok Build, and OpenCode. Tasks, session continuation, managed account profiles, and reported task usage are implemented. Project-selected MCP connections are delivered to Codex and Claude Code; Grok supports on-demand discovery through the HTTP bridge. OpenCode uses its own CLI configuration. Grok and OpenCode validate provider access on launch. Gemini CLI is under evaluation, not supported yet. See ${origin}/#agents for coverage and limits.\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
-    'llms-full.txt': `${intro}${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${post.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note}`).join('\n\n')}\n`,
+    'llms-full.txt': `${intro}${marketingPages.map((page) => `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${page.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.bullets ? `\n\n${section.bullets.map((item) => `- ${item}`).join('\n')}` : ''}`).join('\n\n')}`).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${post.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note}`).join('\n\n')}\n`,
     'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
     'site.webmanifest': JSON.stringify({
       name: 'Jackalope',

@@ -203,6 +203,22 @@ async function _captureSetup(page) {
       invoke: async (command, args) => {
         window.__auditCalls.push({ command, args });
         if (window.__auditErrors[command]) throw new Error(window.__auditErrors[command]);
+        if (command === 'app_execution_access')
+          return { required: false, allowed: true, validUntil: null };
+        if (command === 'app_account_status')
+          return (
+            window.__accountStatus ?? {
+              state: 'disconnected',
+              email: null,
+              userCode: null,
+              expiresAt: null,
+            }
+          );
+        if (command === 'app_account_referrals') {
+          if (!window.__referrals) throw new Error('Connect your Jackalope account first.');
+          return window.__referrals;
+        }
+        if (command === 'app_account_open_referrals') return null;
         if (command === 'release_status') return { version: '0.1.0', activeTasks: 0 };
         if (command === 'task_start') {
           const request = args.request;

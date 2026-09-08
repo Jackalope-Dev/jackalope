@@ -8,6 +8,8 @@ import { BrandMark } from './BrandMark';
 import { JournalPage } from './Journal';
 import { LandingPage } from './LandingPage';
 import { LegalPage } from './Legal';
+import { MarketingPage } from './MarketingPage';
+import { marketingPages } from './marketing-content';
 import { Newsletter, WaitlistButton } from './Signup';
 
 const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
@@ -67,6 +69,7 @@ const faqs = [
 
 export function App({ path = '/' }: { path?: string }) {
   const home = path === '/';
+  const marketingPage = marketingPages.find((page) => page.path === path);
   const [dark, setDark] = useState(false);
   const [palette, setPalette] = useState(() =>
     PRESET_THEMES.findIndex((theme) => theme.id === DEFAULT_THEME.id),
@@ -91,13 +94,10 @@ export function App({ path = '/' }: { path?: string }) {
             Jackalope
           </a>
           <nav className="desktop-nav" aria-label="Main navigation">
-            <a href={home ? '#workflow' : '/#workflow'}>How it works</a>
-            <a href={home ? '#features' : '/#features'}>Features</a>
-            <a
-              href={home ? '#inside' : '/changelog/'}
-              aria-current={path === '/changelog/' ? 'page' : undefined}
-            >
-              {home ? 'Inside the app' : 'Changelog'}
+            <a href={home ? '#inside' : '/#inside'}>Product</a>
+            <a href="/parallel-coding-agents/">Parallel agents</a>
+            <a href="/agents/" aria-current={path.startsWith('/agents/') ? 'page' : undefined}>
+              Agents
             </a>
             <a href="/blog/" aria-current={path.startsWith('/blog/') ? 'page' : undefined}>
               Field notes
@@ -137,9 +137,11 @@ export function App({ path = '/' }: { path?: string }) {
                   collisionPadding={16}
                 >
                   {[
-                    ['How it works', '/#workflow'],
-                    ['Features', '/#features'],
-                    ['Inside the app', '/#inside'],
+                    ['Product tour', '/#inside'],
+                    ['Parallel coding agents', '/parallel-coding-agents/'],
+                    ['Git worktrees for agents', '/git-worktrees-for-ai-agents/'],
+                    ['Supported agents', '/agents/'],
+                    ['Review AI-generated code', '/guides/review-ai-generated-code/'],
                     ['Make it yours', '/#atmosphere'],
                     ['Questions', '/#questions'],
                     ['Changelog', '/changelog/'],
@@ -185,6 +187,8 @@ export function App({ path = '/' }: { path?: string }) {
         <AccessPage />
       ) : path === '/privacy/' || path === '/terms/' ? (
         <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
+      ) : marketingPage ? (
+        <MarketingPage page={marketingPage} dark={dark} />
       ) : (
         <JournalPage path={path} dark={dark} />
       )}
@@ -201,6 +205,9 @@ export function App({ path = '/' }: { path?: string }) {
         </p>
         <nav className="footer-links" aria-label="Footer navigation">
           <a href="/tour/">App tour</a>
+          <a href="/parallel-coding-agents/">Parallel agents</a>
+          <a href="/git-worktrees-for-ai-agents/">Git worktrees</a>
+          <a href="/agents/">Agents</a>
           <a href="/changelog/">Changelog</a>
           <a href="/blog/">Field notes</a>
           <a href="/access/">Your access</a>

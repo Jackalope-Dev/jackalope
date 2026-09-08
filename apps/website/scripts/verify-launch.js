@@ -19,6 +19,17 @@ async function _verifyLaunch(page) {
     '/changelog/',
     '/privacy/',
     '/terms/',
+    '/parallel-coding-agents/',
+    '/git-worktrees-for-ai-agents/',
+    '/agents/',
+    '/agents/codex/',
+    '/agents/claude-code/',
+    '/agents/grok/',
+    '/agents/opencode/',
+    '/guides/run-codex-and-claude-code-in-parallel/',
+    '/guides/review-ai-generated-code/',
+    '/features/project-context-for-coding-agents/',
+    '/features/recurring-coding-agent-tasks/',
     '/blog/room-for-the-work/',
     '/blog/from-brief-to-review/',
     '/blog/work-and-personal-accounts/',
@@ -79,7 +90,10 @@ async function _verifyLaunch(page) {
       body: JSON.stringify(reply === 'success' ? { success: true } : { success: false }),
     });
   });
-  await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
+  const headerWaitlistButton = page
+    .locator('.landing-header')
+    .getByRole('button', { name: 'Join waitlist', exact: true });
+  await headerWaitlistButton.click();
   const dialog = page.getByRole('dialog', { name: 'Join the Jackalope waitlist' });
   const input = dialog.getByRole('textbox', { name: 'Email address' });
   const submit = dialog.getByRole('button', { name: 'Join the waitlist', exact: true });
@@ -104,7 +118,11 @@ async function _verifyLaunch(page) {
   await dialog.getByRole('status').waitFor();
   assert((await dialog.getByRole('form').count()) === 0, 'Success replaces form');
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => document.activeElement?.textContent === 'Join waitlist');
+  await headerWaitlistButton.evaluate((button) => {
+    if (document.activeElement !== button) {
+      throw new Error('Waitlist dialog did not return focus to its header trigger.');
+    }
+  });
   await page.unroute(signupRoutes);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert(

@@ -23,7 +23,13 @@ beforeAll(async () => {
   );
 });
 beforeEach(async () => {
-  for (const name of ['access_device_links', 'access_devices', 'access_sessions', 'access_members'])
+  for (const name of [
+    'access_device_links',
+    'access_devices',
+    'access_sessions',
+    'access_invites',
+    'access_members',
+  ])
     await env.DB.prepare(`DELETE FROM ${name}`).run();
 });
 async function member() {
@@ -93,6 +99,11 @@ it('requires browser approval and native proof; retrying a lost exchange respons
   expect(
     (await env.DB.prepare('SELECT count(*) AS n FROM access_devices').first<{ n: number }>())?.n,
   ).toBe(1);
+  expect(
+    await env.DB.prepare('SELECT first_desktop_at FROM access_members WHERE id=?')
+      .bind(owner.id)
+      .first(),
+  ).toEqual({ first_desktop_at: expect.any(Number) });
   const list = await call('/v1/access/devices', 'GET', undefined, owner.session, true);
   const devices = await list.json<{ id: string }[]>();
   expect(devices).toHaveLength(1);
@@ -191,4 +202,60 @@ it('a different member cannot revoke a device and native disconnect is idempoten
   expect((await call('/v1/desktop/session', 'DELETE', undefined, flow.secret)).status).toBe(200);
   expect((await call('/v1/desktop/session', 'DELETE', undefined, flow.secret)).status).toBe(200);
   expect((await call('/v1/desktop/me', 'GET', undefined, flow.secret)).status).toBe(401);
+});
+it('returns bounded invitation progress to the connected desktop without exposing device secrets', async () => {
+  const owner = await member();
+  const flow = await start();
+  await approve(owner.session, flow.verification);
+  expect((await call('/v1/desktop/exchange', 'POST', undefined, flow.secret)).status).toBe(200);
+  const invitedId = crypto.randomUUID();
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO access_members(id,email,status,created_at,approved_at,verified_at,source,invited_by,share_code) VALUES(?,?,'approved',?,?,?,'invitation',?,?)",
+    ).bind(invitedId, 'friend@example.invalid', now, now, now, owner.id, randomToken()),
+    env.DB.prepare(
+      "INSERT INTO access_invites(id,owner_id,email,status,created_at,expires_at,accepted_at,last_sent) VALUES(?,?,?,'accepted',?,?,?,?)",
+    ).bind(crypto.randomUUID(), owner.id, 'friend@example.invalid', now, now + 60000, now, now),
+  ]);
+  const accepted = await call('/v1/desktop/referrals', 'GET', undefined, flow.secret);
+  expect(await accepted.json()).toMatchObject({
+    limit: 5,
+    remaining: 4,
+    accepted: 1,
+    downloaded: 0,
+    connected: 0,
+    shareUrl: expect.stringContaining('/access/?invite='),
+    invites: [
+      {
+        email: 'friend@example.invalid',
+        status: 'accepted',
+        downloaded_at: null,
+        connected_at: null,
+      },
+    ],
+  });
+  const invitedSecret = randomToken();
+  await env.DB.prepare(
+    'INSERT INTO access_devices(id,hash,member_id,created_at,expires_at) VALUES(?,?,?,?,?)',
+  )
+    .bind(crypto.randomUUID(), await tokenHash(invitedSecret), invitedId, now, now + 60000)
+    .run();
+  await env.DB.prepare(
+    'UPDATE access_members SET first_download_at=?,first_desktop_at=? WHERE id=?',
+  )
+    .bind(now - 1, now, invitedId)
+    .run();
+  const connected = await call('/v1/desktop/referrals', 'GET', undefined, flow.secret);
+  const body = await connected.json<{
+    downloaded: number;
+    connected: number;
+    invites: { downloaded_at: number | null; connected_at: number | null }[];
+  }>();
+  expect(body.downloaded).toBe(1);
+  expect(body.connected).toBe(1);
+  expect(body.invites[0].downloaded_at).toBe(now - 1);
+  expect(body.invites[0].connected_at).toBe(now);
+  expect(JSON.stringify(body)).not.toContain(invitedSecret);
+  expect((await call('/v1/desktop/referrals')).status).toBe(401);
 });

@@ -40,6 +40,13 @@ For UI development, pnpm dev starts the desktop browser preview on port 5173;
 it cannot execute native tasks. /design-lab.html contains component fixtures.
 pnpm dev:website starts the marketing site on port 5180.
 
+The website statically prerenders the product tour plus focused discovery pages for
+parallel coding agents, Git worktrees, Codex, Claude Code, Grok, OpenCode, project
+context, recurring tasks and agent-code review. Route metadata, structured data,
+the sitemap, RSS and LLM-readable indexes are generated from the same content map.
+See the [marketing growth brief](docs/MARKETING-GROWTH.md) for claim boundaries,
+competitor research, product gaps and the next search opportunities.
+
 Run pnpm verify for formatting/lint, documentation links, frontend builds,
 server checks and native unit tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for
 prerequisites, secret checks and rendered/native verification. Builds do not

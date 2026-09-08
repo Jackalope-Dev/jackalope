@@ -8,6 +8,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
+import type { SettingsCategory } from '../settings/SettingsDialog';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
@@ -78,9 +79,7 @@ export function Shell({
   }, [focusOnMount, initialTaskAgent, initialCapture]);
   const [setupOpen, setSetupOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsCategory, setSettingsCategory] = useState<'General' | 'System' | 'Diagnostics'>(
-    'General',
-  );
+  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   useEffect(() => {
     const feature: Partial<Record<ActiveTab, Feature>> = {
@@ -138,6 +137,14 @@ export function Shell({
     window.addEventListener('jackalope:navigate', handle);
     return () => window.removeEventListener('jackalope:navigate', handle);
   }, [navigate]);
+  useEffect(() => {
+    const handle = (event: Event) => {
+      setSettingsCategory((event as CustomEvent<SettingsCategory>).detail);
+      setSettingsOpen(true);
+    };
+    window.addEventListener('jackalope:open-settings', handle);
+    return () => window.removeEventListener('jackalope:open-settings', handle);
+  }, []);
   const shortcut = navigator.platform.includes('Mac') ? '⌘ K' : 'Ctrl K';
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

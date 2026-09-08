@@ -12,8 +12,10 @@ interface AccountStatus {
 }
 export function JackalopeAccount({
   presentation = 'settings',
+  onInvitations,
 }: {
   presentation?: 'settings' | 'welcome';
+  onInvitations?: () => void;
 }) {
   const [account, setAccount] = useState<AccountStatus | null>(null);
   const [error, setError] = useState('');
@@ -135,6 +137,7 @@ export function JackalopeAccount({
         )}
         {connected && (
           <>
+            {onInvitations && <Button onClick={onInvitations}>View invitations</Button>}
             <Button
               variant="outline"
               disabled={busy}

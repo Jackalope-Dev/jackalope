@@ -89,6 +89,8 @@ pub fn run() {
             commands::account::app_account_status,
             commands::account::app_account_connect,
             commands::account::app_account_open_browser,
+            commands::account::app_account_referrals,
+            commands::account::app_account_open_referrals,
             commands::account::app_account_poll,
             commands::account::app_account_disconnect,
             desktop_settings,

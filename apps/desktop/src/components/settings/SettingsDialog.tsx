@@ -21,6 +21,7 @@ import { ArchivedHistory } from './ArchivedHistory';
 import { JackalopeAccount } from './JackalopeAccount';
 import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
+import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { Setting } from './Setting';
 import { SystemInfoView } from './SystemInfo';
@@ -32,11 +33,12 @@ interface SettingsDialogProps {
   onClose: () => void;
   initialScope?: 'app' | 'project';
   initialProjectId?: string;
-  initialCategory?: Category;
+  initialCategory?: SettingsCategory;
 }
 const categories = [
   'General',
   'Jackalope account',
+  'Invitations',
   'Appearance',
   'Agents',
   'Privacy',
@@ -46,7 +48,7 @@ const categories = [
   'System',
   'Diagnostics',
 ] as const;
-type Category = (typeof categories)[number];
+export type SettingsCategory = (typeof categories)[number];
 
 export function SettingsDialog({
   open,
@@ -61,7 +63,7 @@ export function SettingsDialog({
   const { currentTheme, setTheme } = useThemeStore();
   const { pet } = useMascotStore();
   const [previewMood, setPreviewMood] = useState<MascotMood>('idle');
-  const [category, setCategory] = useState<Category>(
+  const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
   const [query, setQuery] = useState('');
@@ -69,7 +71,7 @@ export function SettingsDialog({
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [resetting, setResetting] = useState(false);
-  const matches = (section: Category, words: string) =>
+  const matches = (section: SettingsCategory, words: string) =>
     query.trim()
       ? `${section} ${words}`.toLowerCase().includes(query.trim().toLowerCase())
       : section === category;
@@ -80,6 +82,7 @@ export function SettingsDialog({
         System: 'device computer operating system architecture git',
         'Jackalope account':
           'connect sign in email membership early access invitations disconnect device',
+        Invitations: 'invite referral share link email accepted connected early access',
         Diagnostics: 'activity log routing events errors codebase',
         General:
           'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
@@ -209,7 +212,12 @@ export function SettingsDialog({
                   <header className="settings-section-header">
                     <h2 className="settings-section-title">{c}</h2>
                   </header>
-                  {c === 'Jackalope account' && <JackalopeAccount />}
+                  {c === 'Jackalope account' && (
+                    <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
+                  )}
+                  {c === 'Invitations' && (
+                    <ReferralSettings onAccount={() => setCategory('Jackalope account')} />
+                  )}
                   {c === 'General' && (
                     <>
                       <Setting title="Guided setup">

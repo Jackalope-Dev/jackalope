@@ -290,6 +290,11 @@ it('requires the exact site origin, gives generic sign-in responses, and protect
   expect(download.status).toBe(200);
   expect(download.headers.get('cache-control')).toBe('no-store');
   expect(new TextDecoder().decode(await download.arrayBuffer())).toBe('test installer fixture');
+  expect(
+    await env.DB.prepare(
+      "SELECT first_download_at FROM access_members WHERE email='owner@example.com'",
+    ).first(),
+  ).toEqual({ first_download_at: expect.any(Number) });
   const publicResponse = await worker.fetch(
     new Request(`https://api.jackalope.dev/updates/${bindings.ACCESS_INSTALLER_KEY}`),
     bindings,
@@ -311,6 +316,11 @@ it('offers an approved member a Store link without a private installer and still
   expect(response.status).toBe(302);
   expect(response.headers.get('location')).toBe(bindings.ACCESS_STORE_URL);
   expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(
+    await env.DB.prepare(
+      "SELECT first_download_at FROM access_members WHERE email='store-owner@example.com'",
+    ).first(),
+  ).toEqual({ first_download_at: expect.any(Number) });
   for (const url of [
     'https://apps.microsoft.com.evil.example/detail/9NBLGGH4R315',
     'https://evil.example/',

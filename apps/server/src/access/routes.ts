@@ -184,15 +184,28 @@ export async function accessRoutes(
     }
     if (['GET', 'HEAD'].includes(request.method) && path === '/v1/access/download') {
       const store = storeUrl(env);
-      if (store)
+      if (store) {
+        if (request.method === 'GET')
+          await env.DB.prepare(
+            'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
+          )
+            .bind(Date.now(), member.id)
+            .run();
         return new Response(null, {
           status: 302,
           headers: { ...headers, ...cors, location: store },
         });
+      }
       const key = installerKey(env);
       if (!key) throw new AccessError(404, 'download_not_ready');
       const object = await env.RELEASES.get(key);
       if (!object) throw new AccessError(404, 'download_not_ready');
+      if (request.method === 'GET')
+        await env.DB.prepare(
+          'UPDATE access_members SET first_download_at=coalesce(first_download_at,?) WHERE id=?',
+        )
+          .bind(Date.now(), member.id)
+          .run();
       if (request.method === 'HEAD') await object.body.cancel();
       return new Response(request.method === 'HEAD' ? null : object.body, {
         headers: {
