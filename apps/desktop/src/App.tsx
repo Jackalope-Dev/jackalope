@@ -9,6 +9,7 @@ import { observeTelemetry } from './lib/observe-telemetry';
 import { nativeTask } from './lib/task-runtime';
 import { useCommunityStore } from './stores/communityStore';
 import { observeExecution } from './stores/executionStore';
+import { observeNotifications } from './stores/notificationStore';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { useProjectStore } from './stores/projectStore';
 import './components/tasks/task-workspace.css';
@@ -17,6 +18,7 @@ import './components/ui/experience.css';
 export default function App() {
   useEffect(startThemeClock, []);
   useEffect(observeTelemetry, []);
+  useEffect(observeNotifications, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();

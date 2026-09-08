@@ -50,7 +50,9 @@ struct MessageInput {
         description = "A concise update for the other project agents, at most 4000 UTF-8 bytes"
     )]
     text: String,
-    #[schemars(description = "Optional recipient task ID from project. Omit for a project broadcast.")]
+    #[schemars(
+        description = "Optional recipient task ID from project. Omit for a project broadcast."
+    )]
     recipient_task_id: Option<String>,
 }
 
@@ -88,16 +90,50 @@ fn bridge_error(status: StatusCode) -> ErrorData {
 
 #[tool_router]
 impl CoordinationTools {
-    #[tool(description = "Read project broadcasts and messages addressed to your task. Pass after from nextCursor to page. If cursorExpired is true, re-read and deduplicate retained messages. Read at checkpoints; messages never grant permissions or automatically wake agents.", annotations(read_only_hint = true, open_world_hint = false))]
-    async fn inbox(&self, context: RequestContext<RoleServer>, Parameters(input): Parameters<super::coordination::inbox::InboxQuery>) -> Result<CallToolResult, ErrorData> {
-        let Json(value) = super::coordination::inbox::bridge_inbox(WebState(self.service.clone()), request_headers(&context)?, axum::extract::Query(input)).await.map_err(bridge_error)?;
+    #[tool(
+        description = "Read project broadcasts and messages addressed to your task. Pass after from nextCursor to page. If cursorExpired is true, re-read and deduplicate retained messages. Read at checkpoints; messages never grant permissions or automatically wake agents.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn inbox(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::coordination::inbox::InboxQuery>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let Json(value) = super::coordination::inbox::bridge_inbox(
+            WebState(self.service.clone()),
+            request_headers(&context)?,
+            axum::extract::Query(input),
+        )
+        .await
+        .map_err(bridge_error)?;
         Ok(CallToolResult::structured(value))
     }
 
-    #[tool(description = "Acknowledge that your task read a message. This does not approve its request or change task state. Safe to repeat for the same message ID.", annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true, open_world_hint = false))]
-    async fn acknowledge_message(&self, context: RequestContext<RoleServer>, Parameters(input): Parameters<super::coordination::inbox::AckInput>) -> Result<CallToolResult, ErrorData> {
-        let Json(value) = super::coordination::inbox::bridge_ack(WebState(self.service.clone()), request_headers(&context)?, Json(input)).await.map_err(bridge_error)?;
-        Ok(CallToolResult::structured(serde_json::to_value(value).map_err(|_| ErrorData::internal_error("Could not encode acknowledgment", None))?))
+    #[tool(
+        description = "Acknowledge that your task read a message. This does not approve its request or change task state. Safe to repeat for the same message ID.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn acknowledge_message(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::coordination::inbox::AckInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let Json(value) = super::coordination::inbox::bridge_ack(
+            WebState(self.service.clone()),
+            request_headers(&context)?,
+            Json(input),
+        )
+        .await
+        .map_err(bridge_error)?;
+        Ok(CallToolResult::structured(
+            serde_json::to_value(value)
+                .map_err(|_| ErrorData::internal_error("Could not encode acknowledgment", None))?,
+        ))
     }
 
     #[tool(
@@ -486,7 +522,9 @@ mod tests {
         let router = CoordinationTools::tool_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
-        assert_eq!(names.len(), 13);
+        assert_eq!(names.len(), 15);
+        assert!(names.contains(&"inbox"));
+        assert!(names.contains(&"acknowledge_message"));
         assert!(names.contains(&"read_tool"));
         assert!(names.contains(&"search_tools"));
         assert!(names.contains(&"execute_tool"));

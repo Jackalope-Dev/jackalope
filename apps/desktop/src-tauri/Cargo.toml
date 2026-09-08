@@ -52,4 +52,4 @@ store = ["beta-access"]
 
 [target.'cfg(windows)'.dependencies]
 tauri-winrt-notification = "0.8.1"
-windows-sys = { version = "0.61", features = ["Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading"] }

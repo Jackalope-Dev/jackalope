@@ -157,7 +157,9 @@ export function AgentManager() {
                   )}
                 </div>
               </div>
-              <AgentSupport adapter={'adapter' in agent ? agent.adapter : agent.id} />
+              <AgentSupport
+                adapter={('adapter' in agent ? agent.adapter : undefined) ?? agent.id}
+              />
               <section aria-label="Models and executable">
                 <h3 className="text-base font-medium mt-4">Models & executable</h3>
                 <div className="agent-config-fields">

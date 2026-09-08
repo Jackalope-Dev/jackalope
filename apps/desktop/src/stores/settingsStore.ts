@@ -9,6 +9,7 @@ export interface SettingsState {
   // Experience & appearance
   mascotReactions: boolean;
   notifications: NotificationLevel;
+  osNotifications: boolean;
 
   // Runners & execution
   defaultRunner: DefaultRunnerId;
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: Omit<
 > = {
   mascotReactions: true,
   notifications: 'all' as const,
+  osNotifications: true,
 
   defaultRunner: 'codex' as const,
   concurrencyLimit: 2,

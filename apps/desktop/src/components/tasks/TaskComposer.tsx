@@ -1,7 +1,9 @@
 import { ArrowRight, Bot, GitBranch } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { agentCapabilities, connectionSupport } from '../../lib/agent-capabilities';
 import type { Runner } from '../../lib/task-runtime';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { TaskDraft } from '../../stores/executionStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
@@ -55,14 +57,24 @@ export function TaskComposer({
   onLaunch,
   onSave,
 }: Props) {
+  const customAgents = useAgentConfigStore((state) => state.customAgents);
+  const adapter = customAgents.find((agent) => agent.id === currentAgent)?.adapter ?? currentAgent;
+  const support = agentCapabilities(adapter);
+  const incompatible = projectConnections.filter(
+    (server) =>
+      (current.connectionIds ?? projectConnections.map((server) => server.id)).includes(
+        server.id,
+      ) && connectionSupport(adapter, server.transport, server.discovery === true),
+  );
   return (
     <form
       id="task-composer"
       className="task-composer"
       onSubmit={(event) => {
         event.preventDefault();
-        if (executionReady) void onLaunch();
-        else if (current.prompt.trim() && !submitting) onSave();
+        if (executionReady) {
+          if (!incompatible.length) void onLaunch();
+        } else if (current.prompt.trim() && !submitting) onSave();
       }}
     >
       <fieldset disabled={submitting} className="contents">
@@ -83,7 +95,7 @@ export function TaskComposer({
               !event.nativeEvent.isComposing &&
               !submitting &&
               current.prompt.trim() &&
-              (!executionReady || (runner?.available && desktop))
+              (!executionReady || (runner?.available && desktop && !incompatible.length))
             ) {
               event.preventDefault();
               if (executionReady) void onLaunch();
@@ -150,6 +162,15 @@ export function TaskComposer({
             instructions={projectInstructions}
             prompt={current.prompt.trim() ? finalPrompt : ''}
           />
+          {support && (
+            <p className="task-muted">
+              Project awareness, messages, questions and evidence:{' '}
+              {support.bridge === 'mcp'
+                ? 'built-in tools'
+                : 'available through permitted shell/network tools'}
+              . {support.accounts ? '' : 'Uses the current CLI account.'}
+            </p>
+          )}
           {projectConnections.length > 0 && (
             <details className="my-3">
               <summary>
@@ -178,12 +199,25 @@ export function TaskComposer({
                   />
                   {server.name}
                   {server.discovery ? ' · On demand' : ''}
+                  {connectionSupport(adapter, server.transport, server.discovery === true) && (
+                    <span className="task-muted">
+                      {' '}
+                      · {connectionSupport(adapter, server.transport, server.discovery === true)}
+                    </span>
+                  )}
                 </label>
               ))}
             </details>
           )}
           {setup}
         </details>
+        {incompatible.length > 0 && (
+          <p role="alert" className="task-error">
+            Selected tools need attention: {incompatible.map((server) => server.name).join(', ')}.
+            Enable on-demand tools in MCP settings, deselect the connection, or choose a compatible
+            agent.
+          </p>
+        )}
         {executionReady && (
           <p className="task-composer-note">
             {current.isolated
@@ -209,7 +243,13 @@ export function TaskComposer({
             {executionReady && (
               <Button
                 type="submit"
-                disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
+                disabled={
+                  !desktop ||
+                  !current.prompt.trim() ||
+                  !runner?.available ||
+                  submitting ||
+                  incompatible.length > 0
+                }
               >
                 {submitting ? 'Starting…' : 'Start task'}
                 <ArrowRight size={15} />

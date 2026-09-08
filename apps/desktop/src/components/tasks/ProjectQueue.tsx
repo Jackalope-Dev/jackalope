@@ -407,6 +407,15 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                     {new Date(m.createdAt).toLocaleTimeString()}
                   </small>
                   <p>{m.text}</p>
+                  <small>
+                    {m.recipientTaskId
+                      ? `To ${items.find((item) => item.id === m.recipientTaskId)?.title ?? 'task'}`
+                      : 'Project broadcast'}{' '}
+                    ·{' '}
+                    {m.acknowledgedBy?.length
+                      ? `Read by ${m.acknowledgedBy.length} task(s)`
+                      : 'No acknowledgment yet'}
+                  </small>
                 </div>
               ))}
           </section>

@@ -48,6 +48,7 @@ pub fn run() {
             app.manage(commands::account::AccountService::new(preferences.join("account.bin"), runtime.access.clone()));
             commands::account::launch_refresh(app.handle().clone());
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));
+            app.manage(commands::notifications::Notifications::load(preferences.join("notifications.json")));
             app.manage(commands::community::Community::load(preferences.join("community.json")));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
@@ -64,6 +65,7 @@ pub fn run() {
                 window = window.initialization_script(format!("if (localStorage.getItem('jackalope-reset-receipt') !== {token}) {{ for (const key of Object.keys(localStorage)) {{ if (key.startsWith('jackalope-')) localStorage.removeItem(key); }} sessionStorage.clear(); localStorage.setItem('jackalope-reset-receipt', {token}); }} window.__JACKALOPE_RESET__ = true;"));
             }
             window.build()?;
+            commands::notifications::launch(app.handle().clone());
             if let Err(error) = setup_tray(app) {
                 eprintln!("System tray unavailable; closing will quit Jackalope: {error}");
             }
@@ -87,6 +89,10 @@ pub fn run() {
             commands::account::app_account_poll,
             commands::account::app_account_disconnect,
             desktop_settings,
+            commands::notifications::notification_status,
+            commands::notifications::notification_configure,
+            commands::notifications::notification_test,
+            commands::notifications::notification_take_open,
             commands::knowledge::knowledge_list,
             commands::knowledge::knowledge_save,
             commands::knowledge::knowledge_remove,
@@ -169,6 +175,7 @@ pub fn run() {
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
                 app.state::<Scheduler>().shutdown();
+                app.state::<commands::notifications::Notifications>().shutdown();
                 commands::browser::close_all();
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();

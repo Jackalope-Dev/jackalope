@@ -315,7 +315,7 @@ impl TaskRuntime {
                 &serde_json::json!({"mcpServers":project_mcp}).to_string(),
             ]);
         }
-        let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. If you need clarification or a denied permission, explain what is needed and stop so the user can reply.\n", req.prompt);
+        let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. If permissions are denied, explain what is needed and stop; do not bypass the denial.\n", req.prompt);
         if req.previous_run_id.is_none() {
             input.push_str(&req.context_receipt.text());
             if let Some(change) = &req.monitor_change {
@@ -336,7 +336,7 @@ impl TaskRuntime {
                     "--mcp-config",
                     &config.to_string(),
                     "--allowedTools",
-                    "mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__project,mcp__jackalope__message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify",
+                    "mcp__jackalope__search_tools,mcp__jackalope__read_tool,mcp__jackalope__project,mcp__jackalope__message,mcp__jackalope__inbox,mcp__jackalope__acknowledge_message,mcp__jackalope__browser_navigate,mcp__jackalope__browser_screenshot,mcp__jackalope__browser_snapshot,mcp__jackalope__browser_interact,mcp__jackalope__ask_user,mcp__jackalope__user_response,mcp__jackalope__record_validation_step,mcp__jackalope__computer_verify",
                 ]);
                 input.push_str("\nClaude harness tools: You have access to in-app browser automation, interactive user questions, and structured verification via provided mcp__jackalope__* tools (browser_navigate, browser_screenshot, browser_snapshot, browser_interact, ask_user, record_validation_step, computer_verify). If testing UI changes or onboarding flows, proactively use browser_screenshot and record_validation_step to provide verifiable evidence, and ask_user if you need test data or confirmation. If a question returns pending, use user_response with its ID to read the saved answer.\n");
             }
@@ -575,6 +575,27 @@ impl TaskRuntime {
             .values()
             .cloned()
             .collect())
+    }
+    pub fn notification_snapshot(&self) -> Vec<crate::commands::notifications::Snapshot> {
+        self.inner
+            .lock()
+            .unwrap()
+            .runs
+            .values()
+            .map(|run| crate::commands::notifications::Snapshot {
+                id: run.id.clone(),
+                task_id: run.task_id.clone(),
+                project_id: run.project_id.clone(),
+                started_at: run.started_at.clone(),
+                status: run.status.clone(),
+                questions: run
+                    .prompts
+                    .iter()
+                    .filter(|prompt| prompt.status == "pending")
+                    .map(|prompt| prompt.id.clone())
+                    .collect(),
+            })
+            .collect()
     }
     pub fn integration_directory(&self) -> PathBuf {
         self.directory.join("integrations")

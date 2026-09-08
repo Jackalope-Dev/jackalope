@@ -69,14 +69,14 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         .split(',')
     {
         let id = uuid::Uuid::new_v4().to_string();
-        let transport = if ["grok", "antigravity"].contains(&agent) {
+        let transport = if ["grok", "antigravity", "opencode"].contains(&agent) {
             "Use the authenticated HTTP bridge described below: POST /v1/tools/search, then POST /v1/tools/read. HTTP is explicitly authorized for this local echo verification. This adapter does not receive the selected connection through native MCP; do not search its other MCP servers."
         } else {
             "Use native MCP search_tools and read_tool. Do not use shell HTTP."
         };
         let mut prompt = format!("Verify Jackalope's selected local MCP connection. {transport} Search for jackalope_echo, then call the returned read operation with value jackalope-native-trial. Do not inspect files or use other connections. Do not bypass any denied permission. Report the actual tool response, or report the permission or connection failure.");
-        if agent == "antigravity" {
-            prompt.push_str(" Also verify the local Jackalope harness with authenticated HTTP: GET /v1/project; POST /v1/messages with kind progress and text antigravity-bridge-trial; POST /v1/user-prompt with question 'Confirm this automated fixture' and input_type text. A test harness will answer automatically. If pending, GET /v1/user-prompt/poll?id=<returned-question-id> until answered. Include the exact answer in your final response. POST /v1/validation-step with step 'Antigravity bridge round trip', status passed and notes describing the actual echo and answer. Use these HTTP endpoints, not your built-in ask_question tool. This is an authorized local fixture; never print the bearer token.");
+        if ["codex", "claude", "grok", "opencode", "antigravity"].contains(&agent) {
+            prompt.push_str(" Also verify the local Jackalope harness with its supplied native MCP tools, or authenticated HTTP for agents with HTTP transport: GET /v1/project; POST /v1/messages with kind progress and text agent-bridge-trial; POST /v1/user-prompt with question 'Confirm this automated fixture' and input_type text. A test harness will answer automatically. If pending, GET /v1/user-prompt/poll?id=<returned-question-id> until answered. Include the exact answer in your final response. POST /v1/validation-step with step 'Agent bridge round trip', status passed and notes describing the actual echo and answer. Use Jackalope questions, not CLI-native terminal questions. Also read the inbox and acknowledge your own fixture message using its ID, and include the project assignedTaskId in a directed message recipientTaskId to yourself. These correspond to inbox and acknowledge_message native MCP tools, or GET /v1/messages and POST /v1/messages/ack with id. This is an authorized local fixture; never print the bearer token.");
         }
         let request: RunRequest = serde_json::from_value(
             json!({"id":id,"projectId":project,"projectName":"MCP verification","projectPath":repo,"agent":agent,"isolated":false,"connectionIds":["trial"],"prompt":prompt}),
@@ -92,7 +92,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 .into_iter()
                 .find(|run| run.id == id)
                 .ok_or("Missing attempt")?;
-            if agent == "antigravity" {
+            if ["codex", "claude", "grok", "opencode", "antigravity"].contains(&agent) {
                 for question in run
                     .prompts
                     .iter()
@@ -117,7 +117,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                         profile.display()
                     ));
                 }
-                if agent == "antigravity"
+                if ["codex", "claude", "grok", "opencode", "antigravity"].contains(&agent)
                     && (!run.result.contains("fixture-ack-731")
                         || !run
                             .prompts
@@ -127,11 +127,10 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                             .validation_steps
                             .iter()
                             .any(|step| step.status == "passed")
-                        || !coordinator
-                            .view()?
-                            .messages
-                            .iter()
-                            .any(|message| message.text.contains("antigravity-bridge-trial")))
+                        || !coordinator.view()?.messages.iter().any(|message| {
+                            message.text.contains("agent-bridge-trial")
+                                && !message.acknowledged_by.is_empty()
+                        }))
                 {
                     failures.push("Antigravity did not complete the question, validation and messaging round trip".into());
                 }

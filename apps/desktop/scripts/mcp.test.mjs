@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { marketplaceSetup, safeMarketplaceUrl } from '../src/components/mcp/marketplace-info.ts';
+import { agentCapabilities, connectionSupport } from '../src/lib/agent-capabilities.ts';
 import {
   deleteMcpServer,
   listMcpServers,
@@ -9,6 +10,20 @@ import {
 } from '../src/lib/tauri-bridge.ts';
 import { useMcpStore } from '../src/stores/mcpStore.ts';
 import { useSettingsStore } from '../src/stores/settingsStore.ts';
+
+test('all built-in agents share discovery with explicit transport and account limits', () => {
+  for (const agent of ['codex', 'claude', 'grok', 'opencode', 'antigravity']) {
+    assert.equal(connectionSupport(agent, 'stdio', true), null);
+    assert.equal(connectionSupport(agent, 'http', true), null);
+    assert.notEqual(connectionSupport(agent, 'sse', true), null);
+  }
+  assert.equal(connectionSupport('claude', 'sse', false), null);
+  assert.notEqual(connectionSupport('codex', 'sse', false), null);
+  assert.notEqual(connectionSupport('antigravity', 'http', false), null);
+  assert.notEqual(connectionSupport('unknown', 'http', true), null);
+  assert.equal(agentCapabilities('antigravity').accounts, false);
+  assert.equal(agentCapabilities('opencode').capacity, false);
+});
 
 test('marketplace opt-out blocks search and detail fetches and discards in-flight results', async () => {
   const originalFetch = globalThis.fetch;

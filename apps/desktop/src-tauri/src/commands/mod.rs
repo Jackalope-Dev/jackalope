@@ -38,3 +38,4 @@ mod account_storage;
 pub mod community;
 pub mod execution_access;
 mod git_command;
+pub mod notifications;

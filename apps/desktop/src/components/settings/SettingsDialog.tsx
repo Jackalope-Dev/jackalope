@@ -19,6 +19,7 @@ import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ArchivedHistory } from './ArchivedHistory';
 import { JackalopeAccount } from './JackalopeAccount';
+import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
 import { ReleaseSupport } from './ReleaseSupport';
 import { Setting } from './Setting';
@@ -252,6 +253,7 @@ export function SettingsDialog({
                           <SelectItem value="none">Quiet</SelectItem>
                         </Select>
                       </Setting>
+                      <NotificationSettings />
                       <Setting
                         title="Companion animations"
                         description="Show reactions and movement for activity. Your reduced-motion preference always applies."

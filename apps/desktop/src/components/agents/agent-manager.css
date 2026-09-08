@@ -149,6 +149,18 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.agent-support-list { margin: 16px 0; }
-.agent-support-list > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 20px; padding: 8px 0; border-bottom: 1px solid var(--color-border); }
-.agent-support-list dd { color: var(--color-text-secondary); margin: 0; }
+.agent-support-list {
+  margin: 16px 0;
+}
+.agent-support-list > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.agent-support-list dd {
+  color: var(--color-text-secondary);
+  margin: 0;
+}

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { taskNotices } from '../../lib/companion-tasks';
 import type { TaskRun } from '../../lib/task-runtime';
+import { nativeTask } from '../../lib/task-runtime';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
+import { useNotificationStore } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { useCompanionNotices } from './useCompanionNotices';
@@ -15,10 +18,63 @@ export function openCompanionTask(run: TaskRun) {
 }
 
 export function CompanionSources() {
+  const notificationError = useNotificationStore((state) => state.error || state.status?.error);
   const runs = useExecutionStore((state) => state.runs);
   const error = useExecutionStore((state) => state.error);
   const message = useMascotStore((state) => state.message);
   const [latest, setLatest] = useState<{ id: string; text: string } | null>(null);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let alive = true;
+    let opening = false;
+    let unlisten: (() => void) | undefined;
+    const open = async () => {
+      if (opening || !alive) return;
+      opening = true;
+      try {
+        const id = await nativeTask<string | null>('notification_take_open');
+        if (!id || !alive) return;
+        await useExecutionStore.getState().refresh();
+        const run = useExecutionStore.getState().runs.find((run) => run.id === id);
+        if (alive && run) openCompanionTask(run);
+        else if (alive) navigateWorkspace('kanban');
+      } catch (error) {
+        if (alive) useNotificationStore.setState({ error: String(error) });
+      } finally {
+        opening = false;
+      }
+    };
+    void import('@tauri-apps/api/event')
+      .then(async ({ listen }) => {
+        const stop = await listen('jackalope-notification-open', () => void open());
+        if (alive) {
+          unlisten = stop;
+          void open();
+        } else stop();
+      })
+      .catch((error) => {
+        if (alive) useNotificationStore.setState({ error: String(error) });
+      });
+    window.addEventListener('focus', open);
+    return () => {
+      alive = false;
+      unlisten?.();
+      window.removeEventListener('focus', open);
+    };
+  }, []);
+  useCompanionNotices(
+    'os-notifications',
+    notificationError
+      ? [
+          {
+            id: 'os-notification-error',
+            kind: 'attention',
+            title: 'OS notifications need attention',
+            detail: notificationError,
+          },
+        ]
+      : [],
+  );
   useEffect(() => {
     if (message) setLatest({ id: `message:${crypto.randomUUID()}`, text: message });
   }, [message]);

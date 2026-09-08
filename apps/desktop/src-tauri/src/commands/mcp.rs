@@ -663,7 +663,13 @@ mod tests {
                 .1
                 .is_empty());
         }
-        assert!(project_delivery(&id, Some(&["tools".into()]), "opencode").is_err());
+        assert_eq!(
+            project_delivery(&id, Some(&["tools".into()]), "opencode")
+                .unwrap()
+                .1
+                .len(),
+            1
+        );
         assert!(project_delivery(&id, Some(&[]), "opencode")
             .unwrap()
             .1
@@ -750,8 +756,13 @@ pub(super) fn project_delivery(
                 optimized.push(server);
                 continue;
             }
-            let capabilities: Value = serde_json::from_str(include_str!("../../../src/lib/agent-capabilities.json")).map_err(|e| e.to_string())?;
-            if !capabilities[adapter]["direct"].as_array().is_some_and(|transports| transports.contains(&json!(server.transport))) {
+            let capabilities: Value =
+                serde_json::from_str(include_str!("../../../src/lib/agent-capabilities.json"))
+                    .map_err(|e| e.to_string())?;
+            if !capabilities[adapter]["direct"]
+                .as_array()
+                .is_some_and(|transports| transports.contains(&json!(server.transport)))
+            {
                 return Err("This agent requires on-demand discovery for this project connection. Enable on-demand tools, or choose an agent supporting its direct transport.".into());
             }
             result.insert(id.clone(), spec(&server, adapter));
