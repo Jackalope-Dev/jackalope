@@ -1,6 +1,6 @@
 # Recurring task templates
 
-In **Tasks → Task tools → Recurring**, choose **Use template** to open a prefilled
+In **Tasks → Recurring**, choose **Use template** to open a prefilled
 schedule. The library includes 16 original, provider-neutral prompts. Search by
 topic or filter by category; the first three suggestions cover security, backlog
 progress, and UX/UI review. Existing schedules stay above the library.
