@@ -1,6 +1,10 @@
 use super::*;
 
 impl Coordinator {
+    pub(in crate::commands) fn bridge_ready(&self) -> bool {
+        self.inner.lock().is_ok_and(|inner| inner.url.is_some())
+    }
+
     pub(super) fn view(&self) -> Result<QueueView, String> {
         self.ensure_storage_loaded()?;
         let merged_run_ids = crate::commands::integration::applied_run_ids(&self.runtime)?;
@@ -203,6 +207,7 @@ impl Coordinator {
     }
 
     pub(super) fn tick(&self) -> Result<(), String> {
+        self.reconcile()?;
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
@@ -231,7 +236,8 @@ impl Coordinator {
                 .grants
                 .insert(token.clone(), (item.id.clone(), run_id.clone()));
             let instructions = instructions(&item);
-            let result = self.runtime.start_locked(RunRequest {
+            let assigned = item.clone();
+            let mut request = RunRequest {
                 monitor_change: None,
                 context_selection: item.context_selection.clone(),
                 context_receipt: Default::default(),
@@ -256,7 +262,18 @@ impl Coordinator {
                     token: token.clone(),
                     instructions,
                 }),
-            });
+            };
+            let result = (|| {
+                let snapshot = self.startup(&mut inner, &request, Some(&assigned))?;
+                request
+                    .coordination
+                    .as_mut()
+                    .unwrap()
+                    .instructions
+                    .push_str(&snapshot);
+                self.register_launch(&mut inner, &request.id)?;
+                self.runtime.start_locked(request)
+            })();
             if let Err(error) = result {
                 inner.grants.remove(&token);
                 inner
@@ -270,6 +287,7 @@ impl Coordinator {
                 self.save(&inner.ledger)?;
             }
         }
+        self.reconcile_locked(&mut inner)?;
         Ok(())
     }
 
@@ -298,8 +316,12 @@ impl Coordinator {
                         .route("/v1/computer/verify", post(bridge_computer_verify))
                         .layer(DefaultBodyLimit::max(65_536))
                         .with_state(service.clone());
-                    let router =
-                        router.merge(crate::commands::coordination_mcp::router(service.clone()));
+                    let router = router
+                        .merge(crate::commands::coordination_mcp::router(service.clone()))
+                        .layer(axum::middleware::from_fn_with_state(
+                            service.clone(),
+                            automatic::deliver,
+                        ));
                     let alive = service.alive.clone();
                     if let Err(error) = axum::serve(listener, router)
                         .with_graceful_shutdown(async move {
@@ -332,6 +354,7 @@ impl Coordinator {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
+        let mut assigned = None;
         if let Some(previous_id) = &request.previous_run_id {
             let runs = self.runtime.integration_runs()?;
             if let Some(previous) = runs.iter().find(|r| &r.id == previous_id) {
@@ -365,6 +388,7 @@ impl Coordinator {
                         token,
                         instructions: instructions(&item),
                     });
+                    assigned = Some(item);
                 }
             }
         }
@@ -381,7 +405,31 @@ impl Coordinator {
                 });
             }
         }
-        self.runtime.start(request)
+        if request.coordination.is_none() {
+            return Err(
+                "The coordination bridge is starting or unavailable. Retry when it is ready."
+                    .into(),
+            );
+        }
+        let token = request.coordination.as_ref().unwrap().token.clone();
+        let result = (|| {
+            let snapshot = self.startup(&mut inner, &request, assigned.as_ref())?;
+            request
+                .coordination
+                .as_mut()
+                .unwrap()
+                .instructions
+                .push_str(&snapshot);
+            self.register_launch(&mut inner, &request.id)?;
+            self.runtime.start(request)
+        })();
+        if result.is_err() {
+            inner.grants.remove(&token);
+        }
+        if let Err(error) = self.reconcile_locked(&mut inner) {
+            inner.error = Some(error);
+        }
+        result
     }
 
     pub(in crate::commands) fn prepare_reset(&self) -> Result<(), String> {

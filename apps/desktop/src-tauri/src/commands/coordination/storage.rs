@@ -30,7 +30,7 @@ impl Coordinator {
                 (Ledger::default(), Some(reason))
             }
         };
-        Ok(Self {
+        let service = Self {
             inner: Arc::new(Mutex::new(Inner {
                 ledger,
                 enabled: HashSet::new(),
@@ -38,13 +38,20 @@ impl Coordinator {
                 grants: HashMap::new(),
                 url: None,
                 error: None,
+                delivered: HashMap::new(),
             })),
             directory,
             runtime,
             alive: Arc::new(AtomicBool::new(true)),
             _lock: Arc::new(lock),
             storage_error,
-        })
+        };
+        if service.storage_error.is_none() {
+            if let Err(error) = service.reconcile() {
+                service.inner.lock().unwrap().error = Some(error);
+            }
+        }
+        Ok(service)
     }
 
     pub(super) fn ensure_storage_loaded(&self) -> Result<(), String> {

@@ -326,6 +326,9 @@ impl Scheduler {
                 || overlap
                 || capacity_busy
                 || (late && saved.definition.missed == "skip");
+            if !skip && saved.account.is_some() && !self.coordinator.bridge_ready() {
+                continue;
+            }
             let mut request = saved.definition.request.clone();
             request.monitor_change = change.clone();
             request.id = uuid::Uuid::new_v4().to_string();
@@ -649,6 +652,15 @@ mod tests {
     fn due_schedule_dispatches_once_and_skips_overlap() {
         use super::super::agent_policy::{AgentPolicy, CustomAgent};
         let (directory, scheduler) = fixture("once");
+        scheduler.coordinator.launch();
+        let ready = std::time::Instant::now() + Duration::from_secs(5);
+        while !scheduler.coordinator.bridge_ready() {
+            assert!(
+                std::time::Instant::now() < ready,
+                "Coordination bridge did not start"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
         let repo = directory.join("repo");
         std::fs::create_dir_all(&repo).unwrap();
         for args in [
@@ -740,6 +752,35 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(25));
         }
+        scheduler.coordinator.shutdown();
+        std::thread::sleep(Duration::from_millis(1100));
+        drop(scheduler);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn unavailable_bridge_defers_a_bound_schedule_without_consuming_it() {
+        let (directory, scheduler) = fixture("once");
+        let now = Utc::now();
+        {
+            let mut ledger = scheduler.ledger.lock().unwrap();
+            let saved = &mut ledger.schedules[0];
+            saved.next_at = now;
+            saved.account = Some(
+                super::super::agent_profiles::bind_account(
+                    &scheduler.coordinator.runtime.profiles_root(),
+                    "codex",
+                    None,
+                )
+                .unwrap(),
+            );
+        }
+        scheduler.tick(now).unwrap();
+        scheduler.tick(now).unwrap();
+        let ledger = scheduler.ledger.lock().unwrap().clone();
+        assert!(ledger.schedules[0].history.is_empty());
+        assert!(ledger.schedules[0].last_run_id.is_none());
+        assert_eq!(ledger.schedules[0].next_at, now);
         drop(scheduler);
         std::fs::remove_dir_all(directory).unwrap();
     }

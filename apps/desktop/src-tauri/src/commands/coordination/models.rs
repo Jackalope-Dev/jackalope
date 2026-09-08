@@ -119,6 +119,8 @@ pub struct CoordinationMessage {
 pub(super) struct Ledger {
     pub(super) items: Vec<QueueItem>,
     pub(super) messages: Vec<CoordinationMessage>,
+    #[serde(default)]
+    pub(super) lifecycle: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Serialize)]
