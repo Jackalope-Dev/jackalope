@@ -77,6 +77,136 @@ fn opencode_stream_tracks_results_sessions_errors_and_deduplicated_step_usage() 
 }
 
 #[test]
+fn antigravity_stream_keeps_attempt_usage_and_requires_a_terminal_result() {
+    let mut run = sample("antigravity");
+    let mut stream = antigravity::Stream::new(Some("conversation-1".into()));
+    stream.consume(&mut run, r#"{"event":"init","conversation_id":"conversation-1","init":{"permission_mode":"request-review","model":"test-model"}}"#);
+    let step = r#"{"event":"step_update","step_update":{"conversation_id":"conversation-1","step_index":8,"step_type":"agent_response","state":"DONE","text_delta":"Hello","usage":{"input_tokens":10,"output_tokens":7,"thinking_tokens":5,"cache_read_tokens":20}}}"#;
+    stream.consume(&mut run, step);
+    stream.consume(&mut run, step);
+    assert_eq!(
+        (run.usage.input, run.usage.output, run.usage.cache_read),
+        (30, 7, 20)
+    );
+    assert!(run.result.is_empty());
+    stream.consume(&mut run, r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"SUCCESS","response":"Done","usage":{"input_tokens":1000,"output_tokens":200}}}"#);
+    stream.finish(&mut run);
+    assert!(run.error.is_none(), "{:?}", run.error);
+    assert_eq!(run.result, "Done");
+    assert_eq!(run.model.as_deref(), Some("test-model"));
+    assert_eq!((run.usage.input, run.usage.output), (30, 7));
+    assert_eq!(run.session_id.as_deref(), Some("conversation-1"));
+}
+
+#[test]
+fn antigravity_rejects_incomplete_malformed_and_non_success_streams() {
+    for tail in [
+        "",
+        "not-json",
+        r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"WAITING","response":"Need an answer"}}"#,
+        r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"SUCCESS","response":"  "}}"#,
+        r#"{"event":"result","result":{"conversation_id":"another-session","status":"SUCCESS","response":"Done"}}"#,
+        r#"{"event":"result","result":{"conversation_id":"conversation-1","response":"Done"}}"#,
+    ] {
+        let mut run = sample("antigravity");
+        let mut stream = antigravity::Stream::default();
+        stream.consume(
+            &mut run,
+            r#"{"event":"init","conversation_id":"conversation-1","init":{}}"#,
+        );
+        stream.consume(&mut run, tail);
+        stream.finish(&mut run);
+        assert!(run.error.is_some(), "Accepted {tail}");
+    }
+    let mut run = sample("antigravity");
+    let mut stream = antigravity::Stream::default();
+    stream.consume(
+        &mut run,
+        r#"{"event":"result","result":{"status":"ERROR","error":"authentication required"}}"#,
+    );
+    stream.finish(&mut run);
+    assert!(run.error.unwrap().contains("authentication required"));
+}
+
+#[test]
+fn antigravity_permissions_and_interactive_questions_cannot_be_successful() {
+    for tool in [
+        r#"{"tool_name":"run_command","tool_info":{"error":{"message":"Permission denied for command(test)"}}}"#,
+        r#"{"tool_name":"ask_question"}"#,
+    ] {
+        let mut run = sample("antigravity");
+        let mut stream = antigravity::Stream::default();
+        stream.consume(
+            &mut run,
+            r#"{"event":"init","conversation_id":"conversation-1","init":{}}"#,
+        );
+        let mut step: Value = serde_json::from_str(tool).unwrap();
+        step["conversation_id"] = "conversation-1".into();
+        step["step_index"] = 1.into();
+        step["step_type"] = "tool".into();
+        step["state"] = "ERROR".into();
+        stream.consume(
+            &mut run,
+            &serde_json::json!({"event":"step_update","step_update":step}).to_string(),
+        );
+        stream.consume(&mut run, r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"SUCCESS","response":"Done"}}"#);
+        assert!(run.error.is_some());
+    }
+    assert!(antigravity::permission_denied(
+        "Tool requires approval in headless mode"
+    ));
+    assert!(!antigravity::permission_denied(
+        "CLI permission mode: request-review"
+    ));
+}
+
+#[test]
+fn antigravity_uses_literal_stdin_and_explicit_workspace_without_bypassing_permissions() {
+    let mut cmd = Command::new("agy");
+    antigravity::configure(&mut cmd, "C:/a workspace", Some("conversation-1"));
+    let args: Vec<_> = cmd
+        .get_args()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
+    assert!(args
+        .windows(2)
+        .any(|pair| pair == ["--add-dir", "C:/a workspace"]));
+    assert!(args
+        .windows(2)
+        .any(|pair| pair == ["--conversation", "conversation-1"]));
+    assert!(!args
+        .iter()
+        .any(|arg| arg == "--dangerously-skip-permissions"
+            || arg == "--continue"
+            || arg == "--print"));
+    let input = antigravity::input("/logout\n\"quoted\" $HOME", "C:/a workspace");
+    assert_eq!(input.lines().count(), 1);
+    let value: Value = serde_json::from_str(&input).unwrap();
+    assert_eq!(value["event"], "user");
+    assert!(value["message"]["content"]
+        .as_str()
+        .unwrap()
+        .contains("/logout\n\"quoted\" $HOME"));
+}
+
+#[test]
+fn antigravity_never_invents_isolated_accounts_or_resumed_usage() {
+    let root = std::env::temp_dir().join("jackalope-agy-account-test");
+    assert!(crate::commands::agent_profiles::env_var_for("antigravity").is_none());
+    assert!(
+        crate::commands::agent_profiles::bind_account(&root, "antigravity", Some("work")).is_err()
+    );
+    let mut run = sample("antigravity");
+    let mut stream = antigravity::Stream::new(Some("conversation-1".into()));
+    stream.consume(
+        &mut run,
+        r#"{"event":"init","conversation_id":"conversation-1","init":{}}"#,
+    );
+    stream.consume(&mut run, r#"{"event":"result","result":{"conversation_id":"conversation-1","status":"SUCCESS","response":"Done","usage":{"input_tokens":1000,"output_tokens":200}}}"#);
+    assert!(!run.usage.reported);
+}
+
+#[test]
 #[ignore = "Runs a paid or free installed agent in a disposable repository; set JACKALOPE_AGENT_TRIAL"]
 fn installed_agent_lifecycle_trial() {
     let agent = std::env::var("JACKALOPE_AGENT_TRIAL").expect("Choose the agent explicitly");

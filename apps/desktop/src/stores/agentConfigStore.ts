@@ -78,6 +78,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         claude: true,
         grok: true,
         opencode: true,
+        antigravity: true,
       },
       allowedModels: {
         // By default, all standard models are allowed

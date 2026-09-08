@@ -474,12 +474,6 @@ select option {
   .task-composer-footer {
     align-items: flex-end;
   }
-  .task-context-chip {
-    max-width: 150px;
-  }
-  .task-context-chip select {
-    max-width: 115px;
-  }
   .task-first-project {
     flex-wrap: wrap;
   }

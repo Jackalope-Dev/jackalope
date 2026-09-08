@@ -1,6 +1,7 @@
 use super::*;
 
-pub(in crate::commands) const BUILTIN_AGENTS: &[&str] = &["codex", "claude", "grok", "opencode"];
+pub(in crate::commands) const BUILTIN_AGENTS: &[&str] =
+    &["codex", "claude", "grok", "opencode", "antigravity"];
 
 pub(super) fn discover_runner(
     policy: &crate::commands::agent_policy::AgentPolicy,
@@ -14,6 +15,7 @@ pub(super) fn discover_runner(
             "claude" => "Claude Code",
             "grok" => "Grok",
             "opencode" => "OpenCode",
+            "antigravity" => "Antigravity",
             _ => id,
         }
         .into(),
@@ -28,6 +30,11 @@ pub(super) fn discover_runner(
         Err(error) => runner.detail = error,
         Ok((adapter, path)) => {
             runner.available = true;
+            if adapter == "antigravity" {
+                runner.account = "Current Antigravity CLI account (identity not reported)".into();
+                runner.detail = "Uses agy and its existing CLI sign-in and permission settings. Access is checked when a task starts. Sign in with agy, then refresh. Separate Jackalope accounts are unavailable; changing the CLI account also affects continuations.".into();
+                return runner;
+            }
             let profile_env =
                 crate::commands::agent_profiles::env_var_for(&adapter).and_then(|name| {
                     crate::commands::agent_profiles::active_profile_dir(profiles_root, &adapter)
@@ -80,10 +87,11 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
     if !BUILTIN_AGENTS.contains(&agent) {
         return Err("Unsupported agent".into());
     }
+    let binary = if agent == "antigravity" { "agy" } else { agent };
     let name = if cfg!(windows) {
-        format!("{agent}.exe")
+        format!("{binary}.exe")
     } else {
-        agent.to_string()
+        binary.to_string()
     };
     let mut dirs: Vec<PathBuf> =
         std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect();
@@ -91,6 +99,11 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
         dirs.push(PathBuf::from(&home).join(".local/bin"));
         dirs.push(PathBuf::from(&home).join(".grok/bin"));
         dirs.push(PathBuf::from(home).join(".opencode/bin"));
+    }
+    if agent == "antigravity" {
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            dirs.push(PathBuf::from(local).join("agy/bin"));
+        }
     }
     if agent == "opencode" {
         if let Some(roaming) = std::env::var_os("APPDATA") {

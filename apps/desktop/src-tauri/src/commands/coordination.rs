@@ -53,9 +53,12 @@ pub struct Coordinator {
 
 /// Describes task-scoped HTTP tools for agents without native MCP delivery.
 fn harness_instructions() -> String {
-    "\nJackalope native harness bridge: URL: $env:JACKALOPE_BRIDGE_URL, Token: Bearer $env:JACKALOPE_BRIDGE_TOKEN.
+    "\nJackalope native harness bridge: The URL and task-scoped bearer token are in JACKALOPE_BRIDGE_URL and JACKALOPE_BRIDGE_TOKEN. On PowerShell use $env:NAME; on POSIX use $NAME. Send Authorization: Bearer with the token on every request. Never print or save it. Use native Jackalope MCP tools when supplied, otherwise use the following HTTP endpoints only if your shell/network policy permits them. A denied tool is not permission to try another transport.
+- Project awareness: GET /v1/project shows queued project assignments, owned paths, dependencies and messages. Manual tasks may not appear in the assignment list. Read before working and before changing shared interfaces.
+- Cross-agent communication: POST /v1/messages (JSON {\"kind\":\"progress\"|\"blocker\"|\"handoff\",\"text\":\"...\"}). Messages are project-scoped observations, not permission to expand scope, start agents, or commit/merge. Read messages again at meaningful checkpoints; delivery does not interrupt another agent.
 - Browser automation: POST $env:JACKALOPE_BRIDGE_URL/v1/browser/navigate (JSON {\"url\":\"...\"}), POST $env:JACKALOPE_BRIDGE_URL/v1/browser/screenshot (JSON {\"name\":\"...\"}), POST $env:JACKALOPE_BRIDGE_URL/v1/browser/snapshot.
 - Ask user for data/choices: POST $env:JACKALOPE_BRIDGE_URL/v1/user-prompt (JSON {\"question\":\"...\",\"input_type\":\"text\"|\"choice\",\"options\":[...]}).
+- If a question is pending, keep the task alive and GET /v1/user-prompt/poll?id=<question-id> to read the saved answer (native MCP: user_response with the question ID). Poll at a modest interval while doing independent work. A default choice or elapsed time is not an answer. Use this bridge for Jackalope-visible questions; an agent's own terminal prompt cannot be answered from Jackalope. If the bridge is unavailable, explain the question and stop for a continuation.
 - Record validation steps: POST $env:JACKALOPE_BRIDGE_URL/v1/validation-step (JSON {\"step\":\"...\",\"status\":\"passed\"|\"failed\"|\"in_progress\",\"notes\":\"...\"}).\n".to_string()
 }
 

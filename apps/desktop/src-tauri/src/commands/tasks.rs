@@ -1,3 +1,4 @@
+mod antigravity;
 mod events;
 mod models;
 mod project_setup;

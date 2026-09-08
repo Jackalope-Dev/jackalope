@@ -35,6 +35,16 @@ export function AgentAvatar({
             d="m40 8 6 16 15-9-4 17 17 2-14 10 11 13-18-1-3 17-10-13-12 12-1-18-17 2 10-14L6 34l18-3-5-16 15 9Z"
             fill="currentColor"
           />
+        ) : provider === 'antigravity' ? (
+          <>
+            <path d="M13 60 30 18q10-16 20 0l17 42q-27-12-54 0Z" fill="currentColor" />
+            <path
+              d="M24 69q16-6 32 0"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </>
         ) : provider === 'grok' ? (
           <>
             <ellipse

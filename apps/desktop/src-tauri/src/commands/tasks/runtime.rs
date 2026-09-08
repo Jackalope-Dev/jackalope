@@ -219,6 +219,9 @@ impl TaskRuntime {
         let (adapter, executable) = policy.resolve(&req.agent)?;
         let selected_model = policy.model(&req.agent, req.model.as_deref())?;
         let mut cmd = command(executable);
+        if let Some(binding) = &req.account_binding {
+            crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
+        }
         if crate::commands::agent_profiles::env_var_for(&adapter).is_some() {
             let binding = req
                 .account_binding
@@ -251,6 +254,12 @@ impl TaskRuntime {
             if let Some(ref old) = previous {
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
+        } else if adapter == "antigravity" {
+            antigravity::configure(
+                &mut cmd,
+                &workspace,
+                previous.as_ref().and_then(|old| old.session_id.as_deref()),
+            );
         } else if adapter == "opencode" {
             cmd.args(["run", "--format", "json"]);
             if let Some(ref old) = previous {
@@ -271,6 +280,7 @@ impl TaskRuntime {
         }
         if let Some(model) = &selected_model {
             cmd.args(["--model", model]);
+            self.update_checked(id, |run| run.model = Some(model.clone()))?;
         }
         let (mut project_mcp, discovered_mcp) = crate::commands::mcp::project_delivery(
             &req.project_id,
@@ -335,6 +345,9 @@ impl TaskRuntime {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;
         }
+        if adapter == "antigravity" {
+            input = antigravity::input(&input, &workspace);
+        }
         cmd.current_dir(&workspace)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -398,13 +411,19 @@ impl TaskRuntime {
         let runtime = self.clone();
         let event_id = id.to_string();
         let output_adapter = adapter.clone();
+        let resumed_session = previous.as_ref().and_then(|run| run.session_id.clone());
         let reader = std::thread::spawn(move || {
+            let mut stream = antigravity::Stream::new(resumed_session);
             if let Err(error) = crate::commands::process_control::bounded_lines(
                 BufReader::new(stdout),
                 1_000_000,
                 |line, truncated| {
                     runtime.update(&event_id, |r| {
-                    if truncated { activity(r, "An oversized agent event was omitted. Inspect the agent session for full output."); }
+                    if truncated {
+                        activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
+                        if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }
+                    }
+                    else if output_adapter == "antigravity" { stream.consume(r, &line); }
                     else { consume_adapter_event(r, &line, &output_adapter); }
                 });
                 },
@@ -413,9 +432,13 @@ impl TaskRuntime {
                     r.error = Some(format!("Agent output could not be read: {error}"))
                 });
             }
+            if output_adapter == "antigravity" {
+                runtime.update(&event_id, |run| stream.finish(run));
+            }
         });
         let runtime = self.clone();
         let event_id = id.to_string();
+        let diagnostics_adapter = adapter.clone();
         let diagnostics = std::thread::spawn(move || {
             let _ = crate::commands::process_control::bounded_lines(
                 BufReader::new(stderr),
@@ -424,10 +447,19 @@ impl TaskRuntime {
                     if truncated {
                         line.push_str(" [truncated]");
                     }
-                    runtime.update(&event_id, |r| r.diagnostics.push(line));
+                    runtime.update(&event_id, |r| {
+                        if diagnostics_adapter == "antigravity"
+                            && antigravity::permission_denied(&line)
+                        {
+                            antigravity::mark_permission_denied(r);
+                        }
+                        r.diagnostics.push(line);
+                    });
                 },
             );
         });
+        let started = std::time::Instant::now();
+        let mut timed_out = false;
         let exit = loop {
             if let Some(exit) = process
                 .lock()
@@ -436,6 +468,12 @@ impl TaskRuntime {
                 .map_err(|e| e.to_string())?
             {
                 break exit;
+            }
+            if adapter == "antigravity" && !timed_out && started.elapsed() > antigravity::TIMEOUT {
+                timed_out = true;
+                self.update(id, |run| run.error = Some("Antigravity exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.".into()));
+                tree.terminate();
+                let _ = process.lock().unwrap().kill();
             }
             std::thread::sleep(Duration::from_millis(100));
         };

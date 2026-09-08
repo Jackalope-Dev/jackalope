@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
+import { builtinAgents } from '../../lib/agent-catalog';
 import type { QueueItem } from '../../lib/queue';
 import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -135,15 +136,9 @@ export function AddWork({
                   value={draft.agent}
                   onValueChange={(value) => update({ agent: value })}
                 >
-                  {['codex', 'claude', 'grok', 'opencode'].map((id) => (
+                  {builtinAgents.map(({ id, name }) => (
                     <SelectItem key={id} value={id}>
-                      {id === 'claude'
-                        ? 'Claude Code'
-                        : id === 'codex'
-                          ? 'Codex'
-                          : id === 'opencode'
-                            ? 'OpenCode'
-                            : 'Grok'}
+                      {name}
                       {runners.find((r) => r.id === id)?.available ? '' : ' · not detected'}
                     </SelectItem>
                   ))}

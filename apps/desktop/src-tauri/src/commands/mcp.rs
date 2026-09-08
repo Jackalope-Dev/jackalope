@@ -616,6 +616,12 @@ mod tests {
         );
         assert!(project_servers(&id, Some(&[]), "grok").unwrap().is_empty());
         assert!(project_servers(&id, Some(&selected), "grok").is_err());
+        assert!(project_servers(&id, Some(&selected), "antigravity")
+            .unwrap_err()
+            .contains("on-demand discovery"));
+        assert!(project_servers(&id, Some(&[]), "antigravity")
+            .unwrap()
+            .is_empty());
         assert!(project_servers(&id, Some(&["off".into()]), "codex").is_err());
         assert!(config_path("project:../escape").is_err());
         let invalid = parse_server_spec(
@@ -647,7 +653,7 @@ mod tests {
             json!({"mcpServers":{"tools":spec(&server,&scope)}}).to_string(),
         )
         .unwrap();
-        for adapter in ["codex", "claude", "grok"] {
+        for adapter in ["codex", "claude", "grok", "antigravity"] {
             let (direct, optimized) =
                 project_delivery(&id, Some(&["tools".into()]), adapter).unwrap();
             assert!(direct.is_empty());
@@ -746,6 +752,9 @@ pub(super) fn project_delivery(
             if server.discovery {
                 optimized.push(server);
                 continue;
+            }
+            if adapter == "antigravity" {
+                return Err("Antigravity supports project connections through on-demand discovery. Enable on-demand discovery for this connection, use its own CLI MCP configuration, or choose another agent.".into());
             }
             if adapter == "grok" || (adapter == "codex" && server.transport == "sse") {
                 return Err("This agent does not support the selected project MCP transport. Choose Claude or a compatible Codex connection.".into());

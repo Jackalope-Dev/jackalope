@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { builtinAgents } from '../../lib/agent-catalog';
 import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
@@ -76,15 +77,12 @@ function parsePlan(text: string): PlanEntry[] {
       throw new Error(`${label} needs instructions of 1–20,000 characters.`);
     if (
       ![
-        'codex',
-        'claude',
-        'grok',
-        'opencode',
+        ...builtinAgents.map((agent) => agent.id),
         ...useAgentConfigStore.getState().customAgents.map((a) => a.id),
       ].includes(String(item.agent))
     )
       throw new Error(
-        `${label} must choose an available agent (codex, claude, grok, opencode or a configured custom agent).`,
+        `${label} must choose an available agent (${builtinAgents.map((agent) => agent.id).join(', ')} or a configured custom agent).`,
       );
     if (
       !Array.isArray(item.scopes) ||

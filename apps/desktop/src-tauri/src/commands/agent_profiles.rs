@@ -128,6 +128,21 @@ pub fn bind_account(
     adapter: &str,
     explicit: Option<&str>,
 ) -> Result<AccountBinding, String> {
+    if adapter == "antigravity" {
+        if explicit.is_some() {
+            return Err("Antigravity uses its current CLI sign-in; separate Jackalope accounts are not supported.".into());
+        }
+        let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+            .map(|home| PathBuf::from(home).join(".gemini"))
+            .filter(|path| path.is_absolute())
+            .ok_or("Cannot locate Antigravity's CLI data directory.")?;
+        return Ok(AccountBinding {
+            adapter: adapter.into(),
+            profile_id: None,
+            directory,
+            label: "Current Antigravity CLI account (identity not pinned)".into(),
+        });
+    }
     let env_name = env_var_for(adapter).ok_or("This agent does not support account isolation.")?;
     let manifest = if manifest_path(root).exists() {
         serde_json::from_slice::<Manifest>(
@@ -201,6 +216,12 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
 }
 
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
+    if binding.adapter == "antigravity" {
+        let current = bind_account(root, &binding.adapter, binding.profile_id.as_deref())?;
+        if current.directory != binding.directory {
+            return Err("Antigravity's CLI data location changed. Start a new task.".into());
+        }
+    }
     if let Some(id) = &binding.profile_id {
         let resolved = bind_account(root, &binding.adapter, Some(id))?;
         if resolved.directory != binding.directory {

@@ -79,7 +79,9 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
     return (
       <p className="task-muted">
         {desktop
-          ? `Jackalope does not have a known way to isolate ${agentName}'s sign-in, so separate accounts aren't available for it.`
+          ? agentId === 'antigravity'
+            ? 'Antigravity uses your current agy CLI sign-in. Sign in by running agy in a terminal. Separate Jackalope accounts are unavailable; changing the CLI account also affects task continuations.'
+            : `Jackalope does not have a known way to isolate ${agentName}'s sign-in, so separate accounts aren't available for it.`
           : 'Accounts are available in the desktop app.'}
       </p>
     );
