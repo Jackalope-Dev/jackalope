@@ -344,23 +344,25 @@ export function AccessPage() {
               </div>
             </div>
             <ol className="pass-strip" aria-label="Instant Access Pass allowance">
-              {Array.from({ length: Math.min(member.limit, 100) }, (_, index) => index + 1).map((passNumber) => {
-                const state =
-                  passNumber <= member.accepted
-                    ? 'Claimed'
-                    : passNumber <= member.limit - member.remaining
-                      ? 'Reserved'
-                      : 'Available';
-                return (
-                  <li key={passNumber} data-state={state}>
-                    <BrandMark />
-                    <strong>Instant Access</strong>
-                    <span>
-                      Pass {String(passNumber).padStart(2, '0')} · {state}
-                    </span>
-                  </li>
-                );
-              })}
+              {Array.from({ length: Math.min(member.limit, 100) }, (_, index) => index + 1).map(
+                (passNumber) => {
+                  const state =
+                    passNumber <= member.accepted
+                      ? 'Claimed'
+                      : passNumber <= member.limit - member.remaining
+                        ? 'Reserved'
+                        : 'Available';
+                  return (
+                    <li key={passNumber} data-state={state}>
+                      <BrandMark />
+                      <strong>Instant Access</strong>
+                      <span>
+                        Pass {String(passNumber).padStart(2, '0')} · {state}
+                      </span>
+                    </li>
+                  );
+                },
+              )}
             </ol>
             <p className="access-fine">
               Your shared pass link draws from this allowance. Email passes reserve a place for
@@ -613,13 +615,13 @@ export function AccessPage() {
               <h2>{invite ? 'Claim your pass' : 'Sign in'}</h2>
               <p>
                 {invite
-                  ? 'Enter your email. Follow the link we send to confirm your invitation while a place is available.'
+                  ? 'Enter your email. Follow the link we send to claim your pass while a place is available.'
                   : 'Enter your approved or invited email address to receive a sign-in link.'}
               </p>
               {invite && available === false && (
                 <p className="access-alert">
-                  This invitation has no places available right now. You can still sign in if you
-                  already have access, or <a href="/#newsletter">join the waitlist</a>.
+                  All passes on this link are claimed or reserved right now. You can still sign in
+                  if you already have access, or <a href="/#newsletter">join the waitlist</a>.
                 </p>
               )}
               <form onSubmit={signIn}>

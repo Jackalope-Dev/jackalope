@@ -208,6 +208,137 @@
   font-size: var(--text-xs);
   overflow-wrap: anywhere;
 }
+.onboarding-agent-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.onboarding-agent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.onboarding-runner-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.onboarding-runner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.onboarding-vendor-pill {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+.onboarding-strengths-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.onboarding-strength-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+.onboarding-signin-tip {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+}
+.onboarding-signin-tip .onboarding-note {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+.onboarding-command-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.onboarding-command-box code {
+  font-size: 12px;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onboarding-install-catalog {
+  margin-top: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--color-surface-elevated);
+}
+.onboarding-install-catalog summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+.onboarding-catalog-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.onboarding-catalog-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+}
+.onboarding-catalog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.onboarding-catalog-head strong {
+  font-size: var(--text-sm);
+  margin-right: 6px;
+}
+.onboarding-catalog-link {
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+}
+.onboarding-catalog-link:hover {
+  color: var(--color-text-primary);
+}
+.onboarding-catalog-desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
 .onboarding-radio {
   border: 1px solid var(--color-border);
   width: 22px;

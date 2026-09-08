@@ -3,9 +3,9 @@ import { randomToken, seal, tokenHash } from './crypto';
 import type { WaitlistMail } from './mail';
 
 const day = 86400000;
-export const waitlistRankSql = `SELECT m.id,m.created_at,m.referral_count,
- row_number() OVER (ORDER BY m.created_at-m.referral_count*86400000,m.created_at,m.id) AS position
- FROM access_members m WHERE m.status='waiting'`;
+export const waitlistRankSql = `SELECT m.id,m.waitlist_joined_at AS created_at,m.referral_count,
+ row_number() OVER (ORDER BY m.waitlist_joined_at-m.referral_count*86400000,m.waitlist_joined_at,m.id) AS position
+ FROM access_members m WHERE m.status='waiting' AND m.waitlist_joined_at IS NOT NULL`;
 
 export async function waitlistMailStatements(
   env: Env,
@@ -36,7 +36,7 @@ export async function waitlistMailStatements(
 
 export async function requestWaitlistLink(env: Env, email: string, now = Date.now()) {
   const member = await env.DB.prepare(
-    "SELECT id FROM access_members WHERE email=? AND status!='revoked'",
+    "SELECT id FROM access_members WHERE email=? AND status!='revoked' AND (waitlist_joined_at IS NOT NULL OR status='approved')",
   )
     .bind(email)
     .first<{ id: string }>();

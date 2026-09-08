@@ -174,7 +174,7 @@ it('locks attribution to the new signup and ignores unverified referrers and exi
 it('uses the same deterministic priority in the user page and admin queue, with referral sorting and pagination', async () => {
   const a = await verified('early@example.com');
   const b = await verified('later@example.com');
-  await env.DB.prepare('UPDATE access_members SET created_at=? WHERE id=?')
+  await env.DB.prepare('UPDATE access_members SET waitlist_joined_at=? WHERE id=?')
     .bind(Date.now() - 3600000, a.m.id)
     .run();
   expect((await waitlistStatus(browser(b.session), bindings)).position).toBe(2);
@@ -283,6 +283,9 @@ it('returns expired email reservations and queues one owner notice without email
   await acceptToken(bindings, await mailToken(owner.m.email, 'welcome'));
   const m = await person(owner.m.email);
   await inviteEmails(bindings, m, ['guest@example.com']);
+  expect((await env.DB.prepare(waitlistRankSql).all()).results).toHaveLength(0);
+  await signup('guest@example.com');
+  expect((await env.DB.prepare(waitlistRankSql).all()).results).toHaveLength(1);
   await env.DB.prepare('UPDATE access_invites SET expires_at=?')
     .bind(Date.now() - 1000)
     .run();

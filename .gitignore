@@ -101,3 +101,5 @@ tmp/
 # Public/test certificates may be explicitly allowlisted beside their fixture.
 wrangler.deploy.jsonc
 dist-lab/
+
+/marketing-assets/submissions/*.zip

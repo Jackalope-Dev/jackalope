@@ -1,5 +1,31 @@
 [
   {
+    "id": "agent-ecosystem-and-multi-agent-routing",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Expanded agent ecosystem and multi-agent routing.",
+    "description": "Support for 8 coding agents, broad package manager discovery, multi-account tags, intelligent task routing, and interactive multi-agent decomposition.",
+    "items": [
+      "Built-in detection across npm, pnpm, yarn, pipx, scoop, cargo, winget, and brew for Codex, Claude, Grok, OpenCode, Antigravity, Gemini CLI, Aider, and Goose.",
+      "Multi-account custom tagging, visual badges, and one-click import of default CLI logins.",
+      "Automatic best-fit task routing and interactive goal splitting into sequenced subtasks across specialized agents."
+    ],
+    "note": "Prerelease milestone. Desktop builds pass all automated verification checks."
+  },
+  {
+    "id": "your-next-hop-into-jackalope",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Your next hop into Jackalope.",
+    "description": "Track your waitlist place, bring people along, and share Instant Access Passes once you are in.",
+    "items": [
+      "Unlimited verified waitlist referrals earn priority, with progress visible to you and the admin.",
+      "Accepted members get five passes to bring people straight into early access.",
+      "Clear emails guide verification, referral milestones, pass claims, and expired reservations."
+    ],
+    "note": "Development milestone. Service migration and real email acceptance are required before rollout."
+  },
+  {
     "id": "a-cross-platform-workspace",
     "date": "2026-09-08",
     "status": "In development",
@@ -39,7 +65,9 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": ["A Follow on X link is available in the shared footer."],
+    "items": [
+      "A Follow on X link is available in the shared footer."
+    ],
     "note": "Website milestone, not a public product release."
   },
   {

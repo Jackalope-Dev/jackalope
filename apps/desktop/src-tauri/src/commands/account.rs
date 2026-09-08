@@ -465,7 +465,9 @@ pub async fn app_account_open_referrals(
 ) -> Result<(), String> {
     let _guard = state.operation.lock().await;
     let (api, web) = endpoints(&app)?;
-    let record = state.read()?.ok_or("Connect your Jackalope account first.")?;
+    let record = state
+        .read()?
+        .ok_or("Connect your Jackalope account first.")?;
     bound(&record, &api)?;
     if record.email.is_none() {
         return Err("Finish connecting your Jackalope account first.".into());
@@ -477,7 +479,9 @@ pub async fn app_account_open_referrals(
                 .as_str(),
             None,
         )
-        .map_err(|_| "Could not open your browser. Check your default browser and try again.".into())
+        .map_err(|_| {
+            "Could not open your browser. Check your default browser and try again.".into()
+        })
 }
 #[tauri::command]
 pub async fn app_account_poll(

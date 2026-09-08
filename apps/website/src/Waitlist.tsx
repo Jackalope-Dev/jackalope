@@ -225,10 +225,15 @@ export function WaitlistPage() {
           )}
           <section className="access-card waitlist-sharing">
             <div>
-              <h2>Good company gets you closer.</h2>
+              <h2>
+                {place.status === 'approved'
+                  ? 'Keep the door open.'
+                  : 'Good company gets you closer.'}
+              </h2>
               <p>
-                Invite as many people to the waitlist as you like. Every new signup that verifies
-                their email through your link earns you one day of priority.
+                {place.status === 'approved'
+                  ? 'Keep sharing the waitlist with as many people as you like. Your referral total keeps growing, and your five Instant Access Passes stay separate.'
+                  : 'Invite as many people to the waitlist as you like. Every new signup that verifies their email through your link earns you one day of priority.'}
               </p>
               <p className="access-fine">
                 We rank signup time minus earned priority, with earlier signups breaking ties. Your
@@ -278,10 +283,14 @@ export function WaitlistPage() {
           <aside className="waitlist-next">
             <BrandMark />
             <div>
-              <h2>On the other side: five passes.</h2>
+              <h2>
+                {place.status === 'approved'
+                  ? 'Five passes. A head start for your people.'
+                  : 'On the other side: five passes.'}
+              </h2>
               <p>
-                Once accepted, you’ll get five Instant Access Passes. Each lets one person skip the
-                line after email verification. Unlimited waitlist referrals and your five passes are
+                Accepted members get five Instant Access Passes. Each lets one person skip the line
+                after email verification. Unlimited waitlist referrals and your five passes are
                 separate.
               </p>
             </div>

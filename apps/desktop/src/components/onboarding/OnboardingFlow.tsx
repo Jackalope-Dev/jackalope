@@ -4,12 +4,16 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  Copy,
+  ExternalLink,
   FolderOpen,
   FolderPlus,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
 import { createProject, openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -91,6 +95,12 @@ export function OnboardingFlow({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
+  const copyToClipboard = (text: string) => {
+    void navigator.clipboard.writeText(text);
+    setCopiedCommand(text);
+    setTimeout(() => setCopiedCommand((curr) => (curr === text ? null : curr)), 2500);
+  };
   const heading = useRef<HTMLHeadingElement>(null);
   const errorMessage = useRef<HTMLParagraphElement>(null);
   const tipIndex = useRef(0);
@@ -457,9 +467,29 @@ export function OnboardingFlow({
               <p className="onboarding-description">
                 Choose an agent for <strong>{project?.name}</strong>.
               </p>
+              <div className="onboarding-agent-summary">
+                <span className="onboarding-agent-badge">
+                  <Sparkles size={14} />
+                  {execution.runners.filter((r) => r.available).length === 0
+                    ? 'No agents detected yet'
+                    : `${execution.runners.filter((r) => r.available).length} ${execution.runners.filter((r) => r.available).length === 1 ? 'agent' : 'agents'} detected (${execution.runners.filter((r) => r.available && r.signedIn).length} ready)`}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy || execution.discovering || !desktop}
+                  onClick={() => void refresh()}
+                >
+                  <RefreshCw size={13} className={execution.discovering ? 'animate-spin' : ''} />
+                  {execution.discovering ? 'Detecting…' : 'Scan system'}
+                </Button>
+              </div>
+
               <fieldset className="onboarding-runner-list" aria-label="Choose your agent">
                 {execution.runners.map((item) => {
                   const enabled = available(item.id);
+                  const meta = getAgentMetadata(item.id);
                   return (
                     <button
                       type="button"
@@ -472,8 +502,13 @@ export function OnboardingFlow({
                       <span className="onboarding-radio">
                         {agent === item.id && <Check size={14} />}
                       </span>
-                      <span>
-                        <strong>{item.name}</strong>
+                      <div className="onboarding-runner-info">
+                        <div className="onboarding-runner-header">
+                          <strong>{item.name}</strong>
+                          {meta?.vendor && (
+                            <span className="onboarding-vendor-pill">{meta.vendor}</span>
+                          )}
+                        </div>
                         <small>
                           {!enabled
                             ? 'Disabled in agent or model settings'
@@ -483,8 +518,17 @@ export function OnboardingFlow({
                                 ? 'Installed · sign-in detected'
                                 : 'Installed · sign-in not confirmed'}
                         </small>
+                        {meta?.strengths && meta.strengths.length > 0 && (
+                          <div className="onboarding-strengths-row">
+                            {meta.strengths.slice(0, 3).map((st) => (
+                              <span key={st} className="onboarding-strength-tag">
+                                {st}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <small>{item.detail}</small>
-                      </span>
+                      </div>
                     </button>
                   );
                 })}
@@ -501,25 +545,105 @@ export function OnboardingFlow({
                   {execution.error}
                 </p>
               )}
+
+              {runner && !runner.signedIn && runner.available && (
+                <div className="onboarding-signin-tip">
+                  <p className="onboarding-note">
+                    Sign in through {runner.name} before starting a task.
+                  </p>
+                  {(() => {
+                    const meta = getAgentMetadata(runner.id);
+                    if (meta?.loginCommand) {
+                      const loginCmd = meta.loginCommand;
+                      return (
+                        <div className="onboarding-command-box">
+                          <code>{loginCmd}</code>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(loginCmd)}
+                          >
+                            {copiedCommand === loginCmd ? <Check size={13} /> : <Copy size={13} />}
+                            {copiedCommand === loginCmd ? 'Copied' : 'Copy'}
+                          </Button>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              )}
+
+              {builtinAgents.filter(
+                (b) => !execution.runners.some((r) => r.id === b.id && r.available),
+              ).length > 0 && (
+                <details className="onboarding-install-catalog">
+                  <summary>
+                    Install other supported agents (
+                    {
+                      builtinAgents.filter(
+                        (b) => !execution.runners.some((r) => r.id === b.id && r.available),
+                      ).length
+                    }{' '}
+                    available)
+                  </summary>
+                  <div className="onboarding-catalog-grid">
+                    {builtinAgents
+                      .filter((b) => !execution.runners.some((r) => r.id === b.id && r.available))
+                      .map((b) => (
+                        <div key={b.id} className="onboarding-catalog-card">
+                          <div className="onboarding-catalog-head">
+                            <div>
+                              <strong>{b.name}</strong>
+                              <span className="onboarding-vendor-pill">{b.vendor}</span>
+                            </div>
+                            <a
+                              href={b.installUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="onboarding-catalog-link"
+                              title={`Open ${b.name} docs`}
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                          <p className="onboarding-catalog-desc">{b.description}</p>
+                          {b.installCommand &&
+                            (() => {
+                              const instCmd = b.installCommand;
+                              return (
+                                <div className="onboarding-command-box">
+                                  <code>{instCmd}</code>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => copyToClipboard(instCmd)}
+                                  >
+                                    {copiedCommand === instCmd ? (
+                                      <Check size={13} />
+                                    ) : (
+                                      <Copy size={13} />
+                                    )}
+                                    {copiedCommand === instCmd ? 'Copied' : 'Copy'}
+                                  </Button>
+                                </div>
+                              );
+                            })()}
+                        </div>
+                      ))}
+                  </div>
+                </details>
+              )}
+
               <details className="onboarding-advanced">
                 <summary>Agent commands, models & manual setup</summary>
                 <Suspense fallback={<p className="task-muted">Loading agent setup…</p>}>
                   <AgentManager />
                 </Suspense>
               </details>
-              <Button
-                variant="ghost"
-                disabled={busy || execution.discovering || !desktop}
-                onClick={() => void refresh()}
-              >
-                <RefreshCw size={15} />
-                {execution.discovering ? 'Checking agents…' : 'Check again'}
-              </Button>
-              {runner && !runner.signedIn && (
-                <p className="onboarding-note">
-                  Sign in through {runner.name} before starting a task.
-                </p>
-              )}
+
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('project')}>
                   <ArrowLeft size={16} />

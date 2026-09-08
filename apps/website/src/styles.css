@@ -269,8 +269,10 @@ h3 {
   border-radius: 14px;
   background: var(--color-surface-elevated);
   box-shadow: var(--shadow-pop);
+  max-height: var(--radix-dropdown-menu-content-available-height);
+  overflow-y: auto;
 }
-.nav-menu a {
+.nav-menu [role="menuitem"] {
   display: flex;
   align-items: center;
   min-height: 48px;
@@ -278,7 +280,7 @@ h3 {
   font-size: 14px;
   border-radius: 8px;
 }
-.nav-menu a[data-highlighted] {
+.nav-menu [role="menuitem"][data-highlighted] {
   background: var(--color-accent-subtle);
   outline: none;
 }

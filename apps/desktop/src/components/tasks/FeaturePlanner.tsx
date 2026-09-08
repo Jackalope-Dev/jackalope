@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
+import { routeTaskToBestAgent } from '../../lib/agent-routing';
 import { type FeatureStep, featurePlanningPrompt, readFeaturePlan } from '../../lib/feature-plan';
 import { queueCommand } from '../../lib/queue';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
@@ -92,6 +93,17 @@ export function FeaturePlanner({
   };
   const change = (index: number, patch: Partial<FeatureStep>) =>
     update({ steps: draft.steps.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
+  const autoAssignBestAgents = () => {
+    const updated = draft.steps.map((step) => {
+      const routing = routeTaskToBestAgent({
+        prompt: `${step.title}\n${step.prompt}`,
+        scopes: step.scopes,
+        availableRunners: available,
+      });
+      return { ...step, agent: routing.agentId };
+    });
+    update({ steps: updated });
+  };
   return (
     <Dialog.Root
       open
@@ -221,22 +233,52 @@ export function FeaturePlanner({
               )}
             </div>
           )}
+          {draft.steps.length > 1 && (
+            <div className="flex justify-end mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy || draft.added}
+                onClick={autoAssignBestAgents}
+              >
+                <Sparkles size={14} />
+                Auto-assign best agents
+              </Button>
+            </div>
+          )}
           <fieldset disabled={busy || draft.added} className="space-y-5 mt-5">
             {draft.steps.map((step, index) => (
               <article
                 key={step.key}
                 className="border-t border-[var(--color-border)] pt-4 space-y-3"
               >
-                <label className="block" htmlFor={`feature-title-${step.key}`}>
-                  Task {index + 1}
-                  <input
-                    id={`feature-title-${step.key}`}
-                    className="task-input w-full"
-                    maxLength={160}
-                    value={step.title}
-                    onChange={(e) => change(index, { title: e.target.value })}
-                  />
-                </label>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <label className="block" htmlFor={`feature-title-${step.key}`}>
+                    Task {index + 1}
+                    <input
+                      id={`feature-title-${step.key}`}
+                      className="task-input w-full"
+                      maxLength={160}
+                      value={step.title}
+                      onChange={(e) => change(index, { title: e.target.value })}
+                    />
+                  </label>
+                  <label className="block" htmlFor={`feature-agent-${step.key}`}>
+                    Assigned agent
+                    <Select
+                      id={`feature-agent-${step.key}`}
+                      value={step.agent || draft.agent}
+                      onValueChange={(agent) => change(index, { agent })}
+                    >
+                      {available.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  </label>
+                </div>
                 <label className="block" htmlFor={`feature-instruction-${step.key}`}>
                   Instructions
                   <textarea

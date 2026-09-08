@@ -13,6 +13,7 @@ import {
   renameAgentProfile,
   setActiveAgentProfile,
   setAgentProfileGroup,
+  setAgentProfileTag,
 } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
@@ -50,12 +51,13 @@ function EditAccount({
   onClose,
 }: {
   profile: AgentProfile;
-  onSave: (name: string, group: AgentProfile['group']) => Promise<void>;
+  onSave: (name: string, group: AgentProfile['group'], tag: string | null) => Promise<void>;
   onClose: () => void;
 }) {
   const dialogFocus = useDialogFocus();
   const [name, setName] = useState(profile.name);
   const [group, setGroup] = useState(profile.group);
+  const [tag, setTag] = useState(profile.tag ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   return (
@@ -73,7 +75,7 @@ function EditAccount({
         >
           <Dialog.Title className="text-xl font-medium">Edit account</Dialog.Title>
           <Dialog.Description className="task-muted mt-2">
-            Group accounts to choose Work or Personal across agents in Project settings.
+            Customize the account name, group, and custom label for organizing multiple accounts.
           </Dialog.Description>
           <form
             className="grid gap-4 mt-4"
@@ -82,7 +84,7 @@ function EditAccount({
               setBusy(true);
               setError('');
               try {
-                await onSave(name.trim(), group);
+                await onSave(name.trim(), group, tag.trim() || null);
                 onClose();
               } catch (e) {
                 setError(String(e));
@@ -100,6 +102,17 @@ function EditAccount({
                 disabled={busy}
                 required
                 maxLength={80}
+              />
+            </label>
+            <label className="task-label">
+              Custom label / tag (optional)
+              <input
+                className="task-input"
+                value={tag}
+                onChange={(e) => setTag(e.target.value)}
+                disabled={busy}
+                placeholder="e.g. Client A, Account #3, Research Lab"
+                maxLength={40}
               />
             </label>
             <AccountGroup value={group} onChange={setGroup} label="Account group" />
@@ -219,18 +232,44 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
           {error}
         </p>
       )}
-      <Button
-        variant="outline"
-        disabled={locked || !view.activeId}
-        onClick={() =>
-          void action('default', async () => {
-            await setActiveAgentProfile(agentId, null);
-            await load();
-          })
-        }
-      >
-        {view.activeId ? 'Use normal CLI sign-in' : 'Using normal CLI sign-in'}
-      </Button>
+      <div className="flex flex-wrap gap-2 mb-3">
+        <Button
+          variant="outline"
+          disabled={locked || !view.activeId}
+          onClick={() =>
+            void action('default', async () => {
+              await setActiveAgentProfile(agentId, null);
+              await load();
+            })
+          }
+        >
+          {view.activeId ? 'Use normal CLI sign-in' : 'Using normal CLI sign-in'}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={locked}
+          onClick={() =>
+            void action('import-cli', async () => {
+              const status = await checkAgentProfile(agentId, null);
+              const label = status?.identity
+                ? `${agentName} (${status.identity})`
+                : `${agentName} Account ${view.profiles.length + 1}`;
+              const created = await createAgentProfile(agentId, label, 'personal');
+              await setAgentProfileTag(
+                agentId,
+                created.id,
+                status?.identity ? 'Imported' : `Account #${view.profiles.length + 1}`,
+              );
+              await load();
+              await check(created);
+            })
+          }
+        >
+          <Plus size={15} />
+          Import system CLI login as profile
+        </Button>
+      </div>
       <ul className="agent-accounts-list">
         {view.profiles.map((profile) => {
           const status = statuses[profile.id];
@@ -255,6 +294,11 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
               <div className="agent-account-identity">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{profile.name}</strong>
+                  {profile.tag && (
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-[var(--color-surface-hover)] border border-[var(--color-border)]">
+                      {profile.tag}
+                    </span>
+                  )}
                   {profile.group && (
                     <span className="task-muted text-xs">
                       {profile.group === 'work' ? 'Work' : 'Personal'}
@@ -368,9 +412,10 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
         <EditAccount
           profile={editing}
           onClose={() => setEditing(undefined)}
-          onSave={async (name, group) => {
+          onSave={async (name, group, tag) => {
             await renameAgentProfile(agentId, editing.id, name);
             await setAgentProfileGroup(agentId, editing.id, group);
+            await setAgentProfileTag(agentId, editing.id, tag);
             await load();
           }}
         />

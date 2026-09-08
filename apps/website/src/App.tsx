@@ -154,6 +154,9 @@ export function App({ path = '/' }: { path?: string }) {
                   sideOffset={12}
                   collisionPadding={16}
                 >
+                  <Menu.Item onSelect={() => setDark(!dark)}>
+                    Switch to {dark ? 'light' : 'dark'} appearance
+                  </Menu.Item>
                   {[
                     ['Your waitlist place', '/waitlist/'],
                     ['Member access', '/access/'],

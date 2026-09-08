@@ -25,8 +25,16 @@ export function memberInsert(
   id = crypto.randomUUID(),
 ) {
   return env.DB.prepare(
-    'INSERT INTO access_members(id,email,created_at,source,share_code,newsletter) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET newsletter=max(newsletter,excluded.newsletter)',
-  ).bind(id, email, now, source, randomToken(), Number(newsletter));
+    'INSERT INTO access_members(id,email,created_at,source,share_code,newsletter,waitlist_joined_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET newsletter=max(newsletter,excluded.newsletter),waitlist_joined_at=coalesce(waitlist_joined_at,excluded.waitlist_joined_at)',
+  ).bind(
+    id,
+    email,
+    now,
+    source,
+    randomToken(),
+    Number(newsletter),
+    source === 'invitation' ? null : now,
+  );
 }
 export async function register(
   env: Env,

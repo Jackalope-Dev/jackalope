@@ -182,6 +182,7 @@ pub fn run() {
             agent_profile_delete,
             agent_profile_set_active,
             agent_profile_set_group,
+            agent_profile_set_tag,
             agent_profile_sign_in,
             agent_profile_sign_in_poll,
             agent_profile_sign_in_input,

@@ -4,6 +4,7 @@ export interface AgentProfile {
   id: string;
   name: string;
   group?: 'work' | 'personal' | null;
+  tag?: string | null;
 }
 
 export interface AgentProfilesView {
@@ -20,6 +21,9 @@ export const createAgentProfile = (agent: string, name: string, group: AgentProf
 
 export const setAgentProfileGroup = (agent: string, id: string, group: AgentProfile['group']) =>
   nativeTask<void>('agent_profile_set_group', { agent, id, group });
+
+export const setAgentProfileTag = (agent: string, id: string, tag: string | null) =>
+  nativeTask<void>('agent_profile_set_tag', { agent, id, tag });
 
 export const renameAgentProfile = (agent: string, id: string, name: string) =>
   nativeTask<void>('agent_profile_rename', { agent, id, name });

@@ -121,21 +121,23 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
         </p>
       </div>
       <ol className="desktop-pass-strip" aria-label="Instant Access Pass allowance">
-        {Array.from({ length: Math.min(referrals.limit, 100) }, (_, index) => index + 1).map((passNumber) => {
-          const state =
-            passNumber <= referrals.accepted
-              ? 'Claimed'
-              : passNumber <= referrals.limit - referrals.remaining
-                ? 'Reserved'
-                : 'Available';
-          return (
-            <li key={passNumber} data-state={state}>
-              <Ticket size={24} />
-              <strong>Pass {passNumber}</strong>
-              <span>{state}</span>
-            </li>
-          );
-        })}
+        {Array.from({ length: Math.min(referrals.limit, 100) }, (_, index) => index + 1).map(
+          (passNumber) => {
+            const state =
+              passNumber <= referrals.accepted
+                ? 'Claimed'
+                : passNumber <= referrals.limit - referrals.remaining
+                  ? 'Reserved'
+                  : 'Available';
+            return (
+              <li key={passNumber} data-state={state}>
+                <Ticket size={24} />
+                <strong>Pass {passNumber}</strong>
+                <span>{state}</span>
+              </li>
+            );
+          },
+        )}
       </ol>
       <p className="settings-row-description">
         Each pass lets one person skip the waitlist. These are separate from unlimited waitlist

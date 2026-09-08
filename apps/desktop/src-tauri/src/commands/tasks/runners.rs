@@ -1,7 +1,15 @@
 use super::*;
 
-pub(in crate::commands) const BUILTIN_AGENTS: &[&str] =
-    &["codex", "claude", "grok", "opencode", "antigravity"];
+pub(in crate::commands) const BUILTIN_AGENTS: &[&str] = &[
+    "codex",
+    "claude",
+    "grok",
+    "opencode",
+    "antigravity",
+    "gemini",
+    "aider",
+    "goose",
+];
 
 pub(super) fn discover_runner(
     policy: &crate::commands::agent_policy::AgentPolicy,
@@ -16,6 +24,9 @@ pub(super) fn discover_runner(
             "grok" => "Grok",
             "opencode" => "OpenCode",
             "antigravity" => "Antigravity",
+            "gemini" => "Gemini CLI",
+            "aider" => "Aider",
+            "goose" => "Goose",
             _ => id,
         }
         .into(),
@@ -46,6 +57,18 @@ pub(super) fn discover_runner(
             }
             if adapter == "opencode" {
                 runner.detail = "Installed. OpenCode validates the selected provider on launch; saved credentials do not prove current access. Free and local models may not require sign-in. Managed profiles isolate its saved credentials and sessions.".into();
+                return runner;
+            }
+            if adapter == "gemini" {
+                runner.detail = "Installed. Gemini CLI validates credentials on launch. Sign in with gemini login or set GEMINI_API_KEY.".into();
+                return runner;
+            }
+            if adapter == "aider" {
+                runner.detail = "Installed. Aider pair programming uses configured provider keys (e.g. OPENAI_API_KEY or ANTHROPIC_API_KEY).".into();
+                return runner;
+            }
+            if adapter == "goose" {
+                runner.detail = "Installed. Goose developer agent with local automation and extension capabilities.".into();
                 return runner;
             }
             let args = if adapter == "codex" {
@@ -88,36 +111,53 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
         return Err("Unsupported agent".into());
     }
     let binary = if agent == "antigravity" { "agy" } else { agent };
-    let name = if cfg!(windows) {
-        format!("{binary}.exe")
+    let candidates: Vec<String> = if cfg!(windows) {
+        vec![
+            format!("{binary}.exe"),
+            format!("{binary}.cmd"),
+            format!("{binary}.bat"),
+            binary.to_string(),
+        ]
     } else {
-        binary.to_string()
+        vec![binary.to_string()]
     };
     let mut dirs: Vec<PathBuf> =
         std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect();
     if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
-        dirs.push(PathBuf::from(&home).join(".local/bin"));
-        dirs.push(PathBuf::from(&home).join(".grok/bin"));
-        dirs.push(PathBuf::from(home).join(".opencode/bin"));
-    }
-    if agent == "antigravity" {
-        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            dirs.push(PathBuf::from(local).join("agy/bin"));
+        let home_path = PathBuf::from(&home);
+        dirs.push(home_path.join(".local/bin"));
+        dirs.push(home_path.join(".grok/bin"));
+        dirs.push(home_path.join(".opencode/bin"));
+        dirs.push(home_path.join(".cargo/bin"));
+        dirs.push(home_path.join(".npm-global/bin"));
+        if cfg!(windows) {
+            dirs.push(home_path.join("scoop/shims"));
+            dirs.push(home_path.join(".pipx/venvs"));
         }
     }
-    if agent == "opencode" {
-        if let Some(roaming) = std::env::var_os("APPDATA") {
-            dirs.push(PathBuf::from(roaming).join("npm/node_modules/opencode-ai/bin"));
-        }
-        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            dirs.push(
-                PathBuf::from(local).join("Jackalope/agent-tools/node_modules/opencode-ai/bin"),
-            );
-        }
+    if let Some(roaming) = std::env::var_os("APPDATA") {
+        let roaming_path = PathBuf::from(&roaming);
+        dirs.push(roaming_path.join("npm"));
+        dirs.push(roaming_path.join("npm/node_modules/opencode-ai/bin"));
+        dirs.push(roaming_path.join("Python/Python310/Scripts"));
+        dirs.push(roaming_path.join("Python/Python311/Scripts"));
+        dirs.push(roaming_path.join("Python/Python312/Scripts"));
+        dirs.push(roaming_path.join("Python/Python313/Scripts"));
     }
-    if agent == "codex" {
-        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            if let Ok(entries) = std::fs::read_dir(PathBuf::from(local).join("OpenAI/Codex/bin")) {
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        let local_path = PathBuf::from(&local);
+        dirs.push(local_path.join("agy/bin"));
+        dirs.push(local_path.join("pnpm"));
+        dirs.push(local_path.join("Yarn/bin"));
+        dirs.push(local_path.join("Microsoft/WinGet/Links"));
+        dirs.push(local_path.join("Programs/Python/Python310/Scripts"));
+        dirs.push(local_path.join("Programs/Python/Python311/Scripts"));
+        dirs.push(local_path.join("Programs/Python/Python312/Scripts"));
+        dirs.push(local_path.join("Programs/Python/Python313/Scripts"));
+        dirs.push(local_path.join("pipx/venvs"));
+        dirs.push(local_path.join("Jackalope/agent-tools/node_modules/opencode-ai/bin"));
+        if agent == "codex" {
+            if let Ok(entries) = std::fs::read_dir(local_path.join("OpenAI/Codex/bin")) {
                 let mut versions: Vec<_> = entries.flatten().map(|e| e.path()).collect();
                 versions.sort_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
                 versions.reverse();
@@ -125,10 +165,19 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
             }
         }
     }
-    dirs.into_iter()
-        .map(|p| p.join(&name))
-        .find(|p| p.is_file())
-        .ok_or_else(|| {
-            format!("Install {agent} and make its executable available on PATH, then refresh.")
-        })
+    if !cfg!(windows) {
+        dirs.push(PathBuf::from("/usr/local/bin"));
+        dirs.push(PathBuf::from("/opt/homebrew/bin"));
+    }
+    for dir in &dirs {
+        for candidate in &candidates {
+            let target = dir.join(candidate);
+            if target.is_file() {
+                return Ok(target);
+            }
+        }
+    }
+    Err(format!(
+        "Install {agent} and make its executable available on PATH, then refresh."
+    ))
 }

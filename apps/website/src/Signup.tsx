@@ -98,6 +98,11 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               <p>{message}</p>
             </div>
           </div>
+          {accessOrigin && (
+            <a className="button button-secondary" href="/waitlist/">
+              Check my place <ArrowRight size={16} />
+            </a>
+          )}
           {surveyToken && <WaitlistPreferences token={surveyToken} />}
         </div>
       ) : (

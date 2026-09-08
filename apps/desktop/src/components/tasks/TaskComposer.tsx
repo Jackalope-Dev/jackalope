@@ -33,6 +33,7 @@ interface Props {
   current: TaskDraft;
 
   automaticAgent?: string;
+  automaticRationale?: string;
   models: string[];
   defaultModel: string;
   runner: Runner | undefined;
@@ -50,6 +51,7 @@ interface Props {
   onChange: (value: Partial<TaskDraft>) => void;
   onLaunch: () => Promise<void>;
   onSave: () => void;
+  onSplitTask?: () => void;
 }
 
 const effortIcons = [Zap, Layers, ShieldCheck];
@@ -63,6 +65,7 @@ export function TaskComposer({
   projectPath,
   current,
   automaticAgent,
+  automaticRationale,
   models,
   defaultModel,
   runner,
@@ -80,6 +83,7 @@ export function TaskComposer({
   onChange,
   onLaunch,
   onSave,
+  onSplitTask,
 }: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const effort = effortFor(current.effort);
@@ -92,7 +96,9 @@ export function TaskComposer({
       id: 'agent',
       icon: Bot,
       label: 'Agent',
-      value: current.agent ? runner?.name || 'Unavailable' : `Auto · ${runner?.name || 'No agent'}`,
+      value: current.agent
+        ? runner?.name || 'Unavailable'
+        : `Auto · ${runner?.name || 'No agent'}${automaticRationale ? ` (${automaticRationale})` : ''}`,
     },
     {
       id: 'workspace',
@@ -244,7 +250,7 @@ export function TaskComposer({
                         <strong>Let Jackalope choose</strong>
                         <span>
                           {automaticAgent
-                            ? `Project or app default · ${automaticAgent}`
+                            ? `Recommended · ${automaticAgent}${automaticRationale ? ` · ${automaticRationale}` : ''}`
                             : 'Connect an agent to get started'}
                         </span>
                       </span>
@@ -397,6 +403,12 @@ export function TaskComposer({
       </form>
       <div className="task-composer-footer">
         <div className="flex flex-wrap gap-2">
+          {onSplitTask && current.prompt.trim().length > 25 && (
+            <Button type="button" variant="outline" disabled={submitting} onClick={onSplitTask}>
+              <Sparkles size={15} />
+              Split into subtasks
+            </Button>
+          )}
           <Button
             type="button"
             variant={executionReady ? 'ghost' : 'primary'}

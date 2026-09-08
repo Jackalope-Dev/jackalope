@@ -27,5 +27,26 @@
     "discovery": true,
     "accounts": false,
     "capacity": false
+  },
+  "gemini": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": false
+  },
+  "aider": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": false
+  },
+  "goose": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": false
   }
 }

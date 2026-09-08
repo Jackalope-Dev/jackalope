@@ -61,7 +61,7 @@ export function readFeaturePlan(text: string, agent: string): FeatureStep[] {
       key: item.key,
       title: item.title.trim(),
       prompt: item.prompt.trim(),
-      agent,
+      agent: typeof item.agent === 'string' && item.agent.trim() ? item.agent.trim() : agent,
       scopes,
       dependsOn: deps,
       contextSelection: { outcomes },

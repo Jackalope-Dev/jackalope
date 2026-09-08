@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { connectionSupport } from '../../lib/agent-capabilities';
+import { routeTaskToBestAgent } from '../../lib/agent-routing';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt } from '../../lib/skills/context-assembler';
@@ -20,6 +21,7 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { MultiAgentSplitDialog } from './MultiAgentSplitDialog';
 import { ProjectSetup } from './ProjectSetup';
 import { TaskComposer } from './TaskComposer';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
@@ -76,8 +78,21 @@ export function CaptureTask({
     (r) => config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
   const preferred = project?.preferences?.preferredRunner;
-  const defaultAgent = suggestedRunner(allowed, preferred, config.defaultMetaAgent)?.id ?? '';
+  const routing = useMemo(
+    () =>
+      routeTaskToBestAgent({
+        prompt: current.prompt,
+        effort: current.effort,
+        availableRunners: allowed,
+        preferredRunner: preferred,
+      }),
+    [current.prompt, current.effort, allowed, preferred],
+  );
+  const defaultAgent =
+    (allowed.some((r) => r.id === routing.agentId) ? routing.agentId : '') ||
+    (suggestedRunner(allowed, preferred, config.defaultMetaAgent)?.id ?? '');
   const currentAgent = current.agent || defaultAgent;
+  const [splitOpen, setSplitOpen] = useState(false);
   const runner = allowed.find((r) => r.id === currentAgent);
   const modelOptions = config.runnerOptions[currentAgent];
   const defaultModel =
@@ -350,6 +365,8 @@ export function CaptureTask({
             models={models}
             defaultModel={defaultModel}
             automaticAgent={allowed.find((r) => r.id === defaultAgent)?.name}
+            automaticRationale={routing?.rationale}
+            onSplitTask={project ? () => setSplitOpen(true) : undefined}
             runner={runner}
             allowedRunners={allowed}
             submitting={submitting}
@@ -475,6 +492,19 @@ export function CaptureTask({
                 });
             }}
           />
+          {project && (
+            <MultiAgentSplitDialog
+              open={splitOpen}
+              onClose={() => setSplitOpen(false)}
+              goal={current.prompt}
+              project={project}
+              runners={allowed}
+              onImported={() => {
+                clear();
+                onClose();
+              }}
+            />
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

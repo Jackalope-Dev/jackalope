@@ -16,6 +16,8 @@ pub struct AgentProfile {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -49,6 +51,9 @@ pub fn env_var_for(adapter: &str) -> Option<&'static str> {
         "claude" => Some("CLAUDE_CONFIG_DIR"),
         "grok" => Some("GROK_HOME"),
         "opencode" => Some("XDG_DATA_HOME"),
+        "gemini" => Some("GEMINI_CLI_HOME"),
+        "aider" => Some("AIDER_HOME"),
+        "goose" => Some("GOOSE_HOME"),
         _ => None,
     }
 }
@@ -59,6 +64,7 @@ pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
         "grok" => &["login"],
         "opencode" => &["auth", "login"],
         "claude" => &["auth", "login"],
+        "gemini" => &["auth", "login"],
         _ => &[],
     }
 }
@@ -279,6 +285,7 @@ pub fn agent_profile_create(
         id: id.clone(),
         name: name.to_string(),
         group,
+        tag: None,
     };
     entry.profiles.push(profile.clone());
     fs::create_dir_all(dir_for(&root, &agent, &id)).map_err(|e| e.to_string())?;
@@ -311,6 +318,26 @@ pub fn agent_profile_set_group(
         .find(|p| p.id == id)
         .ok_or("Unknown account")?;
     profile.group = group;
+    save(&root, &manifest)
+}
+
+#[tauri::command]
+pub fn agent_profile_set_tag(
+    runtime: State<'_, TaskRuntime>,
+    agent: String,
+    id: String,
+    tag: Option<String>,
+) -> Result<(), String> {
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let root = runtime.profiles_root();
+    let mut manifest = load_checked(&root)?;
+    let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
+    let profile = entry
+        .profiles
+        .iter_mut()
+        .find(|p| p.id == id)
+        .ok_or("Unknown account")?;
+    profile.tag = tag.map(|t| t.trim().to_string()).filter(|t| !t.is_empty());
     save(&root, &manifest)
 }
 
@@ -512,11 +539,13 @@ mod tests {
             id: "work".into(),
             name: "Work".into(),
             group: None,
+            tag: None,
         });
         entry.profiles.push(AgentProfile {
             id: "personal".into(),
             name: "Personal".into(),
             group: None,
+            tag: None,
         });
         entry.active = Some("personal".into());
         save(&root, &manifest).unwrap();
@@ -550,11 +579,13 @@ mod tests {
                         id: "work".into(),
                         name: "Work".into(),
                         group: None,
+                        tag: None,
                     },
                     AgentProfile {
                         id: "personal".into(),
                         name: "Personal".into(),
                         group: None,
+                        tag: None,
                     },
                 ],
                 active: Some("work".into()),
@@ -589,11 +620,13 @@ mod tests {
             id: "a".into(),
             name: "Work".into(),
             group: None,
+            tag: None,
         });
         entry.profiles.push(AgentProfile {
             id: "b".into(),
             name: "Personal".into(),
             group: None,
+            tag: None,
         });
         entry.active = Some("a".into());
         save(&root, &manifest).unwrap();
