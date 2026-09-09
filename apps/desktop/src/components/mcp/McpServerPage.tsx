@@ -1,6 +1,7 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import { ArrowLeft, ExternalLink, Search } from 'lucide-react';
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
+import remarkGfm from 'remark-gfm';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
@@ -355,7 +356,18 @@ export function McpServerPage({
                   <Suspense fallback={<LoadingState label="Rendering documentation…" compact />}>
                     <Markdown
                       skipHtml
+                      remarkPlugins={[remarkGfm]}
                       components={{
+                        table: ({ children }) => (
+                          <section
+                            className="mcp-readme-table"
+                            aria-label="Documentation table"
+                            // biome-ignore lint/a11y/noNoninteractiveTabindex: Wide tables need keyboard scrolling.
+                            tabIndex={0}
+                          >
+                            <table>{children}</table>
+                          </section>
+                        ),
                         a: ({ href, children }) =>
                           safeMarketplaceUrl(href) ? (
                             <SourceLink url={href}>{children}</SourceLink>

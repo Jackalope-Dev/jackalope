@@ -1,5 +1,14 @@
 [
   {
+    "id": "mcp-documentation-tables",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Readable MCP documentation tables",
+    "description": "MCP documentation now renders GitHub-style Markdown tables.",
+    "items": ["Tables follow the app theme and support keyboard scrolling when they are wide."],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "mcp-marketplace-third-party-notice",
     "date": "2026-09-09",
     "status": "In development",

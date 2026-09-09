@@ -573,6 +573,32 @@
 .mcp-readme > * + * {
   margin-top: 16px;
 }
+.mcp-readme-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.mcp-readme-table:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.mcp-readme-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  overflow-wrap: normal;
+}
+.mcp-readme-table th,
+.mcp-readme-table td {
+  border: 1px solid var(--color-border-subtle);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.mcp-readme-table th {
+  background: var(--color-surface-sunken);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
 .mcp-readme h1,
 .mcp-readme h2,
 .mcp-readme h3,
