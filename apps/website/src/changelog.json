@@ -6,7 +6,7 @@
     "title": "Worktrees without the wait",
     "description": "Workspaces appear before cleanup checks finish.",
     "items": [
-      "Worktrees load independently of merge and cleanup checks, with retryable errors for slow reads.",
+      "Task and feature worktrees load independently of cleanup checks, with retryable errors for slow reads. Primary, main and master checkouts stay out of the list.",
       "Cleanup checks avoid enumerating ignored dependency folders while retaining deletion safeguards.",
       "The desktop companion sits slightly lower in its footer."
     ],
