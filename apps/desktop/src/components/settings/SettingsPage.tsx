@@ -93,7 +93,8 @@ export function SettingsPage({
         General:
           'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
         Appearance: 'theme color light dark atmosphere picker toolbar',
-        Agents: 'default models allowed restrict manual cli command executable configuration',
+        Agents:
+          'default models available detected allowed restrict cli command executable configuration',
         Privacy: 'marketplace MCP network telemetry crash reporting',
         Project: 'repository name path agent instructions verification command',
         'Updates & support':

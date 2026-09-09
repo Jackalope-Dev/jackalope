@@ -24,10 +24,12 @@ export function TaskTools({ onClose }: { onClose: () => void }) {
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
         <Dialog.Content {...focus} className="task-dialog appearance-panel task-tools-dialog">
-          <Dialog.Title className="text-xl pr-10">Set up what this task needs</Dialog.Title>
+          <Dialog.Title className="text-xl pr-10">Agents & project tools</Dialog.Title>
           <Dialog.Description className="task-muted mt-2">
             Your task and draft stay in place.{' '}
-            {project ? `Settings for ${project.name}.` : 'Choose an agent or connect a service.'}
+            {project
+              ? `These defaults apply to tasks in ${project.name}.`
+              : 'Choose an agent or connect a service.'}
           </Dialog.Description>
           <Dialog.Close asChild>
             <Button variant="ghost" className="task-close" aria-label="Close task setup">

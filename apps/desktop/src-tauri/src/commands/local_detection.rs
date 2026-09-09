@@ -223,7 +223,7 @@ pub fn agent_import_detected_key(
     let _ = agent_profiles::agent_profile_set_tag(
         runtime.clone(),
         target_agent.to_string(),
-        profile.id.clone(),
+        Some(profile.id.clone()),
         Some("Imported Key".to_string()),
     );
 

@@ -2,8 +2,10 @@ import { useProjectStore } from '../../stores/projectStore';
 import { AgentPreferences } from '../settings/AgentPreferences';
 import { AppearancePreferences } from '../settings/AppearancePreferences';
 import { Setting } from '../settings/Setting';
+import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
 export function ProjectPreferences({
   embedded = false,
@@ -145,6 +147,17 @@ export function ProjectPreferences({
                 onCheckedChange={(autoVerify) =>
                   updateProjectPreferences(project.id, { autoVerify })
                 }
+              />
+            </Setting>
+          </section>
+          <section className="project-preferences-section">
+            <Setting
+              title="Remove project"
+              description="Remove this project from Jackalope. Your files and task history stay intact."
+            >
+              <RemoveProjectAction
+                project={project}
+                trigger={<Button variant="outline">Remove from Jackalope…</Button>}
               />
             </Setting>
           </section>

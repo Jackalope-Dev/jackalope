@@ -6,6 +6,7 @@ import {
   setActiveAgentProfile,
 } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
@@ -192,6 +193,7 @@ function AccountPreferences({
   save: (change: () => void) => Promise<void>;
 }) {
   const [view, setView] = useState<AgentProfilesView>();
+  const statuses = useAgentAccountsStore((state) => state.agents[agentId]?.statuses);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const agents = useAgentConfigStore();
@@ -201,6 +203,7 @@ function AccountPreferences({
   useEffect(() => {
     let alive = true;
     if (!isTauriEnvironment()) return;
+    void useAgentAccountsStore.getState().load(agentId, true);
     setView(undefined);
     setError('');
     void listAgentProfiles(agentId)
@@ -232,7 +235,7 @@ function AccountPreferences({
       <p className="task-muted">Accounts are available in the desktop app.</p>
     );
   if (!view.envVar) return <p className="task-muted">Uses the CLI account.</p>;
-  const accounts = [{ id: '__default', name: 'CLI default account' }, ...view.profiles];
+  const accounts = accountProfiles(view, statuses ?? {});
   const blocked = project ? (project.preferences?.disabledAccounts ?? {}) : agents.disabledAccounts;
   const accountEnabled = (id: string) =>
     !agents.disabledAccounts?.[agentId]?.includes(id) && !blocked?.[agentId]?.includes(id);
@@ -261,13 +264,11 @@ function AccountPreferences({
         }}
       >
         {project && <SelectItem value="inherit">Automatic · enabled accounts</SelectItem>}
-        {accounts
-          .filter((account) => !project || account.id !== '__default')
-          .map((account) => (
-            <SelectItem key={account.id} value={account.id} disabled={!accountEnabled(account.id)}>
-              {account.name}
-            </SelectItem>
-          ))}
+        {accounts.map((account) => (
+          <SelectItem key={account.id} value={account.id} disabled={!accountEnabled(account.id)}>
+            {account.name}
+          </SelectItem>
+        ))}
       </Select>
       {accounts.map((account) => (
         <div key={account.id} className="agent-account-permission">

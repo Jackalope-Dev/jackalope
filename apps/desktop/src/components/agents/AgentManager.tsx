@@ -114,7 +114,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                   <p className="task-muted">
                     {runner?.available
                       ? runner.signedIn
-                        ? 'Ready · existing CLI sign-in'
+                        ? 'Ready · account connected'
                         : 'Installed · sign-in checked by the CLI on launch'
                       : runner?.detail || 'Not checked yet'}
                   </p>
@@ -199,37 +199,6 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                     restricted={options.restrictModels}
                     onChange={update}
                   />
-                  <div className="agent-model-restriction">
-                    <span>Allow only the listed models</span>
-                    <Switch
-                      checked={options.restrictModels}
-                      onCheckedChange={(value) => update({ restrictModels: value })}
-                      label={`Allow only listed models for ${agent.name}`}
-                    />
-                  </div>
-                  <div className="agent-model-fields">
-                    <label className="task-label">
-                      Allowed model IDs (one per line)
-                      <textarea
-                        className="task-input"
-                        rows={3}
-                        value={options.models.join('\n')}
-                        onChange={(e) => update({ models: e.target.value.split('\n') })}
-                      />
-                    </label>
-                    <label className="task-label">
-                      Default model ID
-                      <input
-                        className="task-input"
-                        value={options.defaultModel}
-                        onChange={(e) => update({ defaultModel: e.target.value })}
-                        placeholder="CLI default or first allowed model"
-                      />
-                    </label>
-                  </div>
-                  <p className="task-muted">
-                    Use supported model IDs. An empty restricted list blocks task launches.
-                  </p>
                 </div>
               </section>
             </section>

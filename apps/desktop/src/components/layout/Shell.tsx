@@ -1,15 +1,16 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, GitBranch, LifeBuoy, Plus, Search, Settings2 } from 'lucide-react';
+import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
+import { RemoveProjectAction } from '../projects/RemoveProjectAction';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
 import type { SettingsCategory } from '../settings/SettingsPage';
 import { UpdateNotice } from '../settings/UpdateNotice';
@@ -82,6 +83,7 @@ export function Shell({
 } = {}) {
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   const canvas = useRef<HTMLElement>(null);
+  const projectSwitcher = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (focusOnMount && !initialDraftKey && !initialTaskAgent && !initialCapture)
       canvas.current?.focus();
@@ -122,6 +124,7 @@ export function Shell({
     if (activeTab === 'preferences') telemetry.track({ name: 'feature_used', feature: 'settings' });
   }, [activeTab]);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [removingProject, setRemovingProject] = useState<Project | null>(null);
   // Keep the command palette mounted after first use so close transitions can finish.
   const [commandsSeen, setCommandsSeen] = useState(false);
   useEffect(() => {
@@ -147,6 +150,24 @@ export function Shell({
     setComposerFocus((value) => value + 1);
   }, []);
   const { projects, activeProjectId, selectProject } = useProjectStore();
+  const switchProject = (id: string) => {
+    if (id === activeProjectId) return;
+    const execution = useExecutionStore.getState();
+    const existing =
+      execution.drafts.capture ?? (activeProjectId ? execution.drafts[activeProjectId] : undefined);
+    execution.draft('capture', {
+      ...existing,
+      projectId: id,
+      isolated:
+        existing?.isolated ??
+        projects.find((item) => item.id === id)?.preferences?.isolatedByDefault ??
+        true,
+      ...((existing?.projectId ?? activeProjectId) !== id
+        ? { model: undefined, connectionIds: undefined, contextSelection: undefined }
+        : {}),
+    });
+    selectProject(id);
+  };
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
@@ -199,13 +220,18 @@ export function Shell({
         Skip to workspace
       </a>
       <ResizeHandles />
-      <TitleBar />
+      <TitleBar onSettings={() => setActiveTab('preferences')} />
       <header className="workspace-chrome">
         <div className="flex items-center gap-4 min-w-0">
           <img src="/mascot.svg" alt="Jackalope" className="size-8 shrink-0" />
           <Menu.Root>
             <Menu.Trigger asChild>
-              <button type="button" className="project-switcher" aria-label="Switch project">
+              <button
+                ref={projectSwitcher}
+                type="button"
+                className="project-switcher"
+                aria-label="Switch project"
+              >
                 <span className="truncate max-w-52">{project?.name ?? 'Choose a project'}</span>
                 <ChevronDown className="size-3 text-[var(--color-text-muted)]" />
               </button>
@@ -221,7 +247,7 @@ export function Shell({
                 {projects.map((item) => (
                   <Menu.Item
                     key={item.id}
-                    onSelect={() => selectProject(item.id)}
+                    onSelect={() => switchProject(item.id)}
                     className="workspace-menu-item"
                   >
                     <span className="flex-1">{item.name}</span>
@@ -232,6 +258,14 @@ export function Shell({
                 <Menu.Item className="workspace-menu-item" onSelect={openProjectSetup}>
                   Add a project…
                 </Menu.Item>
+                {project && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => setRemovingProject(project)}
+                  >
+                    Remove from Jackalope…
+                  </Menu.Item>
+                )}
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
@@ -268,27 +302,19 @@ export function Shell({
               <kbd>{shortcut}</kbd>
             </button>
           </Tooltip>
-          {showThemePicker && <ArcColorPicker />}
-          <Tooltip content="Help Center">
-            <button
-              type="button"
-              onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
-              className="quiet-icon"
-              aria-label="Help and knowledgebase"
-            >
-              <LifeBuoy className="size-4" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Settings (Ctrl+,)">
-            <button
-              type="button"
-              onClick={() => setActiveTab('preferences')}
-              className="quiet-icon"
-              aria-label="Settings and preferences"
-            >
-              <Settings2 className="size-4" />
-            </button>
-          </Tooltip>
+          {!isTauriEnvironment() && showThemePicker && <ArcColorPicker />}
+          {!isTauriEnvironment() && (
+            <Tooltip content="Settings (Ctrl+,)">
+              <button
+                type="button"
+                onClick={() => setActiveTab('preferences')}
+                className="quiet-icon"
+                aria-label="Settings and preferences"
+              >
+                <Settings2 className="size-4" />
+              </button>
+            </Tooltip>
+          )}
         </div>
       </header>
       <div className="workspace-navigation">
@@ -458,6 +484,18 @@ export function Shell({
         />
       )}
       <UpdateNotice />
+      {removingProject && (
+        <RemoveProjectAction
+          project={removingProject}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setRemovingProject(null);
+              requestAnimationFrame(() => projectSwitcher.current?.focus());
+            }
+          }}
+        />
+      )}
       <ScheduleNotice />
       <HistoryRecoveryNotice />
       <UnsavedTasksNotice />

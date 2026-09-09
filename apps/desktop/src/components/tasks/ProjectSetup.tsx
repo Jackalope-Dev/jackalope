@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
@@ -29,7 +30,11 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true);
     setError('');
     try {
-      await openProject(path);
+      const project = await openProject(path, { provisional: true });
+      const onboarding = useOnboardingStore.getState();
+      onboarding.begin(project.id);
+      onboarding.stageProject(project);
+      onboarding.go('agent');
       setPath('');
       onClose();
     } catch (error) {
@@ -121,7 +126,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
             </p>
             <div className="flex justify-end mt-7">
               <Button type="submit" disabled={!desktop || !path.trim() || busy}>
-                {busy ? 'Checking repository…' : 'Open project'}
+                {busy ? 'Checking repository…' : 'Continue setup'}
                 <ArrowRight size={15} />
               </Button>
             </div>

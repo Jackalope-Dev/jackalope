@@ -175,14 +175,19 @@ pub async fn agent_models(
     service: State<'_, ModelCatalogService>,
     agent: String,
     refresh: Option<bool>,
+    agent_profile_id: Option<String>,
 ) -> Result<ModelCatalog, String> {
     let mut policy = runtime.policy()?;
     policy.enabled_agents.clear();
     let (adapter, executable) = policy.resolve(&agent)?;
     if !["codex", "claude", "opencode"].contains(&adapter.as_str()) {
-        return Ok(ModelCatalog {models: vec![], source: adapter, account: None, checked_at: chrono::Utc::now().to_rfc3339(), detail: "This CLI does not expose a supported model catalog to Jackalope. You can enter model IDs manually.".into()});
+        return Ok(ModelCatalog {models: vec![], source: adapter, account: None, checked_at: chrono::Utc::now().to_rfc3339(), detail: "This agent does not expose a supported model catalog. Model selection is unavailable; the agent manages its model unless a saved override exists.".into()});
     }
-    let binding = agent_profiles::bind_account(&runtime.profiles_root(), &adapter, None)?;
+    let binding = agent_profiles::bind_account(
+        &runtime.profiles_root(),
+        &adapter,
+        agent_profile_id.as_deref(),
+    )?;
     let key = format!("{}:{:?}:{:?}", adapter, executable, binding.directory);
     let mut cache = service.0.lock().await;
     if !refresh.unwrap_or(false) {
@@ -196,7 +201,7 @@ pub async fn agent_models(
     }
     let models = read_catalog(&adapter, &executable, &binding).await?;
     let detail = if models.is_empty() {
-        "The CLI returned no models. Check its sign-in or enter a model ID manually."
+        "The agent returned no models. Check its sign-in and refresh. Model selection is unavailable until models can be detected."
     } else {
         "Models reported by the current CLI account. Access and quota are checked when a task runs."
     };

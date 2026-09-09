@@ -1,6 +1,9 @@
-import { Minus, Square, X } from 'lucide-react';
+import { LifeBuoy, Minus, Settings2, Square, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { Tooltip } from '../ui/Tooltip';
 
 /**
  * Custom window chrome, replacing the OS titlebar (see `decorations: false`
@@ -9,8 +12,9 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
  * propagation so clicking a button doesn't also start a window drag.
  * A no-op outside Tauri (browser dev preview keeps its normal chrome).
  */
-export function TitleBar() {
+export function TitleBar({ onSettings }: { onSettings?: () => void }) {
   const [isMaximized, setIsMaximized] = useState(false);
+  const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
 
   useEffect(() => {
     if (!isTauriEnvironment()) return;
@@ -42,6 +46,33 @@ export function TitleBar() {
         <span>Jackalope</span>
       </div>
       <div className="app-titlebar-controls">
+        {onSettings && showThemePicker && <ArcColorPicker variant="titlebar" />}
+        {onSettings && (
+          <Tooltip content={`Settings (${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+,)`}>
+            <button
+              type="button"
+              className="app-titlebar-button"
+              aria-label="Settings and preferences"
+              onMouseDown={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onClick={onSettings}
+            >
+              <Settings2 size={16} />
+            </button>
+          </Tooltip>
+        )}
+        <Tooltip content="Help Center">
+          <button
+            type="button"
+            className="app-titlebar-button app-titlebar-help"
+            aria-label="Help and knowledgebase"
+            onMouseDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onClick={() => void openExternalUrl('https://jackalope.dev/knowledge/')}
+          >
+            <LifeBuoy size={16} />
+          </button>
+        </Tooltip>
         <button
           type="button"
           className="app-titlebar-button"

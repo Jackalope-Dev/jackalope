@@ -1,7 +1,9 @@
 import { EchoMark } from '@jackalope/brand/echo';
+import { applyThemeTokens } from '@jackalope/brand/theme';
 import { useEffect, useRef, useState } from 'react';
 import { prepareWorkspace } from '../../lib/workspace-preparation';
-import { useProjectStore } from '../../stores/projectStore';
+import { type Project, useProjectStore } from '../../stores/projectStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { Button } from '../ui/button';
@@ -10,13 +12,27 @@ import './onboarding.css';
 export function WorkspaceTransition({
   onComplete,
   onBack,
+  project: pendingProject,
 }: {
   onComplete: () => void;
   onBack: () => void;
+  project?: Project;
 }) {
-  const project = useProjectStore((state) =>
+  const activeProject = useProjectStore((state) =>
     state.projects.find((item) => item.id === state.activeProjectId),
   );
+  const project = pendingProject ?? activeProject;
+  const appTheme = useThemeStore((state) => state.appTheme);
+  const preview = pendingProject ? (pendingProject.preferences?.theme ?? appTheme) : undefined;
+  useEffect(() => {
+    if (!preview) return;
+    useThemeStore.setState({ previewing: true });
+    applyThemeTokens(preview);
+    return () => {
+      useThemeStore.setState({ previewing: false });
+      applyThemeTokens(useThemeStore.getState().currentTheme);
+    };
+  }, [preview]);
   const [checks, setChecks] = useState<
     {
       id: string;

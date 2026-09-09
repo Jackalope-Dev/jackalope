@@ -19,6 +19,7 @@ import type { McpServerConfig } from '../../lib/tauri-bridge';
 import type { TaskDraft } from '../../stores/executionStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
+import { Select, SelectItem } from '../ui/Select';
 import { OutcomeEditor } from './OutcomeEditor';
 import { TaskContextPanel } from './TaskContextPanel';
 import './task-composer.css';
@@ -37,6 +38,8 @@ interface Props {
   automaticRationale?: string;
   models: string[];
   defaultModel: string;
+  modelNotice?: string;
+  modelNames?: Record<string, string>;
   runner: Runner | undefined;
   allowedRunners: Runner[];
   submitting: boolean;
@@ -70,6 +73,8 @@ export function TaskComposer({
   automaticRationale,
   models,
   defaultModel,
+  modelNotice,
+  modelNames,
   runner,
   allowedRunners,
   submitting,
@@ -93,6 +98,7 @@ export function TaskComposer({
   const toolCount = projectConnections.filter(
     (server) => !current.connectionIds || current.connectionIds.includes(server.id),
   ).length;
+  const customTools = current.connectionIds !== undefined;
   const controls = [
     {
       id: 'agent',
@@ -118,7 +124,7 @@ export function TaskComposer({
       id: 'tools',
       icon: Plug,
       label: 'Tools',
-      value: `${toolCount} project ${toolCount === 1 ? 'tool' : 'tools'}`,
+      value: customTools ? `${toolCount} selected · saved override` : 'From project settings',
     },
   ];
   const outcomes = (
@@ -173,245 +179,282 @@ export function TaskComposer({
             }}
           />
           {context}
-          <div className="composer-configuration">
-            <section
-              className="composer-effort"
-              aria-labelledby="effort-label"
-              style={{ '--effort-position': `${effortIndex * 50}%` } as CSSProperties}
-            >
-              <div className="composer-section-heading">
-                <span id="effort-label">Level of effort</span>
-                <span>More depth, more time & usage</span>
-              </div>
-              <div className="composer-effort-choices">
-                {taskEfforts.map((option, index) => {
-                  const Icon = effortIcons[index];
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      aria-pressed={effort.id === option.id}
-                      title={option.description}
-                      onClick={() => onChange({ effort: option.id })}
-                    >
-                      <Icon size={18} aria-hidden="true" />
-                      <span>{option.name}</span>
-                      {effort.id === option.id && <Check size={14} aria-hidden="true" />}
-                    </button>
-                  );
-                })}
-              </div>
-              {!inline && (
-                <input
-                  id="task-effort"
-                  aria-labelledby="effort-label"
-                  className="composer-effort-slider"
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={1}
-                  value={effortIndex}
-                  aria-valuetext={`${effort.name}: ${effort.description}`}
-                  aria-describedby="effort-description"
-                  onChange={(event) =>
-                    onChange({ effort: taskEfforts[Number(event.target.value)].id })
-                  }
-                />
-              )}
-              <p id="effort-description" className="composer-effort-description" aria-live="polite">
-                {effort.description}
-              </p>
-            </section>
-            <fieldset className="composer-config" aria-label="Task configuration">
-              {controls.map(({ id, icon: Icon, label, value }) => (
-                <button
-                  key={id}
-                  id={`composer-control-${id}`}
-                  type="button"
-                  className="composer-config-button"
-                  aria-expanded={panel === id}
-                  aria-controls={`composer-panel-${id}`}
-                  onClick={() => setPanel(panel === id ? null : id)}
-                >
-                  <Icon size={18} aria-hidden="true" />
-                  <span>
-                    <strong>{label}</strong>
-                    <span>{value}</span>
-                  </span>
-                </button>
-              ))}
-            </fieldset>
+          <div className="composer-defaults" aria-label="Task setup summary">
+            {current.agent && current.model && <span>{current.model}</span>}
+            <span>
+              <Plug size={15} aria-hidden="true" />
+              {customTools ? 'Saved tool selection' : 'Project tools included'}
+            </span>
+            <span>
+              <BookOpen size={15} aria-hidden="true" />
+              {current.contextSelection?.memoryOff ? 'Lessons off' : 'Matching project lessons'}
+            </span>
+            {(current.contextSelection?.workflowId ||
+              current.contextSelection?.excludedMemoryIds?.length ||
+              activeSkills.length > 0) && <span>Custom context included</span>}
           </div>
-          {controls.map(({ id }) => (
-            <section
-              key={id}
-              id={`composer-panel-${id}`}
-              hidden={panel !== id}
-              aria-labelledby={`composer-control-${id}`}
-              className="composer-config-panel"
-            >
-              {id === 'agent' && (
-                <>
-                  <div className="composer-section-heading">
-                    <span>Lead agent</span>
-                    <span>One agent per task</span>
-                  </div>
+          <section className="composer-customization" aria-label="Customize task">
+            <div className="composer-configuration">
+              <section
+                className="composer-effort"
+                aria-labelledby="effort-label"
+                style={{ '--effort-position': `${effortIndex * 50}%` } as CSSProperties}
+              >
+                <div className="composer-section-heading">
+                  <span id="effort-label">Level of effort</span>
+                  <span>More depth, more time & usage</span>
+                </div>
+                <div className="composer-effort-choices">
+                  {taskEfforts.map((option, index) => {
+                    const Icon = effortIcons[index];
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={effort.id === option.id}
+                        title={option.description}
+                        onClick={() => onChange({ effort: option.id })}
+                      >
+                        <Icon size={18} aria-hidden="true" />
+                        <span>{option.name}</span>
+                        {effort.id === option.id && <Check size={14} aria-hidden="true" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p
+                  id="effort-description"
+                  className="composer-effort-description"
+                  aria-live="polite"
+                >
+                  {effort.description}
+                </p>
+              </section>
+              <fieldset className="composer-config" aria-label="Task configuration">
+                {controls.map(({ id, icon: Icon, label, value }) => (
+                  <button
+                    key={id}
+                    id={`composer-control-${id}`}
+                    type="button"
+                    className="composer-config-button"
+                    aria-expanded={panel === id}
+                    aria-controls={`composer-panel-${id}`}
+                    onClick={() => setPanel(panel === id ? null : id)}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                    <span>
+                      <strong>{label}</strong>
+                      <span>{value}</span>
+                    </span>
+                  </button>
+                ))}
+              </fieldset>
+            </div>
+            {controls.map(({ id }) => (
+              <section
+                key={id}
+                id={`composer-panel-${id}`}
+                hidden={panel !== id}
+                aria-labelledby={`composer-control-${id}`}
+                className="composer-config-panel"
+              >
+                {id === 'agent' && (
+                  <>
+                    <div className="composer-section-heading">
+                      <span>Lead agent</span>
+                      <span>One agent per task</span>
+                    </div>
+                    <div className="composer-choice-grid">
+                      <button
+                        type="button"
+                        className="composer-choice"
+                        aria-pressed={!current.agent}
+                        onClick={() => onChange({ agent: '', model: undefined })}
+                      >
+                        <Sparkles size={20} aria-hidden="true" />
+                        <span>
+                          <strong>Let Jackalope choose</strong>
+                          <span>
+                            {automaticAgent
+                              ? `${automaticAgent} selects an agent, model and account for this task and its quota needs.`
+                              : 'Connect an agent to get started'}
+                          </span>
+                        </span>
+                      </button>
+                      {allowedRunners.map((agent) => (
+                        <button
+                          key={agent.id}
+                          type="button"
+                          className="composer-choice"
+                          aria-pressed={current.agent === agent.id}
+                          onClick={() => onChange({ agent: agent.id, model: undefined })}
+                        >
+                          <Bot size={20} aria-hidden="true" />
+                          <span>
+                            <strong>{agent.name}</strong>
+                            <span>{agent.available ? 'Available' : 'Needs setup'}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    {current.agent && (
+                      <>
+                        <div className="composer-section-heading mt-4">
+                          <span>Model</span>
+                          <Cpu size={16} aria-hidden="true" />
+                        </div>
+                        {modelNotice && <p className="task-muted mb-3">{modelNotice}</p>}
+                        {models.length > 0 && (
+                          <Select
+                            aria-label="Task model"
+                            value={
+                              current.model
+                                ? models.includes(current.model)
+                                  ? current.model
+                                  : '__unavailable'
+                                : '__agent_default'
+                            }
+                            onValueChange={(model) =>
+                              onChange({ model: model === '__agent_default' ? undefined : model })
+                            }
+                          >
+                            <SelectItem
+                              value="__agent_default"
+                              disabled={!!defaultModel && !models.includes(defaultModel)}
+                            >
+                              {defaultModel
+                                ? `Agent setting · ${modelNames?.[defaultModel] ?? defaultModel}`
+                                : 'Let the agent choose'}
+                            </SelectItem>
+                            {current.model && !models.includes(current.model) && (
+                              <SelectItem value="__unavailable" disabled>
+                                Saved model unavailable
+                              </SelectItem>
+                            )}
+                            {models.map((model) => (
+                              <SelectItem key={model} value={model}>
+                                {modelNames?.[model] ?? model}
+                              </SelectItem>
+                            ))}
+                          </Select>
+                        )}
+                        {current.model && !models.includes(current.model) && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onChange({ model: undefined })}
+                          >
+                            Clear saved task model
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+                {id === 'workspace' && (
                   <div className="composer-choice-grid">
                     <button
                       type="button"
                       className="composer-choice"
-                      aria-pressed={!current.agent}
-                      onClick={() => onChange({ agent: '', model: undefined })}
+                      aria-pressed={current.isolated}
+                      onClick={() => onChange({ isolated: true })}
                     >
-                      <Sparkles size={20} aria-hidden="true" />
+                      <GitBranch size={20} aria-hidden="true" />
                       <span>
-                        <strong>Let Jackalope choose</strong>
-                        <span>
-                          {automaticAgent
-                            ? `${automaticAgent} selects an agent, model and account for this task and its quota needs.`
-                            : 'Connect an agent to get started'}
-                        </span>
+                        <strong>Separate worktree</strong>
+                        <span>Starts from the target branch; excludes uncommitted changes.</span>
                       </span>
                     </button>
-                    {allowedRunners.map((agent) => (
-                      <button
-                        key={agent.id}
-                        type="button"
-                        className="composer-choice"
-                        aria-pressed={current.agent === agent.id}
-                        onClick={() => onChange({ agent: agent.id, model: undefined })}
-                      >
-                        <Bot size={20} aria-hidden="true" />
-                        <span>
-                          <strong>{agent.name}</strong>
-                          <span>{agent.available ? 'Available' : 'Needs setup'}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  {current.agent && (
-                    <>
-                      <div className="composer-section-heading mt-4">
-                        <span>Model</span>
-                        <Cpu size={16} aria-hidden="true" />
-                      </div>
-                      <div className="composer-models">
-                        <button
-                          type="button"
-                          aria-pressed={!current.model}
-                          onClick={() => onChange({ model: undefined })}
-                        >
-                          {defaultModel ? `Default · ${defaultModel}` : 'Agent default'}
-                        </button>
-                        {models.map((model) => (
-                          <button
-                            key={model}
-                            type="button"
-                            aria-pressed={current.model === model}
-                            onClick={() => onChange({ model })}
-                          >
-                            {model}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-              {id === 'workspace' && (
-                <div className="composer-choice-grid">
-                  <button
-                    type="button"
-                    className="composer-choice"
-                    aria-pressed={current.isolated}
-                    onClick={() => onChange({ isolated: true })}
-                  >
-                    <GitBranch size={20} aria-hidden="true" />
-                    <span>
-                      <strong>Separate worktree</strong>
-                      <span>Starts from the target branch; excludes uncommitted changes.</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="composer-choice"
-                    aria-pressed={!current.isolated}
-                    onClick={() => onChange({ isolated: false })}
-                  >
-                    <Folder size={20} aria-hidden="true" />
-                    <span>
-                      <strong>Current checkout</strong>
-                      <span>Edits your files, including uncommitted changes.</span>
-                    </span>
-                  </button>
-                </div>
-              )}
-              {id === 'workspace' && workspaceSetup}
-              {id === 'context' && panel === id && (
-                <>
-                  {projectId && projectPath && (
-                    <TaskKnowledge
-                      embedded
-                      key={projectId}
-                      projectId={projectId}
-                      projectPath={projectPath}
-                      prompt={finalPrompt}
-                      selection={current.contextSelection}
-                      onChange={(contextSelection) => onChange({ contextSelection })}
-                    />
-                  )}
-                  <TaskContextPanel
-                    embedded
-                    selected={activeSkills}
-                    suggested={suggestedSkills}
-                    onToggle={toggleSkill}
-                    instructions={projectInstructions}
-                    prompt={current.prompt.trim() ? finalPrompt : ''}
-                  />
-                </>
-              )}
-              {id === 'tools' && (
-                <>
-                  {!projectConnections.length && (
-                    <p className="task-muted mt-3">
-                      {projectId
-                        ? 'No project tools connected yet.'
-                        : 'Choose a project to configure its tools.'}
-                    </p>
-                  )}
-                  {projectConnections.map((server) => (
-                    <label key={server.id} className="flex items-center gap-3 min-h-11">
-                      <input
-                        type="checkbox"
-                        checked={(
-                          current.connectionIds ?? projectConnections.map((s) => s.id)
-                        ).includes(server.id)}
-                        onChange={(event) => {
-                          const selected =
-                            current.connectionIds ?? projectConnections.map((s) => s.id);
-                          onChange({
-                            connectionIds: event.target.checked
-                              ? [...selected, server.id]
-                              : selected.filter((value) => value !== server.id),
-                          });
-                        }}
-                      />
+                    <button
+                      type="button"
+                      className="composer-choice"
+                      aria-pressed={!current.isolated}
+                      onClick={() => onChange({ isolated: false })}
+                    >
+                      <Folder size={20} aria-hidden="true" />
                       <span>
-                        {server.name}
-                        {server.discovery ? ' · On demand' : ''}
-                        {connectionIssues[server.id] && (
-                          <span className="task-muted block text-xs">
-                            {connectionIssues[server.id]}
-                          </span>
-                        )}
+                        <strong>Current checkout</strong>
+                        <span>Edits your files, including uncommitted changes.</span>
                       </span>
-                    </label>
-                  ))}
-                </>
-              )}
-              {(id === 'agent' || id === 'tools') && setup}
-            </section>
-          ))}
+                    </button>
+                  </div>
+                )}
+                {id === 'workspace' && workspaceSetup}
+                {id === 'context' && panel === id && (
+                  <>
+                    {projectId && projectPath && (
+                      <TaskKnowledge
+                        embedded
+                        key={projectId}
+                        projectId={projectId}
+                        projectPath={projectPath}
+                        prompt={finalPrompt}
+                        selection={current.contextSelection}
+                        onChange={(contextSelection) => onChange({ contextSelection })}
+                      />
+                    )}
+                    <TaskContextPanel
+                      embedded
+                      selected={activeSkills}
+                      suggested={suggestedSkills}
+                      onToggle={toggleSkill}
+                      instructions={projectInstructions}
+                      prompt={current.prompt.trim() ? finalPrompt : ''}
+                    />
+                  </>
+                )}
+                {id === 'tools' && (
+                  <>
+                    <p className="task-muted mb-3">
+                      {customTools
+                        ? 'This saved task has a custom tool selection. It is kept until you choose to use the project defaults.'
+                        : 'Enabled project tools are included automatically. Manage connections once in project settings; Jackalope checks agent compatibility when routing.'}
+                    </p>
+                    {customTools && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mb-3"
+                        onClick={() => onChange({ connectionIds: undefined })}
+                      >
+                        Use project tools automatically
+                      </Button>
+                    )}
+                    {!projectConnections.length && (
+                      <p className="task-muted mt-3">
+                        {projectId
+                          ? 'No project tools connected yet.'
+                          : 'Choose a project to configure its tools.'}
+                      </p>
+                    )}
+                    <ul className="composer-tool-list">
+                      {projectConnections.map((server) => (
+                        <li key={server.id}>
+                          <Plug size={16} aria-hidden="true" />
+                          <span>
+                            {server.name}
+                            {server.discovery ? ' · On demand' : ''}
+                            {current.connectionIds &&
+                              !current.connectionIds.includes(server.id) && (
+                                <span className="task-muted block text-xs">
+                                  Excluded by saved task
+                                </span>
+                              )}
+                            {connectionIssues[server.id] && (
+                              <span className="task-muted block text-xs">
+                                {connectionIssues[server.id]}
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {(id === 'agent' || id === 'tools') && setup}
+              </section>
+            ))}
+          </section>
           {inline ? (
             <details className="composer-outcomes">
               <summary>

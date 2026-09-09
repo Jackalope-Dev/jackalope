@@ -148,6 +148,22 @@ body {
   background: var(--color-surface-hover, rgb(255 255 255 / 0.06));
   color: var(--color-text-primary);
 }
+.app-titlebar-help {
+  position: relative;
+  margin-inline-end: 4px;
+}
+.app-titlebar-help::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: var(--color-border-subtle);
+}
+.app-titlebar-button:focus-visible {
+  outline-offset: -3px;
+}
 .app-titlebar-button-close:hover {
   background: #e5484d;
   color: #ffffff;

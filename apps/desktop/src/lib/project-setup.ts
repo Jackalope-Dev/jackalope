@@ -1,6 +1,6 @@
 import { syncAgentConfig } from '../stores/agentConfigStore';
 import { useContextMemoryStore } from '../stores/contextMemoryStore';
-import { type Project, useProjectStore } from '../stores/projectStore';
+import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
 import { nativeTask } from './task-runtime';
 
 interface ProjectInfo {
@@ -9,36 +9,52 @@ interface ProjectInfo {
   branch: string;
 }
 
-export async function openProject(path: string) {
+export async function openProject(
+  path: string,
+  options: { provisional?: boolean; pending?: Project | null } = {},
+) {
   await syncAgentConfig();
   const info = await nativeTask<ProjectInfo>('task_validate_project', { path: path.trim() });
-  return registerProject(info);
+  const project = projectFromInfo(info, options.pending);
+  return options.provisional ? project : commitProjectSetup(project);
 }
 
-export async function createProject(name: string, parentPath: string | null) {
+export async function createProject(
+  name: string,
+  parentPath: string | null,
+  options: { provisional?: boolean } = {},
+) {
   await syncAgentConfig();
   const info = await nativeTask<ProjectInfo>('task_create_project', {
     name: name.trim(),
     parentPath,
   });
-  return registerProject(info);
+  const project = projectFromInfo(info);
+  return options.provisional ? project : commitProjectSetup(project);
 }
 
-async function registerProject(info: ProjectInfo) {
+function projectFromInfo(info: ProjectInfo, pending?: Project | null): Project {
   const store = useProjectStore.getState();
-  const normalize = (value: string) => value.replaceAll('\\', '/').toLowerCase();
-  const existing = store.projects.find(
-    (project) => normalize(project.path) === normalize(info.path),
-  );
-  const project: Omit<Project, 'worktrees'> = existing ?? {
-    id: crypto.randomUUID(),
-    name: info.name,
-    path: info.path,
-    gitBranch: info.branch || 'Detached HEAD',
-    agentProvider: 'codex' as const,
-  };
-  if (existing) store.selectProject(existing.id);
-  else await store.addProject(project);
+  const existing =
+    pending && projectPathKey(pending.path) === projectPathKey(info.path)
+      ? pending
+      : store.projects.find(
+          (project) => projectPathKey(project.path) === projectPathKey(info.path),
+        );
+  return existing
+    ? { ...existing, worktrees: [] }
+    : {
+        id: crypto.randomUUID(),
+        name: info.name,
+        path: info.path,
+        gitBranch: info.branch || 'Detached HEAD',
+        agentProvider: 'codex' as const,
+        worktrees: [],
+      };
+}
+
+export function commitProjectSetup(pending: Project): Project {
+  const project = useProjectStore.getState().completeSetup(pending);
   void useContextMemoryStore
     .getState()
     .refreshMemory(project)

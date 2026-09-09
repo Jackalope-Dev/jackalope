@@ -9,6 +9,7 @@ globalThis.localStorage = {
 };
 globalThis.window = { localStorage: globalThis.localStorage };
 const { useOnboardingStore: store } = await import('../src/stores/onboardingStore.ts');
+const { useProjectStore: projects } = await import('../src/stores/projectStore.ts');
 
 test('first launch resumes after opening a project, including across hydration', async () => {
   store.setState({ status: 'new', step: 'project' });
@@ -65,4 +66,77 @@ test('old account and theme steps migrate to project setup', async () => {
     assert.equal(store.getState().step, 'project');
     assert.equal(store.getState().status, 'active');
   }
+});
+
+const existingProject = {
+  id: 'existing',
+  name: 'Existing',
+  path: 'C:/Projects/existing',
+  gitBranch: 'main',
+  agentProvider: 'codex',
+  worktrees: [],
+  preferences: { preferredRunner: 'codex', customInstructions: 'Keep existing instructions.' },
+};
+const pendingProject = {
+  ...existingProject,
+  id: 'pending',
+  name: 'Pending',
+  path: 'C:/Projects/pending',
+  preferences: {
+    preferredRunner: 'claude',
+    allowedAgents: ['claude'],
+    theme: { id: 'project-theme' },
+  },
+};
+
+test('project selection and cancellation leave saved projects and active selection untouched', () => {
+  projects.setState({ projects: [existingProject], activeProjectId: existingProject.id });
+  store.getState().begin();
+  store.getState().stageProject(pendingProject, 'A task that is not ready yet');
+  store.getState().go('theme');
+  assert.deepEqual(projects.getState().projects, [existingProject]);
+  assert.equal(projects.getState().activeProjectId, existingProject.id);
+  store.getState().go('project');
+  store.getState().cancel();
+  assert.equal(store.getState().status, 'skipped');
+  assert.equal(store.getState().pendingProject, null);
+  assert.equal(store.getState().firstTask, null);
+  assert.deepEqual(projects.getState().projects, [existingProject]);
+  assert.equal(projects.getState().activeProjectId, existingProject.id);
+});
+
+test('provisional appearance and first task survive reload without registering a project', async () => {
+  projects.setState({ projects: [existingProject], activeProjectId: existingProject.id });
+  store.getState().begin();
+  store.getState().stageProject(pendingProject, 'Keep this draft');
+  store.getState().go('theme');
+  const saved = values.get('jackalope-onboarding-v1');
+  store.getState().finish();
+  values.set('jackalope-onboarding-v1', saved);
+  await store.persist.rehydrate();
+  assert.equal(store.getState().step, 'theme');
+  assert.deepEqual(store.getState().pendingProject, pendingProject);
+  assert.equal(store.getState().firstTask, 'Keep this draft');
+  assert.deepEqual(projects.getState().projects, [existingProject]);
+  const completed = projects.getState().completeSetup(store.getState().pendingProject);
+  store.getState().finish();
+  assert.equal(projects.getState().projects.length, 2);
+  assert.equal(projects.getState().activeProjectId, completed.id);
+  assert.equal(completed.preferences.theme.id, 'project-theme');
+});
+
+test('reconfiguring an existing repository saves only setup preferences and does not duplicate it', () => {
+  projects.setState({ projects: [existingProject], activeProjectId: existingProject.id });
+  const pending = { ...pendingProject, path: 'C:\\Projects\\existing' };
+  store.getState().begin();
+  store.getState().stageProject(pending);
+  assert.equal(projects.getState().projects[0].preferences.preferredRunner, 'codex');
+  projects.getState().updateProjectPreferences(existingProject.id, {
+    customInstructions: 'Updated while setup was open.',
+  });
+  const completed = projects.getState().completeSetup(pending);
+  assert.equal(completed.id, existingProject.id);
+  assert.equal(projects.getState().projects.length, 1);
+  assert.equal(completed.preferences.preferredRunner, 'claude');
+  assert.equal(completed.preferences.customInstructions, 'Updated while setup was open.');
 });

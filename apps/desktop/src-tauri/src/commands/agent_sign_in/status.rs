@@ -178,7 +178,11 @@ pub async fn agent_profile_status(
     agent: String,
     id: Option<String>,
 ) -> Result<AccountStatus, String> {
-    let binding = agent_profiles::bind_account(&runtime.profiles_root(), &agent, id.as_deref())?;
+    let binding = if let Some(id) = id {
+        agent_profiles::bind_account(&runtime.profiles_root(), &agent, Some(&id))?
+    } else {
+        agent_profiles::bind_cli_account(&runtime.profiles_root(), &agent)?
+    };
     if super::super::tasks::executable(&agent).is_err() {
         return Ok(status(
             "notInstalled",

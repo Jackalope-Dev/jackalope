@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { connectionSupport } from '../../lib/agent-capabilities';
+import { useAgentModels } from '../../lib/agent-models';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt } from '../../lib/skills/context-assembler';
@@ -83,39 +84,44 @@ export function CaptureTask({
   const currentAgent = current.agent || defaultAgent;
   const runner = (current.agent ? allowed : runners).find((r) => r.id === currentAgent);
   const [splitOpen, setSplitOpen] = useState(false);
+  const [toolRevision, setToolRevision] = useState(0);
+  const adapter = config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
+  const modelCatalog = useAgentModels(
+    current.agent ? currentAgent : '',
+    toolRevision,
+    agentAccountFor(project, adapter),
+  );
   const modelOptions = config.runnerOptions[currentAgent];
   const defaultModel =
     modelOptions?.defaultModel ||
     (modelOptions?.restrictModels ? modelOptions.models[0] : '') ||
     '';
-  const models = [
-    ...new Set([
-      ...(modelOptions?.models ?? []),
-      ...(modelOptions?.restrictModels
-        ? []
-        : (config.customAgents.find((a) => a.id === currentAgent)?.models.map((m) => m.id) ?? [])),
-      ...(defaultModel ? [defaultModel] : []),
-    ]),
-  ].filter(
-    (model) =>
-      config.isModelAllowed(model) &&
-      config.isModelAllowed(`${currentAgent}:${model}`) &&
-      (!modelOptions?.restrictModels || modelOptions.models.includes(model)),
-  );
+  const models = (modelCatalog.catalog?.models ?? [])
+    .map((model) => model.id)
+    .filter(
+      (model) =>
+        config.isModelAllowed(model) &&
+        config.isModelAllowed(`${currentAgent}:${model}`) &&
+        (!modelOptions?.restrictModels || modelOptions.models.includes(model)),
+    );
   const modelError =
-    current.agent && current.model && !models.includes(current.model)
-      ? 'The selected model is no longer allowed. Choose another model or use the agent default.'
-      : '';
+    !modelCatalog.loading && current.agent && current.model && !models.includes(current.model)
+      ? 'The saved task model could not be verified. Under Customize task → Agent, choose an available model or clear the task override.'
+      : !modelCatalog.loading &&
+          current.agent &&
+          !current.model &&
+          defaultModel &&
+          !models.includes(defaultModel)
+        ? 'The configured default model could not be verified. Choose an available task model or reset model preferences in agent settings.'
+        : '';
   const [error, setError] = useState('');
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [toolRevision, setToolRevision] = useState(0);
   const [setup, setSetup] = useState(false);
   const [setupProject, setSetupProject] = useState<string | null>(null);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const connections = servers.filter(
     (s) => s.enabled !== false && s.scope === `project:${project?.id}`,
   );
-  const adapter = config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
   const connectionIssues = Object.fromEntries(
     connections.flatMap((server) => {
       const reason = current.agent
@@ -130,13 +136,13 @@ export function CaptureTask({
       (!current.connectionIds || current.connectionIds.includes(server.id)),
   );
   const toolError = incompatible.length
-    ? `Check Tools: ${incompatible.map((server) => server.name).join(', ')} cannot be used with this agent. Change the connection settings, deselect it, or choose another agent.`
+    ? `${incompatible.map((server) => server.name).join(', ')} cannot be used with this agent. Under Customize task, choose automatic routing or update the project connection settings.`
     : '';
   const [loadedProject, setLoadedProject] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState('');
   const desktop = isTauriEnvironment();
   useEffect(() => {
-    // Freeze the suggested destination with the draft; navigation must not retarget it.
+    // Ordinary navigation preserves the draft; the project switcher explicitly retargets capture.
     if (!inline && useExecutionStore.getState().drafts[key]?.projectId === undefined)
       draft(key, current);
   }, [inline, key, current, draft]);
@@ -224,6 +230,7 @@ export function CaptureTask({
       loadedProject !== `${project.id}:${toolRevision}` ||
       connectionError ||
       modelError ||
+      modelCatalog.loading ||
       toolError ||
       !current.prompt.trim()
     )
@@ -326,6 +333,17 @@ export function CaptureTask({
         current={current}
         models={models}
         defaultModel={defaultModel}
+        modelNotice={
+          modelCatalog.loading
+            ? 'Reading available models…'
+            : modelCatalog.error ||
+              (!models.length
+                ? 'No available models could be detected or allowed. Model selection is unavailable; check the agent sign-in and model preferences.'
+                : modelCatalog.catalog?.detail)
+        }
+        modelNames={Object.fromEntries(
+          (modelCatalog.catalog?.models ?? []).map((model) => [model.id, model.name]),
+        )}
         automaticAgent={runners.find((r) => r.id === defaultAgent)?.name}
         onSplitTask={project ? () => setSplitOpen(true) : undefined}
         runner={runner}
@@ -337,6 +355,7 @@ export function CaptureTask({
           loadedProject === `${project.id}:${toolRevision}` &&
           !connectionError &&
           !modelError &&
+          !modelCatalog.loading &&
           !toolError
         }
         activeSkills={skills}

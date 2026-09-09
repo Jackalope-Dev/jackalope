@@ -11,6 +11,8 @@ export interface AgentProfilesView {
   profiles: AgentProfile[];
   activeId: string | null;
   defaultGroup?: AgentProfile['group'];
+  defaultName?: string | null;
+  defaultTag?: string | null;
   envVar: string | null;
 }
 
@@ -26,10 +28,10 @@ export const setAgentProfileGroup = (
   group: AgentProfile['group'],
 ) => nativeTask<void>('agent_profile_set_group', { agent, id, group });
 
-export const setAgentProfileTag = (agent: string, id: string, tag: string | null) =>
+export const setAgentProfileTag = (agent: string, id: string | null, tag: string | null) =>
   nativeTask<void>('agent_profile_set_tag', { agent, id, tag });
 
-export const renameAgentProfile = (agent: string, id: string, name: string) =>
+export const renameAgentProfile = (agent: string, id: string | null, name: string) =>
   nativeTask<void>('agent_profile_rename', { agent, id, name });
 
 export const deleteAgentProfile = (agent: string, id: string) =>

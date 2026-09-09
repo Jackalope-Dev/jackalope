@@ -78,23 +78,11 @@
   justify-self: start;
 }
 
-.agent-model-fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px 24px;
-}
-
 .agent-model-restriction {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-}
-
-@container (max-width: 600px) {
-  .agent-model-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .agent-accounts {

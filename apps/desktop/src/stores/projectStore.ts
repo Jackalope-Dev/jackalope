@@ -77,6 +77,7 @@ interface ProjectState {
   checkingWorktrees: boolean;
   worktreesError: string | null;
   addProject: (project: Omit<Project, 'worktrees'>) => Promise<void>;
+  completeSetup: (project: Project) => Project;
   updateProject: (id: string, partial: Partial<Omit<Project, 'id' | 'worktrees'>>) => void;
   updateProjectPreferences: (id: string, prefs: Partial<ProjectPreferences>) => void;
   removeProject: (id: string) => void;
@@ -89,6 +90,13 @@ interface ProjectState {
 }
 
 let worktreeRequest = 0;
+
+export function projectPathKey(path: string) {
+  const normalized = path.replaceAll('\\', '/').replace(/\/$/, '');
+  return typeof navigator !== 'undefined' && navigator.platform.includes('Win')
+    ? normalized.toLowerCase()
+    : normalized;
+}
 
 export const useProjectStore = create<ProjectState>()(
   persist(
@@ -107,6 +115,33 @@ export const useProjectStore = create<ProjectState>()(
         }));
       },
 
+      completeSetup: (pending) => {
+        const existing = get().projects.find(
+          (project) =>
+            project.id === pending.id ||
+            projectPathKey(project.path) === projectPathKey(pending.path),
+        );
+        const project = existing
+          ? {
+              ...existing,
+              preferences: {
+                ...existing.preferences,
+                preferredRunner: pending.preferences?.preferredRunner,
+                allowedAgents: pending.preferences?.allowedAgents,
+                theme: pending.preferences?.theme,
+              },
+            }
+          : pending;
+        set((state) => ({
+          projects: existing
+            ? state.projects.map((item) => (item.id === project.id ? project : item))
+            : [...state.projects, project],
+          activeProjectId: project.id,
+          worktreesError: null,
+        }));
+        return project;
+      },
+
       updateProject: (id, partial) => {
         set((state) => ({
           projects: state.projects.map((p) => (p.id === id ? { ...p, ...partial } : p)),
@@ -122,11 +157,19 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       removeProject: (id) => {
+        const removingActive = get().activeProjectId === id;
+        if (removingActive) worktreeRequest++;
         set((state) => {
           const nextProjects = state.projects.filter((p) => p.id !== id);
           const nextActive =
             state.activeProjectId === id ? (nextProjects[0]?.id ?? null) : state.activeProjectId;
-          return { projects: nextProjects, activeProjectId: nextActive };
+          return {
+            projects: nextProjects,
+            activeProjectId: nextActive,
+            ...(removingActive
+              ? { loading: false, checkingWorktrees: false, worktreesError: null }
+              : {}),
+          };
         });
       },
 

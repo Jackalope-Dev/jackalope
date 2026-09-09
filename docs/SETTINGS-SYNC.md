@@ -7,13 +7,17 @@ Official beta builds require a native verified access lease; development builds
 can continue without a hosted account. Native execution checks remain authoritative
 including after revocation and offline expiry. Saved work remains reviewable.
 
-Project setup has three steps: Project, Agent and First task. Adding another project
-reuses this flow without replaying the launch gate or app privacy. The Agent step
-saves a project default and an optional allowed-agent list through the existing
+Project setup has four steps: Project, Agents, Appearance and First task. Adding another project
+reuses this flow without replaying the launch gate or app privacy. The Agents step
+stages a project default and an optional allowed-agent list for the existing
 native policy path. It requires at least one available enabled agent, moves the
 default when it is switched off, and preserves global agent preferences. Existing
-project drafts and saved completion state remain compatible; obsolete account/theme
-steps resume at Project without deleting saved projects or drafts.
+project drafts and saved completion state remain compatible. The selected project,
+agent preferences, appearance and first task stay in the onboarding draft until
+workspace entry. Back/Cancel does not register the project or change its saved
+preferences. Legacy account/theme steps without a provisional project resume at
+Project; new Appearance steps resume with their saved draft. No database migration
+is required; the existing persisted-state merge supplies the new optional fields.
 
 Browser pairing can share a verified waitlist membership with the requesting
 desktop. That reports waiting, issues no device credential and grants neither
@@ -21,6 +25,11 @@ execution nor settings access. Pairing expires after ten minutes. After admissio
 the member signs in with their approved email and reconnects if needed.
 
 ## Preferences and privacy
+
+Agent account names, groups and tags remain in the local native profile manifest,
+including optional metadata for the existing CLI login. Older manifests default
+those fields without migration. Identity/status observations are cached only in
+renderer memory and are not part of settings sync.
 
 Settings sync defaults on for new connections, disclosed on the launch screen with a
 control in its app privacy disclosure and Settings → Privacy. Users can

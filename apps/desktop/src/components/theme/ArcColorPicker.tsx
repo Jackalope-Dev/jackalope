@@ -7,7 +7,13 @@ import { Button } from '../ui/button';
 import { Tooltip } from '../ui/Tooltip';
 import { ThemeEditor } from './ThemeEditor';
 
-export function ArcColorPicker({ scope = 'project' }: { scope?: 'app' | 'project' }) {
+export function ArcColorPicker({
+  scope = 'project',
+  variant = 'toolbar',
+}: {
+  scope?: 'app' | 'project';
+  variant?: 'toolbar' | 'titlebar';
+}) {
   const theme = useThemeStore();
   const currentTheme = scope === 'app' ? theme.appTheme : theme.currentTheme;
   const setTheme = scope === 'app' ? theme.setAppTheme : theme.setTheme;
@@ -39,14 +45,16 @@ export function ArcColorPicker({ scope = 'project' }: { scope?: 'app' | 'project
         <Popover.Trigger asChild>
           <button
             type="button"
-            className="appearance-trigger"
+            className={variant === 'titlebar' ? 'app-titlebar-button' : 'appearance-trigger'}
             aria-label="Personalize your workspace"
+            onMouseDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
             onClick={() => {
               if (open) setTheme(draft);
             }}
           >
             <span
-              className="size-5 rounded-full"
+              className={`${variant === 'titlebar' ? 'size-4' : 'size-5'} rounded-full`}
               style={{
                 background: 'var(--color-palette-gradient)',
               }}

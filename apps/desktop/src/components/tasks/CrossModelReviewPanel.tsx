@@ -103,7 +103,7 @@ export function CrossModelReviewPanel({
       {!review && !loading && (
         <div className="mt-3 flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-[var(--color-text-secondary)]">Reviewer model:</span>
+            <span className="text-[var(--color-text-secondary)]">Reviewing agent:</span>
             <Select
               value={selectedReviewer}
               onValueChange={setSelectedReviewer}

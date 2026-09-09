@@ -35,6 +35,10 @@ struct AgentEntry {
     active: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     default_group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default_tag: Option<String>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -49,6 +53,8 @@ pub struct AgentProfilesView {
     pub profiles: Vec<AgentProfile>,
     pub active_id: Option<String>,
     pub default_group: Option<String>,
+    pub default_name: Option<String>,
+    pub default_tag: Option<String>,
     /// The environment variable Jackalope sets to redirect this agent's sign-in
     /// to a profile directory, or None when this agent has no known override
     /// (accounts are unsupported for it — e.g. a manually added custom agent).
@@ -149,6 +155,9 @@ pub(in crate::commands) fn routing_accounts(
     }
     let manifest = load_checked(root)?;
     let mut bindings = vec![bind_account(root, adapter, None)?];
+    if bindings[0].profile_id.is_some() {
+        bindings.push(bind_cli_account(root, adapter)?);
+    }
     if let Some(entry) = manifest.agents.get(adapter) {
         for profile in &entry.profiles {
             if !bindings
@@ -167,8 +176,27 @@ pub fn bind_account(
     adapter: &str,
     explicit: Option<&str>,
 ) -> Result<AccountBinding, String> {
+    if explicit == Some("__default") {
+        return bind_cli_account(root, adapter);
+    }
+    bind_account_selection(root, adapter, explicit, true)
+}
+
+pub fn bind_cli_account(root: &Path, adapter: &str) -> Result<AccountBinding, String> {
+    bind_account_selection(root, adapter, None, false)
+}
+
+fn bind_account_selection(
+    root: &Path,
+    adapter: &str,
+    explicit: Option<&str>,
+    use_active: bool,
+) -> Result<AccountBinding, String> {
     let saved = load_checked(root)?;
     let selected = explicit.or_else(|| {
+        if !use_active {
+            return None;
+        }
         saved
             .agents
             .get(adapter)
@@ -183,13 +211,16 @@ pub fn bind_account(
             adapter: adapter.into(),
             profile_id: None,
             directory,
-            label: "Current Antigravity CLI account (identity not pinned)".into(),
+            label: saved
+                .agents
+                .get(adapter)
+                .and_then(|entry| entry.default_name.clone())
+                .unwrap_or_else(|| "Current Antigravity CLI account (identity not pinned)".into()),
         });
     }
     let env_name = env_var_for(adapter).ok_or("This agent does not support account isolation.")?;
-    let manifest = saved;
-    let entry = manifest.agents.get(adapter);
-    let id = explicit.or_else(|| entry.and_then(|e| e.active.as_deref()));
+    let entry = saved.agents.get(adapter);
+    let id = selected;
     let (profile_id, directory, label) = if let Some(id) = id {
         if id.is_empty() || !id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {
             return Err("Invalid account selection.".into());
@@ -223,7 +254,9 @@ pub fn bind_account(
         (
             None,
             directory,
-            "CLI default profile (identity not reported)".to_string(),
+            entry
+                .and_then(|entry| entry.default_name.clone())
+                .unwrap_or_else(|| "CLI account (identity not reported)".to_string()),
         )
     };
     if !directory.is_absolute() {
@@ -362,6 +395,8 @@ pub fn agent_profile_list(
         profiles: entry.profiles,
         active_id: entry.active,
         default_group: entry.default_group,
+        default_name: entry.default_name,
+        default_tag: entry.default_tag,
         env_var: env_var_for(&agent).map(str::to_string),
     })
 }
@@ -454,12 +489,18 @@ pub fn agent_profile_set_group(
 pub fn agent_profile_set_tag(
     runtime: State<'_, TaskRuntime>,
     agent: String,
-    id: String,
+    id: Option<String>,
     tag: Option<String>,
 ) -> Result<(), String> {
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
     let mut manifest = load_checked(&root)?;
+    let Some(id) = id else {
+        env_var_for(&agent).ok_or("Unknown agent")?;
+        manifest.agents.entry(agent).or_default().default_tag =
+            tag.map(|t| t.trim().to_string()).filter(|t| !t.is_empty());
+        return save(&root, &manifest);
+    };
     let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
     let profile = entry
         .profiles
@@ -474,7 +515,7 @@ pub fn agent_profile_set_tag(
 pub fn agent_profile_rename(
     runtime: State<'_, TaskRuntime>,
     agent: String,
-    id: String,
+    id: Option<String>,
     name: String,
 ) -> Result<(), String> {
     let name = name.trim();
@@ -483,8 +524,15 @@ pub fn agent_profile_rename(
     }
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
-    super::agent_sign_in::ensure_idle(&bind_account(&root, &agent, Some(&id))?)?;
+    if let Some(id) = &id {
+        super::agent_sign_in::ensure_idle(&bind_account(&root, &agent, Some(id))?)?;
+    }
     let mut manifest = load_checked(&root)?;
+    let Some(id) = id else {
+        env_var_for(&agent).ok_or("Unknown agent")?;
+        manifest.agents.entry(agent).or_default().default_name = Some(name.to_string());
+        return save(&root, &manifest);
+    };
     let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
     let profile = entry
         .profiles
@@ -825,10 +873,29 @@ mod tests {
                 ],
                 active: Some("work".into()),
                 default_group: None,
+                ..Default::default()
             },
         );
         save(&root, &manifest).unwrap();
         let binding = bind_account(&root, "codex", None).unwrap();
+        let cli = bind_cli_account(&root, "codex").unwrap();
+        assert!(cli.profile_id.is_none());
+        assert_ne!(cli.directory, binding.directory);
+        assert_eq!(
+            bind_account(&root, "codex", Some("__default"))
+                .unwrap()
+                .directory,
+            cli.directory
+        );
+        let accounts = routing_accounts(&root, "codex", None).unwrap();
+        assert_eq!(accounts.len(), 3);
+        assert_eq!(
+            accounts
+                .iter()
+                .filter(|account| account.profile_id.is_none())
+                .count(),
+            1
+        );
         manifest.agents.get_mut("codex").unwrap().active = Some("personal".into());
         save(&root, &manifest).unwrap();
         validate_binding(&root, &binding).unwrap();

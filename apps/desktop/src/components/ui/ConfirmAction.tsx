@@ -9,15 +9,24 @@ export function ConfirmAction({
   label = 'Delete',
   busyLabel = 'Deleting…',
   onConfirm,
+  open: controlledOpen,
+  onOpenChange,
 }: {
-  trigger: ReactNode;
+  trigger?: ReactNode;
   title: string;
   description: string;
   label?: string;
   busyLabel?: string;
   onConfirm: () => void | Promise<void>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = (value: boolean) => {
+    setLocalOpen(value);
+    onOpenChange?.(value);
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const confirm = async () => {
@@ -43,7 +52,7 @@ export function ConfirmAction({
         }
       }}
     >
-      <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
+      {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay confirm-action-overlay" />
         <Dialog.Content className="task-dialog appearance-panel confirm-action-dialog">

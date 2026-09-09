@@ -3,6 +3,7 @@ import { ArrowRight, CircleAlert, Plus, RefreshCw, Settings2, X } from 'lucide-r
 import { useEffect, useState } from 'react';
 import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -27,11 +28,27 @@ export function RunnerConnections({
   const { runners, runs, discovering, discover, error } = useExecutionStore();
   const config = useAgentConfigStore();
   const capacity = useCapacityStore();
+  const accounts = useAgentAccountsStore((state) => state.agents);
+  const accountAgents = JSON.stringify([
+    ...new Set(
+      runners
+        .filter((runner) => runner.available)
+        .map(
+          (runner) =>
+            config.customAgents.find((agent) => agent.id === runner.id)?.adapter ?? runner.id,
+        ),
+    ),
+  ]);
   const [adding, setAdding] = useState(false);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState('');
   const dialogFocus = useDialogFocus();
   const desktop = isTauriEnvironment();
+  useEffect(() => {
+    if (!desktop) return;
+    for (const agent of JSON.parse(accountAgents) as string[])
+      void useAgentAccountsStore.getState().load(agent);
+  }, [desktop, accountAgents]);
   useEffect(() => {
     if (!desktop) return;
     let active = true;
@@ -50,6 +67,8 @@ export function RunnerConnections({
     try {
       await syncAgentConfig();
       await discover();
+      for (const agent of JSON.parse(accountAgents) as string[])
+        void useAgentAccountsStore.getState().load(agent, true);
     } catch (error) {
       setCheckError(String(error));
     } finally {
@@ -97,11 +116,20 @@ export function RunnerConnections({
             <Button
               variant="ghost"
               disabled={!desktop || capacity.loading}
-              onClick={() => void capacity.fetch(false)}
+              onClick={() => {
+                void capacity.fetch(false);
+                for (const agent of JSON.parse(accountAgents) as string[]) {
+                  const entry = useAgentAccountsStore.getState().agents[agent];
+                  if (entry?.view) {
+                    for (const profile of accountProfiles(entry.view, entry.statuses))
+                      void useAgentAccountsStore.getState().check(agent, profile.id);
+                  } else void useAgentAccountsStore.getState().load(agent, true);
+                }
+              }}
               title="Reads each signed-in agent's account identity and remaining capacity."
             >
               <RefreshCw size={15} />
-              {capacity.loading ? 'Checking…' : 'Check account'}
+              {capacity.loading ? 'Checking…' : 'Check accounts'}
             </Button>
             <Button
               variant="ghost"
@@ -183,13 +211,35 @@ export function RunnerConnections({
               const knownAccount = accountForAgent(capacity.records, runner.id);
               const genericAccount = !runner.account || runner.account === 'Current CLI account';
               const identity = knownAccount ?? (genericAccount ? null : runner.account);
+              const accountData = accounts[provider];
+              const profiles = accountData?.view
+                ? accountProfiles(accountData.view, accountData.statuses)
+                : [];
+              const accountLabels = profiles.map((profile) => {
+                const identity = accountData?.statuses[profile.id]?.identity;
+                return identity && identity !== profile.name
+                  ? `${profile.name} · ${identity}`
+                  : identity || profile.name;
+              });
               return (
                 <article key={runner.id} className="agent-roster-row" data-provider={provider}>
-                  <AgentAvatar
-                    provider={provider}
-                    working={working && !waitingRun}
-                    waiting={!!waitingRun}
-                  />
+                  <div
+                    className="agent-account-avatars"
+                    data-multiple={profiles.length > 1 || undefined}
+                    aria-hidden="true"
+                  >
+                    {Array.from(
+                      { length: Math.max(1, Math.min(profiles.length, 3)) },
+                      (_, index) => (
+                        <AgentAvatar
+                          key={profiles[index]?.id ?? runner.id}
+                          provider={provider}
+                          working={index === 0 && working && !waitingRun}
+                          waiting={index === 0 && !!waitingRun}
+                        />
+                      ),
+                    )}
+                  </div>
                   <div className="agent-roster-identity">
                     <div className="agent-roster-name">
                       <h2>{custom?.name ?? runner.name}</h2>
@@ -205,7 +255,32 @@ export function RunnerConnections({
                       </p>
                     )}
                     {detail && <p className="task-muted">{detail}</p>}
-                    {identity && <p className="task-muted text-xs">{identity}</p>}
+                    {profiles.length > 0 ? (
+                      <button
+                        type="button"
+                        className="agent-account-summary"
+                        onClick={() => openAgentConfiguration(runner.id)}
+                        title={accountLabels.join('\n')}
+                        aria-label={`Manage ${profiles.length} ${runner.name} ${profiles.length === 1 ? 'account' : 'accounts'}`}
+                      >
+                        <span>
+                          {profiles.length} {profiles.length === 1 ? 'account' : 'accounts'}
+                        </span>
+                        {accountLabels.slice(0, 2).map((label, index) => (
+                          <span key={profiles[index].id} className="agent-account-summary-identity">
+                            {label}
+                          </span>
+                        ))}
+                        {profiles.length > 2 && <span>+{profiles.length - 2} more</span>}
+                      </button>
+                    ) : identity ? (
+                      <p className="task-muted text-xs">{identity}</p>
+                    ) : null}
+                    {accountData?.error && (
+                      <p className="task-muted text-xs">
+                        Account list unavailable. Open Configure to retry.
+                      </p>
+                    )}
                     {taskToOpen && (
                       <button
                         className="agent-task-link"

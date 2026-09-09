@@ -1,3 +1,4 @@
+import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,16 +19,19 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
+import { ProjectThemeStep } from './ProjectThemeStep';
 import './onboarding.css';
 
 const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
-  { id: 'agent', label: 'Agent' },
+  { id: 'agent', label: 'Agents' },
+  { id: 'theme', label: 'Appearance' },
   { id: 'task', label: 'First task' },
 ];
 const setupTips: Record<OnboardingStep, string[]> = {
@@ -35,6 +39,9 @@ const setupTips: Record<OnboardingStep, string[]> = {
   agent: [
     'This preference belongs to this project. Other projects keep their own agent choices.',
     'Add agents, supported accounts and models later in Settings → Agents.',
+  ],
+  theme: [
+    'Keep the app theme or give this project its own colors. Your choices are saved when setup finishes.',
   ],
   task: [
     'Describe the result you want, relevant files, and how to check the work.',
@@ -49,8 +56,11 @@ export function OnboardingFlow({
   onSkip: () => void;
 }) {
   const onboarding = useOnboardingStore();
-  const { projects, updateProjectPreferences } = useProjectStore();
-  const project = projects.find((item) => item.id === onboarding.projectId);
+  const { projects } = useProjectStore();
+  const project =
+    onboarding.pendingProject ?? projects.find((item) => item.id === onboarding.projectId);
+  const appTheme = useThemeStore((state) => state.appTheme);
+  const [themePreview, setThemePreview] = useState<ThemePalette>();
   const execution = useExecutionStore();
   const config = useAgentConfigStore();
   const [path, setPath] = useState(project?.path ?? '');
@@ -60,7 +70,8 @@ export function OnboardingFlow({
   const [defaultDirectory, setDefaultDirectory] = useState('');
   const [directoryError, setDirectoryError] = useState('');
   const [agent, setAgent] = useState(
-    (project && execution.drafts[project.id]?.agent) ||
+    onboarding.pendingProject?.preferences?.preferredRunner ||
+      (project && execution.drafts[project.id]?.agent) ||
       project?.preferences?.preferredRunner ||
       config.defaultMetaAgent,
   );
@@ -85,7 +96,20 @@ export function OnboardingFlow({
   const desktop = isTauriEnvironment();
   const step = !project ? 'project' : onboarding.step;
   const index = steps.findIndex((item) => item.id === step);
-  const draft = project ? (execution.drafts[project.id]?.prompt ?? '') : '';
+  const draft =
+    onboarding.firstTask ?? (project ? (execution.drafts[project.id]?.prompt ?? '') : '');
+  const preview =
+    step === 'theme' && themePreview ? themePreview : (project?.preferences?.theme ?? appTheme);
+  const previewProjectId = project?.id;
+  useEffect(() => {
+    if (!previewProjectId) return;
+    useThemeStore.setState({ previewing: true });
+    applyThemeTokens(preview);
+    return () => {
+      useThemeStore.setState({ previewing: false });
+      applyThemeTokens(useThemeStore.getState().currentTheme);
+    };
+  }, [previewProjectId, preview]);
   const runner = execution.runners.find((item) => item.id === agent);
   const available = (id: string) => {
     const options = config.runnerOptions[id];
@@ -175,8 +199,7 @@ export function OnboardingFlow({
       return;
     }
     if (!draft.trim()) return;
-    execution.draft(project.id, { agent, projectId: project.id });
-    execution.select(null);
+    onboarding.stageProject(project, draft);
     advance(() => onFinish(agent, project.id));
   };
   return (
@@ -238,8 +261,10 @@ export function OnboardingFlow({
             {step === 'project'
               ? 'Choose a project'
               : step === 'agent'
-                ? 'Choose an agent for this project'
-                : 'Describe your first task'}
+                ? 'Choose agents for this project'
+                : step === 'theme'
+                  ? 'Choose this project’s appearance'
+                  : 'Describe your first task'}
           </h2>
           {step === 'project' && (
             <>
@@ -280,19 +305,24 @@ export function OnboardingFlow({
                   void attempt(async () => {
                     const opened =
                       projectMode === 'new'
-                        ? await createProject(projectName, parentPath)
-                        : await openProject(path);
-                    onboarding.selectProject(opened.id);
+                        ? await createProject(projectName, parentPath, { provisional: true })
+                        : await openProject(path, {
+                            provisional: true,
+                            pending: onboarding.pendingProject,
+                          });
+                    onboarding.stageProject(
+                      opened,
+                      projectMode === 'new'
+                        ? 'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.'
+                        : opened.id === onboarding.projectId
+                          ? draft
+                          : (execution.drafts[opened.id]?.prompt ?? ''),
+                    );
                     setAgent(opened.preferences?.preferredRunner ?? config.defaultMetaAgent);
                     setAllowedAgents(opened.preferences?.allowedAgents ?? null);
                     setPath(opened.path);
                     setProjectMode('existing');
-                    if (projectMode === 'new') {
-                      execution.draft(opened.id, {
-                        prompt:
-                          'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.',
-                      });
-                    }
+                    setThemePreview(undefined);
                     await execution.discover();
                     advance(() => onboarding.go('agent'));
                   });
@@ -383,7 +413,7 @@ export function OnboardingFlow({
                     type="button"
                     variant="ghost"
                     disabled={busy}
-                    onClick={() => onboarding.finish()}
+                    onClick={() => onboarding.cancel()}
                   >
                     <ArrowLeft size={16} />
                     Cancel setup
@@ -608,22 +638,19 @@ export function OnboardingFlow({
                   onClick={() =>
                     void attempt(async () => {
                       if (!project) return;
-                      const previous = {
-                        preferredRunner: project.preferences?.preferredRunner,
-                        allowedAgents: project.preferences?.allowedAgents,
-                      };
-                      updateProjectPreferences(project.id, {
-                        preferredRunner: agent,
-                        allowedAgents: allowedAgents ?? undefined,
-                      });
-                      try {
-                        await syncAgentConfig();
-                      } catch (cause) {
-                        updateProjectPreferences(project.id, previous);
-                        throw cause;
-                      }
-                      execution.draft(project.id, { agent });
-                      advance(() => onboarding.go('task'));
+                      setThemePreview(undefined);
+                      onboarding.stageProject(
+                        {
+                          ...project,
+                          preferences: {
+                            ...project.preferences,
+                            preferredRunner: agent,
+                            allowedAgents: allowedAgents ?? undefined,
+                          },
+                        },
+                        draft,
+                      );
+                      advance(() => onboarding.go('theme'));
                     })
                   }
                 >
@@ -632,6 +659,26 @@ export function OnboardingFlow({
                 </Button>
               </div>
             </>
+          )}
+          {step === 'theme' && project && (
+            <ProjectThemeStep
+              key={project.id}
+              initialTheme={project.preferences?.theme}
+              appTheme={appTheme}
+              busy={busy}
+              onPreview={setThemePreview}
+              onBack={() => {
+                setThemePreview(undefined);
+                onboarding.go('agent');
+              }}
+              onContinue={(theme) => {
+                onboarding.stageProject(
+                  { ...project, preferences: { ...project.preferences, theme } },
+                  draft,
+                );
+                advance(() => onboarding.go('task'));
+              }}
+            />
           )}
           {step === 'task' && (
             <>
@@ -648,28 +695,40 @@ export function OnboardingFlow({
                 value={draft}
                 disabled={busy}
                 onChange={(event) => {
-                  if (project) execution.draft(project.id, { prompt: event.target.value });
+                  onboarding.setFirstTask(event.target.value);
                 }}
               />
               <Button
                 variant="ghost"
                 disabled={busy}
                 onClick={() => {
-                  if (project)
-                    execution.draft(project.id, {
-                      prompt:
-                        'Explore this repository and explain its architecture, how to run it, and a useful first improvement. Do not edit files or commit changes.',
-                    });
+                  onboarding.setFirstTask(
+                    'Explore this repository and explain its architecture, how to run it, and a useful first improvement. Do not edit files or commit changes.',
+                  );
                 }}
               >
                 Start with a codebase walkthrough
               </Button>
               <div className="onboarding-actions">
-                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('agent')}>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setThemePreview(undefined);
+                    onboarding.go('theme');
+                  }}
+                >
                   <ArrowLeft size={16} />
                   Back
                 </Button>
-                <Button variant="outline" disabled={busy} onClick={() => advance(onSkip)}>
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    if (project) onboarding.stageProject(project, draft);
+                    advance(onSkip);
+                  }}
+                >
                   Skip for now
                 </Button>
                 <Button disabled={busy || !draft.trim()} onClick={finish}>

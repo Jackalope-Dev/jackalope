@@ -1,5 +1,104 @@
 [
   {
+    "id": "unified-agent-account-list",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "See all your agent accounts together",
+    "description": "Existing CLI logins and added accounts now share one account list with detected identities and editable names.",
+    "items": [
+      "Rename, label and group the existing CLI account just like an added account.",
+      "Agents cards show account identities, total counts and overlapping icons for multiple accounts.",
+      "Keep task customization visible while retaining automatic setup defaults."
+    ],
+    "note": "Account metadata stays local. Existing account data remains compatible."
+  },
+  {
+    "id": "detected-model-selection",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Choose models without typing model IDs",
+    "description": "Model settings and task setup now offer agent-reported model choices instead of manual identifiers.",
+    "items": [
+      "Choose models from a detected list and use dropdowns for defaults and individual tasks.",
+      "See when model discovery is unavailable, with a reset for unverified saved preferences.",
+      "Task model discovery uses the account selected for the project."
+    ],
+    "note": "Existing saved choices remain compatible; model access and quota are checked when tasks run."
+  },
+  {
+    "id": "simpler-automatic-task-setup",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Describe the task and let Jackalope handle setup",
+    "description": "Task creation now puts your intent first, with a compact setup summary and optional customization.",
+    "items": [
+      "Use automatic agent, model and account routing with inherited project tools and matching lessons.",
+      "Project tools no longer need a per-task checklist; saved restrictions remain intact until explicitly reset.",
+      "Find effort, workspace and agent overrides under Customize task."
+    ],
+    "note": "Existing permissions, project defaults and saved task choices are preserved."
+  },
+  {
+    "id": "remove-project-from-app",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Remove projects without deleting files",
+    "description": "Remove a project from Jackalope directly from the project switcher or project settings.",
+    "items": [
+      "A clear confirmation explains that files, worktrees and task history stay intact.",
+      "Keep unfinished task text when removing its selected project."
+    ],
+    "note": "Folders can be added again anytime. Running tasks continue."
+  },
+  {
+    "id": "task-project-switcher",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "New tasks follow your project selection",
+    "description": "Switching projects in the top-left menu also selects that project for your next task.",
+    "items": [
+      "Keep your task text while changing projects and clear context from the previous project."
+    ],
+    "note": "Saved ideas and explicitly resumed drafts keep their own project."
+  },
+  {
+    "id": "complete-project-setup",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Finish setup before adding a project",
+    "description": "Project setup now includes Agents and Appearance, with choices kept provisional until workspace entry.",
+    "items": [
+      "Choose a project theme or inherit the app theme before reviewing an optional first task.",
+      "Cancel setup without adding a project to the switcher or changing the previous project selection.",
+      "Resume unfinished setup after a reload and keep existing repository preferences intact until completion."
+    ],
+    "note": "In development. Regression tests and native walkthrough validation are deferred to the combined acceptance pass."
+  },
+  {
+    "id": "titlebar-theme-settings",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Theme and settings in the title bar",
+    "description": "Keep workspace appearance and settings beside Help and the window controls.",
+    "items": [
+      "Use a compact theme picker in the title bar with the same preview and save behavior.",
+      "Keep the theme picker visibility preference and preserve toolbar controls in browser previews."
+    ],
+    "note": "In development. Native platform validation remains part of the combined acceptance pass."
+  },
+  {
+    "id": "titlebar-help",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Help beside the window controls",
+    "description": "Open the Help Center directly from the desktop title bar.",
+    "items": [
+      "Keep Help beside Minimize, Maximize and Close throughout account access, onboarding and the workspace.",
+      "Match the window controls with theme-aware styling, keyboard focus, a tooltip and touch sizing."
+    ],
+    "note": "In development. Windows, macOS and Linux native acceptance remains part of the combined validation pass."
+  },
+  {
     "id": "consistent-workspace-navigation",
     "date": "2026-09-09",
     "status": "In development",

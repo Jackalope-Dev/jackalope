@@ -7,9 +7,10 @@ import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { WorkspaceTransition } from './components/onboarding/WorkspaceTransition';
 import { observeDesktopControlTheme } from './lib/desktop-control-theme';
 import { observeTelemetry } from './lib/observe-telemetry';
+import { commitProjectSetup } from './lib/project-setup';
 import { nativeTask } from './lib/task-runtime';
 import { useCommunityStore } from './stores/communityStore';
-import { observeExecution } from './stores/executionStore';
+import { observeExecution, useExecutionStore } from './stores/executionStore';
 import { observeFeedbackActivity } from './stores/feedbackStore';
 import { observeNotifications } from './stores/notificationStore';
 import { useOnboardingStore } from './stores/onboardingStore';
@@ -36,13 +37,30 @@ export default function App() {
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const completeEntry = useCallback(() => {
     if (!entry) return;
+    const setup = useOnboardingStore.getState();
+    const pending = setup.pendingProject;
+    const project = pending ? commitProjectSetup(pending) : undefined;
+    if (project && setup.firstTask !== null) {
+      useExecutionStore.getState().draft(project.id, {
+        prompt: setup.firstTask ?? '',
+        agent: entry.agent ?? project.preferences?.preferredRunner ?? '',
+        projectId: project.id,
+      });
+    }
+    if (entry.draftKey) useExecutionStore.getState().select(null);
     setInitialTaskAgent(entry.agent);
-    setInitialDraftKey(entry.draftKey);
+    setInitialDraftKey(entry.draftKey ? (project?.id ?? entry.draftKey) : undefined);
     setFocusWorkspace(true);
     useOnboardingStore.getState().finish();
     setEntry(null);
   }, [entry]);
   const onboarding = useOnboardingStore();
+  useEffect(() => {
+    if (onboarding.status === 'active') {
+      setInitialTaskAgent(undefined);
+      setInitialDraftKey(undefined);
+    }
+  }, [onboarding.status]);
   useEffect(() => {
     if (ready)
       useOnboardingStore.getState().initialize(useProjectStore.getState().projects.length > 0);
@@ -72,7 +90,11 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <AccessBoundary>
         {entry ? (
-          <WorkspaceTransition onComplete={completeEntry} onBack={() => setEntry(null)} />
+          <WorkspaceTransition
+            project={onboarding.pendingProject ?? undefined}
+            onComplete={completeEntry}
+            onBack={() => setEntry(null)}
+          />
         ) : onboarding.status === 'new' || onboarding.status === 'active' ? (
           <OnboardingFlow
             onFinish={(agent, draftKey) => setEntry({ agent, draftKey })}

@@ -1,18 +1,12 @@
 import { Check, Plus, RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { nativeTask } from '../../lib/task-runtime';
+import { useId, useState } from 'react';
+import { useAgentModels } from '../../lib/agent-models';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
+import { Switch } from '../ui/Switch';
 
-interface ModelCatalog {
-  models: { id: string; name: string; isDefault: boolean }[];
-  source: string;
-  account: string | null;
-  checkedAt: string;
-  detail: string;
-}
 export function AgentModels({
   agentId,
   revision,
@@ -26,45 +20,16 @@ export function AgentModels({
   selected: string[];
   defaultModel: string;
   restricted: boolean;
-  onChange: (patch: { models?: string[]; defaultModel?: string }) => void;
+  onChange: (patch: { models?: string[]; defaultModel?: string; restrictModels?: boolean }) => void;
 }) {
   const modelSelectId = useId();
   const [showAll, setShowAll] = useState(false);
-  const [catalog, setCatalog] = useState<ModelCatalog>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { catalog, loading, error, refresh } = useAgentModels(agentId, revision);
   const [query, setQuery] = useState('');
-  const request = useRef(0);
-  const refresh = useCallback(
-    async (force = false) => {
-      if (!isTauriEnvironment()) {
-        setLoading(false);
-        return;
-      }
-      const version = ++request.current;
-      setLoading(true);
-      setError('');
-      try {
-        const result = await nativeTask<ModelCatalog>('agent_models', {
-          agent: agentId,
-          refresh: force,
-        });
-        if (version === request.current) setCatalog(result);
-      } catch (cause) {
-        if (version === request.current) setError(String(cause));
-      } finally {
-        if (version === request.current) setLoading(false);
-      }
-    },
-    [agentId],
-  );
-  useEffect(() => {
-    void refresh(revision > 0);
-    return () => {
-      request.current++;
-    };
-  }, [refresh, revision]);
   const models = catalog?.models ?? [];
+  const detectedSelected = selected.filter((id) => models.some((model) => model.id === id));
+  const unavailable = selected.filter((id) => !models.some((model) => model.id === id));
+  const defaultAvailable = models.some((model) => model.id === defaultModel);
   const matches = models.filter((model) =>
     `${model.id} ${model.name}`.toLowerCase().includes(query.toLowerCase()),
   );
@@ -89,6 +54,66 @@ export function AgentModels({
         </p>
       )}
       {catalog?.detail && <p className="task-muted text-xs">{catalog.detail}</p>}
+      {!loading && !models.length && (
+        <p className="task-muted">
+          Available models could not be detected. Model selection is unavailable.
+        </p>
+      )}
+      {(models.length > 0 || restricted) && (
+        <div className="agent-model-restriction">
+          <span>Use only selected models</span>
+          <Switch
+            checked={restricted}
+            disabled={loading}
+            label="Use only selected models"
+            onCheckedChange={(value) =>
+              onChange({
+                restrictModels: value,
+                ...(value
+                  ? {
+                      models: [
+                        ...new Set([
+                          ...(detectedSelected.length
+                            ? detectedSelected
+                            : models.map((model) => model.id)),
+                          ...(defaultAvailable ? [defaultModel] : []),
+                        ]),
+                      ],
+                      ...(!defaultAvailable ? { defaultModel: '' } : {}),
+                    }
+                  : {}),
+              })
+            }
+          />
+        </div>
+      )}
+      {restricted && !loading && !detectedSelected.length && (
+        <p className="task-error">
+          No selected models could be verified. Refresh models, choose available models or turn off
+          the restriction.
+        </p>
+      )}
+      {!loading && (unavailable.length > 0 || (defaultModel && !defaultAvailable)) && (
+        <div className="task-notice">
+          <p>
+            Some saved model choices could not be verified:{' '}
+            {[
+              ...new Set([
+                ...unavailable,
+                ...(!defaultAvailable && defaultModel ? [defaultModel] : []),
+              ]),
+            ].join(', ')}
+            . They remain saved but are not offered as available choices.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onChange({ models: [], defaultModel: '', restrictModels: false })}
+          >
+            Reset model preferences
+          </Button>
+        </div>
+      )}
       {models.length > 0 && (
         <>
           <input
@@ -104,12 +129,18 @@ export function AgentModels({
                 key={model.id}
                 variant={selected.includes(model.id) ? 'secondary' : 'outline'}
                 aria-pressed={selected.includes(model.id)}
+                disabled={
+                  restricted && detectedSelected.length === 1 && detectedSelected.includes(model.id)
+                }
                 aria-label={`${selected.includes(model.id) ? 'Remove' : 'Add'} ${model.id} ${selected.includes(model.id) ? 'from' : 'to'} model list`}
                 onClick={() =>
                   onChange({
                     models: selected.includes(model.id)
                       ? selected.filter((id) => id !== model.id)
                       : [...selected, model.id],
+                    ...(restricted && selected.includes(model.id) && defaultModel === model.id
+                      ? { defaultModel: '' }
+                      : {}),
                   })
                 }
               >
@@ -137,7 +168,9 @@ export function AgentModels({
             <Select
               id={modelSelectId}
               aria-label="Choose a discovered default model"
-              value={defaultModel || '__cli_default'}
+              value={
+                defaultModel ? (defaultAvailable ? defaultModel : '__unavailable') : '__cli_default'
+              }
               onValueChange={(id) =>
                 onChange({
                   defaultModel: id === '__cli_default' ? '' : id,
@@ -147,9 +180,13 @@ export function AgentModels({
                 })
               }
             >
-              <SelectItem value="__cli_default">CLI default</SelectItem>
-              {defaultModel && !models.some((model) => model.id === defaultModel) && (
-                <SelectItem value={defaultModel}>{defaultModel} (manual)</SelectItem>
+              <SelectItem value="__cli_default">
+                {restricted ? 'First selected model' : 'Let the agent choose'}
+              </SelectItem>
+              {defaultModel && !defaultAvailable && (
+                <SelectItem value="__unavailable" disabled>
+                  Saved model unavailable
+                </SelectItem>
               )}
               {models.map((model) => (
                 <SelectItem key={model.id} value={model.id}>

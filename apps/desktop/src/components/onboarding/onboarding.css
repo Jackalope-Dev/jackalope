@@ -178,6 +178,19 @@
   margin-top: 28px;
   flex-wrap: wrap;
 }
+.onboarding-theme-editor {
+  width: 100%;
+  max-width: 400px;
+  min-width: 0;
+}
+.onboarding-theme-inherit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-bottom: 24px;
+  font-size: var(--text-sm);
+}
 .onboarding-runner-list {
   display: grid;
   gap: 8px;

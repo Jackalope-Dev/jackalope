@@ -2,20 +2,22 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, KeyRound, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
-  type AccountStatus,
   type AgentProfile,
-  type AgentProfilesView,
   accountStatusLabel,
-  checkAgentProfile,
   createAgentProfile,
   deleteAgentProfile,
-  listAgentProfiles,
   renameAgentProfile,
   setActiveAgentProfile,
   setAgentProfileGroup,
   setAgentProfileTag,
 } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import {
+  accountProfiles,
+  CLI_ACCOUNT_ID,
+  profileId,
+  useAgentAccountsStore,
+} from '../../stores/agentAccountsStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { LoadingState } from '../ui/LoadingState';
@@ -154,53 +156,26 @@ export function AgentAccounts({
   agentName: string;
   onChanged?: () => void;
 }) {
-  const [view, setView] = useState<AgentProfilesView>();
-  const [loading, setLoading] = useState(true);
+  const accountData = useAgentAccountsStore((state) => state.agents[agentId]);
+  const view = accountData?.view;
+  const loading = accountData?.loading ?? true;
   const [error, setError] = useState('');
   const [name, setName] = useState('');
   const [group, setGroup] = useState<AgentProfile['group']>('work');
   const [busy, setBusy] = useState('');
   const [keyModalOpen, setKeyModalOpen] = useState(false);
-  const [statuses, setStatuses] = useState<Record<string, AccountStatus | undefined>>({});
+  const statuses = accountData?.statuses ?? {};
   const [signIn, setSignIn] = useState<AgentProfile>();
   const signInOpener = useRef<HTMLElement | null>(null);
   const [editing, setEditing] = useState<AgentProfile>();
   const desktop = isTauriEnvironment();
   const keyAccount = agentId === 'antigravity' || agentId === 'aider';
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setView(await listAgentProfiles(agentId));
-      onChanged?.();
-    } finally {
-      setLoading(false);
-    }
+    await useAgentAccountsStore.getState().load(agentId, true);
+    onChanged?.();
   }, [agentId, onChanged]);
   useEffect(() => {
-    let cancelled = false;
-    setView(undefined);
-    setStatuses({});
-    if (!desktop) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    void listAgentProfiles(agentId)
-      .then((view) => {
-        if (!cancelled) {
-          setView(view);
-          setError('');
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (desktop) void useAgentAccountsStore.getState().load(agentId);
   }, [agentId, desktop]);
   const action = async (id: string, run: () => Promise<void>) => {
     setBusy(id);
@@ -214,17 +189,15 @@ export function AgentAccounts({
     }
   };
   const check = async (profile: AgentProfile) => {
-    setStatuses((old) => ({ ...old, [profile.id]: undefined }));
-    const status = await checkAgentProfile(agentId, profile.id);
-    setStatuses((old) => ({ ...old, [profile.id]: status }));
+    await useAgentAccountsStore.getState().check(agentId, profile.id);
   };
   if (!desktop) return <p className="task-muted">Accounts are available in the desktop app.</p>;
   if (!view)
     return (
       <div>
-        {error && (
+        {(error || accountData?.error) && (
           <p role="alert" className="task-error">
-            {error}
+            {error || accountData?.error}
           </p>
         )}
         {loading ? (
@@ -247,9 +220,9 @@ export function AgentAccounts({
   const locked = !!busy || loading;
   return (
     <div className="agent-accounts">
-      {error && (
+      {(error || accountData?.error) && (
         <p role="alert" className="task-error">
-          {error}
+          {error || accountData?.error}
         </p>
       )}
       <form
@@ -306,35 +279,6 @@ export function AgentAccounts({
               : 'Add account & sign in'}
         </Button>
       </form>
-      <div className="agent-accounts-row">
-        <div className="agent-account-identity">
-          <strong>Existing {agentName} CLI login</strong>
-          {!view.activeId && <p className="task-muted text-sm">Default for new tasks</p>}
-          <AccountGroup
-            value={view.defaultGroup}
-            label={`Existing ${agentName} login group`}
-            disabled={locked}
-            onChange={(group) =>
-              void action('default-group', async () => {
-                await setAgentProfileGroup(agentId, null, group);
-                await load();
-              })
-            }
-          />
-        </div>
-        <Button
-          variant="outline"
-          disabled={locked || !view.activeId}
-          onClick={() =>
-            void action('default', async () => {
-              await setActiveAgentProfile(agentId, null);
-              await load();
-            })
-          }
-        >
-          {view.activeId ? 'Use existing CLI login' : 'Using existing CLI login'}
-        </Button>
-      </div>
       <Button
         type="button"
         className="justify-self-start"
@@ -346,9 +290,10 @@ export function AgentAccounts({
         Scan Local Models & Keys
       </Button>
       <ul className="agent-accounts-list">
-        {view.profiles.map((profile) => {
+        {accountProfiles(view, statuses).map((profile) => {
           const status = statuses[profile.id];
-          const active = profile.id === view.activeId;
+          const existing = profile.id === CLI_ACCOUNT_ID;
+          const active = profileId(profile.id) === view.activeId;
           return (
             <li key={profile.id} className="agent-accounts-row">
               <button
@@ -359,7 +304,7 @@ export function AgentAccounts({
                 disabled={locked}
                 onClick={() =>
                   void action(profile.id, async () => {
-                    await setActiveAgentProfile(agentId, profile.id);
+                    await setActiveAgentProfile(agentId, profileId(profile.id));
                     await load();
                   })
                 }
@@ -369,6 +314,7 @@ export function AgentAccounts({
               <div className="agent-account-identity">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{profile.name}</strong>
+                  {existing && <span className="task-muted text-xs">CLI login</span>}
                   {profile.tag && (
                     <span className="font-mono text-xs px-2 py-0.5 rounded bg-[var(--color-surface-hover)] border border-[var(--color-border)]">
                       {profile.tag}
@@ -377,7 +323,9 @@ export function AgentAccounts({
                   {active && <span className="task-muted text-xs">Default for new tasks</span>}
                 </div>
                 <p className="task-muted text-sm" role="status">
-                  {busy === `check-${profile.id}` ? 'Checking…' : accountStatusLabel(status)}
+                  {busy === `check-${profile.id}` || !status
+                    ? 'Checking sign-in…'
+                    : accountStatusLabel(status)}
                   {status?.identity && ` · ${status.identity}`}
                 </p>
                 {status && (
@@ -400,27 +348,29 @@ export function AgentAccounts({
                   disabled={locked}
                   onChange={(group) =>
                     void action(`group-${profile.id}`, async () => {
-                      await setAgentProfileGroup(agentId, profile.id, group);
+                      await setAgentProfileGroup(agentId, profileId(profile.id), group);
                       await load();
                     })
                   }
                 />
               </div>
               <div className="agent-accounts-actions">
-                <Button
-                  variant="outline"
-                  disabled={locked}
-                  onClick={(event) => {
-                    signInOpener.current = event.currentTarget;
-                    setSignIn(profile);
-                  }}
-                >
-                  {keyAccount
-                    ? 'Connect API key'
-                    : agentId === 'goose'
-                      ? 'Set up account'
-                      : 'Sign in'}
-                </Button>
+                {!existing && (
+                  <Button
+                    variant="outline"
+                    disabled={locked}
+                    onClick={(event) => {
+                      signInOpener.current = event.currentTarget;
+                      setSignIn(profile);
+                    }}
+                  >
+                    {keyAccount
+                      ? 'Connect API key'
+                      : agentId === 'goose'
+                        ? 'Set up account'
+                        : 'Sign in'}
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   disabled={locked}
@@ -438,20 +388,26 @@ export function AgentAccounts({
                 >
                   <Pencil size={16} />
                 </Button>
-                <ConfirmAction
-                  title="Remove account?"
-                  description={`Remove ${profile.name} and its sign-in data? Projects and existing tasks using it will need attention. The normal CLI sign-in is kept.`}
-                  label="Remove account"
-                  onConfirm={async () => {
-                    await deleteAgentProfile(agentId, profile.id);
-                    await load();
-                  }}
-                  trigger={
-                    <Button variant="ghost" disabled={locked} aria-label={`Remove ${profile.name}`}>
-                      <Trash2 size={16} />
-                    </Button>
-                  }
-                />
+                {!existing && (
+                  <ConfirmAction
+                    title="Remove account?"
+                    description={`Remove ${profile.name} and its sign-in data? Projects and existing tasks using it will need attention. The normal CLI sign-in is kept.`}
+                    label="Remove account"
+                    onConfirm={async () => {
+                      await deleteAgentProfile(agentId, profile.id);
+                      await load();
+                    }}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        disabled={locked}
+                        aria-label={`Remove ${profile.name}`}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    }
+                  />
+                )}
               </div>
             </li>
           );
@@ -463,9 +419,9 @@ export function AgentAccounts({
           profile={editing}
           onClose={() => setEditing(undefined)}
           onSave={async (name, group, tag) => {
-            await renameAgentProfile(agentId, editing.id, name);
-            await setAgentProfileGroup(agentId, editing.id, group);
-            await setAgentProfileTag(agentId, editing.id, tag);
+            await renameAgentProfile(agentId, profileId(editing.id), name);
+            await setAgentProfileGroup(agentId, profileId(editing.id), group);
+            await setAgentProfileTag(agentId, profileId(editing.id), tag);
             await load();
           }}
         />
@@ -497,7 +453,9 @@ export function AgentAccounts({
               await setActiveAgentProfile(agentId, signIn.id);
               await load();
             }}
-            onStatus={(status) => setStatuses((old) => ({ ...old, [signIn.id]: status }))}
+            onStatus={(status) =>
+              useAgentAccountsStore.getState().setStatus(agentId, signIn.id, status)
+            }
           />
         </Suspense>
       )}
