@@ -20,7 +20,7 @@ export const listAgentProfiles = (agent: string) =>
   nativeTask<AgentProfilesView>('agent_profile_list', { agent });
 
 export const createAgentProfile = (agent: string, name: string, group: AgentProfile['group']) =>
-  nativeTask<AgentProfile>('agent_profile_create', { agent, name, group });
+  nativeTask<AgentProfile>('agent_profile_create', { agent, name, group, pending: true });
 
 export const setAgentProfileGroup = (
   agent: string,

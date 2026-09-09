@@ -217,6 +217,7 @@ pub fn agent_import_detected_key(
         target_agent.to_string(),
         name,
         Some("personal".to_string()),
+        None,
     )?;
 
     // Set tag

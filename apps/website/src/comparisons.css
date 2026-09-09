@@ -1,0 +1,84 @@
+.comparison-page article a {
+  color: var(--color-accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.comparison-page .acquisition-related {
+  border-radius: 18px;
+  padding: 20px;
+  max-height: calc(100dvh - 150px);
+  overflow-y: auto;
+}
+.comparison-page .acquisition-related a {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 44px;
+  align-items: center;
+}
+.comparison-page .acquisition-related a:hover,
+.comparison-page .acquisition-related a:focus-visible {
+  background: var(--color-bg);
+}
+.comparison-page .acquisition-related svg {
+  flex-shrink: 0;
+}
+.comparison-byline {
+  margin-top: 20px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.acquisition-body article > .comparison-overview {
+  grid-template-columns: minmax(0, 1fr);
+}
+.comparison-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  margin-block: 24px;
+}
+.comparison-table-scroll table {
+  width: 100%;
+  min-width: 540px;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.comparison-table-scroll caption {
+  text-align: left;
+  padding: 16px;
+  color: var(--color-text-secondary);
+}
+.comparison-table-scroll th,
+.comparison-table-scroll td {
+  text-align: left;
+  vertical-align: top;
+  padding: 16px;
+  border-top: 1px solid var(--color-border);
+}
+.comparison-table-scroll thead {
+  background: var(--color-shell);
+}
+.comparison-table-scroll td {
+  width: 38%;
+  color: var(--color-text-secondary);
+}
+.comparison-page .comparison-sources {
+  font-size: 12px;
+}
+.comparison-faq h3 {
+  font-size: 19px;
+  margin-bottom: 12px;
+}
+.comparison-faq + .comparison-faq {
+  margin-top: 28px;
+}
+.comparison-page :where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .comparison-page .acquisition-related {
+    max-height: none;
+  }
+}

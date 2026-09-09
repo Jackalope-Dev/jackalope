@@ -32,12 +32,13 @@ export function AgentSignIn({
   profileName: string;
   returnFocus: HTMLElement | null;
   onStatus: (status: AccountStatus | undefined) => void;
-  onClose: () => void;
+  onClose: () => Promise<void>;
   onUse?: () => Promise<void>;
 }) {
   const dialogFocus = useDialogFocus();
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const session = useRef<string | null>(null);
+  const starting = useRef<Promise<void> | null>(null);
   const finishingSetup = useRef(false);
   const completeSetup = useRef<(() => Promise<void>) | null>(null);
   const finish = useRef<HTMLButtonElement>(null);
@@ -186,7 +187,7 @@ export function AgentSignIn({
         }
       }
     };
-    void signInAgentProfile(agentId, profileId, terminal.cols, terminal.rows)
+    starting.current = signInAgentProfile(agentId, profileId, terminal.cols, terminal.rows)
       .then(async (value) => {
         id = value;
         if (disposed) {
@@ -196,7 +197,7 @@ export function AgentSignIn({
         session.current = value;
         setStage('Complete the provider’s sign-in below');
         terminal.focus();
-        await poll();
+        void poll();
       })
       .catch((e) => {
         if (!disposed) {
@@ -219,15 +220,21 @@ export function AgentSignIn({
   }, [agentId, agentName, profileId, attempt, host]);
   const close = async () => {
     if (saving || checking) return;
-    if (session.current) {
-      try {
+    setSaving(true);
+    finishingSetup.current = true;
+    try {
+      await starting.current;
+      if (session.current) {
         await stopSignIn(session.current);
-      } catch (e) {
-        setError(String(e));
-        return;
+        session.current = null;
       }
+      await onClose();
+    } catch (e) {
+      setRunning(false);
+      setError(String(e));
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
   return (
     <Dialog.Root
@@ -324,7 +331,7 @@ export function AgentSignIn({
                     try {
                       if (session.current) await stopSignIn(session.current);
                       await onUse();
-                      onClose();
+                      await onClose();
                     } catch (e) {
                       setError(String(e));
                     } finally {

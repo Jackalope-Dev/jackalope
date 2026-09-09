@@ -1,0 +1,101 @@
+.site-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 32px;
+  padding-block: 48px 24px;
+}
+.site-footer .wordmark {
+  align-self: flex-start;
+  min-height: 44px;
+  font-size: 17px;
+}
+.site-footer .wordmark svg {
+  width: 23px;
+  height: 29px;
+}
+.footer-navigation {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px;
+}
+.footer-group h2 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+.footer-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-group a,
+.footer-legal a {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  min-width: 44px;
+  min-height: 44px;
+  padding-block: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.footer-group a {
+  color: var(--color-text-secondary);
+}
+.site-footer a:hover,
+.site-footer a[aria-current="page"] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+}
+.footer-bottom p {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.footer-bottom p a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.landing-footer {
+  width: 100%;
+  padding-inline: max(5vw, calc((100% - 1280px) / 2));
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.landing-footer .footer-group a,
+.landing-footer .footer-bottom p {
+  color: inherit;
+}
+.landing-footer a:focus-visible {
+  outline-color: currentColor;
+}
+@media (max-width: 760px) {
+  .footer-navigation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 24px;
+  }
+  .site-footer {
+    padding-block: 36px 20px;
+  }
+  .landing-footer {
+    padding-inline: 22px;
+  }
+}

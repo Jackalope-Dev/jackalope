@@ -1,5 +1,66 @@
 [
   {
+    "id": "cleaner-account-editing",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Cleaner account setup and editing.",
+    "description": "Agent accounts appear after setup succeeds, and the editor keeps fields consistently spaced.",
+    "items": [
+      "Full-width name and label fields align with a clearly labeled account group.",
+      "Cancelled or failed new sign-ins no longer leave unfinished accounts in the list.",
+      "Cancelling a reconnect keeps the existing account and refreshes its sign-in status."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "practical-coding-agent-guides",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Practical guides for working with coding agents.",
+    "description": "Five longer reads cover worktrees, working with two agents, code review, MCP connections and choosing a workspace.",
+    "items": [
+      "Follow worked examples, reusable prompts and checklists with authoritative references.",
+      "Navigate article sections and explore related guides and app comparisons."
+    ],
+    "note": "Website content milestone; Jackalope is coming soon."
+  },
+  {
+    "id": "detailed-workspace-comparisons",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Detailed workspace comparisons.",
+    "description": "Explore Jackalope alongside eight coding-agent tools with practical workflow comparisons.",
+    "items": [
+      "Read dedicated comparisons with official sources, workflow tables, and common questions.",
+      "Find each comparison in the rounded sidebar, sitemap, and LLM discovery files."
+    ],
+    "note": "Website content update."
+  },
+  {
+    "id": "a-clearer-website-footer-and-search-previews",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A clearer website footer and search previews.",
+    "description": "Find product guides, supported agents, and account links in an organized footer, with clearer search previews across the site.",
+    "items": [
+      "Grouped footer navigation adapts to desktop and mobile layouts.",
+      "Public pages share verified sitemap coverage, concise metadata, and relevant structured data."
+    ],
+    "note": "Website improvement; publication pending."
+  },
+  {
+    "id": "clearer-pass-sharing-feedback",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Clearer pass sharing feedback",
+    "description": "Sharing from your access page now confirms each copy right where you clicked.",
+    "items": [
+      "Copy pass link is the primary action, with more space between copy buttons and a checkmark confirmation.",
+      "The X sharing button is labeled X (Twitter)."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "mcp-documentation-tables",
     "date": "2026-09-09",
     "status": "In development",
@@ -25,9 +86,7 @@
     "status": "In development",
     "title": "Clearer project settings",
     "description": "Project settings keep repository controls together with direct access to appearance and agent preferences.",
-    "items": [
-      "Edit the selected project's theme and accounts in the main Settings page."
-    ],
+    "items": ["Edit the selected project's theme and accounts in the main Settings page."],
     "note": "Development milestone, not a public release."
   },
   {
@@ -36,9 +95,7 @@
     "status": "In development",
     "title": "More natural account icons.",
     "description": "Multiple agent accounts now appear together with clear, balanced spacing.",
-    "items": [
-      "Removed avatar backgrounds and preserved icon proportions with staggered sizes."
-    ],
+    "items": ["Removed avatar backgrounds and preserved icon proportions with staggered sizes."],
     "note": "Development milestone, not a public release."
   },
   {
@@ -82,9 +139,7 @@
     "status": "In development",
     "title": "Clearer pass sharing.",
     "description": "Pass links confirm copying directly in the share button.",
-    "items": [
-      "Removed extra pass-sharing copy and simplified website punctuation."
-    ],
+    "items": ["Removed extra pass-sharing copy and simplified website punctuation."],
     "note": "Website update pending deployment."
   },
   {
@@ -288,9 +343,7 @@
     "status": "In development",
     "title": "Simpler settings header",
     "description": "Settings now opens directly at its heading.",
-    "items": [
-      "Removed the extra Back to workspace link."
-    ],
+    "items": ["Removed the extra Back to workspace link."],
     "note": "In development."
   },
   {
@@ -369,9 +422,7 @@
     "status": "In development",
     "title": "A flatter command shortcut.",
     "description": "The top-bar Jump to control fits more quietly into the workspace.",
-    "items": [
-      "Removed the inset shadow from the Jump to search control."
-    ],
+    "items": ["Removed the inset shadow from the Jump to search control."],
     "note": "In development. Included in the next desktop release."
   },
   {
@@ -851,9 +902,7 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": [
-      "A Follow on X link is available in the shared footer."
-    ],
+    "items": ["A Follow on X link is available in the shared footer."],
     "note": "Website milestone, not a public product release."
   },
   {

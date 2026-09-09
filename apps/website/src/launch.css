@@ -179,8 +179,7 @@
 }
 .landing-hero :focus-visible,
 .landing-header :focus-visible,
-.landing-finale :focus-visible,
-.landing-footer :focus-visible {
+.landing-finale :focus-visible {
   outline-color: var(--color-accent-ink);
 }
 .workspace-section {
@@ -796,29 +795,6 @@
   font-weight: 350;
   font-size: 0.55em;
 }
-.landing-footer {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  width: 100%;
-  padding: 25px max(5vw, calc((100% - 1280px) / 2));
-  min-height: 140px;
-  flex-wrap: wrap;
-}
-.landing-footer > .wordmark {
-  display: none;
-}
-.landing-footer > p,
-.landing-footer > p a,
-.landing-footer .footer-links {
-  color: inherit;
-}
-.landing-footer .footer-links a {
-  color: inherit;
-}
-.landing-footer .footer-links a:hover {
-  color: inherit;
-  text-decoration: underline;
-}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1149,15 +1125,6 @@
     font-size: 15.5vw;
     margin-top: 20px;
     padding-bottom: 16px;
-  }
-  .landing-footer {
-    padding-inline: 22px;
-    min-height: 160px;
-    padding-block: 25px;
-    gap: 20px;
-  }
-  .landing-footer > p {
-    order: 2;
   }
 }
 @media (max-width: 360px) {

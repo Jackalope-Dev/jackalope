@@ -7,6 +7,7 @@ import { AccessPage } from './Access';
 import { BrandMark } from './BrandMark';
 import { tour } from './content';
 import { FeedbackPage } from './Feedback';
+import { Footer } from './Footer';
 import { JournalPage } from './Journal';
 import { KnowledgebasePage } from './Knowledgebase';
 import { LandingPage } from './LandingPage';
@@ -26,7 +27,7 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
   return (
     <a
       className={`button button-primary button-download ${compact ? 'button-compact' : ''}`}
-      href="#download"
+      href="/#download"
     >
       <span>Get Jackalope</span>
       <ArrowDownToLine size={16} />
@@ -240,33 +241,7 @@ export function App({ path = '/' }: { path?: string }) {
         <Newsletter />
       )}
 
-      <footer className={`site-footer ${home ? 'landing-footer' : 'page-width'}`}>
-        <a href="/" className="wordmark">
-          <BrandMark />
-          Jackalope
-        </a>
-        <p>
-          A product of <a href="https://jackalope.digital">Jackalope Digital LLC</a>.
-        </p>
-        <nav className="footer-links" aria-label="Footer navigation">
-          <a href="/tour/">App tour</a>
-          <a href="/parallel-coding-agents/">Parallel agents</a>
-          <a href="/git-worktrees-for-ai-agents/">Git worktrees</a>
-          <a href="/agents/">Agents</a>
-          <a href="/knowledge/">Knowledgebase</a>
-          <a href="/changelog/">Changelog</a>
-          <a href="/roadmap/">Roadmap</a>
-          <a href="/blog/">Field notes</a>
-          <a href="https://x.com/JackalopeDotDev" rel="me">
-            Follow on X
-          </a>
-          <a href="/waitlist/">Your waitlist place</a>
-          <a href="/access/">Your access & passes</a>
-          <a href="/privacy/">Privacy</a>
-          <a href="/terms/">Terms</a>
-          <a href="/#questions">Questions</a>
-        </nav>
-      </footer>
+      <Footer home={home} path={path} />
 
       <Dialog.Root open={videoOpen} onOpenChange={setVideoOpen}>
         <Dialog.Portal>

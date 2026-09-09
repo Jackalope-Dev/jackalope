@@ -1,27 +1,17 @@
 import assert from 'node:assert/strict';
+import { pages } from '../src/content.ts';
 
 const origin = new URL(process.argv[2] ?? 'https://jackalope.dev');
-const pages = [
-  '/',
-  '/tour/',
-  '/blog/',
-  '/changelog/',
-  '/privacy/',
-  '/terms/',
-  '/blog/room-for-the-work/',
-  '/blog/from-brief-to-review/',
-  '/blog/work-and-personal-accounts/',
-];
-
-for (const path of pages) {
+for (const { path, noindex } of pages) {
   const url = new URL(path, origin);
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   assert.equal(response.status, 200, path);
   assert.match(response.headers.get('content-type'), /text\/html/);
   const html = await response.text();
   assert.match(html, /<h1[\s>]/, `${path} must be prerendered`);
-  assert.ok(html.includes(`href="${url.href}"`), `${path} canonical URL`);
+  assert.ok(html.includes(`<link rel="canonical" href="${url.href}"`), `${path} canonical URL`);
   assert.match(html, /application\/ld\+json/);
+  assert.equal(/<meta name="robots" content="noindex/.test(html), Boolean(noindex), path);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
 }
 

@@ -136,7 +136,7 @@ async function _verifyPage(page) {
       throw new Error('Waitlist dialog did not return focus to its header trigger.');
     }
   });
-  const play = page.getByRole('button', { name: 'Watch the 32-second tour', exact: true });
+  const play = page.getByRole('button', { name: /^Watch the \d+-second tour$/ });
   await play.click();
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 1);
   const media = await page.locator('video').evaluate(async (video) => {
@@ -144,19 +144,26 @@ async function _verifyPage(page) {
     await video.play();
     const playing = !video.paused;
     video.pause();
-    return { playing, width: video.videoWidth, height: video.videoHeight };
+    return {
+      playing,
+      width: video.videoWidth,
+      height: video.videoHeight,
+      source: video.currentSrc,
+    };
   });
   assert(media.playing, 'Video playback');
   await page.keyboard.press('Escape');
   await page.waitForFunction(
-    () => document.activeElement?.textContent === 'Watch the 32-second tour',
+    (button) => document.activeElement === button,
+    await play.elementHandle(),
   );
-  await page.route('**/media/launch-v3-720p.mp4', (route) => route.abort());
+  assert(Boolean(media.source), 'Active tour source');
+  await page.route(media.source, (route) => route.abort());
   await play.click();
   await page.getByText('The walkthrough couldn’t load.', { exact: false }).waitFor();
   await page.getByRole('button', { name: 'Explore the workspace', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.unroute('**/media/launch-v3-720p.mp4');
+  await page.unroute(media.source);
   assert(
     await page
       .locator('.workbench [role="tabpanel"][data-state="active"]')

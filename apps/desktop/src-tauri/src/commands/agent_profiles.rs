@@ -31,6 +31,8 @@ pub struct AgentProfile {
 struct AgentEntry {
     #[serde(default)]
     profiles: Vec<AgentProfile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pending: Vec<String>,
     #[serde(default)]
     active: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -151,6 +153,14 @@ pub(in crate::commands) fn routing_accounts(
 ) -> Result<Vec<AccountBinding>, String> {
     let _guard = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     if explicit.is_some() {
+        let manifest = load_checked(root)?;
+        if manifest
+            .agents
+            .get(adapter)
+            .is_some_and(|entry| entry.pending.iter().any(|id| Some(id.as_str()) == explicit))
+        {
+            return Err("Finish signing in to this account before using it.".into());
+        }
         return Ok(vec![bind_account(root, adapter, explicit)?]);
     }
     let manifest = load_checked(root)?;
@@ -160,6 +170,9 @@ pub(in crate::commands) fn routing_accounts(
     }
     if let Some(entry) = manifest.agents.get(adapter) {
         for profile in &entry.profiles {
+            if entry.pending.contains(&profile.id) {
+                continue;
+            }
             if !bindings
                 .iter()
                 .any(|binding| binding.profile_id.as_ref() == Some(&profile.id))
@@ -391,14 +404,22 @@ pub fn agent_profile_list(
 ) -> Result<AgentProfilesView, String> {
     let manifest = load_checked(&runtime.profiles_root())?;
     let entry = manifest.agents.get(&agent).cloned().unwrap_or_default();
-    Ok(AgentProfilesView {
-        profiles: entry.profiles,
+    Ok(profile_view(entry, &agent))
+}
+
+fn profile_view(entry: AgentEntry, agent: &str) -> AgentProfilesView {
+    AgentProfilesView {
+        profiles: entry
+            .profiles
+            .into_iter()
+            .filter(|profile| !entry.pending.contains(&profile.id))
+            .collect(),
         active_id: entry.active,
         default_group: entry.default_group,
         default_name: entry.default_name,
         default_tag: entry.default_tag,
-        env_var: env_var_for(&agent).map(str::to_string),
-    })
+        env_var: env_var_for(agent).map(str::to_string),
+    }
 }
 
 #[tauri::command]
@@ -407,6 +428,7 @@ pub fn agent_profile_create(
     agent: String,
     name: String,
     group: Option<String>,
+    pending: Option<bool>,
 ) -> Result<AgentProfile, String> {
     validate_group(group.as_deref())?;
     env_var_for(&agent).ok_or(
@@ -428,6 +450,9 @@ pub fn agent_profile_create(
         tag: None,
     };
     entry.profiles.push(profile.clone());
+    if pending.unwrap_or(false) {
+        entry.pending.push(id.clone());
+    }
     let directory = dir_for(&root, &agent, &id);
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     #[cfg(unix)]
@@ -450,6 +475,20 @@ pub fn agent_profile_create(
     }
     save(&root, &manifest)?;
     Ok(profile)
+}
+
+pub(super) fn confirm_profile(root: &Path, agent: &str, id: &str) -> Result<(), String> {
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let mut manifest = load_checked(root)?;
+    let entry = manifest.agents.get_mut(agent).ok_or("Unknown account")?;
+    if !entry.profiles.iter().any(|profile| profile.id == id) {
+        return Err("Unknown account".into());
+    }
+    if entry.pending.iter().any(|pending| pending == id) {
+        entry.pending.retain(|pending| pending != id);
+        save(root, &manifest)?;
+    }
+    Ok(())
 }
 
 fn validate_group(group: Option<&str>) -> Result<(), String> {
@@ -586,6 +625,7 @@ pub fn agent_profile_delete(
             .map_err(|e| format!("Account files could not be removed: {e}"))?;
     }
     entry.profiles.retain(|p| p.id != id);
+    entry.pending.retain(|pending| pending != &id);
     if entry.active.as_deref() == Some(id.as_str()) {
         entry.active = None;
     }
@@ -603,6 +643,9 @@ pub fn agent_profile_set_active(
     let mut manifest = load_checked(&root)?;
     let entry = manifest.agents.entry(agent).or_default();
     if let Some(id) = &id {
+        if entry.pending.contains(id) {
+            return Err("Finish signing in to this account before using it.".into());
+        }
         if !entry.profiles.iter().any(|p| &p.id == id) {
             return Err("Unknown account".into());
         }
@@ -663,6 +706,51 @@ fn resolve_profile_dir(root: &Path, agent: &str, explicit_id: Option<&str>) -> O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pending_accounts_stay_hidden_after_reload_until_confirmed() {
+        let root = temp_root();
+        let mut manifest: Manifest = serde_json::from_str(
+            r#"{"agents":{"codex":{"profiles":[{"id":"existing","name":"Existing"},{"id":"setup","name":"Work 2"}],"pending":["setup"]}}}"#,
+        )
+        .unwrap();
+        save(&root, &manifest).unwrap();
+        let view = profile_view(
+            load_checked(&root).unwrap().agents.remove("codex").unwrap(),
+            "codex",
+        );
+        assert_eq!(view.profiles.len(), 1);
+        assert_eq!(view.profiles[0].id, "existing");
+        assert_eq!(routing_accounts(&root, "codex", None).unwrap().len(), 2);
+        assert!(routing_accounts(&root, "codex", Some("setup")).is_err());
+        assert!(bind_account(&root, "codex", Some("setup")).is_ok());
+
+        confirm_profile(&root, "codex", "setup").unwrap();
+        confirm_profile(&root, "codex", "setup").unwrap();
+        manifest = load_checked(&root).unwrap();
+        assert!(manifest.agents["codex"].pending.is_empty());
+        assert_eq!(
+            profile_view(manifest.agents.remove("codex").unwrap(), "codex")
+                .profiles
+                .len(),
+            2
+        );
+        assert_eq!(routing_accounts(&root, "codex", None).unwrap().len(), 3);
+        assert!(confirm_profile(&root, "codex", "deleted").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_accounts_remain_visible_without_setup_metadata() {
+        let entry: AgentEntry = serde_json::from_str(
+            r#"{"profiles":[{"id":"old","name":"Existing account"}],"active":"old"}"#,
+        )
+        .unwrap();
+        assert!(entry.pending.is_empty());
+        let view = profile_view(entry, "codex");
+        assert_eq!(view.profiles.len(), 1);
+        assert_eq!(view.active_id.as_deref(), Some("old"));
+    }
 
     fn temp_root() -> PathBuf {
         std::env::temp_dir().join(format!(

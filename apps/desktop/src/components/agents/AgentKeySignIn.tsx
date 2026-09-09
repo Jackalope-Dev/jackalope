@@ -28,7 +28,7 @@ export function AgentKeySignIn({
   agentName: string;
   profile: AgentProfile;
   onSaved: (useForTasks: boolean) => Promise<void>;
-  onClose: () => void;
+  onClose: () => Promise<void>;
   returnFocus: HTMLElement | null;
 }) {
   const focus = useDialogFocus();
@@ -38,11 +38,23 @@ export function AgentKeySignIn({
   const [useForTasks, setUseForTasks] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const close = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await onClose();
+    } catch (error) {
+      setError(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Dialog.Root
       open
       onOpenChange={(open) => {
-        if (!open && !busy) onClose();
+        if (!open) void close();
       }}
     >
       <Dialog.Portal>
@@ -75,7 +87,7 @@ export function AgentKeySignIn({
                 await saveAgentProfileKey(agentId, profile.id, provider, key);
                 setKey('');
                 await onSaved(useForTasks);
-                onClose();
+                await onClose();
               } catch (error) {
                 setError(String(error));
               } finally {
@@ -129,7 +141,7 @@ export function AgentKeySignIn({
               </p>
             )}
             <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
                 Cancel
               </Button>
               <Button type="submit" disabled={busy || !key.trim()}>

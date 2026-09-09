@@ -1,3 +1,4 @@
+import { comparisonPages } from './comparison-content.ts';
 import { growthPages } from './growth-content.ts';
 
 export type MarketingPage = {
@@ -9,16 +10,25 @@ export type MarketingPage = {
   lede: string;
   image: 'tasks' | 'review' | 'agents';
   signals: string[];
+  comparison?: {
+    name: string;
+    reviewed: string;
+    rows: Array<{ topic: string; jackalope: string; competitor: string }>;
+    sources: Array<{ href: string; label: string }>;
+    faqs: Array<{ question: string; answer: string }>;
+  };
   sections: Array<{
     title: string;
     paragraphs: string[];
     bullets?: string[];
+    links?: Array<{ href: string; label: string }>;
   }>;
   related: Array<{ href: string; label: string }>;
 };
 
 export const marketingPages: MarketingPage[] = [
   ...growthPages,
+  ...comparisonPages,
   {
     path: '/parallel-coding-agents/',
     kind: 'Product guide',
@@ -124,7 +134,7 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/agents/',
     kind: 'Agent compatibility',
-    title: 'Coding agents supported by Jackalope: Codex, Claude Code, Grok & OpenCode',
+    title: 'Supported AI coding agents | Jackalope',
     description:
       'Compare Jackalope support for Codex, Claude Code, Grok, and OpenCode across tasks, project connections, accounts, continuation, and reported usage.',
     headline: 'Bring the coding agents you already use.',
@@ -259,7 +269,7 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/agents/grok/',
     kind: 'Agent integration',
-    title: 'Run Grok coding-agent tasks in isolated worktrees | Jackalope',
+    title: 'Run Grok in isolated Git worktrees | Jackalope',
     description:
       'Run Grok coding-agent tasks in isolated Git worktrees with project context, on-demand HTTP tool discovery, task history, and review in Jackalope.',
     headline: 'Give Grok focused work without losing the project around it.',
@@ -394,7 +404,7 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/guides/review-ai-generated-code/',
     kind: 'Practical guide',
-    title: 'How to review AI-generated code before integration | Jackalope',
+    title: 'How to review AI-generated code | Jackalope',
     description:
       'Review AI-generated code with the original brief, exact patch snapshot, checks, evidence, follow-ups, and combined integration state in view.',
     headline: 'Review the outcome, the evidence, and the exact code together.',
@@ -488,7 +498,7 @@ export const marketingPages: MarketingPage[] = [
   {
     path: '/features/recurring-coding-agent-tasks/',
     kind: 'Feature',
-    title: 'Recurring AI coding-agent tasks with review history | Jackalope',
+    title: 'Recurring coding-agent tasks & review history | Jackalope',
     description:
       'Schedule recurring coding-agent work with its project, account, context, missed-run policy, isolated worktree, result, and review history intact.',
     headline: 'Repeat the work. Keep every run reviewable.',

@@ -19,7 +19,9 @@ clean-profile and external beta acceptance remain in progress; see the
 - Reported usage, connected capacity, persistent history and recovery notices.
 - Light/dark/automatic appearance, shared theme controls and local fonts.
 
-Remote execution, automatic failover and budget-aware routing remain planned.
+Automatic agent/model/account routing and bounded quota handoff are implemented;
+see [routing behavior and limits](docs/USAGE-AND-ROUTING.md).
+Remote execution, monetary budgets and broader recovery remain planned.
 Developer builds have no configured reporting endpoint. Official builds can
 configure opt-out usage reporting and explicit feedback through the optional
 service; see [monitoring and privacy](docs/BETA-MONITORING.md).

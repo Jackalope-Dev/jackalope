@@ -4,6 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 
 import {
   type AgentProfile,
   accountStatusLabel,
+  checkAgentProfile,
   createAgentProfile,
   deleteAgentProfile,
   renameAgentProfile,
@@ -22,8 +23,8 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { LoadingState } from '../ui/LoadingState';
 import { useDialogFocus } from '../ui/useDialogFocus';
-import { DetectedKeysModal } from './DetectedKeysModal';
 import { AgentKeySignIn } from './AgentKeySignIn';
+import { DetectedKeysModal } from './DetectedKeysModal';
 
 const AgentSignIn = lazy(() =>
   import('./AgentSignIn').then((module) => ({ default: module.AgentSignIn })),
@@ -83,14 +84,14 @@ function EditAccount({
         <Dialog.Overlay className="task-dialog-overlay" />
         <Dialog.Content
           {...dialogFocus}
-          className="task-dialog appearance-panel confirm-action-dialog"
+          className="task-dialog appearance-panel confirm-action-dialog agent-account-edit"
         >
           <Dialog.Title className="text-xl font-medium">Edit account</Dialog.Title>
           <Dialog.Description className="task-muted mt-2">
-            Customize the account name, group, and custom label for organizing multiple accounts.
+            Choose a name, label and group to keep your accounts organized.
           </Dialog.Description>
           <form
-            className="grid gap-4 mt-4"
+            className="agent-account-edit-form"
             onSubmit={async (e) => {
               e.preventDefault();
               setBusy(true);
@@ -117,23 +118,31 @@ function EditAccount({
               />
             </label>
             <label className="task-label">
-              Custom label / tag (optional)
+              Custom label (optional)
               <input
                 className="task-input"
                 value={tag}
                 onChange={(e) => setTag(e.target.value)}
                 disabled={busy}
-                placeholder="e.g. Client A, Account #3, Research Lab"
+                placeholder="e.g. Client A or Research"
                 maxLength={40}
               />
             </label>
-            <AccountGroup value={group} onChange={setGroup} label="Account group" disabled={busy} />
+            <div className="task-label">
+              <span aria-hidden="true">Account group</span>
+              <AccountGroup
+                value={group}
+                onChange={setGroup}
+                label="Account group"
+                disabled={busy}
+              />
+            </div>
             {error && (
               <p role="alert" className="task-error">
                 {error}
               </p>
             )}
-            <div className="flex justify-end gap-3">
+            <div className="agent-account-edit-actions">
               <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
                 Cancel
               </Button>
@@ -166,6 +175,7 @@ export function AgentAccounts({
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const statuses = accountData?.statuses ?? {};
   const [signIn, setSignIn] = useState<AgentProfile>();
+  const pendingProfile = useRef<string | null>(null);
   const signInOpener = useRef<HTMLElement | null>(null);
   const [editing, setEditing] = useState<AgentProfile>();
   const desktop = isTauriEnvironment();
@@ -190,6 +200,14 @@ export function AgentAccounts({
   };
   const check = async (profile: AgentProfile) => {
     await useAgentAccountsStore.getState().check(agentId, profile.id);
+  };
+  const closeSignIn = async () => {
+    if (signIn && pendingProfile.current === signIn.id) {
+      await deleteAgentProfile(agentId, signIn.id);
+      pendingProfile.current = null;
+    }
+    setSignIn(undefined);
+    await load();
   };
   if (!desktop) return <p className="task-muted">Accounts are available in the desktop app.</p>;
   if (!view)
@@ -239,8 +257,7 @@ export function AgentAccounts({
                 `${group === 'personal' ? 'Personal' : group === 'work' ? 'Work' : agentName} ${view.profiles.length + 1}`,
               group,
             );
-            setName('');
-            await load();
+            pendingProfile.current = profile.id;
             setSignIn(profile);
           });
         }}
@@ -432,10 +449,16 @@ export function AgentAccounts({
           agentName={agentName}
           profile={signIn}
           returnFocus={signInOpener.current}
-          onClose={() => setSignIn(undefined)}
+          onClose={closeSignIn}
           onSaved={async (useForTasks) => {
+            const status = await checkAgentProfile(agentId, signIn.id);
+            useAgentAccountsStore.getState().setStatus(agentId, signIn.id, status);
+            if (status.state !== 'signedIn' && status.state !== 'configured') {
+              throw new Error(status.detail);
+            }
+            pendingProfile.current = null;
+            setName('');
             if (useForTasks) await setActiveAgentProfile(agentId, signIn.id);
-            await check(signIn);
             await load();
           }}
         />
@@ -448,14 +471,19 @@ export function AgentAccounts({
             profileId={signIn.id}
             profileName={signIn.name}
             returnFocus={signInOpener.current}
-            onClose={() => setSignIn(undefined)}
+            onClose={closeSignIn}
             onUse={async () => {
               await setActiveAgentProfile(agentId, signIn.id);
               await load();
             }}
-            onStatus={(status) =>
-              useAgentAccountsStore.getState().setStatus(agentId, signIn.id, status)
-            }
+            onStatus={(status) => {
+              useAgentAccountsStore.getState().setStatus(agentId, signIn.id, status);
+              if (status?.state === 'signedIn' || status?.state === 'configured') {
+                pendingProfile.current = null;
+                setName('');
+                void load();
+              }
+            }}
           />
         </Suspense>
       )}

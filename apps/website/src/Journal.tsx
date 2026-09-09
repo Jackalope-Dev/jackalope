@@ -1,6 +1,8 @@
 import { ArrowRight, GitBranch } from 'lucide-react';
+import type { BlogSection } from './blog-types';
 import { posts, tour, updates } from './content';
 import { PublishedReleases } from './PublishedReleases';
+import './blog.css';
 
 const publishedVersion = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL
   ? import.meta.env.VITE_RELEASE_VERSION
@@ -14,19 +16,26 @@ const dateLabel = (date: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${date}T12:00:00Z`));
 
-export function JournalTeaser() {
+const sectionId = (section: BlogSection, index: number) => section.id || `section-${index + 1}`;
+
+export function JournalTeaser({ all = false }: { all?: boolean }) {
   return (
-    <section className="journal-teaser page-width" aria-labelledby="notes-title">
+    <section
+      className={`journal-teaser page-width${all ? ' journal-index' : ''}`}
+      aria-labelledby="notes-title"
+    >
       <div className="journal-section-heading">
         <div>
-          <h2 id="notes-title">A few field notes.</h2>
+          <h2 id="notes-title">{all ? 'Guides and field notes' : 'A few field notes.'}</h2>
         </div>
-        <a className="text-link" href="/blog/">
-          All notes <ArrowRight size={16} />
-        </a>
+        {!all && (
+          <a className="text-link" href="/blog/">
+            All notes <ArrowRight size={16} />
+          </a>
+        )}
       </div>
       <div className="notes-grid">
-        {posts.map((post, index) => (
+        {(all ? posts : posts.slice(0, 2)).map((post, index) => (
           <a className="note-preview" href={`/blog/${post.slug}/`} key={post.slug}>
             <div className={`note-art note-art-${index}`} aria-hidden="true">
               <span className="note-orbit" />
@@ -133,15 +142,104 @@ export function JournalPage({ path }: { path: string }) {
             {post.readingTime}
           </div>
         </header>
-        <div className="article-body">
-          {post.sections.map((section) => (
-            <section key={section.title}>
-              <h2>{section.title}</h2>
+        <div className="article-body blog-body">
+          {post.related && (
+            <nav className="blog-contents" aria-label="On this page">
+              <h2>On this page</h2>
+              <ol>
+                {post.sections.map((section, index) => (
+                  <li key={section.title}>
+                    <a href={`#${sectionId(section, index)}`}>{section.title}</a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )}
+          {post.sections.map((section, index) => (
+            <section key={section.title} aria-labelledby={sectionId(section, index)}>
+              <h2 id={sectionId(section, index)} tabIndex={-1}>
+                {section.title}
+              </h2>
               {section.paragraphs.map((text) => (
                 <p key={text}>{text}</p>
               ))}
+              {section.bullets && (
+                <ul className="blog-checklist">
+                  {section.bullets.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+              {section.code && (
+                <figure className="blog-code">
+                  <figcaption>{section.code.label}</figcaption>
+                  {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Overflowing code must be keyboard-scrollable. */}
+                  <pre tabIndex={0}>
+                    <code>{section.code.value}</code>
+                  </pre>
+                </figure>
+              )}
+              {section.table && (
+                <section
+                  className="blog-table-scroll"
+                  aria-label={section.table.caption}
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: The table region must support keyboard scrolling on narrow screens.
+                  tabIndex={0}
+                >
+                  <table>
+                    <caption>{section.table.caption}</caption>
+                    <thead>
+                      <tr>
+                        {section.table.headers.map((header) => (
+                          <th key={header} scope="col">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {section.table.rows.map((row) => (
+                        <tr key={row[0]}>
+                          {row.map((cell, cellIndex) =>
+                            cellIndex === 0 ? (
+                              <th key={cell} scope="row">
+                                {cell}
+                              </th>
+                            ) : (
+                              <td key={cell}>{cell}</td>
+                            ),
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              )}
+              {section.links && (
+                <ul className="blog-references" aria-label={`References for ${section.title}`}>
+                  {section.links.map((link) => (
+                    <li key={link.href}>
+                      <a href={link.href}>{link.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           ))}
+          {post.related && (
+            <nav className="blog-related" aria-label="Further reading">
+              <h2>Keep reading</h2>
+              <ul>
+                {post.related.map((link) => (
+                  <li key={link.href}>
+                    <a href={link.href}>
+                      {link.label} <ArrowRight size={16} aria-hidden="true" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
           <a className="text-link" href="/changelog/">
             Follow what’s taking shape <ArrowRight size={16} />
           </a>
@@ -149,6 +247,12 @@ export function JournalPage({ path }: { path: string }) {
             <a href="/tour/">Watch the app tour</a> or{' '}
             <a href="/#workflow">explore the task workspace</a>.
           </p>
+          {post.related && (
+            <p>
+              <a href="/#newsletter">Join the early-access waitlist</a> to try Jackalope when access
+              is ready.
+            </p>
+          )}
         </div>
       </main>
     );
@@ -208,7 +312,7 @@ export function JournalPage({ path }: { path: string }) {
           <h1>Field notes.</h1>
           <p>Ideas, practical guides, and product updates.</p>
         </header>
-        <JournalTeaser />
+        <JournalTeaser all />
       </main>
     );
   return (

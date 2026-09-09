@@ -837,36 +837,6 @@ h1 span {
   font-size: 13px;
   color: var(--color-text-secondary);
 }
-.site-footer {
-  min-height: 124px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-}
-.site-footer .wordmark {
-  font-size: 17px;
-}
-:where(.site-footer) .wordmark svg {
-  width: 23px;
-  height: 29px;
-}
-.site-footer > p {
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-.site-footer > :where(p) a {
-  color: var(--color-text-primary);
-  text-decoration: underline;
-  text-decoration-color: var(--color-border);
-  text-underline-offset: 3px;
-}
-.site-footer > :where(p) a:hover {
-  text-decoration-color: currentColor;
-}
-.site-footer .text-link {
-  font-size: 10px;
-}
 .back-arrow {
   transform: rotate(-90deg);
 }
@@ -1139,15 +1109,6 @@ h1 span {
   .download-section {
     padding-block: 65px;
   }
-  .site-footer {
-    flex-wrap: wrap;
-    gap: 10px;
-    padding-block: 28px;
-  }
-  .site-footer > p {
-    order: 3;
-    flex-basis: 100%;
-  }
   .video-heading h2 {
     font-size: 20px;
   }
@@ -1209,21 +1170,6 @@ fieldset {
 }
 .button:disabled::before {
   animation: none;
-}
-.footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  font-size: 11px;
-}
-.footer-links a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--color-text-secondary);
-}
-.footer-links a:hover {
-  color: var(--color-accent-ink);
 }
 .newsletter {
   display: grid;
@@ -1788,10 +1734,6 @@ fieldset {
   .newsletter .signup-fields {
     flex-direction: column;
   }
-  .site-footer {
-    flex-wrap: wrap;
-    padding-block: 24px;
-  }
 }
 @media (max-width: 760px) {
   .newsletter {
@@ -1847,9 +1789,6 @@ fieldset {
   }
   .article-body {
     margin-top: 36px;
-  }
-  .footer-links {
-    gap: 4px 18px;
   }
   .note-art {
     height: 215px;

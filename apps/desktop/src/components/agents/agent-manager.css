@@ -55,14 +55,16 @@
   padding-block: 12px 4px;
 }
 
-.agent-manager .task-label {
+.agent-manager .task-label,
+.agent-account-edit .task-label {
   display: grid;
   gap: 8px;
   min-width: 0;
   align-content: start;
 }
 
-.agent-manager .task-input {
+.agent-manager .task-input,
+.agent-account-edit .task-input {
   display: block;
   width: 100%;
   min-width: 0;
@@ -72,6 +74,25 @@
 .agent-manager textarea {
   resize: vertical;
   min-height: 104px;
+}
+
+.agent-account-edit-form {
+  display: grid;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.agent-account-edit .task-input {
+  min-height: 44px;
+  color: var(--color-text-primary);
+}
+
+.agent-account-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
 }
 
 .agent-manual-form > button {

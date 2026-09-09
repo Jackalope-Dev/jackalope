@@ -46,11 +46,30 @@ export function AccessPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [copied, setCopied] = useState<'link' | 'message' | null>(null);
+  const [copyError, setCopyError] = useState('');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [token, setToken] = useState('');
   const [invite, setInvite] = useState('');
   const [available, setAvailable] = useState<boolean | null>(null);
   const [sent, setSent] = useState(false);
   const pending = useRef(false);
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+  async function copyPass(target: 'link' | 'message') {
+    if (!member) return;
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(
+        target === 'link' ? member.shareUrl : `${invitationMessage}\n\n${member.shareUrl}`,
+      );
+      clearTimeout(copyTimer.current);
+      setCopied(target);
+      copyTimer.current = setTimeout(() => setCopied(null), 2500);
+    } catch {
+      setCopied(null);
+      setCopyError('Couldn’t copy automatically. Select and copy the pass link above.');
+    }
+  }
   const refreshMembership = useCallback(() => {
     void accessRequest<Membership>('me')
       .then((value) => {
@@ -398,34 +417,41 @@ export function AccessPage() {
                   value={member.shareUrl}
                   onFocus={(event) => event.currentTarget.select()}
                 />
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  disabled={busy || member.remaining === 0}
-                  onClick={() =>
-                    act(async () => {
-                      await navigator.clipboard.writeText(member.shareUrl);
-                      setNotice('Pass link copied.');
-                    })
-                  }
-                >
-                  <Copy size={16} /> Copy pass link
-                </button>
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  disabled={busy || member.remaining === 0}
-                  onClick={() =>
-                    act(async () => {
-                      await navigator.clipboard.writeText(
-                        `${invitationMessage}\n\n${member.shareUrl}`,
-                      );
-                      setNotice('Pass message copied.');
-                    })
-                  }
-                >
-                  <Copy size={16} /> Copy message
-                </button>
+                <div className="access-copy-actions">
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    disabled={busy || member.remaining === 0}
+                    onClick={() => void copyPass('link')}
+                    aria-live="polite"
+                  >
+                    {copied === 'link' ? (
+                      <Check size={16} aria-hidden="true" />
+                    ) : (
+                      <Copy size={16} aria-hidden="true" />
+                    )}
+                    {copied === 'link' ? 'Copied' : 'Copy pass link'}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    disabled={busy || member.remaining === 0}
+                    onClick={() => void copyPass('message')}
+                    aria-live="polite"
+                  >
+                    {copied === 'message' ? (
+                      <Check size={16} aria-hidden="true" />
+                    ) : (
+                      <Copy size={16} aria-hidden="true" />
+                    )}
+                    {copied === 'message' ? 'Copied' : 'Copy message'}
+                  </button>
+                </div>
+                {copyError && (
+                  <p className="access-alert" role="alert">
+                    {copyError}
+                  </p>
+                )}
                 <div className="access-share-actions">
                   {typeof navigator.share === 'function' && (
                     <button
@@ -451,7 +477,7 @@ export function AccessPage() {
                     disabled={member.remaining === 0}
                     onClick={() => void share('x')}
                   >
-                    X
+                    X (Twitter)
                   </button>
                   <button
                     type="button"

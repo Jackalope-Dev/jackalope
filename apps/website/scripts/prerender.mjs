@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createServer, loadEnv } from 'vite';
+import { verifySeo } from './verify-seo.mjs';
 
 const server = await createServer({
   mode: 'production',
@@ -10,7 +11,7 @@ const server = await createServer({
 try {
   const { render } = await server.ssrLoadModule('/src/entry-server.tsx');
   const { pageHtml, routes } = await server.ssrLoadModule('/src/seo.ts');
-  const { siteOrigin } = await server.ssrLoadModule('/src/content.ts');
+  const { siteOrigin, pages } = await server.ssrLoadModule('/src/content.ts');
   const origin = new URL(loadEnv('production', process.cwd(), 'VITE_').VITE_SITE_URL || siteOrigin)
     .origin;
   const { applyThemeTokens, DEFAULT_THEME } = await server.ssrLoadModule('@jackalope/brand/theme');
@@ -46,6 +47,7 @@ try {
     await writeFile(target, html);
   }
   console.log(`Prerendered ${routes.length} routes and the not-found page.`);
+  await verifySeo(resolve('dist'), pages, origin);
 } finally {
   await server.close();
 }

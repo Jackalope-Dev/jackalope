@@ -263,6 +263,16 @@
 .access-invite-options p {
   font-size: 14px;
 }
+.access-copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 18px;
+}
+.access-copy-actions .button {
+  min-width: 160px;
+  margin-top: 0;
+}
 .access-share-actions {
   display: flex;
   flex-wrap: wrap;

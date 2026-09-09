@@ -1,3 +1,5 @@
+import { practicalPosts } from './blog-content.ts';
+import type { BlogPost } from './blog-types.ts';
 import updates from './changelog.json' with { type: 'json' };
 import { growthPost } from './growth-content.ts';
 import { knowledgeGuides } from './knowledge-content.ts';
@@ -19,11 +21,13 @@ export const tour = {
     'Your next idea. Already in motion. Choose a theme, set up a project and its agents, and open your workspace. Describe an outcome and dispatch a task. Watch a sample browser booking flow, then inspect its check results and screenshot evidence in Jackalope. Bring Codex, Claude Code, Grok, and OpenCode together, with separate work and personal accounts. Explore directories and file dependencies in the interactive codebase map. More room to build. Get early access at jackalope.dev. This recorded frontend walkthrough uses fictional Atlas data and an original instrumental track. Task execution, account identities, and check results are sample states; browser interactions are scripted. No native agent task or Windows app-control session is launched.',
 };
 
-export const posts = [
+export const posts: BlogPost[] = [
+  ...practicalPosts,
   growthPost,
   {
     slug: 'work-and-personal-accounts',
     title: 'Work and personal accounts, with room for both.',
+    seoTitle: 'Separate work and personal coding-agent accounts',
     category: 'Working with agents',
     date: '2026-09-06',
     readingTime: '3 min read',
@@ -71,6 +75,7 @@ export const posts = [
   {
     slug: 'room-for-the-work',
     title: 'A little more room for the work.',
+    seoTitle: 'Why we are building a coding-agent workspace',
     category: 'From the studio',
     date: '2026-09-06',
     readingTime: '3 min read',
@@ -110,6 +115,7 @@ export const posts = [
   {
     slug: 'from-brief-to-review',
     title: 'From a clear brief to a considered review.',
+    seoTitle: 'Coding-agent workflow: From brief to code review',
     category: 'Working with agents',
     date: '2026-09-06',
     readingTime: '3 min read',
@@ -150,12 +156,19 @@ export const posts = [
 
 export { updates };
 
-export const pages = [
+export type SitePage = {
+  path: string;
+  title: string;
+  description: string;
+  noindex?: boolean;
+};
+
+export const pages: SitePage[] = [
   {
     path: '/',
-    title: 'Jackalope: Run Codex, Claude Code & coding agents in parallel',
+    title: 'Jackalope: Run AI coding agents in parallel',
     description:
-      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Keep project context, agent coordination, evidence, and code review in one desktop workspace.',
+      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Coordinate tasks, keep project context, and review code in one desktop workspace.',
   },
   {
     path: '/tour/',
@@ -164,7 +177,7 @@ export const pages = [
   },
   {
     path: '/blog/',
-    title: 'Field notes | Jackalope',
+    title: 'Coding-agent workflows & field notes | Jackalope',
     description:
       'Notes from the Jackalope studio on building a calmer workspace and working thoughtfully with coding agents.',
   },
@@ -176,7 +189,7 @@ export const pages = [
   },
   {
     path: '/knowledge/',
-    title: 'Knowledgebase: Guides, Architecture & Diagnostics | Jackalope',
+    title: 'Coding-agent guides & troubleshooting | Jackalope',
     description:
       'Explore official guides, parallel worktree architecture, multi-account setup, automatic quota handoff, and troubleshooting recipes for Jackalope.',
   },
@@ -194,16 +207,19 @@ export const pages = [
   },
   {
     path: '/waitlist/',
+    noindex: true,
     title: 'Your waitlist place | Jackalope',
     description: 'Your private waitlist position and referral progress.',
   },
   {
     path: '/access/',
+    noindex: true,
     title: 'Your early access | Jackalope',
     description: 'Your private Jackalope downloads and invitations.',
   },
   {
     path: '/feedback/',
+    noindex: true,
     title: 'Share your experience | Jackalope',
     description: 'Share private feedback about your experience with Jackalope.',
   },
@@ -214,12 +230,12 @@ export const pages = [
   })),
   ...posts.map((post) => ({
     path: `/blog/${post.slug}/`,
-    title: `${post.title} | Jackalope`,
+    title: `${post.seoTitle || post.title} | Jackalope`,
     description: post.description,
   })),
   ...knowledgeGuides.map((guide) => ({
     path: `/knowledge/${guide.slug}/`,
-    title: `${guide.title} | Jackalope Knowledgebase`,
+    title: `${guide.shortTitle} | Jackalope`,
     description: guide.description,
   })),
 ];

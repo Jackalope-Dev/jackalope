@@ -1,3 +1,4 @@
+import { comparisonLinks } from './comparison-content.ts';
 import type { MarketingPage } from './marketing-content.ts';
 
 export const growthPages: MarketingPage[] = [
@@ -77,7 +78,7 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Find the workflow that fits.',
         paragraphs: [
-          'These summaries reflect official product pages reviewed September 8, 2026. Follow the sources below for current availability and details.',
+          'Explore the detailed comparisons for workflow tables, evaluation guidance, and official sources reviewed September 9, 2026. Each page explains where the alternative fits and which Jackalope capabilities remain future work.',
         ],
         bullets: [
           'Superset: a workspace for different coding agents, parallel tasks, recurring work, and remote hosts.',
@@ -98,38 +99,7 @@ export const growthPages: MarketingPage[] = [
       },
     ],
     related: [
-      {
-        href: 'https://superset.sh/',
-        label: 'Superset',
-      },
-      {
-        href: 'https://www.onorca.dev/',
-        label: 'Orca',
-      },
-      {
-        href: 'https://www.conductor.build/',
-        label: 'Conductor',
-      },
-      {
-        href: 'https://emdash.com/',
-        label: 'Emdash',
-      },
-      {
-        href: 'https://getbraid.dev/',
-        label: 'Braid',
-      },
-      {
-        href: 'https://tryworktree.com/',
-        label: 'Worktree',
-      },
-      {
-        href: 'https://codius.ai/',
-        label: 'Codius',
-      },
-      {
-        href: 'https://hermes-agent.nousresearch.com/',
-        label: 'Hermes by Nous Research',
-      },
+      ...comparisonLinks,
       {
         href: '/compare/terminal-tabs/',
         label: 'Jackalope and terminal tabs',
@@ -181,7 +151,7 @@ export const growthPages: MarketingPage[] = [
   {
     path: '/features/browser-automation-for-coding-agents/',
     kind: 'Product guide',
-    title: 'Browser automation and evidence for coding agents | Jackalope',
+    title: 'Browser automation for coding agents | Jackalope',
     description:
       'Keep browser sessions, screenshots, and accessibility findings attached to coding-agent tasks in Jackalope.',
     headline: 'Give browser work a place in the task.',
@@ -230,6 +200,7 @@ export const growthPages: MarketingPage[] = [
 export const growthPost = {
   slug: 'building-for-your-workflow',
   title: 'Help shape a workspace that fits how you build.',
+  seoTitle: 'Help shape a coding-agent workspace',
   category: 'From the studio',
   date: '2026-09-08',
   readingTime: '2 min read',

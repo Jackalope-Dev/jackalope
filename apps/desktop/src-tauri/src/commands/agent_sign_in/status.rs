@@ -178,7 +178,7 @@ pub async fn agent_profile_status(
     agent: String,
     id: Option<String>,
 ) -> Result<AccountStatus, String> {
-    let binding = if let Some(id) = id {
+    let binding = if let Some(id) = &id {
         agent_profiles::bind_account(&runtime.profiles_root(), &agent, Some(&id))?
     } else {
         agent_profiles::bind_cli_account(&runtime.profiles_root(), &agent)?
@@ -190,13 +190,19 @@ pub async fn agent_profile_status(
             "Install this agent, then check again.",
         ));
     }
-    Ok(check(binding).await.unwrap_or_else(|_| {
+    let result = check(binding).await.unwrap_or_else(|_| {
         status(
             "unknown",
             None,
             "Could not check this account. Check your connection and agent version, then retry.",
         )
-    }))
+    });
+    if matches!(result.state.as_str(), "signedIn" | "configured") {
+        if let Some(id) = id {
+            agent_profiles::confirm_profile(&runtime.profiles_root(), &agent, &id)?;
+        }
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
