@@ -32,7 +32,7 @@ export function KnowledgebasePage({
   const normalizedPath = normalizeKnowledgePath(path);
   const slug = normalizedPath.replace(/^\/knowledge\//, '').replace(/\/$/, '');
   const activeGuide = useMemo(
-    () => (slug ? knowledgeGuides.find((g) => g.slug === slug) ?? null : null),
+    () => (slug ? (knowledgeGuides.find((g) => g.slug === slug) ?? null) : null),
     [slug],
   );
 
@@ -332,11 +332,10 @@ export function KnowledgebasePage({
           /* Live Search Results View */
           <section className="knowledge-search-results" aria-label="Search results">
             <div className="knowledge-results-header">
-              <h2>
-                Results for &ldquo;{query}&rdquo;
-              </h2>
+              <h2>Results for &ldquo;{query}&rdquo;</h2>
               <span className="knowledge-results-count">
-                Found {searchResults.length} matching {searchResults.length === 1 ? 'topic' : 'topics'}
+                Found {searchResults.length} matching{' '}
+                {searchResults.length === 1 ? 'topic' : 'topics'}
               </span>
             </div>
 
@@ -401,9 +400,7 @@ export function KnowledgebasePage({
                     <ul>
                       {guide.sections.slice(0, 3).map((section) => (
                         <li key={section.id}>
-                          <a href={`/knowledge/${guide.slug}/#${section.id}`}>
-                            {section.question}
-                          </a>
+                          <a href={`/knowledge/${guide.slug}/#${section.id}`}>{section.question}</a>
                         </li>
                       ))}
                     </ul>

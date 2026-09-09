@@ -19,8 +19,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   const title = page?.title || 'Page not found | Jackalope';
   const description = page?.description || 'Find your way back to Jackalope.';
   const url = `${origin}${normalized}`;
-  const isKnowledgeGuide =
-    normalized.startsWith('/knowledge/') && normalized !== '/knowledge/';
+  const isKnowledgeGuide = normalized.startsWith('/knowledge/') && normalized !== '/knowledge/';
   const graph: Record<string, unknown>[] = [
     {
       '@type': 'Organization',

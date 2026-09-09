@@ -50,7 +50,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
       {
         id: 'concurrency-collisions',
-        question: 'How does worktree isolation prevent checkout collisions during parallel execution?',
+        question:
+          'How does worktree isolation prevent checkout collisions during parallel execution?',
         paragraphs: [
           'Native Git strictly prevents two worktrees from checking out the same local branch at the same time. Jackalope respects this invariant through its native Coordinator and Execution Guard before an agent process is spawned.',
           'When a task begins, Jackalope generates an attempt-specific branch reference (such as jackalope/task-<id>) derived from your target baseline. The coordinator acquires a reservation and execution lock, ensuring that no two concurrent tasks can claim the same branch name or workspace path.',
@@ -360,7 +361,8 @@ which claude || where claude`,
       },
       {
         id: 'physical-interruption',
-        question: 'How do physical interruptions (mouse movement, focus loss, Escape) pause control?',
+        question:
+          'How do physical interruptions (mouse movement, focus loss, Escape) pause control?',
         paragraphs: [
           'Human safety overrides agent automation at all times. Jackalope installs native low-level hardware hooks that monitor physical input devices.',
           'If you move your physical mouse, touch the keyboard, switch active window focus, or press the physical Escape key, Jackalope instantly revokes the agent’s input lease and halts interaction.',
@@ -391,7 +393,8 @@ which claude || where claude`,
     sections: [
       {
         id: 'missing-cli-path',
-        question: 'Why does the desktop app report "CLI not found" and how do I fix Windows PATH inheritance?',
+        question:
+          'Why does the desktop app report "CLI not found" and how do I fix Windows PATH inheritance?',
         paragraphs: [
           'A frequent issue on Windows occurs when an agent CLI (like codex, claude, or grok) is installed via npm or cargo in a terminal session, but the desktop application was launched from the Windows Start menu or Taskbar before the system PATH environment variable was broadcast.',
           'Applications launched by Windows Explorer inherit the environment variables that existed when the Explorer shell process started. If you recently modified your PATH in a terminal, restart the Jackalope desktop app so it inherits your updated User and System PATH variables.',
