@@ -1,5 +1,16 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, FileText, ListTodo, Pencil, Plus, RefreshCw, Search, X } from 'lucide-react';
+import {
+  Check,
+  Circle,
+  FileText,
+  ListTodo,
+  Pencil,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -13,17 +24,26 @@ import {
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
+import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { todoDraftKey, useRepoTodoStore } from '../../stores/repoTodoStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
+import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
+import { Tooltip } from '../ui/Tooltip';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import './repo-todos.css';
 
-export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
+export function RepoTodos({
+  onOpenProject,
+  onCapture,
+}: {
+  onOpenProject: () => void;
+  onCapture: (draftKey: string) => void;
+}) {
   const { projects, activeProjectId } = useProjectStore();
   const project = projects.find((item) => item.id === activeProjectId);
   const [documents, setDocuments] = useState<RepoTodoDocument[]>([]);
@@ -37,13 +57,13 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
   const [newTitle, setNewTitle] = useState('');
   const [editing, setEditing] = useState<RepoTodoItem | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [editCompleted, setEditCompleted] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createPath, setCreatePath] = useState('TODO.md');
   const request = useRef(0);
   const addInput = useRef<HTMLInputElement>(null);
   const filterButton = useRef<HTMLButtonElement>(null);
-  const checkboxes = useRef(new Map<number, HTMLInputElement>());
   const dialogFocus = useDialogFocus();
   const { drafts, setDraft, saving: savingFiles, setSaving, revision } = useRepoTodoStore();
   const key = todoDraftKey(project?.path ?? '', selected);
@@ -131,6 +151,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
       setDraft(key, null);
       setSaving(key, false, true);
       setNotice(`Saved to ${selected}.`);
+      setSource(false);
       useContextMemoryStore.getState().removeMemory(project.id);
       void useContextMemoryStore
         .getState()
@@ -199,9 +220,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
             </div>
           )}
           {loading ? (
-            <p role="status" className="task-muted">
-              Reading repository lists…
-            </p>
+            <LoadingState label="Reading repository lists…" />
           ) : (
             <div className="repo-todo-layout">
               <aside className="repo-todo-files" aria-label="Repository task files">
@@ -287,10 +306,24 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                           {items.length - open} completed
                         </p>
                       </div>
-                      <Button variant="ghost" disabled={saving} onClick={() => setSource(!source)}>
-                        {source ? <ListTodo size={16} /> : <Pencil size={16} />}
-                        {source ? 'Checklist' : 'Edit document'}
-                      </Button>
+                      <div className="flex gap-2">
+                        {!source && (
+                          <Button variant="ghost" disabled={saving} onClick={() => setSource(true)}>
+                            <Pencil size={16} />
+                            Edit document
+                          </Button>
+                        )}
+                        {(source || dirty) && (
+                          <Button
+                            variant="ghost"
+                            disabled={saving}
+                            onClick={() => (dirty ? setDiscarding(true) : setSource(false))}
+                          >
+                            <X size={16} />
+                            {dirty ? 'Discard changes' : 'Cancel'}
+                          </Button>
+                        )}
+                      </div>
                     </header>
                     {source ? (
                       <div className="repo-todo-source">
@@ -351,50 +384,17 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                                     key={item.line}
                                     className={item.completed ? 'is-completed' : undefined}
                                   >
-                                    <label className="repo-todo-check">
-                                      <input
-                                        type="checkbox"
-                                        ref={(element) => {
-                                          if (element) checkboxes.current.set(item.line, element);
-                                          else checkboxes.current.delete(item.line);
-                                        }}
-                                        checked={item.completed}
-                                        disabled={saving}
-                                        aria-label={`Mark ${item.title} ${item.completed ? 'open' : 'complete'}`}
-                                        onChange={(event) => {
-                                          if (filter !== 'all') {
-                                            const index = visible.findIndex(
-                                              (entry) => entry.line === item.line,
-                                            );
-                                            const next = visible[index + 1] ?? visible[index - 1];
-                                            (next
-                                              ? checkboxes.current.get(next.line)
-                                              : filterButton.current
-                                            )?.focus();
-                                          }
-                                          update(
-                                            updateRepoTodo(content, item.line, {
-                                              completed: event.target.checked,
-                                            }),
-                                          );
-                                          setNotice(
-                                            `Marked ${item.title} ${event.target.checked ? 'complete' : 'open'}. Save to keep this change.`,
-                                          );
-                                        }}
-                                      />
-                                      <span aria-hidden="true">
-                                        {item.completed && <Check size={14} />}
+                                    <span className="repo-todo-status">
+                                      {item.completed ? (
+                                        <Check size={18} aria-hidden="true" />
+                                      ) : (
+                                        <Circle size={17} aria-hidden="true" />
+                                      )}
+                                      <span className="sr-only">
+                                        {item.completed ? 'Completed' : 'Open'}
                                       </span>
-                                    </label>
-                                    <button
-                                      type="button"
-                                      className="repo-todo-title"
-                                      disabled={saving}
-                                      onClick={() => {
-                                        setEditing(item);
-                                        setEditTitle(item.title);
-                                      }}
-                                    >
+                                    </span>
+                                    <div className="repo-todo-title">
                                       {item.depth > 0 && (
                                         <span className="repo-todo-nested" aria-hidden="true">
                                           ↳{' '}
@@ -408,11 +408,44 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                                           {item.title}
                                         </ReactMarkdown>
                                       </span>
-                                      <span className="repo-todo-edit">
-                                        <Pencil size={14} aria-hidden="true" />
-                                        <span className="sr-only">Edit TODO</span>
-                                      </span>
-                                    </button>
+                                    </div>
+                                    <div className="repo-todo-actions">
+                                      <Button
+                                        variant="ghost"
+                                        disabled={saving}
+                                        onClick={() => {
+                                          const draftKey = `repo-todo:${JSON.stringify([project.id, selected, item.line, item.title])}`;
+                                          const store = useExecutionStore.getState();
+                                          if (!store.drafts[draftKey])
+                                            store.draft(draftKey, {
+                                              projectId: project.id,
+                                              title: item.title,
+                                              prompt: `${item.title}\n\nRepository TODO: ${selected}, line ${item.line + 1} (${item.section}).\nRead the current repository document for context before working on this item.`,
+                                              isolated:
+                                                project.preferences?.isolatedByDefault ?? true,
+                                            });
+                                          onCapture(draftKey);
+                                        }}
+                                      >
+                                        <Play size={14} aria-hidden="true" />
+                                        Start task
+                                      </Button>
+                                      <Tooltip content="Edit TODO">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          aria-label={`Edit ${item.title}`}
+                                          disabled={saving}
+                                          onClick={() => {
+                                            setEditing(item);
+                                            setEditTitle(item.title);
+                                            setEditCompleted(item.completed);
+                                          }}
+                                        >
+                                          <Pencil size={15} aria-hidden="true" />
+                                        </Button>
+                                      </Tooltip>
+                                    </div>
                                   </li>
                                 ))}
                               </ul>
@@ -557,7 +590,12 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  update(updateRepoTodo(content, editing.line, { title: editTitle.trim() }));
+                  update(
+                    updateRepoTodo(content, editing.line, {
+                      title: editTitle.trim(),
+                      completed: editCompleted,
+                    }),
+                  );
                   setEditing(null);
                 }}
               >
@@ -567,6 +605,14 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
                 />
+                <label className="repo-todo-completion">
+                  <input
+                    type="checkbox"
+                    checked={editCompleted}
+                    onChange={(event) => setEditCompleted(event.target.checked)}
+                  />
+                  Mark as completed
+                </label>
                 <div className="repo-todo-dialog-actions">
                   <Dialog.Close asChild>
                     <Button variant="ghost">Cancel</Button>
@@ -586,6 +632,7 @@ export function RepoTodos({ onOpenProject }: { onOpenProject: () => void }) {
                   onClick={() => {
                     setDraft(key, null);
                     setDiscarding(false);
+                    setSource(false);
                     setNotice('');
                     setSelected('');
                     void load();

@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { ValidationJourney } from '../tasks/ValidationJourney';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
 export function BrowserHarness({
@@ -42,9 +43,7 @@ export function BrowserHarness({
           </div>
         )}
         {loading ? (
-          <p role="status" className="task-muted">
-            Loading task evidence…
-          </p>
+          <LoadingState label={'Loading task evidence…'} />
         ) : evidenceRuns.length === 0 && !error ? (
           <EmptyState
             icon={FileCheck2}

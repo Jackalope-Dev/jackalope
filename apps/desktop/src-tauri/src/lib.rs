@@ -152,6 +152,7 @@ pub fn run() {
             task_screenshot,
             task_start,
             task_stop,
+            commands::desktop_control::indicator::desktop_control_theme,
             task_mark_reviewed,
             commands::outcomes::task_outcome_snapshot,
             commands::readiness::project_readiness,

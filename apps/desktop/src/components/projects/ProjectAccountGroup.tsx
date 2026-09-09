@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { accountGroupChoices } from '../../lib/account-groups';
 import { listAgentProfiles } from '../../lib/agent-profiles';
 import { Button } from '../ui/button';
+import { LoadingState } from '../ui/LoadingState';
 export function ProjectAccountGroup({
   agents,
   value,
@@ -65,11 +66,7 @@ export function ProjectAccountGroup({
           Personal accounts
         </Button>
       </div>
-      {busy && (
-        <p role="status" className="mt-3 task-muted">
-          Checking accounts…
-        </p>
-      )}
+      {busy && <LoadingState label={'Checking accounts…'} compact />}
       {error && (
         <p role="alert" className="task-error mt-3">
           {error}

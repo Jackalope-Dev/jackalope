@@ -11,6 +11,7 @@ import { AgentAvatar } from '../agents/AgentAvatar';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { LoadingState } from '../ui/LoadingState';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import '../agents/agents-workspace.css';
@@ -112,12 +113,12 @@ export function RunnerConnections({
           </p>
         )}
         {!desktop && <p className="task-muted">Agent discovery requires the desktop app.</p>}
-        {identified.length === 0 ? (
+        {identified.length === 0 && (discovering || checking) ? (
+          <LoadingState label="Looking for your agents…" />
+        ) : identified.length === 0 ? (
           <EmptyState
             icon={Plus}
-            title={
-              discovering || checking ? 'Looking for your agents…' : 'No agents identified yet'
-            }
+            title="No agents identified yet"
             action={
               <Button variant="outline" onClick={() => setAdding(true)}>
                 <Plus size={18} />

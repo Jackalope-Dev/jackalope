@@ -23,6 +23,7 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
+import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
@@ -309,11 +310,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               </div>
             </form>
           )}
-          {loading && (
-            <p role="status" className="task-notice">
-              Loading worktrees…
-            </p>
-          )}
+          {loading && <LoadingState label={'Loading worktrees…'} />}
           {project.worktrees?.map((wt) => (
             <article key={wt.path} className="worktree-row">
               <GitBranch

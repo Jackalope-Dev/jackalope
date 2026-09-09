@@ -5,6 +5,7 @@ import { lazy, type ReactNode, Suspense, useRef, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
+import { LoadingState } from '../ui/LoadingState';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import {
   categoryLabel,
@@ -127,11 +128,7 @@ export function McpInspectModal({
               <Tabs.Trigger value="docs">Documentation</Tabs.Trigger>
             </Tabs.List>
             <div className="mcp-detail-scroll" ref={scroll}>
-              {loadingMarkdown && (
-                <p role="status" className="mcp-detail-note">
-                  Loading details from AllMCPs…
-                </p>
-              )}
+              {loadingMarkdown && <LoadingState label={'Loading details from AllMCPs…'} />}
               {inspectError && (
                 <div role="alert" className="mcp-detail-notice">
                   <p>{inspectError} The listing is still available below.</p>

@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { LoadingState } from '../ui/LoadingState';
 
 const CodebaseExplorer = lazy(() => import('./CodebaseExplorer'));
 
@@ -12,13 +13,7 @@ export function CodebaseMap({ onOpenProject }: { onOpenProject: () => void }) {
   return (
     <section className="task-page">
       {project ? (
-        <Suspense
-          fallback={
-            <p role="status" className="task-muted">
-              Opening codebase…
-            </p>
-          }
-        >
+        <Suspense fallback={<LoadingState label={'Opening codebase…'} />}>
           <CodebaseExplorer key={`${project.id}:${project.path}`} project={project} />
         </Suspense>
       ) : (

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
+import { LoadingState } from '../ui/LoadingState';
 
 interface ReferralInvite {
   id: string;
@@ -87,12 +88,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
       setError(typeof cause === 'string' ? cause : 'Could not open invitation management.');
     }
   };
-  if (loading)
-    return (
-      <p role="status" className="settings-row-description">
-        Loading passes…
-      </p>
-    );
+  if (loading) return <LoadingState label={'Loading passes…'} />;
   if (!referrals)
     return (
       <div className="space-y-4">

@@ -1,3 +1,4 @@
+import { BookOpen, Lightbulb, Search, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { type KnowledgeEntry, openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
 import { nativeTask } from '../../lib/task-runtime';
@@ -7,6 +8,7 @@ import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { Input } from '../ui/input';
+import { LoadingState } from '../ui/LoadingState';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 
 export function KnowledgeLibrary({ project }: { project: Project }) {
@@ -14,6 +16,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
   const [editing, setEditing] = useState<KnowledgeEntry | null>(null);
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [matches, setMatches] = useState<
     { runId: string; agent: string; date: string; excerpt: string }[] | null
@@ -70,7 +73,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
       </div>
 
       {!desktop && <p className="task-notice">Open the desktop app to manage saved knowledge.</p>}
-      {loading && <p role="status">Loading saved knowledge…</p>}
+      {loading && <LoadingState label={'Loading saved knowledge…'} />}
       {(error || actionError) && (
         <p role="alert" className="task-error">
           {error || actionError}
@@ -80,90 +83,122 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
         </p>
       )}
       {desktop && !loading && !error && !entries.length && (
-        <p className="task-muted">No saved lessons or workflows.</p>
+        <div className="context-knowledge-empty">
+          <BookOpen size={28} aria-hidden="true" />
+          <div>
+            <h3>Make good decisions reusable</h3>
+            <p>Save a lesson or add a workflow for future tasks.</p>
+          </div>
+        </div>
       )}
-      {entries.map((entry) => (
-        <article key={entry.id} className="py-4 border-b border-[var(--color-border)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="font-medium">{entry.title}</h3>
-              <p className="task-muted">
-                {entry.kind === 'memory' ? 'Lesson' : 'Workflow'} ·{' '}
-                {entry.enabled ? 'Available' : 'Paused'} · Revision {entry.revision}
-                {runs.some((run) => run.contextReceipt?.entries.some((e) => e.id === entry.id)) && (
-                  <>
-                    {' '}
-                    · Used in{' '}
-                    {
-                      new Set(
-                        runs
-                          .filter((run) =>
-                            run.contextReceipt?.entries.some((e) => e.id === entry.id),
-                          )
-                          .map((run) => run.taskId),
-                      ).size
-                    }{' '}
-                    tasks
-                  </>
-                )}
-              </p>
+      <div className="context-knowledge-grid">
+        {entries.map((entry) => (
+          <article key={entry.id} className="context-knowledge-card">
+            <div className="context-knowledge-type">
+              {entry.kind === 'memory' ? (
+                <Lightbulb size={18} aria-hidden="true" />
+              ) : (
+                <Workflow size={18} aria-hidden="true" />
+              )}
+              {entry.kind === 'memory' ? 'Lesson' : 'Workflow'}
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setEditing(entry)}>
-                Edit
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-medium">{entry.title}</h3>
+                <p className="task-muted">
+                  {entry.enabled ? 'Available' : 'Paused'} · Revision {entry.revision}
+                  {runs.some((run) =>
+                    run.contextReceipt?.entries.some((e) => e.id === entry.id),
+                  ) && (
+                    <>
+                      {' '}
+                      · Used in{' '}
+                      {
+                        new Set(
+                          runs
+                            .filter((run) =>
+                              run.contextReceipt?.entries.some((e) => e.id === entry.id),
+                            )
+                            .map((run) => run.taskId),
+                        ).size
+                      }{' '}
+                      tasks
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setEditing(entry)}>
+                  Edit
+                </Button>
+                <ConfirmAction
+                  title="Remove saved knowledge?"
+                  description="Future tasks will stop using it. Existing task context and source history are kept."
+                  onConfirm={async () => {
+                    try {
+                      await nativeTask('knowledge_remove', {
+                        id: entry.id,
+                        revision: entry.revision,
+                      });
+                      await refresh();
+                    } catch (e) {
+                      setActionError(String(e));
+                    }
+                  }}
+                  trigger={<Button variant="ghost">Remove</Button>}
+                />
+              </div>
+            </div>
+            <div className="mt-2">
+              <div className="context-knowledge-content">
+                <p
+                  className={`whitespace-pre-wrap break-words ${expanded[entry.id] ? '' : 'context-knowledge-preview'}`}
+                >
+                  {entry.content}
+                </p>
+                <Button
+                  variant="ghost"
+                  aria-expanded={!!expanded[entry.id]}
+                  onClick={() =>
+                    setExpanded((current) => ({ ...current, [entry.id]: !current[entry.id] }))
+                  }
+                >
+                  {expanded[entry.id] ? 'Show less' : 'Read full content'}
+                </Button>
+              </div>
+              {entry.keywords.length > 0 && (
+                <p className="task-muted mt-2">Matches: {entry.keywords.join(', ')}</p>
+              )}
+            </div>
+            {entry.sourceRunId && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (entry.sourceRunId) openKnowledgeTask(project.id, entry.sourceRunId);
+                }}
+              >
+                Open source task
               </Button>
-              <ConfirmAction
-                title="Remove saved knowledge?"
-                description="Future tasks will stop using it. Existing task context and source history are kept."
-                onConfirm={async () => {
+            )}
+            {entry.kind === 'workflow' && (
+              <Button
+                variant="ghost"
+                onClick={async () => {
                   try {
-                    await nativeTask('knowledge_remove', {
-                      id: entry.id,
-                      revision: entry.revision,
-                    });
-                    await refresh();
-                  } catch (e) {
-                    setActionError(String(e));
+                    await navigator.clipboard.writeText(entry.content);
+                    setActionError('');
+                  } catch (cause) {
+                    setActionError(`Could not copy workflow: ${String(cause)}`);
                   }
                 }}
-                trigger={<Button variant="ghost">Remove</Button>}
-              />
-            </div>
-          </div>
-          <div className="mt-2">
-            <p className="whitespace-pre-wrap break-words">{entry.content}</p>
-            {entry.keywords.length > 0 && (
-              <p className="task-muted mt-2">Matches: {entry.keywords.join(', ')}</p>
+              >
+                Copy Markdown
+              </Button>
             )}
-          </div>
-          {entry.sourceRunId && (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (entry.sourceRunId) openKnowledgeTask(project.id, entry.sourceRunId);
-              }}
-            >
-              Open source task
-            </Button>
-          )}
-          {entry.kind === 'workflow' && (
-            <Button
-              variant="ghost"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(entry.content);
-                  setActionError('');
-                } catch (cause) {
-                  setActionError(`Could not copy workflow: ${String(cause)}`);
-                }
-              }}
-            >
-              Copy Markdown
-            </Button>
-          )}
-        </article>
-      ))}
-      <section aria-label="Search past decisions">
+          </article>
+        ))}
+      </div>
+      <section className="context-history-search" aria-label="Search past decisions">
         <h3 className="text-base font-medium">Find a decision in past tasks</h3>
         <form
           className="flex gap-2 my-3"
@@ -180,13 +215,16 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             }
           }}
         >
-          <Input
-            aria-label="Search this project's task history"
-            value={query}
-            maxLength={200}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search instructions and results…"
-          />
+          <div className="context-history-field">
+            <Search size={16} aria-hidden="true" />
+            <Input
+              aria-label="Search this project's task history"
+              value={query}
+              maxLength={200}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search instructions and results…"
+            />
+          </div>
           <Button disabled={!desktop || searching || query.trim().length < 2}>
             {searching ? 'Searching…' : 'Search'}
           </Button>

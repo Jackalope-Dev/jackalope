@@ -61,9 +61,10 @@ fn desktop_input_consumes_a_fresh_snapshot_even_on_wrong_id() {
         id: "x".into(),
         bounds: json!([0, 0, 800, 600]),
         taken: Instant::now(),
+        epoch: 1,
     });
     assert_eq!(
-        take_snapshot(&mut access, Some("x")).unwrap(),
+        take_snapshot(&mut access, Some("x")).unwrap().bounds,
         json!([0, 0, 800, 600])
     );
     assert!(take_snapshot(&mut access, Some("x")).is_err());
@@ -71,6 +72,7 @@ fn desktop_input_consumes_a_fresh_snapshot_even_on_wrong_id() {
         id: "x".into(),
         bounds: json!([0, 0, 800, 600]),
         taken: Instant::now(),
+        epoch: 1,
     });
     assert!(take_snapshot(&mut access, Some("old")).is_err());
     assert!(access.snapshot.is_none());
@@ -78,6 +80,7 @@ fn desktop_input_consumes_a_fresh_snapshot_even_on_wrong_id() {
         id: "x".into(),
         bounds: json!([0, 0, 800, 600]),
         taken: Instant::now() - Duration::from_secs(61),
+        epoch: 1,
     });
     assert!(take_snapshot(&mut access, Some("x")).is_err());
 }
@@ -209,6 +212,14 @@ fn native_desktop_window_trial() {
             std::thread::sleep(Duration::from_millis(200));
         }
         let target = target.expect("Fixture window appeared");
+        let mut indicator =
+            indicator::Indicator::start(&serde_json::from_value(target.clone()).unwrap()).unwrap();
+        let state = indicator.state().unwrap();
+        assert_eq!(state.status, "active");
+        let native = |mut payload: Value, canceled: &AtomicBool| {
+            payload["guard"] = indicator.guard(state.epoch);
+            super::native(payload, canceled)
+        };
         native(json!({"action":"focus","window":target}), &canceled)
             .expect("Focus the disposable fixture");
         let snap = native(json!({"action":"snapshot","window":target}), &canceled).unwrap();

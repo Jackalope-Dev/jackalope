@@ -55,9 +55,11 @@ export function ScheduleTemplateLibrary({
           ))}
         </Select>
       </div>
-      <p className="task-muted" role="status">
-        {showAll ? `${filtered.length} matching templates` : 'A few places to start'}
-      </p>
+      {showAll && (
+        <p className="task-muted" role="status">
+          {filtered.length} matching templates
+        </p>
+      )}
       <div className="template-library-list">
         {visible.map((template) => (
           <article className="template-library-row" key={template.id}>

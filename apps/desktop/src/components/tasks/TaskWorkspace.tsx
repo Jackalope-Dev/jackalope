@@ -1,3 +1,4 @@
+import { LoadingState } from '../ui/LoadingState';
 import './core-workflow.css';
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import {
@@ -153,11 +154,7 @@ export function TaskWorkspace({
           onOpen={select}
         />
       )}
-      {loading && (
-        <p role="status" className="task-muted">
-          Loading task history…
-        </p>
-      )}
+      {loading && <LoadingState label={'Loading task history…'} />}
       {error && (
         <p role="alert" className="task-error">
           {error}

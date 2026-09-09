@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { type AgentProfilesView, listAgentProfiles } from '../../lib/agent-profiles';
 import { AgentAccounts } from '../agents/AgentAccounts';
 import { Button } from '../ui/button';
+import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import '../agents/agent-manager.css';
 export function ProjectAgentAccount({
@@ -83,11 +84,7 @@ export function ProjectAgentAccount({
           ))}
         </Select>
       )}
-      {!view && !error && (
-        <p role="status" className="task-muted">
-          Loading accounts…
-        </p>
-      )}
+      {!view && !error && <LoadingState label={'Loading accounts…'} compact />}
       {view?.envVar && (
         <Dialog.Root
           open={open}

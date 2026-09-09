@@ -26,6 +26,7 @@ import { ProjectSetup } from '../tasks/ProjectSetup';
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { LoadingState } from '../ui/LoadingState';
 import { Tooltip } from '../ui/Tooltip';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
@@ -340,13 +341,7 @@ export function Shell({
             </nav>
           </div>
         )}
-        <Suspense
-          fallback={
-            <p className="workspace-page" role="status">
-              Opening {view.label}…
-            </p>
-          }
-        >
+        <Suspense fallback={<LoadingState label={`Opening ${view.label}…`} />}>
           {activeTab === 'kanban' && (
             <TaskWorkspace
               onOpenProject={() => setSetupOpen(true)}
@@ -365,6 +360,7 @@ export function Shell({
           {activeTab === 'repo-todos' && (
             <RepoTodos
               key={project?.path ?? activeProjectId}
+              onCapture={(draftKey) => setCapture({ draftKey })}
               onOpenProject={() => setSetupOpen(true)}
             />
           )}

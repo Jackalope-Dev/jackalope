@@ -9,7 +9,32 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Diagnostics;
 public static class JackalopeDesktop {
+    public static string GuardFile;
+    public static long GuardEpoch;
+    public static void Guard() {
+        if(String.IsNullOrEmpty(GuardFile)) throw new Exception("Desktop indicator grant is required.");
+        using(var gate=System.Threading.EventWaitHandle.OpenExisting("Local\\JackalopeDesktop-"+Path.GetFileName(Path.GetDirectoryName(GuardFile))))
+            if(!gate.WaitOne(0)) throw new Exception("Desktop control paused or canceled. Wait for the human to resume, then take a new snapshot.");
+        string[] state=ReadState();
+        if(state.Length!=6 || state[0]!="active" || long.Parse(state[1])!=GuardEpoch) throw new Exception("Desktop control paused or canceled. Wait for the human to resume, then take a new snapshot.");
+        long age=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()-long.Parse(state[2]);
+        if(age<0 || age>3000) throw new Exception("Desktop indicator stopped responding. Input is disabled.");
+        using(var process=Process.GetProcessById(int.Parse(state[3])))
+            if(process.HasExited || process.StartTime.ToUniversalTime().Ticks!=long.Parse(state[4])) throw new Exception("Desktop indicator closed. Input is disabled.");
+        using(var gate=System.Threading.EventWaitHandle.OpenExisting("Local\\JackalopeDesktop-"+Path.GetFileName(Path.GetDirectoryName(GuardFile))))
+            if(!gate.WaitOne(0)) throw new Exception("Desktop control paused or canceled. Wait for the human to resume, then take a new snapshot.");
+    }
+    static string[] ReadState() {
+        for(int attempt=0;;attempt++) {
+            try {
+                using(var stream=new FileStream(GuardFile,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+                using(var reader=new StreamReader(stream)) return reader.ReadToEnd().Split('|');
+            } catch(IOException) { if(attempt>=3) throw; System.Threading.Thread.Sleep(10); }
+        }
+    }
     [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] struct Mouse { public int X,Y; public uint Data,Flags,Time; public UIntPtr Extra; }
@@ -30,7 +55,8 @@ public static class JackalopeDesktop {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr handle, uint flags);
     [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point point);
-    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] static extern uint SendInput(uint count, Input[] inputs, int size);
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr handle, IntPtr dc, uint flags);
@@ -57,15 +83,24 @@ public static class JackalopeDesktop {
         return new int[]{rect.Left,rect.Top,width,height};
     }
     public static void Foreground(IntPtr handle) {
+        Guard();
         if (GetForegroundWindow()!=handle) throw new Exception("Selected window is not foreground. Focus it and take a new snapshot.");
         foreach(int key in new int[]{0x10,0x11,0x12,0x5B,0x5C,1,2,4})
             if ((GetAsyncKeyState(key)&0x8000)!=0) throw new Exception("User input is active. Release keyboard modifiers and mouse buttons before retrying.");
     }
     static void Send(Input[] inputs) {
-        if(SendInput((uint)inputs.Length,inputs,Marshal.SizeOf(typeof(Input)))!=inputs.Length)
+        if(SendInput((uint)inputs.Length,inputs,Marshal.SizeOf(typeof(Input)))!=inputs.Length) {
+            var releases=new List<Input>();
+            foreach(var sent in inputs) {
+                var released=sent;
+                if(sent.Type==1) { released.Data.Keyboard.Flags|=2; releases.Add(released); }
+                else if(sent.Data.Mouse.Flags==2) { released.Data.Mouse.Flags=4; releases.Add(released); }
+            }
+            if(releases.Count>0) SendInput((uint)releases.Count,releases.ToArray(),Marshal.SizeOf(typeof(Input)));
             throw new Exception("Windows blocked or only partially sent input. Inspect before retrying; elevation or desktop restrictions may apply.");
+        }
     }
-    static Input Key(ushort key, ushort scan, uint flags) { var input=new Input(); input.Type=1; input.Data.Keyboard.Key=key; input.Data.Keyboard.Scan=scan; input.Data.Keyboard.Flags=flags; return input; }
+    static Input Key(ushort key, ushort scan, uint flags) { var input=new Input(); input.Type=1; input.Data.Keyboard.Key=key; input.Data.Keyboard.Scan=scan; input.Data.Keyboard.Flags=flags; input.Data.Keyboard.Extra=new UIntPtr(0x4A41434B); return input; }
     public static void Text(IntPtr handle, string text) {
         foreach(char value in text) { Foreground(handle); Send(new Input[]{Key(0,value,4),Key(0,value,6)}); }
     }
@@ -83,12 +118,18 @@ public static class JackalopeDesktop {
         if(x<0 || y<0 || x>=bounds[2] || y>=bounds[3]) throw new Exception("Pointer is outside the selected window.");
         var point=new Point{X=bounds[0]+x,Y=bounds[1]+y};
         if(GetAncestor(WindowFromPoint(point),2)!=handle) throw new Exception("Another window covers the pointer target. Take a new snapshot.");
-        if(!SetCursorPos(point.X,point.Y)) throw new Exception("Windows could not move the pointer.");
+        var movement=new Input(); movement.Type=0; movement.Data.Mouse.Flags=0x8000|0x4000|1;
+        movement.Data.Mouse.X=(int)((long)(point.X-GetSystemMetrics(76))*65535/Math.Max(1,GetSystemMetrics(78)-1));
+        movement.Data.Mouse.Y=(int)((long)(point.Y-GetSystemMetrics(77))*65535/Math.Max(1,GetSystemMetrics(79)-1));
+        movement.Data.Mouse.Extra=new UIntPtr(0x4A41434B); Send(new Input[]{movement});
+        System.Threading.Thread.Sleep(30);
         Foreground(handle);
+        Point cursor;
+        if(!GetCursorPos(out cursor) || Math.Abs(cursor.X-point.X)>1 || Math.Abs(cursor.Y-point.Y)>1) throw new Exception("Pointer moved during the action. Take a new snapshot after resuming.");
         if(GetAncestor(WindowFromPoint(point),2)!=handle) throw new Exception("Pointer target changed. Take a new snapshot.");
-        var first=new Input(); first.Type=0;
+        var first=new Input(); first.Type=0; first.Data.Mouse.Extra=new UIntPtr(0x4A41434B);
         if(wheel!=0) { first.Data.Mouse.Flags=0x0800; first.Data.Mouse.Data=unchecked((uint)(wheel*120)); Send(new Input[]{first}); }
-        else { first.Data.Mouse.Flags=2; var second=new Input(); second.Type=0; second.Data.Mouse.Flags=4; Send(new Input[]{first,second}); }
+        else { first.Data.Mouse.Flags=2; var second=new Input(); second.Type=0; second.Data.Mouse.Flags=4; second.Data.Mouse.Extra=new UIntPtr(0x4A41434B); Send(new Input[]{first,second}); }
     }
     public static void Capture(IntPtr handle,string path) {
         var bounds=Bounds(handle);
@@ -122,6 +163,9 @@ if ($request.action -eq 'list') {
     @{windows=$windows} | ConvertTo-Json -Depth 8 -Compress
     exit 0
 }
+[JackalopeDesktop]::GuardFile=[string]$request.guard.file
+[JackalopeDesktop]::GuardEpoch=[long]$request.guard.epoch
+[JackalopeDesktop]::Guard()
 $target=[IntPtr][long]$request.window.handle
 if (![JackalopeDesktop]::IsWindow($target) -or ![JackalopeDesktop]::IsWindowVisible($target) -or [JackalopeDesktop]::IsIconic($target)) { throw 'Selected window closed, is hidden, or is minimized. Restore it or request access again.' }
 $actual=Get-WindowInfo $target

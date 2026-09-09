@@ -25,6 +25,7 @@ import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { AddWork } from './AddWork';
 import { FeatureGraphView } from './FeatureGraphView';
@@ -303,9 +304,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
             ))}
           </fieldset>
           {loading ? (
-            <p className="task-muted py-6" role="status">
-              Loading your plan…
-            </p>
+            <LoadingState label="Loading your plan…" />
           ) : items.length === 0 ? (
             <div className="queue-empty">
               <ListPlus size={28} />

@@ -18,6 +18,7 @@ import {
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
+import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { DetectedKeysModal } from './DetectedKeysModal';
@@ -209,7 +210,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
           </p>
         )}
         {loading ? (
-          <p role="status">Loading accounts…</p>
+          <LoadingState label={'Loading accounts…'} />
         ) : (
           <Button variant="outline" onClick={() => void action('load', load)}>
             Retry accounts
@@ -432,7 +433,7 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
         />
       )}
       {signIn && (
-        <Suspense fallback={<p role="status">Opening sign-in…</p>}>
+        <Suspense fallback={<LoadingState label={'Opening sign-in…'} compact />}>
           <AgentSignIn
             agentId={agentId}
             agentName={agentName}

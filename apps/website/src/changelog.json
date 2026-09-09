@@ -1,5 +1,56 @@
 [
   {
+    "id": "visual-project-context",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Your project at a glance",
+    "description": "Repository knowledge is easier to scan and turn into work.",
+    "items": [
+      "Project Context groups source files, technologies, instructions and commands in a visual overview.",
+      "Lessons and workflows use compact cards with full content available on demand.",
+      "Repo TODOs offer a Start task action with prefilled context. Completion moves into explicit edit controls, with Cancel and Discard beside the document heading."
+    ],
+    "note": "Tasks remain yours to review and start; repository edits still require Save changes."
+  },
+  {
+    "id": "quieter-loading-states",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A calmer wait",
+    "description": "Loading views use consistent, understated visual feedback.",
+    "items": [
+      "Subtle spinners and placeholders replace bare loading text across the workspace.",
+      "Compact checks keep a small status indicator, and loading animation respects reduced motion."
+    ],
+    "note": "Indicators follow real loading state without adding delays."
+  },
+  {
+    "id": "stay-in-control-of-desktop-assistance",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Stay in control of desktop assistance.",
+    "description": "A clear status bar and theme-colored glow show when Jackalope is using your computer.",
+    "items": [
+      "Pause or cancel from the top bar, press Escape to cancel, and explicitly resume after mouse, keyboard or window interruptions.",
+      "Larger display-scaled text and working controls keep desktop assistance readable.",
+      "The landing page gives the mobile New task preview more bottom space."
+    ],
+    "note": "Development milestone. Disposable Windows checks pass; installed-agent and packaged-app acceptance remain separate."
+  },
+  {
+    "id": "clearer-recurring-setup",
+    "date": "2026-09-08",
+    "status": "In development",
+    "title": "Recurring work, clearly configured",
+    "description": "Create routines with instructions, timing and behavior laid out together.",
+    "items": [
+      "The wider schedule editor keeps settings visible and its save controls in place.",
+      "Daily, weekday and weekly routines use a time picker, with custom cron timing preserved.",
+      "Template search places the icon inside the field and removes the extra introductory note."
+    ],
+    "note": "Existing schedules, saved context and paused defaults remain supported."
+  },
+  {
     "id": "actionable-task-welcome",
     "date": "2026-09-08",
     "status": "In development",
@@ -263,7 +314,9 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": ["A Follow on X link is available in the shared footer."],
+    "items": [
+      "A Follow on X link is available in the shared footer."
+    ],
     "note": "Website milestone, not a public product release."
   },
   {

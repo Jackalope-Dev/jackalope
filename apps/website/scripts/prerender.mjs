@@ -26,7 +26,17 @@ try {
     else globalThis.document = previousDocument;
   }
   const themeStyle = [...tokens].map(([name, value]) => `${name}:${value}`).join(';');
-  const template = await readFile('dist/index.html', 'utf8');
+  let template = '';
+  const templatePath = resolve('dist/index.html');
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      template = await readFile(templatePath, 'utf8');
+      break;
+    } catch (error) {
+      if (attempt === 9) throw error;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
   for (const path of [...routes, '/404/']) {
     const html = pageHtml(template, path, origin)
       .replace('<html lang="en">', `<html lang="en" style="${themeStyle}">`)

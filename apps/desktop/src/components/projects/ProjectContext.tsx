@@ -8,7 +8,7 @@ export function ProjectContext() {
     state.projects.find((item) => item.id === state.activeProjectId),
   );
   return (
-    <section className="workspace-page">
+    <section className="workspace-page project-context-page">
       <WorkspaceHeading title="Project context" description={project?.name} />
       {project ? (
         <>

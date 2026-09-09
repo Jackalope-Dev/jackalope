@@ -142,38 +142,52 @@
 .repo-todo-group li:hover {
   background: var(--color-surface-hover);
 }
-.repo-todo-check {
-  position: relative;
+.repo-todo-status {
   display: grid;
   place-items: center;
-  min-width: 44px;
+  flex: 0 0 36px;
   height: 52px;
-  cursor: pointer;
+  color: var(--color-text-muted);
 }
-.repo-todo-check input {
-  position: absolute;
+.repo-todo-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 4px;
   opacity: 0;
-  width: 44px;
-  height: 44px;
-  cursor: pointer;
-}
-.repo-todo-check > span {
-  width: 19px;
-  height: 19px;
-  border-radius: 5px;
-  border: 1px solid var(--color-text-muted);
-  display: grid;
-  place-items: center;
   pointer-events: none;
 }
-.repo-todo-check input:checked + span {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  border-color: var(--color-accent);
+.repo-todo-group li:is(:hover, :focus-within) .repo-todo-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
-.repo-todo-check input:focus-visible + span {
-  outline: 2px solid var(--color-accent-ink);
-  outline-offset: 4px;
+.repo-todo-actions button {
+  cursor: pointer;
+}
+.repo-todo-dialog .repo-todo-completion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.repo-todo-completion input {
+  width: 18px;
+  accent-color: var(--color-accent);
+}
+@media (hover: none), (pointer: coarse), (max-width: 700px) {
+  .repo-todo-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (max-width: 700px) {
+  .repo-todo-group li {
+    flex-wrap: wrap;
+  }
+  .repo-todo-actions {
+    margin-left: auto;
+  }
 }
 .repo-todo-title {
   display: flex;

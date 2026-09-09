@@ -20,6 +20,27 @@ desktop control at a time, including across Jackalope profiles through a per-use
 file lease. Calls serialize per attempt. The lease remains held until canceled
 in-flight work has returned. Other applications can still interact with the desktop.
 
+## Visible control and interruption
+
+An opaque black bar sits flush with the top of the selected window's monitor,
+centered above a wide glow in the current desktop accent color. Its rounded lower
+corners, shared logo, display-scaled type and real Pause/Resume and Cancel buttons
+keep the status and Escape hint readable. The center of the screen stays clear.
+The overlay has no taskbar entry, does not activate on arrival and uses no animation.
+
+Physical Escape cancels access. Mouse movement, typing, lost foreground focus,
+minimizing or moving/resizing the selected window pauses control. Only the human
+can Resume from the bar. Agent-generated input is tagged so it does not trigger
+its own pause; an agent's Escape remains scoped to the selected application.
+Every pause/resume invalidates previous snapshots, so resumed work must inspect
+the window again. Paused access also blocks snapshots and captures.
+
+The indicator resets a named event before saving a pause/cancel state. Native
+input checks that event, the current epoch, a recent heartbeat and the indicator
+process identity. Closing or losing the indicator disables input and ends the
+grant. The theme bridge follows appearance previews and rollback without changing
+saved settings. These controls do not expand the grant beyond the selected window.
+
 This is an interaction guard, not a security sandbox: agents and local programs
 retain their existing OS privileges. A chosen app can change files or send data.
 Do not grant a window containing secrets. App content and accessibility names are
@@ -62,6 +83,11 @@ runs in an owned process tree and times out after 20 seconds. It cannot elevate 
 bypass Windows foreground/UIPI restrictions. Screenshots retain the existing 8 MiB
 artifact limit. See Microsoft's [password edit styles](https://learn.microsoft.com/en-us/windows/win32/controls/edit-control-styles)
 and [SendInput contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput).
+
+`desktop_control/indicator.rs` owns the indicator process, temporary assets,
+heartbeat and theme updates. `indicator.cs` draws the native layered glow and
+status bar and handles physical interruption. The renderer's
+`lib/desktop-control-theme.ts` forwards the shared accent, including live previews.
 
 Run ordinary guards with `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 --lib --no-default-features desktop_control`. The opt-in

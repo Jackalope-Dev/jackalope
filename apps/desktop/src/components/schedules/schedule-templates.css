@@ -23,15 +23,22 @@
 }
 
 .template-search {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
   color: var(--color-text-secondary);
   min-width: 0;
 }
 
+.template-search > svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
 .template-search input {
   min-width: 0;
+  padding-left: 40px;
 }
 
 .template-library-row {
@@ -53,7 +60,13 @@
 }
 
 .task-dialog.schedule-editor {
-  width: min(680px, calc(100vw - 48px));
+  width: min(1080px, calc(100vw - 48px));
+  height: min(800px, calc(100dvh - 48px));
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
 }
 
 .schedule-fields {
@@ -81,14 +94,86 @@
   gap: 12px;
 }
 
-.schedule-editor form > .schedule-disclosure {
-  margin-block: 0;
+.schedule-editor-heading {
+  padding: 24px 64px 20px 24px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
-
-.schedule-disclosure > summary {
+.schedule-editor-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.schedule-editor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 28px;
+  padding: 24px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.schedule-editor-column,
+.schedule-editor-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.schedule-editor-column {
+  gap: 28px;
+}
+.schedule-editor-section h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.schedule-editor-section > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+.schedule-editor-section > label > button {
+  width: 100%;
+}
+.schedule-fields {
+  font-size: var(--text-sm);
+}
+.schedule-fields > label:last-child:nth-child(odd),
+.schedule-fields > .schedule-field-wide {
+  grid-column: 1 / -1;
+}
+.schedule-run-policy {
+  display: grid;
+  gap: 4px;
+}
+.schedule-run-policy label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-height: 44px;
-  padding-block: 12px;
+  font-size: var(--text-sm);
   cursor: pointer;
+}
+.schedule-run-policy input {
+  accent-color: var(--color-action);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.schedule-editor-footer {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-elevated);
+}
+.schedule-editor-footer > p {
+  margin-top: 8px;
+}
+@media (max-width: 800px) {
+  .schedule-editor-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .schedule-editor textarea {

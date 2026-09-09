@@ -1,4 +1,5 @@
 import { Component, lazy, type ReactNode, Suspense } from 'react';
+import { LoadingState } from '../ui/LoadingState';
 
 const RichDiff = lazy(() => import('./RichDiff'));
 
@@ -31,7 +32,7 @@ class DiffBoundary extends Component<{ patch: string; children: ReactNode }, { f
 export function DiffPreview(props: { patch: string; file?: string }) {
   return (
     <DiffBoundary patch={props.patch}>
-      <Suspense fallback={<p role="status">Opening diff…</p>}>
+      <Suspense fallback={<LoadingState label={'Opening diff…'} />}>
         <RichDiff {...props} />
       </Suspense>
     </DiffBoundary>

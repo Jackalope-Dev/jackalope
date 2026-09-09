@@ -3,6 +3,7 @@ use super::{
     tasks::{TaskRun, TaskRuntime},
 };
 use rmcp::schemars;
+pub mod indicator;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -18,7 +19,7 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct DesktopRequest {
     #[schemars(
-        description = "request_access, snapshot, screenshot, focus, click, type, press, scroll, or release. Windows only. request_access asks the user to select one window; wait for their answer. Stop/release revokes access."
+        description = "request_access, snapshot, screenshot, focus, click, type, press, scroll, or release. Windows only. request_access asks the user to select one window. Escape/Stop/release revokes access. Physical input pauses control; only the human can Resume."
     )]
     pub action: String,
     #[schemars(
@@ -55,6 +56,7 @@ struct Snapshot {
     id: String,
     bounds: Value,
     taken: Instant,
+    epoch: u64,
 }
 
 #[derive(Default)]
@@ -63,6 +65,7 @@ struct Access {
     choices: Vec<(String, Window)>,
     window: Option<Window>,
     snapshot: Option<Snapshot>,
+    indicator: Option<indicator::Indicator>,
 }
 
 struct Session {
@@ -236,7 +239,7 @@ fn validate(request: &DesktopRequest) -> Result<(), String> {
     Ok(())
 }
 
-fn take_snapshot(access: &mut Access, id: Option<&str>) -> Result<Value, String> {
+fn take_snapshot(access: &mut Access, id: Option<&str>) -> Result<Snapshot, String> {
     let snapshot = access
         .snapshot
         .take()
@@ -244,11 +247,12 @@ fn take_snapshot(access: &mut Access, id: Option<&str>) -> Result<Value, String>
     if Some(snapshot.id.as_str()) != id || snapshot.taken.elapsed() > Duration::from_secs(60) {
         return Err("The desktop snapshot is stale. Take a new snapshot before input.".into());
     }
-    Ok(snapshot.bounds)
+    Ok(snapshot)
 }
 
 #[cfg(windows)]
-fn native(payload: Value, canceled: &AtomicBool) -> Result<Value, String> {
+fn native_command(script: &str, payload: Value) -> Result<std::process::Command, String> {
+    use std::os::windows::process::CommandExt;
     let windows =
         std::env::var_os("SystemRoot").ok_or("Windows system directory is unavailable.")?;
     let mut command = std::process::Command::new(
@@ -261,12 +265,14 @@ fn native(payload: Value, canceled: &AtomicBool) -> Result<Value, String> {
         .env("TEMP", std::env::temp_dir())
         .env("TMP", std::env::temp_dir())
         .env("JACKALOPE_DESKTOP_REQUEST", payload.to_string())
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            include_str!("desktop_control/windows.ps1"),
-        ]);
+        .args(["-NoProfile", "-NonInteractive", "-Command", script]);
+    command.creation_flags(0x08000000);
+    Ok(command)
+}
+
+#[cfg(windows)]
+fn native(payload: Value, canceled: &AtomicBool) -> Result<Value, String> {
+    let command = native_command(include_str!("desktop_control/windows.ps1"), payload)?;
     if canceled.load(Ordering::SeqCst) {
         return Err("Desktop access was revoked.".into());
     }
@@ -324,7 +330,7 @@ pub async fn execute(
             let mut options = vec!["Do not allow".to_owned()];
             options.extend(access.choices.iter().map(|(label, _)| label.clone()));
             let prompt = PendingUserPrompt { id: uuid::Uuid::new_v4().to_string(), run_id: run.id.clone(),
-                question: "Allow desktop control for this attempt? Choose one window the agent may read, capture, focus, click, and type into. This is your live desktop; input can change files or send data. Other windows and popups need separate access. Stop this task to revoke access. Do not choose a window containing secrets.".into(),
+                question: "Allow desktop control for this attempt? Choose one window the agent may read, capture, focus, click, and type into. A desktop glow shows when control is active. Escape or Stop revokes access. Moving the mouse or using the keyboard pauses control until you click Resume. This is your live desktop; input can change files or send data. Other windows and popups need separate access. Do not choose a window containing secrets.".into(),
                 input_type: "choice".into(), options, default_value: None, status: "pending".into(), answer: None,
                 created_at: chrono::Utc::now().to_rfc3339(), answered_at: None };
             current(&runtime, &run.id)?;
@@ -337,15 +343,26 @@ pub async fn execute(
         }
         if access.window.is_none() {
             let Some(window) = selected(&fresh, &access)? else { return Ok(json!({"status":"pending","questionId":access.prompt_id})); };
-            runtime.update_checked(&run.id, |r| r.activity.push("User granted desktop control for one window. Stop this task to revoke access.".into()))?;
+            let indicator = indicator::Indicator::start(&window)?;
+            indicator.watch(&owned, runtime.clone(), run.id.clone());
+            access.indicator = Some(indicator);
+            runtime.update_checked(&run.id, |r| r.activity.push("User granted desktop control for one window. Escape or Stop revokes access; user input pauses it until Resume.".into()))?;
             access.window = Some(window);
         }
         let window = access.window.clone().ok_or("No selected window.")?;
-        if request.action == "request_access" { return Ok(json!({"status":"granted","window":window,"instruction":"Focus the selected window, then take a snapshot or screenshot before input. Other windows and modal dialogs require a new grant. Stop or release revokes access."})); }
+        let state = access.indicator.as_mut().ok_or("Desktop indicator is unavailable.")?.state()?;
+        if state.status == "canceled" { return Err("Desktop control canceled by the user.".into()); }
+        if request.action == "request_access" { return Ok(json!({"status":state.status,"pauseReason":state.reason,"window":window,"instruction":"The window indicator must be active. If paused, wait for the human to click Resume. Never resume or refocus through another tool. Take a fresh snapshot after resuming. Escape or Stop cancels access."})); }
+        if state.status != "active" { access.snapshot = None; return Err("Desktop control paused. Wait for the user to click Resume in the window indicator; then take a fresh snapshot. Do not reclaim focus or bypass the pause.".into()); }
         let input = ["click", "type", "press", "scroll"].contains(&request.action.as_str());
-        let bounds = if input { Some(take_snapshot(&mut access, request.snapshot_id.as_deref())?) } else { access.snapshot = None; None };
+        let bounds = if input {
+            let snapshot = take_snapshot(&mut access, request.snapshot_id.as_deref())?;
+            if snapshot.epoch != state.epoch { return Err("Desktop control changed since the snapshot. Take a fresh snapshot after the user resumes.".into()); }
+            Some(snapshot.bounds)
+        } else { access.snapshot = None; None };
         current(&runtime, &run.id)?;
         let mut payload = json!({"action":request.action,"window":window,"bounds":bounds,"x":request.x,"y":request.y,"text":request.text,"key":request.key,"wheel":request.wheel});
+        payload["guard"] = access.indicator.as_ref().unwrap().guard(state.epoch);
         let artifact_id = uuid::Uuid::new_v4().to_string();
         let temporary = std::env::temp_dir().join(format!("jackalope-desktop-{artifact_id}.png"));
         if request.action == "screenshot" { payload["path"] = json!(temporary); }
@@ -370,8 +387,10 @@ pub async fn execute(
             value["artifact"] = json!(artifact);
         }
         if ["snapshot", "screenshot"].contains(&request.action.as_str()) {
+            let after = access.indicator.as_mut().unwrap().state()?;
+            if after.status != "active" || after.epoch != state.epoch { return Err("Desktop control paused or changed during capture. Wait for the user to resume and take a new snapshot.".into()); }
             let id = uuid::Uuid::new_v4().to_string();
-            access.snapshot = Some(Snapshot { id: id.clone(), bounds: value["bounds"].clone(), taken: Instant::now() });
+            access.snapshot = Some(Snapshot { id: id.clone(), bounds: value["bounds"].clone(), taken: Instant::now(), epoch: state.epoch });
             value["snapshotId"] = json!(id);
         }
         value["untrustedContent"] = json!(true);
@@ -381,7 +400,7 @@ pub async fn execute(
     if result
         .as_ref()
         .err()
-        .is_some_and(|e| e.contains("declined"))
+        .is_some_and(|e| e.contains("declined") || e.contains("Desktop control canceled"))
     {
         close(&id);
     }

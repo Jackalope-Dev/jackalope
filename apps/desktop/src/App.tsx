@@ -5,6 +5,7 @@ import { AccessBoundary } from './components/account/AccessBoundary';
 import { Shell } from './components/layout/Shell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { WorkspaceTransition } from './components/onboarding/WorkspaceTransition';
+import { observeDesktopControlTheme } from './lib/desktop-control-theme';
 import { observeTelemetry } from './lib/observe-telemetry';
 import { nativeTask } from './lib/task-runtime';
 import { useCommunityStore } from './stores/communityStore';
@@ -18,6 +19,7 @@ import './components/ui/experience.css';
 
 export default function App() {
   useEffect(startThemeClock, []);
+  useEffect(observeDesktopControlTheme, []);
   useEffect(observeTelemetry, []);
   useEffect(observeFeedbackActivity, []);
   useEffect(observeNotifications, []);
