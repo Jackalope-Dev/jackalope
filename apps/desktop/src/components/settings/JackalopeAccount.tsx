@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useReferralStore } from '../../stores/referralStore';
+import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
 import { Button } from '../ui/button';
 import { FeedbackPreferences } from './FeedbackPreferences';
 
-interface AccountStatus {
-  state: 'unavailable' | 'disconnected' | 'pending' | 'connected' | 'offline' | 'expired';
+export interface AccountStatus {
+  state: 'unavailable' | 'disconnected' | 'pending' | 'waiting' | 'connected' | 'offline' | 'expired';
   email: string | null;
   userCode: string | null;
   expiresAt: number | null;
@@ -15,9 +16,11 @@ interface AccountStatus {
 export function JackalopeAccount({
   presentation = 'settings',
   onInvitations,
+  onStatus,
 }: {
   presentation?: 'settings' | 'welcome';
   onInvitations?: () => void;
+  onStatus?: (status: AccountStatus) => void;
 }) {
   const [account, setAccount] = useState<AccountStatus | null>(null);
   const [error, setError] = useState('');
@@ -41,7 +44,7 @@ export function JackalopeAccount({
     };
   }, []);
   useEffect(() => {
-    if (account?.state !== 'pending' || error) return;
+    if (!['pending', 'waiting'].includes(account?.state ?? '') || error) return;
     let canceled = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
@@ -82,9 +85,11 @@ export function JackalopeAccount({
   }
   useEffect(() => {
     if (!account) return;
+    onStatus?.(account);
+    void useSettingsSyncStore.getState().refresh();
     useReferralStore.getState().clear();
     if (account.state === 'connected') void useReferralStore.getState().load(false);
-  }, [account]);
+  }, [account, onStatus]);
   const connected = account?.state === 'connected' || account?.state === 'offline';
   const welcome = presentation === 'welcome';
   return (
@@ -106,15 +111,15 @@ export function JackalopeAccount({
           </p>
         </div>
       )}
-      {account?.state === 'pending' && (
+      {(account?.state === 'pending' || account?.state === 'waiting') && (
         <div className={welcome ? 'access-pairing' : 'space-y-4'}>
-          <p role="status">Continue in your browser</p>
+          <p role="status">{account.state === 'waiting' ? 'Your email is verified. Early access is still waiting for approval.' : 'Continue in your browser'}</p>
           <p className="settings-row-description">Only approve if this code matches:</p>
           <p className={welcome ? 'access-code' : 'font-mono text-xl tracking-widest'}>
             {account.userCode?.slice(0, 4)}–{account.userCode?.slice(4)}
           </p>
           <p className="settings-row-description">
-            Use your approved email. This code expires in 10 minutes.
+            Sign in to check your access. This connection request expires in 10 minutes.
           </p>
         </div>
       )}
@@ -128,7 +133,7 @@ export function JackalopeAccount({
             {welcome && !busy && <ArrowUpRight size={18} aria-hidden="true" />}
           </Button>
         )}
-        {account?.state === 'pending' && (
+        {(account?.state === 'pending' || account?.state === 'waiting') && (
           <>
             <Button disabled={busy} onClick={() => void act('app_account_open_browser', false)}>
               Open browser
@@ -166,7 +171,7 @@ export function JackalopeAccount({
             variant="outline"
             disabled={busy}
             onClick={() =>
-              void act(account?.state === 'pending' ? 'app_account_poll' : 'app_account_status')
+              void act(account?.state === 'pending' || account?.state === 'waiting' ? 'app_account_poll' : 'app_account_status')
             }
           >
             Retry

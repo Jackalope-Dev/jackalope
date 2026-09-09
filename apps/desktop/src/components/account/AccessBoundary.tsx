@@ -3,6 +3,7 @@ import { ArrowRight, FolderOpen } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeAccount } from '../settings/JackalopeAccount';
@@ -16,6 +17,7 @@ interface AccessStatus {
 }
 
 export function AccessBoundary({ children }: { children: ReactNode }) {
+  const onboarding = useOnboardingStore((state) => state.status);
   const [access, setAccess] = useState<AccessStatus | null>(null);
   const [error, setError] = useState(false);
   const [reviewing, setReviewing] = useState(false);
@@ -49,6 +51,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
     };
   }, []);
   if (access?.allowed) entered.current = true;
+  if (onboarding === 'new' || onboarding === 'active') return <>{children}</>;
   if (!connecting && (access?.allowed || reviewing || entered.current)) {
     return (
       <div className="access-frame">

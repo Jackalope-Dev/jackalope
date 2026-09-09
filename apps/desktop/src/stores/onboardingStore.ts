@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type OnboardingStep = 'theme' | 'project' | 'agent' | 'task';
+export type OnboardingStep = 'account' | 'theme' | 'project' | 'agent' | 'task';
 export type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
 
 interface OnboardingState {
@@ -17,12 +17,12 @@ export const useOnboardingStore = create<OnboardingState>()(
   persist(
     (set, get) => ({
       status: 'new',
-      step: 'theme',
+      step: 'account',
       initialize: (hasProjects) => {
         if (get().status === 'new')
-          set({ status: hasProjects ? 'complete' : 'active', step: 'theme' });
+          set({ status: hasProjects ? 'complete' : 'active', step: 'account' });
       },
-      begin: () => set({ status: 'active', step: 'theme' }),
+      begin: () => set({ status: 'active', step: 'account' }),
       go: (step) => set({ step }),
       finish: () => set({ status: 'complete' }),
     }),

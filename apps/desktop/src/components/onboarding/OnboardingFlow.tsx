@@ -28,6 +28,7 @@ import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { PrivacySettings } from '../settings/PrivacySettings';
+import { JackalopeAccount, type AccountStatus } from '../settings/JackalopeAccount';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
@@ -35,12 +36,14 @@ import { Switch } from '../ui/Switch';
 import './onboarding.css';
 
 const steps: { id: OnboardingStep; label: string }[] = [
+  { id: 'account', label: 'Account' },
   { id: 'theme', label: 'Theme' },
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agent' },
   { id: 'task', label: 'First task' },
 ];
 const setupTips: Record<OnboardingStep, string[]> = {
+  account: ['Connect your Jackalope account to check early access. Settings sync is optional.'],
   theme: [
     'Theme changes are a preview until you choose Keep theme and continue.',
     'Try a palette, then adjust its accent and atmosphere to make it yours.',
@@ -102,7 +105,28 @@ export function OnboardingFlow({
   const errorMessage = useRef<HTMLParagraphElement>(null);
   const tipIndex = useRef(0);
   const desktop = isTauriEnvironment();
-  const step = onboarding.step === 'theme' ? 'theme' : !project ? 'project' : onboarding.step;
+  const [account, setAccount] = useState<AccountStatus | null>(null);
+  const [access, setAccess] = useState<{ required: boolean; allowed: boolean } | null>(null);
+  useEffect(() => {
+    let canceled = false;
+    const check = async () => {
+      try {
+        const value = desktop ? await nativeTask<{ required: boolean; allowed: boolean }>('app_execution_access') : { required: false, allowed: true };
+        if (!canceled) setAccess(value);
+      } catch { if (!canceled) setAccess(null); }
+    };
+    void check();
+    const timer = setInterval(() => void check(), 2000);
+    return () => { canceled = true; clearInterval(timer); };
+  }, [desktop]);
+  const needsAccount = !access || (access.required && !access.allowed);
+  const step = needsAccount || onboarding.step === 'account' ? 'account'
+    : onboarding.step === 'theme' ? 'theme' : !project ? 'project' : onboarding.step;
+  useEffect(() => {
+    if (step !== 'theme') return;
+    useThemeStore.setState({ previewing: true });
+    return () => { useThemeStore.setState({ previewing: false }); };
+  }, [step]);
   const index = steps.findIndex((item) => item.id === step);
   const draft = project ? (execution.drafts[project.id]?.prompt ?? '') : '';
   const runner = execution.runners.find((item) => item.id === agent);
@@ -198,7 +222,7 @@ export function OnboardingFlow({
           <img src="/mascot.svg" alt="" />
           Jackalope
         </span>
-        {step !== 'theme' && <ArcColorPicker />}
+        {step !== 'theme' && step !== 'account' && <ArcColorPicker />}
       </header>
       <main className="onboarding-layout">
         <aside className="onboarding-intro" aria-label="Setup progress">
@@ -246,7 +270,7 @@ export function OnboardingFlow({
             )}
           </div>
           <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
-            {step === 'theme'
+            {step === 'account' ? 'Connect your account' : step === 'theme'
               ? 'Choose your theme'
               : step === 'project'
                 ? 'Choose a project'
@@ -254,10 +278,27 @@ export function OnboardingFlow({
                   ? 'Choose a default agent for Jackalope'
                   : 'Describe your first task'}
           </h2>
+          {step === 'account' && <>
+            <p className="onboarding-description">Connect your Jackalope account to check whether you have early access.</p>
+            <JackalopeAccount onStatus={setAccount} />
+            <details className="onboarding-privacy-panel">
+              <summary><ShieldCheck size={20} aria-hidden="true" /><span><strong>Manage privacy settings</strong><small>Choose settings sync and usage sharing.</small></span><ChevronDown size={18} className="onboarding-privacy-chevron" aria-hidden="true" /></summary>
+              <div className="onboarding-privacy-controls"><PrivacySettings /></div>
+            </details>
+            {!access && <p role="status">Checking access…</p>}
+            {access?.required && !access.allowed && account?.state === 'offline' && <p role="status">Reconnect online to verify access before continuing setup.</p>}
+            {access && !access.required && account?.state !== 'connected' && <p className="onboarding-note">This development build can continue without an account.</p>}
+            <div className="onboarding-actions">
+              <Button disabled={busy || !access || (access.required && !access.allowed)} onClick={() => advance(() => onboarding.go('theme'))}>
+                {account?.state === 'connected' ? 'Continue' : access && !access.required ? 'Continue without an account' : 'Continue after approval'}<ArrowRight size={16} />
+              </Button>
+            </div>
+          </>}
           {step === 'theme' && (
             <>
               <ThemeEditor value={themeDraft} onChange={setThemeDraft} />
               <div className="onboarding-actions">
+                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('account')}>Back</Button>
                 <Button
                   variant="ghost"
                   disabled={busy}
