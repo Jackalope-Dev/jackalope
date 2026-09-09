@@ -703,11 +703,19 @@ try {
           is_bare: false,
           is_locked: false,
         },
+        {
+          path: 'C:/fixture/trail/.worktrees/search',
+          head: 'abc',
+          branch: 'feature/search',
+          is_bare: false,
+          is_locked: false,
+        },
       ];
     };
   });
   await navigate('worktrees');
-  await page.getByRole('button', { name: 'Copy path for master' }).waitFor();
+  await page.getByRole('button', { name: 'Copy path for feature/search' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Copy path for master' }).count(), 0);
   await page.getByText('Checking merge and cleanup status…', { exact: true }).waitFor();
   assert.equal(await page.getByText('Loading worktrees…', { exact: true }).count(), 0);
   for (const width of [1280, 960]) {
@@ -716,7 +724,7 @@ try {
   }
   await page.evaluate(() => window.failWorktreeInspection());
   await page.getByRole('alert').filter({ hasText: 'Cleanup check unavailable' }).waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Copy path for master' }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Copy path for feature/search' }).count(), 1);
   assert.equal(await page.getByRole('button', { name: 'Refresh worktrees' }).isEnabled(), true);
   assert.deepEqual(errors, []);
   console.log(

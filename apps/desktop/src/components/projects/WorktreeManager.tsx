@@ -48,10 +48,11 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const [removing, setRemoving] = useState<string | null>(null);
   const pending = busy || removing !== null;
   const refreshing = loading || checkingWorktrees;
-  const ready = (project?.worktrees ?? []).filter(
-    (wt) => wt.cleanup?.merged && !wt.cleanup.blocked_reason,
+  const worktrees = (project?.worktrees ?? []).filter(
+    (wt, index) => index > 0 && !['main', 'master'].includes(wt.branch),
   );
-  const missing = (project?.worktrees ?? []).filter((wt) => wt.cleanup?.missing && !wt.is_locked);
+  const ready = worktrees.filter((wt) => wt.cleanup?.merged && !wt.cleanup.blocked_reason);
+  const missing = worktrees.filter((wt) => wt.cleanup?.missing && !wt.is_locked);
   const targetBranch = target === 'auto' ? undefined : target;
   const projectId = useRef(activeProjectId);
   const refreshButton = useRef<HTMLButtonElement>(null);
@@ -311,11 +312,9 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               </div>
             </form>
           )}
-          {loading && (
-            <LoadingState label="Loading worktrees…" compact={!!project.worktrees.length} />
-          )}
+          {loading && <LoadingState label="Loading worktrees…" compact={!!worktrees.length} />}
           {checkingWorktrees && <LoadingState label="Checking merge and cleanup status…" compact />}
-          {project.worktrees?.map((wt) => (
+          {worktrees.map((wt) => (
             <article key={wt.path} className="worktree-row">
               <GitBranch
                 size={24}
@@ -404,7 +403,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               {worktreesError}
             </p>
           )}
-          {!loading && !worktreesError && !project.worktrees?.length && (
+          {!loading && !worktreesError && !worktrees.length && (
             <EmptyState
               icon={GitBranch}
               title="A place for parallel work"
