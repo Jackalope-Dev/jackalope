@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useCommunityStore } from '../../stores/communityStore';
@@ -16,12 +16,15 @@ type Report = {
 };
 export function FeedbackForm({
   invited = false,
+  showHeading = true,
   onSubmitted,
 }: {
   invited?: boolean;
+  showHeading?: boolean;
   onSubmitted?: () => void;
 }) {
   const settings = useCommunityStore((s) => s.settings);
+  const id = useId();
   const [kind, setKind] = useState<Report['kind']>(invited ? 'idea' : 'bug');
   const messageInput = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -78,11 +81,13 @@ export function FeedbackForm({
   };
   return (
     <section className="space-y-3" aria-label="Send feedback">
-      <h3 className="text-base font-medium">
-        {invited
-          ? 'What’s useful, and what could feel better?'
-          : 'Send a bug, feature request, or idea'}
-      </h3>
+      {showHeading && (
+        <h3 className="text-base font-medium">
+          {invited
+            ? 'What’s useful, and what could feel better?'
+            : 'Send a bug, feature request, or idea'}
+        </h3>
+      )}
       <p className="settings-row-description">
         Your message goes to Jackalope’s private dashboard and contact@jackalope.dev. App version,
         installed channel, and operating system are included. Leave out secrets and personal
@@ -91,8 +96,8 @@ export function FeedbackForm({
       </p>
       {!settings?.configured && (
         <p className="settings-disclosure-box">
-          Sending is unavailable in this build. You can still prepare and copy a local support
-          report below.
+          Sending is unavailable in this build. You can copy a local support report from Settings →
+          Updates &amp; support.
         </p>
       )}
       {preview ? (
@@ -120,11 +125,11 @@ export function FeedbackForm({
         </>
       ) : (
         <>
-          <label htmlFor="feedback-kind" className="block text-sm font-medium">
+          <label htmlFor={`${id}-kind`} className="block text-sm font-medium">
             Type
           </label>
           <Select
-            id="feedback-kind"
+            id={`${id}-kind`}
             className="settings-input"
             disabled={busy}
             value={kind}
@@ -134,12 +139,12 @@ export function FeedbackForm({
             <SelectItem value="feature">Feature request</SelectItem>
             <SelectItem value="idea">Idea</SelectItem>
           </Select>
-          <label htmlFor="feedback-message" className="block text-sm font-medium">
+          <label htmlFor={`${id}-message`} className="block text-sm font-medium">
             What would you like us to know?
           </label>
           <textarea
             ref={messageInput}
-            id="feedback-message"
+            id={`${id}-message`}
             className="settings-textarea"
             rows={5}
             maxLength={8000}

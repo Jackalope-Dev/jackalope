@@ -60,7 +60,10 @@ export function commitProjectSetup(pending: Project): Project {
   const project = useProjectStore.getState().completeSetup(pending);
   const execution = useExecutionStore.getState();
   if (execution.drafts.capture) {
-    execution.draft('capture', captureDraftForProject(execution.drafts, project, previousProjectId));
+    execution.draft(
+      'capture',
+      captureDraftForProject(execution.drafts, project, previousProjectId),
+    );
   }
   void useContextMemoryStore
     .getState()

@@ -5,6 +5,7 @@ import {
   CircleCheck,
   CircleHelp,
   Info,
+  MessageSquare,
   Search,
   Settings2,
   X,
@@ -21,6 +22,7 @@ import {
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { openCompanionTask } from './CompanionSources';
 import { JackalopeMascot } from './JackalopeMascot';
 import { returnToCompanion } from './useCompanionNotices';
@@ -34,6 +36,7 @@ export function Companion({
   onSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const interactedOutside = useRef(false);
   const pendingAction = useRef<(() => void) | null>(null);
   const [hint, setHint] = useState<Pick<CompanionNotice, 'id' | 'title' | 'kind'> | null>(null);
@@ -163,6 +166,15 @@ export function Companion({
               <X size={18} />
             </Popover.Close>
           </header>
+          <button
+            type="button"
+            className="companion-feedback"
+            onClick={() => activate(() => setFeedbackOpen(true))}
+          >
+            <MessageSquare size={18} aria-hidden="true" />
+            <span>Send feedback</span>
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </button>
           <div className="companion-content">
             <div className="companion-section-heading">
               <h3>Notifications</h3>
@@ -265,6 +277,7 @@ export function Companion({
           </div>
         </Popover.Content>
       </Popover.Portal>
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </Popover.Root>
   );
 }

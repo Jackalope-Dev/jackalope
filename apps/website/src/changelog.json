@@ -1,5 +1,16 @@
 [
   {
+    "id": "feedback-from-your-companion",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Feedback from your companion",
+    "description": "Share a bug, feature request or idea directly from the bottom-right Jackalope helper.",
+    "items": [
+      "Open Send feedback, review your message and send it to our private inbox without leaving your work."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "task-capture-stays-in-place",
     "date": "2026-09-09",
     "status": "In development",

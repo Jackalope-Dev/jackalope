@@ -98,6 +98,23 @@
   min-height: 0;
   padding: 8px 20px 16px;
 }
+.companion-feedback {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+  margin: 12px 20px 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-surface-hover);
+  color: var(--color-accent-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+}
+.companion-feedback span {
+  flex: 1;
+}
 .companion-section-heading {
   display: flex;
   align-items: center;
