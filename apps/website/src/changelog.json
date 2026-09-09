@@ -1,5 +1,18 @@
 [
   {
+    "id": "a-predictable-local-work-cycle",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A predictable local work cycle",
+    "description": "Completed tasks get automatic checkpoints, followed by a reviewed merge and safe worktree cleanup.",
+    "items": [
+      "Choose agent, shared or user-only commit credit per project during setup.",
+      "Review automatic commit messages and merge a task group as one commit.",
+      "Detect already integrated content and remove completed worktrees and branches; one failed folder no longer stops bulk cleanup."
+    ],
+    "note": "Development milestone; installed-agent acceptance remains open."
+  },
+  {
     "id": "hourly-recurring-tasks",
     "date": "2026-09-09",
     "status": "In development",

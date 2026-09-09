@@ -433,6 +433,9 @@ impl TaskRuntime {
             ]);
         }
         let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. If permissions are denied, explain what is needed and stop; do not bypass the denial.\n", req.prompt);
+        let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
+        commit_policy.environment(&mut cmd, &[req.agent.clone()]);
+        input.push_str(&format!("\nProject commit attribution: {:?}. Jackalope writes a checkpoint at successful task completion when automatic checkpoints are enabled, then creates the final commit after human review with the configured attribution. Leave changes uncommitted. End your result with a concise, accurate line: Commit message: <imperative summary of the actual changes>. Do not claim tests passed unless they ran. This applies to continuations and agent handoffs too.\n", commit_policy.attribution));
         if req.previous_run_id.is_none() {
             input.push_str(&req.context_receipt.text());
 
@@ -639,6 +642,34 @@ impl TaskRuntime {
             self.update_checked(id, |r| r.finishing = true)?;
             if let Err(error) = crate::commands::verification::finish(self, id) {
                 self.update(id, |r| r.verification_error = Some(error));
+            }
+        }
+        if exit.success() && run.error.is_none() && !run.result.is_empty() && !quota_stopped {
+            let _guard = crate::commands::integration::execution_guard()?;
+            let result = {
+                let inner = self.inner.lock().unwrap();
+                let current = inner.runs.get(id).ok_or("Attempt not found")?;
+                if !inner.canceled.contains(id)
+                    && ["starting", "running"].contains(&current.status.as_str())
+                {
+                    Some(crate::commands::checkpoint::create(
+                        current,
+                        &self.integration_directory(),
+                    ))
+                } else {
+                    None
+                }
+            };
+            if let Some(result) = result {
+                self.update_checked(id, |current| match result {
+                    Ok(checkpoint) => {
+                        current.checkpoint = checkpoint;
+                        current.checkpoint_error = None;
+                    }
+                    Err(error) => {
+                        current.checkpoint_error = Some(error);
+                    }
+                })?;
             }
         }
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
@@ -918,6 +949,8 @@ impl TaskRuntime {
                 )?
             };
             let run = TaskRun {
+                checkpoint: None,
+                checkpoint_error: None,
                 routing: (request.agent == "auto").then(super::routing::RoutingHistory::default),
                 quota_failure: None,
                 contract,

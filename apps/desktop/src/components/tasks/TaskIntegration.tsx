@@ -37,20 +37,27 @@ export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: (
         Checking integration history…
       </p>
     );
-  if (queue.mergedRunIds.includes(run.id))
-    return (
-      <p role="status" className="task-notice">
-        This result is integrated into {run.targetBranch}. Its workspace and history are retained.
-      </p>
-    );
   return (
-    <MergeReview
-      project={project}
-      runs={runs}
-      items={queue.items}
-      merged={queue.mergedRunIds}
-      onChanged={refresh}
-      onlyRunId={run.id}
-    />
+    <div>
+      {run.checkpoint && (
+        <p className="task-notice">
+          Checkpoint saved: {run.checkpoint.head.slice(0, 8)} ·{' '}
+          {run.checkpoint.message.split('\n')[0]}
+        </p>
+      )}
+      {run.checkpointError && (
+        <p role="alert" className="task-error">
+          Automatic checkpoint needs attention: {run.checkpointError}
+        </p>
+      )}
+      <MergeReview
+        project={project}
+        runs={runs}
+        items={queue.items}
+        merged={queue.mergedRunIds}
+        onChanged={refresh}
+        onlyRunId={run.id}
+      />
+    </div>
   );
 }

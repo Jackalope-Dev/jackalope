@@ -298,7 +298,7 @@ export function TaskDetail({
       )}
       {finished && isLatest && (
         <div className="result-actions">
-          {isolated && !integrated && (
+          {isolated && (
             <Button
               onClick={() => {
                 setTab('changes');
@@ -306,7 +306,7 @@ export function TaskDetail({
               }}
             >
               <GitMerge size={16} />
-              Review integration
+              {integrated ? 'Merge receipt' : 'Review integration'}
             </Button>
           )}
           {run.status === 'review' && (
@@ -441,16 +441,18 @@ export function TaskDetail({
           </Tabs.Content>
           {((!active && run.workspace) || tab === 'changes') && (
             <Tabs.Content value="changes" forceMount hidden={tab !== 'changes'}>
-              {!active && run.workspace ? (
+              {!active && run.workspace && !integrated ? (
                 <ResultReview key={run.id} run={run} />
               ) : (
                 <p className="task-muted">
-                  {active
-                    ? 'Changes become available for review after this attempt stops.'
-                    : 'No workspace was recorded for this attempt. Inspect its result and activity for more detail.'}
+                  {integrated
+                    ? 'The reviewed patch and cleanup results are saved in the merge receipt below.'
+                    : active
+                      ? 'Changes become available for review after this attempt stops.'
+                      : 'No workspace was recorded for this attempt. Inspect its result and activity for more detail.'}
                 </p>
               )}
-              {integrating && finished && isLatest && (
+              {(integrating || integrated) && finished && isLatest && (
                 <TaskIntegration run={run} onApplied={applied} />
               )}
             </Tabs.Content>

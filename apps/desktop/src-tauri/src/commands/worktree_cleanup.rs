@@ -24,6 +24,8 @@ pub struct CleanupStatus {
     pub missing: bool,
     #[serde(default)]
     pub generated_paths: Vec<String>,
+    #[serde(default)]
+    pub content_merged: bool,
 }
 
 /// Cap on the untracked content an archive will copy before bailing out.
@@ -320,15 +322,101 @@ fn local_content(path: &Path) -> Result<LocalContent, String> {
     Ok(content)
 }
 
+struct ScratchIndex(PathBuf);
+impl Drop for ScratchIndex {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+// Require a no-op three-way merge for both the index and working copy. Comparing
+// whole trees would reject older worktrees; checking only HEAD would lose edits.
+fn content_in_target(path: &Path, head: &str, target: &str) -> Result<bool, String> {
+    let temp = ScratchIndex(
+        std::env::temp_dir().join(format!("jackalope-cleanup-{}.index", uuid::Uuid::new_v4())),
+    );
+    let index = git(
+        path,
+        &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+    )?;
+    let before = std::fs::read(index.trim()).map_err(|e| e.to_string())?;
+    std::fs::write(&temp.0, &before).map_err(|e| e.to_string())?;
+    let indexed = |args: &[&str]| -> Result<String, String> {
+        let result = command(path, args)
+            .env("GIT_INDEX_FILE", &temp.0)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !result.status.success() {
+            return Err(String::from_utf8_lossy(&result.stderr).trim().into());
+        }
+        Ok(String::from_utf8_lossy(&result.stdout).trim().into())
+    };
+    let staged = indexed(&["write-tree"])?;
+    indexed(&["add", "--all", "--", "."])?;
+    let working = indexed(&["write-tree"])?;
+    let target_tree = git(path, &["rev-parse", &format!("{target}^{{tree}}")])?;
+    for tree in [&staged, &working] {
+        let result = command(
+            path,
+            &[
+                "commit-tree",
+                tree,
+                "-p",
+                head,
+                "-m",
+                "Cleanup content check",
+            ],
+        )
+        .env("GIT_AUTHOR_NAME", "Jackalope")
+        .env("GIT_AUTHOR_EMAIL", "cleanup@jackalope.invalid")
+        .env("GIT_COMMITTER_NAME", "Jackalope")
+        .env("GIT_COMMITTER_EMAIL", "cleanup@jackalope.invalid")
+        .output()
+        .map_err(|e| e.to_string())?;
+        if !result.status.success() {
+            return Err("Cannot inspect local content safely.".into());
+        }
+        let commit = String::from_utf8_lossy(&result.stdout);
+        let result = output(path, &["merge-tree", "--write-tree", target, commit.trim()])?;
+        if !result.status.success()
+            || String::from_utf8_lossy(&result.stdout).lines().next() != Some(target_tree.trim())
+        {
+            return Ok(false);
+        }
+    }
+    if git(path, &["rev-parse", "HEAD"])?.trim() != head
+        || std::fs::read(index.trim()).map_err(|e| e.to_string())? != before
+    {
+        return Err("The worktree changed during inspection. Refresh before cleanup.".into());
+    }
+    indexed(&["add", "--all", "--", "."])?;
+    if indexed(&["write-tree"])? != working {
+        return Err("Local files changed during inspection.".into());
+    }
+    Ok(true)
+}
+
 pub(super) fn inspect(
     repo_path: &str,
     requested: Option<&str>,
     runs: &[TaskRun],
 ) -> Result<Vec<WorktreeEntry>, String> {
+    inspect_entries(repo_path, requested, runs, None)
+}
+
+fn inspect_entries(
+    repo_path: &str,
+    requested: Option<&str>,
+    runs: &[TaskRun],
+    only: Option<&str>,
+) -> Result<Vec<WorktreeEntry>, String> {
     let repo = canonical(repo_path)?;
     let mut entries = list_worktrees(repo_path)?;
     let target = target(&repo, requested);
     for index in 0..entries.len() {
+        if only.is_some_and(|path| entries[index].path != path) {
+            continue;
+        }
         let mut status = CleanupStatus {
             target_branch: None,
             target_head: None,
@@ -336,6 +424,7 @@ pub(super) fn inspect(
             blocked_reason: None,
             recoverable: false,
             generated_paths: Vec::new(),
+            content_merged: false,
             missing: Path::new(&entries[index].path)
                 .try_exists()
                 .is_ok_and(|exists| !exists),
@@ -379,26 +468,48 @@ pub(super) fn inspect(
                 Err(reason) => status.blocked_reason = Some(reason),
             },
         }
+        if status.recoverable {
+            if let Some(head) = status.target_head.as_deref() {
+                match content_in_target(Path::new(&entries[index].path), &entries[index].head, head)
+                {
+                    Ok(true) => {
+                        status.content_merged = true;
+                        status.blocked_reason = None;
+                        status.recoverable = false;
+                    }
+                    Ok(false) => {}
+                    Err(reason) => {
+                        status.blocked_reason = Some(reason);
+                        status.recoverable = false;
+                    }
+                }
+            }
+        }
         entries[index].cleanup = Some(status);
     }
     Ok(entries)
 }
 
-fn remove(
+pub(super) fn remove(
     repo_path: &str,
     worktree_path: &str,
     target_branch: &str,
     expected_head: &str,
     expected_target_head: &str,
     runs: &[TaskRun],
+    delete_branch: bool,
+    expected_branch: Option<&str>,
 ) -> Result<(), String> {
-    let entries = inspect(repo_path, Some(target_branch), runs)?;
+    let entries = inspect_entries(repo_path, Some(target_branch), runs, Some(worktree_path))?;
     let wt = entries
         .iter()
         .find(|wt| wt.path == worktree_path)
         .ok_or("Worktree is no longer registered. Refresh the list.")?;
     let status = wt.cleanup.as_ref().ok_or("Refresh the worktree status.")?;
-    if wt.head != expected_head || status.target_head.as_deref() != Some(expected_target_head) {
+    if expected_branch.is_some_and(|branch| branch != wt.branch)
+        || wt.head != expected_head
+        || status.target_head.as_deref() != Some(expected_target_head)
+    {
         return Err(
             "The worktree or target branch changed. Refresh and review its status again.".into(),
         );
@@ -406,7 +517,7 @@ fn remove(
     if let Some(reason) = &status.blocked_reason {
         return Err(reason.clone());
     }
-    if status.merged != Some(true) {
+    if status.merged != Some(true) && !status.content_merged {
         return Err("All commits must be merged before cleanup.".into());
     }
     if git(Path::new(worktree_path), &["rev-parse", "HEAD"])?.trim() != expected_head
@@ -416,10 +527,93 @@ fn remove(
             "The worktree or target branch changed. Refresh and review its status again.".into(),
         );
     }
-    git(
-        Path::new(repo_path),
-        &["worktree", "remove", "--", worktree_path],
-    )?;
+    let root = canonical(worktree_path)?;
+    for generated in &status.generated_paths {
+        let path = root.join(generated);
+        if !path.starts_with(&root)
+            || path == root
+            || is_link(&std::fs::symlink_metadata(&path).map_err(|e| e.to_string())?)
+        {
+            return Err("Generated folder changed. Refresh before cleanup.".into());
+        }
+        std::fs::remove_dir_all(&path).map_err(|e| format!("Cannot remove generated folder {}: {e}. Close terminals, development servers or file viewers using this folder, then retry. Other worktrees can still be cleaned.", path.display()))?;
+    }
+    // Recheck after potentially slow dependency removal, before permitting dirty removal.
+    let checked = inspect_entries(repo_path, Some(target_branch), runs, Some(worktree_path))?;
+    let now = checked
+        .iter()
+        .find(|entry| entry.path == worktree_path)
+        .ok_or("Worktree registration changed.")?;
+    if now.head != expected_head
+        || now.branch != wt.branch
+        || now.cleanup.as_ref().is_none_or(|s| {
+            s.blocked_reason.is_some() || s.target_head.as_deref() != Some(expected_target_head)
+        })
+    {
+        return Err("Worktree changed during cleanup. Refresh before retrying.".into());
+    }
+    let args = if status.content_merged {
+        vec!["worktree", "remove", "--force", "--", worktree_path]
+    } else {
+        vec!["worktree", "remove", "--", worktree_path]
+    };
+    git(Path::new(repo_path), &args).map_err(|e| format!("Could not finish removing {worktree_path}: {e}. Close processes using this folder and refresh. If Git already removed its registration, inspect the remaining folder manually; no unverified files will be deleted."))?;
+    if delete_branch && !wt.branch.is_empty() {
+        delete_merged_branch(
+            repo_path,
+            &wt.branch,
+            expected_head,
+            target_branch,
+            expected_target_head,
+        )?;
+    }
+    Ok(())
+}
+
+pub(super) fn delete_merged_branch(
+    repo: &str,
+    branch: &str,
+    head: &str,
+    target_branch: &str,
+    target_head: &str,
+) -> Result<(), String> {
+    if ["main", "master", target_branch].contains(&branch)
+        || list_worktrees(repo)?
+            .iter()
+            .any(|entry| entry.branch == branch)
+    {
+        return Err(
+            "Worktree removed; branch kept because it is protected or checked out elsewhere."
+                .into(),
+        );
+    }
+    use std::io::Write;
+    let mut child = command(Path::new(repo), &["update-ref", "--stdin"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let input = format!("start\nverify refs/heads/{target_branch} {target_head}\ndelete refs/heads/{branch} {head}\nprepare\ncommit\n");
+    child
+        .stdin
+        .take()
+        .ok_or("Cannot open Git input.")?
+        .write_all(input.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err("Worktree removed; branch kept because its reference or the target changed. Refresh before removing the branch.".into());
+    }
+    let _ = git(
+        Path::new(repo),
+        &[
+            "config",
+            "--local",
+            "--remove-section",
+            &format!("branch.{branch}"),
+        ],
+    );
     Ok(())
 }
 
@@ -459,7 +653,7 @@ fn archive(
     expected_target_head: &str,
     runs: &[TaskRun],
 ) -> Result<String, String> {
-    let entries = inspect(repo_path, Some(target_branch), runs)?;
+    let entries = inspect_entries(repo_path, Some(target_branch), runs, Some(worktree_path))?;
     let wt = entries
         .iter()
         .find(|wt| wt.path == worktree_path)
@@ -701,6 +895,8 @@ pub async fn git_cleanup_worktree(
     target_branch: String,
     expected_head: String,
     expected_target_head: String,
+    delete_branch: Option<bool>,
+    expected_branch: Option<String>,
     state: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
     let runtime = state.inner().clone();
@@ -717,6 +913,8 @@ pub async fn git_cleanup_worktree(
             &expected_head,
             &expected_target_head,
             &runs,
+            delete_branch.unwrap_or(false),
+            expected_branch.as_deref(),
         )
     })
     .await
@@ -779,6 +977,8 @@ mod tests {
                 &entry.head,
                 status.target_head.as_deref().unwrap_or(""),
                 runs,
+                false,
+                Some(&entry.branch),
             )
         }
         fn commit(&self, path: &Path, text: &str) {
@@ -839,15 +1039,71 @@ mod tests {
     }
 
     #[test]
-    fn unmerged_and_squashed_commits_are_kept() {
+    fn copied_uncommitted_work_is_ready_but_new_staged_content_is_kept() {
+        let f = Fixture::new("main");
+        fs::write(f.worktree.join("file.txt"), "integrated\n").unwrap();
+        fs::write(f.worktree.join("new.txt"), "new file\n").unwrap();
+        fs::write(f.repo.join("new.txt"), "new file\n").unwrap();
+        f.commit(&f.repo, "integrated\n");
+        let entry = f.entry();
+        assert!(entry.cleanup.as_ref().unwrap().content_merged);
+        assert!(entry.cleanup.as_ref().unwrap().blocked_reason.is_none());
+        fs::write(f.worktree.join("file.txt"), "staged unique\n").unwrap();
+        git(&f.worktree, &["add", "file.txt"]).unwrap();
+        fs::write(f.worktree.join("file.txt"), "integrated\n").unwrap();
+        assert!(!f.entry().cleanup.as_ref().unwrap().content_merged);
+        assert!(f.remove(&entry, &[]).is_err());
+        assert_eq!(
+            git(&f.worktree, &["show", ":file.txt"]).unwrap().trim(),
+            "staged unique"
+        );
+    }
+
+    #[test]
+    fn branch_switch_at_the_same_commit_invalidates_cleanup() {
+        let f = Fixture::new("main");
+        let entry = f.entry();
+        git(&f.worktree, &["checkout", "-b", "different-work"]).unwrap();
+        assert!(f.remove(&entry, &[]).unwrap_err().contains("changed"));
+        assert!(f.worktree.exists());
+    }
+
+    #[test]
+    fn cleanup_can_remove_the_matching_local_branch() {
+        let f = Fixture::new("master");
+        let entry = f.entry();
+        remove(
+            f.repo.to_str().unwrap(),
+            &entry.path,
+            "master",
+            &entry.head,
+            entry
+                .cleanup
+                .as_ref()
+                .unwrap()
+                .target_head
+                .as_deref()
+                .unwrap(),
+            &[],
+            true,
+            Some(&entry.branch),
+        )
+        .unwrap();
+        assert!(git(&f.repo, &["show-ref", "--verify", "refs/heads/feature"]).is_err());
+        assert!(git(&f.repo, &["show-ref", "--verify", "refs/heads/master"]).is_ok());
+    }
+
+    #[test]
+    fn unmerged_commits_are_kept_and_exact_squash_content_is_detected() {
         let f = Fixture::new("main");
         f.commit(&f.worktree, "unmerged\n");
         assert_eq!(f.entry().cleanup.as_ref().unwrap().merged, Some(false));
         assert!(f.remove(&f.entry(), &[]).is_err());
         f.commit(&f.repo, "unmerged\n");
         git(&f.repo, &["commit", "--amend", "-m", "squash merge"]).unwrap();
-        assert!(f.remove(&f.entry(), &[]).is_err());
-        assert!(f.worktree.exists());
+        assert!(f.entry().cleanup.as_ref().unwrap().content_merged);
+        f.remove(&f.entry(), &[]).unwrap();
+        assert!(!f.worktree.exists());
     }
 
     #[test]
@@ -1170,7 +1426,9 @@ mod tests {
             "main",
             &entries[1].head,
             &entries[1].head,
-            &[]
+            &[],
+            false,
+            None,
         )
         .is_err());
     }

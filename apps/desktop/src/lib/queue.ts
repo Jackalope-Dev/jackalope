@@ -49,6 +49,10 @@ export interface IntegrationPlan {
   status: string;
   createdAt: string;
   appliedAt: string | null;
+  commitMessage?: string;
+  commitPolicy?: import('./project-git').CommitPolicy;
+  cleanupRequested?: boolean;
+  cleanupResults?: { workspace: string; removed: boolean; error: string | null }[];
 }
 
 export type QueueCommand =
@@ -68,7 +72,7 @@ export async function queueCommand<T>(
 }
 export const queueSnapshot = () => queueCommand<QueueView>('queue_snapshot');
 export const integrationPlans = () => nativeTask<IntegrationPlan[]>('integration_plans');
-export const prepareIntegration = (runIds: string[]) =>
-  nativeTask<IntegrationPlan>('integration_prepare', { runIds });
-export const applyIntegration = (planId: string) =>
-  nativeTask<IntegrationPlan>('integration_apply', { planId });
+export const prepareIntegration = (runIds: string[], commitMessage?: string) =>
+  nativeTask<IntegrationPlan>('integration_prepare', { runIds, commitMessage });
+export const applyIntegration = (planId: string, cleanup = false) =>
+  nativeTask<IntegrationPlan>('integration_apply', { planId, cleanup });

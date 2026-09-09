@@ -2,6 +2,8 @@ use super::*;
 
 pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {
+        checkpoint: None,
+        checkpoint_error: None,
         routing: None,
         quota_failure: None,
         contract: Default::default(),

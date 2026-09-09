@@ -182,6 +182,7 @@ pub fn run() {
             queue_dispatch,
             queue_cancel,
             queue_release,
+            commands::project_git::project_git_policy,
             integration_prepare,
             integration_apply,
             integration_plans,

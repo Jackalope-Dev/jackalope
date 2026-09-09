@@ -18,6 +18,8 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  checkpoint?: { head: string; message: string } | null;
+  checkpointError?: string | null;
   routing?: {
     attempts?: {
       agent: string;

@@ -25,6 +25,10 @@ pub struct UsageObservation {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]
+    pub checkpoint: Option<crate::commands::checkpoint::Checkpoint>,
+    #[serde(default)]
+    pub checkpoint_error: Option<String>,
+    #[serde(default)]
     pub routing: Option<super::routing::RoutingHistory>,
     #[serde(default)]
     pub quota_failure: Option<super::routing::QuotaFailure>,

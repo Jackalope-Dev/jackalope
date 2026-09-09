@@ -48,3 +48,7 @@ pub mod community;
 pub mod execution_access;
 mod git_command;
 pub mod notifications;
+
+pub mod project_git;
+
+pub mod checkpoint;

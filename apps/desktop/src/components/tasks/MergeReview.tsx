@@ -1,5 +1,5 @@
 import { ArrowRight, Check, GitMerge, GitPullRequest } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import type { IntegrationPlan, QueueItem } from '../../lib/queue';
 import { applyIntegration, integrationPlans, prepareIntegration } from '../../lib/queue';
 import type { TaskRun } from '../../lib/task-runtime';
@@ -8,6 +8,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { DiffPreview } from './DiffPreview';
 export function MergeReview({
   project,
@@ -24,6 +25,7 @@ export function MergeReview({
   merged: string[];
   onChanged: () => Promise<void>;
 }) {
+  const messageId = useId();
   const titleFor = (id: string) => {
     const run = runs.find((run) => run.id === id);
     const item = items.find((item) =>
@@ -37,6 +39,8 @@ export function MergeReview({
   const [file, setFile] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [cleanup, setCleanup] = useState(true);
   const normalizePath = (path: string) =>
     path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
   const candidates = runs.filter(
@@ -63,8 +67,18 @@ export function MergeReview({
       plan.status === 'applying' ||
       plan.runIds.every((id) => candidateIds.includes(id)));
   const load = useCallback(async () => {
-    if (isTauriEnvironment()) setPlans(await integrationPlans());
-  }, []);
+    if (isTauriEnvironment()) {
+      const next = await integrationPlans();
+      setPlans(next);
+      if (onlyRunId)
+        setPlan(
+          (current) =>
+            current ??
+            next.find((item) => item.status === 'applied' && item.runIds.includes(onlyRunId)) ??
+            null,
+        );
+    }
+  }, [onlyRunId]);
   useEffect(() => {
     void load().catch((error) => setError(String(error)));
   }, [load]);
@@ -72,8 +86,9 @@ export function MergeReview({
     setBusy(true);
     setError('');
     try {
-      const next = await prepareIntegration(chosen);
+      const next = await prepareIntegration(chosen, message);
       setPlan(next);
+      setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
       setFile('');
       await load();
     } catch (error) {
@@ -87,7 +102,7 @@ export function MergeReview({
     setBusy(true);
     setError('');
     try {
-      setPlan(await applyIntegration(plan.id));
+      setPlan(await applyIntegration(plan.id, cleanup));
       setSelected([]);
       await onChanged();
       await load();
@@ -145,6 +160,20 @@ export function MergeReview({
               </button>
             </label>
           ))}
+          <label htmlFor={messageId} className="task-label block mt-5">
+            Commit message
+            <Input
+              id={messageId}
+              value={message}
+              maxLength={4000}
+              disabled={busy}
+              placeholder={chosen.length === 1 ? titleFor(chosen[0]) : 'Complete selected tasks'}
+              onChange={(event) => {
+                setMessage(event.target.value);
+                setPlan(null);
+              }}
+            />
+          </label>
           <Button className="mt-5" disabled={busy || !chosen.length} onClick={() => void prepare()}>
             {busy
               ? 'Preparing…'
@@ -152,11 +181,11 @@ export function MergeReview({
             <GitMerge size={15} />
           </Button>
         </>
-      ) : (
+      ) : !plan ? (
         <p className="task-muted py-5">
           Finished tasks arrive here with their results and changes.
         </p>
-      )}
+      ) : null}
       {error && (
         <p className="task-error" role="alert">
           {error}
@@ -174,10 +203,12 @@ export function MergeReview({
                     : 'Review this integration'}
               </p>
               <h3>
-                {plan.runIds.length} tasks → {plan.targetBranch}
+                {plan.runIds.length} {plan.runIds.length === 1 ? 'task' : 'tasks'} →{' '}
+                {plan.targetBranch}
               </h3>
               <p className="task-muted mt-2">
-                {plan.files.length} files · starting at {plan.masterHead.slice(0, 8)}
+                {plan.files.length} {plan.files.length === 1 ? 'file' : 'files'} · starting at{' '}
+                {plan.masterHead.slice(0, 8)}
               </p>
               <ul className="task-muted mt-2">
                 {plan.runIds.map((id) => (
@@ -187,6 +218,39 @@ export function MergeReview({
             </div>
             {plan.status === 'applied' && <Check size={24} />}
           </div>
+          {plan.commitMessage && (
+            <div className="my-4">
+              <p className="task-label">Commit preview</p>
+              <pre className="whitespace-pre-wrap break-words task-muted mt-2">
+                {plan.commitMessage}
+              </pre>
+              <p className="task-muted mt-2">
+                Attribution:{' '}
+                {plan.commitPolicy?.attribution === 'agent'
+                  ? 'Agents'
+                  : `${plan.commitPolicy?.name} <${plan.commitPolicy?.email}>`}
+              </p>
+            </div>
+          )}
+          {!!plan.cleanupResults?.length && (
+            <div role="status" className="task-notice merge-cleanup-results">
+              <p>The merge is complete.</p>
+              <ul>
+                {plan.cleanupResults.map((result) => (
+                  <li key={result.workspace} className="break-all">
+                    {result.removed ? 'Removed worktree and branch' : 'Kept for attention'}:{' '}
+                    {result.workspace}
+                    {result.error ? ` · ${result.error}` : ''}
+                  </li>
+                ))}
+              </ul>
+              {plan.cleanupResults.some((result) => !result.removed) && (
+                <Button variant="outline" disabled={busy} onClick={() => void apply()}>
+                  Retry cleanup
+                </Button>
+              )}
+            </div>
+          )}
           {plan.conflicts.length > 0 && (
             <div className="task-error">
               <p>
@@ -228,10 +292,19 @@ export function MergeReview({
           {planEligible && ['ready', 'applying'].includes(plan.status) && (
             <div className="merge-approval">
               <p className="task-muted">
-                Creates commits as your configured Git user and fast-forwards {plan.targetBranch}.
-                The target checkout must be clean, and the reviewed source files must still match.
-                Build and test the changes before merging.
+                Creates one commit and updates {plan.targetBranch}. The target checkout must be
+                clean, and reviewed files must still match. Work that changed or remains in use is
+                kept.
               </p>
+              <label className="flex items-center gap-3 min-h-11">
+                <input
+                  type="checkbox"
+                  checked={cleanup}
+                  disabled={busy}
+                  onChange={(event) => setCleanup(event.target.checked)}
+                />
+                Remove completed worktrees and local branches after merging
+              </label>
               <Button disabled={busy} onClick={() => void apply()}>
                 {busy
                   ? 'Integrating…'

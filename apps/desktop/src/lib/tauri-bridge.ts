@@ -13,6 +13,7 @@ export interface WorktreeEntry {
     recoverable?: boolean;
     missing?: boolean;
     generated_paths?: string[];
+    content_merged?: boolean;
   } | null;
 }
 
@@ -59,11 +60,18 @@ export async function listWorktrees(
 export async function cleanupWorktree(repoPath: string, worktree: WorktreeEntry): Promise<void> {
   if (!isTauriEnvironment()) throw new Error('Open the desktop app to clean up a worktree.');
   const status = worktree.cleanup;
-  if (!status?.merged || status.blocked_reason || !status.target_branch || !status.target_head) {
+  if (
+    (!status?.merged && !status?.content_merged) ||
+    status.blocked_reason ||
+    !status.target_branch ||
+    !status.target_head
+  ) {
     throw new Error('Refresh and review this worktree before cleanup.');
   }
   const { invoke } = await import('@tauri-apps/api/core');
   await invoke('git_cleanup_worktree', {
+    deleteBranch: true,
+    expectedBranch: worktree.branch,
     repoPath,
     worktreePath: worktree.path,
     targetBranch: status.target_branch,

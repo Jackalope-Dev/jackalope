@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
+import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { createProject, openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -23,6 +24,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
+import { ProjectGitSettings } from '../projects/ProjectGitSettings';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { ProjectThemeStep } from './ProjectThemeStep';
@@ -60,6 +62,7 @@ export function OnboardingFlow({
   const project =
     onboarding.pendingProject ?? projects.find((item) => item.id === onboarding.projectId);
   const appTheme = useThemeStore((state) => state.appTheme);
+  const [commitPolicy, setCommitPolicy] = useState<CommitPolicy>();
   const [themePreview, setThemePreview] = useState<ThemePalette>();
   const execution = useExecutionStore();
   const config = useAgentConfigStore();
@@ -525,6 +528,13 @@ export function OnboardingFlow({
                   {execution.error}
                 </p>
               )}
+              {project && (
+                <ProjectGitSettings
+                  key={project.path}
+                  projectPath={project.path}
+                  onDraftChange={setCommitPolicy}
+                />
+              )}
               <p className="onboarding-note">
                 Add more agents, supported accounts and models in <strong>Settings → Agents</strong>
                 . Choose the agents and accounts each project uses in{' '}
@@ -638,6 +648,7 @@ export function OnboardingFlow({
                   onClick={() =>
                     void attempt(async () => {
                       if (!project) return;
+                      if (commitPolicy) await projectGitPolicy(project.path, commitPolicy);
                       setThemePreview(undefined);
                       onboarding.stageProject(
                         {

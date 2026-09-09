@@ -28,6 +28,8 @@ pub fn execution_guard() -> Result<std::sync::MutexGuard<'static, ()>, String> {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct IntegrationSource {
+    #[serde(default)]
+    pub branch: Option<String>,
     pub run_id: String,
     pub workspace: String,
     pub head: String,
@@ -52,6 +54,22 @@ pub struct IntegrationPlan {
     pub status: String,
     pub created_at: String,
     pub applied_at: Option<String>,
+    #[serde(default)]
+    pub commit_message: String,
+    #[serde(default)]
+    pub commit_policy: Option<super::project_git::CommitPolicy>,
+    #[serde(default)]
+    pub cleanup_requested: bool,
+    #[serde(default)]
+    pub cleanup_results: Vec<CleanupResult>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupResult {
+    pub workspace: String,
+    pub removed: bool,
+    pub error: Option<String>,
 }
 
 fn legacy_target_branch() -> String {
@@ -59,7 +77,9 @@ fn legacy_target_branch() -> String {
 }
 
 fn command(path: &Path, args: &[&str]) -> Command {
-    super::git_command::command(path, args, super::git_command::Policy::Isolated)
+    let mut command = super::git_command::command(path, args, super::git_command::Policy::Isolated);
+    command.env("GIT_NO_REPLACE_OBJECTS", "1");
+    command
 }
 
 fn output_text(output: Output) -> Result<String, String> {
@@ -108,7 +128,7 @@ impl Drop for TemporaryIndex {
     }
 }
 
-fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSource, String> {
+pub(super) fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSource, String> {
     let workspace = canonical(&run.workspace)?;
     let head = git(&workspace, &["rev-parse", "HEAD"])?;
     let status = git(
@@ -147,6 +167,7 @@ fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSource, String
         );
     }
     Ok(IntegrationSource {
+        branch: git(&workspace, &["symbolic-ref", "--quiet", "--short", "HEAD"]).ok(),
         run_id: run.id.clone(),
         workspace: run.workspace.clone(),
         head,
@@ -160,13 +181,8 @@ pub(super) fn workspace_tree(run: &TaskRun, directory: &Path) -> Result<String, 
 }
 
 fn commit_tree(path: &Path, tree: &str, parents: &[&str], message: &str) -> Result<String, String> {
-    let name = git(path, &["config", "user.name"])
-        .map_err(|_| "Set Git user.name before preparing an integration.".to_string())?;
-    let email = git(path, &["config", "user.email"])
-        .map_err(|_| "Set Git user.email before preparing an integration.".to_string())?;
-    if name.is_empty() || email.is_empty() {
-        return Err("Configure your Git name and email first.".into());
-    }
+    let name = "Jackalope review";
+    let email = "review@jackalope.invalid";
     let mut cmd = command(path, &["commit-tree", tree]);
     for parent in parents {
         cmd.args(["-p", parent]);
@@ -293,7 +309,17 @@ fn require_verification(run: &TaskRun, tree: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(test)]
 fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<IntegrationPlan, String> {
+    prepare_with_message(directory, runs, ids, None)
+}
+
+fn prepare_with_message(
+    directory: &Path,
+    runs: &[TaskRun],
+    ids: &[String],
+    message: Option<&str>,
+) -> Result<IntegrationPlan, String> {
     fs::create_dir_all(directory).map_err(|e| e.to_string())?;
     let selected = selected_runs(runs, ids)?;
     let project = canonical(&selected[0].project_path)?;
@@ -315,6 +341,44 @@ fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<Integra
         &project,
         &["rev-parse", &format!("refs/heads/{target_branch}")],
     )?;
+    let policy = super::project_git::read(&project)?;
+    policy.validate()?;
+    let message = message
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            if selected.len() == 1 {
+                super::checkpoint::suggested_message(&selected[0])
+            } else {
+                format!(
+                    "Complete {} tasks\n\n{}",
+                    selected.len(),
+                    selected
+                        .iter()
+                        .map(|run| format!("- {}", super::checkpoint::suggested_message(run)))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+        });
+    if message.len() > 4000
+        || message.contains('\0')
+        || message.lines().any(|line| {
+            line.trim()
+                .to_ascii_lowercase()
+                .starts_with("co-authored-by:")
+        })
+    {
+        return Err("Use a commit message under 4,000 bytes without attribution trailers; project settings add those automatically.".into());
+    }
+    let mut agents: Vec<_> = selected
+        .iter()
+        .flat_map(super::project_git::contributors)
+        .collect();
+    agents.sort();
+    agents.dedup();
+    let message = policy.message(&message, &agents);
     let mut plan = IntegrationPlan {
         id: unique_id(),
         project_path: selected[0].project_path.clone(),
@@ -329,6 +393,10 @@ fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<Integra
         status: "ready".into(),
         created_at: Utc::now().to_rfc3339(),
         applied_at: None,
+        commit_message: message.clone(),
+        commit_policy: Some(policy.clone()),
+        cleanup_requested: false,
+        cleanup_results: vec![],
     };
     let mut combined = master.clone();
     let mut preview_target = master;
@@ -392,6 +460,19 @@ fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<Integra
     }
     (plan.files, plan.patch) = preview(&project, &plan.master_head, &preview_target)?;
     if plan.status == "ready" {
+        let mut cmd = command(
+            &project,
+            &[
+                "commit-tree",
+                &preview_target,
+                "-p",
+                &plan.master_head,
+                "-m",
+                &message,
+            ],
+        );
+        policy.environment(&mut cmd, &agents);
+        combined = output_text(cmd.output().map_err(|e| e.to_string())?)?;
         git(
             &project,
             &[
@@ -464,6 +545,19 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
     {
         return Err("The target checkout has local changes. Review and commit or move them before integration; Jackalope will not stash them.".into());
     }
+    if let Some(policy) = &plan.commit_policy {
+        if &super::project_git::read(&project)? != policy {
+            return Err("Project commit settings changed. Prepare a fresh review.".into());
+        }
+    }
+    if runs.iter().any(|run| {
+        ["starting", "running", "stopping", "interrupted"].contains(&run.status.as_str())
+            && canonical(&run.workspace)
+                .ok()
+                .is_some_and(|workspace| project.starts_with(&workspace))
+    }) {
+        return Err("The target checkout is in use by an active or interrupted task.".into());
+    }
     let selected = selected_runs(runs, &plan.run_ids)?;
     if canonical(&selected[0].project_path)? != project {
         return Err("The project's location changed. Prepare a fresh integration.".into());
@@ -476,7 +570,8 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
             .ok_or("A task snapshot is missing.")?;
         let now = snapshot(run, directory)?;
         require_verification(run, &now.tree)?;
-        if before.head != now.head
+        if (plan.commit_policy.is_some() && before.branch != now.branch)
+            || before.head != now.head
             || before.tree != now.tree
             || before.status != now.status
             || canonical(&before.workspace)? != canonical(&now.workspace)?
@@ -511,6 +606,114 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
     plan.applied_at = Some(Utc::now().to_rfc3339());
     save(directory, &plan).map_err(|e| format!("The target branch was updated, but saving the receipt failed: {e}. Reload and apply this same plan to recover the receipt."))?;
     Ok(plan)
+}
+
+fn cleanup_sources(
+    directory: &Path,
+    runs: &[TaskRun],
+    plan: &mut IntegrationPlan,
+) -> Result<(), String> {
+    for source in plan.sources.clone() {
+        if plan
+            .cleanup_results
+            .iter()
+            .any(|result| result.workspace == source.workspace && result.removed)
+        {
+            continue;
+        }
+        let result = (|| {
+            let project = Path::new(&plan.project_path);
+            let head = plan
+                .integration_head
+                .as_deref()
+                .ok_or("Missing integration commit.")?;
+            if !command(
+                project,
+                &[
+                    "merge-base",
+                    "--is-ancestor",
+                    head,
+                    &format!("refs/heads/{}", plan.target_branch),
+                ],
+            )
+            .output()
+            .map_err(|e| e.to_string())?
+            .status
+            .success()
+            {
+                return Err("The target branch no longer contains this integration.".into());
+            }
+            if !Path::new(&source.workspace).exists()
+                && !super::git::list_worktrees(&plan.project_path)?
+                    .iter()
+                    .any(|entry| entry.path == source.workspace)
+            {
+                if let Some(branch) = &source.branch {
+                    if git(
+                        project,
+                        &["show-ref", "--verify", &format!("refs/heads/{branch}")],
+                    )
+                    .is_ok()
+                    {
+                        let target = git(
+                            project,
+                            &["rev-parse", &format!("refs/heads/{}", plan.target_branch)],
+                        )?;
+                        super::worktree_cleanup::delete_merged_branch(
+                            &plan.project_path,
+                            branch,
+                            &source.head,
+                            &plan.target_branch,
+                            &target,
+                        )?;
+                    }
+                }
+                return Ok(());
+            }
+            let run = runs
+                .iter()
+                .find(|run| run.id == source.run_id)
+                .ok_or("Task history is missing.")?;
+            let now = snapshot(run, directory)?;
+            if now.branch != source.branch
+                || now.head != source.head
+                || now.tree != source.tree
+                || now.status != source.status
+            {
+                return Err(
+                    "The source changed after review. Review it in Project Worktrees.".into(),
+                );
+            }
+            let entries = super::git::list_worktrees(&plan.project_path)?;
+            let entry = entries
+                .iter()
+                .find(|entry| canonical(&entry.path).ok() == canonical(&source.workspace).ok())
+                .ok_or("Worktree registration missing. Inspect the remaining folder manually.")?;
+            let target = git(
+                project,
+                &["rev-parse", &format!("refs/heads/{}", plan.target_branch)],
+            )?;
+            super::worktree_cleanup::remove(
+                &plan.project_path,
+                &entry.path,
+                &plan.target_branch,
+                &source.head,
+                &target,
+                runs,
+                true,
+                Some(source.branch.as_deref().unwrap_or("")),
+            )
+        })();
+        plan.cleanup_results
+            .retain(|result| result.workspace != source.workspace);
+        plan.cleanup_results.push(CleanupResult {
+            workspace: source.workspace,
+            removed: result.is_ok(),
+            error: result.err(),
+        });
+        save(directory, plan)?;
+    }
+    Ok(())
 }
 
 pub fn plans(runtime: &TaskRuntime) -> Result<Vec<IntegrationPlan>, String> {
@@ -582,14 +785,16 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
 pub async fn integration_prepare(
     state: State<'_, TaskRuntime>,
     run_ids: Vec<String>,
+    commit_message: Option<String>,
 ) -> Result<IntegrationPlan, String> {
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = execution_guard()?;
-        prepare(
+        prepare_with_message(
             &runtime.integration_directory(),
             &runtime.integration_runs()?,
             &run_ids,
+            commit_message.as_deref(),
         )
     })
     .await
@@ -600,15 +805,23 @@ pub async fn integration_prepare(
 pub async fn integration_apply(
     state: State<'_, TaskRuntime>,
     plan_id: String,
+    cleanup: Option<bool>,
 ) -> Result<IntegrationPlan, String> {
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = execution_guard()?;
-        apply(
-            &runtime.integration_directory(),
-            &runtime.integration_runs()?,
-            &plan_id,
-        )
+        let directory = runtime.integration_directory();
+        let runs = runtime.integration_runs()?;
+        let mut plan = load(&directory, &plan_id)?;
+        if cleanup == Some(true) {
+            plan.cleanup_requested = true;
+            save(&directory, &plan)?;
+        }
+        let mut plan = apply(&directory, &runs, &plan_id)?;
+        if plan.cleanup_requested {
+            cleanup_sources(&directory, &runs, &mut plan)?;
+        }
+        Ok(plan)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -705,6 +918,164 @@ mod tests {
                 let _ = fs::remove_dir_all(&self.root);
             }
         }
+    }
+
+    #[test]
+    fn checkpoints_and_single_commit_merge_enforce_all_attribution_modes() {
+        use crate::commands::project_git::{Attribution, CommitPolicy};
+        for attribution in [Attribution::User, Attribution::CoAuthor, Attribution::Agent] {
+            let f = Fixture::new();
+            let mut run = f.run(1, "feature.txt", "done\n");
+            run.branch = "jackalope/task-1".into();
+            git(Path::new(&run.workspace), &["branch", "-m", &run.branch]).unwrap();
+            run.result = "Implemented feature.\n\nCommit message: Add the requested feature".into();
+            let policy = CommitPolicy {
+                attribution: attribution.clone(),
+                name: "Review User".into(),
+                email: "user@example.test".into(),
+                cleanup_after_merge: true,
+                auto_checkpoint: true,
+            };
+            git(
+                &f.project,
+                &[
+                    "config",
+                    "--local",
+                    "jackalope.commitPolicy",
+                    &serde_json::to_string(&policy).unwrap(),
+                ],
+            )
+            .unwrap();
+            let checkpoint = crate::commands::checkpoint::create(&run, &f.plans)
+                .unwrap()
+                .unwrap();
+            assert!(checkpoint.message.starts_with("Add the requested feature"));
+            assert!(git(Path::new(&run.workspace), &["status", "--porcelain"])
+                .unwrap()
+                .is_empty());
+            assert!(crate::commands::checkpoint::create(&run, &f.plans)
+                .unwrap()
+                .is_none());
+            assert_eq!(git(&f.project, &["rev-parse", "HEAD"]).unwrap(), f.base);
+            let plan = prepare(&f.plans, &[run.clone()], &[run.id.clone()]).unwrap();
+            assert!(plan.commit_message.starts_with("Add the requested feature"));
+            let mut applied = apply(&f.plans, &[run.clone()], &plan.id).unwrap();
+            assert_eq!(
+                git(
+                    &f.project,
+                    &["rev-list", "--count", &format!("{}..HEAD", f.base)]
+                )
+                .unwrap(),
+                "1"
+            );
+            let author = git(&f.project, &["log", "-1", "--format=%an <%ae>"]).unwrap();
+            assert_eq!(
+                author,
+                if attribution == Attribution::Agent {
+                    "Codex <codex@agents.jackalope.invalid>"
+                } else {
+                    "Review User <user@example.test>"
+                }
+            );
+            assert_eq!(
+                plan.commit_message.contains("Co-authored-by: Codex"),
+                attribution == Attribution::CoAuthor
+            );
+            cleanup_sources(&f.plans, &[run.clone()], &mut applied).unwrap();
+            assert!(
+                applied.cleanup_results[0].removed,
+                "{:?}",
+                applied.cleanup_results
+            );
+            assert!(!Path::new(&run.workspace).exists());
+            assert!(git(
+                &f.project,
+                &[
+                    "show-ref",
+                    "--verify",
+                    &format!("refs/heads/{}", run.branch)
+                ]
+            )
+            .is_err());
+            cleanup_sources(&f.plans, &[run], &mut applied).unwrap();
+            assert_eq!(applied.cleanup_results.len(), 1);
+        }
+    }
+
+    #[test]
+    fn legacy_review_without_commit_policy_or_branch_snapshot_can_still_apply() {
+        let f = Fixture::new();
+        let run = f.run(1, "new.txt", "done\n");
+        let mut plan = prepare(&f.plans, &[run.clone()], &[run.id.clone()]).unwrap();
+        plan.commit_policy = None;
+        for source in &mut plan.sources {
+            source.branch = None;
+        }
+        save(&f.plans, &plan).unwrap();
+        assert_eq!(apply(&f.plans, &[run], &plan.id).unwrap().status, "applied");
+    }
+
+    #[test]
+    fn checkpoints_preserve_divergent_staging_and_existing_index_locks() {
+        let f = Fixture::new();
+        let mut run = f.run(1, "new.txt", "working\n");
+        run.branch = "jackalope/task-1".into();
+        let path = Path::new(&run.workspace);
+        git(path, &["branch", "-m", &run.branch]).unwrap();
+        git(path, &["add", "new.txt"]).unwrap();
+        fs::write(path.join("new.txt"), "later edit\n").unwrap();
+        assert!(crate::commands::checkpoint::create(&run, &f.plans)
+            .unwrap_err()
+            .contains("Staged content"));
+        assert_eq!(git(path, &["show", ":new.txt"]).unwrap(), "working");
+        git(path, &["add", "new.txt"]).unwrap();
+        let index = git(
+            path,
+            &["rev-parse", "--path-format=absolute", "--git-path", "index"],
+        )
+        .unwrap();
+        let lock = format!("{index}.lock");
+        fs::write(&lock, "owned elsewhere").unwrap();
+        assert!(crate::commands::checkpoint::create(&run, &f.plans).is_err());
+        assert_eq!(fs::read_to_string(&lock).unwrap(), "owned elsewhere");
+        assert_eq!(git(path, &["rev-parse", "HEAD"]).unwrap(), f.base);
+    }
+
+    #[test]
+    fn changed_policy_invalidates_review_and_cleanup_failure_keeps_merge() {
+        let f = Fixture::new();
+        let run = f.run(1, "new.txt", "done\n");
+        let plan = prepare(&f.plans, &[run.clone()], &[run.id.clone()]).unwrap();
+        git(&f.project, &["config", "user.name", "Changed name"]).unwrap();
+        assert!(apply(&f.plans, &[run.clone()], &plan.id)
+            .unwrap_err()
+            .contains("settings changed"));
+        let plan = prepare_with_message(
+            &f.plans,
+            &[run.clone()],
+            &[run.id.clone()],
+            Some("Add the feature"),
+        )
+        .unwrap();
+        let mut applied = apply(&f.plans, &[run.clone()], &plan.id).unwrap();
+        fs::write(
+            Path::new(&run.workspace).join("new.txt"),
+            "unreviewed work\n",
+        )
+        .unwrap();
+        cleanup_sources(&f.plans, &[run.clone()], &mut applied).unwrap();
+        assert!(!applied.cleanup_results[0].removed);
+        assert!(applied.cleanup_results[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("changed after review"));
+        assert_eq!(
+            git(&f.project, &["log", "-1", "--format=%s"]).unwrap(),
+            "Add the feature"
+        );
+        assert!(Path::new(&run.workspace).exists());
+        assert_eq!(load(&f.plans, &plan.id).unwrap().status, "applied");
     }
 
     #[test]

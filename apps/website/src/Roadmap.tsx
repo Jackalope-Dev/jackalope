@@ -60,7 +60,7 @@ export function RoadmapPage() {
         <Tabs.Root value={selected} onValueChange={setSelected}>
           <Tabs.List className="roadmap-stages" aria-label="Roadmap stages">
             {roadmapStages.map((stage, index) => {
-              const Icon = stageIcons[index];
+              const Icon = stageIcons[index] ?? Compass;
               return (
                 <Tabs.Trigger key={stage.id} value={stage.id} className="roadmap-stage">
                   <span className="roadmap-stage-track">
@@ -76,7 +76,7 @@ export function RoadmapPage() {
             })}
           </Tabs.List>
           {roadmapStages.map((stage, stageIndex) => {
-            const ChapterIcon = stageIcons[stageIndex];
+            const ChapterIcon = stageIcons[stageIndex] ?? Compass;
             return (
               <Tabs.Content key={stage.id} value={stage.id} className="roadmap-chapter">
                 <div className="roadmap-chapter-intro">
@@ -95,7 +95,7 @@ export function RoadmapPage() {
                 </div>
                 <div className="roadmap-items">
                   {stage.items.map((item, itemIndex) => {
-                    const ItemIcon = itemIcons[stageIndex][itemIndex];
+                    const ItemIcon = itemIcons[stageIndex]?.[itemIndex] ?? Wrench;
                     return (
                       <details className="roadmap-item" key={item.title}>
                         <summary>

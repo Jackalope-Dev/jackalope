@@ -324,3 +324,9 @@
 .queue-heading-active .task-eyebrow {
   margin-bottom: 10px;
 }
+
+.merge-cleanup-results {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}

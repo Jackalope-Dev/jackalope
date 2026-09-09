@@ -5,6 +5,7 @@ import { Setting } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { ProjectGitSettings } from './ProjectGitSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
 export function ProjectPreferences({
@@ -124,6 +125,7 @@ export function ProjectPreferences({
               ))}
             </details>
           </section>
+          <ProjectGitSettings key={project.path} projectPath={project.path} />
           <section className="project-preferences-section">
             <h2>Workspace</h2>
             <div className="project-workspace-fields">
