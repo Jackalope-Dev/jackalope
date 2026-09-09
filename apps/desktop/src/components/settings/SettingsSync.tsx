@@ -27,7 +27,13 @@ export function SettingsSync() {
         Optional on each desktop. Turning it off stops transfers and keeps both local settings and
         the saved copy. Account access checks continue.
       </p>
-      {!sync.owner && <p role="status">{sync.enabled ? 'Sync starts after you connect an approved account.' : 'Connect an approved account to sync settings.'}</p>}
+      {!sync.owner && (
+        <p role="status">
+          {sync.enabled
+            ? 'Sync starts after you connect an approved account.'
+            : 'Connect an approved account to sync settings.'}
+        </p>
+      )}
       {sync.owner && (
         <div className="space-y-2">
           <Button variant="outline" disabled={sync.busy} onClick={() => void sync.remove()}>

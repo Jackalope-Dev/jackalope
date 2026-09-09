@@ -59,10 +59,14 @@ export async function deviceRoutes(
     if (url.pathname === '/v1/desktop/settings/consent' && request.method === 'POST') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
-      const { enabled, automatic } = z.strictObject({ enabled: z.boolean(), automatic: z.boolean().default(false) }).parse(await readJson(request));
+      const { enabled, automatic } = z
+        .strictObject({ enabled: z.boolean(), automatic: z.boolean().default(false) })
+        .parse(await readJson(request));
       const consent = await env.DB.prepare(
         `UPDATE access_devices SET settings_sync=CASE WHEN ?=1 AND (?=0 OR EXISTS(SELECT 1 FROM access_members WHERE id=? AND settings_sync_deleted=0)) THEN 1 ELSE 0 END WHERE id=? RETURNING settings_sync`,
-      ).bind(enabled ? 1 : 0, automatic ? 1 : 0, member.memberId, member.id).first<{ settings_sync: number }>();
+      )
+        .bind(enabled ? 1 : 0, automatic ? 1 : 0, member.memberId, member.id)
+        .first<{ settings_sync: number }>();
       return json({ enabled: consent?.settings_sync === 1 });
     }
     if (url.pathname === '/v1/desktop/settings') {

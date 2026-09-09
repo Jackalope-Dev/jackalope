@@ -27,7 +27,8 @@ import {useOnboardingStore} from './src/stores/onboardingStore';
 import './src/index.css';
 import './src/components/settings/settings.css';
 import './src/components/ui/experience.css';
-window.fixture={account:'disconnected',enabled:false,revision:1,settings:{version:1,accentHex:'#6366f1',isDark:true,appearance:'manual',atmosphere:12,harmony:'single',mascotReactions:true,notifications:'none',osNotifications:true},calls:[],fail:false};
+window.fixture={account:'disconnected',enabled:true,revision:1,settings:{version:1,accentHex:'#6366f1',isDark:true,appearance:'manual',atmosphere:12,harmony:'single',mascotReactions:true,notifications:'none',osNotifications:true},calls:[],fail:false};
+window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
 window.syncStore=useSettingsSyncStore;window.settingsStore=useSettingsStore;window.themeStore=useThemeStore;
 window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebview:{label:'main'}},transformCallback:()=>0,unregisterCallback:()=>{},invoke:async(command,args)=>{
  const f=window.fixture;f.calls.push(command+':'+(args?.action?.action??''));
@@ -38,7 +39,7 @@ window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebvie
  if(command==='app_account_referrals')return {limit:5,remaining:5,accepted:0,downloaded:0,connected:0,shareUrl:'',invites:[]};
  if(command==='app_community_settings'||command==='app_community_configure')return {reviewed:true,telemetry:false,errors:false,configured:false,buildChannel:'beta'};
  if(command==='app_settings_sync'){
-   const a=args.action;const view=()=>({available:f.account==='connected',enabled:f.enabled,owner:f.account==='connected'?'fixture-owner':null,revision:f.revision,settings:f.settings,conflict:false});
+   const a=args.action;const view=()=>({available:true,enabled:f.enabled,owner:f.account==='connected'?'fixture-owner':null,revision:f.revision,settings:f.settings,conflict:false});
    if(a.action==='status')return view();
    if(f.fail)throw Error('Fixture offline');
    if(a.action==='configure'){f.enabled=a.enabled;return view();}
@@ -66,6 +67,17 @@ useOnboardingStore.getState().begin();createRoot(document.getElementById('root')
       await page.goto('http://127.0.0.1:5179/.settings-sync-fixture.html');
       await page.getByRole('heading', { name: 'Connect your account' }).waitFor();
       assert(await page.getByRole('button', { name: 'Continue after approval' }).isDisabled());
+      const disclosure = page.locator('summary').filter({ hasText: 'Manage privacy settings' });
+      await disclosure.focus();
+      await page.keyboard.press('Enter');
+      const toggle = page.getByRole('switch', { name: 'Sync settings with my account' });
+      await page.waitForFunction(() => window.syncStore.getState().available);
+      assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await page.waitForFunction(() => !window.syncStore.getState().busy);
+      await disclosure.focus();
+      await page.keyboard.press('Enter');
       await page.evaluate(
         (dark) =>
           window.themeStore
@@ -82,10 +94,8 @@ useOnboardingStore.getState().begin();createRoot(document.getElementById('root')
         window.fixture.account = 'connected';
       });
       await page.getByText('Early access approved', { exact: true }).waitFor();
-      const disclosure = page.locator('summary').filter({ hasText: 'Manage privacy settings' });
       await disclosure.focus();
       await page.keyboard.press('Enter');
-      const toggle = page.getByRole('switch', { name: 'Sync settings with my account' });
       await toggle.waitFor();
       assert.equal(await toggle.getAttribute('aria-checked'), 'false');
       await page.screenshot({

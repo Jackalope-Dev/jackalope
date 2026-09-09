@@ -7,12 +7,34 @@ pub(super) struct SyncChoice {
 }
 pub(super) fn read_choice(state: &AccountService) -> Result<SyncChoice, String> {
     account_storage::read(&state.path.with_file_name("settings-sync-choice.bin"))?
-        .map(|bytes| serde_json::from_slice(&bytes).map_err(|_| "Could not read the settings sync choice.".into()))
-        .unwrap_or(Ok(SyncChoice { enabled: true, explicit: false }))
+        .map(|bytes| {
+            serde_json::from_slice(&bytes)
+                .map_err(|_| "Could not read the settings sync choice.".into())
+        })
+        .unwrap_or(Ok(SyncChoice {
+            enabled: true,
+            explicit: false,
+        }))
 }
 fn save_choice(state: &AccountService, enabled: bool) -> Result<(), String> {
-    account_storage::write(&state.path.with_file_name("settings-sync-choice.bin"),
-        &serde_json::to_vec(&SyncChoice { enabled, explicit: true }).map_err(|_| "Could not save the settings sync choice.")?)
+    account_storage::write(
+        &state.path.with_file_name("settings-sync-choice.bin"),
+        &serde_json::to_vec(&SyncChoice {
+            enabled,
+            explicit: true,
+        })
+        .map_err(|_| "Could not save the settings sync choice.")?,
+    )
+}
+pub(super) fn preserve_choice(state: &AccountService, record: &SavedAccount) -> Result<(), String> {
+    account_storage::write(
+        &state.path.with_file_name("settings-sync-choice.bin"),
+        &serde_json::to_vec(&SyncChoice {
+            enabled: record.settings_sync,
+            explicit: !record.settings_sync_automatic,
+        })
+        .map_err(|_| "Could not save the settings sync choice.")?,
+    )
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -101,7 +123,9 @@ pub async fn app_settings_sync(
     let mut saved = state.read()?;
     if saved.as_ref().is_none_or(|r| r.email.is_none()) {
         view.available = cfg!(windows) && endpoints(&app).is_ok();
-        if view.available { view.enabled = read_choice(&state)?.enabled; }
+        if view.available {
+            view.enabled = read_choice(&state)?.enabled;
+        }
         return match action {
             Action::Status => Ok(view),
             Action::Configure { enabled, owner } if owner.is_empty() && view.available => {
@@ -113,7 +137,7 @@ pub async fn app_settings_sync(
                 }
                 view.enabled = enabled;
                 Ok(view)
-            },
+            }
             _ => Err("Connect an approved Jackalope account to sync settings.".into()),
         };
     }
@@ -125,13 +149,27 @@ pub async fn app_settings_sync(
         Sha256::digest(format!("{}:{}", record.origin, record.secret).as_bytes())
     );
     view.available = true;
-    if record.settings_sync_pending && matches!(action, Action::Status | Action::Read { .. } | Action::Write { .. }) {
+    if record.settings_sync_pending
+        && matches!(
+            action,
+            Action::Status | Action::Read { .. } | Action::Write { .. }
+        )
+    {
         let (code, data) = request(&api, "/v1/desktop/settings/consent", reqwest::Method::POST,
             Some(&record.secret), Some(serde_json::json!({"enabled": record.settings_sync, "automatic": record.settings_sync_automatic}))).await?;
-        if code != 200 { return Err("Could not initialize settings sync. Retry when the account service is available.".into()); }
-        record.settings_sync = data["enabled"].as_bool().ok_or("Invalid sync consent response.")?;
+        if code != 200 {
+            return Err(
+                "Could not initialize settings sync. Retry when the account service is available."
+                    .into(),
+            );
+        }
+        record.settings_sync = data["enabled"]
+            .as_bool()
+            .ok_or("Invalid sync consent response.")?;
         record.settings_sync_pending = false;
-        if !record.settings_sync { save_choice(&state, false)?; }
+        if !record.settings_sync {
+            save_choice(&state, false)?;
+        }
         state.save(&record)?;
     }
     view.enabled = record.settings_sync;

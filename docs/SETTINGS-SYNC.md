@@ -13,9 +13,11 @@ the member signs in with their approved email and reconnects if needed.
 
 ## Preferences and privacy
 
-Settings sync is off by default, with one control in onboarding's privacy
-disclosure and Settings → Privacy. Consent belongs to each connected desktop;
-disconnecting clears its local consent. Enabling a new connection restores the
+Settings sync defaults on for new connections, disclosed on Account with a
+control in onboarding's privacy disclosure and Settings → Privacy. Users can
+opt out before connecting. Existing saved opt-outs remain off. The local choice
+survives disconnect/reconnect; transfers always require an approved connection.
+Enabling a new connection restores the
 existing account copy, or uploads the current portable preferences if none exists.
 Subsequent changes sync after a short debounce, on focus/online events and once
 per minute while the app is open. Work continues during network failures.
@@ -44,6 +46,9 @@ fresh explicit opt-in to upload again. Local preferences remain. A failed delete
 shows an error and must be retried online; it never claims remote deletion.
 Deleting a membership also cascades to its settings row as part of the existing
 account-deletion workflow. Provider backup retention remains separate.
+An account-level deletion marker prevents future default-on connections from
+recreating deleted settings. Only explicitly enabling sync overrides that marker
+for the chosen desktop; the marker contains no settings or identifying text.
 
 ## Ownership and extension
 
@@ -75,6 +80,8 @@ Migration `0011_settings_sync.sql` adds the settings table and per-device consen
 defaulting every existing device to off. Apply before deploying the matching
 Worker; older service and desktop builds remain compatible with this additive
 schema. The updated desktop and website must also be shipped for the new flows.
+Migration `0012_settings_sync_defaults.sql` adds the account deletion marker used
+by the new default-on connection flow. Both migrations precede the Worker rollout.
 
 Server tests cover consent, account isolation, forbidden fields, unknown versions,
 concurrent writes, delete/opt-out behavior and waitlist pairing without admission.

@@ -578,6 +578,7 @@ pub async fn app_account_disconnect(
         if code != 200 && code != 401 {
             return Err(failure(code));
         }
+        settings_sync::preserve_choice(&state, &record)?;
         state.access.revoke();
         account_storage::remove(&state.path)?;
     }
