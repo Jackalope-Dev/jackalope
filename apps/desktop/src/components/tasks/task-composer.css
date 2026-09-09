@@ -379,13 +379,9 @@
   outline-offset: 3px;
 }
 .task-inline-capture .task-composer-footer {
-  position: sticky;
-  bottom: 12px;
-  z-index: 2;
-  background: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 16px;
+  border-top: 1px solid var(--color-border);
+  margin-top: 16px;
+  padding: 16px 0 0;
   flex-wrap: wrap;
 }
 .composer-dispatch-note {

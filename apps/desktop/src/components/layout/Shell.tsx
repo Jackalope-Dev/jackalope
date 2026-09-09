@@ -1,6 +1,7 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { captureDraftForProject } from '../../lib/capture-draft';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
@@ -24,7 +25,7 @@ import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import { InvitationsButton } from './InvitationsButton';
-import { type ActiveTab, type UsageView, USAGE_VIEWS, WORKSPACE_VIEWS } from './navigation';
+import { type ActiveTab, USAGE_VIEWS, type UsageView, WORKSPACE_VIEWS } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
 
@@ -152,20 +153,10 @@ export function Shell({
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const switchProject = (id: string) => {
     if (id === activeProjectId) return;
+    const project = projects.find((item) => item.id === id);
+    if (!project) return;
     const execution = useExecutionStore.getState();
-    const existing =
-      execution.drafts.capture ?? (activeProjectId ? execution.drafts[activeProjectId] : undefined);
-    execution.draft('capture', {
-      ...existing,
-      projectId: id,
-      isolated:
-        existing?.isolated ??
-        projects.find((item) => item.id === id)?.preferences?.isolatedByDefault ??
-        true,
-      ...((existing?.projectId ?? activeProjectId) !== id
-        ? { model: undefined, connectionIds: undefined, contextSelection: undefined }
-        : {}),
-    });
+    execution.draft('capture', captureDraftForProject(execution.drafts, project, activeProjectId));
     selectProject(id);
   };
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
