@@ -7,10 +7,50 @@
   text-align: center;
 }
 .waitlist-heading > svg {
-  width: 52px;
-  height: 52px;
+  width: 76px;
+  height: 76px;
   color: var(--color-accent-ink);
-  margin: 0 auto 18px;
+  margin: 0 auto 22px;
+}
+/* Acceptance is the moment the page exists for: centre it and lead with the mark. */
+.waitlist-approved {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 14px;
+}
+.waitlist-approved > svg {
+  color: var(--color-success);
+}
+.waitlist-approved h2,
+.waitlist-approved p {
+  margin: 0;
+  max-width: 46ch;
+}
+.waitlist-approved .button {
+  margin-top: 10px;
+}
+/* The number is the answer to the only question this page is asked. */
+.queue-ticket-number {
+  text-align: center;
+  align-items: center;
+}
+.queue-ticket-number span:first-child {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.waitlist-questions fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 22px;
+}
+.waitlist-questions legend {
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 10px;
 }
 .waitlist-heading h1 {
   font-size: clamp(36px, 6vw, 64px);
