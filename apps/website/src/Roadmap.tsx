@@ -6,15 +6,33 @@ import {
   Check,
   ChevronDown,
   Compass,
+  Bot,
+  GitBranch,
+  GitPullRequest,
+  Gauge,
   Hammer,
+  Laptop,
   MoveUpRight,
+  Network,
+  Rocket,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Users,
+  Wrench,
 } from 'lucide-react';
 import { useState } from 'react';
 import { roadmapHeadline, roadmapLede, roadmapStages } from './roadmap-content';
 import { WaitlistButton } from './Signup';
 import './roadmap.css';
 
-const stageIcons = [Check, Hammer, ArrowRight, Compass];
+const stageIcons = [Check, Hammer, Rocket, Compass];
+const itemIcons = [
+  [Bot, GitBranch, Wrench],
+  [Sparkles, Laptop, ShieldCheck],
+  [Users, GitPullRequest, Gauge],
+  [Network, Smartphone, Users],
+];
 
 export function RoadmapPage() {
   const [selected, setSelected] = useState('now');
@@ -24,11 +42,6 @@ export function RoadmapPage() {
       <header className="roadmap-hero">
         <div className="page-width roadmap-hero-grid">
           <div className="roadmap-intro">
-            <nav className="article-breadcrumbs" aria-label="Breadcrumb">
-              <a href="/">Jackalope</a>
-              <span aria-hidden="true">/</span>
-              <span>Roadmap</span>
-            </nav>
             <h1>{roadmapHeadline}</h1>
             <p>{roadmapLede}</p>
             <a className="text-link roadmap-explore" href="#journey">
@@ -40,9 +53,6 @@ export function RoadmapPage() {
               <EchoMark animated={false} />
             </div>
             <div className="roadmap-position">
-              <span className="roadmap-position-label">
-                <Hammer size={15} /> Where we are
-              </span>
               <strong>
                 Built locally.
                 <br />
@@ -55,10 +65,6 @@ export function RoadmapPage() {
       </header>
 
       <section id="journey" className="page-width roadmap-journey" aria-label="Explore the roadmap">
-        <div className="roadmap-map-heading">
-          <span>From the first task to what’s possible next.</span>
-          <span>Direction, not deadlines.</span>
-        </div>
         <Tabs.Root value={selected} onValueChange={setSelected}>
           <Tabs.List className="roadmap-stages" aria-label="Roadmap stages">
             {roadmapStages.map((stage, index) => {
@@ -67,7 +73,7 @@ export function RoadmapPage() {
                 <Tabs.Trigger key={stage.id} value={stage.id} className="roadmap-stage">
                   <span className="roadmap-stage-track">
                     <span className="roadmap-stage-symbol">
-                      <Icon size={19} />
+                      <Icon size={28} />
                     </span>
                   </span>
                   <span className="roadmap-stage-label">{stage.label}</span>
@@ -80,22 +86,28 @@ export function RoadmapPage() {
               );
             })}
           </Tabs.List>
-          {roadmapStages.map((stage) => (
+          {roadmapStages.map((stage, stageIndex) => {
+            const ChapterIcon = stageIcons[stageIndex];
+            return (
             <Tabs.Content key={stage.id} value={stage.id} className="roadmap-chapter">
               <div className="roadmap-chapter-intro">
-                <p className="roadmap-status">{stage.status}</p>
+                <div className="roadmap-chapter-art" aria-hidden="true"><ChapterIcon size={72} strokeWidth={1.25} /><span /><span /></div>
                 <h2>{stage.title}</h2>
                 <p className="roadmap-description">{stage.description}</p>
+                <p className="roadmap-status">{stage.status}</p>
                 <a className="text-link" href={stage.link.href}>
                   {stage.link.label}
                   <MoveUpRight size={16} />
                 </a>
               </div>
               <div className="roadmap-items">
-                {stage.items.map((item) => (
+                {stage.items.map((item, itemIndex) => {
+                  const ItemIcon = itemIcons[stageIndex][itemIndex];
+                  return (
                   <details className="roadmap-item" key={item.title}>
                     <summary>
-                      <span>
+                      <span className="roadmap-item-icon"><ItemIcon size={24} strokeWidth={1.6} /></span>
+                      <span className="roadmap-item-copy">
                         <strong>{item.title}</strong>
                         <span>{item.summary}</span>
                       </span>
@@ -103,14 +115,12 @@ export function RoadmapPage() {
                     </summary>
                     <p>{item.detail}</p>
                   </details>
-                ))}
-                <p className="roadmap-chapter-note">
-                  <ArrowRight size={16} />
-                  {stage.next}
-                </p>
+                  );
+                })}
               </div>
             </Tabs.Content>
-          ))}
+            );
+          })}
         </Tabs.Root>
       </section>
 
@@ -129,14 +139,7 @@ export function RoadmapPage() {
             </a>
           </div>
         </div>
-        <div className="roadmap-promise">
-          <Compass size={24} />
-          <h3>A direction we’ll keep refining.</h3>
-          <p>
-            Built means implemented in the prerelease app. Planned and exploring features are future
-            work. Priorities may change as we learn; we haven’t announced a public launch date.
-          </p>
-        </div>
+        <EchoMark className="roadmap-follow-echo" animated={false} />
       </section>
     </main>
   );

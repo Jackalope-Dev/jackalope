@@ -184,8 +184,7 @@ export const pages: SitePage[] = [
   {
     path: '/changelog/',
     title: 'Changelog | Jackalope',
-    description:
-      'Follow Jackalope development milestones, website updates, and future public releases.',
+    description: 'Follow new Jackalope features, meaningful improvements, and major milestones.',
   },
   {
     path: '/knowledge/',

@@ -62,14 +62,18 @@ separate secret check; it scans reachable history and current nonignored files.
 CI runs both checks without deployment credentials. `pnpm licenses:generate` regenerates
 the [dependency inventory](docs/DEPENDENCIES.md) after dependency changes.
 
-User-visible product and website changes also need one concise public milestone.
-Add it to the website's shared changelog source with:
+Reserve public changelog entries for notable features, meaningful improvements
+and larger milestones readers would care about. Group related work into one
+concise update; omit routine copy, spacing, icon and internal maintenance changes.
+Add qualifying updates to the website's shared changelog source with:
 
 ```powershell
-pnpm changelog:add -- --title "A clearer task review." --description "Review now keeps the task and evidence together." --item "The exact patch and checks appear in one view." --note "Development milestone, not a public release."
+pnpm changelog:add -- --title "A clearer task review." --description "Review now keeps the task and evidence together." --item "The exact patch and checks appear in one view."
 ```
 
-Repeat `--item` for additional bullets. Optional `--id`, `--date`, and `--status`
+Repeat `--item` for additional bullets. Use optional `--note` only for useful
+context or a specific limitation, without repeating a development-release disclaimer.
+Optional `--id`, `--date`, and `--status`
 flags override the generated ID, today's date, and `In development` status. The
 website changelog and LLM-readable discovery output both consume the resulting
 JSON directly. `pnpm verify` rejects duplicate IDs, invalid dates, unsupported

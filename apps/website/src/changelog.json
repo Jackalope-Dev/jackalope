@@ -8,8 +8,7 @@
     "items": [
       "Explore built, in-progress, planned, and exploratory work with expandable feature details.",
       "A branded journey makes current priorities and future possibilities easier to follow."
-    ],
-    "note": "Development milestone, not a public release."
+    ]
   },
   {
     "id": "smarter-project-settings",
@@ -19,113 +18,8 @@
     "description": "Repository context helps fill project setup defaults.",
     "items": [
       "Detect preparation and verification commands from documentation and manifests, and the target branch from local Git metadata.",
-      "Preserve saved choices and deliberately cleared fields when refreshing context.",
-      "Show the repository path beside the project name under Project settings."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "a-simpler-waitlist-signup",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A simpler waitlist signup.",
-    "description": "The newsletter area keeps the focus on joining the waitlist.",
-    "items": [
-      "Removed the email-provider credit and extra availability copy, consolidated signup text across the website, and stacked the email field and button on mobile."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "tidier-project-task-context",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Tidier project task context.",
-    "description": "Project settings keep task guidance controls closer together.",
-    "items": [
-      "Reduced spacing before Choose guidelines automatically and removed the divider before Always include guidelines."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "an-echo-in-the-footer",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "An echo in the footer.",
-    "description": "The homepage footer now ends with a clean Jackalope wordmark.",
-    "items": [
-      "Hover over the text for a brief outlined echo that folds back into place, matching the logo.",
-      "Removed the standalone symbol; touch devices and reduced-motion preferences keep the text still."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "a-quieter-footer-signature",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A quieter footer signature.",
-    "description": "The homepage wordmark pairs Jackalope with a small constellation symbol.",
-    "items": [
-      "Replaced the decorative arrow with an asterism that does not suggest a clickable action."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "a-favicon-that-matches-the-site",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A favicon that matches the site.",
-    "description": "The website now uses the black Jackalope logo.",
-    "items": ["Browser tabs, bookmarks and home-screen icons share the same monochrome artwork."],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "service-feedback-audience-reliability",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "More reliable feedback and product updates",
-    "description": "Feedback stays available across configured deployments, and consented product-update preferences stay in sync.",
-    "items": [
-      "Catch disabled feedback ingestion during deployment checks.",
-      "Keep audience selection and subscriber preferences consistent through deployments and retries."
-    ],
-    "note": "In development; deployment and live service acceptance remain pending."
-  },
-  {
-    "id": "a-simpler-task-composer",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A simpler task composer",
-    "description": "Task creation puts the project before the prompt and chooses relevant guidance automatically.",
-    "items": [
-      "Moved the project selector above the text area and removed repeated tool and lesson summaries.",
-      "Match guidance to new tasks, with project defaults and per-task overrides.",
-      "Keep detailed setup under Customize task so the default view stays focused on writing."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "reliable-agent-sign-in-links",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Reliable agent sign-in links",
-    "description": "Agent account setup exposes browser and copy actions so sign-in can continue when a browser does not open.",
-    "items": [
-      "Claude authorization links open through the desktop browser handler, with selectable URLs and clipboard recovery."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "cleaner-account-editing",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Cleaner account setup and editing.",
-    "description": "Agent accounts appear after setup succeeds, and the editor keeps fields consistently spaced.",
-    "items": [
-      "Full-width name and label fields align with a clearly labeled account group.",
-      "Cancelled or failed new sign-ins no longer leave unfinished accounts in the list.",
-      "Cancelling a reconnect keeps the existing account and refreshes its sign-in status."
-    ],
-    "note": "Development milestone, not a public release."
+      "Preserve saved choices and deliberately cleared fields when refreshing context."
+    ]
   },
   {
     "id": "practical-coding-agent-guides",
@@ -136,126 +30,7 @@
     "items": [
       "Follow worked examples, reusable prompts and checklists with authoritative references.",
       "Navigate article sections and explore related guides and app comparisons."
-    ],
-    "note": "Website content milestone; Jackalope is coming soon."
-  },
-  {
-    "id": "detailed-workspace-comparisons",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Detailed workspace comparisons.",
-    "description": "Explore Jackalope alongside eight coding-agent tools with practical workflow comparisons.",
-    "items": [
-      "Read dedicated comparisons with official sources, workflow tables, and common questions.",
-      "Find each comparison in the rounded sidebar, sitemap, and LLM discovery files."
-    ],
-    "note": "Website content update."
-  },
-  {
-    "id": "a-clearer-website-footer-and-search-previews",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A clearer website footer and search previews.",
-    "description": "Find product guides, supported agents, and account links in an organized footer, with clearer search previews across the site.",
-    "items": [
-      "Grouped footer navigation adapts to desktop and mobile layouts.",
-      "Public pages share verified sitemap coverage, concise metadata, and relevant structured data."
-    ],
-    "note": "Website improvement; publication pending."
-  },
-  {
-    "id": "clearer-pass-sharing-feedback",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Clearer pass sharing feedback",
-    "description": "Sharing from your access page now confirms each copy right where you clicked.",
-    "items": [
-      "Copy pass link is the primary action, with more space between copy buttons and a checkmark confirmation.",
-      "The X sharing button is labeled X (Twitter)."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "mcp-documentation-tables",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Readable MCP documentation tables",
-    "description": "MCP documentation now renders GitHub-style Markdown tables.",
-    "items": ["Tables follow the app theme and support keyboard scrolling when they are wide."],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "mcp-marketplace-third-party-notice",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Clearer MCP marketplace disclosure",
-    "description": "The MCP marketplace now identifies listings as unaudited third-party tools.",
-    "items": [
-      "A notice beneath the title explains third-party responsibility and use at your own risk."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "clearer-project-settings",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Clearer project settings",
-    "description": "Project settings keep repository controls together with direct access to appearance and agent preferences.",
-    "items": ["Edit the selected project's theme and accounts in the main Settings page."],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "more-natural-account-icons",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "More natural account icons.",
-    "description": "Multiple agent accounts now appear together with clear, balanced spacing.",
-    "items": ["Removed avatar backgrounds and preserved icon proportions with staggered sizes."],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "a-simpler-marketing-page",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A simpler marketing page.",
-    "description": "Trim supporting copy and a footer divider from the homepage.",
-    "items": [
-      "Remove the workflow example footnotes and sample-project label from the hero tour preview.",
-      "Remove the line beneath the large footer wordmark."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "simpler-app-updates",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Simpler app updates",
-    "description": "Update controls use the same styled dropdown as the rest of Jackalope, with clearer, shorter details.",
-    "items": [
-      "Choose Stable or Beta from the shared dropdown.",
-      "See your version, update status and installation controls without repeated explanations."
-    ],
-    "note": "In development for a future desktop release."
-  },
-  {
-    "id": "cleaner-tour-preview",
-    "date": "2026-09-09",
-    "status": "Website",
-    "title": "A cleaner tour preview",
-    "description": "The app tour opens with less surrounding text.",
-    "items": [
-      "Removed the duration, preview, sample-data and music metadata line from the video dialog and tour page."
-    ],
-    "note": "Video controls, descriptive captions and the transcript remain available."
-  },
-  {
-    "id": "clearer-pass-sharing",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Clearer pass sharing.",
-    "description": "Pass links confirm copying directly in the share button.",
-    "items": ["Removed extra pass-sharing copy and simplified website punctuation."],
-    "note": "Website update pending deployment."
+    ]
   },
   {
     "id": "updated-product-tour",
@@ -270,40 +45,6 @@
     "note": "The walkthrough uses sample workspace data and scripted browser interactions."
   },
   {
-    "id": "a-clearer-task-input",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A clearer task input",
-    "description": "The task description is easier to distinguish from the Work page.",
-    "items": [
-      "Added a subtle theme-aware background and inset text spacing to the task description box."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "feedback-from-your-companion",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Feedback from your companion",
-    "description": "Share a bug, feature request or idea directly from the bottom-right Jackalope helper.",
-    "items": [
-      "Open Send feedback, review your message and send it to our private inbox without leaving your work."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "task-capture-stays-in-place",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Task capture stays in place",
-    "description": "Start work with the right project selected and actions that stay below your task settings.",
-    "items": [
-      "Save for later and Start task scroll with the Work page instead of floating over its content.",
-      "Finishing project setup selects that project for new tasks while keeping existing draft text."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
     "id": "unified-agent-account-list",
     "date": "2026-09-09",
     "status": "In development",
@@ -313,21 +54,7 @@
       "Rename, label and group the existing CLI account just like an added account.",
       "Agents cards show account identities, total counts and overlapping icons for multiple accounts.",
       "Keep task customization visible while retaining automatic setup defaults."
-    ],
-    "note": "Account metadata stays local. Existing account data remains compatible."
-  },
-  {
-    "id": "detected-model-selection",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Choose models without typing model IDs",
-    "description": "Model settings and task setup now offer agent-reported model choices instead of manual identifiers.",
-    "items": [
-      "Choose models from a detected list and use dropdowns for defaults and individual tasks.",
-      "See when model discovery is unavailable, with a reset for unverified saved preferences.",
-      "Task model discovery uses the account selected for the project."
-    ],
-    "note": "Existing saved choices remain compatible; model access and quota are checked when tasks run."
+    ]
   },
   {
     "id": "simpler-automatic-task-setup",
@@ -339,161 +66,7 @@
       "Use automatic agent, model and account routing with inherited project tools and matching lessons.",
       "Project tools no longer need a per-task checklist; saved restrictions remain intact until explicitly reset.",
       "Find effort, workspace and agent overrides under Customize task."
-    ],
-    "note": "Existing permissions, project defaults and saved task choices are preserved."
-  },
-  {
-    "id": "remove-project-from-app",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Remove projects without deleting files",
-    "description": "Remove a project from Jackalope directly from the project switcher or project settings.",
-    "items": [
-      "A clear confirmation explains that files, worktrees and task history stay intact.",
-      "Keep unfinished task text when removing its selected project."
-    ],
-    "note": "Folders can be added again anytime. Running tasks continue."
-  },
-  {
-    "id": "task-project-switcher",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "New tasks follow your project selection",
-    "description": "Switching projects in the top-left menu also selects that project for your next task.",
-    "items": [
-      "Keep your task text while changing projects and clear context from the previous project."
-    ],
-    "note": "Saved ideas and explicitly resumed drafts keep their own project."
-  },
-  {
-    "id": "complete-project-setup",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Finish setup before adding a project",
-    "description": "Project setup now includes Agents and Appearance, with choices kept provisional until workspace entry.",
-    "items": [
-      "Choose a project theme or inherit the app theme before reviewing an optional first task.",
-      "Cancel setup without adding a project to the switcher or changing the previous project selection.",
-      "Resume unfinished setup after a reload and keep existing repository preferences intact until completion."
-    ],
-    "note": "In development. Regression tests and native walkthrough validation are deferred to the combined acceptance pass."
-  },
-  {
-    "id": "titlebar-theme-settings",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Theme and settings in the title bar",
-    "description": "Keep workspace appearance and settings beside Help and the window controls.",
-    "items": [
-      "Use a compact theme picker in the title bar with the same preview and save behavior.",
-      "Keep the theme picker visibility preference and preserve toolbar controls in browser previews."
-    ],
-    "note": "In development. Native platform validation remains part of the combined acceptance pass."
-  },
-  {
-    "id": "titlebar-help",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Help beside the window controls",
-    "description": "Open the Help Center directly from the desktop title bar.",
-    "items": [
-      "Keep Help beside Minimize, Maximize and Close throughout account access, onboarding and the workspace.",
-      "Match the window controls with theme-aware styling, keyboard focus, a tooltip and touch sizing."
-    ],
-    "note": "In development. Windows, macOS and Linux native acceptance remains part of the combined validation pass."
-  },
-  {
-    "id": "consistent-workspace-navigation",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Consistent workspace navigation",
-    "description": "Usage now follows the same layout as Tasks, Project and MCP.",
-    "items": [
-      "Switch between token usage and performance insights in the shared top navigation, with filters preserved between views.",
-      "Align Project settings and Agent configuration headings and actions with the rest of the workspace."
-    ],
-    "note": "In development. Keyboard, theme and narrow-layout acceptance will be included in the combined validation pass."
-  },
-  {
-    "id": "managed-agent-accounts",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "More ways to keep agent accounts separate",
-    "description": "Set up work and personal accounts from agent settings with provider-specific login and API-key options.",
-    "items": [
-      "Add isolated Gemini and Goose account setup, and separate provider API keys for Aider.",
-      "Use separate Gemini API-key accounts with Antigravity while keeping the existing CLI subscription login available.",
-      "Finish interactive account setup and select an account for new tasks without changing existing task bindings."
-    ],
-    "note": "In development. Antigravity subscription logins are not separately isolated. Gemini, Aider and Goose task execution remains in development; real multi-account acceptance is pending."
-  },
-  {
-    "id": "easier-agent-accounts",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Work and personal agent accounts",
-    "description": "Add another login for an agent directly from Jackalope.",
-    "items": [
-      "An upfront Add account & sign in flow makes additional accounts easier to discover.",
-      "Label existing and saved accounts as Work, Personal or Other without opening an edit dialog.",
-      "Choose a newly connected account for future tasks from the sign-in screen."
-    ],
-    "note": "In development. Real multi-account sign-in validation remains pending."
-  },
-  {
-    "id": "branded-task-notifications",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Jackalope notification branding",
-    "description": "Windows task notifications now include the Jackalope logo.",
-    "items": [
-      "Test notifications share the same branding as task updates.",
-      "Added breathing room below the notification settings divider."
-    ],
-    "note": "In development. Native visual verification is pending."
-  },
-  {
-    "id": "settings-header-cleanup",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Simpler settings header",
-    "description": "Settings now opens directly at its heading.",
-    "items": ["Removed the extra Back to workspace link."],
-    "note": "In development."
-  },
-  {
-    "id": "unified-feedback-email-preference",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "One choice for product emails",
-    "description": "The signup product-notes choice now includes a one-time feedback email after trying Jackalope.",
-    "items": [
-      "The signup choice starts checked, and the separate feedback-email switch is removed from account settings.",
-      "Existing opt-outs remain respected, with consent checked again before sending."
-    ],
-    "note": "In development. Matching service and website deployment is pending."
-  },
-  {
-    "id": "concise-privacy-settings",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Simpler privacy settings",
-    "description": "Privacy settings are easier to scan.",
-    "items": [
-      "Short summaries keep the choices clear, with expandable details for settings sync and usage sharing."
-    ],
-    "note": "In development."
-  },
-  {
-    "id": "floating-action-borders",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Clearer floating actions",
-    "description": "Floating action bars are easier to distinguish from the content beneath them.",
-    "items": [
-      "Added subtle theme-aware borders and consistent spacing to task, connection and repository todo actions."
-    ],
-    "note": "In development."
+    ]
   },
   {
     "id": "worktree-cleanup-ready",
@@ -504,136 +77,7 @@
     "items": [
       "See which worktrees are ready and which generated folders cleanup removes.",
       "Keep local edits, configuration and unrecognized ignored files protected, including during archive and remove."
-    ],
-    "note": "In development. Combined desktop verification is pending."
-  },
-  {
-    "id": "more-room-for-task-details",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "More room for task details.",
-    "description": "Expanded task controls have clearer spacing and more consistent field sizes.",
-    "items": [
-      "Separate workflow labels and inputs, space context sections consistently and keep guideline cards from stretching with their neighbors.",
-      "Keep the large prompt style on task intent, with normal sizing for workflow fields."
-    ],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "tidier-project-preferences",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Tidier project preferences.",
-    "description": "Project settings are easier to scan and appearance settings have more breathing room.",
-    "items": [
-      "Align project fields in a consistent column, grouped into instructions, workspace and verification.",
-      "Add spacing before the project theme picker and remove companion previews from appearance settings."
-    ],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "a-flatter-command-shortcut",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A flatter command shortcut.",
-    "description": "The top-bar Jump to control fits more quietly into the workspace.",
-    "items": ["Removed the inset shadow from the Jump to search control."],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "start-with-what-you-want-to-do",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Start with what you want to do.",
-    "description": "Create and dispatch tasks directly from the Tasks page.",
-    "items": [
-      "A large inline composer puts your intent, project and start action first, with compact effort and configuration controls.",
-      "Keep drafts, save ideas for later and find existing work below the composer. New task shortcuts focus the prompt directly."
-    ],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "clearer-helper-bubbles",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Clearer helper bubbles.",
-    "description": "Helper messages stand out against your workspace theme.",
-    "items": [
-      "Speech bubbles and brief notification hints use dark backgrounds with light text in light themes, and light backgrounds with dark text in dark themes."
-    ],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "keep-quick-confirmations-temporary",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Keep quick confirmations temporary.",
-    "description": "Brief helper messages disappear after they have been shown.",
-    "items": [
-      "Copy confirmations and other temporary speech no longer become companion inbox entries or unread notifications."
-    ],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "see-when-a-pass-is-copied",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "See when a pass is copied.",
-    "description": "Pass tickets confirm when their invitation link is copied.",
-    "items": [
-      "The clicked desktop pass briefly shows Copied with a checkmark after a successful copy, alongside the helper confirmation."
-    ],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "recover-from-a-page-error",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Recover from a page error.",
-    "description": "A page that fails to open now offers a way back into Jackalope.",
-    "items": [
-      "Keep workspace navigation and the helper available after a page error, with options to return to tasks or reload."
-    ],
-    "note": "In development. Included in the next desktop release."
-  },
-  {
-    "id": "a-tidier-appearance-page",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A tidier appearance page.",
-    "description": "Personalize your workspace with a compact theme editor and control over the top-bar picker.",
-    "items": [
-      "The settings theme editor uses a width closer to the pop-out picker.",
-      "A saved checkbox lets you hide the top-bar theme picker while keeping Appearance settings available."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "share-a-head-start",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Share a head start.",
-    "description": "Early access passes share colorful ticket designs across the website and desktop, while desktop connections are easier to follow.",
-    "items": [
-      "Open an available pass to copy its link or send an email invitation.",
-      "The same ticket artwork, colors and availability states appear in the app and on the website.",
-      "The in-app invitation screen keeps the focus on passes and sharing, with less introductory copy.",
-      "The companion confirms when an invitation link or message is copied.",
-      "Connected desktops refresh automatically and show computer names from updated apps.",
-      "Centered approval guidance makes it clear when to return to Jackalope."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "app-version-on-the-welcome-screen",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "App version on the welcome screen.",
-    "description": "See which version of Jackalope is running before connecting your account.",
-    "items": [
-      "The welcome footer shows the current app version alongside the name and Early access label."
-    ],
-    "note": "Development milestone, not a public release."
+    ]
   },
   {
     "id": "account-setup-and-optional-settings-sync",
@@ -646,61 +90,7 @@
       "New connections default to settings sync, with an opt-out before connecting and saved opt-outs preserved.",
       "Sync appearance and notification choices with strict privacy controls and conflict review.",
       "Delete the saved settings copy and disable sync across connected desktops."
-    ],
-    "note": "Development milestone; updated desktop and hosted application rollout still require acceptance."
-  },
-  {
-    "id": "responsive-worktree-loading",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Worktrees without the wait",
-    "description": "Workspaces appear before cleanup checks finish.",
-    "items": [
-      "Task and feature worktrees load independently of cleanup checks, with retryable errors for slow reads. Primary, main and master checkouts stay out of the list.",
-      "Cleanup checks avoid enumerating ignored dependency folders while retaining deletion safeguards.",
-      "The desktop companion sits slightly lower in its footer."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "workspace-controls-and-project-defaults",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A workspace that is ready to use",
-    "description": "Project settings, agent preferences and connected tools are easier to find and configure.",
-    "items": [
-      "Share project settings between Settings and the project workspace, with agent and account permissions and optional project themes.",
-      "Open agent configuration directly from its card and discover model catalogs from supported CLIs.",
-      "Use one MCP connection editor for the marketplace and custom connections, with project and agent scope controls.",
-      "Open an automatically prepared codebase map with a compact toolbar and visual checks.",
-      "Warm account quotas, model catalogs and tool settings during setup; show remaining invitations and a livelier working companion."
-    ],
-    "note": "In development. CLI support and account access determine available models and connections."
-  },
-  {
-    "id": "workspace-pages-and-automatic-refresh",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "More room, less waiting",
-    "description": "Full workspace pages and automatic refresh make browsing and configuration easier.",
-    "items": [
-      "MCP details and configuration move into dedicated pages, with publisher avatars on listings and clearer actions.",
-      "App Settings gets its own page. Agents use a card grid, discover runners on arrival, and explain when an Antigravity desktop install needs the CLI.",
-      "Usage loads quotas automatically and refreshes stale data. Marketplace, connection and knowledge reads reuse recent results, while page scrollbars stay at the workspace edge.",
-      "Performance insights includes an automatic quota handoff switch, enabled by default, without the duplicate capacity section."
-    ],
-    "note": "Disabling quota handoff preserves partial work for review. Existing preferences keep handoff enabled."
-  },
-  {
-    "id": "computer-use-and-agent-browser-together",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "Computer use and agent browser, together.",
-    "description": "The homepage now highlights browser actions and approved Windows app control in the main feature grid.",
-    "items": [
-      "See what agents can do in a task browser or a selected Windows window, with visible pause and cancel controls."
-    ],
-    "note": "Website copy update; deployment remains pending."
+    ]
   },
   {
     "id": "visual-project-context",
@@ -712,20 +102,7 @@
       "Project Context groups source files, technologies, instructions and commands in a visual overview.",
       "Lessons and workflows use compact cards with full content available on demand.",
       "Repo TODOs offer a Start task action with prefilled context. Completion moves into explicit edit controls, with Cancel and Discard beside the document heading."
-    ],
-    "note": "Tasks remain yours to review and start; repository edits still require Save changes."
-  },
-  {
-    "id": "quieter-loading-states",
-    "date": "2026-09-09",
-    "status": "In development",
-    "title": "A calmer wait",
-    "description": "Loading views use consistent, understated visual feedback.",
-    "items": [
-      "Subtle spinners and placeholders replace bare loading text across the workspace.",
-      "Compact checks keep a small status indicator, and loading animation respects reduced motion."
-    ],
-    "note": "Indicators follow real loading state without adding delays."
+    ]
   },
   {
     "id": "stay-in-control-of-desktop-assistance",
@@ -735,122 +112,20 @@
     "description": "A clear status bar and theme-colored glow show when Jackalope is using your computer.",
     "items": [
       "Pause or cancel from the top bar, press Escape to cancel, and explicitly resume after mouse, keyboard or window interruptions.",
-      "Larger display-scaled text and working controls keep desktop assistance readable.",
-      "The landing page gives the mobile New task preview more bottom space."
+      "Larger display-scaled text and working controls keep desktop assistance readable."
     ],
-    "note": "Development milestone. Disposable Windows checks pass; installed-agent and packaged-app acceptance remain separate."
-  },
-  {
-    "id": "clearer-recurring-setup",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "Recurring work, clearly configured",
-    "description": "Create routines with instructions, timing and behavior laid out together.",
-    "items": [
-      "The wider schedule editor keeps settings visible and its save controls in place.",
-      "Daily, weekday and weekly routines use a time picker, with custom cron timing preserved.",
-      "Template search places the icon inside the field and removes the extra introductory note."
-    ],
-    "note": "Existing schedules, saved context and paused defaults remain supported."
-  },
-  {
-    "id": "actionable-task-welcome",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A useful place to start",
-    "description": "An empty Tasks view offers clear next steps.",
-    "items": [
-      "Start a task, then use the shortcut grid to explore the codebase, choose agents, connect tools or schedule recurring work."
-    ],
-    "note": "Actions open the existing workspace flows without starting work automatically."
+    "note": "Desktop assistance requires Windows and permission for each window."
   },
   {
     "id": "knowledgebase-and-diagnostics",
     "date": "2026-09-08",
     "status": "Website",
-    "title": "Knowledgebase, architecture guides, and in-app help",
-    "description": "A clean, searchable Knowledgebase on the marketing website covers common questions, architecture guides, and troubleshooting recipes, with direct access from the desktop app.",
+    "title": "Guides and help, close at hand",
+    "description": "Find answers about Jackalope in a searchable knowledgebase, with direct access from the desktop app.",
     "items": [
       "Search guides, visual architecture diagrams, and troubleshooting recipes across nine feature categories.",
       "Access the Knowledgebase directly from the desktop shell using the new header life preserver shortcut, the Command Palette, or Settings."
-    ],
-    "note": "Structured Schema.org FAQ data and AI search engine files (llms.txt) provide comprehensive discovery."
-  },
-  {
-    "id": "softer-workspace-controls",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "More room to jump around",
-    "description": "Workspace navigation feels more at home in your theme.",
-    "items": [
-      "A wider command control uses neutral light/dark glass and a subtle inset shadow.",
-      "Help, settings, appearance and task shortcuts use themed tooltips with keyboard support."
-    ],
-    "note": "Available in the development build."
-  },
-  {
-    "id": "honest-workspace-preparation",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A prepared workspace from the start",
-    "description": "A friendly welcome gives Jackalope time to prepare your workspace.",
-    "items": [
-      "Setup refreshes history and agents, checks the project, reads repository context and prepares a reusable local codebase map.",
-      "Preparation stays visible for at least five seconds, with accurate progress and recovery for slow or failed checks."
-    ],
-    "note": "Preparation runs locally without launching agent tasks or installing dependencies."
-  },
-  {
-    "id": "calmer-agent-setup",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A clearer agent setup",
-    "description": "Agent setup is easier to scan and fits smaller windows.",
-    "items": [
-      "Removed detected counts and skill badges, with company names shown as subtle text.",
-      "Expanded installation commands wrap within the setup pane.",
-      "A subtle border separates the floating step actions from scrolling content."
-    ],
-    "note": "In development."
-  },
-  {
-    "id": "multi-agent-intelligence-dag-insights",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "Local LLM discovery, cross-model review, visual DAG and insights",
-    "description": "Orchestrate multi-agent teams with zero-latency local model discovery, privacy-preserving API key detection, peer code reviews, visual dependency graphs, and an actionable insights dashboard.",
-    "items": [
-      "Discover running local inference servers (Ollama, LM Studio, llama.cpp) and ambient environment API keys with local-only privacy guarantees and opt-in import.",
-      "Request independent cross-model peer reviews on workspace diffs before merging, surfacing security and correctness advisories.",
-      "Visualize feature subtasks, dependencies, agent avatars, and active parallel execution in an interactive DAG graph.",
-      "Explore speed, cost, and token performance comparisons across agents, with mascot-delivered workflow optimization tips and quota rescue analytics."
-    ],
-    "note": "Available in the local development build; native agent and live provider acceptance remain pending."
-  },
-  {
-    "id": "more-agents-less-juggling",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "More agents. Less juggling.",
-    "description": "Explore Jackalope with a clearer overview and features that open in place.",
-    "items": [
-      "A bolder landing page puts the app preview and six expandable features up front.",
-      "Join the waitlist directly from product pages or the homepage form.",
-      "A dedicated roadmap keeps future plans together while product guides focus on the current workflow."
-    ],
-    "note": "Development milestone; public downloads are not open yet."
-  },
-  {
-    "id": "connected-agents-native-windows",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "Your agents, accounts, and tools together",
-    "description": "A clearer landing-page overview of project agent lineups, routing, tool discovery, and cross-agent coordination, plus explicit Windows desktop window access.",
-    "items": [
-      "See how work and personal accounts, project agent restrictions, automatic routing, MCP discovery, and agent messages fit together.",
-      "Grant one Windows window to an active task for snapshots, captures, focus, clicks, literal typing, and scrolling; Stop or release revokes access."
-    ],
-    "note": "Native window control is Windows-only and requires a human window choice for each attempt. Live routing and installed-agent desktop acceptance remain pending."
+    ]
   },
   {
     "id": "quota-aware-task-routing",
@@ -863,32 +138,7 @@
       "Hands quota-interrupted tasks to an eligible fallback in the same workspace with progress and usage retained.",
       "Shows routing decisions and attributes routing and worker usage separately."
     ],
-    "note": "In development. Missing quota remains unknown; live provider handoff acceptance is still pending. Explicit assignments remain pinned."
-  },
-  {
-    "id": "a-more-expressive-companion",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A more expressive companion",
-    "description": "Jackalope adds small character reactions and more tactile theme controls.",
-    "items": [
-      "The idle companion blinks occasionally and gently follows the mouse, with activity expressions taking priority.",
-      "Successful setup steps get a quick nod before advancing. Reduced motion skips these gestures.",
-      "Atmosphere reaches a richer maximum of 64 and uses a thicker vertical pill handle with a generous drag area."
-    ],
-    "note": "Available in the local development build; native release acceptance is still pending."
-  },
-  {
-    "id": "clearer-button-and-tab-states",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "Clearer button and tab states.",
-    "description": "Primary buttons favor readable white labels, and selected tabs use subtle elevation.",
-    "items": [
-      "Borderline action fills deepen slightly while preserving the chosen theme color elsewhere.",
-      "Selected theme, task, queue and MCP tabs use a shared shadow instead of a bottom-edge highlight."
-    ],
-    "note": "Development milestone, not a public release."
+    "note": "Explicit assignments stay pinned. Missing quota is treated as unknown."
   },
   {
     "id": "palettes-that-follow-your-color",
@@ -898,71 +148,8 @@
     "description": "Choose Single, Duo or Trio to build a coordinated theme from one primary color.",
     "items": [
       "Companion colors and workspace gradients update as you explore the color picker.",
-      "Palette previews preserve cancel, reset and saved themes, with readable action labels on hover.",
-      "Atmosphere has a richer high end while keeping existing saved themes unchanged.",
-      "Choosing automatic appearance keeps the theme picker layout steady."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "a-focused-start-to-setup",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A focused start to setup.",
-    "description": "Choose your theme first, then review privacy choices when setting up a project.",
-    "items": [
-      "Privacy choices appear only on step two, with saved opt-outs preserved.",
-      "Agent setup saves your app-wide default and points to Settings for more customization.",
-      "Re-scan agents is easy to find at the top right of the setup pane."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "a-closer-look-at-jackalope",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A closer look at Jackalope.",
-    "description": "A more expressive landing page brings the workspace and its parallel workflow into focus.",
-    "items": [
-      "An oversized animated brand mark frames the actual app, with a quick path to the tour and waitlist.",
-      "Explore parallel tasks earlier, review the interface, and try palettes across the page."
-    ],
-    "note": "Website development milestone, not a public app release."
-  },
-  {
-    "id": "feedback-after-you-have-tried-jackalope",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "Feedback after you have tried Jackalope",
-    "description": "Share thoughts after reviewing real task results, with optional email follow-up and quiet in-app invitations.",
-    "items": [
-      "Control invitations, snooze requests, and stop this feedback round after responding."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "a-new-look-at-jackalope-in-motion",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A new look at Jackalope in motion.",
-    "description": "Watch our 32-second launch film from the landing page or app tour.",
-    "items": [
-      "See parallel agent work, the agent roster, and review in a light-theme animated preview with music and captions."
-    ],
-    "note": "The preview uses sample project data. Join the waitlist for early access."
-  },
-  {
-    "id": "agent-ecosystem-and-multi-agent-routing",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "Expanded agent ecosystem and multi-agent routing.",
-    "description": "Support for 8 coding agents, broad package manager discovery, multi-account tags, intelligent task routing, and interactive multi-agent decomposition.",
-    "items": [
-      "Built-in detection across npm, pnpm, yarn, pipx, scoop, cargo, winget, and brew for Codex, Claude, Grok, OpenCode, Antigravity, Gemini CLI, Aider, and Goose.",
-      "Multi-account custom tagging, visual badges, and one-click import of default CLI logins.",
-      "Automatic best-fit task routing and interactive goal splitting into sequenced subtasks across specialized agents."
-    ],
-    "note": "Prerelease milestone. Desktop builds pass all automated verification checks."
+      "Palette previews preserve cancel, reset and saved themes, with readable action labels on hover."
+    ]
   },
   {
     "id": "your-next-hop-into-jackalope",
@@ -971,68 +158,10 @@
     "title": "Your next hop into Jackalope.",
     "description": "Track your waitlist place, bring people along, and share Instant Access Passes once you are in.",
     "items": [
-      "Unlimited verified waitlist referrals earn priority, with progress visible to you and the admin.",
+      "Verified waitlist referrals earn priority, with progress visible on your access page.",
       "Accepted members get five passes to bring people straight into early access.",
       "Clear emails guide verification, referral milestones, pass claims, and expired reservations."
-    ],
-    "note": "Development milestone. Service migration and real email acceptance are required before rollout."
-  },
-  {
-    "id": "a-cross-platform-workspace",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A cross-platform workspace.",
-    "description": "Jackalope's public copy and launch assets now describe a cross-platform workspace for coding agents.",
-    "items": [
-      "The launch film, submission images, captions and outreach copy use a shared early-access invitation."
-    ],
-    "note": "Development milestone, not a public release. The first launch is planned for macOS, Windows, and Linux."
-  },
-  {
-    "id": "a-clearer-path-into-jackalope",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "A clearer path into Jackalope.",
-    "description": "Explore the current workspace and help shape our first cross-platform launch.",
-    "items": [
-      "Optional signup preferences and admin insights guide onboarding.",
-      "Find invitations, compare workflows, and watch the updated app tour."
-    ],
-    "note": "Development milestone. Deployment and cross-platform installed acceptance remain pending."
-  },
-  {
-    "id": "newsletter-artwork-stays-behind-the-signup",
-    "date": "2026-09-08",
-    "status": "In development",
-    "title": "Newsletter artwork stays behind the signup.",
-    "description": "The folding Echo outline now remains behind the early-access form as it animates.",
-    "items": [
-      "The signup surface keeps its text and controls clear in light and dark appearances."
-    ],
-    "note": "Development milestone, not a public release."
-  },
-  {
-    "id": "official-x-profile",
-    "date": "2026-09-08",
-    "status": "Website",
-    "title": "Follow Jackalope on X.",
-    "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": ["A Follow on X link is available in the shared footer."],
-    "note": "Website milestone, not a public product release."
-  },
-  {
-    "id": "parallel-work-visual-language",
-    "date": "2026-09-08",
-    "status": "Website",
-    "title": "A clearer view of parallel work.",
-    "description": "The website now shows how different kinds of agent work move through Jackalope instead of repeating one generic workflow diagram.",
-    "items": [
-      "Three animated scenes distinguish feature delivery, regression tracing, and open-ended design exploration.",
-      "Route lines, layered studies, and evidence cards extend the visual language used in Jackalope campaign artwork.",
-      "The early-access form now uses the same line motif and a higher-contrast theme-colored action.",
-      "Focused discovery pages explain parallel agents, Git worktrees, supported adapters, project context, recurring work, and review."
-    ],
-    "note": "Website milestone, not a public product release. Motion respects reduced-motion preferences."
+    ]
   },
   {
     "id": "workspace-foundations",
@@ -1046,7 +175,7 @@
       "Recurring work includes timezone and missed-run controls. The app must remain running; it cannot wake a closed app or a sleeping computer.",
       "Account-aware usage views and locally bundled fonts are part of the current development build."
     ],
-    "note": "Development milestone, not a public release. Installed-app acceptance, signing, and the first public Windows installer remain pending."
+    "note": "Scheduled work requires Jackalope to stay running."
   },
   {
     "id": "a-first-look",
@@ -1059,6 +188,6 @@
       "An interactive recorded tour covering task drafting, patch review, agent selection, and the live theme palette.",
       "A three-step introduction, product notes, and an early-access waitlist."
     ],
-    "note": "The walkthrough illustrates the interface with sample data. It does not launch an agent task."
+    "note": "The walkthrough illustrates the interface with sample data."
   }
 ]

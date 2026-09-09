@@ -28,9 +28,11 @@ function validate(entries) {
     if (entry.date > previousDate) fail('entries must be newest first.');
     previousDate = entry.date;
     if (!allowedStatuses.has(entry.status)) fail(`${location} has an unsupported status.`);
-    for (const key of ['title', 'description', 'note']) {
+    for (const key of ['title', 'description']) {
       if (typeof entry[key] !== 'string' || !entry[key].trim()) fail(`${location} needs ${key}.`);
     }
+    if (entry.note !== undefined && (typeof entry.note !== 'string' || !entry.note.trim()))
+      fail(`${location} has an invalid note.`);
     if (
       !Array.isArray(entry.items) ||
       entry.items.length === 0 ||

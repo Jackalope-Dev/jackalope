@@ -227,11 +227,11 @@
   color: var(--color-text-secondary);
   line-height: 1.6;
 }
-.roadmap-item summary > svg {
+.roadmap-item :where(summary) > svg {
   color: var(--color-accent-ink);
   transition: transform 180ms;
 }
-.roadmap-item:where([open]) summary > svg {
+.roadmap-item:where([open]) :where(summary) > svg {
   transform: rotate(180deg);
 }
 .roadmap-item summary:hover strong {

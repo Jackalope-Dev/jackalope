@@ -1,4 +1,4 @@
-import { ArrowRight, GitBranch } from 'lucide-react';
+import { ArrowRight, Mail } from 'lucide-react';
 import type { BlogSection } from './blog-types';
 import { posts, tour, updates } from './content';
 import { PublishedReleases } from './PublishedReleases';
@@ -261,24 +261,14 @@ export function JournalPage({ path }: { path: string }) {
       <main id="main" className="journal-page page-width">
         <header className="journal-heading">
           <h1>Changelog</h1>
-          <p>Development updates and published releases.</p>
+          <p>New features, meaningful improvements, and major milestones.</p>
         </header>
         {publishedVersion && <PublishedReleases />}
         <div className="release-status">
-          <GitBranch size={18} />
+          <Mail size={18} aria-hidden="true" />
           <p>
-            {publishedVersion ? (
-              <>
-                <strong>Jackalope {publishedVersion} is available.</strong>{' '}
-                <a href="/#download">Download for Windows</a>. Earlier development milestones follow
-                below.
-              </>
-            ) : (
-              <>
-                <strong>Coming soon.</strong> These are development milestones, not downloadable
-                releases.
-              </>
-            )}
+            <strong>Get the next update.</strong> Join our newsletter for launch news and occasional
+            product notes. <a href="#newsletter">Sign up for updates</a>.
           </p>
         </div>
         <div className="changelog-list">
@@ -298,7 +288,7 @@ export function JournalPage({ path }: { path: string }) {
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
-                <p className="change-note">{update.note}</p>
+                {update.note && <p className="change-note">{update.note}</p>}
               </div>
             </article>
           ))}
