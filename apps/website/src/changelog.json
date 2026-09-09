@@ -1,5 +1,17 @@
 [
   {
+    "id": "an-echo-in-the-footer",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "An echo in the footer.",
+    "description": "The homepage footer now ends with a clean Jackalope wordmark.",
+    "items": [
+      "Hover over the text for a brief outlined echo that folds back into place, matching the logo.",
+      "Removed the standalone symbol; touch devices and reduced-motion preferences keep the text still."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "a-quieter-footer-signature",
     "date": "2026-09-09",
     "status": "In development",

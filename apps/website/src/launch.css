@@ -781,24 +781,12 @@
   max-height: 395px;
 }
 .finale-wordmark {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
   font-size: clamp(60px, 15.8vw, 226px);
   font-weight: 650;
   letter-spacing: -0.09em;
   line-height: 1.12;
   margin-top: 45px;
-  padding-bottom: 20px;
-}
-.finale-wordmark > span {
-  align-self: center;
-  flex-shrink: 0;
-  font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", sans-serif;
-  font-weight: 400;
-  font-size: 0.48em;
-  letter-spacing: 0;
-  line-height: 1;
+  padding-bottom: 0.2em;
 }
 .sr-only {
   position: absolute;

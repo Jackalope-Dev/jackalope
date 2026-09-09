@@ -9,6 +9,23 @@ const head = [
   characterPaths.head,
 ].join(' ');
 
+export function EchoWordmark({ className = '' }: { className?: string }) {
+  return (
+    <span className={`brand-echo-wordmark ${className}`} aria-hidden="true">
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((echo) => (
+        <span
+          key={echo}
+          className="brand-echo-wordmark-line"
+          style={{ '--echo': echo } as CSSProperties}
+        >
+          jackalope
+        </span>
+      ))}
+      <span className="brand-echo-wordmark-face">jackalope</span>
+    </span>
+  );
+}
+
 export function EchoMark({
   animated = true,
   className = '',

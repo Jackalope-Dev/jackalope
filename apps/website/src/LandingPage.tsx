@@ -1,4 +1,4 @@
-import { EchoMark } from '@jackalope/brand/echo';
+import { EchoMark, EchoWordmark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
@@ -648,9 +648,7 @@ export function LandingPage({
             </div>
             <BrandMark className="finale-mark" />
           </div>
-          <div className="finale-wordmark" aria-hidden="true">
-            jackalope<span>⁂</span>
-          </div>
+          <EchoWordmark className="finale-wordmark" />
         </div>
       </section>
     </main>
