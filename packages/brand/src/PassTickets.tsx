@@ -9,6 +9,7 @@ export function PassTickets({
   accepted,
   disabled = false,
   actionLabel = 'Share a pass',
+  copiedPass,
   onSelect,
 }: {
   limit: number;
@@ -16,6 +17,7 @@ export function PassTickets({
   accepted: number;
   disabled?: boolean;
   actionLabel?: string;
+  copiedPass?: number;
   onSelect: (number: number, button: HTMLButtonElement) => void;
 }) {
   return (
@@ -24,6 +26,8 @@ export function PassTickets({
         {Array.from({ length: Math.min(limit, 100) }, (_, index) => index + 1).map((number) => {
           const state =
             number <= accepted ? 'Claimed' : number <= limit - remaining ? 'Reserved' : 'Available';
+          const copied = state === 'Available' && copiedPass === number;
+          const label = copied ? 'Copied' : actionLabel;
           return (
             <li
               key={number}
@@ -38,7 +42,7 @@ export function PassTickets({
                 type="button"
                 className="brand-pass-ticket"
                 disabled={state !== 'Available' || disabled}
-                aria-label={`Instant Access Pass ${number}: ${state}${state === 'Available' ? `. ${actionLabel}` : ''}`}
+                aria-label={`Instant Access Pass ${number}: ${state}${state === 'Available' ? `. ${label}` : ''}`}
                 onClick={(event) => onSelect(number, event.currentTarget)}
               >
                 <span className="brand-pass-ticket-top">
@@ -56,7 +60,7 @@ export function PassTickets({
                   Access
                 </strong>
                 <span className="brand-pass-ticket-stub">
-                  <span>{state === 'Available' ? actionLabel : state}</span>
+                  <span>{state === 'Available' ? label : state}</span>
                   {state === 'Available' && (
                     <svg
                       width="17"
@@ -69,7 +73,7 @@ export function PassTickets({
                       strokeLinejoin="round"
                       aria-hidden="true"
                     >
-                      <path d="M5 12h14m-7-7 7 7-7 7" />
+                      <path d={copied ? 'm5 12 4 4L19 6' : 'M5 12h14m-7-7 7 7-7 7'} />
                     </svg>
                   )}
                 </span>

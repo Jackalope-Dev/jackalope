@@ -19,6 +19,7 @@ import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { LoadingState } from '../ui/LoadingState';
+import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { Tooltip } from '../ui/Tooltip';
 import { InvitationsButton } from './InvitationsButton';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
@@ -341,87 +342,94 @@ export function Shell({
               </nav>
             </div>
           )}
-        <Suspense fallback={<LoadingState label={`Opening ${view.label}…`} />}>
-          {activeTab === 'kanban' && (
-            <TaskWorkspace
-              onOpenProject={openProjectSetup}
-              onCapture={(ideaId) => setCapture({ ideaId })}
-              onSchedule={(id) => {
-                const run = useExecutionStore.getState().runs.find((r) => r.id === id);
-                if (run) selectProject(run.projectId);
-                setScheduleRunId(id);
-                setActiveTab('schedules');
-              }}
-            />
-          )}
-          {activeTab === 'worktrees' && (
-            <WorktreeManager key={activeProjectId} onOpenProject={openProjectSetup} />
-          )}
-          {activeTab === 'repo-todos' && (
-            <RepoTodos
-              key={project?.path ?? activeProjectId}
-              onCapture={(draftKey) => setCapture({ draftKey })}
-              onOpenProject={openProjectSetup}
-            />
-          )}
-          {activeTab === 'agents' && (
-            <RunnerConnections
-              onNewTask={(agent) => {
-                useExecutionStore.getState().select(null);
-                setCapture({ agent });
-                setActiveTab('kanban');
-              }}
-              onRun={(run) => {
-                selectProject(run.projectId);
-                useExecutionStore.getState().select(run.id);
-                setActiveTab('kanban');
-              }}
-            />
-          )}
-          {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
-          {activeTab === 'preferences' && (
-            <SettingsPage
-              key={settingsCategory}
-              initialCategory={settingsCategory}
-              onClose={() => setActiveTab(previousView.current)}
-            />
-          )}
-          {activeTab === 'agent-settings' && (
-            <section className="workspace-page agent-settings-page w-full">
-              <AgentManager key={configuredAgent} initialAgentId={configuredAgent} />
-            </section>
-          )}
-          {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
-          {activeTab === 'project-knowledge' && <ProjectContext key={activeProjectId} />}
-          {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
-            <McpWorkspace
-              view={activeTab === 'mcps' ? 'configured' : 'marketplace'}
-              onViewChange={(next) => navigate(next === 'configured' ? 'mcps' : 'mcp-marketplace')}
-            />
-          )}
-          {activeTab === 'schedules' && (
-            <ScheduleManager
-              key={activeProjectId}
-              sourceRunId={scheduleRunId}
-              onSourceHandled={() => setScheduleRunId(undefined)}
-              onOpenProject={openProjectSetup}
-              onPlanning={() => {
-                useExecutionStore.getState().select(null);
-                setActiveTab('kanban');
-              }}
-            />
-          )}
-          {activeTab === 'browser' && (
-            <BrowserHarness
-              onOpenProject={openProjectSetup}
-              onTask={(id) => {
-                useExecutionStore.getState().select(id);
-                setActiveTab('kanban');
-              }}
-            />
-          )}
-          {activeTab === 'topology' && <CodebaseMap onOpenProject={openProjectSetup} />}
-        </Suspense>
+        <PageErrorBoundary
+          key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
+          onBack={activeTab === 'kanban' ? undefined : () => setActiveTab('kanban')}
+        >
+          <Suspense fallback={<LoadingState label={`Opening ${view.label}…`} />}>
+            {activeTab === 'kanban' && (
+              <TaskWorkspace
+                onOpenProject={openProjectSetup}
+                onCapture={(ideaId) => setCapture({ ideaId })}
+                onSchedule={(id) => {
+                  const run = useExecutionStore.getState().runs.find((r) => r.id === id);
+                  if (run) selectProject(run.projectId);
+                  setScheduleRunId(id);
+                  setActiveTab('schedules');
+                }}
+              />
+            )}
+            {activeTab === 'worktrees' && (
+              <WorktreeManager key={activeProjectId} onOpenProject={openProjectSetup} />
+            )}
+            {activeTab === 'repo-todos' && (
+              <RepoTodos
+                key={project?.path ?? activeProjectId}
+                onCapture={(draftKey) => setCapture({ draftKey })}
+                onOpenProject={openProjectSetup}
+              />
+            )}
+            {activeTab === 'agents' && (
+              <RunnerConnections
+                onNewTask={(agent) => {
+                  useExecutionStore.getState().select(null);
+                  setCapture({ agent });
+                  setActiveTab('kanban');
+                }}
+                onRun={(run) => {
+                  selectProject(run.projectId);
+                  useExecutionStore.getState().select(run.id);
+                  setActiveTab('kanban');
+                }}
+              />
+            )}
+            {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
+            {activeTab === 'preferences' && (
+              <SettingsPage
+                key={settingsCategory}
+                initialCategory={settingsCategory}
+                onClose={() => setActiveTab(previousView.current)}
+              />
+            )}
+            {activeTab === 'agent-settings' && (
+              <section className="workspace-page agent-settings-page w-full">
+                <AgentManager key={configuredAgent} initialAgentId={configuredAgent} />
+              </section>
+            )}
+            {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
+            {activeTab === 'project-knowledge' && <ProjectContext key={activeProjectId} />}
+            {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
+              <McpWorkspace
+                view={activeTab === 'mcps' ? 'configured' : 'marketplace'}
+                onViewChange={(next) =>
+                  navigate(next === 'configured' ? 'mcps' : 'mcp-marketplace')
+                }
+              />
+            )}
+            {activeTab === 'schedules' && (
+              <ScheduleManager
+                key={activeProjectId}
+                sourceRunId={scheduleRunId}
+                onSourceHandled={() => setScheduleRunId(undefined)}
+                onOpenProject={openProjectSetup}
+                onPlanning={() => {
+                  useExecutionStore.getState().select(null);
+                  setActiveTab('kanban');
+                }}
+              />
+            )}
+            {activeTab === 'browser' && (
+              <BrowserHarness
+                onOpenProject={openProjectSetup}
+                onTask={(id) => {
+                  useExecutionStore.getState().select(id);
+                  setActiveTab('kanban');
+                }}
+              />
+            )}
+            {activeTab === 'topology' && <CodebaseMap onOpenProject={openProjectSetup} />}
+          </Suspense>
+        </PageErrorBoundary>
       </main>
       {capture && (
         <CaptureTask

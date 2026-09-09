@@ -54,9 +54,7 @@ export function Companion({
   const seen = useRef(new Set<string>());
   useEffect(() => {
     const current: Pick<CompanionNotice, 'id' | 'title' | 'kind'>[] = JSON.parse(announcementKey);
-    const next = current.find(
-      (notice) => !seen.current.has(notice.id) && !notice.id.startsWith('message:'),
-    );
+    const next = current.find((notice) => !seen.current.has(notice.id));
     for (const notice of current) seen.current.add(notice.id);
     if (next && !open) setHint(next);
   }, [announcementKey, open]);

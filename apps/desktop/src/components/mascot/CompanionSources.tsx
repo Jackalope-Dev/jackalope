@@ -4,7 +4,6 @@ import type { TaskRun } from '../../lib/task-runtime';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useMascotStore } from '../../stores/mascotStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { navigateWorkspace, openSettings } from '../layout/navigation';
@@ -21,8 +20,6 @@ export function CompanionSources() {
   const notificationError = useNotificationStore((state) => state.error || state.status?.error);
   const runs = useExecutionStore((state) => state.runs);
   const error = useExecutionStore((state) => state.error);
-  const message = useMascotStore((state) => state.message);
-  const [latest, setLatest] = useState<{ id: string; text: string } | null>(null);
   const [referralAccount, setReferralAccount] = useState<string | null>(null);
   useEffect(() => {
     if (!isTauriEnvironment()) return;
@@ -91,9 +88,6 @@ export function CompanionSources() {
         ]
       : [],
   );
-  useEffect(() => {
-    if (message) setLatest({ id: `message:${crypto.randomUUID()}`, text: message });
-  }, [message]);
   useCompanionNotices('tasks', taskNotices(runs, openCompanionTask));
   useCompanionNotices(
     'execution',
@@ -106,20 +100,6 @@ export function CompanionSources() {
             kind: 'attention',
             actionLabel: 'Open tasks',
             onOpen: () => navigateWorkspace('kanban'),
-          },
-        ]
-      : [],
-  );
-  useCompanionNotices(
-    'message',
-    latest
-      ? [
-          {
-            id: latest.id,
-            title: 'A note from Jackalope',
-            detail: latest.text,
-            kind: 'info',
-            onDismiss: () => setLatest(null),
           },
         ]
       : [],

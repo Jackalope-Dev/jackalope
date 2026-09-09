@@ -1,5 +1,49 @@
 [
   {
+    "id": "clearer-helper-bubbles",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Clearer helper bubbles.",
+    "description": "Helper messages stand out against your workspace theme.",
+    "items": [
+      "Speech bubbles and brief notification hints use dark backgrounds with light text in light themes, and light backgrounds with dark text in dark themes."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
+    "id": "keep-quick-confirmations-temporary",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Keep quick confirmations temporary.",
+    "description": "Brief helper messages disappear after they have been shown.",
+    "items": [
+      "Copy confirmations and other temporary speech no longer become companion inbox entries or unread notifications."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
+    "id": "see-when-a-pass-is-copied",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "See when a pass is copied.",
+    "description": "Pass tickets confirm when their invitation link is copied.",
+    "items": [
+      "The clicked desktop pass briefly shows Copied with a checkmark after a successful copy, alongside the helper confirmation."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
+    "id": "recover-from-a-page-error",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Recover from a page error.",
+    "description": "A page that fails to open now offers a way back into Jackalope.",
+    "items": [
+      "Keep workspace navigation and the helper available after a page error, with options to return to tasks or reload."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
     "id": "a-tidier-appearance-page",
     "date": "2026-09-09",
     "status": "In development",
@@ -420,7 +464,9 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": ["A Follow on X link is available in the shared footer."],
+    "items": [
+      "A Follow on X link is available in the shared footer."
+    ],
     "note": "Website milestone, not a public product release."
   },
   {

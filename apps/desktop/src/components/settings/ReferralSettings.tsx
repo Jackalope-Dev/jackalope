@@ -21,12 +21,19 @@ async function openExternal(url: string) {
 export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
   const { referrals, loading, error: fetchError, load } = useReferralStore();
   const [error, setError] = useState('');
+  const [copiedPass, setCopiedPass] = useState<{ number: number } | null>(null);
+  useEffect(() => {
+    if (!copiedPass) return;
+    const timer = window.setTimeout(() => setCopiedPass(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [copiedPass]);
   useEffect(() => {
     void load(false);
   }, [load]);
-  const copy = async (value: string, success: string) => {
+  const copy = async (value: string, success: string, passNumber?: number) => {
     try {
       await navigator.clipboard.writeText(value);
+      if (passNumber !== undefined) setCopiedPass({ number: passNumber });
       useMascotStore.getState().say(success, 3500);
       setError('');
     } catch {
@@ -89,7 +96,8 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
       <PassTickets
         {...referrals}
         actionLabel="Copy pass link"
-        onSelect={() => void copy(referrals.shareUrl, 'Pass link copied.')}
+        copiedPass={copiedPass?.number}
+        onSelect={(number) => void copy(referrals.shareUrl, 'Pass link copied.', number)}
       />
       <p className="settings-row-description">
         Each pass lets one person skip the waitlist. These are separate from unlimited waitlist

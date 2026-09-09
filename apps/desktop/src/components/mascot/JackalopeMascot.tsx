@@ -121,11 +121,11 @@ export function JackalopeMascot({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`absolute ${bubbleSide === 'above' ? 'bottom-full mb-3' : 'top-full mt-3'} z-30 pointer-events-none w-max max-w-[min(17rem,calc(100vw-2rem))] bg-[var(--color-surface-elevated)] px-3 py-2 rounded-xl shadow-lg text-xs leading-relaxed text-[var(--color-text-primary)] ${bubbleAlign === 'start' ? 'left-0' : bubbleAlign === 'end' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}
+            className={`absolute ${bubbleSide === 'above' ? 'bottom-full mb-3' : 'top-full mt-3'} z-30 pointer-events-none w-max max-w-[min(17rem,calc(100vw-2rem))] bg-[var(--color-text-primary)] px-3 py-2 rounded-xl shadow-lg text-xs leading-relaxed text-[var(--color-surface-elevated)] ${bubbleAlign === 'start' ? 'left-0' : bubbleAlign === 'end' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`}
           >
             {message}
             <span
-              className={`absolute ${bubbleSide === 'above' ? '-bottom-1' : '-top-1'} w-2 h-2 bg-[var(--color-surface-elevated)] rotate-45 ${bubbleAlign === 'end' ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}
+              className={`absolute ${bubbleSide === 'above' ? '-bottom-1' : '-top-1'} w-2 h-2 bg-[var(--color-text-primary)] rotate-45 ${bubbleAlign === 'end' ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}
               style={bubbleAlign === 'start' ? { left: dim / 2 } : undefined}
             />
           </motion.div>
