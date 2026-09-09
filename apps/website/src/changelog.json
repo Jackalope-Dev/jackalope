@@ -1,5 +1,17 @@
 [
   {
+    "id": "simpler-app-updates",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Simpler app updates",
+    "description": "Update controls use the same styled dropdown as the rest of Jackalope, with clearer, shorter details.",
+    "items": [
+      "Choose Stable or Beta from the shared dropdown.",
+      "See your version, update status and installation controls without repeated explanations."
+    ],
+    "note": "In development for a future desktop release."
+  },
+  {
     "id": "cleaner-tour-preview",
     "date": "2026-09-09",
     "status": "Website",
