@@ -36,7 +36,6 @@ export default function App() {
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const completeEntry = useCallback(() => {
     if (!entry) return;
-    void useCommunityStore.getState().applyDefaults();
     setInitialTaskAgent(entry.agent);
     setInitialDraftKey(entry.draftKey);
     setFocusWorkspace(true);

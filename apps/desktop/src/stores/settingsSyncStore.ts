@@ -84,6 +84,7 @@ export const useSettingsSyncStore = create<SyncState>()(
         }
       },
       configure: async (enabled) => {
+        const initial = snapshot();
         const generation = ++epoch;
         retryAction = enabled ? 'enable' : 'disable';
         paused = true;
@@ -92,7 +93,8 @@ export const useSettingsSyncStore = create<SyncState>()(
           await running;
           const view = await invoke({ action: 'configure', enabled, owner: get().owner ?? '' });
           if (generation !== epoch) return;
-          if (view.owner !== get().owner) set({ owner: view.owner, base: null, lastSynced: null });
+          if (view.owner !== get().owner)
+            set({ owner: view.owner, base: view.owner ? initial : null, lastSynced: null });
           set({ enabled: view.enabled, available: view.available });
           paused = false;
         } catch (error) {
@@ -110,10 +112,16 @@ export const useSettingsSyncStore = create<SyncState>()(
         const generation = epoch;
         running = (async () => {
           try {
+            const initial = snapshot();
             const status = await invoke({ action: 'status' });
             if (generation !== epoch) return;
             if (status.owner !== get().owner)
-              set({ owner: status.owner, base: null, lastSynced: null, conflict: null });
+              set({
+                owner: status.owner,
+                base: status.owner ? initial : null,
+                lastSynced: null,
+                conflict: null,
+              });
             set({ enabled: status.enabled, available: status.available });
             if (!status.enabled || !status.owner) {
               set({ conflict: null });

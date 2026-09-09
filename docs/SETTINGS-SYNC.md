@@ -1,10 +1,19 @@
 # Account setup and settings sync
 
-Guided setup starts with Account, then Theme, Project, Agent and First task.
-Official beta builds require a native verified access lease before continuing.
-Development builds can continue without a hosted account. Existing completed
-profiles remain completed; replaying setup begins with Account. Native execution
-checks remain authoritative, including after revocation and offline expiry.
+Launch checks account access outside the numbered setup flow. App appearance and
+privacy controls live on this screen. Approval shows a brief animated checkmark
+(with a reduced-motion alternative), then enters the workspace or project setup.
+Official beta builds require a native verified access lease; development builds
+can continue without a hosted account. Native execution checks remain authoritative
+including after revocation and offline expiry. Saved work remains reviewable.
+
+Project setup has three steps: Project, Agent and First task. Adding another project
+reuses this flow without replaying the launch gate or app privacy. The Agent step
+saves a project default and an optional allowed-agent list through the existing
+native policy path. It requires at least one available enabled agent, moves the
+default when it is switched off, and preserves global agent preferences. Existing
+project drafts and saved completion state remain compatible; obsolete account/theme
+steps resume at Project without deleting saved projects or drafts.
 
 Browser pairing can share a verified waitlist membership with the requesting
 desktop. That reports waiting, issues no device credential and grants neither
@@ -13,8 +22,8 @@ the member signs in with their approved email and reconnects if needed.
 
 ## Preferences and privacy
 
-Settings sync defaults on for new connections, disclosed on Account with a
-control in onboarding's privacy disclosure and Settings → Privacy. Users can
+Settings sync defaults on for new connections, disclosed on the launch screen with a
+control in its app privacy disclosure and Settings → Privacy. Users can
 opt out before connecting. Existing saved opt-outs remain off. The local choice
 survives disconnect/reconnect; transfers always require an approved connection.
 Enabling a new connection restores the
@@ -44,8 +53,8 @@ device's server consent in one D1 transaction. Upload SQL rechecks that consent,
 so stale requests cannot recreate the copy after deletion. Devices require a
 fresh explicit opt-in to upload again. Local preferences remain. A failed delete
 shows an error and must be retried online; it never claims remote deletion.
-Deleting a membership also cascades to its settings row as part of the existing
-account-deletion workflow. Provider backup retention remains separate.
+Membership deletion also cascades to the settings row. Provider backup retention
+remains separate.
 An account-level deletion marker prevents future default-on connections from
 recreating deleted settings. Only explicitly enabling sync overrides that marker
 for the chosen desktop; the marker contains no settings or identifying text.

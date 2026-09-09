@@ -182,7 +182,14 @@
   display: grid;
   gap: 8px;
 }
+.onboarding-agent-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .onboarding-runner {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   text-align: left;

@@ -5,6 +5,7 @@ import { openExternalUrl } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
@@ -13,7 +14,6 @@ import type { SettingsCategory } from '../settings/SettingsPage';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
-import { ProjectSetup } from '../tasks/ProjectSetup';
 import { UnsavedTasksNotice } from '../tasks/TaskSaveRecovery';
 import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
@@ -82,7 +82,7 @@ export function Shell({
     if (focusOnMount && !initialDraftKey && !initialTaskAgent && !initialCapture)
       canvas.current?.focus();
   }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
-  const [setupOpen, setSetupOpen] = useState(false);
+  const openProjectSetup = () => useOnboardingStore.getState().begin();
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const previousView = useRef<ActiveTab>('kanban');
   useEffect(() => {
@@ -217,7 +217,7 @@ export function Shell({
                   </Menu.Item>
                 ))}
                 <Menu.Separator className="menu-separator" />
-                <Menu.Item className="workspace-menu-item" onSelect={() => setSetupOpen(true)}>
+                <Menu.Item className="workspace-menu-item" onSelect={openProjectSetup}>
                   Add a project…
                 </Menu.Item>
               </Menu.Content>
@@ -342,7 +342,7 @@ export function Shell({
         <Suspense fallback={<LoadingState label={`Opening ${view.label}…`} />}>
           {activeTab === 'kanban' && (
             <TaskWorkspace
-              onOpenProject={() => setSetupOpen(true)}
+              onOpenProject={openProjectSetup}
               onCapture={(ideaId) => setCapture({ ideaId })}
               onSchedule={(id) => {
                 const run = useExecutionStore.getState().runs.find((r) => r.id === id);
@@ -353,13 +353,13 @@ export function Shell({
             />
           )}
           {activeTab === 'worktrees' && (
-            <WorktreeManager key={activeProjectId} onOpenProject={() => setSetupOpen(true)} />
+            <WorktreeManager key={activeProjectId} onOpenProject={openProjectSetup} />
           )}
           {activeTab === 'repo-todos' && (
             <RepoTodos
               key={project?.path ?? activeProjectId}
               onCapture={(draftKey) => setCapture({ draftKey })}
-              onOpenProject={() => setSetupOpen(true)}
+              onOpenProject={openProjectSetup}
             />
           )}
           {activeTab === 'agents' && (
@@ -402,7 +402,7 @@ export function Shell({
               key={activeProjectId}
               sourceRunId={scheduleRunId}
               onSourceHandled={() => setScheduleRunId(undefined)}
-              onOpenProject={() => setSetupOpen(true)}
+              onOpenProject={openProjectSetup}
               onPlanning={() => {
                 useExecutionStore.getState().select(null);
                 setActiveTab('kanban');
@@ -411,14 +411,14 @@ export function Shell({
           )}
           {activeTab === 'browser' && (
             <BrowserHarness
-              onOpenProject={() => setSetupOpen(true)}
+              onOpenProject={openProjectSetup}
               onTask={(id) => {
                 useExecutionStore.getState().select(id);
                 setActiveTab('kanban');
               }}
             />
           )}
-          {activeTab === 'topology' && <CodebaseMap onOpenProject={() => setSetupOpen(true)} />}
+          {activeTab === 'topology' && <CodebaseMap onOpenProject={openProjectSetup} />}
         </Suspense>
       </main>
       {capture && (
@@ -444,7 +444,7 @@ export function Shell({
           setActiveTab('preferences');
         }}
       />
-      <ProjectSetup open={setupOpen} onClose={() => setSetupOpen(false)} />
+
       <Suspense fallback={null}>
         {commandsSeen && (
           <CommandPalette

@@ -7,8 +7,10 @@ import { Button } from '../ui/button';
 import { Tooltip } from '../ui/Tooltip';
 import { ThemeEditor } from './ThemeEditor';
 
-export function ArcColorPicker() {
-  const { currentTheme, setTheme } = useThemeStore();
+export function ArcColorPicker({ scope = 'project' }: { scope?: 'app' | 'project' }) {
+  const theme = useThemeStore();
+  const currentTheme = scope === 'app' ? theme.appTheme : theme.currentTheme;
+  const setTheme = scope === 'app' ? theme.setAppTheme : theme.setTheme;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(currentTheme);
   useEffect(() => {

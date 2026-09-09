@@ -5,6 +5,114 @@
   color: var(--color-text-primary);
   background: var(--color-surface);
 }
+.access-appearance {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+}
+.access-privacy {
+  margin: 24px 0;
+  text-align: left;
+  border-radius: 16px;
+  background: var(--color-surface-elevated);
+}
+.access-privacy > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.access-privacy > summary > span {
+  flex: 1;
+}
+.access-privacy small {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.access-privacy > summary:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 3px;
+  border-radius: 16px;
+}
+.access-privacy-controls {
+  padding: 8px 20px 24px;
+}
+.access-privacy-controls > .flex {
+  margin-top: 24px;
+}
+.access-verified h1 {
+  font-size: var(--text-4xl);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  outline: none;
+}
+.access-verified p {
+  color: var(--color-text-secondary);
+  margin-top: 16px;
+}
+.access-validation {
+  width: 148px;
+  height: 148px;
+  margin: 0 auto 32px;
+  color: var(--color-accent-ink);
+  animation: access-validation-enter 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.access-validation svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.access-validation-halo {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.15;
+}
+.access-validation-ring {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-dasharray: 1;
+  animation: access-validation-draw 650ms ease both;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.access-validation-check {
+  stroke: currentColor;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  animation: access-validation-draw 420ms 380ms ease both;
+}
+@keyframes access-validation-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes access-validation-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .access-validation,
+  .access-validation-ring,
+  .access-validation-check {
+    animation: none;
+  }
+}
 .access-page {
   position: relative;
   isolation: isolate;

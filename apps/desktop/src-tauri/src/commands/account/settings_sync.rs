@@ -306,14 +306,21 @@ mod tests {
     #[test]
     #[cfg(windows)]
     fn new_connections_default_on_and_saved_opt_out_survives_restart() {
-        let directory = std::env::temp_dir().join(format!("jackalope-sync-choice-{}", uuid::Uuid::new_v4()));
+        let directory =
+            std::env::temp_dir().join(format!("jackalope-sync-choice-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).unwrap();
-        let state = AccountService::new(directory.join("account.bin"), Arc::new(ExecutionAccess::new(true)));
+        let state = AccountService::new(
+            directory.join("account.bin"),
+            Arc::new(ExecutionAccess::new(true)),
+        );
         let fresh = read_choice(&state).unwrap();
         assert!(fresh.enabled);
         assert!(!fresh.explicit);
         save_choice(&state, false).unwrap();
-        let restarted = AccountService::new(directory.join("account.bin"), Arc::new(ExecutionAccess::new(true)));
+        let restarted = AccountService::new(
+            directory.join("account.bin"),
+            Arc::new(ExecutionAccess::new(true)),
+        );
         let saved = read_choice(&restarted).unwrap();
         assert!(!saved.enabled);
         assert!(saved.explicit);

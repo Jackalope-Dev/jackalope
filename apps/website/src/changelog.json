@@ -3,9 +3,11 @@
     "id": "account-setup-and-optional-settings-sync",
     "date": "2026-09-09",
     "status": "In development",
-    "title": "Account setup and optional settings sync.",
-    "description": "Connect your account first, check early access, and choose whether to sync portable preferences.",
+    "title": "Connect once, set up each project.",
+    "description": "Check early access and app privacy on launch, then set up projects with their own agent choices.",
     "items": [
+      "An animated access check leads into reusable Project, Agent and First task steps, with a project default and switches for detected agents.",
+      "New connections default to settings sync, with an opt-out before connecting and saved opt-outs preserved.",
       "Sync appearance and notification choices with strict privacy controls and conflict review.",
       "Delete the saved settings copy and disable sync across connected desktops."
     ],

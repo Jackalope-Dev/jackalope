@@ -1,6 +1,6 @@
 import { syncAgentConfig } from '../stores/agentConfigStore';
 import { useContextMemoryStore } from '../stores/contextMemoryStore';
-import { useProjectStore } from '../stores/projectStore';
+import { type Project, useProjectStore } from '../stores/projectStore';
 import { nativeTask } from './task-runtime';
 
 interface ProjectInfo {
@@ -30,7 +30,7 @@ async function registerProject(info: ProjectInfo) {
   const existing = store.projects.find(
     (project) => normalize(project.path) === normalize(info.path),
   );
-  const project = existing ?? {
+  const project: Omit<Project, 'worktrees'> = existing ?? {
     id: crypto.randomUUID(),
     name: info.name,
     path: info.path,

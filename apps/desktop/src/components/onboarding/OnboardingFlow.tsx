@@ -1,15 +1,12 @@
-import { applyThemeTokens } from '@jackalope/brand/theme';
 import {
   ArrowLeft,
   ArrowRight,
   Check,
-  ChevronDown,
   Copy,
   ExternalLink,
   FolderOpen,
   FolderPlus,
   RefreshCw,
-  ShieldCheck,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
@@ -17,43 +14,26 @@ import { createProject, openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
-import { useCommunityStore } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useSettingsStore } from '../../stores/settingsStore';
-import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
-import { type AccountStatus, JackalopeAccount } from '../settings/JackalopeAccount';
-import { PrivacySettings } from '../settings/PrivacySettings';
-import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import './onboarding.css';
 
 const steps: { id: OnboardingStep; label: string }[] = [
-  { id: 'account', label: 'Account' },
-  { id: 'theme', label: 'Theme' },
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agent' },
   { id: 'task', label: 'First task' },
 ];
 const setupTips: Record<OnboardingStep, string[]> = {
-  account: ['Connect your Jackalope account to check early access. Settings sync is optional.'],
-  theme: [
-    'Theme changes are a preview until you choose Keep theme and continue.',
-    'Try a palette, then adjust its accent and atmosphere to make it yours.',
-  ],
-  project: [
-    'Choose the Git repository your agent will work in, or create a new project.',
-    'Open Manage privacy settings to review usage sharing before continuing.',
-  ],
+  project: ['Choose the Git repository your agent will work in, or create a new project.'],
   agent: [
-    'Your default is the starting choice for new tasks. Projects and tasks can use another agent.',
+    'This preference belongs to this project. Other projects keep their own agent choices.',
     'Add agents, supported accounts and models later in Settings → Agents.',
   ],
   task: [
@@ -69,17 +49,10 @@ export function OnboardingFlow({
   onSkip: () => void;
 }) {
   const onboarding = useOnboardingStore();
-  const { projects, activeProjectId } = useProjectStore();
-  const project = projects.find((item) => item.id === activeProjectId);
+  const { projects, updateProjectPreferences } = useProjectStore();
+  const project = projects.find((item) => item.id === onboarding.projectId);
   const execution = useExecutionStore();
   const config = useAgentConfigStore();
-  const settings = useSettingsStore();
-  const community = useCommunityStore();
-  const theme = useThemeStore();
-  const [themeDraft, setThemeDraft] = useState(theme.currentTheme);
-  const sharing = community.settings?.reviewed
-    ? community.settings.telemetry
-    : settings.telemetryEnabled;
   const [path, setPath] = useState(project?.path ?? '');
   const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
   const [projectName, setProjectName] = useState('');
@@ -87,7 +60,12 @@ export function OnboardingFlow({
   const [defaultDirectory, setDefaultDirectory] = useState('');
   const [directoryError, setDirectoryError] = useState('');
   const [agent, setAgent] = useState(
-    (project && execution.drafts[project.id]?.agent) || config.defaultMetaAgent,
+    (project && execution.drafts[project.id]?.agent) ||
+      project?.preferences?.preferredRunner ||
+      config.defaultMetaAgent,
+  );
+  const [allowedAgents, setAllowedAgents] = useState<string[] | null>(
+    project?.preferences?.allowedAgents ?? null,
   );
   const [working, setBusy] = useState(false);
   const [nodding, setNodding] = useState(false);
@@ -105,64 +83,37 @@ export function OnboardingFlow({
   const errorMessage = useRef<HTMLParagraphElement>(null);
   const tipIndex = useRef(0);
   const desktop = isTauriEnvironment();
-  const [account, setAccount] = useState<AccountStatus | null>(null);
-  const [access, setAccess] = useState<{ required: boolean; allowed: boolean } | null>(null);
-  useEffect(() => {
-    let canceled = false;
-    const check = async () => {
-      try {
-        const value = desktop
-          ? await nativeTask<{ required: boolean; allowed: boolean }>('app_execution_access')
-          : { required: false, allowed: true };
-        if (!canceled) setAccess(value);
-      } catch {
-        if (!canceled) setAccess(null);
-      }
-    };
-    void check();
-    const timer = setInterval(() => void check(), 2000);
-    return () => {
-      canceled = true;
-      clearInterval(timer);
-    };
-  }, [desktop]);
-  const needsAccount = !access || (access.required && !access.allowed);
-  const step =
-    needsAccount || onboarding.step === 'account'
-      ? 'account'
-      : onboarding.step === 'theme'
-        ? 'theme'
-        : !project
-          ? 'project'
-          : onboarding.step;
-  useEffect(() => {
-    if (step !== 'theme') return;
-    useThemeStore.setState({ previewing: true });
-    return () => {
-      useThemeStore.setState({ previewing: false });
-    };
-  }, [step]);
+  const step = !project ? 'project' : onboarding.step;
   const index = steps.findIndex((item) => item.id === step);
   const draft = project ? (execution.drafts[project.id]?.prompt ?? '') : '';
   const runner = execution.runners.find((item) => item.id === agent);
   const available = (id: string) => {
     const options = config.runnerOptions[id];
     return (
-      ['codex', 'claude', 'grok', 'opencode'].includes(
+      ['codex', 'claude', 'grok', 'opencode', 'antigravity'].includes(
         config.customAgents.find((custom) => custom.id === id)?.adapter ?? id,
       ) &&
       config.isAgentEnabled(id) &&
       !(options?.restrictModels && !options.models.some((model) => model.trim()))
     );
   };
-  useEffect(() => {
-    if (step === 'theme') setThemeDraft(useThemeStore.getState().currentTheme);
-  }, [step]);
-  useEffect(() => {
-    if (step !== 'theme') return;
-    applyThemeTokens(themeDraft);
-    return () => applyThemeTokens(useThemeStore.getState().currentTheme);
-  }, [step, themeDraft]);
+  const projectEnabled = (id: string) => allowedAgents === null || allowedAgents.includes(id);
+  const toggleAgent = (id: string, enabled: boolean) => {
+    const current =
+      allowedAgents ??
+      execution.runners
+        .filter((item) => item.available && available(item.id))
+        .map((item) => item.id);
+    const next = enabled ? [...new Set([...current, id])] : current.filter((item) => item !== id);
+    setAllowedAgents(next);
+    if (!enabled && agent === id)
+      setAgent(
+        execution.runners.find(
+          (item) => item.available && available(item.id) && next.includes(item.id),
+        )?.id ?? '',
+      );
+    else if (enabled && !agent) setAgent(id);
+  };
   useEffect(() => {
     if (!desktop || projectMode !== 'new') return;
     void nativeTask<string>('task_project_directory')
@@ -219,14 +170,14 @@ export function OnboardingFlow({
       await execution.discover();
     });
   const finish = () => {
-    if (!project || !runner?.available || !available(agent)) {
+    if (!project || !runner?.available || !available(agent) || !projectEnabled(agent)) {
       onboarding.go('agent');
       return;
     }
     if (!draft.trim()) return;
-    execution.draft(project.id, { agent: '', projectId: project.id });
+    execution.draft(project.id, { agent, projectId: project.id });
     execution.select(null);
-    advance(() => onFinish('', project.id));
+    advance(() => onFinish(agent, project.id));
   };
   return (
     <div className="onboarding-shell">
@@ -237,7 +188,6 @@ export function OnboardingFlow({
           <img src="/mascot.svg" alt="" />
           Jackalope
         </span>
-        {step !== 'theme' && step !== 'account' && <ArcColorPicker />}
       </header>
       <main className="onboarding-layout">
         <aside className="onboarding-intro" aria-label="Setup progress">
@@ -255,7 +205,7 @@ export function OnboardingFlow({
               tipIndex.current += 1;
             }}
           />
-          <h1>Set up Jackalope</h1>
+          <h1>Set up your project</h1>
           <ol className="onboarding-steps">
             {steps.map((item, itemIndex) => (
               <li key={item.id} aria-current={step === item.id ? 'step' : undefined}>
@@ -285,96 +235,12 @@ export function OnboardingFlow({
             )}
           </div>
           <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
-            {step === 'account'
-              ? 'Connect your account'
-              : step === 'theme'
-                ? 'Choose your theme'
-                : step === 'project'
-                  ? 'Choose a project'
-                  : step === 'agent'
-                    ? 'Choose a default agent for Jackalope'
-                    : 'Describe your first task'}
+            {step === 'project'
+              ? 'Choose a project'
+              : step === 'agent'
+                ? 'Choose an agent for this project'
+                : 'Describe your first task'}
           </h2>
-          {step === 'account' && (
-            <>
-              <p className="onboarding-description">
-                Connect your Jackalope account to check whether you have early access.
-              </p>
-              <p className="onboarding-note">
-                Settings sync is on for new connections. You can turn it off in Manage privacy
-                settings below before connecting.
-              </p>
-              <JackalopeAccount presentation="onboarding" onStatus={setAccount} />
-              <details className="onboarding-privacy-panel">
-                <summary>
-                  <ShieldCheck size={20} aria-hidden="true" />
-                  <span>
-                    <strong>Manage privacy settings</strong>
-                    <small>Choose settings sync and usage sharing.</small>
-                  </span>
-                  <ChevronDown
-                    size={18}
-                    className="onboarding-privacy-chevron"
-                    aria-hidden="true"
-                  />
-                </summary>
-                <div className="onboarding-privacy-controls">
-                  <PrivacySettings />
-                </div>
-              </details>
-              {!access && <p role="status">Checking access…</p>}
-              {access?.required && !access.allowed && account?.state === 'offline' && (
-                <p role="status">Reconnect online to verify access before continuing setup.</p>
-              )}
-              {access && !access.required && account?.state !== 'connected' && (
-                <p className="onboarding-note">
-                  This development build can continue without an account.
-                </p>
-              )}
-              <div className="onboarding-actions">
-                <Button
-                  disabled={busy || !access || (access.required && !access.allowed)}
-                  onClick={() => advance(() => onboarding.go('theme'))}
-                >
-                  {account?.state === 'connected'
-                    ? 'Continue'
-                    : access && !access.required
-                      ? 'Continue without an account'
-                      : 'Continue after approval'}
-                  <ArrowRight size={16} />
-                </Button>
-              </div>
-            </>
-          )}
-          {step === 'theme' && (
-            <>
-              <ThemeEditor value={themeDraft} onChange={setThemeDraft} />
-              <div className="onboarding-actions">
-                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('account')}>
-                  Back
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => setThemeDraft(theme.currentTheme)}
-                >
-                  Reset preview
-                </Button>
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void attempt(async () => {
-                      theme.setTheme(themeDraft);
-                      advance(() => onboarding.go('project'));
-                    })
-                  }
-                >
-                  {busy ? 'Saving…' : 'Keep theme and continue'}
-                  <ArrowRight size={16} />
-                </Button>
-              </div>
-            </>
-          )}
           {step === 'project' && (
             <>
               <fieldset className="onboarding-project-options" aria-label="Project setup">
@@ -411,18 +277,14 @@ export function OnboardingFlow({
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (community.busy) return;
                   void attempt(async () => {
-                    await community.applyDefaults();
-                    const privacy = useCommunityStore.getState();
-                    if (desktop && (!privacy.settings?.reviewed || privacy.error))
-                      throw new Error(
-                        privacy.error ?? 'Privacy settings could not be saved. Please retry.',
-                      );
                     const opened =
                       projectMode === 'new'
                         ? await createProject(projectName, parentPath)
                         : await openProject(path);
+                    onboarding.selectProject(opened.id);
+                    setAgent(opened.preferences?.preferredRunner ?? config.defaultMetaAgent);
+                    setAllowedAgents(opened.preferences?.allowedAgents ?? null);
                     setPath(opened.path);
                     setProjectMode('existing');
                     if (projectMode === 'new') {
@@ -516,60 +378,21 @@ export function OnboardingFlow({
                     </div>
                   </>
                 )}
-                <details className="onboarding-privacy-panel">
-                  <summary>
-                    <ShieldCheck size={20} aria-hidden="true" />
-                    <span>
-                      <strong>Manage privacy settings</strong>
-                      <small>
-                        {community.error
-                          ? 'Usage sharing is paused. Review your settings.'
-                          : sharing
-                            ? 'Anonymous usage sharing is on by default. Opt out here.'
-                            : 'Anonymous usage sharing is off.'}
-                      </small>
-                    </span>
-                    <ChevronDown
-                      size={18}
-                      className="onboarding-privacy-chevron"
-                      aria-hidden="true"
-                    />
-                  </summary>
-                  <div className="onboarding-privacy-controls">
-                    <PrivacySettings />
-                    <div className="onboarding-privacy">
-                      <div>
-                        <label htmlFor="onboarding-marketplace">Community tools</label>
-                        <p>
-                          Allow browsing the MCP marketplace at allmcps.com. Your source code and
-                          prompts aren’t sent to the marketplace.
-                        </p>
-                      </div>
-                      <Switch
-                        id="onboarding-marketplace"
-                        label="Allow MCP marketplace"
-                        checked={settings.useMcpMarketplace}
-                        onCheckedChange={settings.setUseMcpMarketplace}
-                      />
-                    </div>
-                  </div>
-                </details>
                 <div className="onboarding-actions">
                   <Button
                     type="button"
                     variant="ghost"
                     disabled={busy}
-                    onClick={() => onboarding.go('theme')}
+                    onClick={() => onboarding.finish()}
                   >
                     <ArrowLeft size={16} />
-                    Back
+                    Cancel setup
                   </Button>
                   <Button
                     type="submit"
                     disabled={
                       !desktop ||
                       busy ||
-                      community.busy ||
                       (projectMode === 'new'
                         ? !projectName.trim() || (!parentPath && !defaultDirectory)
                         : !path.trim())
@@ -591,48 +414,65 @@ export function OnboardingFlow({
           {step === 'agent' && (
             <>
               <p className="onboarding-description">
-                Your default agent coordinates Jackalope’s automatic task routing. You can configure
-                multiple agents and accounts per project. It chooses among enabled agents,
-                configured models and accounts based on the task and reported quota headroom.
+                Choose a default, then switch other detected agents on or off for this project.
+                Change these choices later in Project settings.
               </p>
-              <fieldset className="onboarding-runner-list" aria-label="Choose your default agent">
+              <fieldset className="onboarding-runner-list" aria-label="Choose your project agent">
                 {execution.runners.map((item) => {
-                  const workerOnly = !['codex', 'claude', 'grok', 'opencode'].includes(
+                  const workerOnly = ![
+                    'codex',
+                    'claude',
+                    'grok',
+                    'opencode',
+                    'antigravity',
+                  ].includes(
                     config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id,
                   );
                   const enabled = available(item.id) && !workerOnly;
                   const meta = getAgentMetadata(item.id);
                   return (
-                    <button
-                      type="button"
-                      key={item.id}
-                      aria-pressed={agent === item.id}
-                      disabled={!item.available || !enabled || busy}
-                      onClick={() => setAgent(item.id)}
-                      className="onboarding-runner"
-                    >
-                      <span className="onboarding-radio">
-                        {agent === item.id && <Check size={14} />}
-                      </span>
-                      <div className="onboarding-runner-info">
-                        <div className="onboarding-runner-header">
-                          <strong>{item.name}</strong>
-                          {meta?.vendor && <span className="onboarding-vendor">{meta.vendor}</span>}
+                    <div className="onboarding-agent-choice" key={item.id}>
+                      <button
+                        type="button"
+                        aria-pressed={agent === item.id}
+                        disabled={!item.available || !enabled || !projectEnabled(item.id) || busy}
+                        onClick={() => setAgent(item.id)}
+                        className="onboarding-runner"
+                      >
+                        <span className="onboarding-radio">
+                          {agent === item.id && <Check size={14} />}
+                        </span>
+                        <div className="onboarding-runner-info">
+                          <div className="onboarding-runner-header">
+                            <strong>{item.name}</strong>
+                            {agent === item.id && projectEnabled(item.id) && (
+                              <span className="onboarding-vendor">Default</span>
+                            )}
+                            {meta?.vendor && (
+                              <span className="onboarding-vendor">{meta.vendor}</span>
+                            )}
+                          </div>
+                          <small>
+                            {workerOnly
+                              ? 'Execution is not supported by this agent yet'
+                              : !enabled
+                                ? 'Disabled in agent or model settings'
+                                : !item.available
+                                  ? 'Not installed or not found'
+                                  : item.signedIn
+                                    ? 'Installed · sign-in detected'
+                                    : 'Installed · sign-in not confirmed'}
+                          </small>
+                          <small>{item.detail}</small>
                         </div>
-                        <small>
-                          {workerOnly
-                            ? 'Routing coordinator not supported'
-                            : !enabled
-                              ? 'Disabled in agent or model settings'
-                              : !item.available
-                                ? 'Not installed or not found'
-                                : item.signedIn
-                                  ? 'Installed · sign-in detected'
-                                  : 'Installed · sign-in not confirmed'}
-                        </small>
-                        <small>{item.detail}</small>
-                      </div>
-                    </button>
+                      </button>
+                      <Switch
+                        label={`Use ${item.name} in this project`}
+                        checked={item.available && enabled && projectEnabled(item.id)}
+                        disabled={!item.available || !enabled || busy}
+                        onCheckedChange={(checked) => toggleAgent(item.id, checked)}
+                      />
+                    </div>
                   );
                 })}
                 {!execution.runners.length && (
@@ -643,6 +483,13 @@ export function OnboardingFlow({
                   </p>
                 )}
               </fieldset>
+              {!execution.runners.some(
+                (item) => item.available && available(item.id) && projectEnabled(item.id),
+              ) && (
+                <p className="onboarding-note" role="status">
+                  Enable at least one available agent to continue.
+                </p>
+              )}
               {execution.error && (
                 <p className="task-error" role="alert">
                   {execution.error}
@@ -752,20 +599,30 @@ export function OnboardingFlow({
                 </Button>
                 <Button
                   disabled={
-                    busy || execution.discovering || !runner?.available || !available(agent)
+                    busy ||
+                    execution.discovering ||
+                    !runner?.available ||
+                    !available(agent) ||
+                    !projectEnabled(agent)
                   }
                   onClick={() =>
                     void attempt(async () => {
-                      const previousDefault = useAgentConfigStore.getState().defaultMetaAgent;
-                      config.setDefaultMetaAgent(agent);
+                      if (!project) return;
+                      const previous = {
+                        preferredRunner: project.preferences?.preferredRunner,
+                        allowedAgents: project.preferences?.allowedAgents,
+                      };
+                      updateProjectPreferences(project.id, {
+                        preferredRunner: agent,
+                        allowedAgents: allowedAgents ?? undefined,
+                      });
                       try {
                         await syncAgentConfig();
                       } catch (cause) {
-                        if (useAgentConfigStore.getState().defaultMetaAgent === agent)
-                          useAgentConfigStore.setState({ defaultMetaAgent: previousDefault });
+                        updateProjectPreferences(project.id, previous);
                         throw cause;
                       }
-                      if (project) execution.draft(project.id, { agent: '' });
+                      execution.draft(project.id, { agent });
                       advance(() => onboarding.go('task'));
                     })
                   }
