@@ -314,7 +314,8 @@
 }
 .task-inline-capture .task-composer .composer-intent {
   min-height: 144px;
-  padding: 12px 4px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--color-surface-sunken) 65%, var(--color-surface-elevated));
   font-size: var(--text-xl);
   line-height: 1.6;
   margin-bottom: 16px;

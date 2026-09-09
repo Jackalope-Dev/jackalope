@@ -1,5 +1,16 @@
 [
   {
+    "id": "a-clearer-task-input",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A clearer task input",
+    "description": "The task description is easier to distinguish from the Work page.",
+    "items": [
+      "Added a subtle theme-aware background and inset text spacing to the task description box."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "feedback-from-your-companion",
     "date": "2026-09-09",
     "status": "In development",
