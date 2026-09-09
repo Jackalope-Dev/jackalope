@@ -1,5 +1,5 @@
 import { company, normalizePath, pages, posts, siteOrigin, tour, updates } from './content.ts';
-import { knowledgeItems } from './knowledge-content.ts';
+import { knowledgeGuides } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
 
 const escapeHtml = (value: string) =>
@@ -19,6 +19,8 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
   const title = page?.title || 'Page not found | Jackalope';
   const description = page?.description || 'Find your way back to Jackalope.';
   const url = `${origin}${normalized}`;
+  const isKnowledgeGuide =
+    normalized.startsWith('/knowledge/') && normalized !== '/knowledge/';
   const graph: Record<string, unknown>[] = [
     {
       '@type': 'Organization',
@@ -40,7 +42,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     {
       '@type': post
         ? 'BlogPosting'
-        : normalized.startsWith('/guides/')
+        : normalized.startsWith('/guides/') || isKnowledgeGuide
           ? 'TechArticle'
           : normalized === '/blog/' ||
               normalized === '/changelog/' ||
@@ -64,7 +66,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
             image: `${origin}/social-preview.png`,
             mainEntityOfPage: url,
           }
-        : normalized.startsWith('/guides/')
+        : normalized.startsWith('/guides/') || isKnowledgeGuide
           ? {
               datePublished: '2026-09-08',
               dateModified: '2026-09-08',
@@ -157,16 +159,16 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     graph.push({
       '@type': 'FAQPage',
       '@id': `${url}#faq`,
-      mainEntity: knowledgeItems
-        .filter((item) => item.isFaq || item.category === 'troubleshooting')
-        .map((item) => ({
+      mainEntity: knowledgeGuides.flatMap((guide) =>
+        guide.sections.map((section) => ({
           '@type': 'Question',
-          name: item.title,
+          name: section.question,
           acceptedAnswer: {
             '@type': 'Answer',
-            text: `${item.summary} ${item.details.join(' ')}${item.command ? ` Command: ${item.command}` : ''}`,
+            text: `${section.paragraphs.join(' ')}${section.codeBox ? ` Command: ${section.codeBox.code}` : ''}`,
           },
         })),
+      ),
     });
   }
   const head = [
@@ -225,7 +227,7 @@ export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
     'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${posts.find((post) => page.path === `/blog/${post.slug}/`) ? `<lastmod>${posts.find((post) => page.path === `/blog/${post.slug}/`)?.date}</lastmod>` : marketingPages.some((entry) => entry.path === page.path) || page.path === '/' || page.path === '/knowledge/' ? '<lastmod>2026-09-08</lastmod>' : ''}</url>`).join('')}</urlset>`,
     'llms.txt': `${intro}## Agent support\n\nNative adapters: Codex, Claude Code, Grok Build, and OpenCode. Tasks, session continuation, managed account profiles, and reported task usage are implemented. Project-selected MCP connections are delivered to Codex and Claude Code; Grok supports on-demand discovery through the HTTP bridge. OpenCode supports on-demand tool discovery. Grok and OpenCode validate provider access on launch. Gemini CLI is under evaluation, not supported yet. See ${origin}/#agents for coverage and limits.\n\n## Knowledgebase & Diagnostics\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: 5-hour quota windows, preflight headroom admission, and 3-attempt failover\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
-    'llms-full.txt': `${intro}${marketingPages.map((page) => `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${page.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.bullets ? `\n\n${section.bullets.map((item) => `- ${item}`).join('\n')}` : ''}`).join('\n\n')}`).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeItems.map((item) => `## ${item.title}\nCategory: ${item.category}\n\n${item.summary}\n\n${item.details.join('\n\n')}${item.command ? `\n\nTerminal command:\n\`\`\`bash\n${item.command}\n\`\`\`` : ''}${item.codeSnippet ? `\n\nConfiguration:\n\`\`\`\n${item.codeSnippet}\n\`\`\`` : ''}`).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${post.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note}`).join('\n\n')}\n`,
+    'llms-full.txt': `${intro}${marketingPages.map((page) => `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${page.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.bullets ? `\n\n${section.bullets.map((item) => `- ${item}`).join('\n')}` : ''}`).join('\n\n')}`).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => `# ${guide.title}\n${origin}/knowledge/${guide.slug}/\n\n${guide.description}\n\n${guide.sections.map((section) => `## ${section.question}\n\n${section.paragraphs.join('\n\n')}${section.bullets ? `\n\n${section.bullets.map((item) => `- ${item}`).join('\n')}` : ''}${section.codeBox ? `\n\n${section.codeBox.title}:\n\`\`\`\n${section.codeBox.code}\n\`\`\`` : ''}`).join('\n\n')}`).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${post.sections.map((section) => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note}`).join('\n\n')}\n`,
     'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
     'site.webmanifest': JSON.stringify({
       name: 'Jackalope',

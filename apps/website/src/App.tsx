@@ -226,8 +226,8 @@ export function App({ path = '/' }: { path?: string }) {
         <WaitlistPage />
       ) : path === '/access/' ? (
         <AccessPage />
-      ) : path === '/knowledge/' ? (
-        <KnowledgebasePage dark={dark} />
+      ) : path.startsWith('/knowledge/') ? (
+        <KnowledgebasePage path={path} dark={dark} />
       ) : path === '/privacy/' || path === '/terms/' ? (
         <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
       ) : marketingPage ? (

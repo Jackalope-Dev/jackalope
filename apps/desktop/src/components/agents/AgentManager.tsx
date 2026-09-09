@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { AddAgentForm } from './AddAgentForm';
 import { AgentAccounts } from './AgentAccounts';
+import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentSupport } from './AgentSupport';
 import './agent-manager.css';
 
@@ -160,6 +161,9 @@ export function AgentManager() {
                   )}
                 </div>
               </div>
+              {agent.id === 'antigravity' && !runner?.available && (
+                <AgentInstallGuide desktopInstalled={runner?.desktopInstalled} />
+              )}
               {!('isCustom' in agent) && (
                 <section aria-label="Agent accounts">
                   <h3 className="text-base font-medium mt-6">Accounts</h3>

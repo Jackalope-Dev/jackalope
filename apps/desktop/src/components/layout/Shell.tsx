@@ -380,7 +380,7 @@ export function Shell({
           )}
           {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
           {activeTab === 'agent-settings' && (
-            <section className="workspace-page w-full">
+            <section className="workspace-page agent-settings-page w-full">
               <AgentManager />
             </section>
           )}

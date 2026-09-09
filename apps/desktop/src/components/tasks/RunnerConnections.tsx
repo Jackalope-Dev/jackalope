@@ -8,6 +8,7 @@ import { accountForAgent, useCapacityStore } from '../../stores/capacityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
+import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
@@ -46,6 +47,7 @@ export function RunnerConnections({
   const identified: Runner[] = runners.filter(
     (runner) =>
       runner.available ||
+      runner.desktopInstalled ||
       !config.isAgentEnabled(runner.id) ||
       config.customAgents.some((agent) => agent.id === runner.id) ||
       runs.some((run) => run.agent === runner.id && isActive(run)),
@@ -156,7 +158,9 @@ export function RunnerConnections({
                     : blockedModels
                       ? 'Choose allowed models'
                       : !runner.available
-                        ? 'Not available'
+                        ? runner.desktopInstalled
+                          ? 'CLI setup needed'
+                          : 'Not available'
                         : runner.signedIn
                           ? 'Ready'
                           : 'Installed';
@@ -230,6 +234,13 @@ export function RunnerConnections({
               );
             })}
           </div>
+        )}
+        {runners.some((runner) => runner.id === 'antigravity' && !runner.available) && (
+          <AgentInstallGuide
+            desktopInstalled={
+              runners.find((runner) => runner.id === 'antigravity')?.desktopInstalled
+            }
+          />
         )}
         {missing.length > 0 && (
           <p className="task-muted">

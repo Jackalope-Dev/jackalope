@@ -1,5 +1,6 @@
 import updates from './changelog.json' with { type: 'json' };
 import { growthPost } from './growth-content.ts';
+import { knowledgeGuides } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
 
 export const siteOrigin = 'https://jackalope.dev';
@@ -214,6 +215,11 @@ export const pages = [
     path: `/blog/${post.slug}/`,
     title: `${post.title} | Jackalope`,
     description: post.description,
+  })),
+  ...knowledgeGuides.map((guide) => ({
+    path: `/knowledge/${guide.slug}/`,
+    title: `${guide.title} | Jackalope Knowledgebase`,
+    description: guide.description,
   })),
 ];
 

@@ -71,10 +71,10 @@ export const builtinAgents = [
     description:
       'Advanced agentic coding with high-level planning, subagent orchestration, and native tools.',
     strengths: ['planning', 'orchestration', 'subagents', 'complex-workflows'],
-    installCommand: 'curl -fsSL https://antigravity.google/install.sh | bash',
-    installUrl: 'https://antigravity.google/docs/cli/',
+    installCommand: '',
+    installUrl: 'https://antigravity.google/docs/cli/install/',
     defaultBinary: 'agy',
-    loginCommand: 'agy auth login',
+    loginCommand: 'agy',
   },
   {
     id: 'gemini',

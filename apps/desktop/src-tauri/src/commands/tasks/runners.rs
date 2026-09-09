@@ -17,6 +17,7 @@ pub(super) fn discover_runner(
     profiles_root: &std::path::Path,
 ) -> Runner {
     let mut runner = Runner {
+        desktop_installed: id == "antigravity" && antigravity_desktop_installed(),
         id: id.to_string(),
         name: match id {
             "codex" => "Codex",
@@ -38,7 +39,13 @@ pub(super) fn discover_runner(
     let mut discovery = policy.clone();
     discovery.enabled_agents.clear();
     match discovery.resolve(id) {
-        Err(error) => runner.detail = error,
+        Err(error) => {
+            runner.detail = if runner.desktop_installed {
+                "Antigravity desktop app found. Install the separate agy CLI to run tasks in Jackalope, then open agy to sign in and check agents again.".into()
+            } else {
+                error
+            };
+        }
         Ok((adapter, path)) => {
             runner.available = true;
             if adapter == "antigravity" {
@@ -180,4 +187,48 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
     Err(format!(
         "Install {agent} and make its executable available on PATH, then refresh."
     ))
+}
+
+fn antigravity_desktop_installed() -> bool {
+    if cfg!(windows) {
+        let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+        let programs = std::env::var_os("ProgramFiles").map(PathBuf::from);
+        antigravity_desktop_at(local.as_deref(), programs.as_deref())
+    } else {
+        false
+    }
+}
+
+fn antigravity_desktop_at(
+    local: Option<&std::path::Path>,
+    programs: Option<&std::path::Path>,
+) -> bool {
+    local
+        .map(|root| root.join("Programs/Antigravity/Antigravity.exe").is_file())
+        .unwrap_or(false)
+        || programs
+            .map(|root| root.join("Antigravity/Antigravity.exe").is_file())
+            .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod desktop_detection_tests {
+    use super::*;
+
+    #[test]
+    fn antigravity_desktop_detection_requires_an_app_executable() {
+        let root = tempfile::tempdir().unwrap();
+        let local = root.path().join("local");
+        let programs = root.path().join("programs");
+        let gui = local.join("Programs/Antigravity/Antigravity.exe");
+        std::fs::create_dir_all(gui.parent().unwrap()).unwrap();
+        assert!(!antigravity_desktop_at(Some(&local), Some(&programs)));
+        std::fs::write(&gui, b"fixture").unwrap();
+        assert!(antigravity_desktop_at(Some(&local), None));
+        assert!(!antigravity_desktop_at(None, None));
+        let system_gui = programs.join("Antigravity/Antigravity.exe");
+        std::fs::create_dir_all(system_gui.parent().unwrap()).unwrap();
+        std::fs::write(&system_gui, b"fixture").unwrap();
+        assert!(antigravity_desktop_at(None, Some(&programs)));
+    }
 }

@@ -1,6 +1,7 @@
-import { ArrowRight, Check, Globe, Server, Shield, Star } from 'lucide-react';
+import { ArrowRight, Check, Shield, Star } from 'lucide-react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
+import { McpServerIcon } from './McpServerIcon';
 import {
   categoryLabel,
   descriptionExcerpt,
@@ -22,13 +23,10 @@ export function McpMarketplaceCard({
   onConfigure: () => void;
 }) {
   const setup = marketplaceSetup(server);
-  const Icon = setup.remote ? Globe : Server;
   return (
-    <article className="mcp-market-card" aria-label={server.name}>
+    <article className="mcp-market-card" aria-label={server.name} data-server-id={server.id}>
       <div className="mcp-market-heading">
-        <span className="mcp-market-icon">
-          <Icon size={20} aria-hidden="true" />
-        </span>
+        <McpServerIcon server={server} />
         <div className="min-w-0">
           <h3 className="mcp-card-title">
             <button type="button" onClick={onInspect}>
@@ -82,10 +80,10 @@ export function McpMarketplaceCard({
         )}
       </div>
       <div className="mcp-card-footer">
-        <Button variant="ghost" size="sm" onClick={onConfigure}>
+        <Button variant="ghost" size="sm" data-action="configure" onClick={onConfigure}>
           {scopes.length ? 'Reconfigure' : 'Configure'}
         </Button>
-        <Button variant="outline" size="sm" onClick={onInspect}>
+        <Button variant="outline" size="sm" data-action="inspect" onClick={onInspect}>
           View details <ArrowRight size={14} aria-hidden="true" />
         </Button>
       </div>

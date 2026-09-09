@@ -157,6 +157,7 @@ pub struct ArchivedRun {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Runner {
+    pub desktop_installed: bool,
     pub id: String,
     pub name: String,
     pub available: bool,

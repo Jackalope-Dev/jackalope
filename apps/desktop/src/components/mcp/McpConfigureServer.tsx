@@ -1,27 +1,28 @@
-import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Download, Key, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, Check, Key, Plug } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
-import { useDialogFocus } from '../ui/useDialogFocus';
+import { McpServerIcon } from './McpServerIcon';
+import { marketplaceName } from './marketplace-info';
 
-interface McpInstallModalProps {
-  server: AllMcpsServer | null;
-  open: boolean;
+interface McpConfigureServerProps {
+  server: AllMcpsServer;
   onClose: () => void;
   defaultScope?: string;
 }
 
-export function McpInstallModal({
+export function McpConfigureServer({
   server,
-  open,
   onClose,
   defaultScope = 'global',
-}: McpInstallModalProps) {
+}: McpConfigureServerProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const dialogFocus = useDialogFocus();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
   const { saveServer } = useMcpStore();
 
   const [scope, setScope] = useState(defaultScope);
@@ -116,9 +117,6 @@ export function McpInstallModal({
 
       await saveServer(config);
       setInstalled(true);
-      setTimeout(() => {
-        onClose();
-      }, 700);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -127,38 +125,39 @@ export function McpInstallModal({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={(val) => !val && !submitting && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content {...dialogFocus} className="task-dialog appearance-panel max-w-lg">
-          <Dialog.Close className="task-close" aria-label="Close dialog" disabled={submitting}>
-            <X size={18} />
-          </Dialog.Close>
-
-          <div className="flex items-center gap-3 mb-4">
-            <span className="p-2.5 rounded-xl bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)]">
-              <Download size={22} />
-            </span>
-            <div>
-              <Dialog.Title className="text-xl font-medium tracking-tight">
-                Install {server.name}
-              </Dialog.Title>
-              <Dialog.Description className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                Configure destination scope and parameters
-              </Dialog.Description>
-            </div>
-          </div>
-
+    <section className="mcp-configure-page" aria-label={`Configure ${marketplaceName(server)}`}>
+      <Button variant="ghost" disabled={submitting} onClick={onClose}>
+        <ArrowLeft size={16} />
+        Back to server
+      </Button>
+      <header className="mcp-server-hero">
+        <McpServerIcon server={server} />
+        <div>
+          <h1 ref={heading} tabIndex={-1}>
+            Configure {marketplaceName(server)}
+          </h1>
+          <p className="task-muted">Choose where this connection is available.</p>
+        </div>
+      </header>
+      {installed ? (
+        <div className="mcp-configuration-saved" role="status">
+          <Check size={28} aria-hidden="true" />
+          <h2>Connection saved</h2>
+          <p>Restart existing agent sessions to use this connection.</p>
+          <Button onClick={onClose}>Back to server</Button>
+        </div>
+      ) : (
+        <>
           <p className="task-notice mb-4">
             Review the publisher and command. Packages may download when the connection starts.
           </p>
-          <div className="space-y-4 text-sm">
+          <div className="mcp-configure-fields text-sm">
             {/* Target Scope */}
             <div>
               <p className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">
                 Target Scope
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="mcp-scope-options">
                 {[
                   ...(activeProjectId
                     ? [{ id: `project:${activeProjectId}`, label: 'This project' }]
@@ -207,12 +206,12 @@ export function McpInstallModal({
               <div>
                 <label
                   className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5"
-                  htmlFor="McpInstallModal-field-1"
+                  htmlFor="McpConfigureServer-field-1"
                 >
                   Remote MCP Endpoint URL
                 </label>
                 <input
-                  id="McpInstallModal-field-1"
+                  id="McpConfigureServer-field-1"
                   className="task-input w-full font-mono text-xs"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -279,7 +278,7 @@ export function McpInstallModal({
             )}
           </div>
 
-          <div className="flex justify-end gap-2.5 mt-6 pt-4 border-t border-[var(--color-border)]">
+          <div className="mcp-configure-actions">
             <Button variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
@@ -287,20 +286,20 @@ export function McpInstallModal({
               {installed ? (
                 <>
                   <Check size={16} />
-                  Installed!
+                  Saved
                 </>
               ) : submitting ? (
-                'Installing…'
+                'Saving…'
               ) : (
                 <>
-                  <Download size={16} />
-                  Install MCP Server
+                  <Plug size={16} />
+                  Save connection
                 </>
               )}
             </Button>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </>
+      )}
+    </section>
   );
 }

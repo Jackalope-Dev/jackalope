@@ -132,7 +132,7 @@
   height: 1px;
   background: var(--color-border);
 }
-.context-source-tree li svg {
+.context-source-tree :where(li) svg {
   flex-shrink: 0;
   color: var(--color-text-muted);
 }

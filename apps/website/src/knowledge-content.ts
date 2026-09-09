@@ -1,684 +1,467 @@
-export interface KnowledgeItem {
+export interface KnowledgeGuideSection {
   id: string;
-  category: KnowledgeCategory;
-  title: string;
-  summary: string;
-  details: string[];
+  question: string;
+  paragraphs: string[];
   bullets?: string[];
-  command?: string;
-  codeSnippet?: string;
-  tags: string[];
-  isFaq?: boolean;
+  codeBox?: {
+    title: string;
+    code: string;
+  };
+  callout?: {
+    kind: 'note' | 'tip' | 'important';
+    text: string;
+  };
 }
 
-export type KnowledgeCategory =
-  | 'quickstart'
-  | 'agents'
-  | 'worktrees'
-  | 'routing'
-  | 'tasks'
-  | 'mcp'
-  | 'usage'
-  | 'troubleshooting'
-  | 'security'
-  | 'experience';
-
-export interface CategoryMeta {
-  id: KnowledgeCategory;
-  name: string;
-  shortDescription: string;
-  iconName: string;
+export interface KnowledgeGuide {
+  slug: string;
+  title: string;
+  shortTitle: string;
+  description: string;
+  readingTime: string;
+  sections: KnowledgeGuideSection[];
 }
 
-export const knowledgeCategories: CategoryMeta[] = [
+export const knowledgeGuides: KnowledgeGuide[] = [
   {
-    id: 'quickstart',
-    name: 'Quick Start & Setup',
-    shortDescription: 'Project setup, Git prerequisites, and running your first agent task.',
-    iconName: 'Sparkles',
-  },
-  {
-    id: 'agents',
-    name: 'Agents & Accounts',
-    shortDescription:
-      'Configuring Codex, Claude Code, Grok, OpenCode, local LLMs, and account profiles.',
-    iconName: 'Bot',
-  },
-  {
-    id: 'worktrees',
-    name: 'Worktrees & Concurrency',
-    shortDescription:
-      'How isolated Git worktrees prevent collisions during parallel task execution.',
-    iconName: 'GitBranch',
-  },
-  {
-    id: 'routing',
-    name: 'Task Routing & Quota Handoff',
-    shortDescription: 'Default-agent coordination, quota window tracking, and automatic failovers.',
-    iconName: 'Cpu',
-  },
-  {
-    id: 'tasks',
-    name: 'Task Workflow & Review',
-    shortDescription: 'Effort levels, prompt refinement, question bridge, and guarded integration.',
-    iconName: 'Layers3',
-  },
-  {
-    id: 'mcp',
-    name: 'MCP Hub & Tool Integration',
-    shortDescription: 'Connecting Model Context Protocol servers and the built-in browser engine.',
-    iconName: 'Plug',
-  },
-  {
-    id: 'usage',
-    name: 'Usage & Rate Limits',
-    shortDescription: 'Tracking token headroom, provider capacity windows, and exportable logs.',
-    iconName: 'ChartNoAxesColumn',
-  },
-  {
-    id: 'troubleshooting',
-    name: 'Troubleshooting Playbook',
-    shortDescription: 'Diagnostic recipes, error resolution steps, and CLI verification commands.',
-    iconName: 'Wrench',
-  },
-  {
-    id: 'security',
-    name: 'FAQ & Local Security Perimeter',
-    shortDescription: 'Code privacy, local SQLite persistence, offline behavior, and licensing.',
-    iconName: 'ShieldCheck',
-  },
-  {
-    id: 'experience',
-    name: 'Atmosphere & Companion',
-    shortDescription: 'Theme harmonies, 64-step atmosphere, mascot reactions, and shortcuts.',
-    iconName: 'Palette',
-  },
-];
+    slug: 'git-worktrees',
+    title: 'Isolated Git Worktrees, Concurrency & Integration Safeguards',
+    shortTitle: 'Git Worktrees & Concurrency',
+    description:
+      'How Jackalope uses native Git worktrees to isolate parallel coding agents, prevent dirty checkout collisions, and enforce guarded fast-forward integration.',
+    readingTime: '6 min read',
+    sections: [
+      {
+        id: 'why-worktrees',
+        question: 'Why does Jackalope isolate tasks in Git worktrees instead of raw branches?',
+        paragraphs: [
+          'Most developer tools attempt to run coding agents directly in the user’s primary working directory or rely on rapid git checkout switches between branches. In practice, this breaks immediately when multiple agents run concurrently: file watchers re-trigger, uncommitted user edits get clobbered or stashed, build artifacts collide, and language server caches thrash.',
+          'Jackalope solves this by provisioning a dedicated, native Git worktree under .worktrees/<task-slug> for every independent task attempt. Each worktree shares the local Git object database (.git/objects) with your primary repository, eliminating repository duplication while maintaining a completely isolated file tree, index, and HEAD pointer.',
+        ],
+        bullets: [
+          'Zero repository disk duplication: worktrees reference the shared object store and packfiles.',
+          'Your active editor, working tree, and staged files remain completely untouched while background agents work.',
+          'Agents run parallel compilers, test runners, and package managers in isolated directories without file contention.',
+        ],
+        callout: {
+          kind: 'note',
+          text: 'Because worktrees share the same Git object store, commit objects created inside a worktree are immediately accessible in your main checkout without any network operations or git fetch calls.',
+        },
+      },
+      {
+        id: 'concurrency-collisions',
+        question: 'How does worktree isolation prevent checkout collisions during parallel execution?',
+        paragraphs: [
+          'Native Git strictly prevents two worktrees from checking out the same local branch at the same time. Jackalope respects this invariant through its native Coordinator and Execution Guard before an agent process is spawned.',
+          'When a task begins, Jackalope generates an attempt-specific branch reference (such as jackalope/task-<id>) derived from your target baseline. The coordinator acquires a reservation and execution lock, ensuring that no two concurrent tasks can claim the same branch name or workspace path.',
+          'If an attempt terminates abnormally or is cancelled, the branch reservation is retained in a quarantined state rather than being silently re-assigned, preventing race conditions during subsequent retries.',
+        ],
+        codeBox: {
+          title: 'Worktree Directory Layout',
+          code: `# Primary repository root
+/my-project/
+  ├── .git/                      # Authoritative Git database
+  ├── src/                       # Your primary uncommitted working tree
+  └── .worktrees/                # Managed agent workspaces
+      ├── task-auth-flow/        # Isolated worktree for Task 1 (Claude Code)
+      └── task-sqlite-schema/    # Isolated worktree for Task 2 (Codex)`,
+        },
+      },
+      {
+        id: 'guarded-integration',
+        question: 'What is the guarded fast-forward integration workflow?',
+        paragraphs: [
+          'Completing a task attempt does not automatically merge changes into your working branch. In Jackalope, an agent’s successful process exit is merely a candidate result, not an integrated change.',
+          'Integration is protected by a strict three-tier verification sequence: Coordinator State → Execution Guard → Runtime Lock. Before applying changes, Jackalope computes a source and target snapshot hash, verifies all test receipts, checks that no uncommitted modifications conflict in the destination branch, and enforces a clean fast-forward application.',
+          'You review the candidate changes in the desktop app using Pierre Diffs, inspect all terminal evidence and check output, and click Apply only when you are satisfied with the diff.',
+        ],
+        bullets: [
+          'Pre-integration snapshot validation ensures the base branch has not drifted since the task began.',
+          'Saved test receipts and check outputs are cryptographically bound to specific file hashes.',
+          'Fast-forward merges avoid unexpected merge commits or automatic conflict resolution.',
+        ],
+      },
+      {
+        id: 'worktree-cleanup',
+        question: 'How does Jackalope clean up and prune completed or cancelled worktrees?',
+        paragraphs: [
+          'When you integrate a candidate patch or archive a task, Jackalope automatically unlinks and prunes the worktree directory using git worktree remove. If uncommitted files or ignored artifacts exist inside the worktree, Jackalope flags them to prevent accidental data loss.',
+          'If a workspace cannot be unlinked cleanly (for instance, because an external editor or terminal process has locked a file handle on Windows), Jackalope marks the worktree as quarantined and releases the branch reservation so subsequent work can proceed unhindered.',
+        ],
+        callout: {
+          kind: 'tip',
+          text: 'The background maintenance runner automatically runs git worktree prune on app startup to cleanly remove stale worktree metadata left by abruptly terminated processes.',
+        },
+      },
+      {
+        id: 'manual-worktree-commands',
+        question: 'What manual Git commands can I use to inspect or recover worktree state?',
+        paragraphs: [
+          'While Jackalope manages worktree lifecycles automatically, you have full native Git access at any time from your favorite terminal. Because all operations follow standard Git conventions, standard Git CLI commands work without proprietary wrappers.',
+        ],
+        codeBox: {
+          title: 'Useful Git Worktree Commands',
+          code: `# List all registered worktrees and their current checkout branches
+git worktree list
 
-export const knowledgeItems: KnowledgeItem[] = [
-  // --- Quick Start & Setup ---
-  {
-    id: 'qs-first-project',
-    category: 'quickstart',
-    title: 'How do I add a local repository to Jackalope?',
-    summary:
-      'Open the project dropdown in the top header chrome, click "Add a project…", and choose any local Git repository directory on your computer.',
-    details: [
-      'Jackalope connects directly to your local file system. It reads Git metadata through fast, isolated reads (using gix with Git fallback) to detect the current branch, remote origins, and codebase topology without modifying your project files.',
-      'Once added, you can configure project-specific instructions, allowed agents, default sign-in profiles, and scoped MCP connections under Project Settings.',
-    ],
-    bullets: [
-      'Your repository and code remain strictly on your local machine.',
-      'Existing gitignore rules, submodules, and branch pointers are honored automatically.',
-      'Switch between multiple repositories instantly using the project switcher in the header chrome.',
-    ],
-    tags: ['add project', 'repository', 'first run', 'git setup', 'onboarding'],
-  },
-  {
-    id: 'qs-prerequisites',
-    category: 'quickstart',
-    title: 'What prerequisites are required before starting tasks?',
-    summary:
-      'You need Git installed locally on your PATH and at least one supported coding agent CLI (Codex, Claude Code, Grok, or OpenCode) signed into your provider account.',
-    details: [
-      'Jackalope is the operator, harness, and review environment for your coding agents. It does not package proprietary AI model weights or subscriptions; you bring the agent CLIs you already trust and use.',
-      'Jackalope checks for Git availability and scans your system PATH for recognized agent binaries during startup. You can re-scan detected agents at any time in Settings → Agents.',
-    ],
-    command: 'git --version && codex --version',
-    tags: ['prerequisites', 'requirements', 'git', 'cli', 'installation', 'path'],
-    isFaq: true,
-  },
-  {
-    id: 'qs-first-task',
-    category: 'quickstart',
-    title: 'How do I create and run my first parallel task?',
-    summary:
-      'Press Ctrl+Shift+N (or ⌘ Shift N on macOS) or click "New task" to open the Task Composer, describe what needs to be changed, select an effort level, and click Start.',
-    details: [
-      'The Task Composer allows you to enter a plain-language prompt or brief. Jackalope helps refine vague prompts into concrete criteria and can suggest decomposing large features into coordinated parallel tasks with explicit dependencies.',
-      'When you start a task, Jackalope allocates a dedicated, isolated Git worktree so the agent works in its own clean directory without locking or dirtying your main workspace.',
-    ],
-    bullets: [
-      'Choose Quick for focused fixes, Balanced for features, or Thorough for large refactors.',
-      'Assign an agent explicitly or choose Automatic to let the coordinator pick the best available agent.',
-      'Follow live terminal output, inspect generated diffs, and review checks before integrating.',
-    ],
-    tags: ['new task', 'composer', 'effort tier', 'parallel execution', 'start task'],
-  },
-  {
-    id: 'qs-keyboard-shortcuts',
-    category: 'quickstart',
-    title: 'What keyboard shortcuts are available in the desktop app?',
-    summary:
-      'Jackalope provides fast keyboard shortcuts for command palette jumping, task creation, settings, and tab switching.',
-    details: [
-      'Use Ctrl+K (⌘K on macOS) to open the Command Palette and jump directly to any view, theme, or settings category.',
-      'Use Ctrl+Shift+N (⌘ Shift N) from anywhere in the app to capture a new task immediately without leaving your current screen.',
-      'Use Ctrl+, (⌘,) to access Preferences & Settings, and Escape to dismiss open overlays, modals, and palettes.',
-    ],
-    command: 'Ctrl + K (Jump) | Ctrl + Shift + N (New task) | Ctrl + , (Settings)',
-    tags: ['shortcuts', 'hotkeys', 'keyboard', 'command palette', 'accessibility'],
-    isFaq: true,
-  },
+# Manually remove a stale worktree directory
+git worktree remove .worktrees/task-auth-flow --force
 
-  // --- Agents & Multi-Account Profiles ---
-  {
-    id: 'agents-supported',
-    category: 'agents',
-    title: 'Which coding agents are natively supported?',
-    summary:
-      'Jackalope includes native streaming adapters for Codex, Claude Code, Grok Build, and OpenCode, with Antigravity supported as a worker.',
-    details: [
-      'Native adapters communicate directly with each CLI tool through typed process ownership, streaming stdout/stderr events, structured question handling, and execution receipts.',
-      'Codex and Claude Code receive project-selected MCP tool connections directly over stdio, HTTP, or SSE. Grok uses on-demand HTTP discovery. OpenCode runs using its own local CLI provider configuration.',
-    ],
-    bullets: [
-      'Codex: Full support for stdio and HTTP tool connections, questions, and usage reports.',
-      'Claude Code: Full tool connection support, in-app question bridge, and continuation sessions.',
-      'Grok Build: High-speed execution with on-demand discovery through the coordinator bridge.',
-      'OpenCode: Multi-model CLI supporting local, free, or self-hosted model configurations.',
-      'Antigravity: Supported as an execution worker; automatic coordinator role is reserved for CLI default agent.',
-    ],
-    tags: ['codex', 'claude code', 'grok', 'opencode', 'antigravity', 'adapters'],
-    isFaq: true,
-  },
-  {
-    id: 'agents-multi-account',
-    category: 'agents',
-    title: 'How do Work and Personal account profiles work?',
-    summary:
-      'Create named account profiles (e.g., "Work" and "Personal") for supported agents to keep provider sign-ins and configurations strictly segregated.',
-    details: [
-      'In Settings → Agents (or the Agents view), expand the Accounts section for any supported agent. Click "Add profile", name it, and launch "Sign in". Jackalope launches the agent’s own authentication flow in an isolated configuration directory.',
-      'You can assign specific accounts to specific projects in Project Settings → Agents. For instance, your client repository can be locked to your "Work" account, while your open-source side project uses "Personal".',
-    ],
-    bullets: [
-      'Zero password pasting: Jackalope never sees or stores your API secrets or provider credentials.',
-      'Task continuations stay pinned to the profile that started them, preventing accidental cross-account billing.',
-      'Note: Account profiles separate configuration directories; they are not an OS-level sandbox against local filesystem access.',
-    ],
-    tags: [
-      'accounts',
-      'profiles',
-      'work personal',
-      'authentication',
-      'sign in',
-      'billing segregation',
-    ],
-  },
-  {
-    id: 'agents-local-llms',
-    category: 'agents',
-    title: 'How does Jackalope discover and connect to local LLMs?',
-    summary:
-      'Jackalope automatically detects local inference servers including Ollama, LM Studio, and llama.cpp on their standard local ports.',
-    details: [
-      'When you open the Local Models & Ambient Keys scanner in Settings → Agents, Jackalope tests loopback connectivity on standard local ports (Ollama on 11434, LM Studio on 1234, llama.cpp on 8080).',
-      'Detected local models can be registered directly as OpenCode or custom endpoints, enabling 100% private, zero-cost, offline agent workflows.',
-    ],
-    command: 'ollama list || curl http://127.0.0.1:11434/api/tags',
-    tags: ['local llm', 'ollama', 'lm studio', 'llama.cpp', 'offline models', 'private inference'],
-    isFaq: true,
-  },
-  {
-    id: 'agents-cross-model-review',
-    category: 'agents',
-    title: 'What is Cross-Model Peer Review?',
-    summary:
-      'Cross-Model Review allows a second, distinct AI model (e.g., Claude Code reviewing a patch written by Codex) to provide a neutral critique before code integration.',
-    details: [
-      'Single-model self-review often suffers from blind spots. Jackalope can submit the generated patch and task brief to an alternative configured model.',
-      'The reviewing model evaluates syntax correctness, security implications, edge cases, and documentation fidelity, surfacing categorized findings and an approval verdict directly in the review panel.',
-    ],
-    tags: ['cross-model review', 'second opinion', 'peer review', 'code quality', 'audit'],
-  },
-  {
-    id: 'agents-custom-flags',
-    category: 'agents',
-    title: 'Can I specify custom CLI flags or model overrides?',
-    summary:
-      'Yes. In Settings → Agents, you can configure allowed models, default effort instructions, and custom CLI invocation arguments per agent.',
-    details: [
-      'You can restrict which models each agent is allowed to use, preventing accidental usage of expensive preview models. During task composition, you can also override the model directly for that specific attempt.',
-    ],
-    tags: ['model overrides', 'cli flags', 'agent settings', 'custom arguments'],
-  },
+# Prune administrative records for removed worktrees
+git worktree prune -v
 
-  // --- Worktrees & Concurrency ---
-  {
-    id: 'worktrees-why',
-    category: 'worktrees',
-    title: 'Why does Jackalope use isolated Git worktrees?',
-    summary:
-      'Git worktrees allow multiple agents to work on independent branches simultaneously without file collision, merge thrashing, or blocking your active checkout.',
-    details: [
-      'Running multiple coding agents inside a single shared working directory leads to file corruption, overwritten edits, and impossible git diffs. A Git worktree gives each task its own isolated directory and HEAD pointer while sharing the same underlying `.git` object database.',
-      'Worktrees are created automatically under `.worktrees/<task-id>` or custom project paths. When a task completes, Jackalope lets you review the changes cleanly, run tests, and perform a guarded fast-forward integration.',
+# Inspect locked worktrees
+git worktree unlock .worktrees/task-auth-flow`,
+        },
+      },
     ],
-    tags: ['worktrees', 'parallel', 'isolation', 'concurrency', 'git branches'],
-    isFaq: true,
   },
   {
-    id: 'worktrees-cleanup',
-    category: 'worktrees',
-    title: 'How does Jackalope protect against accidental data loss in worktrees?',
-    summary:
-      'Active tasks lock their worktree. Jackalope inspects git status and unmerged commits before allowing any worktree removal, offering safe "Archive and remove" if uncommitted changes exist.',
-    details: [
-      'Jackalope will never delete a worktree that contains unintegrated edits without explicit confirmation. If you want to clean up an abandoned task, Jackalope can generate an archive patch bundle so you can restore your experimental work at any time.',
-      'You can inspect and manage all active, locked, and merged worktrees from the Worktrees view in the Project tab.',
-    ],
-    tags: ['cleanup', 'archive', 'data protection', 'unmerged commits', 'locked worktree'],
-  },
-  {
-    id: 'worktrees-branch-management',
-    category: 'worktrees',
-    title: 'How are branch pointers and target commits managed during parallel runs?',
-    summary:
-      'Each task resolves against an explicit target commit. Dependent tasks in a parallel plan wait until prerequisite tasks are integrated before dispatching.',
-    details: [
-      'When tasks are part of a decomposed parallel feature plan, Jackalope coordinates their execution graph. Independent tasks run simultaneously; dependent tasks remain queued.',
-      'Before integration, Jackalope validates that the target branch has not moved unexpectedly, ensuring deterministic verification.',
-    ],
-    tags: ['branches', 'dependencies', 'dag', 'target branch', 'fast-forward'],
-  },
+    slug: 'task-routing-and-quotas',
+    title: 'Automatic Task Routing, Quota Windows & Failover Handoff',
+    shortTitle: 'Task Routing & Quotas',
+    description:
+      'Understanding the Coordinator lock hierarchy, preflight quota headroom admission, 5-hour rolling windows, and 3-attempt failover handoffs.',
+    readingTime: '7 min read',
+    sections: [
+      {
+        id: 'lock-hierarchy',
+        question: 'What is the lock hierarchy and how does the coordinator protect runtime state?',
+        paragraphs: [
+          'Jackalope coordinates multiple background agent processes and desktop commands through a deterministic lock hierarchy: Coordinator State → Execution Guard → Runtime Lock. This strict acquisition order guarantees that dispatch loops, quota inspections, and user cancellations never enter deadlocks.',
+          'When a new task is submitted, the Coordinator first validates project boundaries and reserves candidate agent slots. An Execution Guard is then acquired before any native OS process tree is spawned. If any step fails or is interrupted by the user, the runtime releases locks in reverse order, ensuring state consistency across the local SQLite store.',
+        ],
+      },
+      {
+        id: 'routing-subprocess',
+        question: 'How does the default-agent routing subprocess work outside coordinator locks?',
+        paragraphs: [
+          'When a task is set to Auto-Route, Jackalope consults the configured default agent to analyze the task prompt, project context, outcome expectations, and eligible models. To prevent long model inference calls from blocking interactive desktop operations, the routing evaluation runs in a bounded, cancellable subprocess outside core runtime locks.',
+          'The routing subprocess returns a validated option ID, an explanatory rationale, an estimated token complexity, and an ordered sequence of fallback choices. If the user cancels the task or closes the project while routing is in flight, the subprocess tree is immediately terminated via native OS job objects.',
+        ],
+        callout: {
+          kind: 'important',
+          text: 'Provider identifiers, raw prompt text, and progress streams are treated as untrusted data. They can never alter system permissions, expand tool allowlists, or bypass coordinator boundaries.',
+        },
+      },
+      {
+        id: 'quota-headroom-admission',
+        question: 'How does quota headroom admission calculate 5-hour rolling windows?',
+        paragraphs: [
+          'Major agent providers enforce rolling rate limits—most notably Claude Code’s 5-hour rolling utilization window. Launching a high-effort task against an agent with 3% remaining quota almost guarantees an in-flight rate limit failure, wasting time and partially generated code.',
+          'Jackalope features preflight quota headroom admission. Account-bound capacity readers query the active CLI session (cached for up to 60 seconds) and enforce a mandatory 10-point reserve buffer in the limiting window. Furthermore, Jackalope accounts for all other active local tasks sharing that quota pool.',
+          'If an agent lacks sufficient headroom for the selected effort tier (Quick, Balanced, Thorough), the coordinator refuses admission before spawning and automatically routes to the next eligible provider with available headroom.',
+        ],
+        bullets: [
+          'Rolling 5-hour windows and weekly resets are tracked independently per account profile.',
+          'A mandatory 10-point reserve prevents in-flight rate-limit aborts during complex refactors.',
+          'Active local reservations prevent parallel agents from exhausting the same subscription simultaneously.',
+        ],
+      },
+      {
+        id: 'three-attempt-failover',
+        question: 'How does the 3-attempt failover handoff work when an agent hits a rate limit?',
+        paragraphs: [
+          'Even with preflight estimation, external team usage or sudden provider throttling can trigger a rate-limit error (HTTP 429 or provider rejection event). When this happens, Jackalope’s automatic handoff engine intervenes.',
+          'First, Jackalope verifies that the failure is an authentic provider quota error—not a syntax error, test failure, or transient socket disconnect. Assistant prose and warning-only lines never trigger an automated handoff.',
+          'Second, the exhausted provider account is marked as cooling down and excluded from candidate selection. Jackalope preserves the existing worktree, task prompt, and file changes generated so far.',
+          'Third, Jackalope spawns the next eligible agent in the same worktree, passing the accumulated progress context. Up to three handoffs are permitted per task before execution pauses to ask for human guidance.',
+        ],
+        codeBox: {
+          title: 'Failover Progression Flow',
+          code: `# 1. Task dispatched to Claude Code (Primary)
+Attempt 1: Running in .worktrees/task-billing-refactor
+Claude Code encounters HTTP 429 (5-hour window exhausted)
 
-  // --- Routing & Quota Handoff ---
-  {
-    id: 'routing-auto-coordinator',
-    category: 'routing',
-    title: 'How does automatic task routing work?',
-    summary:
-      'When a task is set to "Automatic", the default agent evaluates the task prompt, required tools, project preferences, and fresh provider quota headroom to pick the best agent.',
-    details: [
-      'The coordinator preflights candidate agents against project restrictions, required tool transports (stdio, HTTP, SSE), and remaining capacity. It atomically reserves conservative headroom for the task so that concurrent dispatches do not exceed local quotas.',
-      'Tasks that require specific tools are routed only to agents with verified compatible adapters. If a provider is near capacity, the coordinator prioritizes secondary eligible agents.',
-    ],
-    tags: ['automatic routing', 'coordinator', 'quota check', 'preflight', 'headroom reservation'],
-  },
-  {
-    id: 'routing-quota-handoff',
-    category: 'routing',
-    title: 'What happens when an agent hits a provider 429 or quota exhaustion?',
-    summary:
-      'Jackalope immediately stops the owned process tree, preserves all workspace edits and context in the worktree, and seamlessly hands the task off to an eligible alternative agent.',
-    details: [
-      'Provider rate limits (HTTP 429, daily token cap, or 5-hour rolling window exhaustion) typically cause agent sessions to fail completely. In Jackalope, recognized quota errors trigger automatic task handoff:',
-      '1. The runtime cleanly halts the current agent process tree without losing files.',
-      '2. The existing task history, question responses, partial diffs, and check receipts are packaged.',
-      '3. A pre-ranked fallback agent is launched inside the exact same worktree to continue the task seamlessly.',
-      'Jackalope permits up to 3 bounded handoffs per attempt, recording each transition in Usage so token consumption is accurately attributed.',
-    ],
-    bullets: [
-      'All code written by the first agent is preserved on disk.',
-      'The fallback agent receives the original task intent and the previous worker summary.',
-      'If no alternative is configured or eligible, execution stops with work safely preserved for manual resumption.',
-    ],
-    tags: ['429 rate limit', 'quota handoff', 'automatic failover', 'fallback', 'resilience'],
-    isFaq: true,
-  },
-  {
-    id: 'routing-windows',
-    category: 'routing',
-    title: 'How does Jackalope track rolling 5-hour quota windows?',
-    summary:
-      'For providers with short rolling windows (such as Codex), Jackalope monitors reported quota consumption and blocks preflight dispatch if the window is exhausted.',
-    details: [
-      'Rather than launching a task only to fail thirty seconds later on an exhausted quota, Jackalope’s capacity client reads reported window metrics.',
-      'If a provider reports 100% consumption on its rolling window, the coordinator skips it during preflight and routes to an alternate available agent.',
-    ],
-    tags: ['5-hour window', 'rolling quota', 'preflight blocking', 'rate limit'],
-  },
+# 2. Jackalope halts process, retains worktree files, and captures context
+Quota error verified -> Claude Account marked cooling down (reset at 19:42)
 
-  // --- Task Workflow & Review ---
-  {
-    id: 'tasks-effort-tiers',
-    category: 'tasks',
-    title: 'What do Quick, Balanced, and Thorough effort levels do?',
-    summary:
-      'Effort tiers control the depth of planning, exploration, and verification instructions passed to the agent runtime.',
-    details: [
-      'Quick: Prioritizes fast, minimal-step changes for typo fixes, minor bugs, or targeted tweaks. Skips deep dependency analysis.',
-      'Balanced: The standard workflow for features and bugfixes. Explores project conventions, makes changes, and executes project test commands.',
-      'Thorough: Instructs the agent to perform extensive architecture analysis, generate exhaustive test cases, verify edge cases, and run full test suites before returning.',
+# 3. Automatic Handoff to Codex (Fallback 1)
+Attempt 2: Resuming in .worktrees/task-billing-refactor with existing patch
+Codex reads prior attempt diff, completes remaining tests, and exits 0`,
+        },
+      },
+      {
+        id: 'task-pinning',
+        question: 'When are tasks pinned to a specific agent versus automatically delegated?',
+        paragraphs: [
+          'If you manually specify an agent (such as selecting Codex or Claude Code explicitly in the task composer), Jackalope pins that task. Pinned tasks will never auto-handoff to a different agent on quota exhaustion; instead, they pause cleanly and notify you, allowing you to either wait for quota reset or explicitly switch providers.',
+          'Continuing an existing task session is also strictly pinned to the agent that originated the session to preserve local session context and reasoning memory.',
+        ],
+      },
     ],
-    tags: ['effort levels', 'quick', 'balanced', 'thorough', 'planning depth'],
   },
   {
-    id: 'tasks-question-bridge',
-    category: 'tasks',
-    title: 'How does the interactive question bridge work?',
-    summary:
-      'When an agent needs clarification or human permission, Jackalope suspends the task and surfaces an interactive question directly in the app UI and companion mascot.',
-    details: [
-      'Agents do not stall silently in background terminal tabs. When an agent issues a prompt or tool permission request, Jackalope generates a prioritized notification, changes the mascot expression to "inquiring", and displays the question in Task Detail.',
-      'You can answer or provide extra direction directly from the app; your input is streamed right back to the agent session.',
-    ],
-    tags: ['questions', 'permissions', 'human in the loop', 'notifications', 'mascot'],
-  },
-  {
-    id: 'tasks-guarded-integration',
-    category: 'tasks',
-    title: 'What is snapshot-bound code review and guarded integration?',
-    summary:
-      'Jackalope binds test and lint receipts to exact git commit hashes, requiring verification before permitting fast-forward branch integration.',
-    details: [
-      'Jackalope avoids "invisible merges". Code review displays rich Pierre Diffs and Streamdown markdown output showing exactly what changed.',
-      'Checks (such as `pnpm test` or `cargo test`) are tied to the exact working tree snapshot. If files change after tests pass, checks are marked stale. Integration verifies that the target branch has not diverged before performing an atomic fast-forward.',
-    ],
-    tags: [
-      'code review',
-      'pierre diffs',
-      'snapshot verification',
-      'guarded integration',
-      'git merge',
-    ],
-    isFaq: true,
-  },
-  {
-    id: 'tasks-repo-todos',
-    category: 'tasks',
-    title: 'How do Repo TODOs work?',
-    summary:
-      'Jackalope can parse repository TODO comments, markdown task lists, and roadmap items into structured, ready-to-run agent briefs.',
-    details: [
-      'In the Repo TODOs view (accessible via the Project tab or Ctrl+K), Jackalope discovers uncompleted TODOs while preserving markdown formatting, CRLF line endings, and code fence blocks.',
-      'You can click any TODO item to convert it into a pre-populated Task Composer brief with attached context.',
-    ],
-    tags: ['repo todos', 'todo comments', 'backlog intake', 'markdown tasks'],
-  },
-  {
-    id: 'tasks-windows-desktop-control',
-    category: 'tasks',
-    title: 'How does native Windows desktop window control work?',
-    summary:
-      'Active tasks can be granted temporary, explicit control of a specific Windows desktop window for screenshots, clicks, keystrokes, and UI testing.',
-    details: [
-      'On Windows, Jackalope allows users to explicitly delegate one window to an active task. The agent can capture window snapshots, send literal keyboard input, and perform mouse clicks.',
-      'Access is strictly human-granted for that specific attempt and can be revoked instantly with the Stop button or when the task completes.',
-    ],
-    tags: ['windows control', 'ui testing', 'desktop automation', 'window capture', 'clicks'],
-  },
+    slug: 'multi-account-and-agents',
+    title: 'Configuring Agents, Multi-Account Profiles & Credentials',
+    shortTitle: 'Agents & Accounts',
+    description:
+      'Setting up Codex, Claude Code, Grok Build, OpenCode, isolating Work vs Personal subscriptions, and securing tokens in the OS keychain.',
+    readingTime: '6 min read',
+    sections: [
+      {
+        id: 'supported-adapters',
+        question: 'Which coding agent CLIs are supported and how are they authenticated?',
+        paragraphs: [
+          'Jackalope integrates with your locally installed coding agent CLIs via native subprocess adapters. Rather than executing models through a closed cloud proxy, Jackalope drives the authentic developer CLIs on your machine, honoring your existing subscription tiers, model permissions, and configuration files.',
+          'Currently supported adapters include Codex CLI, Claude Code, Grok Build, and OpenCode. Antigravity is supported in dedicated worker execution mode. Gemini CLI integration is actively undergoing evaluation.',
+        ],
+        bullets: [
+          'Codex: Authenticated via standard CLI sign-in or custom OpenAI API tokens.',
+          'Claude Code: Authenticated through Claude CLI OAuth subscription or Anthropic setup.',
+          'Grok Build: Authenticated via xAI developer access with HTTP bridge discovery.',
+          'OpenCode: Supported via local CLI adapter with on-demand tool discovery.',
+        ],
+      },
+      {
+        id: 'work-personal-segregation',
+        question: 'How does Jackalope separate Work and Personal account profiles?',
+        paragraphs: [
+          'Many developers maintain both a personal AI subscription and a corporate enterprise account. Running agents directly from a shell often leads to accidental token clobbering when environment variables like ANTHROPIC_API_KEY or OPENAI_API_KEY collide.',
+          'Jackalope introduces Multi-Account Profiles. You can register separate Work and Personal account profiles for any provider. Each profile maintains its own isolated configuration path, OAuth credentials, and capacity telemetry.',
+          'You can assign accounts globally or bind specific profiles to individual repositories. For example, your open-source side projects can default to your Personal Claude account, while client repositories automatically use your Work Codex profile.',
+        ],
+      },
+      {
+        id: 'keychain-storage',
+        question: 'Where and how are agent credentials stored on the local machine?',
+        paragraphs: [
+          'Jackalope never writes raw secret tokens, private keys, or OAuth refresh tokens to plaintext JSON or YAML files on disk. Credential persistence is managed through native OS security perimeters via the Windows Credential Manager (DPAPI), macOS Keychain, or Linux Secret Service.',
+          'The application profile directory (JACKALOPE_PROFILE_DIR) stores only metadata: account names, profile identifiers, and provider mappings. Sensitive keys are retrieved into memory on demand only for the duration of a task attempt and are scrubbed upon process termination.',
+        ],
+        callout: {
+          kind: 'important',
+          text: 'Credentials never leave your machine. Jackalope does not maintain a cloud proxy or central database of user API keys. All agent network communication originates directly from the local CLI processes on your host.',
+        },
+      },
+      {
+        id: 'credential-drift',
+        question: 'How do I diagnose and fix expired auth tokens or CLI credential drift?',
+        paragraphs: [
+          'If a provider token expires or the CLI is logged out outside of Jackalope, tasks dispatched to that agent may fail with an authentication error. Jackalope detects these errors during the preflight sanity check and displays an actionable notice.',
+        ],
+        codeBox: {
+          title: 'Re-authenticating Agent CLIs',
+          code: `# Re-authenticate Codex CLI
+codex login
 
-  // --- MCP Hub & Tool Integration ---
-  {
-    id: 'mcp-overview',
-    category: 'mcp',
-    title: 'What is Model Context Protocol (MCP) and how does Jackalope use it?',
-    summary:
-      'MCP allows coding agents to access local tools, databases, APIs, and file systems through a standardized protocol.',
-    details: [
-      'Jackalope acts as a central MCP hub for all your agents. Instead of configuring SQLite or GitHub MCP servers separately in four different CLI config files, you manage them once in Jackalope’s MCP tab.',
-      'You can toggle which MCP servers are delivered to specific projects, preventing agents in sensitive repositories from accessing unrelated external tools.',
-    ],
-    bullets: [
-      'Transports: Stdio (command-line binaries), HTTP, and Server-Sent Events (SSE).',
-      'Scoped access: Allow or deny tools at the global or project level.',
-      'Live tool inspection: View tool schemas, test invocations, and read logs directly in the app.',
-    ],
-    tags: ['mcp', 'tools', 'model context protocol', 'stdio', 'sse', 'hub'],
-    isFaq: true,
-  },
-  {
-    id: 'mcp-browser-automation',
-    category: 'mcp',
-    title: 'How does the built-in browser automation engine work?',
-    summary:
-      'Jackalope includes an internal, isolated headless browser daemon that agents can invoke for web research, testing web apps, and capturing visual screenshots.',
-    details: [
-      'The browser engine (`browser.rs`) runs locally with a clean, disposable profile for each task. It exposes safe browser tools (navigation, element clicking, text input, screenshot capture) to the agent.',
-      'All screenshots taken during task execution are saved as durable evidence artifacts that you can inspect in the Evidence tab during code review.',
-    ],
-    tags: ['browser automation', 'screenshots', 'web testing', 'evidence', 'headless engine'],
-  },
-  {
-    id: 'mcp-marketplace-privacy',
-    category: 'mcp',
-    title: 'How does MCP Marketplace privacy and opt-out work?',
-    summary:
-      'The MCP Marketplace allows discovering pre-vetted MCP servers. You can completely disable marketplace network queries in Settings → Privacy.',
-    details: [
-      'If you prefer not to fetch external catalog lists or are working in an air-gapped environment, toggle off "Enable MCP Marketplace" in Settings → Privacy.',
-      'When disabled, all external searches and detail fetches are blocked, and you retain full ability to add custom local stdio or HTTP MCP tools manually.',
-    ],
-    tags: ['mcp marketplace', 'privacy opt-out', 'network policy', 'air gap'],
-  },
+# Re-authenticate Claude Code CLI
+claude login
 
-  // --- Usage & Rate Limits ---
-  {
-    id: 'usage-dashboard',
-    category: 'usage',
-    title: 'How do I track token usage, quotas, and costs across providers?',
-    summary:
-      'The Usage tab provides a unified dashboard of reported token consumption, session counts, and remaining quota windows filtered by project, agent, or account.',
-    details: [
-      'When agents report token usage, Jackalope records prompt tokens, completion tokens, and estimated costs. You can drill down into individual task attempts or export filtered datasets to CSV and JSON.',
-      'For providers with rolling quota limits (such as Codex’s 5-hour window), Jackalope shows current consumed percentage so you can plan workloads without hitting sudden lockouts.',
+# Verify CLI detection in terminal
+which codex || where codex
+which claude || where claude`,
+        },
+      },
+      {
+        id: 'execution-boundaries',
+        question: 'How are project-level tool allowlists and execution boundaries enforced?',
+        paragraphs: [
+          'Each project configured in Jackalope can define strict execution boundaries. You can specify which agents are permitted to run, restrict which models can be invoked, and define tool allowlists.',
+          'For instance, you can grant an agent read-only repository access and test-runner execution permissions while forbidding filesystem modifications outside the assigned worktree or blocking external network requests.',
+        ],
+      },
     ],
-    tags: ['usage dashboard', 'token tracking', 'quota windows', 'costs', 'csv export'],
-    isFaq: true,
   },
   {
-    id: 'usage-attribution',
-    category: 'usage',
-    title: 'Are coordinator routing calls counted separately from worker attempts?',
-    summary:
-      'Yes. Jackalope separates routing evaluation tokens from task execution tokens so your metrics accurately reflect implementation costs.',
-    details: [
-      'When an automatic task is analyzed by the default agent for routing, the decision tokens are recorded under a dedicated routing attribution record.',
-      'If a task is handed off after an interruption, previous worker tokens and fallback worker tokens are preserved without duplicating the initial decision totals.',
+    slug: 'mcp-and-browser-automation',
+    title: 'Central Model Context Protocol (MCP) & Built-in Browser Engine',
+    shortTitle: 'MCP & Browser Automation',
+    description:
+      'Centralized Model Context Protocol configuration, tool gating, local headless browser daemon, and interactive human-in-the-loop dialogs.',
+    readingTime: '6 min read',
+    sections: [
+      {
+        id: 'central-broker',
+        question: 'What is the centralized MCP broker and how does it deliver tools across agents?',
+        paragraphs: [
+          'Configuring Model Context Protocol (MCP) servers individually for every agent CLI (editing separate config files for Claude, Codex, Grok, etc.) is tedious, error-prone, and leads to port collisions.',
+          'Jackalope features a centralized MCP Broker. You configure your database servers, API bridges, documentation searchers, and custom tools once in Jackalope. The broker delivers those capabilities dynamically to whichever agent is currently executing the task.',
+          'Codex and Claude Code receive tools through standard project connections; Grok connects via an on-demand loopback HTTP bridge; OpenCode receives dynamic discovery payloads.',
+        ],
+      },
+      {
+        id: 'tool-gating',
+        question: 'How does project tool gating prevent unauthorized actions or mutations?',
+        paragraphs: [
+          'Not every agent task needs access to write-heavy tools like database migrations or live deployment APIs. Jackalope implements granular Tool Gating.',
+          'You can restrict tool visibility by repository, task effort tier, or individual task intent. A simple frontend UI polish task can be given access to browser screenshot tools while access to cloud infrastructure tools is completely masked from the agent’s schema.',
+        ],
+      },
+      {
+        id: 'browser-engine',
+        question: 'How does the built-in headless browser daemon operate safely?',
+        paragraphs: [
+          'Jackalope bundles a pinned, local headless browser daemon (owned and supervised by src-tauri/src/commands/browser.rs). Agents can take screenshots of running web apps, inspect rendered DOM nodes, and evaluate visual layout without needing third-party cloud browser services.',
+          'Every browser session uses a disposable local profile that is automatically destroyed when the task finishes. Cookies, local storage, and history are wiped, preventing cross-task data contamination.',
+        ],
+        bullets: [
+          'Seven standardized tools: navigate, click, type, screenshot, get_dom, evaluate, and scroll.',
+          'Disposable browser profiles prevent session pollution across unrelated projects.',
+          'Screenshots are saved directly to attempt-bound artifact directories for your inspection.',
+        ],
+      },
+      {
+        id: 'question-bridge',
+        question: 'How does the human-in-the-loop question bridge work when agents need input?',
+        paragraphs: [
+          'When an agent encounters ambiguous requirements, missing environment variables, or critical architectural forks, it shouldn’t guess or silently crash. Jackalope provides a native interactive Question Bridge.',
+          'When an agent calls the question tool, Jackalope suspends the agent process, surfaces a focused prompt in the desktop UI, and emits a discreet notification. Once you provide your choice or type an answer, execution seamlessly resumes with your guidance injected into context.',
+        ],
+      },
+      {
+        id: 'debugging-mcp',
+        question: 'How do I configure and debug custom stdio or SSE MCP servers?',
+        paragraphs: [
+          'You can configure custom MCP servers in Jackalope under Settings → MCP Tools. Jackalope supports both local stdio processes and remote SSE / HTTP endpoints.',
+        ],
+        codeBox: {
+          title: 'Example MCP Configuration (jackalope-mcp.json)',
+          code: `{
+  "servers": {
+    "sqlite-docs": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "./data/docs.db"],
+      "transport": "stdio"
+    },
+    "staging-api": {
+      "url": "http://127.0.0.1:8080/sse",
+      "transport": "sse"
+    }
+  }
+}`,
+        },
+      },
     ],
-    tags: ['attribution', 'decision receipts', 'routing tokens', 'audit log'],
   },
+  {
+    slug: 'windows-desktop-control',
+    title: 'Windows Desktop Control, Window Grants & Input Safeguards',
+    shortTitle: 'Windows Desktop Control',
+    description:
+      'Attempt-scoped window grants, desktop visual indicators, physical mouse interruption, and native input lease safeguards.',
+    readingTime: '5 min read',
+    sections: [
+      {
+        id: 'window-grants',
+        question: 'What is the local security perimeter and how do window grants work?',
+        paragraphs: [
+          'Unlike reckless automation tools that take over your entire desktop and click arbitrary coordinates on your monitors, Jackalope implements an explicit Window Grant security architecture.',
+          'An agent is never granted global desktop access. Instead, grants are attempt-scoped to specific, user-selected application windows. The agent can only read pixels, inspect accessibility trees, and synthesize input within the bounded rectangular coordinates of that granted window.',
+        ],
+      },
+      {
+        id: 'visual-indicators',
+        question: 'What visual indicators show that Jackalope is interacting with a window?',
+        paragraphs: [
+          'Whenever an agent is actively controlling a granted window, Jackalope renders a high-visibility, top-centered status bar above your display, accompanied by a broad theme-colored perimeter glow around the active window.',
+          'The status bar explicitly announces "Jackalope is using your computer" and provides prominent, one-click Pause and Cancel buttons. You are never left wondering if an agent is currently controlling the machine.',
+        ],
+      },
+      {
+        id: 'physical-interruption',
+        question: 'How do physical interruptions (mouse movement, focus loss, Escape) pause control?',
+        paragraphs: [
+          'Human safety overrides agent automation at all times. Jackalope installs native low-level hardware hooks that monitor physical input devices.',
+          'If you move your physical mouse, touch the keyboard, switch active window focus, or press the physical Escape key, Jackalope instantly revokes the agent’s input lease and halts interaction.',
+        ],
+        bullets: [
+          'Physical mouse movement immediately transitions automation into the Paused state.',
+          'Pressing the Escape key immediately cancels the active desktop control lease.',
+          'Window focus loss or minimize events pause execution until you explicitly review and click Resume.',
+          'Resuming requires taking a fresh visual snapshot to prevent stale-state misclicks.',
+        ],
+      },
+      {
+        id: 'input-leasing',
+        question: 'How does single-lease input ownership prevent conflicting native clicks?',
+        paragraphs: [
+          'Native input synthesis requires a single, exclusive lease. Only one task attempt can hold an input lease at any given instant. If a second task attempts to request desktop control while a lease is active, the request is safely queued or rejected.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'troubleshooting-and-diagnostics',
+    title: 'Diagnostic Playbook, Worktree Locks & History Recovery',
+    shortTitle: 'Troubleshooting & Diagnostics',
+    description:
+      'Resolving missing CLI PATH on Windows, clearing stale Git index locks, recovering interrupted tasks from SQLite journals, and generating support reports.',
+    readingTime: '6 min read',
+    sections: [
+      {
+        id: 'missing-cli-path',
+        question: 'Why does the desktop app report "CLI not found" and how do I fix Windows PATH inheritance?',
+        paragraphs: [
+          'A frequent issue on Windows occurs when an agent CLI (like codex, claude, or grok) is installed via npm or cargo in a terminal session, but the desktop application was launched from the Windows Start menu or Taskbar before the system PATH environment variable was broadcast.',
+          'Applications launched by Windows Explorer inherit the environment variables that existed when the Explorer shell process started. If you recently modified your PATH in a terminal, restart the Jackalope desktop app so it inherits your updated User and System PATH variables.',
+        ],
+        codeBox: {
+          title: 'Verifying Executables in PowerShell',
+          code: `# Verify the CLI executable is discoverable in your PATH
+Get-Command codex | Select-Object -ExpandProperty Source
+Get-Command claude | Select-Object -ExpandProperty Source
 
-  // --- Troubleshooting Playbook ---
-  {
-    id: 'trouble-cli-not-found',
-    category: 'troubleshooting',
-    title: 'Agent CLI not detected ("Command not found" or missing in PATH)',
-    summary:
-      'If Jackalope shows an agent as uninstalled or unavailable, verify that its executable is located in your system environment PATH.',
-    details: [
-      'When Jackalope launches, it inherits the system environment PATH. On macOS and Linux, CLIs installed via npm, brew, or cargo may be located in `~/.nvm/versions`, `~/.cargo/bin`, or `/opt/homebrew/bin`.',
-      'Test CLI availability in your terminal with the command below. After installing or updating PATH, open Settings → Agents in Jackalope and click "Re-scan agents".',
-    ],
-    command: 'which codex || which claude || which grok || which opencode',
-    codeSnippet: `# If installed via npm globally:
-npm list -g --depth=0
+# If installed via npm global, verify your npm prefix is in User PATH
+npm config get prefix
+# Should output: C:\\Users\\<user>\\AppData\\Roaming\\npm`,
+        },
+      },
+      {
+        id: 'stale-git-locks',
+        question: 'How do I clear stale Git index locks (.git/index.lock or worktree locks)?',
+        paragraphs: [
+          'If an agent process is forcefully terminated (e.g. power loss, machine reboot, or killing a task via Task Manager), Git may leave behind stale lockfiles such as .git/index.lock or .git/worktrees/<name>/locked.',
+          'These lockfiles prevent subsequent Git operations with errors like Fatal: Unable to create .git/index.lock: File exists. Once you have confirmed that no active Git or agent processes are running, you can safely remove stale lockfiles.',
+        ],
+        codeBox: {
+          title: 'Clearing Stale Git Lockfiles',
+          code: `# 1. Ensure no git or agent processes are running
+# 2. Check for and remove the index lockfile in root
+rm -Force .git/index.lock
 
-# Ensure the npm global bin directory is on your PATH:
-export PATH="$(npm prefix -g)/bin:$PATH"`,
-    tags: ['cli not found', 'path', 'rescan', 'npm install', 'binary missing', 'diagnostics'],
-    isFaq: true,
-  },
-  {
-    id: 'trouble-auth-expired',
-    category: 'troubleshooting',
-    title: 'Agent authentication expired or profile sign-in failed',
-    summary:
-      'Re-authenticate the agent profile directly inside Jackalope or test credentials from your terminal.',
-    details: [
-      'Provider OAuth tokens or session cookies periodically expire. When an agent fails with authentication errors, navigate to Settings → Agents → Accounts.',
-      'Find the affected profile and click "Sign in". Jackalope will launch the agent’s native login handshake in its isolated profile directory.',
-    ],
-    command: 'codex login --help',
-    tags: ['authentication', 'oauth', 'token expired', 'login failed', 'credentials'],
-  },
-  {
-    id: 'trouble-worktree-locked',
-    category: 'troubleshooting',
-    title: 'Git worktree locked or cannot remove worktree directory',
-    summary:
-      'Worktrees locked by active tasks can be unlocked or safely cleaned up once the task finishes or is explicitly stopped.',
-    details: [
-      'If Jackalope was closed unexpectedly during an active task, a worktree lock file may remain. In the Worktrees tab, inspect the blocked reason. If the task is no longer running, click "Archive & remove" or unlock the worktree.',
-      'You can also prune stale Git worktree metadata using standard Git commands in your terminal:',
-    ],
-    command: 'git worktree prune -v',
-    codeSnippet: `# View all registered worktrees and their status:
-git worktree list --porcelain
+# 3. Check for and remove worktree-specific index locks
+rm -Force .git/worktrees/*/index.lock
 
-# If a worktree directory was manually deleted from disk:
-git worktree prune`,
-    tags: ['worktree locked', 'git lock', 'prune', 'cleanup error', 'stale worktree'],
-  },
-  {
-    id: 'trouble-mcp-timeout',
-    category: 'troubleshooting',
-    title: 'MCP server connection refused or timed out',
-    summary:
-      'Verify that the MCP command path is valid, executable, and not blocked by local firewalls or missing runtime dependencies.',
-    details: [
-      'For stdio MCP servers, check that the runtime (such as `npx`, `python`, or `uvx`) is available. For HTTP/SSE servers, verify that the target port is open and listening.',
-      'In the MCP tab, click on the failing server and inspect the connection logs. You can trigger a manual "Test connection" to see immediate handshake responses.',
+# 4. Prune orphaned worktree registrations
+git worktree prune -v`,
+        },
+      },
+      {
+        id: 'history-recovery',
+        question: 'How does atomic SQLite history recovery restore interrupted tasks?',
+        paragraphs: [
+          'Jackalope stores task metadata, attempt logs, check outputs, and user decisions in a local SQLite database located in your application profile directory. Write operations use write-ahead logging (WAL) and atomic transactions.',
+          'If an unexpected shutdown occurs while a task is executing, Jackalope detects unclosed attempt records on the next launch. It marks the interrupted attempt with an Interrupted status, preserves all written logs and partial patches, and gives you a one-click Resume or Discard action in the Tasks view.',
+        ],
+      },
+      {
+        id: 'diagnostic-bundles',
+        question: 'How do I generate and inspect a diagnostic support bundle?',
+        paragraphs: [
+          'If you encounter an unexpected issue or need assistance from the Jackalope team, you can generate an anonymized diagnostic bundle directly within the app under Settings → Updates & support.',
+          'The diagnostic bundle inspects installed CLI versions, worktree health, SQLite schema integrity, recent error traces, and system display metrics. It strictly scrubs all repository paths, code content, prompts, and personal tokens before export.',
+        ],
+        bullets: [
+          'Available at Settings → Updates & support → Export Diagnostics.',
+          'Generates a local, human-readable JSON report.',
+          'Includes CLI version detection, native OS build, and worktree status.',
+          'All private file paths, prompts, and credentials are redacted.',
+        ],
+      },
+      {
+        id: 'verification-checklist',
+        question: 'What is the pre-support verification checklist?',
+        paragraphs: [
+          'Before opening a support ticket or reporting a bug, running these four quick checks resolves over 90% of local environment issues:',
+        ],
+        bullets: [
+          '1. Verify your agent CLI runs standalone in terminal (e.g. claude --version or codex --version).',
+          '2. Verify your Git status is clean and git worktree list returns valid paths.',
+          '3. Check Settings → Agents to confirm your chosen default agent is detected with a green checkmark.',
+          '4. Check Settings → Updates & support to confirm you are running the latest Jackalope release.',
+        ],
+      },
     ],
-    command: 'curl -I http://127.0.0.1:3000/sse',
-    tags: ['mcp error', 'connection refused', 'timeout', 'port', 'stdio crash'],
-  },
-  {
-    id: 'trouble-git-line-endings',
-    category: 'troubleshooting',
-    title: 'Windows Git CRLF vs LF line-ending warnings',
-    summary:
-      'Configure Git core.autocrlf to preserve consistent line endings and prevent unnecessary diff churn across worktrees.',
-    details: [
-      'On Windows, Git may convert line endings to CRLF, causing cross-platform diff noise or test failures in POSIX-standard tools.',
-      'Run the command below to configure Git to checkout Windows-style but commit LF-style, or add a `.gitattributes` file with `* text=auto`.',
-    ],
-    command: 'git config --global core.autocrlf true',
-    codeSnippet: `# .gitattributes recommended rule
-* text=auto eol=lf`,
-    tags: ['crlf', 'line endings', 'git config', 'windows diff', 'formatting'],
-  },
-  {
-    id: 'trouble-history-recovery',
-    category: 'troubleshooting',
-    title: 'How do I recover from an interrupted task or unexpected shutdown?',
-    summary:
-      'Jackalope never drops interrupted work; it preserves partial diffs, output journals, and worktrees with a visible recovery banner.',
-    details: [
-      'If the app terminates during an active task, Jackalope quarantines unreadable files and displays an "Interrupted Task" notice on next launch.',
-      'Click "Inspect recovery" to review what was written. You can choose to continue the task with feedback, archive the worktree patch, or discard the attempt safely.',
-    ],
-    tags: ['interrupted task', 'crash recovery', 'unsaved changes', 'quarantine', 'continuity'],
-  },
-  {
-    id: 'trouble-diagnostics-report',
-    category: 'troubleshooting',
-    title: 'How do I generate an unredacted local support report?',
-    summary:
-      'Open Settings (Ctrl+, or ⌘,) → Updates & support, and click "Preview support report".',
-    details: [
-      'Jackalope generates a sanitized JSON report containing your app version, operating system, hardware architecture, detected agents, and task outcome counts.',
-      'The report strictly excludes account credentials, project paths, code snippets, prompts, and git commit messages. You can inspect the complete JSON in the preview window and copy it to your clipboard for support assistance.',
-    ],
-    tags: ['support report', 'diagnostics', 'debug logs', 'app version', 'system info'],
-  },
-
-  // --- FAQ & Local Security Perimeter ---
-  {
-    id: 'faq-code-privacy',
-    category: 'security',
-    title: 'Does Jackalope send my source code or repositories to the cloud?',
-    summary:
-      'No. Your repositories, code, tasks, and history live 100% locally on your computer. Jackalope does not have a central code ingestion server.',
-    details: [
-      'All task execution, Git worktrees, and history records remain on your local disk inside `JACKALOPE_PROFILE_DIR`.',
-      'When an agent runs, it communicates directly with its own AI provider (OpenAI, Anthropic, xAI, etc.) under your personal account and that provider’s data policies. Jackalope does not proxy, inspect, or intercept model payloads on a remote server.',
-    ],
-    bullets: [
-      'Zero proprietary repository uploads to Jackalope servers.',
-      'Local coordinator runs on an isolated local loopback socket.',
-      'Optional anonymous telemetry can be toggled off at any time in Settings → Privacy.',
-    ],
-    tags: ['privacy', 'security', 'cloud', 'local storage', 'data policy', 'telemetry'],
-    isFaq: true,
-  },
-  {
-    id: 'faq-subscription',
-    category: 'security',
-    title: 'Do I need to pay for Jackalope to use my coding agents?',
-    summary:
-      'Jackalope is a bring-your-own-agent desktop workspace. You use your existing provider subscriptions (e.g., ChatGPT Plus/Pro, Claude Pro/Team, xAI, or local models).',
-    details: [
-      'Jackalope does not resell API credits or add markups to token usage. Provider subscription fees or API usage costs are billed directly by OpenAI, Anthropic, or xAI through your own accounts.',
-    ],
-    tags: ['pricing', 'subscription', 'api keys', 'billing', 'cost'],
-    isFaq: true,
-  },
-  {
-    id: 'faq-platforms',
-    category: 'security',
-    title: 'Which operating systems and platforms are supported?',
-    summary:
-      'Jackalope is built with Tauri and Rust for cross-platform desktop performance on Windows 10/11, macOS (Apple Silicon and Intel), and Linux.',
-    details: [
-      'The current public preview is available for Windows x64. macOS and Linux builds are undergoing native process and PTY acceptance testing and will be released following the verification schedule.',
-    ],
-    tags: ['platforms', 'windows', 'macos', 'linux', 'system requirements'],
-    isFaq: true,
-  },
-  {
-    id: 'faq-offline',
-    category: 'security',
-    title: 'Can Jackalope work offline or without internet access?',
-    summary:
-      'Yes. Project exploration, Git worktrees, task history review, diff inspection, and local CLI agents (like OpenCode with local models) work completely offline.',
-    details: [
-      'Only cloud-hosted agents (Codex, Claude, Grok) and external MCP servers require internet connectivity to reach their respective provider APIs. All UI and workspace features operate locally.',
-    ],
-    tags: ['offline', 'local models', 'airplane mode', 'no internet'],
-    isFaq: true,
-  },
-  {
-    id: 'faq-data-reset',
-    category: 'security',
-    title: 'How can I back up or completely reset my local data?',
-    summary:
-      'Use Settings → Data & reset to export your configuration or perform an atomic factory reset.',
-    details: [
-      'Click "Export configuration" to copy your non-sensitive project settings, themes, and agent preferences to your clipboard.',
-      'If you wish to wipe local databases, task histories, and saved worktrees, the "Reset all local data" option performs an atomic wipe and returns Jackalope to first-time setup.',
-    ],
-    tags: ['backup', 'export', 'factory reset', 'wipe', 'data management'],
-  },
-
-  // --- Atmosphere & Companion ---
-  {
-    id: 'exp-theme-harmonies',
-    category: 'experience',
-    title: 'How do Single, Duo, and Trio color harmonies work?',
-    summary:
-      'Jackalope generates balanced companion hues and live gradients across your workspace from a single primary color.',
-    details: [
-      'Click the ArcColorPicker in the header chrome to open the Theme Editor. Choose Single for a pure monochrome accent, Duo for a complementary pairing, or Trio for an energetic triadic harmony.',
-      'All action buttons maintain high contrast (contrast-safe 4.5:1 ratios) regardless of the chosen hue, ensuring full accessibility across both light and dark modes.',
-    ],
-    tags: ['theme', 'harmonies', 'single duo trio', 'color picker', 'arc inspired', 'contrast'],
-    isFaq: true,
-  },
-  {
-    id: 'exp-atmosphere-slider',
-    category: 'experience',
-    title: 'What does the Atmosphere slider control?',
-    summary:
-      'Atmosphere controls surface tint depth across your workspace, reaching up to 64 for rich ambient color.',
-    details: [
-      'Atmosphere tints cards, sidebars, and title chrome with a wash of your chosen harmony colors.',
-      'The slider features a tactile 44px vertical pill handle with fluid drag responsiveness. Status indicators (like git diffs and error badges) automatically adapt their brightness when high atmosphere is active to preserve contrast.',
-    ],
-    tags: ['atmosphere', 'tint', 'ambient', 'slider', 'surfaces'],
-  },
-  {
-    id: 'exp-mascot-moods',
-    category: 'experience',
-    title: 'How does the Jackalope companion mascot behave?',
-    summary:
-      'The bottom-right mascot companion reflects real app activity across five distinct moods and idle gestures.',
-    details: [
-      'The five activity moods are: idle (grounded resting pose), thinking (analyzing or planning), working (executing task), inquiring (awaiting your answer), and celebrating (task passed checks).',
-      'When idle, the companion blinks occasionally and follows pointer movement. When reduced motion is preferred by your operating system, pointer gaze and playful animations pause immediately while keeping status expressions clear.',
-    ],
-    tags: ['mascot', 'companion', 'moods', 'gestures', 'reduced motion', 'notifications'],
   },
 ];

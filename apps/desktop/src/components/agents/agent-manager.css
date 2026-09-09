@@ -208,3 +208,26 @@
   overflow-wrap: anywhere;
   margin-top: 8px;
 }
+
+.workspace-page.agent-settings-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 64px;
+}
+
+.agent-install-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-block: 16px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.agent-install-guide p {
+  flex: 1 1 200px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}

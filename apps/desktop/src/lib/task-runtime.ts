@@ -1,6 +1,7 @@
 import { isTauriEnvironment } from './tauri-bridge.ts';
 
 export interface Runner {
+  desktopInstalled?: boolean;
   id: string;
   name: string;
   available: boolean;
