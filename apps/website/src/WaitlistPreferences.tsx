@@ -41,6 +41,113 @@ const groups = [
   },
 ];
 
+export type Preferences = { platforms: string[]; agents: string[]; priorities: string[] };
+
+/**
+ * The same three questions, for a member who is already signed in.
+ *
+ * The signup version rides a one-time capability token that expires, so anyone
+ * who skipped it there could never answer. This one posts against the waitlist
+ * session, prefills what they said before, and lets them change their mind.
+ */
+export function WaitlistQuestions({
+  answers,
+  onSaved,
+}: {
+  answers: Preferences | null;
+  onSaved: (next: Preferences) => void;
+}) {
+  const id = useId();
+  const [state, setState] = useState<'idle' | 'saving'>('idle');
+  const [message, setMessage] = useState('');
+  const [open, setOpen] = useState(!answers);
+  const pending = useRef(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending.current) return;
+    pending.current = true;
+    setState('saving');
+    setMessage('');
+    const data = new FormData(event.currentTarget);
+    const preferences = Object.fromEntries(
+      groups.map(({ name }) => [name, data.getAll(name) as string[]]),
+    ) as unknown as Preferences;
+    try {
+      await accessRequest('waitlist/preferences', { preferences });
+      onSaved(preferences);
+      setOpen(false);
+      setMessage('Saved. Thanks — this is what we plan against.');
+    } catch (error) {
+      setMessage(accessMessage(error));
+    } finally {
+      setState('idle');
+      pending.current = false;
+    }
+  }
+
+  const chosen = (name: string) => (answers?.[name as keyof Preferences] ?? []) as string[];
+  const answered = groups.flatMap((group) => chosen(group.name)).length;
+
+  return (
+    <section className="access-card waitlist-questions" aria-labelledby={`${id}-title`}>
+      <h2 id={`${id}-title`}>Help us decide what to build next.</h2>
+      <p>
+        Three optional questions. Windows is furthest along — if you are on macOS or Linux, saying so
+        is the most useful thing you can do right now.
+      </p>
+      {!open ? (
+        <div className="preference-actions">
+          <p className="access-fine">
+            You answered {answered} {answered === 1 ? 'option' : 'options'}. You can change them any
+            time.
+          </p>
+          <button type="button" className="button button-secondary" onClick={() => setOpen(true)}>
+            Update my answers
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={submit}>
+          {groups.map((group) => (
+            <fieldset key={group.name} disabled={state === 'saving'}>
+              <legend>{group.title}</legend>
+              <div className="preference-options">
+                {group.options.map(([value, label]) => (
+                  <label key={value}>
+                    <input
+                      type="checkbox"
+                      name={group.name}
+                      value={value}
+                      defaultChecked={chosen(group.name).includes(value)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+          <div className="preference-actions">
+            <button type="submit" className="button button-primary" disabled={state === 'saving'}>
+              {state === 'saving' ? 'Saving…' : 'Save my answers'} <Check size={16} />
+            </button>
+            {answers && (
+              <button
+                type="button"
+                className="text-link"
+                disabled={state === 'saving'}
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+      <p role="status">{message}</p>
+    </section>
+  );
+}
+
 export function WaitlistPreferences({ token }: { token: string }) {
   const id = useId();
   const [state, setState] = useState<'idle' | 'saving' | 'done' | 'skipped'>('idle');
