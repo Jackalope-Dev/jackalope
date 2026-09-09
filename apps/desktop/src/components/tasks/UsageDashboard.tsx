@@ -18,7 +18,7 @@ export function UsageDashboard({
   view?: UsageView;
   onTask: () => void;
 }) {
-  const { runs, select, loading, error } = useExecutionStore();
+  const { runs, select, loading, error, historyError, refresh } = useExecutionStore();
   const { projects, selectProject } = useProjectStore();
   const [project, setProject] = useState('all');
   const [period, setPeriod] = useState('30');
@@ -118,7 +118,7 @@ export function UsageDashboard({
   return (
     <section className="task-page usage-page">
       <WorkspaceHeading
-        title={view === 'analytics' ? 'Agent performance' : 'Usage'}
+        title={view === 'analytics' ? 'Performance & insights' : 'Usage'}
         action={
           view === 'tokens' && (
             <Button variant="outline" onClick={exportUsage} disabled={!filtered.length}>
@@ -130,7 +130,20 @@ export function UsageDashboard({
       />
 
       {view === 'analytics' ? (
-        <AgentMetricsDashboard runs={runs} />
+        <>
+          {loading && <p role="status">Loading saved task history…</p>}
+          {historyError && (
+            <p className="task-error" role="alert">
+              {historyError}
+              <Button variant="ghost" onClick={() => void refresh()}>
+                Reload history
+              </Button>
+            </p>
+          )}
+          <div hidden={loading || Boolean(historyError)}>
+            <AgentMetricsDashboard runs={runs} />
+          </div>
+        </>
       ) : (
         <>
           <div className="usage-filters">

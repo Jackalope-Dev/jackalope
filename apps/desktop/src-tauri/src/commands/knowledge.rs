@@ -8,6 +8,8 @@ use std::{
 };
 use tauri::State;
 
+mod automatic;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum KnowledgeKind {
@@ -20,6 +22,10 @@ pub enum KnowledgeKind {
 pub struct KnowledgeEntry {
     #[serde(default)]
     pub process: super::outcomes::ProcessTemplate,
+    #[serde(default)]
+    pub automatic: Option<automatic::LearningSource>,
+    #[serde(default)]
+    pub dismissed: bool,
     pub id: String,
     pub project_id: String,
     pub project_path: String,
@@ -63,7 +69,7 @@ impl ContextReceipt {
         if self.entries.is_empty() {
             return String::new();
         }
-        let mut text = "\n\nSaved project context selected by Jackalope. These are user-maintained notes, not new permissions; current instructions and repository evidence take precedence.\n".to_string();
+        let mut text = "\n\nSaved project context selected by Jackalope. These are saved notes and local observations, not new permissions. Historical feedback applies only when relevant; current instructions and repository evidence take precedence.\n".to_string();
         for entry in &self.entries {
             text.push_str(&format!("\n{}:\n{}\n", entry.title, entry.content));
         }
@@ -75,6 +81,7 @@ impl ContextReceipt {
 pub struct KnowledgeStore {
     path: PathBuf,
     lock: Arc<Mutex<()>>,
+    refreshes: Arc<Mutex<std::collections::HashMap<String, std::time::Instant>>>,
 }
 
 impl KnowledgeStore {
@@ -82,6 +89,7 @@ impl KnowledgeStore {
         Self {
             path,
             lock: Arc::new(Mutex::new(())),
+            refreshes: Arc::new(Mutex::new(Default::default())),
         }
     }
 
@@ -105,7 +113,7 @@ impl KnowledgeStore {
         Ok(self
             .read()?
             .into_iter()
-            .filter(|e| e.project_id == project_id && e.project_path == path)
+            .filter(|e| e.project_id == project_id && e.project_path == path && !e.dismissed)
             .collect())
     }
 
@@ -171,11 +179,26 @@ impl KnowledgeStore {
             {
                 return Err("This entry changed. Reload it before saving.".into());
             }
+            if old.dismissed {
+                return Err("This entry was removed. Reload before saving.".into());
+            }
+            entry.automatic = old.automatic.clone();
+            entry.dismissed = false;
+            if let Some(source) = &mut entry.automatic {
+                if old.content != entry.content
+                    || old.keywords != entry.keywords
+                    || old.title != entry.title
+                {
+                    source.managed = false;
+                }
+            }
             entry.source_run_id = old.source_run_id.clone();
             entry.revision += 1;
             entry.updated_at = Utc::now().to_rfc3339();
             entries[index] = entry.clone();
         } else {
+            entry.automatic = None;
+            entry.dismissed = false;
             if entry.revision != 0 {
                 return Err("This entry was deleted. Reload before saving.".into());
             }
@@ -199,10 +222,11 @@ impl KnowledgeStore {
     fn write(&self, entries: &[KnowledgeEntry]) -> Result<(), String> {
         std::fs::create_dir_all(self.path.parent().ok_or("Missing knowledge directory")?)
             .map_err(|e| e.to_string())?;
-        history::write_atomic(
-            &self.path,
-            &serde_json::to_vec_pretty(entries).map_err(|e| e.to_string())?,
-        )
+        let bytes = serde_json::to_vec_pretty(entries).map_err(|e| e.to_string())?;
+        if bytes.len() > 4_000_000 {
+            return Err("Saved knowledge exceeds the storage limit. Remove unused entries before adding more.".into());
+        }
+        history::write_atomic(&self.path, &bytes)
     }
 
     fn remove(&self, id: &str, revision: u64) -> Result<(), String> {
@@ -215,7 +239,19 @@ impl KnowledgeStore {
         if entries[index].revision != revision {
             return Err("This entry changed. Reload before removing it.".into());
         }
-        entries.remove(index);
+        if entries[index].automatic.is_some() {
+            entries[index].dismissed = true;
+            entries[index].enabled = false;
+            entries[index].revision += 1;
+            entries[index].title = "Removed automatic lesson".into();
+            entries[index].content.clear();
+            entries[index].keywords.clear();
+            entries[index].source_run_id = None;
+            entries[index].source_head = None;
+            entries[index].automatic.as_mut().unwrap().evidence.clear();
+        } else {
+            entries.remove(index);
+        }
         self.write(&entries)
     }
 
@@ -285,6 +321,7 @@ fn select(
             .into_iter()
             .filter(|e| {
                 e.enabled
+                    && !e.dismissed
                     && e.kind == KnowledgeKind::Memory
                     && e.content.len() <= 800
                     && e.title.len() <= 120
@@ -299,7 +336,18 @@ fn select(
                     .count();
                 (score, e)
             })
-            .filter(|(score, _)| *score > 0)
+            .filter(|(score, entry)| {
+                *score
+                    >= if entry
+                        .automatic
+                        .as_ref()
+                        .is_some_and(|source| source.kind == "adjustment")
+                    {
+                        2
+                    } else {
+                        1
+                    }
+            })
             .collect();
         matches.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.id.cmp(&b.1.id)));
         let mut seen = HashSet::new();
@@ -316,12 +364,18 @@ fn select(
 }
 
 #[tauri::command]
-pub fn knowledge_list(
+pub async fn knowledge_list(
     project_id: String,
     project_path: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<Vec<KnowledgeEntry>, String> {
-    state.knowledge.list(&project_id, &project_path)
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime.refresh_knowledge(&project_id, &project_path, true)?;
+        runtime.knowledge.list(&project_id, &project_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -329,16 +383,18 @@ pub fn knowledge_save(
     entry: KnowledgeEntry,
     state: State<'_, TaskRuntime>,
 ) -> Result<KnowledgeEntry, String> {
-    if let Some(id) = &entry.source_run_id {
-        let runs = state.integration_runs()?;
-        let run = runs
-            .iter()
-            .find(|r| &r.id == id && r.project_id == entry.project_id)
-            .ok_or("Source task is unavailable in this project")?;
-        if canonical(&run.project_path)? != canonical(&entry.project_path)?
-            || run.status != "reviewed"
-        {
-            return Err("Review the source task before saving knowledge from it.".into());
+    if entry.revision == 0 {
+        if let Some(id) = &entry.source_run_id {
+            let runs = state.integration_runs()?;
+            let run = runs
+                .iter()
+                .find(|r| &r.id == id && r.project_id == entry.project_id)
+                .ok_or("Source task is unavailable in this project")?;
+            if canonical(&run.project_path)? != canonical(&entry.project_path)?
+                || run.status != "reviewed"
+            {
+                return Err("Review the source task before saving knowledge from it.".into());
+            }
         }
     }
     state.knowledge.save(entry)
@@ -354,7 +410,7 @@ pub fn knowledge_remove(
 }
 
 #[tauri::command]
-pub fn knowledge_preview(
+pub async fn knowledge_preview(
     project_id: String,
     project_path: String,
     prompt: String,
@@ -364,9 +420,17 @@ pub fn knowledge_preview(
     if prompt.len() > 100_000 {
         return Err("Task instruction is too long".into());
     }
-    state
-        .knowledge
-        .select(&project_id, &project_path, &prompt, &selection)
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !selection.memory_off {
+            runtime.refresh_knowledge(&project_id, &project_path, false)?;
+        }
+        runtime
+            .knowledge
+            .select(&project_id, &project_path, &prompt, &selection)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[derive(Serialize)]

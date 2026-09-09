@@ -15,6 +15,10 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
   const { entries, error, loading, refresh } = useKnowledge(project.id, project.path);
   const [editing, setEditing] = useState<KnowledgeEntry | null>(null);
   const [actionError, setActionError] = useState('');
+  const openSource = (runId: string) => {
+    setActionError('');
+    void openKnowledgeTask(project.id, runId).catch((cause) => setActionError(String(cause)));
+  };
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
@@ -100,7 +104,11 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
               ) : (
                 <Workflow size={18} aria-hidden="true" />
               )}
-              {entry.kind === 'memory' ? 'Lesson' : 'Workflow'}
+              {entry.automatic
+                ? 'Automatically learned'
+                : entry.kind === 'memory'
+                  ? 'Lesson'
+                  : 'Workflow'}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -170,11 +178,22 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                 <p className="task-muted mt-2">Matches: {entry.keywords.join(', ')}</p>
               )}
             </div>
+            {entry.automatic && (
+              <div className="task-muted break-words">
+                <p>
+                  {entry.automatic.managed ? 'Updated from local evidence' : 'Edited by you'} ·{' '}
+                  {entry.automatic.kind}
+                </p>
+                {entry.automatic.evidence.map((evidence) => (
+                  <p key={evidence}>{evidence}</p>
+                ))}
+              </div>
+            )}
             {entry.sourceRunId && (
               <Button
                 variant="ghost"
                 onClick={() => {
-                  if (entry.sourceRunId) openKnowledgeTask(project.id, entry.sourceRunId);
+                  if (entry.sourceRunId) openSource(entry.sourceRunId);
                 }}
               >
                 Open source task
@@ -233,7 +252,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
         {matches?.map((match) => (
           <div key={match.runId} className="py-3">
             <p className="whitespace-pre-wrap break-words">{match.excerpt}</p>
-            <Button variant="ghost" onClick={() => openKnowledgeTask(project.id, match.runId)}>
+            <Button variant="ghost" onClick={() => openSource(match.runId)}>
               Open task · {match.agent} · {new Date(match.date).toLocaleDateString()}
             </Button>
           </div>

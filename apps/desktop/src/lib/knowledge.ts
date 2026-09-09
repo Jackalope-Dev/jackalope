@@ -11,6 +11,12 @@ export interface ProcessTemplate {
   inputs: string[];
 }
 export interface KnowledgeEntry {
+  automatic?: {
+    kind: 'preference' | 'adjustment' | 'review' | 'repository' | 'verification';
+    evidence: string[];
+    managed: boolean;
+  } | null;
+  dismissed?: boolean;
   process?: ProcessTemplate;
   id: string;
   projectId: string;
@@ -41,18 +47,31 @@ export interface ContextReceipt {
 const knowledgeCache = createReadCache<KnowledgeEntry[]>(30_000);
 
 export function useKnowledge(projectId: string, projectPath: string) {
+  const historyVersion = useExecutionStore((state) =>
+    state.runs
+      .filter((run) => run.projectId === projectId)
+      .map(
+        (run) =>
+          `${run.id}:${run.status}:${run.contract?.requirements.map((item) => item.receipt?.recordedAt).join(',')}`,
+      )
+      .join('|'),
+  );
   const key = JSON.stringify([projectId, projectPath]);
   const [entries, setEntries] = useState<KnowledgeEntry[]>(() => knowledgeCache.peek(key) ?? []);
+  const entriesKey = useRef(key);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(!knowledgeCache.peek(key));
   const request = useRef(0);
   const refresh = useCallback(
     async (force = true) => {
       const version = ++request.current;
-      if (!isTauriEnvironment()) {
+      if (!isTauriEnvironment() || !projectId || !projectPath) {
+        setEntries([]);
+        setError('');
         setLoading(false);
         return;
       }
+      entriesKey.current = key;
       const cached = knowledgeCache.peek(key);
       setEntries(cached ?? []);
       setLoading(!cached);
@@ -74,15 +93,22 @@ export function useKnowledge(projectId: string, projectPath: string) {
     [key, projectId, projectPath],
   );
   useEffect(() => {
-    void refresh(false);
+    void historyVersion;
+    void refresh(true);
     return () => {
       request.current++;
     };
-  }, [refresh]);
-  return { entries, error, loading, refresh };
+  }, [refresh, historyVersion]);
+  return { entries: entriesKey.current === key ? entries : [], error, loading, refresh };
 }
 
-export function openKnowledgeTask(projectId: string, runId: string) {
+export async function openKnowledgeTask(projectId: string, runId: string) {
+  if (!useExecutionStore.getState().runs.some((run) => run.id === runId)) {
+    await nativeTask('task_restore_archived', { id: runId });
+    await useExecutionStore.getState().refresh();
+    if (!useExecutionStore.getState().runs.some((run) => run.id === runId))
+      throw new Error('The source task could not be loaded. Retry from archived history.');
+  }
   useProjectStore.getState().selectProject(projectId);
   useExecutionStore.getState().select(runId);
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: 'kanban' }));

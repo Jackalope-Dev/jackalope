@@ -267,6 +267,8 @@ fn installed_agent_lifecycle_trial() {
         let workflow = runtime
             .knowledge
             .save(crate::commands::knowledge::KnowledgeEntry {
+                automatic: None,
+                dismissed: false,
                 id: uuid::Uuid::new_v4().to_string(),
                 project_id: request.project_id.clone(),
                 project_path: request.project_path.clone(),

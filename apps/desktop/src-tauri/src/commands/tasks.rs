@@ -378,6 +378,9 @@ pub fn task_runs(state: State<'_, TaskRuntime>, detail_id: Option<String>) -> Ve
             run.diagnostics.clear();
             for entry in &mut run.context_receipt.entries {
                 entry.content.clear();
+                if let Some(source) = &mut entry.automatic {
+                    source.evidence.clear();
+                }
             }
             if let Some(check) = &mut run.verification {
                 check.result.stdout.clear();
@@ -450,7 +453,10 @@ pub async fn task_mark_reviewed(id: String, state: State<'_, TaskRuntime>) -> Re
         state.save(&updated)?;
         updated.persistence_error = None;
         *run = updated;
-        Ok(())
+        drop(inner);
+        state
+            .refresh_knowledge(&current.project_id, &current.project_path, true)
+            .map_err(|e| format!("Review saved, but project lessons could not refresh: {e}"))
     })
     .await
     .map_err(|error| error.to_string())?

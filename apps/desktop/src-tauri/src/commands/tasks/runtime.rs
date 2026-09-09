@@ -826,6 +826,9 @@ impl TaskRuntime {
         } else {
             None
         };
+        if request.previous_run_id.is_none() && !request.context_selection.memory_off {
+            self.refresh_knowledge(&request.project_id, &request.project_path, true)?;
+        }
         self.apply_policy(&mut request)?;
         let previous;
         let policy = self.policy()?;

@@ -1,5 +1,16 @@
 [
   {
+    "id": "project-lessons-grounded-in-your-work",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Project lessons grounded in your work",
+    "description": "Jackalope learns from local task feedback and repository evidence, and shows recorded findings in Performance & insights.",
+    "items": [
+      "Matching lessons retain their sources and can be edited, paused, removed or skipped.",
+      "Performance distinguishes finished runs from human outcome decisions and removes invented savings and generic recommendations."
+    ]
+  },
+  {
     "id": "a-predictable-local-work-cycle",
     "date": "2026-09-09",
     "status": "In development",

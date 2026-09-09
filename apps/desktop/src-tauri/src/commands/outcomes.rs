@@ -336,7 +336,10 @@ pub fn record(runtime: &TaskRuntime, review: OutcomeReview) -> Result<(), String
             recorded_at: chrono::Utc::now().to_rfc3339(),
         });
         r.status = "review".into();
-    })
+    })?;
+    runtime
+        .refresh_knowledge(&run.project_id, &run.project_path, true)
+        .map_err(|e| format!("Review saved, but project lessons could not refresh: {e}"))
 }
 
 #[tauri::command]

@@ -1,31 +1,37 @@
-import { Bot, Clock, Coins, Gauge, Lightbulb, ShieldCheck, TrendingUp, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { computeAgentAnalytics } from '../../lib/agent-analytics';
-import { generateAgentInsights } from '../../lib/agent-insights';
+import { generateAgentInsights, type WorkflowInsight } from '../../lib/agent-insights';
+import type { KnowledgeEntry } from '../../lib/knowledge';
+import { openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
 import type { TaskRun } from '../../lib/task-runtime';
+import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
-import { JackalopeMascot } from '../mascot/JackalopeMascot';
+import { useProjectStore } from '../../stores/projectStore';
+import { KnowledgeEditor } from '../knowledge/KnowledgeEditor';
 import { Button } from '../ui/button';
+import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 
 export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
-  const { metrics, impact } = useMemo(() => computeAgentAnalytics(runs), [runs]);
-  const insights = useMemo(
-    () => generateAgentInsights(runs, metrics, impact),
-    [runs, metrics, impact],
+  const projects = useProjectStore((state) => state.projects);
+  const [projectId, setProjectId] = useState('all');
+  const [category, setCategory] = useState<'all' | WorkflowInsight['category']>('all');
+  const [editing, setEditing] = useState<KnowledgeEntry | null>(null);
+  const [sourceError, setSourceError] = useState('');
+  const openSource = (project: string, run: string) => {
+    setSourceError('');
+    void openKnowledgeTask(project, run).catch((cause) => setSourceError(String(cause)));
+  };
+  const project = projects.find((item) => item.id === projectId);
+  const scoped = useMemo(
+    () => runs.filter((run) => projectId === 'all' || run.projectId === projectId),
+    [runs, projectId],
   );
-
-  const [activeCategory, setActiveCategory] = useState<'all' | 'speed' | 'cost' | 'workflow'>(
-    'all',
-  );
-
-  const filteredInsights = useMemo(() => {
-    const recommendations = insights.filter((insight) => insight.id !== 'handoff-ready');
-    if (activeCategory === 'all') return recommendations;
-    return recommendations.filter((i) => i.category === activeCategory);
-  }, [insights, activeCategory]);
-
+  const analytics = useMemo(() => computeAgentAnalytics(scoped), [scoped]);
+  const insights = useMemo(() => generateAgentInsights(scoped), [scoped]);
+  const knowledge = useKnowledge(project?.id ?? '', project?.path ?? '');
+  const lessons = knowledge.error ? [] : knowledge.entries.filter((entry) => entry.automatic);
   const automaticQuotaHandoff = useAgentConfigStore((state) => state.automaticQuotaHandoff);
   const [savingHandoff, setSavingHandoff] = useState(false);
   const [handoffError, setHandoffError] = useState('');
@@ -43,231 +49,259 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
       setSavingHandoff(false);
     }
   };
-
+  const shown = insights.filter((insight) => category === 'all' || insight.category === category);
+  const names = new Map([
+    ...projects.map((item) => [item.id, item.name] as const),
+    ...runs.map((run) => [run.projectId, run.projectName] as const),
+  ]);
   return (
     <div className="agent-metrics-dashboard space-y-6">
-      <section
-        className="p-5 rounded-xl border border-[var(--color-border)] flex items-start gap-4"
-        aria-label="Automatic quota handoff"
-      >
-        <JackalopeMascot size="sm" overrideMood="idle" />
-        <div className="flex-1 min-w-0 space-y-2">
-          <h3 className="text-base font-medium">Automatic quota handoff</h3>
-          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed max-w-2xl">
-            {automaticQuotaHandoff
-              ? 'When an automatically routed task reaches a provider quota, Jackalope can continue with another available agent, model or account while preserving its workspace and context.'
-              : 'Tasks that reach a provider quota stop for your review. Your workspace and progress are preserved so you can retry or choose another agent.'}
-          </p>
-          {handoffError && (
-            <p role="alert" className="task-error">
-              {handoffError}
-            </p>
-          )}
+      {sourceError && (
+        <p role="alert" className="task-error">
+          {sourceError}
+        </p>
+      )}
+      <div className="usage-filters">
+        <label htmlFor="insights-project">
+          Project
+          <Select id="insights-project" value={projectId} onValueChange={setProjectId}>
+            <SelectItem value="all">All projects</SelectItem>
+            {[...names].map(([id, name]) => (
+              <SelectItem key={id} value={id}>
+                {name}
+              </SelectItem>
+            ))}
+          </Select>
+        </label>
+      </div>
+      <p className="task-muted">
+        Loaded Jackalope history only. Acceptance uses the latest saved attempt per task with
+        explicit outcome-review decisions. Records describe the reviewed snapshot; files may have
+        changed since.
+      </p>
+      <dl className="grid grid-cols-2 gap-4">
+        {[
+          [
+            'Recorded acceptance',
+            analytics.outcomes.acceptanceRate === null
+              ? 'Not measured'
+              : `${analytics.outcomes.acceptanceRate}%`,
+            `${analytics.outcomes.accepted} accepted / ${analytics.outcomes.measured} with outcome decisions; ${analytics.outcomes.total - analytics.outcomes.measured} without a complete decision`,
+          ],
+          [
+            'Saved context supplied',
+            String(analytics.contextTasks),
+            `of ${analytics.outcomes.total} latest task attempts; inclusion does not prove the agent followed it`,
+          ],
+          [
+            'Quota handoffs recorded',
+            String(analytics.handoffs),
+            `${analytics.completedAfterHandoff} attempts finished after a handoff`,
+          ],
+          [
+            'Changes requested',
+            String(analytics.outcomes.changes),
+            'Latest saved outcome decisions',
+          ],
+        ].map(([label, value, detail]) => (
+          <div key={label} className="p-4 rounded-lg border border-[var(--color-border)]">
+            <dt className="task-muted">{label}</dt>
+            <dd className="text-xl font-semibold mt-1">{value}</dd>
+            <dd className="task-muted mt-2">{detail}</dd>
+          </div>
+        ))}
+      </dl>
+      <section className="space-y-3" aria-label="Findings from task history">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg">Findings from task history</h2>
+          <Select
+            aria-label="Insight category"
+            value={category}
+            onValueChange={(value) => setCategory(value as typeof category)}
+          >
+            {(['all', 'review', 'checks', 'learning', 'resilience'] as const).map((value) => (
+              <SelectItem key={value} value={value}>
+                {value === 'all' ? 'All findings' : value[0].toUpperCase() + value.slice(1)}
+              </SelectItem>
+            ))}
+          </Select>
         </div>
+        {!shown.length && (
+          <p className="task-muted" role="status">
+            No findings in this view. Recorded review feedback, failed checks, quota handoffs and
+            context comparisons appear when the history supports them.
+          </p>
+        )}
+        {shown.map((insight) => (
+          <article
+            key={insight.id}
+            className="py-3 border-b border-[var(--color-border)] space-y-2"
+          >
+            <h3 className="font-medium">{insight.title}</h3>
+            <p className="task-muted">{insight.description}</p>
+            <details>
+              <summary className="cursor-pointer min-h-11 py-3">
+                Inspect {insight.runs.length} source task(s)
+              </summary>
+              <ul>
+                {insight.runs.map((run) => (
+                  <li key={run.id}>
+                    <Button
+                      variant="ghost"
+                      className="max-w-full whitespace-normal text-left"
+                      onClick={() => openSource(run.projectId, run.id)}
+                    >
+                      {run.projectName} · {taskTitle(run.prompt).slice(0, 100) || run.id}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </article>
+        ))}
+      </section>
+      <section className="space-y-3" aria-label="Automatic project lessons">
+        <h2 className="text-lg">Automatic project lessons</h2>
+        <p className="task-muted">
+          Explicit preferences, review corrections and repository tooling are saved locally and
+          matched to future tasks. Edit or pause a lesson here; remove it in Project → Context.
+          Current instructions take precedence.
+        </p>
+        {!project ? (
+          <p className="task-muted">Choose a registered project to inspect its lessons.</p>
+        ) : !isTauriEnvironment() ? (
+          <p className="task-notice">Open the desktop app to inspect local project lessons.</p>
+        ) : (
+          <>
+            {knowledge.loading && <p role="status">Reading project evidence…</p>}
+            {knowledge.error && (
+              <p className="task-error" role="alert">
+                {knowledge.error}
+                <Button variant="ghost" onClick={() => void knowledge.refresh()}>
+                  Retry
+                </Button>
+              </p>
+            )}
+            {!knowledge.loading && !knowledge.error && !lessons.length && (
+              <p className="task-muted">
+                No automatic lessons found in the inspected history or supported repository files.
+              </p>
+            )}
+            {lessons.map((entry) => {
+              const uses = new Set(
+                scoped
+                  .filter((run) => run.contextReceipt?.entries.some((item) => item.id === entry.id))
+                  .map((run) => run.taskId),
+              ).size;
+              return (
+                <article
+                  key={entry.id}
+                  className="py-3 border-b border-[var(--color-border)] space-y-2"
+                >
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <h3 className="font-medium">{entry.title}</h3>
+                    <Button variant="outline" onClick={() => setEditing(entry)}>
+                      Edit lesson
+                    </Button>
+                  </div>
+                  <p className="task-muted">
+                    {entry.enabled ? 'Available for matching' : 'Paused'} · Supplied to {uses}{' '}
+                    task(s) in loaded history ·{' '}
+                    {entry.automatic?.managed ? 'Automatically maintained' : 'Edited by you'}
+                  </p>
+                  <p className="whitespace-pre-wrap break-words">{entry.content}</p>
+                  <details>
+                    <summary className="cursor-pointer min-h-11 py-3">
+                      Source evidence and matching
+                    </summary>
+                    <p className="task-muted">Matches: {entry.keywords.join(', ')}</p>
+                    {entry.automatic?.evidence.map((evidence) => (
+                      <p className="task-muted break-words" key={evidence}>
+                        {evidence}
+                      </p>
+                    ))}
+                    {entry.sourceRunId && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => openSource(entry.projectId, entry.sourceRunId as string)}
+                      >
+                        Open source task
+                      </Button>
+                    )}
+                  </details>
+                </article>
+              );
+            })}
+          </>
+        )}
+      </section>
+      <section className="space-y-3" aria-label="Recorded agent runs">
+        <h2 className="text-lg">Recorded agent runs</h2>
+        <p className="task-muted">
+          Grouped by the final assigned agent. Duration excludes active attempts and attempts with
+          handoffs. Task complexity differs; these averages do not rank agents or measure
+          acceptance.
+        </p>
+        {!analytics.metrics.length ? (
+          <p className="task-muted">No runs recorded in this view.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr>
+                  {['Agent', 'Attempts', 'Finished', 'Failed', 'Mean duration'].map((label) => (
+                    <th key={label} className="p-3 font-medium">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.metrics.map((metric) => (
+                  <tr key={metric.agent} className="border-t border-[var(--color-border)]">
+                    <th scope="row" className="p-3 font-medium">
+                      {metric.agent}
+                    </th>
+                    <td className="p-3">{metric.attempts}</td>
+                    <td className="p-3">{metric.completed}</td>
+                    <td className="p-3">{metric.failed}</td>
+                    <td className="p-3">
+                      {metric.avgDurationMs === null
+                        ? 'Not reported'
+                        : `${Math.round(metric.avgDurationMs / 1000)}s (${metric.durationSamples} samples)`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <details className="border-t border-[var(--color-border)] pt-3">
+        <summary className="cursor-pointer min-h-11 py-3">Automatic quota handoff setting</summary>
         <Switch
           label="Automatic quota handoff"
           checked={automaticQuotaHandoff}
           disabled={savingHandoff || !isTauriEnvironment()}
           onCheckedChange={(value) => void changeHandoff(value)}
         />
-      </section>
-
-      {/* High-Level Impact Scorecard */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-          <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-            <span>Handoff Resilience</span>
-            <ShieldCheck size={15} className="text-emerald-400" />
-          </div>
-          <p className="text-xl font-bold text-[var(--color-text-primary)] mt-1">
-            {impact.rescuedTasksCount}{' '}
-            <span className="text-xs font-normal text-[var(--color-text-muted)]">saves</span>
+        {handoffError && (
+          <p role="alert" className="task-error">
+            {handoffError}
           </p>
-          <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
-            {impact.totalHandoffs} quota handoffs executed
-          </p>
-        </div>
-
-        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-          <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-            <span>Context Preserved</span>
-            <Zap size={15} className="text-amber-400" />
-          </div>
-          <p className="text-xl font-bold text-[var(--color-text-primary)] mt-1">
-            {Math.round(impact.estimatedTokensSaved / 1000)}k{' '}
-            <span className="text-xs font-normal text-[var(--color-text-muted)]">tokens</span>
-          </p>
-          <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
-            Saved from rate limit aborts
-          </p>
-        </div>
-
-        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-          <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-            <span>Hours Saved</span>
-            <Clock size={15} className="text-blue-400" />
-          </div>
-          <p className="text-xl font-bold text-[var(--color-text-primary)] mt-1">
-            ~{impact.hoursSaved}{' '}
-            <span className="text-xs font-normal text-[var(--color-text-muted)]">hours</span>
-          </p>
-          <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
-            Automated handoff & split gains
-          </p>
-        </div>
-
-        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-          <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-            <span>Fastest Agent</span>
-            <Gauge size={15} className="text-purple-400" />
-          </div>
-          <p className="text-xl font-bold text-[var(--color-text-primary)] mt-1 capitalize">
-            {impact.fastestAgent ?? 'Balanced'}
-          </p>
-          <p className="text-[11px] text-[var(--color-text-muted)] mt-1">Top throughput on repo</p>
-        </div>
-      </div>
-
-      {/* Comparative Agent Performance */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
-            <Bot size={16} className="text-[var(--color-brand)]" />
-            Agent Efficiency & Speed Comparison
-          </h4>
-          <span className="text-xs text-[var(--color-text-muted)]">
-            {metrics.length} active agent(s) tracked
-          </span>
-        </div>
-
-        {metrics.length === 0 ? (
-          <div className="p-6 text-center rounded-lg border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
-            No agent run metrics recorded yet. Complete tasks to see real-time comparative
-            analytics.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {metrics.map((m) => (
-              <div
-                key={m.agent}
-                className="p-3.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/50 space-y-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold capitalize text-[var(--color-text-primary)]">
-                    {m.agent}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]">
-                    {m.tasksCount} task(s)
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-[var(--color-text-muted)] italic">
-                  Specialty: {m.topSpecialty}
-                </p>
-
-                <div className="space-y-1 pt-2 border-t border-[var(--color-border)]/60 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[var(--color-text-muted)]">Avg Duration:</span>
-                    <span className="font-mono text-[var(--color-text-primary)]">
-                      {m.avgDurationMs > 0 ? `${Math.round(m.avgDurationMs / 1000)}s` : '—'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-[var(--color-text-muted)]">Tokens / Task:</span>
-                    <span className="font-mono text-[var(--color-text-primary)]">
-                      {m.avgTokensPerTask > 0 ? m.avgTokensPerTask.toLocaleString() : '—'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-[var(--color-text-muted)]">Success Rate:</span>
-                    <span className="font-medium text-emerald-400">{m.successRate}%</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-[var(--color-text-muted)]">Est. Cost:</span>
-                    <span className="font-mono text-[var(--color-text-secondary)]">
-                      ${m.estimatedCostUsd.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="w-full bg-[var(--color-bg-tertiary)] h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-emerald-400 h-full rounded-full"
-                    style={{ width: `${m.successRate}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
         )}
-      </section>
-
-      {/* Actionable Workflow Tips & Optimization Carousel */}
-      <section className="space-y-3 pt-2">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h4 className="text-sm font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
-            <Lightbulb size={16} className="text-amber-400" />
-            Workflow Tips & Optimization Recommendations
-          </h4>
-
-          <div className="flex items-center gap-1">
-            {(['all', 'speed', 'cost', 'workflow'] as const).map((cat) => (
-              <Button
-                key={cat}
-                variant={activeCategory === cat ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveCategory(cat)}
-                className="h-6 text-[11px] px-2 capitalize"
-              >
-                {cat}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          {filteredInsights.map((insight) => (
-            <div
-              key={insight.id}
-              className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/40 flex items-start gap-3 transition-colors hover:bg-[var(--color-bg-secondary)]"
-            >
-              <div
-                className={`p-1.5 rounded mt-0.5 ${
-                  insight.category === 'speed'
-                    ? 'bg-purple-500/10 text-purple-400'
-                    : insight.category === 'cost'
-                      ? 'bg-emerald-500/10 text-emerald-400'
-                      : insight.category === 'resilience'
-                        ? 'bg-blue-500/10 text-blue-400'
-                        : 'bg-amber-500/10 text-amber-400'
-                }`}
-              >
-                {insight.category === 'speed' && <Gauge size={14} />}
-                {insight.category === 'cost' && <Coins size={14} />}
-                {insight.category === 'resilience' && <ShieldCheck size={14} />}
-                {insight.category === 'workflow' && <TrendingUp size={14} />}
-              </div>
-
-              <div className="flex-1 space-y-0.5">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-xs font-semibold text-[var(--color-text-primary)]">
-                    {insight.title}
-                  </h5>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-bg-tertiary)] font-medium text-[var(--color-text-secondary)]">
-                    {insight.badge}
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                  {insight.description}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      </details>
+      {editing && (
+        <KnowledgeEditor
+          key={editing.id}
+          entry={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            void knowledge.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
