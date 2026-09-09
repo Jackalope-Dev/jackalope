@@ -259,31 +259,6 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
         command.env(name, &binding.directory);
     }
     if binding.profile_id.is_some() {
-        match binding.adapter.as_str() {
-            "antigravity" | "aider" => {
-                command.env("HOME", &binding.directory).env("USERPROFILE", &binding.directory);
-                if binding.adapter == "aider" {
-                    command.env("AIDER_ENV_FILE", binding.directory.join(".env"));
-                    command.env("AIDER_CONFIG", binding.directory.join(".aider.conf.yml"));
-                }
-            }
-            "goose" => {
-                command.env("GOOSE_DISABLE_KEYRING", "1");
-                command.env_remove("GOOSE_ADDITIONAL_CONFIG_FILES");
-            }
-            _ => {}
-        }
-    }
-    if binding.adapter == "opencode" && binding.profile_id.is_some() {
-        for (name, folder) in [
-            ("XDG_CONFIG_HOME", "config"),
-            ("XDG_CACHE_HOME", "cache"),
-            ("XDG_STATE_HOME", "state"),
-        ] {
-            command.env(name, binding.directory.join(folder));
-        }
-    }
-    if binding.profile_id.is_some() {
         if let Ok(content) = fs::read_to_string(binding.directory.join(".env")) {
             for line in content.lines() {
                 let trimmed = line.trim();
@@ -299,6 +274,45 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
                 }
             }
         }
+    }
+    // Apply owned storage paths after legacy profile settings so they cannot rebind an account.
+    if let Some(name) = env_var_for(&binding.adapter).filter(|_| binding.profile_id.is_some()) {
+        command.env(name, &binding.directory);
+    }
+    if binding.profile_id.is_some() {
+        match binding.adapter.as_str() {
+            "antigravity" | "aider" => {
+                command.env("HOME", &binding.directory).env("USERPROFILE", &binding.directory);
+                if binding.adapter == "antigravity" {
+                    for name in credential_env_vars("antigravity") {
+                        command.env_remove(name);
+                    }
+                }
+                if binding.adapter == "aider" {
+                    command.env("AIDER_ENV_FILE", binding.directory.join(".env"));
+                    command.env("AIDER_CONFIG", binding.directory.join(".aider.conf.yml"));
+                }
+            }
+            "goose" => {
+                command.env("GOOSE_DISABLE_KEYRING", "1");
+                command.env_remove("GOOSE_ADDITIONAL_CONFIG_FILES");
+            }
+            "gemini" => {
+                command.env("GEMINI_FORCE_FILE_STORAGE", "true");
+            }
+            _ => {}
+        }
+    }
+    if binding.adapter == "opencode" && binding.profile_id.is_some() {
+        for (name, folder) in [
+            ("XDG_CONFIG_HOME", "config"),
+            ("XDG_CACHE_HOME", "cache"),
+            ("XDG_STATE_HOME", "state"),
+        ] {
+            command.env(name, binding.directory.join(folder));
+        }
+    }
+    if binding.profile_id.is_some() {
         if let Some(key) = credentials::read(binding)? {
             command.env(&key.name, &key.value);
         } else if binding.adapter == "antigravity" {
@@ -311,8 +325,9 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
     super::agent_sign_in::ensure_idle(binding)?;
     if binding.adapter == "antigravity" && binding.profile_id.is_none() {
-        let current = bind_account(root, &binding.adapter, binding.profile_id.as_deref())?;
-        if current.directory != binding.directory {
+        let current = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+            .map(|home| PathBuf::from(home).join(".gemini"));
+        if current.as_ref() != Some(&binding.directory) {
             return Err("Antigravity's CLI data location changed. Start a new task.".into());
         }
     }
