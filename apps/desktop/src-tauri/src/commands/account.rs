@@ -599,6 +599,8 @@ mod tests {
         let access = ExecutionAccess::new(true);
         access.update(record.verified_at, record.expires_at);
         assert!(!access.status().allowed);
+        assert!(!record.settings_sync);
+        assert!(!record.settings_sync_pending);
         assert_eq!(record.email.as_deref(), Some("member@example.invalid"));
     }
     #[test]

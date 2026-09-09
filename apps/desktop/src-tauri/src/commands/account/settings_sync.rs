@@ -304,6 +304,23 @@ pub async fn app_settings_sync(
 mod tests {
     use super::*;
     #[test]
+    #[cfg(windows)]
+    fn new_connections_default_on_and_saved_opt_out_survives_restart() {
+        let directory = std::env::temp_dir().join(format!("jackalope-sync-choice-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&directory).unwrap();
+        let state = AccountService::new(directory.join("account.bin"), Arc::new(ExecutionAccess::new(true)));
+        let fresh = read_choice(&state).unwrap();
+        assert!(fresh.enabled);
+        assert!(!fresh.explicit);
+        save_choice(&state, false).unwrap();
+        let restarted = AccountService::new(directory.join("account.bin"), Arc::new(ExecutionAccess::new(true)));
+        let saved = read_choice(&restarted).unwrap();
+        assert!(!saved.enabled);
+        assert!(saved.explicit);
+        std::fs::remove_file(directory.join("settings-sync-choice.bin")).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+    #[test]
     fn sync_payload_rejects_secrets_unknown_fields_and_invalid_values() {
         let valid = serde_json::json!({"version":1,"accentHex":"#6366f1","isDark":true,
             "appearance":"automatic","atmosphere":12,"harmony":"single",
