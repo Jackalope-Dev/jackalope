@@ -103,3 +103,6 @@ wrangler.deploy.jsonc
 dist-lab/
 
 /marketing-assets/
+
+/apps/desktop/.settings-sync-fixture.html
+/apps/desktop/.settings-sync-fixture.tsx
