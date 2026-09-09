@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { randomToken, tokenHash } from './crypto';
 import { memberFeedback } from './feedback';
 import { AccessError, invitations, type Member, tokenSchema } from './service';
+import { settingsRoute } from './settings';
 
 const lifetime = 90 * 86400000;
 export async function deviceMember(env: Env, hash: string, now = Date.now()) {
@@ -55,6 +56,19 @@ export async function deviceRoutes(
     const token = request.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
     if (!token) throw new AccessError(401, 'device_sign_in_required');
     const hash = await tokenHash(token);
+    if (url.pathname === '/v1/desktop/settings/consent' && request.method === 'POST') {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      const { enabled } = z.strictObject({ enabled: z.boolean() }).parse(await readJson(request));
+      await env.DB.prepare('UPDATE access_devices SET settings_sync=? WHERE id=?').bind(enabled ? 1 : 0, member.id).run();
+      return json({ enabled });
+    }
+    if (url.pathname === '/v1/desktop/settings') {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      return json(await settingsRoute(env, member.memberId, member.id, request.method,
+        request.method === 'PUT' ? await readJson(request) : undefined));
+    }
     if (request.method === 'POST' && url.pathname === '/v1/desktop/feedback') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');

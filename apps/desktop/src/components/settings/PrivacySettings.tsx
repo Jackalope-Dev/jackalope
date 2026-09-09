@@ -4,6 +4,7 @@ import { useCommunityStore } from '../../stores/communityStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
+import { SettingsSync } from './SettingsSync';
 
 export function PrivacySettings() {
   const community = useCommunityStore();
@@ -25,7 +26,8 @@ export function PrivacySettings() {
     }
   }, [community.settings]);
   return (
-    <section className="space-y-4" aria-label="Usage privacy">
+    <section className="space-y-4" aria-label="Privacy settings">
+      <SettingsSync />
       <h2 className="text-xl font-medium">Usage sharing</h2>
       <div className="flex items-center justify-between gap-4">
         <span>Share anonymous usage counts</span>

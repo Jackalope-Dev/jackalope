@@ -14,6 +14,7 @@ import { observeFeedbackActivity } from './stores/feedbackStore';
 import { observeNotifications } from './stores/notificationStore';
 import { useOnboardingStore } from './stores/onboardingStore';
 import { useProjectStore } from './stores/projectStore';
+import { observeSettingsSync } from './stores/settingsSyncStore';
 import './components/tasks/task-workspace.css';
 import './components/ui/experience.css';
 
@@ -23,6 +24,7 @@ export default function App() {
   useEffect(observeTelemetry, []);
   useEffect(observeFeedbackActivity, []);
   useEffect(observeNotifications, []);
+  useEffect(observeSettingsSync, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();

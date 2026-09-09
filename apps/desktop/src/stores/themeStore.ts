@@ -10,6 +10,7 @@ import { persist } from 'zustand/middleware';
 import { useProjectStore } from './projectStore';
 
 interface ThemeState {
+  previewing: boolean;
   currentTheme: ThemePalette;
   appTheme: ThemePalette;
   setAppTheme: (theme: ThemePalette) => void;
@@ -25,6 +26,7 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
       currentTheme: initialTheme,
+      previewing: false,
       appTheme: initialTheme,
       setAppTheme: (appTheme) => {
         set({ appTheme });
@@ -66,6 +68,7 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: 'jackalope-theme',
+      partialize: ({ currentTheme, appTheme }) => ({ currentTheme, appTheme }),
       merge: (persisted, current) => {
         const saved = persisted as Partial<ThemeState>;
         return {

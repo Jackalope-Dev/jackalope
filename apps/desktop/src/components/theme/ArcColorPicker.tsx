@@ -11,6 +11,11 @@ export function ArcColorPicker() {
   const { currentTheme, setTheme } = useThemeStore();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(currentTheme);
+  useEffect(() => {
+    if (!open) return;
+    useThemeStore.setState({ previewing: true });
+    return () => { useThemeStore.setState({ previewing: false }); };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

@@ -8,6 +8,7 @@ use tauri::Manager;
 use tauri::{AppHandle, State};
 use tauri_plugin_shell::ShellExt;
 pub mod feedback;
+pub mod settings_sync;
 
 pub struct AccountService {
     path: PathBuf,
@@ -51,6 +52,8 @@ struct SavedAccount {
     verified_at: i64,
     #[serde(default)]
     feedback: feedback::LocalFeedback,
+    #[serde(default)]
+    settings_sync: bool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -396,6 +399,7 @@ pub async fn app_account_connect(
         email: None,
         verified_at: 0,
         feedback: feedback::LocalFeedback::default(),
+        settings_sync: false,
     };
     state.save(&record)?;
     let url = web

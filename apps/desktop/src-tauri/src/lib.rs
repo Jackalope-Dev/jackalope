@@ -88,6 +88,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::execution_access::app_execution_access,
             commands::account::app_account_status,
+            commands::account::settings_sync::app_settings_sync,
             commands::account::app_account_connect,
             commands::account::app_account_open_browser,
             commands::account::app_account_referrals,
