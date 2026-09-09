@@ -1,5 +1,6 @@
 import { ArrowRight, Check, Copy, LogOut, Mail, RefreshCw, Share2 } from 'lucide-react';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { DesktopConnection } from './DesktopConnection';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
 import './access.css';
@@ -26,6 +27,9 @@ export function WaitlistPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const pending = useRef(false);
+  const refreshPlace = useCallback(() => {
+    void accessRequest<Place>('waitlist/me').then(setPlace).catch(() => undefined);
+  }, []);
   useEffect(() => {
     const readLink = () => {
       const url = new URL(window.location.href);
@@ -127,6 +131,7 @@ export function WaitlistPage() {
       <p className="access-notice" role="status">
         {notice}
       </p>
+      {place?.status !== 'approved' && <DesktopConnection email={place?.email ?? null} waiting refreshMembership={refreshPlace} />}
       {loading ? (
         <p role="status">Finding your place…</p>
       ) : token ? (

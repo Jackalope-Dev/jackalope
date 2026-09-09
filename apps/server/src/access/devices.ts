@@ -114,6 +114,9 @@ export async function deviceRoutes(
       .run();
     if (claimed.meta.changes !== 1) throw new AccessError(429, 'slow_down');
     if (!link.member_id) return json({ status: 'pending' }, 202);
+    const waiting = await env.DB.prepare("SELECT id FROM access_members WHERE id=? AND status='waiting' AND waitlist_verified_at IS NOT NULL")
+      .bind(link.member_id).first();
+    if (waiting) return json({ status: 'waiting' }, 202);
     await env.DB.batch([
       env.DB.prepare(
         "INSERT INTO access_devices(id,hash,member_id,created_at,expires_at) SELECT ?,l.hash,l.member_id,?,? FROM access_device_links l JOIN access_members m ON m.id=l.member_id WHERE l.hash=? AND l.used_at IS NULL AND l.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL ON CONFLICT(hash) DO NOTHING",
@@ -137,9 +140,10 @@ export async function deviceRoutes(
   }
 }
 
-export async function browserDeviceAction(env: Env, member: Member, action: string, body: unknown) {
+export async function browserDeviceAction(env: Env, member: Pick<Member, 'id'>, action: string, body: unknown, waiting = false) {
   const now = Date.now();
   if (action === 'revoke') {
+    if (waiting) throw new AccessError(403, 'access_not_approved');
     const { id } = z.strictObject({ id: z.uuid() }).parse(body);
     await env.DB.batch([
       env.DB.prepare(
@@ -169,7 +173,7 @@ export async function browserDeviceAction(env: Env, member: Member, action: stri
           .bind(hash)
           .run()
       : await env.DB.prepare(
-          "UPDATE access_device_links SET member_id=? WHERE verification_hash=? AND expires_at>? AND member_id IS NULL AND used_at IS NULL AND EXISTS(SELECT 1 FROM access_members WHERE id=? AND status='approved' AND verified_at IS NOT NULL)",
+          `UPDATE access_device_links SET member_id=? WHERE verification_hash=? AND expires_at>? AND member_id IS NULL AND used_at IS NULL AND EXISTS(SELECT 1 FROM access_members WHERE id=? AND ${waiting ? "status='waiting' AND waitlist_verified_at IS NOT NULL" : "status='approved' AND verified_at IS NOT NULL"})`,
         )
           .bind(member.id, hash, now, member.id)
           .run();

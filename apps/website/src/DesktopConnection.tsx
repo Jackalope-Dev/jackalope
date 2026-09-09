@@ -5,9 +5,11 @@ const storageKey = 'jackalope-desktop-approval';
 export function DesktopConnection({
   email,
   refreshMembership,
+  waiting = false,
 }: {
   email: string | null;
   refreshMembership: () => void;
+  waiting?: boolean;
 }) {
   const signedIn = !!email;
   const [verification, setVerification] = useState('');
@@ -98,7 +100,7 @@ export function DesktopConnection({
       setMatches(false);
       setPreview(null);
       void accessRequest<{ userCode: string; expiresAt: number }>(
-        'desktop/preview',
+        `${waiting ? 'waitlist/' : ''}desktop/preview`,
         { verification },
         signal,
       )
@@ -113,7 +115,7 @@ export function DesktopConnection({
           if (!signal?.aborted) setError(accessMessage(cause));
         });
     },
-    [verification, email],
+    [verification, email, waiting],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -125,7 +127,7 @@ export function DesktopConnection({
     setBusy(true);
     setError('');
     try {
-      await accessRequest(`desktop/${action}`, { verification });
+      await accessRequest(`${waiting ? 'waitlist/' : ''}desktop/${action}`, { verification });
       try {
         sessionStorage.removeItem(storageKey);
       } catch {
@@ -134,7 +136,7 @@ export function DesktopConnection({
       setVerification('');
       setDone(
         action === 'approve'
-          ? 'Desktop approved. Return to Jackalope to finish connecting.'
+          ? waiting ? 'Your verified waitlist status was shared with this desktop. Early access still needs approval.' : 'Desktop approved. Return to Jackalope to finish connecting.'
           : 'Connection canceled. This desktop has not been connected.',
       );
     } catch (cause) {
@@ -155,10 +157,10 @@ export function DesktopConnection({
     <section className="access-card access-entry" aria-label="Connect desktop">
       <h2>Connect your desktop</h2>
       {!signedIn ? (
-        <p>
+        <div><p>
           Sign in below using your invited email. If the email opens another tab, return here to
           approve the connection.
-        </p>
+        </p><p>Still on the waitlist? <a className="text-link" href="/waitlist/">Verify your waitlist email</a> to share your acceptance status with the app.</p></div>
       ) : (
         <>
           <p>

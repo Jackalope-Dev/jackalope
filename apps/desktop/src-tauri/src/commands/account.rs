@@ -518,6 +518,7 @@ pub async fn app_account_poll(
     )
     .await?;
     match code {
+        202 if data["status"] == "waiting" => Ok(status("waiting", Some(&record))),
         202 | 429 => Ok(status("pending", Some(&record))),
         410 | 401 => {
             state.access.revoke();

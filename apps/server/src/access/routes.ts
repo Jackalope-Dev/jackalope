@@ -26,6 +26,7 @@ import {
   waitlistCookie,
   waitlistLogout,
   waitlistStatus,
+  waitingMember,
 } from './waitlist';
 
 const headers = {
@@ -205,6 +206,11 @@ export async function accessRoutes(
     if (request.method === 'POST' && path === '/v1/access/logout') {
       await logout(request, env);
       return json({ success: true }, 200, { 'set-cookie': sessionCookie('', true) });
+    }
+    if (request.method === 'POST' && path.startsWith('/v1/access/waitlist/desktop/')) {
+      const waiting = await waitingMember(request, env);
+      if (!waiting) throw new AccessError(401, 'access_sign_in_required');
+      return json(await browserDeviceAction(env, waiting, path.slice('/v1/access/waitlist/desktop/'.length), await readJson(request), true));
     }
     const member = await sessionMember(request, env);
     if (!member) throw new AccessError(401, 'access_sign_in_required');

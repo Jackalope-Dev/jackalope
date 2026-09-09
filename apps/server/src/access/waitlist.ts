@@ -76,6 +76,14 @@ function sessionToken(request: Request) {
     .get('cookie')
     ?.match(/(?:^|;\s*)__Host-jackalope-waitlist=([a-f0-9]{64})(?:;|$)/)?.[1];
 }
+export async function waitingMember(request: Request, env: Env) {
+  const raw = sessionToken(request);
+  if (!raw) return null;
+  return env.DB.prepare(
+    `SELECT m.id FROM access_members m JOIN access_waitlist_sessions s ON s.member_id=m.id
+     WHERE s.hash=? AND s.expires_at>? AND m.status='waiting' AND m.waitlist_verified_at IS NOT NULL`,
+  ).bind(await tokenHash(raw), Date.now()).first<{ id: string }>();
+}
 export async function waitlistLogout(request: Request, env: Env) {
   const raw = sessionToken(request);
   if (raw)
