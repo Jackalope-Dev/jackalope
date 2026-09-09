@@ -144,6 +144,11 @@ export const WORKSPACE_VIEWS = [
   },
 ] as const;
 export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
+export const USAGE_VIEWS = [
+  { id: 'tokens', label: 'Tokens & usage' },
+  { id: 'analytics', label: 'Performance & insights' },
+] as const;
+export type UsageView = (typeof USAGE_VIEWS)[number]['id'];
 export function navigateWorkspace(tab: ActiveTab) {
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));
 }

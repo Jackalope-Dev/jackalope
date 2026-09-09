@@ -21,8 +21,9 @@ import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { LoadingState } from '../ui/LoadingState';
 import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { Tooltip } from '../ui/Tooltip';
+import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import { InvitationsButton } from './InvitationsButton';
-import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
+import { type ActiveTab, type UsageView, USAGE_VIEWS, WORKSPACE_VIEWS } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
 
@@ -87,6 +88,7 @@ export function Shell({
   }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
   const openProjectSetup = () => useOnboardingStore.getState().begin();
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
+  const [usageView, setUsageView] = useState<UsageView>('tokens');
   const previousView = useRef<ActiveTab>('kanban');
   useEffect(() => {
     if (activeTab !== 'preferences') previousView.current = activeTab;
@@ -321,34 +323,37 @@ export function Shell({
         {view.group !== 'settings' &&
           view.group !== 'agents' &&
           WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
-            <div>
-              <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
-                {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    aria-current={activeTab === item.id ? 'page' : undefined}
-                    onClick={() => navigate(item.id)}
-                    className="workspace-nav-item"
-                  >
-                    {item.id === 'kanban'
-                      ? 'Work'
-                      : item.id === 'topology'
-                        ? 'Codebase'
-                        : item.id === 'agents'
-                          ? 'Runners'
-                          : item.id === 'agent-settings'
-                            ? 'Configuration'
-                            : item.id === 'mcps'
-                              ? 'Connections'
-                              : item.id === 'project-settings'
-                                ? 'Settings'
-                                : item.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
+            <WorkspaceSubnavigation
+              label={`${view.group} views`}
+              value={activeTab}
+              onChange={navigate}
+              items={WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => ({
+                id: item.id,
+                label:
+                  item.id === 'kanban'
+                    ? 'Work'
+                    : item.id === 'topology'
+                      ? 'Codebase'
+                      : item.id === 'agents'
+                        ? 'Runners'
+                        : item.id === 'agent-settings'
+                          ? 'Configuration'
+                          : item.id === 'mcps'
+                            ? 'Connections'
+                            : item.id === 'project-settings'
+                              ? 'Settings'
+                              : item.label,
+              }))}
+            />
           )}
+        {activeTab === 'usage' && (
+          <WorkspaceSubnavigation
+            label="Usage views"
+            items={USAGE_VIEWS}
+            value={usageView}
+            onChange={setUsageView}
+          />
+        )}
         <PageErrorBoundary
           key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
           onBack={activeTab === 'kanban' ? undefined : () => setActiveTab('kanban')}
@@ -391,7 +396,9 @@ export function Shell({
                 }}
               />
             )}
-            {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
+            {activeTab === 'usage' && (
+              <UsageDashboard view={usageView} onTask={() => setActiveTab('kanban')} />
+            )}
             {activeTab === 'preferences' && (
               <SettingsPage
                 key={settingsCategory}

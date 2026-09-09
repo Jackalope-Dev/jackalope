@@ -14,6 +14,9 @@
   gap: 24px;
   min-width: 0;
 }
+.agent-manager > .workspace-heading {
+  padding-bottom: 0;
+}
 
 .agent-config-row {
   min-width: 0;

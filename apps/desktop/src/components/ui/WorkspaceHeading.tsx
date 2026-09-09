@@ -10,7 +10,7 @@ export function WorkspaceHeading({
   action?: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-5 pb-6">
+    <header className="workspace-heading flex flex-wrap items-end justify-between gap-5 pb-6">
       <div className="max-w-xl">
         <h1 className="text-2xl font-semibold tracking-[-0.045em] leading-tight text-[var(--color-text-primary)]">
           {title}

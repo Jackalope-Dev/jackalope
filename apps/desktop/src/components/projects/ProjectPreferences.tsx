@@ -3,6 +3,7 @@ import { AgentPreferences } from '../settings/AgentPreferences';
 import { AppearancePreferences } from '../settings/AppearancePreferences';
 import { Setting } from '../settings/Setting';
 import { Switch } from '../ui/Switch';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import '../settings/settings.css';
 export function ProjectPreferences({
   embedded = false,
@@ -17,8 +18,7 @@ export function ProjectPreferences({
   const project = projects.find((p) => p.id === (projectId ?? activeProjectId));
   return (
     <section className={embedded ? 'project-preferences' : 'workspace-page project-preferences'}>
-      {!embedded && <h1 className="text-2xl">Project settings</h1>}
-      {!embedded && project && <p className="task-muted mt-2">{project.name}</p>}
+      {!embedded && <WorkspaceHeading title="Project settings" description={project?.name} />}
       {!project ? (
         <p className="settings-section-subtitle mt-4">
           Open a repository to configure project preferences.

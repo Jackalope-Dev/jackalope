@@ -4,13 +4,20 @@ import { taskTitle } from '../../lib/task-title';
 import { usageEntries } from '../../lib/usage-entries';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import type { UsageView } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { AgentMetricsDashboard } from './AgentMetricsDashboard';
 import { CapacityPanel } from './CapacityPanel';
-export function UsageDashboard({ onTask }: { onTask: () => void }) {
+export function UsageDashboard({
+  view = 'tokens',
+  onTask,
+}: {
+  view?: UsageView;
+  onTask: () => void;
+}) {
   const { runs, select, loading, error } = useExecutionStore();
   const { projects, selectProject } = useProjectStore();
   const [project, setProject] = useState('all');
@@ -21,7 +28,6 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
     `${r.accountBinding?.adapter ?? r.agent}:${r.accountBinding?.profileId ?? 'cli-default'}`;
   const accounts = new Map(entries.map((r) => [accountKey(r), `${r.agent} · ${r.account}`]));
   const [sort, setSort] = useState('tokens');
-  const [view, setView] = useState<'tokens' | 'analytics'>('tokens');
   const projectNames = new Map([
     ...projects.map((p) => [p.id, p.name] as const),
     ...runs.map((r) => [r.projectId, r.projectName] as const),
@@ -112,30 +118,16 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
   return (
     <section className="task-page usage-page">
       <WorkspaceHeading
-        title="Usage & Intelligence"
+        title={view === 'analytics' ? 'Agent performance' : 'Usage'}
         action={
-          <Button variant="outline" onClick={exportUsage} disabled={!filtered.length}>
-            <Download size={18} />
-            Export
-          </Button>
+          view === 'tokens' && (
+            <Button variant="outline" onClick={exportUsage} disabled={!filtered.length}>
+              <Download size={18} />
+              Export
+            </Button>
+          )
         }
       />
-      <div className="flex items-center gap-2 mb-4 border-b border-[var(--color-border)] pb-2">
-        <Button
-          variant={view === 'tokens' ? 'primary' : 'ghost'}
-          size="sm"
-          onClick={() => setView('tokens')}
-        >
-          Tokens & Usage
-        </Button>
-        <Button
-          variant={view === 'analytics' ? 'primary' : 'ghost'}
-          size="sm"
-          onClick={() => setView('analytics')}
-        >
-          Agent Performance & Insights
-        </Button>
-      </div>
 
       {view === 'analytics' ? (
         <AgentMetricsDashboard runs={runs} />

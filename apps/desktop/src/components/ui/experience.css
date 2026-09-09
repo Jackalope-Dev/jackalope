@@ -686,10 +686,15 @@ button:disabled {
 
 .workspace-subnavigation {
   display: flex;
+  flex-shrink: 0;
   gap: 4px;
   padding: 8px 24px;
   overflow-x: auto;
   border-bottom: 1px solid var(--color-border);
+}
+.workspace-subnavigation .workspace-nav-item {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .workspace-subnavigation [aria-current="page"] {
   color: var(--color-accent-ink);

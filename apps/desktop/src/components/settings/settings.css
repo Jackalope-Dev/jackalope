@@ -704,9 +704,6 @@
   padding: 20px 0 0;
   margin-top: 8px;
 }
-.workspace-page.project-preferences .project-identity-fields {
-  margin-top: 28px;
-}
 .project-preferences .settings-row-info,
 .agent-preferences .settings-row-info {
   min-width: 0;

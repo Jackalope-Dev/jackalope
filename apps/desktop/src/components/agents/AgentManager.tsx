@@ -7,6 +7,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { AddAgentForm } from './AddAgentForm';
 import { AgentAccounts } from './AgentAccounts';
 import { AgentInstallGuide } from './AgentInstallGuide';
@@ -48,22 +49,26 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
         <ArrowLeft size={16} />
         Back to agents
       </Button>
-      <h1 className="text-2xl font-medium">Configure {selected?.name ?? 'agent'}</h1>
-      <div className="flex flex-wrap gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void save()}
-          disabled={!desktop || busy || discovering}
-        >
-          <RefreshCw size={15} />
-          {busy || discovering ? 'Checking…' : 'Save & check agents'}
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setAdding(!adding)}>
-          <Plus size={15} />
-          Add agent manually
-        </Button>
-      </div>
+      <WorkspaceHeading
+        title={`Configure ${selected?.name ?? 'agent'}`}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void save()}
+              disabled={!desktop || busy || discovering}
+            >
+              <RefreshCw size={15} />
+              {busy || discovering ? 'Checking…' : 'Save & check agents'}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setAdding(!adding)}>
+              <Plus size={15} />
+              Add agent manually
+            </Button>
+          </div>
+        }
+      />
       {error && (
         <p role="alert" className="task-error">
           {error}
