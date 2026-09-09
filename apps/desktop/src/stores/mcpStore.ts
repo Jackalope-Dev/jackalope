@@ -140,7 +140,11 @@ export const useMcpStore = create<McpState>((set, get) => ({
         () => listMcpServers(projectId ?? undefined),
         force,
       );
-      if (version !== connectionsVersion || projectId !== useProjectStore.getState().activeProjectId) return;
+      if (
+        version !== connectionsVersion ||
+        projectId !== useProjectStore.getState().activeProjectId
+      )
+        return;
       set({ servers, loadingServers: false });
     } catch (e) {
       if (version !== connectionsVersion) return;

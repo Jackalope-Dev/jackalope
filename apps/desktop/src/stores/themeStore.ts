@@ -68,7 +68,11 @@ export const useThemeStore = create<ThemeState>()(
       name: 'jackalope-theme',
       merge: (persisted, current) => {
         const saved = persisted as Partial<ThemeState>;
-        return { ...current, ...saved, appTheme: saved.appTheme ?? saved.currentTheme ?? initialTheme };
+        return {
+          ...current,
+          ...saved,
+          appTheme: saved.appTheme ?? saved.currentTheme ?? initialTheme,
+        };
       },
       onRehydrateStorage: () => (state) => {
         if (state) applyThemeTokens(state.currentTheme);
@@ -79,7 +83,9 @@ export const useThemeStore = create<ThemeState>()(
 
 export function refreshProjectTheme() {
   const { projects, activeProjectId } = useProjectStore.getState();
-  const theme = projects.find((project) => project.id === activeProjectId)?.preferences?.theme ?? useThemeStore.getState().appTheme;
+  const theme =
+    projects.find((project) => project.id === activeProjectId)?.preferences?.theme ??
+    useThemeStore.getState().appTheme;
   if (theme !== useThemeStore.getState().currentTheme) {
     useThemeStore.setState({ currentTheme: theme });
     applyThemeTokens(theme);
