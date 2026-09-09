@@ -681,22 +681,19 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
 }
-.project-identity-fields {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
+.project-preferences .workspace-heading > div {
+  min-width: 0;
 }
-@media (max-width: 600px) {
-  .project-identity-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.project-preferences .workspace-heading p,
+.project-settings-identity {
+  overflow-wrap: anywhere;
 }
 .project-preference-field {
   display: grid;
   gap: 8px;
   min-width: 0;
 }
-.project-preference-field > label,
-.project-field-label {
+.project-preference-field > label {
   font-size: var(--text-sm);
   font-weight: 500;
 }
@@ -707,11 +704,6 @@
 .project-preference-field .settings-input {
   width: 100%;
   min-height: 44px;
-}
-.project-repository-path {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  overflow-wrap: anywhere;
 }
 .project-preferences-section > .settings-row {
   padding: 20px 0 0;

@@ -230,7 +230,14 @@ export function SettingsPage({
           {visible.map((c) => (
             <section key={c} className="settings-section">
               <header className="settings-section-header">
-                <h2 className="settings-section-title">{c}</h2>
+                <h2 className="settings-section-title">
+                  {c === 'Project' ? 'Project settings' : c}
+                </h2>
+                {c === 'Project' && project && (
+                  <p className="settings-section-subtitle project-settings-identity">
+                    {project.name} · {project.path}
+                  </p>
+                )}
               </header>
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />

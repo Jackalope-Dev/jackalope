@@ -1,5 +1,29 @@
 [
   {
+    "id": "smarter-project-settings",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Smarter project settings.",
+    "description": "Repository context helps fill project setup defaults.",
+    "items": [
+      "Detect preparation and verification commands from documentation and manifests, and the target branch from local Git metadata.",
+      "Preserve saved choices and deliberately cleared fields when refreshing context.",
+      "Show the repository path beside the project name under Project settings."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "a-simpler-waitlist-signup",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A simpler waitlist signup.",
+    "description": "The newsletter area keeps the focus on joining the waitlist.",
+    "items": [
+      "Removed the email-provider credit and extra availability copy, consolidated signup text, and stacked the email field and button on mobile."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "tidier-project-task-context",
     "date": "2026-09-09",
     "status": "In development",

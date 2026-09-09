@@ -110,8 +110,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.hero-inline-signup .signup-consent,
-.hero-inline-signup .signup-provider {
+.hero-inline-signup .signup-consent {
   color: var(--color-text-secondary);
 }
 .hero-inline-signup .signup input[type="email"] {

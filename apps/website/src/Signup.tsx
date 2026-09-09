@@ -149,17 +149,14 @@ export function Signup({ popup = false }: { popup?: boolean }) {
             </button>
           </div>
           <p id={`${id}-consent`} className="signup-consent">
-            {accessOrigin ? (
+            {!accessOrigin && (
               <>
-                We’ll email you about your access request. Product notes are optional.{' '}
-                <a href="/privacy/">Privacy</a>.
-              </>
-            ) : (
-              <>
-                By joining, you agree to receive Jackalope launch news and occasional product notes
-                from Jackalope Digital LLC. Unsubscribe anytime. <a href="/privacy/">Privacy</a>.
+                By joining, you agree to launch news and product notes from Jackalope Digital LLC.
+                Unsubscribe anytime.{' '}
               </>
             )}
+            Joining confirms you’re 18+ and accept the <a href="/terms/">Terms</a>.{' '}
+            <a href="/privacy/">Privacy</a>.
           </p>
           {accessOrigin && (
             <label className="signup-newsletter">
@@ -170,14 +167,11 @@ export function Signup({ popup = false }: { popup?: boolean }) {
                 disabled={state === 'sending'}
               />
               <span>
-                Send me product notes and one feedback email after I’ve tried Jackalope. Unsubscribe
+                Optional: product notes and one feedback email after trying Jackalope. Unsubscribe
                 anytime.
               </span>
             </label>
           )}
-          <p className="signup-consent">
-            By joining, you confirm you’re 18 or older and agree to the <a href="/terms/">Terms</a>.
-          </p>
           {accessOrigin && (
             <noscript>
               <p className="signup-consent">
@@ -193,14 +187,6 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           )}
         </form>
       )}
-      <a
-        className="signup-provider"
-        href="https://www.sequenzy.com"
-        target="_blank"
-        rel="noreferrer"
-      >
-        Email by Sequenzy <ArrowRight size={11} />
-      </a>
     </div>
   );
 }

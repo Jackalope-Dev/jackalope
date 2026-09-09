@@ -434,10 +434,10 @@
 .landing-finale .signup {
   max-width: 640px;
 }
-.landing-finale .signup :is(.signup-consent, .signup-provider, .signup-newsletter) {
+.landing-finale .signup :is(.signup-consent, .signup-newsletter) {
   color: var(--color-on-accent);
 }
-.landing-finale .signup :is(.signup-consent, .signup-provider) {
+.landing-finale .signup .signup-consent {
   font-size: 12px;
 }
 .landing-finale .signup :is(.signup-error, .signup-success) {
@@ -454,6 +454,9 @@
   outline-color: var(--color-on-accent);
 }
 @media (max-width: 760px) {
+  .landing-finale .signup-fields {
+    flex-direction: column;
+  }
   .feature-heading {
     align-items: start;
     flex-direction: column;

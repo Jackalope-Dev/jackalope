@@ -1,6 +1,9 @@
 use serde::Serialize;
 use std::path::Path;
 
+mod defaults;
+use defaults::ProjectDefaults;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Readiness {
@@ -91,51 +94,12 @@ pub fn inspect(path: &str) -> Result<Readiness, String> {
         missing_configuration: vec![],
         notes: vec![],
     };
-    if let Some(bytes) = read(&root, "package.json")? {
-        let manifest: serde_json::Value = serde_json::from_slice(&bytes)
-            .map_err(|_| "package.json is not valid JSON.".to_string())?;
-        let manager = if root.join("pnpm-lock.yaml").exists() {
-            "pnpm"
-        } else if root.join("package-lock.json").exists() {
-            "npm"
-        } else if root.join("yarn.lock").exists() {
-            "yarn"
-        } else {
-            ""
-        };
-        result.dependencies_missing = !root.join("node_modules").is_dir();
-        if !manager.is_empty() {
-            result.prepare_command = Some(
-                match manager {
-                    "pnpm" => "pnpm install --frozen-lockfile",
-                    "npm" => "npm ci",
-                    _ if manifest["packageManager"]
-                        .as_str()
-                        .is_some_and(|v| v.starts_with("yarn@1.")) =>
-                    {
-                        "yarn install --frozen-lockfile"
-                    }
-                    _ if root.join(".yarnrc.yml").exists() => "yarn install --immutable",
-                    _ => "yarn install --frozen-lockfile",
-                }
-                .into(),
-            );
-            let scripts = &manifest["scripts"];
-            for name in ["verify", "check", "test", "build"] {
-                if scripts[name].is_string() {
-                    result.verify_command = Some(format!("{manager} run {name}"));
-                    break;
-                }
-            }
-            if scripts["dev"].is_string() {
-                result.preview_command = Some(format!("{manager} run dev"));
-            }
-        } else {
-            result.notes.push("No supported package lockfile found. Choose preparation and verification commands in project settings.".into());
-        }
-    } else if root.join("Cargo.toml").exists() {
-        result.verify_command = Some("cargo test --locked".into());
-    }
+    let defaults = defaults::detect(&root);
+    result.prepare_command = defaults.prepare_command;
+    result.verify_command = defaults.verify_command;
+    result.preview_command = defaults.preview_command;
+    result.dependencies_missing =
+        root.join("package.json").is_file() && !root.join("node_modules").is_dir();
     let mut configured = Vec::new();
     for name in [
         ".env",
@@ -162,6 +126,17 @@ pub async fn project_readiness(path: String) -> Result<Readiness, String> {
     tauri::async_runtime::spawn_blocking(move || inspect(&path))
         .await
         .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn project_defaults(path: String) -> Result<ProjectDefaults, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root =
+            dunce::canonicalize(path).map_err(|_| "Project folder is unavailable.".to_string())?;
+        Ok(defaults::detect(&root))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

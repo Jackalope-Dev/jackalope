@@ -3,6 +3,7 @@ import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { useExecutionStore } from '../stores/executionStore';
 import { type Project, projectPathKey, useProjectStore } from '../stores/projectStore';
 import { captureDraftForProject } from './capture-draft';
+import { missingProjectDefaults } from './context/project-defaults';
 import { nativeTask } from './task-runtime';
 
 interface ProjectInfo {
@@ -57,7 +58,15 @@ function projectFromInfo(info: ProjectInfo, pending?: Project | null): Project {
 
 export function commitProjectSetup(pending: Project): Project {
   const previousProjectId = useProjectStore.getState().activeProjectId;
-  const project = useProjectStore.getState().completeSetup(pending);
+  let project = useProjectStore.getState().completeSetup(pending);
+  const memory = useContextMemoryStore.getState().getMemory(project.id);
+  if (memory?.projectPath === project.path) {
+    const defaults = missingProjectDefaults(project.preferences, memory.projectDefaults);
+    if (Object.keys(defaults).length) {
+      project = { ...project, preferences: { ...project.preferences, ...defaults } };
+      useProjectStore.getState().updateProjectPreferences(project.id, defaults);
+    }
+  }
   const execution = useExecutionStore.getState();
   if (execution.drafts.capture) {
     execution.draft(

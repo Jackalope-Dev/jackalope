@@ -1,3 +1,5 @@
+import type { ProjectDefaults } from './project-defaults.ts';
+
 export interface OpenTaskItem {
   id: string;
   title: string;
@@ -22,4 +24,5 @@ export interface DiscoveredCodebaseMemory {
   scanDurationMs: number;
   sourceFilesDetected: string[];
   metaAgent?: string;
+  projectDefaults?: ProjectDefaults;
 }

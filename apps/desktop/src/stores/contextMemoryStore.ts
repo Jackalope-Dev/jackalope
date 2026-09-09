@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { discoverCodebaseContext } from '../lib/context/discovery';
+import { missingProjectDefaults } from '../lib/context/project-defaults';
 import type { DiscoveredCodebaseMemory } from '../lib/context/types';
 import { useAuditStore } from './auditStore';
 import { useMascotStore } from './mascotStore';
+import { useProjectStore } from './projectStore';
 
 interface ContextMemoryState {
   memories: Record<string, DiscoveredCodebaseMemory>;
@@ -45,6 +47,13 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
             memories: { ...state.memories, [id]: memory },
             scanning: { ...state.scanning, [id]: false },
           }));
+
+          const current = useProjectStore.getState().projects.find((item) => item.id === id);
+          if (current?.path === path) {
+            const defaults = missingProjectDefaults(current.preferences, memory.projectDefaults);
+            if (Object.keys(defaults).length)
+              useProjectStore.getState().updateProjectPreferences(id, defaults);
+          }
 
           if (!options.silent) useMascotStore.getState().say('Repository context updated.', 2500);
 

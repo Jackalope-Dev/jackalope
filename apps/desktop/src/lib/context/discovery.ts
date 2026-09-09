@@ -1,6 +1,7 @@
 import { useAgentConfigStore } from '../../stores/agentConfigStore.ts';
 import { parseRepoTodos, TODO_FILES } from '../repo-todos.ts';
 import { nativeTask } from '../task-runtime.ts';
+import type { ProjectDefaults } from './project-defaults.ts';
 import type { DiscoveredCodebaseMemory, OpenTaskItem } from './types.ts';
 
 export interface DiscoveryOptions {
@@ -190,8 +191,13 @@ export async function discoverCodebaseContext(
     break;
   }
 
-  const duration = Date.now() - startTime;
   const metaAgent = useAgentConfigStore.getState().defaultMetaAgent;
+  const projectDefaults = fileReader
+    ? undefined
+    : await nativeTask<ProjectDefaults>('project_defaults', { path: projectPath }).catch(
+        () => undefined,
+      );
+  const duration = Date.now() - startTime;
 
   return {
     projectId,
@@ -209,5 +215,6 @@ export async function discoverCodebaseContext(
     scanDurationMs: duration,
     sourceFilesDetected,
     metaAgent,
+    projectDefaults,
   };
 }

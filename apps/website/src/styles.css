@@ -1239,15 +1239,6 @@ fieldset {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.signup-provider {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 36px;
-  margin-top: 4px;
-  color: var(--color-text-muted);
-  font-size: 10px;
-}
 .signup-error {
   font-size: 12px;
   color: var(--color-danger);
@@ -1446,9 +1437,6 @@ fieldset {
 }
 .waitlist-dialog .signup-error {
   font-size: 12px;
-}
-.waitlist-dialog .signup-provider {
-  margin-top: 8px;
 }
 :where(.waitlist-dialog) .signup .button {
   width: 100%;

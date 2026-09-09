@@ -158,6 +158,7 @@ pub fn run() {
             task_mark_reviewed,
             commands::outcomes::task_outcome_snapshot,
             commands::readiness::project_readiness,
+            commands::readiness::project_defaults,
             commands::previews::task_preview_start,
             commands::previews::task_preview_status,
             commands::previews::task_preview_stop,

@@ -637,14 +637,12 @@ export function LandingPage({
               <p>
                 {available
                   ? 'Install Jackalope for Windows and connect your coding agents.'
-                  : 'Join the waitlist. We’ll email you when access opens.'}
+                  : 'We’ll email you when access opens.'}
               </p>
               {downloadAction}
-              <p className="availability">
-                {available
-                  ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
-                  : 'Coming soon · No payment to join'}
-              </p>
+              {available && (
+                <p className="availability">Windows x64 · {releaseVersion ?? 'Available now'}</p>
+              )}
             </div>
             <BrandMark className="finale-mark" />
           </div>

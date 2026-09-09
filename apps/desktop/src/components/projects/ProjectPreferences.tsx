@@ -18,14 +18,19 @@ export function ProjectPreferences({
   const project = projects.find((p) => p.id === (projectId ?? activeProjectId));
   return (
     <section className={embedded ? 'project-preferences' : 'workspace-page project-preferences'}>
-      {!embedded && <WorkspaceHeading title="Project settings" description={project?.name} />}
+      {!embedded && (
+        <WorkspaceHeading
+          title="Project settings"
+          description={project ? `${project.name} · ${project.path}` : undefined}
+        />
+      )}
       {!project ? (
         <p className="settings-section-subtitle mt-4">
           Open a repository to configure project preferences.
         </p>
       ) : (
         <>
-          <div className="project-workspace-fields project-identity-fields">
+          <div className="project-workspace-fields">
             <div className="project-preference-field">
               <label htmlFor="project-name">Project name</label>
               <input
@@ -34,10 +39,6 @@ export function ProjectPreferences({
                 value={project.name}
                 onChange={(e) => updateProject(project.id, { name: e.target.value })}
               />
-            </div>
-            <div className="project-preference-field">
-              <span className="project-field-label">Repository path</span>
-              <p className="project-repository-path">{project.path}</p>
             </div>
           </div>
           {!embedded && (
