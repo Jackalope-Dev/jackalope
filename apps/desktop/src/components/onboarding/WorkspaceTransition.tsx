@@ -18,15 +18,22 @@ export function WorkspaceTransition({
     state.projects.find((item) => item.id === state.activeProjectId),
   );
   const [checks, setChecks] = useState<
-    { id: string; label: string; state: 'running' | 'complete' | 'failed'; error?: string }[]
+    {
+      id: string;
+      label: string;
+      state: 'running' | 'complete' | 'failed';
+      error?: string;
+      optional?: boolean;
+    }[]
   >([]);
   const [minimumElapsed, setMinimumElapsed] = useState(false);
   const [slow, setSlow] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const finished = useRef(false);
-  const preparing = !checks.length || checks.some((check) => check.state === 'running');
-  const errors = checks.filter((check) => check.state === 'failed');
+  const preparing =
+    !checks.length || checks.some((check) => check.state === 'running' && !check.optional);
+  const errors = checks.filter((check) => check.state === 'failed' && !check.optional);
   const error = errors.map((check) => `${check.label}: ${check.error}`).join('\n');
 
   useEffect(() => {
@@ -40,7 +47,7 @@ export function WorkspaceTransition({
     let disposed = false;
     setSlow(false);
     const jobs = prepareWorkspace(project);
-    setChecks(jobs.map(({ id, label }) => ({ id, label, state: 'running' })));
+    setChecks(jobs.map(({ id, label, optional }) => ({ id, label, optional, state: 'running' })));
     const update = (id: string, state: 'complete' | 'failed', cause?: unknown) => {
       if (!disposed)
         setChecks((current) =>

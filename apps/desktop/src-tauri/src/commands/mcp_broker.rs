@@ -60,11 +60,11 @@ pub struct ExecuteInput {
 }
 
 pub(super) fn validate_connection(server: &McpServerConfig) -> Result<(), String> {
-    if !server.scope.starts_with("project:")
+    if !(server.scope.starts_with("project:") || (server.scope == "global" && server.managed))
         || !["stdio", "http"].contains(&server.transport.as_str())
     {
         return Err(
-            "On-demand discovery requires a project stdio or Streamable HTTP connection.".into(),
+            "On-demand discovery requires a managed stdio or Streamable HTTP connection.".into(),
         );
     }
     for key in server.extra.keys() {

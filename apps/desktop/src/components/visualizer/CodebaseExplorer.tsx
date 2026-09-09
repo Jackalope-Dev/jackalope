@@ -9,12 +9,15 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   Download,
   FileCode2,
   Folder,
+  ListTodo,
   Network,
   RefreshCw,
   Search,
+  Settings2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -26,17 +29,20 @@ import {
 } from '../../lib/codebase';
 import { dependencyCycles, directoryOf, GRAPH_LIMIT, mapGraph } from '../../lib/codebase-graph';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
+import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import '@xyflow/react/dist/style.css';
 import './codebase.css';
 
 export default function CodebaseExplorer({ project }: { project: Project }) {
+  const memory = useContextMemoryStore((state) => state.memories[project.id]);
   const [snapshot, setSnapshot] = useState<CodebaseSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -64,14 +70,16 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
 
   useEffect(() => {
     let canceled = false;
-    const prepared = preparedCodebase(project.path);
+    const prepared =
+      preparedCodebase(project.path) ??
+      (isTauriEnvironment() ? scanCodebase(project.path, false) : undefined);
     if (prepared) {
       setBusy(true);
       void prepared
         .then((value) => {
           if (!canceled) {
             setSnapshot(value);
-            setStale(true);
+            setStale(false);
           }
         })
         .catch((cause) => {
@@ -105,7 +113,6 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
         if (canceled) void cleanup().catch(() => {});
         else {
           stop = cleanup;
-          invalidate();
         }
       })
       .catch(() => {
@@ -294,17 +301,53 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
       <p className="task-path codebase-root" title={project.path}>
         {project.path}
       </p>
+      <div className="codebase-landing">
+        <div className="codebase-intro">
+          <h2>{project.name}</h2>
+          <p className="task-muted">
+            {memory?.summary ||
+              project.description ||
+              'Explore this repository, review its context, and turn open work into tasks.'}
+          </p>
+          {memory?.techStack?.length ? (
+            <div className="codebase-stack">
+              {memory.techStack.slice(0, 6).map((tech) => (
+                <span key={tech}>{tech}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <nav className="codebase-shortcuts" aria-label="Project shortcuts">
+          <Button variant="outline" onClick={() => navigateWorkspace('project-knowledge')}>
+            <BookOpen size={18} />
+            <span>
+              Project context<small>Instructions and saved knowledge</small>
+            </span>
+            <ArrowRight size={16} />
+          </Button>
+          <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
+            <ListTodo size={18} />
+            <span>
+              Repo TODOs<small>Review open work and start a task</small>
+            </span>
+            <ArrowRight size={16} />
+          </Button>
+          <Button variant="outline" onClick={() => navigateWorkspace('project-settings')}>
+            <Settings2 size={18} />
+            <span>
+              Project settings<small>Agents, appearance and workflow</small>
+            </span>
+            <ArrowRight size={16} />
+          </Button>
+        </nav>
+      </div>
       {error && (
         <p role="alert" className="task-error">
           {error}
           {snapshot && ' The previous snapshot is still shown.'}
         </p>
       )}
-      {busy && (
-        <p role="status" className="task-muted">
-          Reading local files and resolving references…
-        </p>
-      )}
+      {busy && <LoadingState compact={!!snapshot} label="Mapping files and references…" />}
       {watchError && (
         <p role="status" className="task-muted">
           {watchError}
@@ -316,15 +359,17 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
         </p>
       )}
       {!snapshot ? (
-        <EmptyState
-          icon={Network}
-          title={busy ? 'Building your map' : 'A map of the code you have'}
-          description={
-            isTauriEnvironment()
-              ? 'Explore file references and dependency cycles.'
-              : 'Open the desktop app to analyze this repository.'
-          }
-        />
+        busy ? null : (
+          <EmptyState
+            icon={Network}
+            title={busy ? 'Building your map' : 'A map of the code you have'}
+            description={
+              isTauriEnvironment()
+                ? 'Explore file references and dependency cycles.'
+                : 'Open the desktop app to analyze this repository.'
+            }
+          />
+        )
       ) : (
         <>
           <div className="codebase-summary">

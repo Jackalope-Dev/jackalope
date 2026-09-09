@@ -1,5 +1,7 @@
+import { useCapacityStore } from '../stores/capacityStore';
 import { useContextMemoryStore } from '../stores/contextMemoryStore';
 import { useExecutionStore } from '../stores/executionStore';
+import { useMcpStore } from '../stores/mcpStore';
 import { type Project, useProjectStore } from '../stores/projectStore';
 import { prepareCodebase } from './codebase';
 import { nativeTask } from './task-runtime';
@@ -9,6 +11,7 @@ export interface PreparationJob {
   id: string;
   label: string;
   result: Promise<void>;
+  optional?: boolean;
 }
 
 const pending = new Map<string, Promise<void>>();
@@ -40,6 +43,36 @@ export function prepareWorkspace(project: Project | undefined): PreparationJob[]
       const error = useExecutionStore.getState().discoveryError;
       if (error) throw new Error(error);
     }),
+  );
+  jobs.push(
+    {
+      ...job('capacity', 'Reading account quotas', () => useCapacityStore.getState().fetch(false)),
+      optional: true,
+    },
+    {
+      ...job('connections', 'Loading configured tools', () =>
+        useMcpStore.getState().loadServers(project?.id),
+      ),
+      optional: true,
+    },
+    {
+      ...job('models', 'Reading agent model catalogs', async () => {
+        await useExecutionStore.getState().discover(false);
+        const runners = useExecutionStore
+          .getState()
+          .runners.filter(
+            (runner) => runner.available && ['codex', 'claude', 'opencode'].includes(runner.id),
+          );
+        const results = await Promise.allSettled(
+          runners.map((runner) => nativeTask('agent_models', { agent: runner.id, refresh: false })),
+        );
+        if (results.some((result) => result.status === 'rejected'))
+          throw new Error(
+            'Some model catalogs are unavailable. They can be refreshed in agent configuration.',
+          );
+      }),
+      optional: true,
+    },
   );
   if (project) {
     const key = `${project.id}:${project.path}`;

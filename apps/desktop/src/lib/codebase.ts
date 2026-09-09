@@ -28,17 +28,23 @@ export interface CodebaseSnapshot {
   truncated: boolean;
 }
 
+const snapshots = new Map<string, { value: CodebaseSnapshot; at: number }>();
 const scans = new Map<string, Promise<CodebaseSnapshot>>();
 let prepared: { path: string; result: Promise<CodebaseSnapshot> } | undefined;
 
-export function scanCodebase(repoPath: string): Promise<CodebaseSnapshot> {
+export function scanCodebase(repoPath: string, force = true): Promise<CodebaseSnapshot> {
+  const cached = snapshots.get(repoPath);
+  if (!force && cached && Date.now() - cached.at < 120_000) return Promise.resolve(cached.value);
   const pending = scans.get(repoPath);
   if (pending) return pending;
   if (prepared?.path === repoPath) prepared = undefined;
   const result = (async () => {
     if (!isTauriEnvironment()) throw new Error('Open the desktop app to analyze local files.');
     const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<CodebaseSnapshot>('codebase_scan', { repoPath });
+    const value = await invoke<CodebaseSnapshot>('codebase_scan', { repoPath });
+    if (snapshots.size >= 8) snapshots.delete(snapshots.keys().next().value!);
+    snapshots.set(repoPath, { value, at: Date.now() });
+    return value;
   })().finally(() => scans.delete(repoPath));
   scans.set(repoPath, result);
   return result;
