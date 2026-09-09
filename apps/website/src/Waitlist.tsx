@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
 import { DesktopConnection } from './DesktopConnection';
+import { type Preferences, WaitlistQuestions } from './WaitlistPreferences';
 import './access.css';
 import './waitlist.css';
 
@@ -14,6 +15,7 @@ interface Place {
   pending: number;
   priorityDays: number;
   shareUrl: string;
+  preferences: Preferences | null;
 }
 const shareMessage =
   'Join me on the Jackalope waitlist. A cross-platform workspace for coding agents, with room for your projects, changes, and review.';
@@ -287,6 +289,10 @@ export function WaitlistPage() {
               </div>
             </div>
           </section>
+          <WaitlistQuestions
+            answers={place.preferences}
+            onSaved={(preferences) => setPlace({ ...place, preferences })}
+          />
           <aside className="waitlist-next">
             <BrandMark />
             <div>
