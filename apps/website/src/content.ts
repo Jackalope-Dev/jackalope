@@ -7,15 +7,16 @@ export const siteOrigin = 'https://jackalope.dev';
 export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.digital' };
 
 export const tour = {
-  title: 'A little look around Jackalope.',
+  title: 'More room to build.',
   description:
-    'See how tasks, coding agents, and code review come together in a 32-second app tour with sample project data.',
-  video: '/media/launch-v3-720p.mp4',
-  poster: '/media/launch-v3-poster.png',
-  captions: '/media/launch-v3.vtt',
-  published: '2026-09-08T21:45:00Z',
+    'Explore themes, project setup, task dispatch, browser tools, agent accounts, and the interactive codebase map in a 64-second tour with sample data.',
+  durationSeconds: 64,
+  video: '/media/launch-v4-720p.mp4',
+  poster: '/media/launch-v4-poster.png',
+  captions: '/media/launch-v4.vtt',
+  published: '2026-09-09T18:00:00Z',
   transcript:
-    'One workspace. More possibilities. A cross-platform workspace for coding agents. Run coding agents in parallel Git worktrees. Bring Codex, Claude Code, Grok or OpenCode. Inspect the result before applying changes. Your agents. Parallel work. One place to review. Get early access to Jackalope: join the waitlist. This animated preview uses the light-theme app with fictional Atlas project data and instrumental music; no agent task is launched.',
+    'Your next idea. Already in motion. Choose a theme, set up a project and its agents, and open your workspace. Describe an outcome and dispatch a task. Watch a sample browser booking flow, then inspect its check results and screenshot evidence in Jackalope. Bring Codex, Claude Code, Grok, and OpenCode together, with separate work and personal accounts. Explore directories and file dependencies in the interactive codebase map. More room to build. Get early access at jackalope.dev. This recorded frontend walkthrough uses fictional Atlas data and an original instrumental track. Task execution, account identities, and check results are sample states; browser interactions are scripted. No native agent task or Windows app-control session is launched.',
 };
 
 export const posts = [

@@ -64,9 +64,11 @@ export function JournalPage({ path }: { path: string }) {
         <header className="article-heading">
           <h1>{tour.title}</h1>
           <p className="article-deck">
-            From an idea to a patch you can review. See how the workspace feels.
+            Make it yours, put your agents to work, and explore how your code fits together.
           </p>
-          <p className="article-byline">32 seconds · Animated app preview · Sample data · Music</p>
+          <p className="article-byline">
+            {tour.durationSeconds} seconds · Product walkthrough · Sample data · Music
+          </p>
         </header>
         <video
           className="tour-player"

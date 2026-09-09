@@ -22,6 +22,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 import { ConnectedWorkspace } from './ConnectedWorkspace';
+import { tour } from './content';
 
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
@@ -388,7 +389,7 @@ export function LandingPage({
                 {action}
                 <button type="button" onClick={onPlay} className="landing-text-button">
                   <Play size={15} fill="currentColor" />
-                  Watch the 32-second tour
+                  Watch the {tour.durationSeconds}-second tour
                 </button>
               </div>
               <span className="availability">
@@ -403,24 +404,24 @@ export function LandingPage({
               type="button"
               className="hero-window"
               onClick={onPlay}
-              aria-label="Play the 32-second Jackalope app tour"
+              aria-label={`Play the ${tour.durationSeconds}-second Jackalope app tour`}
             >
               <span className="hero-window-meta">
-                <span>Tasks, together.</span>
+                <span>More room to build.</span>
                 <span>Atlas sample project</span>
               </span>
               <img
-                src={`/media/tasks${dark ? '' : '-light'}.png`}
-                width="1440"
-                height="840"
-                alt="Jackalope task board with separate project work ready, running, and under review"
+                src={tour.poster}
+                width="1920"
+                height="1080"
+                alt="Jackalope product tour featuring the updated task workspace"
               />
               <span className="hero-film-cue">
                 <span>
                   <Play size={18} fill="currentColor" /> See the workspace in action
                 </span>
                 <span>
-                  32 sec <ArrowUpRight size={16} />
+                  {tour.durationSeconds} sec <ArrowUpRight size={16} />
                 </span>
               </span>
             </button>

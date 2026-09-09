@@ -146,7 +146,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       description: tour.description,
       thumbnailUrl: `${origin}${tour.poster}`,
       uploadDate: tour.published,
-      duration: 'PT32S',
+      duration: `PT${tour.durationSeconds}S`,
       contentUrl: `${origin}${tour.video}`,
       transcript: tour.transcript,
       inLanguage: 'en',
