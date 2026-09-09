@@ -603,6 +603,7 @@ mod tests {
             email: None,
             verified_at: 0,
             feedback: feedback::LocalFeedback::default(),
+            settings_sync: false,
         };
         let result = serde_json::to_string(&status("pending", Some(&record))).unwrap();
         assert!(!result.contains(&record.secret));
@@ -621,6 +622,7 @@ mod tests {
             email: None,
             verified_at: 0,
             feedback: feedback::LocalFeedback::default(),
+            settings_sync: false,
         };
         assert!(bound(
             &record,
