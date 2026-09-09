@@ -7,14 +7,25 @@ import { settingsRoute } from './settings';
 const lifetime = 90 * 86400000;
 export async function deviceMember(env: Env, hash: string, now = Date.now()) {
   return env.DB.prepare(
-    "SELECT d.id,d.expires_at AS expiresAt,m.id AS memberId,m.email FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL",
+    "SELECT d.id,d.name AS deviceName,d.expires_at AS expiresAt,m.id AS memberId,m.email FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL",
   )
     .bind(hash, now)
-    .first<{ id: string; expiresAt: number; memberId: string; email: string }>();
+    .first<{
+      id: string;
+      deviceName: string | null;
+      expiresAt: number;
+      memberId: string;
+      email: string;
+    }>();
 }
 
 function publicDevice(member: NonNullable<Awaited<ReturnType<typeof deviceMember>>>) {
-  return { id: member.id, expiresAt: member.expiresAt, email: member.email };
+  return {
+    id: member.id,
+    deviceName: member.deviceName,
+    expiresAt: member.expiresAt,
+    email: member.email,
+  };
 }
 export async function deviceRoutes(
   request: Request,
@@ -56,6 +67,24 @@ export async function deviceRoutes(
     const token = request.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
     if (!token) throw new AccessError(401, 'device_sign_in_required');
     const hash = await tokenHash(token);
+    if (url.pathname === '/v1/desktop/name' && request.method === 'POST') {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      const { name } = z
+        .strictObject({
+          name: z
+            .string()
+            .trim()
+            .min(1)
+            .max(120)
+            .refine((value) => !/[\p{Cc}\p{Cf}]/u.test(value)),
+        })
+        .parse(await readJson(request));
+      await env.DB.prepare('UPDATE access_devices SET name=? WHERE id=? AND member_id=?')
+        .bind(name, member.id, member.memberId)
+        .run();
+      return json({ success: true });
+    }
     if (url.pathname === '/v1/desktop/settings/consent' && request.method === 'POST') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');

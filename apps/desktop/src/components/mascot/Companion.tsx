@@ -42,6 +42,7 @@ export function Companion({
   const loading = useExecutionStore((state) => state.loading);
   const error = useExecutionStore((state) => state.error);
   const mood = useMascotStore((state) => state.mood);
+  const message = useMascotStore((state) => state.message);
   const reactions = useSettingsStore((state) => state.mascotReactions);
   const level = useSettingsStore((state) => state.notifications);
   const notices = sortNotices(Object.values(sources).flat());
@@ -53,7 +54,9 @@ export function Companion({
   const seen = useRef(new Set<string>());
   useEffect(() => {
     const current: Pick<CompanionNotice, 'id' | 'title' | 'kind'>[] = JSON.parse(announcementKey);
-    const next = current.find((notice) => !seen.current.has(notice.id));
+    const next = current.find(
+      (notice) => !seen.current.has(notice.id) && !notice.id.startsWith('message:'),
+    );
     for (const notice of current) seen.current.add(notice.id);
     if (next && !open) setHint(next);
   }, [announcementKey, open]);
@@ -98,15 +101,20 @@ export function Companion({
         </div>
         <Popover.Anchor asChild>
           <div className="companion-anchor">
-            {!open && hint && !readIds.includes(hint.id) && shouldNotify(hint.kind, level) && (
-              <div key={hint.id} className="companion-hint" data-motion={reactions} role="status">
-                {hint.title}
-              </div>
-            )}
+            {!open &&
+              !message &&
+              hint &&
+              !readIds.includes(hint.id) &&
+              shouldNotify(hint.kind, level) && (
+                <div key={hint.id} className="companion-hint" data-motion={reactions} role="status">
+                  {hint.title}
+                </div>
+              )}
             <JackalopeMascot
               size="sm"
               className="companion-avatar"
-              showBubble={false}
+              showBubble={!open}
+              bubbleAlign="end"
               overrideMood={currentMood}
               reduceMotion={!reactions}
               onActivate={() => setOpen((value) => !value)}

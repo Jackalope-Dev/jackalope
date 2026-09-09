@@ -1412,24 +1412,6 @@ fieldset {
   color: var(--color-accent-ink);
   font-style: normal;
 }
-.waitlist-perks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  list-style: none;
-  padding: 0;
-  margin: 18px 0 0;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-}
-.waitlist-perks li {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.waitlist-perks svg {
-  color: var(--color-accent-ink);
-}
 @keyframes invitation-arrive {
   from {
     opacity: 0;

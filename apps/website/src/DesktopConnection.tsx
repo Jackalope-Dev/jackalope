@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { EchoMark } from '@jackalope/brand/echo';
+import { Check, Monitor } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
 
 const storageKey = 'jackalope-desktop-approval';
@@ -18,7 +20,12 @@ export function DesktopConnection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
+  const [approved, setApproved] = useState(false);
+  const resultHeading = useRef<HTMLHeadingElement>(null);
   const [expiresAt, setExpiresAt] = useState(Date.now() + 10 * 60000);
+  useEffect(() => {
+    if (done) resultHeading.current?.focus();
+  }, [done]);
   useEffect(() => {
     function readRequest() {
       const url = new URL(window.location.href);
@@ -26,6 +33,7 @@ export function DesktopConnection({
       const token = fragment.get('desktop');
       if (token) {
         setDone('');
+        setApproved(false);
         setError('');
         setMatches(false);
         setPreview(null);
@@ -134,6 +142,8 @@ export function DesktopConnection({
         /* Storage can be disabled. */
       }
       setVerification('');
+      setApproved(action === 'approve' && !waiting);
+      if (action === 'approve') window.dispatchEvent(new Event('jackalope-desktops-changed'));
       setDone(
         action === 'approve'
           ? waiting
@@ -149,9 +159,26 @@ export function DesktopConnection({
   }
   if (done)
     return (
-      <section className="access-card">
-        <h2>Desktop connection</h2>
-        <p role="status">{done}</p>
+      <section className="access-card desktop-connection-result" aria-live="polite">
+        {approved && (
+          <div className="desktop-connection-celebration" aria-hidden="true">
+            <EchoMark animated={false} />
+            <span>
+              <Check size={26} strokeWidth={3} />
+            </span>
+          </div>
+        )}
+        <h2 ref={resultHeading} tabIndex={-1}>
+          {approved ? 'Your desktop is approved.' : 'Desktop connection'}
+        </h2>
+        <p role="status">
+          {approved ? 'Return to the Jackalope app to continue setting up your workspace.' : done}
+        </p>
+        {approved && (
+          <p className="desktop-return-note">
+            You can close this tab. Jackalope will continue automatically.
+          </p>
+        )}
       </section>
     );
   if (!verification) return null;
@@ -241,6 +268,7 @@ export function DesktopConnection({
 
 interface Device {
   id: string;
+  name?: string | null;
   createdAt: number;
   expiresAt: number;
 }
@@ -249,19 +277,39 @@ export function ConnectedDesktops() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [confirm, setConfirm] = useState('');
+  const request = useRef<AbortController | null>(null);
   const load = useCallback(async () => {
-    setError('');
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
     try {
-      setDevices(await accessRequest<Device[]>('devices'));
+      const next = await accessRequest<Device[]>('devices', undefined, controller.signal);
+      if (!controller.signal.aborted) {
+        setDevices(next);
+        setError('');
+      }
     } catch (cause) {
-      setError(accessMessage(cause));
+      if (!controller.signal.aborted) setError(accessMessage(cause));
+    } finally {
+      if (request.current === controller) request.current = null;
     }
   }, []);
   useEffect(() => {
     void load();
-    const refresh = () => void load();
+    const refresh = () => {
+      if (document.visibilityState === 'visible' && !request.current) void load();
+    };
+    const timer = setInterval(refresh, 5000);
     window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
+    window.addEventListener('jackalope-desktops-changed', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      request.current?.abort();
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('jackalope-desktops-changed', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, [load]);
   async function revoke(id: string) {
     if (busy) return;
@@ -277,9 +325,9 @@ export function ConnectedDesktops() {
     }
   }
   return (
-    <section className="access-card">
+    <section className="access-card connected-desktops">
       <h2>Connected desktops</h2>
-      <p>
+      <p className="connected-desktops-description">
         Connect from Settings → Jackalope account in the app. Disconnecting removes account access
         on that desktop; its local projects and agent accounts remain available.
       </p>
@@ -288,7 +336,10 @@ export function ConnectedDesktops() {
       {devices?.map((device) => (
         <div key={device.id} className="desktop-device-row">
           <div>
-            <strong>Connected desktop</strong>
+            <strong className="desktop-device-name">
+              <Monitor size={18} />
+              {device.name || `Desktop ${device.id.slice(0, 8)}`}
+            </strong>
             <p>Connected {new Date(device.createdAt).toLocaleString()}</p>
           </div>
           <div className="desktop-connection-actions">

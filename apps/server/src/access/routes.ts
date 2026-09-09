@@ -235,7 +235,7 @@ export async function accessRoutes(
       return json(
         (
           await env.DB.prepare(
-            'SELECT id,created_at AS createdAt,expires_at AS expiresAt FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 10',
+            'SELECT id,name,created_at AS createdAt,expires_at AS expiresAt FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 10',
           )
             .bind(member.id, Date.now())
             .all()

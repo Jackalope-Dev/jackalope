@@ -1,7 +1,9 @@
-import { ArrowUpRight, Check, Copy, Mail, RefreshCw, Ticket } from 'lucide-react';
+import { PassTickets } from '@jackalope/brand/passes';
+import { ArrowUpRight, Check, Copy, Mail, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useMascotStore } from '../../stores/mascotStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
@@ -19,14 +21,13 @@ async function openExternal(url: string) {
 export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
   const { referrals, loading, error: fetchError, load } = useReferralStore();
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   useEffect(() => {
     void load(false);
   }, [load]);
   const copy = async (value: string, success: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      setNotice(success);
+      useMascotStore.getState().say(success, 3500);
       setError('');
     } catch {
       setError('Could not copy to the clipboard. Select and copy the invitation link instead.');
@@ -78,31 +79,18 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
           <strong>{referrals.remaining}</strong>
           <span>of {referrals.limit} Instant Access Passes available</span>
         </div>
-        <p>
-          {referrals.accepted
-            ? `${referrals.accepted} accepted · ${referrals.downloaded} downloaded · ${referrals.connected} connected`
-            : 'Invite a developer who would enjoy working with local coding agents.'}
-        </p>
-      </div>
-      <ol className="desktop-pass-strip" aria-label="Instant Access Pass allowance">
-        {Array.from({ length: Math.min(referrals.limit, 100) }, (_, index) => index + 1).map(
-          (passNumber) => {
-            const state =
-              passNumber <= referrals.accepted
-                ? 'Claimed'
-                : passNumber <= referrals.limit - referrals.remaining
-                  ? 'Reserved'
-                  : 'Available';
-            return (
-              <li key={passNumber} data-state={state}>
-                <Ticket size={24} />
-                <strong>Pass {passNumber}</strong>
-                <span>{state}</span>
-              </li>
-            );
-          },
+        {referrals.accepted > 0 && (
+          <p>
+            {referrals.accepted} accepted · {referrals.downloaded} downloaded ·{' '}
+            {referrals.connected} connected
+          </p>
         )}
-      </ol>
+      </div>
+      <PassTickets
+        {...referrals}
+        actionLabel="Copy pass link"
+        onSelect={() => void copy(referrals.shareUrl, 'Pass link copied.')}
+      />
       <p className="settings-row-description">
         Each pass lets one person skip the waitlist. These are separate from unlimited waitlist
         referrals.
@@ -163,10 +151,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
         Places are claimed after email verification. You can see who accepts and whether they
         connect a desktop; Jackalope does not share their projects or task activity.
       </p>
-      <p className="settings-row-description referral-notice" role="status" aria-live="polite">
-        {notice}
-      </p>
-      {referrals.invites.length ? (
+      {referrals.invites.length > 0 && (
         <div className="referral-progress">
           <div className="referral-progress-heading">
             <h3>Your people</h3>
@@ -204,8 +189,6 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
             ))}
           </ul>
         </div>
-      ) : (
-        <p className="settings-row-description">Your passes are ready for good company.</p>
       )}
       <Button variant="outline" onClick={() => void openManagement()}>
         Manage email passes <ArrowUpRight size={16} />

@@ -85,6 +85,14 @@ cost. Do not add free text, paths or credentials to this protocol.
 
 ## Rollout and checks
 
+Migration `0013_desktop_names.sql` adds an optional name to connected devices.
+New desktop clients fill in or refresh their computer name through the authenticated
+device-name endpoint. The native response advertises support through `deviceName`;
+older services omit that field and are left untouched. Names are bounded to 120
+characters, reject control/format characters and are returned only to the owning
+account. They are device metadata, outside the portable-settings allowlist.
+Apply the migration before deploying the matching Worker and website.
+
 Migration `0011_settings_sync.sql` adds the settings table and per-device consent,
 defaulting every existing device to off. Apply before deploying the matching
 Worker; older service and desktop builds remain compatible with this additive

@@ -8,12 +8,15 @@ pub struct SystemInfo {
     pub git_available: bool,
 }
 
-#[tauri::command]
-pub async fn system_get_info() -> Result<SystemInfo, String> {
-    let hostname = match std::env::var("COMPUTERNAME") {
+pub(super) fn device_name() -> String {
+    match std::env::var("COMPUTERNAME") {
         Ok(name) => name,
         Err(_) => std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string()),
-    };
+    }
+}
+
+#[tauri::command]
+pub async fn system_get_info() -> Result<SystemInfo, String> {
 
     let git_available = std::process::Command::new("git")
         .arg("--version")
@@ -24,7 +27,7 @@ pub async fn system_get_info() -> Result<SystemInfo, String> {
     Ok(SystemInfo {
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
-        device_name: hostname,
+        device_name: device_name(),
         git_available,
     })
 }

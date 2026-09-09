@@ -467,3 +467,123 @@
   padding: 24px 0;
   border-top: 1px solid var(--color-border);
 }
+.connected-desktops .connected-desktops-description {
+  margin-bottom: 32px;
+  max-width: 760px;
+}
+.desktop-device-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.desktop-device-name svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+.desktop-connection-result {
+  text-align: center;
+  padding: 48px 24px;
+}
+.desktop-connection-result > p {
+  max-width: 480px;
+  margin: 12px auto 0;
+}
+.desktop-connection-result .desktop-return-note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.desktop-connection-celebration {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 28px;
+  color: var(--color-accent-ink);
+  animation: desktop-approval-in 550ms ease-out both;
+}
+.desktop-connection-celebration > svg {
+  width: 100%;
+  height: 100%;
+}
+.desktop-connection-celebration > span {
+  position: absolute;
+  right: -4px;
+  bottom: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-on-action);
+  background: var(--color-action);
+  box-shadow: 0 0 0 6px var(--color-surface);
+  animation: desktop-approval-in 400ms 160ms ease-out both;
+}
+@keyframes desktop-approval-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.pass-dialog {
+  width: min(520px, calc(100% - 32px));
+}
+.pass-dialog label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 16px 0 10px;
+}
+.pass-dialog input {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  background: var(--color-surface-sunken);
+  font: inherit;
+  font-size: 13px;
+}
+.pass-dialog .button {
+  width: 100%;
+  margin-top: 16px;
+}
+.pass-dialog input:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.pass-dialog form {
+  margin-top: 24px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+.pass-dialog form > p {
+  margin: 0 0 12px;
+}
+.pass-dialog .pass-dialog-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--color-success);
+}
+.pass-dialog-notice svg {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .pass-dialog {
+    padding: 30px 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-connection-celebration,
+  .desktop-connection-celebration > span {
+    animation: none;
+  }
+}

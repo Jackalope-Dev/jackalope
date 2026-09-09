@@ -254,6 +254,30 @@ fn failure(code: u16) -> String {
     }
     .into()
 }
+
+async fn sync_device_name(api: &reqwest::Url, secret: &str, data: &serde_json::Value) {
+    // Older services omit this field and do not support device names.
+    if data.get("deviceName").is_none() {
+        return;
+    }
+    let name: String = super::system::device_name()
+        .trim()
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(120)
+        .collect();
+    if name.is_empty() || data["deviceName"].as_str() == Some(name.as_str()) {
+        return;
+    }
+    let _ = request(
+        api,
+        "/v1/desktop/name",
+        reqwest::Method::POST,
+        Some(secret),
+        Some(serde_json::json!({ "name": name })),
+    )
+    .await;
+}
 #[tauri::command]
 pub async fn app_account_status(
     app: AppHandle,
@@ -318,6 +342,7 @@ impl AccountService {
                 record.expires_at = data["expiresAt"].as_i64().unwrap();
                 self.save(&record)?;
                 self.access.update(record.verified_at, record.expires_at);
+                sync_device_name(&api, &record.secret, &data).await;
                 Ok(status("connected", Some(&record)))
             }
             Ok((401, _)) => {
@@ -553,6 +578,7 @@ pub async fn app_account_poll(
             record.settings_sync_pending = record.settings_sync;
             state.save(&record)?;
             state.access.update(record.verified_at, record.expires_at);
+            sync_device_name(&api, &record.secret, &data).await;
             Ok(status("connected", Some(&record)))
         }
         _ => Err(failure(code)),

@@ -435,13 +435,6 @@ export function LandingPage({
                 </span>
               </span>
             </button>
-            <div className="hero-review-note">
-              <GitMerge size={21} />
-              <span>
-                <strong>Separate worktrees. One clear review.</strong>
-                <small>You choose what makes it into your project.</small>
-              </span>
-            </div>
           </div>
         </div>
       </section>
@@ -459,11 +452,6 @@ export function LandingPage({
               <br />
               All in one place.
             </h2>
-            <p>
-              From the first brief to the final diff.
-              <br />
-              Keep the work moving, and the decisions yours.
-            </p>
           </div>
           <div className="feature-grid">
             {features.map(({ icon: Icon, ...feature }) => (

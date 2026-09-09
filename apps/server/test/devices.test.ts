@@ -95,6 +95,43 @@ async function enableSync(secret: string) {
     (await call('/v1/desktop/settings/consent', 'POST', { enabled: true }, secret)).status,
   ).toBe(200);
 }
+it('stores bounded desktop names only for authenticated devices and lists them for their owner', async () => {
+  const owner = await member();
+  const stranger = await member();
+  const secret = await connectedDevice(owner);
+  const other = await connectedDevice(stranger);
+  expect(await (await call('/v1/desktop/me', 'GET', undefined, secret)).json()).toMatchObject({
+    deviceName: null,
+  });
+  expect((await call('/v1/desktop/name', 'POST', { name: 'Studio PC' })).status).toBe(401);
+  expect((await call('/v1/desktop/name', 'POST', { name: 'Studio PC' }, secret, true)).status).toBe(
+    403,
+  );
+  for (const name of ['', ' ', 'x'.repeat(121), 'Hidden\nname', 'Hidden\u202ename']) {
+    expect((await call('/v1/desktop/name', 'POST', { name }, secret)).status).toBe(400);
+  }
+  expect((await call('/v1/desktop/name', 'POST', { name: '  Studio PC  ' }, secret)).status).toBe(
+    200,
+  );
+  expect(await (await call('/v1/desktop/me', 'GET', undefined, secret)).json()).toMatchObject({
+    deviceName: 'Studio PC',
+  });
+  expect(await (await call('/v1/desktop/me', 'GET', undefined, other)).json()).toMatchObject({
+    deviceName: null,
+  });
+  const devices = await (
+    await call('/v1/access/devices', 'GET', undefined, owner.session, true)
+  ).json<{ name: string }[]>();
+  expect(devices).toHaveLength(1);
+  expect(devices[0].name).toBe('Studio PC');
+  expect(JSON.stringify(devices)).not.toContain(secret);
+  expect((await call('/v1/desktop/name', 'POST', { name: 'Travel laptop' }, secret)).status).toBe(
+    200,
+  );
+  expect(await (await call('/v1/desktop/me', 'GET', undefined, secret)).json()).toMatchObject({
+    deviceName: 'Travel laptop',
+  });
+});
 it('sync requires per-device consent and isolates accounts with strict versioned payloads', async () => {
   const secret = await connectedDevice(await member());
   const other = await connectedDevice(await member());

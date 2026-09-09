@@ -2,7 +2,7 @@ import { accessMessage, accessOrigin, accessRequest } from './access-api';
 import { waitlistReferral } from './referral';
 import './access.css';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, Check, GitBranch, Layers3, LoaderCircle, X } from 'lucide-react';
+import { ArrowRight, Check, LoaderCircle, X } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { BrandMark } from './BrandMark';
 import { signupActions } from './signup-config';
@@ -238,14 +238,6 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
             <Dialog.Description>
               Get an email when your access is ready. No payment to join.
             </Dialog.Description>
-            <ul className="waitlist-perks">
-              <li>
-                <Layers3 size={15} /> One home for your agents
-              </li>
-              <li>
-                <GitBranch size={15} /> Built for local projects
-              </li>
-            </ul>
             <Signup popup />
           </div>
         </Dialog.Content>

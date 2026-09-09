@@ -8,6 +8,7 @@
     "./theme": "./src/theme.ts",
     "./character": "./src/character.ts",
     "./echo": "./src/EchoMark.tsx",
+    "./passes": "./src/PassTickets.tsx",
     "./fonts.css": "./src/fonts.css",
     "./tokens": "./src/tokens.ts"
   },

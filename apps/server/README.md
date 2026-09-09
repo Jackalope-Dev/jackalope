@@ -7,6 +7,12 @@ identifiers. Pass `--config wrangler.deploy.jsonc` for remote operations. Follow
 [SERVER-LAUNCH.md](../../docs/SERVER-LAUNCH.md) for infrastructure, publication,
 monitoring, retention, recovery and the remaining activation gates.
 
+When adding migrations, apply them to the configured local, staging and production
+databases as part of the change. Check pending migrations before and after each
+application and record the results in `docs/STATUS.md`; do not leave migration
+application for a later deployment. Remote commands use the private deployment
+configuration and the explicit environment.
+
 ## Local development
 
 From the repository root, use Node 24 and the repository's pnpm version:

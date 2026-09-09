@@ -7,6 +7,7 @@ import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
@@ -77,6 +78,7 @@ export function Shell({
   initialDraftKey?: string;
   focusOnMount?: boolean;
 } = {}) {
+  const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
   const canvas = useRef<HTMLElement>(null);
   useEffect(() => {
     if (focusOnMount && !initialDraftKey && !initialTaskAgent && !initialCapture)
@@ -256,7 +258,7 @@ export function Shell({
               <kbd>{shortcut}</kbd>
             </button>
           </Tooltip>
-          <ArcColorPicker />
+          {showThemePicker && <ArcColorPicker />}
           <Tooltip content="Help Center">
             <button
               type="button"

@@ -8,6 +8,7 @@ import { useCommunityStore } from '../../stores/communityStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUpdateStore } from '../../stores/updateStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { type AccountStatus, JackalopeAccount } from '../settings/JackalopeAccount';
@@ -27,6 +28,8 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
   const onboarding = useOnboardingStore((state) => state.status);
   const hasProjects = useProjectStore((state) => state.projects.length > 0);
   const settings = useSettingsStore();
+  const version = useUpdateStore((state) => state.release?.currentVersion);
+  const loadRelease = useUpdateStore((state) => state.load);
   const reducedMotion = useReducedMotion();
   const [access, setAccess] = useState<AccessStatus | null>(null);
   const [account, setAccount] = useState<AccountStatus | null>(null);
@@ -38,6 +41,9 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
   const entered = useRef(false);
   const successHeading = useRef<HTMLHeadingElement>(null);
   const needsSetup = onboarding === 'new' || onboarding === 'active';
+  useEffect(() => {
+    void loadRelease();
+  }, [loadRelease]);
   useEffect(() => {
     let canceled = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -133,9 +139,11 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
       <ResizeHandles />
       <TitleBar />
       <main className="access-page">
-        <div className="access-appearance">
-          <ArcColorPicker scope="app" />
-        </div>
+        {settings.showThemePickerInToolbar && (
+          <div className="access-appearance">
+            <ArcColorPicker scope="app" />
+          </div>
+        )}
         <div className="access-atmosphere" aria-hidden="true" />
         {verified ? (
           <section
@@ -236,7 +244,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
             </footer>
           </section>
         )}
-        <p className="access-caption">Jackalope · Early access</p>
+        <p className="access-caption">Jackalope{version ? ` v${version}` : ''} · Early access</p>
       </main>
     </div>
   );

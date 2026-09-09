@@ -112,11 +112,12 @@ const privacy: Section[] = [
         </p>
         <p>
           If you choose to connect your Jackalope membership to the desktop, we store a device
-          identifier, a hash of its credential, your membership association, and connection and
-          expiry times. Connection requests expire after ten minutes; device credentials expire
-          after 90 days and can be revoked from the app or your account page. The Windows app
-          encrypts its local credential using Windows user protection. Connecting does not upload
-          your local projects or link your agent-provider credentials to your Jackalope membership.
+          identifier, its computer name, a hash of its credential, your membership association, and
+          connection and expiry times. Connection requests expire after ten minutes; device
+          credentials expire after 90 days and can be revoked from the app or your account page. The
+          Windows app encrypts its local credential using Windows user protection. Connecting does
+          not upload your local projects or link your agent-provider credentials to your Jackalope
+          membership.
         </p>
         <p>
           Optional settings sync saves your app colors, appearance, companion reactions and

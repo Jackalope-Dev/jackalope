@@ -13,7 +13,7 @@ import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from '
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import './access.css';
 import './waitlist.css';
-import { BrandMark } from './BrandMark';
+import { AccessPasses } from './AccessPasses';
 
 interface Invitation {
   id: string;
@@ -320,7 +320,9 @@ export function AccessPage() {
           >
             <div className="access-invite-intro">
               <div>
-                <h2 id="invite-heading">Bring your people.</h2>
+                <h2 id="invite-heading" tabIndex={-1}>
+                  Bring your people.
+                </h2>
                 <p>
                   Your {member.limit} Instant Access Passes let people skip the waitlist after email
                   verification. Once accepted, they get five passes of their own.
@@ -340,27 +342,12 @@ export function AccessPage() {
                 )}
               </div>
             </div>
-            <ol className="pass-strip" aria-label="Instant Access Pass allowance">
-              {Array.from({ length: Math.min(member.limit, 100) }, (_, index) => index + 1).map(
-                (passNumber) => {
-                  const state =
-                    passNumber <= member.accepted
-                      ? 'Claimed'
-                      : passNumber <= member.limit - member.remaining
-                        ? 'Reserved'
-                        : 'Available';
-                  return (
-                    <li key={passNumber} data-state={state}>
-                      <BrandMark />
-                      <strong>Instant Access</strong>
-                      <span>
-                        Pass {String(passNumber).padStart(2, '0')} · {state}
-                      </span>
-                    </li>
-                  );
-                },
-              )}
-            </ol>
+            <AccessPasses
+              member={member}
+              onSent={(updated) =>
+                setMember((current) => (current ? { ...current, ...updated } : current))
+              }
+            />
             <p className="access-fine">
               Your shared pass link draws from this allowance. Email passes reserve a place for
               seven days. <a href="/waitlist/">Your unlimited waitlist link</a> stays separate and

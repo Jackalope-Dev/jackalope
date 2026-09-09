@@ -1,5 +1,44 @@
 [
   {
+    "id": "a-tidier-appearance-page",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A tidier appearance page.",
+    "description": "Personalize your workspace with a compact theme editor and control over the top-bar picker.",
+    "items": [
+      "The settings theme editor uses a width closer to the pop-out picker.",
+      "A saved checkbox lets you hide the top-bar theme picker while keeping Appearance settings available."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "share-a-head-start",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Share a head start.",
+    "description": "Early access passes share colorful ticket designs across the website and desktop, while desktop connections are easier to follow.",
+    "items": [
+      "Open an available pass to copy its link or send an email invitation.",
+      "The same ticket artwork, colors and availability states appear in the app and on the website.",
+      "The in-app invitation screen keeps the focus on passes and sharing, with less introductory copy.",
+      "The companion confirms when an invitation link or message is copied.",
+      "Connected desktops refresh automatically and show computer names from updated apps.",
+      "Centered approval guidance makes it clear when to return to Jackalope."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "app-version-on-the-welcome-screen",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "App version on the welcome screen.",
+    "description": "See which version of Jackalope is running before connecting your account.",
+    "items": [
+      "The welcome footer shows the current app version alongside the name and Early access label."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "account-setup-and-optional-settings-sync",
     "date": "2026-09-09",
     "status": "In development",

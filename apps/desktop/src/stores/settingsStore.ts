@@ -8,6 +8,7 @@ export type NotificationLevel = 'all' | 'failures-only' | 'none';
 export interface SettingsState {
   // Experience & appearance
   mascotReactions: boolean;
+  showThemePickerInToolbar: boolean;
   notifications: NotificationLevel;
   osNotifications: boolean;
 
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: Omit<
   'updateSettings' | 'resetAll' | 'exportSettings' | 'setUseMcpMarketplace'
 > = {
   mascotReactions: true,
+  showThemePickerInToolbar: true,
   notifications: 'all' as const,
   osNotifications: true,
 

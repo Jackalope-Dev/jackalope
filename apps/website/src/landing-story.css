@@ -107,36 +107,6 @@
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
-.hero-review-note {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: max-content;
-  max-width: 100%;
-  margin: 20px 0 0 26px;
-  padding: 18px 22px;
-  border-left: 2px solid var(--color-accent-ink);
-  background: var(--color-bg);
-  box-shadow: var(--shadow-pop);
-  transform: rotate(-2deg);
-}
-.hero-review-note > svg {
-  flex-shrink: 0;
-  color: var(--color-accent-ink);
-}
-.hero-review-note strong,
-.hero-review-note small {
-  display: block;
-}
-.hero-review-note strong {
-  font-size: 12px;
-}
-.hero-review-note small {
-  margin-top: 5px;
-  font-size: 11px;
-  color: var(--color-text-secondary);
-}
 .landing-story .agent-line {
   margin-top: 0;
   min-height: 62px;
@@ -346,12 +316,6 @@
   letter-spacing: -0.065em;
   font-weight: 550;
 }
-.landing-story .feature-heading > p {
-  max-width: 370px;
-  margin: 0 0 5px;
-  font-size: 15px;
-  line-height: 1.8;
-}
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -548,10 +512,6 @@
   .hero-window-meta > span:last-child {
     display: none;
   }
-  .hero-review-note {
-    margin-left: 0;
-    padding: 16px;
-  }
   .hero-film-cue {
     padding-inline: 4px;
     gap: 8px;
@@ -596,17 +556,6 @@
   .landing-story .hero-window {
     width: 100%;
     transform: none;
-  }
-  .hero-review-note {
-    margin-top: 12px;
-    transform: none;
-    padding: 12px 16px;
-  }
-  .hero-review-note strong {
-    font-size: 11px;
-  }
-  .hero-review-note small {
-    font-size: 10px;
   }
   .journey-rail {
     grid-template-columns: 1fr;
