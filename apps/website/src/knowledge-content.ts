@@ -1,3 +1,136 @@
+export type GuideCategory =
+  | 'workflows'
+  | 'architecture'
+  | 'routing'
+  | 'agents'
+  | 'mcp'
+  | 'desktop-control'
+  | 'troubleshooting'
+  | 'themes';
+
+export interface CategoryInfo {
+  id: GuideCategory;
+  label: string;
+  description: string;
+}
+
+export const guideCategories: CategoryInfo[] = [
+  {
+    id: 'workflows',
+    label: 'Workflows & How-To',
+    description: 'Task composer, effort tiers, Pierre diffs, and recurring schedules.',
+  },
+  {
+    id: 'architecture',
+    label: 'Architecture',
+    description: 'Isolated Git worktrees, concurrency locks, and integration safeguards.',
+  },
+  {
+    id: 'routing',
+    label: 'Routing & Quotas',
+    description: 'Default-agent coordination, 5-hour quota windows, and 3-attempt failover.',
+  },
+  {
+    id: 'agents',
+    label: 'Agents & Accounts',
+    description: 'Codex, Claude Code, Grok, OpenCode, Work vs Personal sign-ins, and OS Keychain.',
+  },
+  {
+    id: 'mcp',
+    label: 'MCP & Tools',
+    description: 'Central Model Context Protocol broker, tool gating, and headless browser.',
+  },
+  {
+    id: 'desktop-control',
+    label: 'Desktop Control',
+    description: 'Attempt-scoped window grants, visual status bars, and physical input protection.',
+  },
+  {
+    id: 'troubleshooting',
+    label: 'Troubleshooting',
+    description: 'Resolving missing PATH, clearing stale Git locks, and history recovery.',
+  },
+  {
+    id: 'themes',
+    label: 'Themes & Atmosphere',
+    description: 'Color harmonies, 64-step atmosphere, and mascot companion reactions.',
+  },
+];
+
+export interface TroubleshootingScenario {
+  id: string;
+  title: string;
+  symptom: string;
+  quickFix: string;
+  targetSlug: string;
+  targetAnchor?: string;
+}
+
+export const troubleshootingScenarios: TroubleshootingScenario[] = [
+  {
+    id: 'cli-not-found',
+    title: 'CLI executable not found in PATH',
+    symptom:
+      'Desktop app reports "CLI not found" or "Command failed: codex/claude not recognized".',
+    quickFix:
+      'Windows GUI apps do not inherit PATH modifications made in open terminals without restarting Explorer or the Jackalope desktop app.',
+    targetSlug: 'fixing-cli-path-on-windows',
+  },
+  {
+    id: 'git-locked',
+    title: 'Git index or worktree is locked',
+    symptom: 'Unable to create or checkout worktree with error "fatal: .git/index.lock exists".',
+    quickFix:
+      'Confirm no background git or agent processes are running, then remove stale lockfiles and run git worktree prune.',
+    targetSlug: 'resolving-git-worktree-locks',
+  },
+  {
+    id: 'rate-limit-429',
+    title: 'Hit 5-hour quota or HTTP 429 limit',
+    symptom: 'Claude Code or Codex halts with rate limit or subscription window exhaustion.',
+    quickFix:
+      'Auto-routed tasks automatically failover to your next eligible provider account. Pinned tasks pause safely until window reset.',
+    targetSlug: 'task-routing-and-quotas',
+    targetAnchor: 'three-attempt-failover',
+  },
+  {
+    id: 'input-paused',
+    title: 'Desktop control paused unexpectedly',
+    symptom: 'Status bar displays "Jackalope is Paused" during window automation.',
+    quickFix:
+      'Physical mouse movement, keyboard touch, or window focus change immediately pauses control for human safety. Click Resume to continue.',
+    targetSlug: 'windows-desktop-control',
+    targetAnchor: 'physical-interruption',
+  },
+  {
+    id: 'mcp-timeout',
+    title: 'MCP tool connection failed or timed out',
+    symptom: 'Agent fails to discover or execute tools configured in Settings → MCP Tools.',
+    quickFix:
+      'Verify the local stdio command exists in PATH and check JSON-RPC port availability for SSE servers.',
+    targetSlug: 'connecting-custom-mcp-servers',
+    targetAnchor: 'debugging-mcp',
+  },
+  {
+    id: 'interrupted-task',
+    title: 'Task abruptly stopped after reboot',
+    symptom: 'A running task attempt appears frozen or incomplete following an unexpected restart.',
+    quickFix:
+      'Atomic SQLite write-ahead logging preserves all attempt history and partial patches. Click Resume in the Tasks view.',
+    targetSlug: 'troubleshooting-and-diagnostics',
+    targetAnchor: 'history-recovery',
+  },
+];
+
+export const likelyArticleSlugs = [
+  'fixing-cli-path-on-windows',
+  'resolving-git-worktree-locks',
+  'git-worktrees',
+  'task-routing-and-quotas',
+  'multi-account-and-agents',
+  'connecting-custom-mcp-servers',
+];
+
 export interface KnowledgeGuideSection {
   id: string;
   question: string;
@@ -15,6 +148,7 @@ export interface KnowledgeGuideSection {
 
 export interface KnowledgeGuide {
   slug: string;
+  category: GuideCategory;
   title: string;
   shortTitle: string;
   description: string;
@@ -23,8 +157,10 @@ export interface KnowledgeGuide {
 }
 
 export const knowledgeGuides: KnowledgeGuide[] = [
+  // 1. Git Worktrees (Architecture)
   {
     slug: 'git-worktrees',
+    category: 'architecture',
     title: 'Isolated Git Worktrees, Concurrency & Integration Safeguards',
     shortTitle: 'Git Worktrees & Concurrency',
     description:
@@ -117,8 +253,11 @@ git worktree unlock .worktrees/task-auth-flow`,
       },
     ],
   },
+
+  // 2. Task Routing & Quotas (Routing)
   {
     slug: 'task-routing-and-quotas',
+    category: 'routing',
     title: 'Automatic Task Routing, Quota Windows & Failover Handoff',
     shortTitle: 'Task Routing & Quotas',
     description:
@@ -192,8 +331,11 @@ Codex reads prior attempt diff, completes remaining tests, and exits 0`,
       },
     ],
   },
+
+  // 3. Agents & Multi-Account (Agents)
   {
     slug: 'multi-account-and-agents',
+    category: 'agents',
     title: 'Configuring Agents, Multi-Account Profiles & Credentials',
     shortTitle: 'Agents & Accounts',
     description:
@@ -264,8 +406,11 @@ which claude || where claude`,
       },
     ],
   },
+
+  // 4. MCP Hub & Browser Automation (MCP)
   {
     slug: 'mcp-and-browser-automation',
+    category: 'mcp',
     title: 'Central Model Context Protocol (MCP) & Built-in Browser Engine',
     shortTitle: 'MCP & Browser Automation',
     description:
@@ -335,8 +480,11 @@ which claude || where claude`,
       },
     ],
   },
+
+  // 5. Windows Desktop Control (Desktop Control)
   {
     slug: 'windows-desktop-control',
+    category: 'desktop-control',
     title: 'Windows Desktop Control, Window Grants & Input Safeguards',
     shortTitle: 'Windows Desktop Control',
     description:
@@ -383,8 +531,11 @@ which claude || where claude`,
       },
     ],
   },
+
+  // 6. Troubleshooting Playbook (Troubleshooting)
   {
     slug: 'troubleshooting-and-diagnostics',
+    category: 'troubleshooting',
     title: 'Diagnostic Playbook, Worktree Locks & History Recovery',
     shortTitle: 'Troubleshooting & Diagnostics',
     description:
@@ -463,6 +614,306 @@ git worktree prune -v`,
           '2. Verify your Git status is clean and git worktree list returns valid paths.',
           '3. Check Settings → Agents to confirm your chosen default agent is detected with a green checkmark.',
           '4. Check Settings → Updates & support to confirm you are running the latest Jackalope release.',
+        ],
+      },
+    ],
+  },
+
+  // 7. Dedicated How-To: Fixing Windows PATH (Troubleshooting)
+  {
+    slug: 'fixing-cli-path-on-windows',
+    category: 'troubleshooting',
+    title: 'How to Fix "CLI Not Found" & Windows Environment PATH Inheritance',
+    shortTitle: 'Fixing Windows PATH',
+    description:
+      'Step-by-step instructions for ensuring agent executables (Codex, Claude Code, Grok, OpenCode) are properly discovered by Jackalope on Windows.',
+    readingTime: '4 min read',
+    sections: [
+      {
+        id: 'root-cause',
+        question: 'Why does a CLI work in my terminal but fail inside the desktop app?',
+        paragraphs: [
+          'When you install a tool using npm install -g or cargo install in an active Windows PowerShell window, that terminal process updates its local environment. However, applications already running—or applications launched by the Windows Explorer shell—do not immediately receive WM_SETTINGCHANGE environment broadcast signals.',
+          'As a result, Jackalope’s native process runner searches the older PATH that existed when Windows Explorer started. When Jackalope calls where codex or spawns the agent binary, the operating system returns Error 2: The system cannot find the file specified.',
+        ],
+      },
+      {
+        id: 'npm-global-path',
+        question: 'How do I add npm and cargo global paths to Windows User PATH?',
+        paragraphs: [
+          'Ensure your user-specific npm and cargo bin directories are permanently listed in your User PATH variable:',
+        ],
+        codeBox: {
+          title: 'Adding Directories to User PATH (PowerShell)',
+          code: `# Check your current npm global prefix
+$npmPrefix = npm config get prefix
+Write-Host "npm path: $npmPrefix"
+
+# Standard paths that should exist in your User PATH:
+# npm:   %APPDATA%\\npm
+# cargo: %USERPROFILE%\\.cargo\\bin
+# pnpm:  %LOCALAPPDATA%\\pnpm
+
+# Verify they exist in your current user environment
+[Environment]::GetEnvironmentVariable("Path", "User") -split ";"`,
+        },
+      },
+      {
+        id: 'desktop-refresh',
+        question: 'How do I force Jackalope to reload system environment variables?',
+        paragraphs: [
+          'After modifying environment variables or installing a new CLI adapter:',
+          '1. Close the Jackalope desktop app completely (check system tray to ensure background processes are terminated).',
+          '2. If you installed the CLI in an elevated terminal, ensure your normal user account has execution permissions on the target directory.',
+          '3. Re-launch Jackalope. On startup, the native coordinator scans system PATH directories and updates Settings → Agents with a verified green status checkmark.',
+        ],
+      },
+    ],
+  },
+
+  // 8. Dedicated How-To: Resolving Git Locks (Troubleshooting)
+  {
+    slug: 'resolving-git-worktree-locks',
+    category: 'troubleshooting',
+    title: 'How to Clear Stale .git/index.lock & Worktree Lockfiles',
+    shortTitle: 'Resolving Git Worktree Locks',
+    description:
+      'How to safely diagnose, remove, and prevent stale Git index locks and orphaned worktrees left by abnormal system termination.',
+    readingTime: '4 min read',
+    sections: [
+      {
+        id: 'what-are-git-locks',
+        question: 'What causes "Unable to create .git/index.lock: File exists" errors?',
+        paragraphs: [
+          'Git creates atomic lockfiles (such as index.lock, HEAD.lock, or refs/heads/<branch>.lock) to guarantee that only one process writes to the repository index at a time. Under normal conditions, Git deletes this lockfile within milliseconds once the transaction finishes.',
+          'However, if an operating system reboots unexpectedly, an agent process is killed forcefully through Task Manager, or an antivirus process holds a file handle open on Windows, Git cannot clean up the lockfile. Any subsequent Git command aborts immediately.',
+        ],
+      },
+      {
+        id: 'step-by-step-unlock',
+        question: 'What is the safe step-by-step procedure to remove stale locks?',
+        paragraphs: [
+          'Before deleting any lockfile, always verify that no background Git process is actively writing to disk:',
+        ],
+        codeBox: {
+          title: 'Safe Lock Removal Recipe (PowerShell)',
+          code: `# 1. Verify no active git processes are running
+Get-Process -Name git, git-remote-https -ErrorAction SilentlyContinue
+
+# 2. Check if primary index.lock exists and remove it
+if (Test-Path .git/index.lock) {
+    Remove-Item -Force .git/index.lock
+    Write-Host "Removed root index.lock"
+}
+
+# 3. Check for worktree-specific index locks
+Get-ChildItem -Path .git/worktrees -Filter "index.lock" -Recurse | Remove-Item -Force
+
+# 4. Prune administrative records for deleted worktrees
+git worktree prune -v`,
+        },
+      },
+      {
+        id: 'preventing-locks',
+        question: 'How do I prevent file lock contention on Windows?',
+        paragraphs: [
+          'On Windows, third-party antivirus scanners and search indexers frequently lock newly written files inside .git/ and .worktrees/. Adding your development repository directory to Windows Defender’s exclusion list eliminates up to 95% of unexpected file-locking delays and index collisions during parallel agent runs.',
+        ],
+        callout: {
+          kind: 'tip',
+          text: 'In Windows Security, navigate to Virus & threat protection settings → Exclusions → Add an exclusion → Folder, and add your development root.',
+        },
+      },
+    ],
+  },
+
+  // 9. Dedicated How-To: Connecting Custom MCP Servers (MCP)
+  {
+    slug: 'connecting-custom-mcp-servers',
+    category: 'mcp',
+    title: 'How to Connect Custom MCP Servers (stdio & SSE) with Tool Gating',
+    shortTitle: 'Custom MCP Servers',
+    description:
+      'Step-by-step instructions for adding custom Model Context Protocol tools, configuring stdio/SSE transports, and enforcing project tool gating.',
+    readingTime: '5 min read',
+    sections: [
+      {
+        id: 'mcp-overview',
+        question: 'What is the Model Context Protocol (MCP) and how does Jackalope use it?',
+        paragraphs: [
+          'The Model Context Protocol (MCP) is an open standard that allows AI agents to interact with external tools, databases, documentation engines, and APIs through a standardized JSON-RPC interface.',
+          'Instead of configuring MCP connections inside individual agent dotfiles, Jackalope acts as a central broker. You add your servers once in the desktop app, and Jackalope manages process lifecycles, health checks, and tool delivery to all connected agents.',
+        ],
+      },
+      {
+        id: 'stdio-setup',
+        question: 'How do I connect a local stdio MCP server (e.g. SQLite or Filesystem)?',
+        paragraphs: [
+          'Local stdio servers run as child processes supervised by Jackalope. You specify the executable binary and command-line arguments:',
+        ],
+        codeBox: {
+          title: 'Configuring stdio MCP Server in Settings',
+          code: `# Example 1: Local SQLite database documentation server
+Command: uvx
+Args:    ["mcp-server-sqlite", "--db-path", "./data/warehouse.db"]
+
+# Example 2: Local GitHub repository context server
+Command: npx
+Args:    ["-y", "@modelcontextprotocol/server-github"]
+Env:     {"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."}`,
+        },
+      },
+      {
+        id: 'sse-setup',
+        question: 'How do I connect a remote or containerized SSE / HTTP MCP server?',
+        paragraphs: [
+          'For servers running inside Docker containers or on your local network, use the Server-Sent Events (SSE) transport. Jackalope establishes a persistent HTTP connection to the server’s SSE stream and routes JSON-RPC messages seamlessly.',
+        ],
+        codeBox: {
+          title: 'Configuring SSE MCP Server',
+          code: `# Example: Remote documentation search server
+URL:       http://127.0.0.1:8080/sse
+Transport: Server-Sent Events (SSE)`,
+        },
+      },
+      {
+        id: 'enforcing-tool-gating',
+        question: 'How do I restrict tool access to prevent accidental database or cloud writes?',
+        paragraphs: [
+          'Under Project Context → Tools, you can toggle tool permissions on a per-project basis. Tools can be set to Allowed, Ask for Confirmation (which triggers the interactive Question Bridge before execution), or Blocked.',
+        ],
+      },
+    ],
+  },
+
+  // 10. Dedicated Feature Guide: Recurring Schedules (Workflows)
+  {
+    slug: 'recurring-schedules-and-automation',
+    category: 'workflows',
+    title: 'Recurring Task Schedules, Cron Intervals & Automation',
+    shortTitle: 'Recurring Schedules',
+    description:
+      'Configuring scheduled code audits, security scans, dependency updates, and recurring maintenance tasks using cron expressions and time cadences.',
+    readingTime: '5 min read',
+    sections: [
+      {
+        id: 'why-schedules',
+        question: 'Why run coding agent tasks on recurring schedules?',
+        paragraphs: [
+          'Certain engineering tasks should happen proactively rather than waiting for user requests: daily dependency vulnerability checks, nightly test suite refactors, documentation drift scans, or automated codebase health reports.',
+          'Jackalope includes a native recurring task scheduler. Tasks execute in isolated Git worktrees during scheduled intervals, run test checks, generate verification receipts, and prepare candidate patches for your morning review.',
+        ],
+      },
+      {
+        id: 'cadence-options',
+        question: 'What schedule cadences and cron formats are supported?',
+        paragraphs: [
+          'Jackalope provides pre-built common cadences (Daily at specified time, Weekly on chosen days, or Every N Hours) as well as full standard 5-field cron syntax for advanced timing.',
+        ],
+        codeBox: {
+          title: 'Supported Schedule Expressions',
+          code: `# Common Cadences
+Daily at 08:00 AM      -> 0 8 * * *
+Weekly every Monday    -> 0 9 * * 1
+Every 6 hours          -> 0 */6 * * *
+
+# Advanced Cadence
+Weekdays at midnight   -> 0 0 * * 1-5`,
+        },
+      },
+      {
+        id: 'safe-execution',
+        question: 'How do scheduled tasks prevent interference with active development?',
+        paragraphs: [
+          'Scheduled tasks follow all standard Jackalope concurrency rules: they acquire coordinator reservations, isolate work in .worktrees/schedule-<id>, run outside user working directories, and never automatically merge code without human review.',
+          'If your machine is asleep or offline during a scheduled trigger, Jackalope safely skips the missed execution or alerts you on wake-up without executing duplicate backlog storms.',
+        ],
+      },
+    ],
+  },
+
+  // 11. Dedicated Feature Guide: Task Composer & Effort Levels (Workflows)
+  {
+    slug: 'task-composer-and-effort-levels',
+    category: 'workflows',
+    title: 'Task Composer, Quick/Balanced/Thorough Effort & Pierre Diffs',
+    shortTitle: 'Task Composer & Effort',
+    description:
+      'Formulating task intents, choosing between Quick, Balanced, and Thorough effort tiers, prompt refinement, and reviewing patches with Pierre Diffs.',
+    readingTime: '6 min read',
+    sections: [
+      {
+        id: 'effort-tiers',
+        question: 'What is the difference between Quick, Balanced, and Thorough effort levels?',
+        paragraphs: [
+          'Different tasks require different levels of rigor and computational depth. Jackalope structures agent runs into three distinct effort tiers:',
+        ],
+        bullets: [
+          'Quick (Fast feedback): Optimized for one-file bugfixes, typos, documentation updates, and small UI tweaks. Bounded token limits and rapid execution.',
+          'Balanced (Default): Ideal for typical feature work, multi-file edits, writing unit tests, and refactoring related modules. Balanced reasoning and validation depth.',
+          'Thorough (Maximum rigor): Designed for complex architectural migrations, deep security audits, and difficult debugging tasks. Allows broad codebase search, multi-step subagents, and extensive test runs.',
+        ],
+      },
+      {
+        id: 'prompt-refinement',
+        question: 'How does prompt refinement clarify underspecified requirements?',
+        paragraphs: [
+          'Before launching a heavy background task, you can click Refine in the task composer. Jackalope analyzes your intent against the project codebase map, identifying ambiguities, missing edge cases, and relevant test targets.',
+          'Refinement produces a structured, actionable outcome contract that keeps the agent focused and minimizes wasted inference cycles.',
+        ],
+      },
+      {
+        id: 'pierre-diffs',
+        question: 'How does Pierre Diffs streamline code review in Jackalope?',
+        paragraphs: [
+          'Reviewing AI-generated code should be comfortable, visual, and fast. Jackalope integrates Pierre Diffs for rich, syntax-highlighted side-by-side and unified diff views.',
+          'You can inspect changes file by file, collapse unmodified context lines, inspect terminal test receipts, and verify that no unintended files were modified before clicking Apply.',
+        ],
+      },
+    ],
+  },
+
+  // 12. Dedicated Feature Guide: Theme Harmonies & Atmosphere (Themes)
+  {
+    slug: 'theme-editor-and-atmosphere',
+    category: 'themes',
+    title: 'Theme Harmonies, Atmosphere Tuning & Mascot Reactions',
+    shortTitle: 'Themes & Atmosphere',
+    description:
+      'Customizing Single, Duo, and Trio color harmonies, adjusting the 64-step atmosphere slider, and understanding the five mascot companion activity moods.',
+    readingTime: '5 min read',
+    sections: [
+      {
+        id: 'harmonies',
+        question: 'What are Single, Duo, and Trio theme harmonies?',
+        paragraphs: [
+          'Jackalope’s visual design system is built around color harmonies calculated mathematically in HSL space to guarantee WCAG AA contrast (minimum 4.5:1 for body text, 7:1 for accents).',
+        ],
+        bullets: [
+          'Single (Monochrome harmony): One focused accent hue applied across borders, active selections, and indicators.',
+          'Duo (Complementary harmony): Two balanced hues separated by 180° for vibrant secondary accents.',
+          'Trio (Triadic harmony): Three balanced hues separated by 120° producing rich, dynamic shell gradients.',
+        ],
+      },
+      {
+        id: 'atmosphere-slider',
+        question: 'What does the 64-step Atmosphere slider control?',
+        paragraphs: [
+          'Atmosphere controls the color saturation and visual depth of background surfaces, sidebars, and elevation layers. At low atmosphere (8–12), the interface is whisper-quiet and neutral. At higher atmosphere (up to 64), your chosen accent tint gently permeates cards, elevated surfaces, and window glass.',
+        ],
+      },
+      {
+        id: 'mascot-moods',
+        question: 'What do the five mascot companion moods signify?',
+        paragraphs: [
+          'The bottom-right Jackalope mascot is an authentic status and activity indicator, not a synthetic decoration. Its expressions reflect real system states:',
+        ],
+        bullets: [
+          'Idle: Grounded pose with gentle breathing, occasional blinks, and subtle mouse gaze.',
+          'Thinking: Ears perked and attentive when agents are performing model reasoning or task routing.',
+          'Working: Energetic posture when background processes are editing files, running compilers, or executing tests.',
+          'Question: Curious posture when the Question Bridge is waiting for human input.',
+          'Celebration: Joyful reaction when a task finishes with all test receipts passing.',
         ],
       },
     ],

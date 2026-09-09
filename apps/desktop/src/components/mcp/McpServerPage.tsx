@@ -145,7 +145,7 @@ export function McpServerPage({
           {inspectError && (
             <div role="alert" className="mcp-detail-notice">
               <p>{inspectError} The listing is still available below.</p>
-              <Button variant="outline" size="sm" onClick={() => void inspectServer(server)}>
+              <Button variant="outline" size="sm" onClick={() => void inspectServer(server, true)}>
                 Retry
               </Button>
             </div>

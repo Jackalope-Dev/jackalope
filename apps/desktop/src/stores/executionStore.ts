@@ -37,11 +37,12 @@ interface ExecutionState {
   discoveryError: string | null;
   loading: boolean;
   discovering: boolean;
+  lastDiscovered: number;
   submitting: boolean;
   drafts: Record<string, TaskDraft>;
   select: (id: string | null) => void;
   draft: (key: string, value: Partial<TaskDraft>) => void;
-  discover: () => Promise<void>;
+  discover: (force?: boolean) => Promise<void>;
   refresh: () => Promise<void>;
   start: (request: Omit<RunRequest, 'id'>, options?: { background?: boolean }) => Promise<string>;
 }
@@ -58,6 +59,7 @@ export const useExecutionStore = create<ExecutionState>()(
       discoveryError: null,
       loading: true,
       discovering: false,
+      lastDiscovered: 0,
       submitting: false,
       drafts: {},
       select: (selectedId) => {
@@ -68,13 +70,16 @@ export const useExecutionStore = create<ExecutionState>()(
         set((state) => ({
           drafts: { ...state.drafts, [key]: { ...emptyDraft, ...state.drafts[key], ...value } },
         })),
-      discover: () => {
+      discover: (force = true) => {
         if (discovering) return discovering;
+        if (!force && get().lastDiscovered > 0 && Date.now() - get().lastDiscovered < 120_000)
+          return Promise.resolve();
         set({ discovering: true, discoveryError: null });
         discovering = Promise.resolve().then(async () => {
           try {
             set({
               runners: await nativeTask<Runner[]>('task_runners'),
+              lastDiscovered: Date.now(),
               error: null,
               discoveryError: null,
             });

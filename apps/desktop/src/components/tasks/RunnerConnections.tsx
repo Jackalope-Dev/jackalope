@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, Check, CircleAlert, Plus, RefreshCw, Settings2, X } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowRight, CircleAlert, Plus, RefreshCw, Settings2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -9,7 +9,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
-import { navigateWorkspace } from '../layout/navigation';
+import { openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/LoadingState';
@@ -32,6 +32,18 @@ export function RunnerConnections({
   const [checkError, setCheckError] = useState('');
   const dialogFocus = useDialogFocus();
   const desktop = isTauriEnvironment();
+  useEffect(() => {
+    if (!desktop) return;
+    let active = true;
+    void syncAgentConfig()
+      .then(() => discover(false))
+      .catch((cause) => {
+        if (active) setCheckError(String(cause));
+      });
+    return () => {
+      active = false;
+    };
+  }, [desktop, discover]);
   const checkAgents = async () => {
     setChecking(true);
     setCheckError('');
@@ -72,14 +84,6 @@ export function RunnerConnections({
           title="Agents"
           action={
             <div className="agent-workspace-actions">
-              <Button
-                variant="ghost"
-                aria-label="Configuration"
-                title="Configuration"
-                onClick={() => navigateWorkspace('agent-settings')}
-              >
-                <Settings2 size={18} />
-              </Button>
               <Button variant="outline" onClick={() => setAdding(true)}>
                 <Plus size={18} />
                 Add agent
@@ -143,7 +147,8 @@ export function RunnerConnections({
               const options = config.runnerOptions[runner.id];
               const blockedModels =
                 options?.restrictModels && !options.models.some((model) => model.trim());
-              const canStart = runner.available && enabled && !blockedModels;
+              const needsSignIn = !runner.signedIn && runner.detail.startsWith('Sign in using');
+              const canStart = runner.available && enabled && !blockedModels && !needsSignIn;
               const working = activeRuns.length > 0;
               const status = waitingRun
                 ? 'Needs your input'
@@ -161,20 +166,18 @@ export function RunnerConnections({
                         ? runner.desktopInstalled
                           ? 'CLI setup needed'
                           : 'Not available'
-                        : runner.signedIn
-                          ? 'Ready'
-                          : 'Installed';
+                        : needsSignIn
+                          ? 'Sign-in needed'
+                          : null;
               const detail = working
                 ? `${activeRuns.length} active ${activeRuns.length === 1 ? 'task' : 'tasks'}`
                 : !enabled
                   ? 'Enable this agent in Settings.'
                   : blockedModels
                     ? 'The allowed model list is empty.'
-                    : !runner.available
+                    : !runner.available || needsSignIn
                       ? runner.detail
-                      : runner.signedIn
-                        ? 'Using your existing CLI sign-in.'
-                        : 'Sign-in is checked by the CLI when a task starts.';
+                      : null;
               const attention = !!waitingRun || (!working && !canStart);
               const taskToOpen = waitingRun ?? activeRuns[0] ?? reviewRun;
               const knownAccount = accountForAgent(capacity.records, runner.id);
@@ -195,11 +198,13 @@ export function RunnerConnections({
                       )}
                       {custom && <span className="agent-custom">Manual</span>}
                     </div>
-                    <p className="agent-presence" data-attention={attention || undefined}>
-                      {attention ? <CircleAlert size={15} /> : <Check size={15} />}
-                      {status}
-                    </p>
-                    <p className="task-muted">{detail}</p>
+                    {status && (
+                      <p className="agent-presence" data-attention={attention || undefined}>
+                        {attention && <CircleAlert size={15} />}
+                        {status}
+                      </p>
+                    )}
+                    {detail && <p className="task-muted">{detail}</p>}
                     {identity && <p className="task-muted text-xs">{identity}</p>}
                     {taskToOpen && (
                       <button
@@ -214,6 +219,7 @@ export function RunnerConnections({
                     )}
                   </div>
                   <div className="agent-roster-action">
+                    {canStart && <Button variant="ghost" onClick={() => openAgentConfiguration(runner.id)} aria-label={`Configure ${custom?.name ?? runner.name}`}><Settings2 size={16} />Configure</Button>}
                     {canStart ? (
                       <Button
                         variant="outline"
@@ -223,8 +229,12 @@ export function RunnerConnections({
                         New task
                         <ArrowRight size={16} />
                       </Button>
+                    ) : runner.id === 'antigravity' &&
+                      runner.desktopInstalled &&
+                      !runner.available ? (
+                      <AgentInstallGuide desktopInstalled compact />
                     ) : (
-                      <Button variant="ghost" onClick={() => navigateWorkspace('agent-settings')}>
+                      <Button variant="ghost" onClick={() => openAgentConfiguration(runner.id)}>
                         Configure
                         <Settings2 size={16} />
                       </Button>
@@ -235,7 +245,9 @@ export function RunnerConnections({
             })}
           </div>
         )}
-        {runners.some((runner) => runner.id === 'antigravity' && !runner.available) && (
+        {runners.some(
+          (runner) => runner.id === 'antigravity' && !runner.available && !runner.desktopInstalled,
+        ) && (
           <AgentInstallGuide
             desktopInstalled={
               runners.find((runner) => runner.id === 'antigravity')?.desktopInstalled

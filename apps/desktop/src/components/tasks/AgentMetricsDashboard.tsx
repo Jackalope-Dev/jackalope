@@ -1,20 +1,13 @@
-import {
-  Bot,
-  Clock,
-  Coins,
-  Gauge,
-  Lightbulb,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Zap,
-} from 'lucide-react';
+import { Bot, Clock, Coins, Gauge, Lightbulb, ShieldCheck, TrendingUp, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { computeAgentAnalytics } from '../../lib/agent-analytics';
 import { generateAgentInsights } from '../../lib/agent-insights';
 import type { TaskRun } from '../../lib/task-runtime';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { Button } from '../ui/button';
+import { Switch } from '../ui/Switch';
 
 export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
   const { metrics, impact } = useMemo(() => computeAgentAnalytics(runs), [runs]);
@@ -28,40 +21,56 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
   );
 
   const filteredInsights = useMemo(() => {
-    if (activeCategory === 'all') return insights;
-    return insights.filter((i) => i.category === activeCategory);
+    const recommendations = insights.filter((insight) => insight.id !== 'handoff-ready');
+    if (activeCategory === 'all') return recommendations;
+    return recommendations.filter((i) => i.category === activeCategory);
   }, [insights, activeCategory]);
 
-  const topInsight = insights[0];
+  const automaticQuotaHandoff = useAgentConfigStore((state) => state.automaticQuotaHandoff);
+  const [savingHandoff, setSavingHandoff] = useState(false);
+  const [handoffError, setHandoffError] = useState('');
+  const changeHandoff = async (enabled: boolean) => {
+    const previous = useAgentConfigStore.getState().automaticQuotaHandoff;
+    setSavingHandoff(true);
+    setHandoffError('');
+    useAgentConfigStore.setState({ automaticQuotaHandoff: enabled });
+    try {
+      await syncAgentConfig();
+    } catch (cause) {
+      useAgentConfigStore.setState({ automaticQuotaHandoff: previous });
+      setHandoffError(`Could not save handoff setting: ${String(cause)}`);
+    } finally {
+      setSavingHandoff(false);
+    }
+  };
 
   return (
     <div className="agent-metrics-dashboard space-y-6">
-      {/* Mascot Insights Banner */}
-      <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)]/70 flex items-start gap-4 shadow-sm">
-        <div className="p-2 rounded-lg bg-[var(--color-brand)]/10 text-[var(--color-brand)] shrink-0">
-          <JackalopeMascot size="sm" overrideMood="working" />
-        </div>
-        <div className="flex-1 space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand)] flex items-center gap-1">
-              <Sparkles size={13} />
-              Jackalope Orchestration Engine
-            </span>
-            {topInsight && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">
-                {topInsight.badge}
-              </span>
-            )}
-          </div>
-          <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-            {topInsight?.title ?? 'Orchestration Performance Insights'}
-          </h3>
-          <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed max-w-2xl">
-            {topInsight?.description ??
-              'Jackalope continuously observes task speed, provider quotas, and model accuracy to route subtasks to the most effective local or cloud agents.'}
+      <section
+        className="p-5 rounded-xl border border-[var(--color-border)] flex items-start gap-4"
+        aria-label="Automatic quota handoff"
+      >
+        <JackalopeMascot size="sm" overrideMood="idle" />
+        <div className="flex-1 min-w-0 space-y-2">
+          <h3 className="text-base font-medium">Automatic quota handoff</h3>
+          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed max-w-2xl">
+            {automaticQuotaHandoff
+              ? 'When an automatically routed task reaches a provider quota, Jackalope can continue with another available agent, model or account while preserving its workspace and context.'
+              : 'Tasks that reach a provider quota stop for your review. Your workspace and progress are preserved so you can retry or choose another agent.'}
           </p>
+          {handoffError && (
+            <p role="alert" className="task-error">
+              {handoffError}
+            </p>
+          )}
         </div>
-      </div>
+        <Switch
+          label="Automatic quota handoff"
+          checked={automaticQuotaHandoff}
+          disabled={savingHandoff || !isTauriEnvironment()}
+          onCheckedChange={(value) => void changeHandoff(value)}
+        />
+      </section>
 
       {/* High-Level Impact Scorecard */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

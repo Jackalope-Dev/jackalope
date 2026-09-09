@@ -8,13 +8,18 @@ import {
   Info,
   Lightbulb,
   Search,
+  Wrench,
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  type GuideCategory,
+  guideCategories,
   type KnowledgeGuide,
   type KnowledgeGuideSection,
   knowledgeGuides,
+  likelyArticleSlugs,
+  troubleshootingScenarios,
 } from './knowledge-content';
 
 function normalizeKnowledgePath(path: string) {
@@ -37,6 +42,7 @@ export function KnowledgebasePage({
   );
 
   const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<GuideCategory | 'all'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeHeadingId, setActiveHeadingId] = useState<string>('');
 
@@ -96,6 +102,19 @@ export function KnowledgebasePage({
     }
     return results;
   }, [query]);
+
+  // Filtered guides for the hub view
+  const filteredGuides = useMemo(() => {
+    if (selectedCategory === 'all') return knowledgeGuides;
+    return knowledgeGuides.filter((g) => g.category === selectedCategory);
+  }, [selectedCategory]);
+
+  // Likely articles
+  const likelyArticles = useMemo(() => {
+    return likelyArticleSlugs
+      .map((slug) => knowledgeGuides.find((g) => g.slug === slug))
+      .filter((g): g is KnowledgeGuide => Boolean(g));
+  }, []);
 
   // ---------------------------------------------------------------------------
   // View 1: Dedicated Guide Page
@@ -294,10 +313,10 @@ export function KnowledgebasePage({
           </nav>
 
           <div className="knowledge-hero-content">
-            <h1>Guides &amp; Architecture Documentation</h1>
+            <h1>Guides, Architecture &amp; Troubleshooting</h1>
             <p className="knowledge-lede">
-              Deep-dive architecture guides, concurrency contracts, quota failovers, and diagnostic
-              recipes for developers building with coding agents in Jackalope.
+              In-depth architecture documentation, quick troubleshooting playbooks, and how-tos for
+              building thoughtfully with coding agents in Jackalope.
             </p>
 
             {/* Streamlined Search Bar */}
@@ -374,45 +393,132 @@ export function KnowledgebasePage({
             )}
           </section>
         ) : (
-          /* Structured Dedicated Guide Cards Grid */
-          <section className="knowledge-hub-guides" aria-label="Documentation guides">
-            <div className="knowledge-hub-intro">
-              <div>
-                <h2>Dedicated Architecture Guides</h2>
+          <>
+            {/* 1. Quick Troubleshooting Diagnostic Helper */}
+            <section className="knowledge-diagnostic-helper" aria-label="Troubleshooting assistant">
+              <div className="knowledge-helper-header">
+                <div className="knowledge-helper-badge">
+                  <Wrench size={16} /> Quick Diagnostic Assistant
+                </div>
+                <h2>What problem are you trying to solve?</h2>
                 <p>
-                  Comprehensive documentation rooted in Jackalope&rsquo;s native contracts and local
-                  safety perimeters.
+                  Instant diagnosis and resolution recipes for the most common local developer
+                  environment and agent execution scenarios.
                 </p>
               </div>
-            </div>
 
-            <div className="knowledge-hub-grid">
-              {knowledgeGuides.map((guide) => (
-                <article key={guide.slug} className="knowledge-hub-card">
-                  <div className="knowledge-card-reading-time">{guide.readingTime}</div>
-                  <h3>
-                    <a href={`/knowledge/${guide.slug}/`}>{guide.title}</a>
-                  </h3>
-                  <p>{guide.description}</p>
+              <div className="knowledge-scenario-grid">
+                {troubleshootingScenarios.map((scenario) => {
+                  const targetHref = `/knowledge/${scenario.targetSlug}/${
+                    scenario.targetAnchor ? `#${scenario.targetAnchor}` : ''
+                  }`;
 
-                  <div className="knowledge-card-topics">
-                    <span className="knowledge-card-topics-label">Key topics covered:</span>
-                    <ul>
-                      {guide.sections.slice(0, 3).map((section) => (
-                        <li key={section.id}>
-                          <a href={`/knowledge/${guide.slug}/#${section.id}`}>{section.question}</a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  return (
+                    <a key={scenario.id} href={targetHref} className="knowledge-scenario-card">
+                      <h3>{scenario.title}</h3>
+                      <p className="knowledge-scenario-symptom">{scenario.symptom}</p>
+                      <p className="knowledge-scenario-quickfix">{scenario.quickFix}</p>
+                      <span className="knowledge-scenario-action">
+                        View resolution steps <ArrowRight size={14} />
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
+            </section>
 
-                  <a href={`/knowledge/${guide.slug}/`} className="knowledge-card-footer-link">
-                    Read guide <ArrowRight size={14} />
+            {/* 2. Likely Articles You May Be Looking For */}
+            <section className="knowledge-likely-section" aria-label="Frequently visited guides">
+              <div className="knowledge-section-intro">
+                <h2>Frequently Visited Guides</h2>
+                <p>Essential architecture references, configuration steps, and safety contracts.</p>
+              </div>
+
+              <div className="knowledge-likely-grid">
+                {likelyArticles.map((guide) => (
+                  <a
+                    key={guide.slug}
+                    href={`/knowledge/${guide.slug}/`}
+                    className="knowledge-likely-card"
+                  >
+                    <span className="knowledge-likely-reading-time">{guide.readingTime}</span>
+                    <h3>{guide.title}</h3>
+                    <p>{guide.description}</p>
+                    <span className="knowledge-likely-link">
+                      Read guide <ArrowRight size={14} />
+                    </span>
                   </a>
-                </article>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+
+            {/* 3. Category Filter Buttons & Guides Grid */}
+            <section className="knowledge-hub-guides" aria-label="Documentation guides by category">
+              <div className="knowledge-section-intro">
+                <h2>Browse by Topic</h2>
+                <p>
+                  Explore all {knowledgeGuides.length} official technical guides and architectural
+                  specifications.
+                </p>
+              </div>
+
+              {/* Clean Category Filter Buttons */}
+              <nav className="knowledge-category-bar" aria-label="Filter by topic">
+                <button
+                  type="button"
+                  className={`knowledge-category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
+                  onClick={() => setSelectedCategory('all')}
+                >
+                  All Topics ({knowledgeGuides.length})
+                </button>
+                {guideCategories.map((cat) => {
+                  const count = knowledgeGuides.filter((g) => g.category === cat.id).length;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className={`knowledge-category-btn ${
+                        selectedCategory === cat.id ? 'active' : ''
+                      }`}
+                      onClick={() => setSelectedCategory(cat.id)}
+                    >
+                      {cat.label} ({count})
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Guide Cards Grid */}
+              <div className="knowledge-hub-grid">
+                {filteredGuides.map((guide) => (
+                  <article key={guide.slug} className="knowledge-hub-card">
+                    <div className="knowledge-card-reading-time">{guide.readingTime}</div>
+                    <h3>
+                      <a href={`/knowledge/${guide.slug}/`}>{guide.title}</a>
+                    </h3>
+                    <p>{guide.description}</p>
+
+                    <div className="knowledge-card-topics">
+                      <span className="knowledge-card-topics-label">Key topics covered:</span>
+                      <ul>
+                        {guide.sections.slice(0, 3).map((section) => (
+                          <li key={section.id}>
+                            <a href={`/knowledge/${guide.slug}/#${section.id}`}>
+                              {section.question}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <a href={`/knowledge/${guide.slug}/`} className="knowledge-card-footer-link">
+                      Read guide <ArrowRight size={14} />
+                    </a>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
         )}
 
         {/* Clean Support Diagnostics Callout */}

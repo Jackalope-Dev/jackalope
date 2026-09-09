@@ -702,3 +702,13 @@ button:disabled {
   max-width: 1200px;
   margin-inline: auto;
 }
+
+.workspace-shell .workspace-canvas > :is(.task-page, .workspace-page, .mcp-workspace) {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: max(var(--workspace-gutter, 32px), calc((100% - 1320px) / 2));
+  overflow-y: auto;
+}

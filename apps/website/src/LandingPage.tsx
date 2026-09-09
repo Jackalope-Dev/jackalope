@@ -279,12 +279,12 @@ const features = [
   },
   {
     icon: Plug,
-    title: 'Bring the tools your task needs.',
-    description: 'Choose project connections from one place.',
+    title: 'Computer use & agent browser.',
+    description: 'Let agents browse the web and use a Windows app you approve.',
     detail:
-      'Connect MCP tools for Codex and Claude Code, and let Grok discover supported HTTP tools. OpenCode uses its own tool configuration. Choose the connections relevant to each task.',
-    href: '/agents/',
-    link: 'See agent compatibility',
+      'Built-in agent-browser lets agents navigate pages, fill forms, capture screenshots, and check accessibility in a separate browser session for each task. On Windows, choose an app window for clicks, typing, and scrolling. A visible status bar lets you pause or cancel control; moving your mouse or typing pauses it, and Escape cancels access. Add project tools through MCP connections.',
+    href: '/knowledge/',
+    link: 'Explore browser and computer use',
   },
   {
     icon: CalendarClock,

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { nativeTask } from '../lib/task-runtime';
+import { nativeTask } from '../lib/task-runtime.ts';
 
 export interface CapacityWindow {
   poolId: string;
@@ -26,33 +26,42 @@ interface CapacityState {
   loading: boolean;
   error: string | null;
   lastFetched: number;
-  /**
-   * Reads the shared native capacity snapshot. `force` requests a live
-   * re-check (subject to the backend's own 60s cooldown); without it, the
-   * very first call in the app's lifetime still performs a real read, and
-   * later calls just return whatever is already cached server-side. Shared
-   * across every consumer so opening the Agents page after Usage (or vice
-   * versa) never re-spawns the CLIs unnecessarily.
-   */
+  lastAttempted: number;
   fetch: (force?: boolean) => Promise<void>;
 }
+
+export const CAPACITY_CACHE_MS = 5 * 60_000;
+let inFlight: Promise<void> | undefined;
 
 export const useCapacityStore = create<CapacityState>((set, get) => ({
   records: [],
   loading: false,
   error: null,
   lastFetched: 0,
-  fetch: async (force = false) => {
-    if (get().loading) return;
-    set({ loading: true, error: null });
-    try {
-      const records = await nativeTask<CapacityRecord[]>('capacity_snapshot', { refresh: force });
-      set({ records, lastFetched: Date.now() });
-    } catch (cause) {
-      set({ error: String(cause) });
-    } finally {
-      set({ loading: false });
-    }
+  lastAttempted: 0,
+  fetch: (force = false) => {
+    if (inFlight) return inFlight;
+    const { lastFetched, lastAttempted, error } = get();
+    const now = Date.now();
+    if (
+      !force &&
+      ((lastFetched > 0 && now - lastFetched < CAPACITY_CACHE_MS) ||
+        (error && now - lastAttempted < 60_000))
+    )
+      return Promise.resolve();
+    set({ loading: true, error: null, lastAttempted: now });
+    inFlight = Promise.resolve().then(async () => {
+      try {
+        const records = await nativeTask<CapacityRecord[]>('capacity_snapshot', { refresh: true });
+        set({ records, lastFetched: Date.now() });
+      } catch (cause) {
+        set({ error: String(cause) });
+      } finally {
+        inFlight = undefined;
+        set({ loading: false });
+      }
+    });
+    return inFlight;
   },
 }));
 

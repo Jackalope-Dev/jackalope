@@ -108,6 +108,15 @@ fn routing_excludes_shared_exhausted_accounts_but_preserves_other_model_pools() 
 
 #[test]
 fn routing_owned_process_handoff_preserves_workspace_and_restart_history() {
+    exercise_quota_handoff(true);
+}
+
+#[test]
+fn routing_disabled_handoff_preserves_partial_work_without_starting_a_backup() {
+    exercise_quota_handoff(false);
+}
+
+fn exercise_quota_handoff(enabled: bool) {
     let root = std::env::temp_dir().join(format!(
         "jackalope-routing-fixture-{}",
         uuid::Uuid::new_v4()
@@ -172,6 +181,7 @@ fn main() {
     let history = root.join("history");
     let runtime = TaskRuntime::new(history.clone()).unwrap();
     let mut policy = AgentPolicy::default();
+    policy.automatic_quota_handoff = Some(enabled);
     for id in BUILTIN_AGENTS {
         policy.enabled_agents.insert((*id).into(), false);
     }
@@ -206,6 +216,21 @@ fn main() {
         );
         std::thread::sleep(Duration::from_millis(50));
     };
+    if !enabled {
+        assert_eq!(settled.status, "failed");
+        assert!(settled
+            .error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("handoff is turned off"));
+        assert!(settled.quota_failure.is_some());
+        assert!(settled.routing.as_ref().unwrap().handoffs.is_empty());
+        assert_eq!(settled.routing.as_ref().unwrap().decisions.len(), 1);
+        assert!(Path::new(&settled.workspace).join("partial.txt").is_file());
+        assert!(!Path::new(&settled.workspace).join("completed.txt").exists());
+        assert!(runtime.inner.lock().unwrap().processes.is_empty());
+        return;
+    }
     assert_eq!(
         settled.status,
         "review",
@@ -343,6 +368,21 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
         }
         std::thread::sleep(Duration::from_millis(100));
     };
+    if !enabled {
+        assert_eq!(settled.status, "failed");
+        assert!(settled
+            .error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("handoff is turned off"));
+        assert!(settled.quota_failure.is_some());
+        assert!(settled.routing.as_ref().unwrap().handoffs.is_empty());
+        assert_eq!(settled.routing.as_ref().unwrap().decisions.len(), 1);
+        assert!(Path::new(&settled.workspace).join("partial.txt").is_file());
+        assert!(!Path::new(&settled.workspace).join("completed.txt").exists());
+        assert!(runtime.inner.lock().unwrap().processes.is_empty());
+        return;
+    }
     assert_eq!(
         settled.status,
         "review",

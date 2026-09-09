@@ -4,15 +4,26 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import './agent-manager.css';
 
-export function AgentInstallGuide({ desktopInstalled }: { desktopInstalled?: boolean }) {
+export function AgentInstallGuide({
+  desktopInstalled,
+  compact = false,
+}: {
+  desktopInstalled?: boolean;
+  compact?: boolean;
+}) {
   const [error, setError] = useState('');
   return (
-    <section className="agent-install-guide" aria-label="Antigravity CLI setup">
-      <p>
-        {desktopInstalled ? 'Antigravity desktop is installed. ' : ''}Jackalope runs Antigravity
-        tasks through the separate agy CLI. Install it, launch agy to sign in, then check agents
-        again.
-      </p>
+    <section
+      className={compact ? 'agent-install-compact' : 'agent-install-guide'}
+      aria-label="Antigravity CLI setup"
+    >
+      {!compact && (
+        <p>
+          {desktopInstalled ? 'Antigravity desktop is installed. ' : ''}Jackalope runs Antigravity
+          tasks through the separate agy CLI. Install it, launch agy to sign in, then check agents
+          again.
+        </p>
+      )}
       <Button
         variant="outline"
         onClick={async () => {

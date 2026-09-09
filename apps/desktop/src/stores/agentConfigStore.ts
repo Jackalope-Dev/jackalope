@@ -53,6 +53,7 @@ interface AgentConfigState {
   enabledAgents: Record<string, boolean>;
   allowedModels: Record<string, boolean>;
   defaultMetaAgent: string;
+  automaticQuotaHandoff: boolean;
   customAgents: CustomAgentConfig[];
 
   // Actions
@@ -93,6 +94,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         'grok-beta': true,
       },
       defaultMetaAgent: 'codex',
+      automaticQuotaHandoff: true,
       customAgents: [],
 
       toggleAgent: (agentId, enabled) => {
@@ -174,8 +176,14 @@ export function syncAgentConfig() {
 }
 
 async function syncAgentConfigNow() {
-  const { enabledAgents, allowedModels, defaultMetaAgent, customAgents, runnerOptions } =
-    useAgentConfigStore.getState();
+  const {
+    enabledAgents,
+    allowedModels,
+    defaultMetaAgent,
+    automaticQuotaHandoff,
+    customAgents,
+    runnerOptions,
+  } = useAgentConfigStore.getState();
   const effectiveOptions = { ...runnerOptions };
   for (const custom of customAgents) {
     const options = effectiveOptions[custom.id];
@@ -204,6 +212,7 @@ async function syncAgentConfigNow() {
       enabledAgents,
       allowedModels,
       defaultMetaAgent,
+      automaticQuotaHandoff,
       customAgents,
       runnerOptions: normalizedOptions,
       projects: Object.fromEntries(

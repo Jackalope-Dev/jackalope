@@ -107,28 +107,250 @@
 }
 
 /* --------------------------------------------------------------------------
+   Quick Troubleshooting Diagnostic Helper
+   -------------------------------------------------------------------------- */
+
+.knowledge-diagnostic-helper {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  padding: clamp(24px, 3.5vw, 36px);
+  margin-bottom: 56px;
+}
+
+.knowledge-helper-header {
+  margin-bottom: 24px;
+}
+
+.knowledge-helper-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent-ink);
+  margin-bottom: 12px;
+}
+
+.knowledge-helper-header h2 {
+  font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin-bottom: 8px;
+  color: var(--color-text-primary);
+}
+
+.knowledge-helper-header p {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  max-width: 720px;
+}
+
+.knowledge-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.knowledge-scenario-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color var(--motion-fast),
+    transform var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.knowledge-scenario-card:hover {
+  border-color: var(--color-accent-ink);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-surface);
+}
+
+.knowledge-scenario-card h3 {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.knowledge-scenario-symptom {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+.knowledge-scenario-quickfix {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  margin-bottom: 14px;
+  flex-grow: 1;
+}
+
+.knowledge-scenario-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-accent-ink);
+  margin-top: auto;
+  transition: gap var(--motion-fast);
+}
+
+.knowledge-scenario-card:hover .knowledge-scenario-action {
+  gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Likely Articles / Frequently Visited
+   -------------------------------------------------------------------------- */
+
+.knowledge-likely-section {
+  margin-bottom: 56px;
+}
+
+.knowledge-section-intro {
+  margin-bottom: 24px;
+}
+
+.knowledge-section-intro h2 {
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+  color: var(--color-text-primary);
+}
+
+.knowledge-section-intro p {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+}
+
+.knowledge-likely-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.knowledge-likely-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  padding: 22px;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color var(--motion-fast),
+    transform var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.knowledge-likely-card:hover {
+  border-color: var(--color-border);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-surface);
+}
+
+.knowledge-likely-reading-time {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+.knowledge-likely-card h3 {
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.knowledge-likely-card p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+  flex-grow: 1;
+}
+
+.knowledge-likely-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-ink);
+  margin-top: auto;
+  transition: gap var(--motion-fast);
+}
+
+.knowledge-likely-card:hover .knowledge-likely-link {
+  gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Category Filter Buttons Bar
+   -------------------------------------------------------------------------- */
+
+.knowledge-category-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.knowledge-category-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast),
+    background-color var(--motion-fast),
+    color var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.knowledge-category-btn:hover {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.knowledge-category-btn.active {
+  border-color: var(--color-accent-ink);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-elevated));
+  color: var(--color-text-primary);
+  box-shadow: 0 0 0 1px var(--color-accent-ink);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
    Hub Guides Cards Grid
    -------------------------------------------------------------------------- */
 
 .knowledge-hub-guides {
   margin-bottom: 56px;
-}
-
-.knowledge-hub-intro {
-  margin-bottom: 28px;
-}
-
-.knowledge-hub-intro h2 {
-  font-size: clamp(22px, 2.6vw, 32px);
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-  margin-bottom: 8px;
-  color: var(--color-text-primary);
-}
-
-.knowledge-hub-intro p {
-  font-size: 15px;
-  color: var(--color-text-secondary);
 }
 
 .knowledge-hub-grid {
@@ -770,7 +992,9 @@
     display: none;
   }
 
-  .knowledge-hub-grid {
+  .knowledge-hub-grid,
+  .knowledge-scenario-grid,
+  .knowledge-likely-grid {
     grid-template-columns: 1fr;
     gap: 16px;
   }
@@ -789,9 +1013,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .knowledge-hub-card,
+  .knowledge-scenario-card,
+  .knowledge-likely-card,
   .knowledge-search-item,
   .knowledge-page-nav-link,
   .knowledge-search-input,
+  .knowledge-category-btn,
   .knowledge-copy-btn {
     transition: none;
     transform: none;

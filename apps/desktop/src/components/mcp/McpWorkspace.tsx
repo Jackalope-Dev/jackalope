@@ -189,9 +189,9 @@ export function McpWorkspace({
                 <Button
                   variant="outline"
                   onClick={() => {
-                    void loadServers();
+                    void loadServers(undefined, true);
                     if (useMcpMarketplace && activeTab === 'marketplace') {
-                      void searchMarketplace();
+                      void searchMarketplace(undefined, undefined, true);
                     }
                   }}
                   disabled={loadingServers || loadingMarketplace}
@@ -552,7 +552,7 @@ export function McpWorkspace({
                   <Button
                     onClick={() => {
                       setUseMcpMarketplace(true);
-                      void searchMarketplace();
+                      void searchMarketplace(undefined, undefined, true);
                     }}
                   >
                     <Globe size={15} />

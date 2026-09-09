@@ -1,9 +1,10 @@
-import { Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { AddAgentForm } from './AddAgentForm';
@@ -12,14 +13,14 @@ import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentSupport } from './AgentSupport';
 import './agent-manager.css';
 
-export function AgentManager() {
+export function AgentManager({initialAgentId}: {initialAgentId?: string}) {
   const config = useAgentConfigStore();
   const { runners, discovering, discover } = useExecutionStore();
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState(config.defaultMetaAgent);
+  const [selectedAgent, setSelectedAgent] = useState(initialAgentId ?? config.defaultMetaAgent);
   const desktop = isTauriEnvironment();
   const agents = [...builtinAgents, ...config.customAgents];
   const selected = agents.find((agent) => agent.id === selectedAgent) ?? agents[0];
@@ -39,9 +40,8 @@ export function AgentManager() {
   };
   return (
     <div className="agent-manager">
-      <div>
-        <h2 className="text-xl font-medium">Agent configuration</h2>
-      </div>
+      <Button variant="ghost" className="self-start" onClick={() => navigateWorkspace('agents')}><ArrowLeft size={16} />Back to agents</Button>
+      <h1 className="text-2xl font-medium">Configure {selected?.name ?? 'agent'}</h1>
       <div className="flex flex-wrap gap-3">
         <Button
           type="button"
@@ -75,18 +75,6 @@ export function AgentManager() {
           }}
         />
       )}
-      <nav className="agent-chooser" aria-label="Agent to configure">
-        {agents.map((agent) => (
-          <Button
-            key={agent.id}
-            variant={selected?.id === agent.id ? 'secondary' : 'ghost'}
-            aria-pressed={selected?.id === agent.id}
-            onClick={() => setSelectedAgent(agent.id)}
-          >
-            {agent.name}
-          </Button>
-        ))}
-      </nav>
       {agents
         .filter((agent) => agent.id === selected?.id)
         .map((agent) => {

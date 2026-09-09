@@ -18,7 +18,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { ScheduleNotice } from '../schedules/ScheduleNotice';
-import type { SettingsCategory } from '../settings/SettingsDialog';
+import type { SettingsCategory } from '../settings/SettingsPage';
 import { UpdateNotice } from '../settings/UpdateNotice';
 import { CaptureTask } from '../tasks/CaptureTask';
 import { HistoryRecoveryNotice } from '../tasks/HistoryRecoveryNotice';
@@ -67,8 +67,8 @@ const ProjectContext = lazy(() =>
 const ProjectPreferences = lazy(() =>
   import('../projects/ProjectPreferences').then((m) => ({ default: m.ProjectPreferences })),
 );
-const SettingsDialog = lazy(() =>
-  import('../settings/SettingsDialog').then((m) => ({ default: m.SettingsDialog })),
+const SettingsPage = lazy(() =>
+  import('../settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
 const CommandPalette = lazy(() =>
   import('./CommandPalette').then((m) => ({ default: m.CommandPalette })),
@@ -91,9 +91,18 @@ export function Shell({
       canvas.current?.focus();
   }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
   const [setupOpen, setSetupOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
+  const previousView = useRef<ActiveTab>('kanban');
+  useEffect(() => {
+    if (activeTab !== 'preferences') previousView.current = activeTab;
+  }, [activeTab]);
+  const [configuredAgent, setConfiguredAgent] = useState<string>();
+  useEffect(() => {
+    const handle = (event: Event) => { setConfiguredAgent((event as CustomEvent<string>).detail); setActiveTab('agent-settings'); };
+    window.addEventListener('jackalope:configure-agent', handle);
+    return () => window.removeEventListener('jackalope:configure-agent', handle);
+  }, []);
+  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
   useEffect(() => {
     const feature: Partial<Record<ActiveTab, Feature>> = {
       kanban: 'tasks',
@@ -110,16 +119,11 @@ export function Shell({
     if (selected) telemetry.track({ name: 'feature_used', feature: selected });
   }, [activeTab]);
   useEffect(() => {
-    if (settingsOpen) telemetry.track({ name: 'feature_used', feature: 'settings' });
-  }, [settingsOpen]);
+    if (activeTab === 'preferences') telemetry.track({ name: 'feature_used', feature: 'settings' });
+  }, [activeTab]);
   const [commandsOpen, setCommandsOpen] = useState(false);
-  // Keep the settings and command-palette chunks out of first paint; mount each
-  // once it has been opened and leave it mounted so close transitions still run.
-  const [settingsSeen, setSettingsSeen] = useState(false);
+  // Keep the command palette mounted after first use so close transitions can finish.
   const [commandsSeen, setCommandsSeen] = useState(false);
-  useEffect(() => {
-    if (settingsOpen) setSettingsSeen(true);
-  }, [settingsOpen]);
   useEffect(() => {
     if (commandsOpen) setCommandsSeen(true);
   }, [commandsOpen]);
@@ -142,7 +146,7 @@ export function Shell({
   const navigate = useCallback((tab: ActiveTab) => {
     if (tab === 'audit' || tab === 'mesh') {
       setSettingsCategory(tab === 'audit' ? 'Diagnostics' : 'System');
-      setSettingsOpen(true);
+      setActiveTab('preferences');
     } else setActiveTab(tab);
   }, []);
   useEffect(() => {
@@ -153,7 +157,7 @@ export function Shell({
   useEffect(() => {
     const handle = (event: Event) => {
       setSettingsCategory((event as CustomEvent<SettingsCategory>).detail);
-      setSettingsOpen(true);
+      setActiveTab('preferences');
     };
     window.addEventListener('jackalope:open-settings', handle);
     return () => window.removeEventListener('jackalope:open-settings', handle);
@@ -173,7 +177,9 @@ export function Shell({
         setCapture({});
       } else if ((event.metaKey || event.ctrlKey) && event.key === ',') {
         event.preventDefault();
-        setSettingsOpen((open) => !open);
+        setActiveTab((current) =>
+          current === 'preferences' ? previousView.current : 'preferences',
+        );
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -269,7 +275,7 @@ export function Shell({
           <Tooltip content="Settings (Ctrl+,)">
             <button
               type="button"
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => setActiveTab('preferences')}
               className="quiet-icon"
               aria-label="Settings and preferences"
             >
@@ -298,7 +304,7 @@ export function Shell({
           className="workspace-nav-item workspace-invitations"
           onClick={() => {
             setSettingsCategory('Invitations');
-            setSettingsOpen(true);
+            setActiveTab('preferences');
           }}
         >
           <UsersRound className="size-3.5" />
@@ -312,35 +318,36 @@ export function Shell({
         className="workspace-canvas"
         aria-label={view.label}
       >
-        {WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
-          <div>
-            <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
-              {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  aria-current={activeTab === item.id ? 'page' : undefined}
-                  onClick={() => navigate(item.id)}
-                  className="workspace-nav-item"
-                >
-                  {item.id === 'kanban'
-                    ? 'Work'
-                    : item.id === 'topology'
-                      ? 'Codebase'
-                      : item.id === 'agents'
-                        ? 'Runners'
-                        : item.id === 'agent-settings'
-                          ? 'Configuration'
-                          : item.id === 'mcps'
-                            ? 'Connections'
-                            : item.id === 'project-settings'
-                              ? 'Settings'
-                              : item.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        )}
+        {view.group !== 'settings' && view.group !== 'agents' &&
+          WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
+            <div>
+              <nav aria-label={`${view.group} views`} className="workspace-subnavigation">
+                {WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    aria-current={activeTab === item.id ? 'page' : undefined}
+                    onClick={() => navigate(item.id)}
+                    className="workspace-nav-item"
+                  >
+                    {item.id === 'kanban'
+                      ? 'Work'
+                      : item.id === 'topology'
+                        ? 'Codebase'
+                        : item.id === 'agents'
+                          ? 'Runners'
+                          : item.id === 'agent-settings'
+                            ? 'Configuration'
+                            : item.id === 'mcps'
+                              ? 'Connections'
+                              : item.id === 'project-settings'
+                                ? 'Settings'
+                                : item.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          )}
         <Suspense fallback={<LoadingState label={`Opening ${view.label}…`} />}>
           {activeTab === 'kanban' && (
             <TaskWorkspace
@@ -379,9 +386,16 @@ export function Shell({
             />
           )}
           {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
+          {activeTab === 'preferences' && (
+            <SettingsPage
+              key={settingsCategory}
+              initialCategory={settingsCategory}
+              onClose={() => setActiveTab(previousView.current)}
+            />
+          )}
           {activeTab === 'agent-settings' && (
             <section className="workspace-page agent-settings-page w-full">
-              <AgentManager />
+              <AgentManager key={configuredAgent} initialAgentId={configuredAgent} />
             </section>
           )}
           {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
@@ -436,7 +450,7 @@ export function Shell({
         onSearch={() => setCommandsOpen(true)}
         onSettings={() => {
           setSettingsCategory('General');
-          setSettingsOpen(true);
+          setActiveTab('preferences');
         }}
       />
       <ProjectSetup open={setupOpen} onClose={() => setSetupOpen(false)} />
@@ -447,15 +461,7 @@ export function Shell({
             onClose={() => setCommandsOpen(false)}
             onNavigate={navigate}
             onCapture={() => setCapture({})}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
-        )}
-        {settingsSeen && (
-          <SettingsDialog
-            key={settingsCategory + String(settingsOpen)}
-            initialCategory={settingsCategory}
-            open={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
+            onOpenSettings={() => setActiveTab('preferences')}
           />
         )}
       </Suspense>

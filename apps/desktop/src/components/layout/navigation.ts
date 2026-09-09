@@ -134,6 +134,14 @@ export const WORKSPACE_VIEWS = [
     group: 'settings',
     primary: false,
   },
+  {
+    id: 'preferences',
+    label: 'Settings',
+    description: 'App preferences, appearance, privacy and support.',
+    icon: Settings2,
+    group: 'settings',
+    primary: false,
+  },
 ] as const;
 export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
 export function navigateWorkspace(tab: ActiveTab) {
@@ -143,4 +151,8 @@ export function openSettings(
   category: 'General' | 'System' | 'Diagnostics' | 'Invitations' | 'Updates & support',
 ) {
   window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: category }));
+}
+
+export function openAgentConfiguration(agentId: string) {
+  window.dispatchEvent(new CustomEvent('jackalope:configure-agent', {detail: agentId}));
 }

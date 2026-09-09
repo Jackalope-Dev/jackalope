@@ -349,7 +349,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
           )}
         </>
       )}
-      <CapacityPanel />
+      {view === 'tokens' && <CapacityPanel />}
     </section>
   );
 }

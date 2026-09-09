@@ -506,6 +506,9 @@ impl TaskRuntime {
             .cloned()
             .ok_or("Attempt not found")?;
         let history = run.routing.clone().unwrap_or_default();
+        if !history.handoffs.is_empty() && policy.automatic_quota_handoff == Some(false) {
+            return Err("Automatic quota handoff is turned off. Your workspace and progress are preserved. Retry when capacity is available or choose another agent.".into());
+        }
         let mut candidates = self.routing_candidates(req, &policy, false)?;
         candidates.retain(|candidate| eligible(candidate, &history.handoffs));
         if candidates.is_empty() {
@@ -676,6 +679,9 @@ impl TaskRuntime {
     }
 
     pub(super) fn handoff(&self, req: &RunRequest, run: &TaskRun) -> Result<RunRequest, String> {
+        if self.policy()?.automatic_quota_handoff == Some(false) {
+            return Err("Automatic quota handoff is turned off. Your workspace and progress are preserved. Retry when capacity is available or choose another agent.".into());
+        }
         let history = run
             .routing
             .as_ref()

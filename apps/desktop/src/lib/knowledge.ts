@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useExecutionStore } from '../stores/executionStore';
 import { useProjectStore } from '../stores/projectStore';
+import { createReadCache } from './read-cache';
 import { nativeTask } from './task-runtime';
 import { isTauriEnvironment } from './tauri-bridge';
 
@@ -37,27 +38,46 @@ export interface ContextReceipt {
   bytes: number;
 }
 
+const knowledgeCache = createReadCache<KnowledgeEntry[]>(30_000);
+
 export function useKnowledge(projectId: string, projectPath: string) {
-  const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
+  const key = JSON.stringify([projectId, projectPath]);
+  const [entries, setEntries] = useState<KnowledgeEntry[]>(() => knowledgeCache.peek(key) ?? []);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const refresh = useCallback(async () => {
-    if (!isTauriEnvironment()) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      setEntries(await nativeTask<KnowledgeEntry[]>('knowledge_list', { projectId, projectPath }));
-      setError('');
-    } catch (cause) {
-      setError(String(cause));
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, projectPath]);
+  const [loading, setLoading] = useState(!knowledgeCache.peek(key));
+  const request = useRef(0);
+  const refresh = useCallback(
+    async (force = true) => {
+      const version = ++request.current;
+      if (!isTauriEnvironment()) {
+        setLoading(false);
+        return;
+      }
+      const cached = knowledgeCache.peek(key);
+      setEntries(cached ?? []);
+      setLoading(!cached);
+      try {
+        const values = await knowledgeCache.read(
+          key,
+          () => nativeTask<KnowledgeEntry[]>('knowledge_list', { projectId, projectPath }),
+          force,
+        );
+        if (version !== request.current) return;
+        setEntries(values);
+        setError('');
+      } catch (cause) {
+        if (version === request.current) setError(String(cause));
+      } finally {
+        if (version === request.current) setLoading(false);
+      }
+    },
+    [key, projectId, projectPath],
+  );
   useEffect(() => {
-    void refresh();
+    void refresh(false);
+    return () => {
+      request.current++;
+    };
   }, [refresh]);
   return { entries, error, loading, refresh };
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
 import { Button } from '../ui/button';
+import { LoadingState } from '../ui/LoadingState';
 import './capacity-panel.css';
 
 const names: Record<string, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
@@ -26,6 +27,20 @@ export function CapacityPanel() {
   const [now, setNow] = useState(Date.now());
   const nextRefresh = lastFetched ? lastFetched + 60_000 : 0;
   const refresh = () => void fetch(true);
+  useEffect(() => {
+    const refreshIfVisible = () => {
+      if (isTauriEnvironment() && document.visibilityState === 'visible') void fetch();
+    };
+    refreshIfVisible();
+    const interval = setInterval(refreshIfVisible, 60_000);
+    window.addEventListener('focus', refreshIfVisible);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', refreshIfVisible);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
+  }, [fetch]);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -52,14 +67,15 @@ export function CapacityPanel() {
         </p>
       )}
       {loading && (
-        <p role="status" className="task-muted text-sm mt-3">
-          Reading available account limits…
-        </p>
+        <LoadingState
+          label={records.length ? 'Updating account limits…' : 'Reading available account limits…'}
+          compact={records.length > 0}
+        />
       )}
       {!records.length && !loading && (
         <p className="task-muted text-sm mt-4">
           {isTauriEnvironment()
-            ? 'Refresh to check limits from your signed-in agents.'
+            ? 'No account limits were reported. Sign in to an agent, then refresh.'
             : 'Account limits are available in the desktop app.'}
         </p>
       )}

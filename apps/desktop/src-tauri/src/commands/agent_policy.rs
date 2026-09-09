@@ -28,6 +28,7 @@ pub struct CustomAgent {
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AgentPolicy {
+    pub automatic_quota_handoff: Option<bool>,
     pub enabled_agents: HashMap<String, bool>,
     pub allowed_models: HashMap<String, bool>,
     pub default_meta_agent: String,
@@ -195,6 +196,14 @@ pub async fn agent_save_policy(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn older_policy_keeps_quota_handoff_enabled() {
+        let policy: AgentPolicy = serde_json::from_str("{}").unwrap();
+        assert_ne!(policy.automatic_quota_handoff, Some(false));
+        let disabled: AgentPolicy =
+            serde_json::from_str(r#"{"automaticQuotaHandoff":false}"#).unwrap();
+        assert_eq!(disabled.automatic_quota_handoff, Some(false));
+    }
     #[test]
     fn model_policy_is_scoped_and_fails_closed() {
         let mut policy = AgentPolicy::default();

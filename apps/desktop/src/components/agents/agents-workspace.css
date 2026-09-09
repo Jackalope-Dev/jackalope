@@ -144,12 +144,16 @@
   overflow-wrap: anywhere;
 }
 .agent-roster-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   grid-column: 1 / -1;
   align-self: end;
   padding-top: 8px;
 }
 .agent-roster-action > button {
-  width: 100%;
+  flex: 1;
+  width: auto;
   cursor: pointer;
 }
 .agent-roster-heading {

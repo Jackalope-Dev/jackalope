@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createReadCache } from '../lib/read-cache.ts';
 import {
   deleteMcpServer,
   listMcpServers,
@@ -71,8 +72,11 @@ export interface AllMcpsDetails {
   websiteUrl?: string | null;
 }
 
-let searchController: AbortController | undefined;
-let inspectController: AbortController | undefined;
+const marketplaceCache = createReadCache<AllMcpsServer[]>(5 * 60_000);
+const detailsCache = createReadCache<AllMcpsDetails>(5 * 60_000);
+const connectionsCache = createReadCache<McpServerConfig[]>(30_000, 8);
+let searchVersion = 0;
+let inspectVersion = 0;
 
 interface McpState {
   servers: McpServerConfig[];
@@ -93,15 +97,15 @@ interface McpState {
   inspectError: string | null;
   loadingMarkdown: boolean;
 
-  loadServers: (projectId?: string | null) => Promise<void>;
+  loadServers: (projectId?: string | null, force?: boolean) => Promise<void>;
   saveServer: (server: McpServerConfig) => Promise<void>;
   deleteServer: (id: string, scope: string) => Promise<void>;
   probeServer: (server: McpServerConfig) => Promise<void>;
 
   setSearchQuery: (q: string) => void;
   setSelectedCategory: (cat: string) => void;
-  searchMarketplace: (query?: string, category?: string) => Promise<void>;
-  inspectServer: (server: AllMcpsServer) => Promise<void>;
+  searchMarketplace: (query?: string, category?: string, force?: boolean) => Promise<void>;
+  inspectServer: (server: AllMcpsServer, force?: boolean) => Promise<void>;
   clearInspecting: () => void;
 }
 
@@ -124,10 +128,16 @@ export const useMcpStore = create<McpState>((set, get) => ({
   inspectError: null,
   loadingMarkdown: false,
 
-  loadServers: async (projectId = useProjectStore.getState().activeProjectId) => {
-    set({ loadingServers: true, serversError: null });
+  loadServers: async (projectId = useProjectStore.getState().activeProjectId, force = false) => {
+    const key = projectId ?? '';
+    const cached = connectionsCache.peek(key);
+    set({ servers: cached ?? [], loadingServers: !cached, serversError: null });
     try {
-      const servers = await listMcpServers(projectId ?? undefined);
+      const servers = await connectionsCache.read(
+        key,
+        () => listMcpServers(projectId ?? undefined),
+        force,
+      );
       if (projectId !== useProjectStore.getState().activeProjectId) return;
       set({ servers, loadingServers: false });
     } catch (e) {
@@ -141,13 +151,15 @@ export const useMcpStore = create<McpState>((set, get) => ({
   saveServer: async (server: McpServerConfig) => {
     await saveMcpServer(server);
     set({ probeResults: {} });
-    await get().loadServers();
+    connectionsCache.clear();
+    await get().loadServers(undefined, true);
   },
 
   deleteServer: async (id: string, scope: string) => {
     await deleteMcpServer(id, scope);
     set({ probeResults: {} });
-    await get().loadServers();
+    connectionsCache.clear();
+    await get().loadServers(undefined, true);
   },
 
   probeServer: async (server: McpServerConfig) => {
@@ -177,12 +189,9 @@ export const useMcpStore = create<McpState>((set, get) => ({
   setSearchQuery: (searchQuery: string) => set({ searchQuery }),
   setSelectedCategory: (selectedCategory: string) => set({ selectedCategory }),
 
-  searchMarketplace: async (query?: string, category?: string) => {
-    searchController?.abort();
-    const controller = new AbortController();
-    searchController = controller;
-    const enabled = useSettingsStore.getState().useMcpMarketplace;
-    if (!enabled) {
+  searchMarketplace: async (query?: string, category?: string, force = false) => {
+    const version = ++searchVersion;
+    if (!useSettingsStore.getState().useMcpMarketplace) {
       set({
         marketplaceServers: [],
         loadingMarketplace: false,
@@ -190,84 +199,87 @@ export const useMcpStore = create<McpState>((set, get) => ({
       });
       return;
     }
-
-    set({ loadingMarketplace: true, marketplaceError: null });
+    const q = query ?? get().searchQuery;
+    const cat = category ?? get().selectedCategory;
+    const params = new URLSearchParams();
+    if (q.trim()) params.set('q', q.trim());
+    if (cat && cat !== 'all') params.set('category', cat);
+    params.set('limit', '24');
+    const key = params.toString();
+    const cached = marketplaceCache.peek(key);
+    set({ marketplaceServers: cached ?? [], loadingMarketplace: !cached, marketplaceError: null });
     try {
-      const q = query !== undefined ? query : get().searchQuery;
-      const cat = category !== undefined ? category : get().selectedCategory;
-
-      const params = new URLSearchParams();
-      if (q.trim()) params.set('q', q.trim());
-      if (cat && cat !== 'all') params.set('category', cat);
-      params.set('limit', '24');
-
-      const url = `https://allmcps.com/api/v1/search?${params.toString()}`;
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) {
-        throw new Error(`Marketplace request failed: HTTP ${res.status}`);
-      }
-      const data: AllMcpsSearchResponse = await res.json();
-      if (controller.signal.aborted || !useSettingsStore.getState().useMcpMarketplace) return;
+      const servers = await marketplaceCache.read(
+        key,
+        async (signal) => {
+          const response = await fetch(`https://allmcps.com/api/v1/search?${key}`, { signal });
+          if (!response.ok) throw new Error(`Marketplace request failed: HTTP ${response.status}`);
+          const data: AllMcpsSearchResponse = await response.json();
+          return data.servers || [];
+        },
+        force,
+      );
+      if (version !== searchVersion || !useSettingsStore.getState().useMcpMarketplace) return;
+      set({ marketplaceServers: servers, loadingMarketplace: false });
+    } catch (cause) {
+      if (version !== searchVersion) return;
       set({
-        marketplaceServers: data.servers || [],
-        loadingMarketplace: false,
-      });
-    } catch (e) {
-      if (controller.signal.aborted) return;
-      set({
-        marketplaceError: e instanceof Error ? e.message : String(e),
+        marketplaceError: cause instanceof Error ? cause.message : String(cause),
         loadingMarketplace: false,
       });
     }
   },
 
-  inspectServer: async (server: AllMcpsServer) => {
-    inspectController?.abort();
+  inspectServer: async (server: AllMcpsServer, force = false) => {
+    const version = ++inspectVersion;
     if (!useSettingsStore.getState().useMcpMarketplace) return;
-    const controller = new AbortController();
-    inspectController = controller;
+    const cached = detailsCache.peek(server.id);
     set({
       inspectingServer: server,
+      inspectingDetails: cached ?? null,
       inspectingMarkdown: null,
-      inspectingDetails: null,
       inspectError: null,
-      loadingMarkdown: true,
+      loadingMarkdown: !cached,
     });
     try {
-      const res = await fetch(
-        `https://allmcps.com/api/v1/servers/${encodeURIComponent(server.id)}`,
-        { signal: controller.signal },
+      const detail = await detailsCache.read(
+        server.id,
+        async (signal) => {
+          const response = await fetch(
+            `https://allmcps.com/api/v1/servers/${encodeURIComponent(server.id)}`,
+            { signal },
+          );
+          if (!response.ok)
+            throw new Error(`Could not load server details (HTTP ${response.status}).`);
+          const data = await response.json();
+          if (!data.server || typeof data.server !== 'object')
+            throw new Error('The marketplace returned no server details.');
+          return data.server as AllMcpsDetails;
+        },
+        force,
       );
-      if (res.ok) {
-        const data = await res.json();
-        const detail: AllMcpsDetails = data.server;
-        if (!detail || typeof detail !== 'object')
-          throw new Error('The marketplace returned no server details.');
-        const text =
-          [
-            detail?.description,
-            detail?.aiOverview,
-            ...(detail?.aiFeatures ?? []).map((feature: string) => `- ${feature}`),
-          ]
-            .filter(Boolean)
-            .join('\n\n') || server.description;
-        if (controller.signal.aborted || !useSettingsStore.getState().useMcpMarketplace) return;
-        set({ inspectingDetails: detail, inspectingMarkdown: text, loadingMarkdown: false });
-      } else {
-        throw new Error(`Could not load server details (HTTP ${res.status}).`);
-      }
-    } catch (error) {
-      if (controller.signal.aborted) return;
+      const text =
+        [
+          detail.description,
+          detail.aiOverview,
+          ...(detail.aiFeatures ?? []).map((feature) => `- ${feature}`),
+        ]
+          .filter(Boolean)
+          .join('\n\n') || server.description;
+      if (version !== inspectVersion || !useSettingsStore.getState().useMcpMarketplace) return;
+      set({ inspectingDetails: detail, inspectingMarkdown: text, loadingMarkdown: false });
+    } catch (cause) {
+      if (version !== inspectVersion) return;
       set({
         inspectingMarkdown: server.description || 'No additional documentation available.',
-        inspectError: error instanceof Error ? error.message : String(error),
+        inspectError: cause instanceof Error ? cause.message : String(cause),
         loadingMarkdown: false,
       });
     }
   },
 
   clearInspecting: () => {
-    inspectController?.abort();
+    inspectVersion++;
     set({
       inspectingServer: null,
       inspectingMarkdown: null,
@@ -280,8 +292,10 @@ export const useMcpStore = create<McpState>((set, get) => ({
 
 useSettingsStore.subscribe((state, previous) => {
   if (previous.useMcpMarketplace && !state.useMcpMarketplace) {
-    searchController?.abort();
-    inspectController?.abort();
+    searchVersion++;
+    marketplaceCache.clear();
+    detailsCache.clear();
+    inspectVersion++;
     useMcpStore.setState({
       marketplaceServers: [],
       loadingMarketplace: false,

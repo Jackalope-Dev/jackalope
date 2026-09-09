@@ -34,35 +34,6 @@
   }
 }
 
-/* Settings Dialog & Panel Styling */
-
-.settings-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--color-surface-sunken) 80%, transparent);
-  backdrop-filter: blur(10px);
-  z-index: 85;
-}
-
-.settings-dialog.appearance-panel {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 860px;
-  max-width: calc(100vw - 48px);
-  height: 640px;
-  max-height: calc(100dvh - 48px);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  box-shadow: var(--shadow-pop);
-  z-index: 86;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 /* Top Header Bar */
 .settings-header {
   height: 64px;
@@ -619,5 +590,63 @@
     align-items: start;
     flex-direction: column;
     gap: 8px;
+  }
+}
+
+.settings-page > .settings-header {
+  height: auto;
+  min-height: 80px;
+  padding: 16px 0;
+  background: transparent;
+  border: 0;
+  flex-wrap: wrap;
+}
+.settings-page h1 {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+}
+.settings-page h1:focus {
+  outline: none;
+}
+.settings-page .settings-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 32px;
+  overflow: visible;
+}
+.settings-page .settings-sidebar {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  align-self: start;
+}
+.settings-page .settings-content {
+  padding: 0 0 32px;
+  min-width: 0;
+  overflow: visible;
+}
+.settings-page .settings-search {
+  max-width: 360px;
+  flex: 1;
+}
+.settings-page .settings-nav-item {
+  min-height: 44px;
+  cursor: pointer;
+}
+@media (max-width: 800px) {
+  .settings-page .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .settings-page .settings-sidebar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .settings-page .settings-nav-item {
+    width: auto;
   }
 }

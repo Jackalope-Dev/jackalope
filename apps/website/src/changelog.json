@@ -1,5 +1,30 @@
 [
   {
+    "id": "workspace-pages-and-automatic-refresh",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "More room, less waiting",
+    "description": "Full workspace pages and automatic refresh make browsing and configuration easier.",
+    "items": [
+      "MCP details and configuration move into dedicated pages, with publisher avatars on listings and clearer actions.",
+      "App Settings gets its own page. Agents use a card grid, discover runners on arrival, and explain when an Antigravity desktop install needs the CLI.",
+      "Usage loads quotas automatically and refreshes stale data. Marketplace, connection and knowledge reads reuse recent results, while page scrollbars stay at the workspace edge.",
+      "Performance insights includes an automatic quota handoff switch, enabled by default, without the duplicate capacity section."
+    ],
+    "note": "Disabling quota handoff preserves partial work for review. Existing preferences keep handoff enabled."
+  },
+  {
+    "id": "computer-use-and-agent-browser-together",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Computer use and agent browser, together.",
+    "description": "The homepage now highlights browser actions and approved Windows app control in the main feature grid.",
+    "items": [
+      "See what agents can do in a task browser or a selected Windows window, with visible pause and cancel controls."
+    ],
+    "note": "Website copy update; deployment remains pending."
+  },
+  {
     "id": "visual-project-context",
     "date": "2026-09-09",
     "status": "In development",
