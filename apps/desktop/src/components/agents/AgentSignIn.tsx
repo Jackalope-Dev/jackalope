@@ -38,6 +38,8 @@ export function AgentSignIn({
   const dialogFocus = useDialogFocus();
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const session = useRef<string | null>(null);
+  const finishingSetup = useRef(false);
+  const completeSetup = useRef<(() => Promise<void>) | null>(null);
   const finish = useRef<HTMLButtonElement>(null);
   const report = useRef(onStatus);
   report.current = onStatus;
@@ -56,6 +58,7 @@ export function AgentSignIn({
     let id: string | null = null;
     let cursor = 0;
     setRunning(true);
+    finishingSetup.current = false;
     setChecking(false);
     setError('');
     setResult(undefined);
@@ -130,10 +133,10 @@ export function AgentSignIn({
       }
     };
     const poll = async () => {
-      if (!id || disposed) return;
+      if (!id || disposed || finishingSetup.current) return;
       try {
         const view = await pollSignIn(id, cursor);
-        if (disposed) return;
+        if (disposed || finishingSetup.current) return;
         if (view.truncated) terminal.reset();
         for (const chunk of view.chunks) {
           terminal.write(chunk.data);
@@ -153,11 +156,34 @@ export function AgentSignIn({
           setError('Review the provider message below, then retry.');
         }
       } catch (e) {
-        if (!disposed) {
+        if (!disposed && !finishingSetup.current) {
           setRunning(false);
           setError(String(e));
         }
         if (id) void stopSignIn(id).catch(() => {});
+      }
+    };
+    completeSetup.current = async () => {
+      if (!id || finishingSetup.current) return;
+      finishingSetup.current = true;
+      clearTimeout(timer);
+      setChecking(true);
+      setError('');
+      try {
+        await stopSignIn(id);
+        if (disposed) return;
+        session.current = null;
+        setRunning(false);
+        terminal.options.disableStdin = true;
+        setStage('Account setup finished');
+        await verify();
+      } catch (e) {
+        if (!disposed) {
+          finishingSetup.current = false;
+          setChecking(false);
+          setError(String(e));
+          timer = setTimeout(() => void poll(), 250);
+        }
       }
     };
     void signInAgentProfile(agentId, profileId, terminal.cols, terminal.rows)
@@ -181,6 +207,7 @@ export function AgentSignIn({
       });
     return () => {
       disposed = true;
+      completeSetup.current = null;
       clearTimeout(timer);
       session.current = null;
       if (id) void stopSignIn(id).catch(() => {});
@@ -191,7 +218,7 @@ export function AgentSignIn({
     };
   }, [agentId, agentName, profileId, attempt, host]);
   const close = async () => {
-    if (saving) return;
+    if (saving || checking) return;
     if (session.current) {
       try {
         await stopSignIn(session.current);
@@ -255,6 +282,9 @@ export function AgentSignIn({
           )}
           <div className="agent-sign-in-terminal" ref={setHost} />
           <div className="flex flex-wrap justify-end gap-3 mt-4">
+            {running && ['gemini', 'goose', 'opencode'].includes(agentId) && (
+              <Button disabled={saving || checking} onClick={() => void completeSetup.current?.()}>Finish setup</Button>
+            )}
             {!running && !checking && (
               <Button
                 variant="outline"
@@ -275,7 +305,7 @@ export function AgentSignIn({
             <Button
               ref={finish}
               variant={running ? 'outline' : 'primary'}
-              disabled={saving}
+              disabled={saving || checking}
               onClick={() => void close()}
             >
               {running ? 'Cancel sign-in' : 'Done'}

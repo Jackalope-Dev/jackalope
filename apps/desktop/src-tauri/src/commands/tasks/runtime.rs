@@ -379,7 +379,7 @@ impl TaskRuntime {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 cmd.args(["--session", old.session_id.as_deref().unwrap()]);
             }
-        } else {
+        } else if adapter == "grok" {
             cmd.args([
                 "--output-format",
                 "streaming-messages-json",
@@ -392,6 +392,8 @@ impl TaskRuntime {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
+        } else {
+            return Err(format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode or Antigravity to run this task."));
         }
         if let Some(model) = &selected_model {
             cmd.args(["--model", model]);

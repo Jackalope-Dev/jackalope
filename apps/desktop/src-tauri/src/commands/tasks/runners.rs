@@ -48,9 +48,11 @@ pub(super) fn discover_runner(
         }
         Ok((adapter, path)) => {
             runner.available = true;
+            if let Ok(binding) = crate::commands::agent_profiles::bind_account(profiles_root, &adapter, None) {
+                runner.account = binding.label;
+            }
             if adapter == "antigravity" {
-                runner.account = "Current Antigravity CLI account (identity not reported)".into();
-                runner.detail = "Uses agy and its existing CLI sign-in and permission settings. Access is checked when a task starts. Sign in with agy, then refresh. Separate Jackalope accounts are unavailable; changing the CLI account also affects continuations.".into();
+                runner.detail = "Uses agy. Add separate Gemini API-key accounts in Jackalope, or use the existing CLI subscription login. Access is checked when a task starts; multiple subscription logins are not isolated.".into();
                 return runner;
             }
             let profile_env =
@@ -67,15 +69,15 @@ pub(super) fn discover_runner(
                 return runner;
             }
             if adapter == "gemini" {
-                runner.detail = "Installed. Gemini CLI validates credentials on launch. Sign in with gemini login or set GEMINI_API_KEY.".into();
+                runner.detail = "Installed. Add separate accounts and complete sign-in in Jackalope. Task execution support is still in development.".into();
                 return runner;
             }
             if adapter == "aider" {
-                runner.detail = "Installed. Aider pair programming uses configured provider keys (e.g. OPENAI_API_KEY or ANTHROPIC_API_KEY).".into();
+                runner.detail = "Installed. Add separate provider API-key accounts in Jackalope. Task execution support is still in development.".into();
                 return runner;
             }
             if adapter == "goose" {
-                runner.detail = "Installed. Goose developer agent with local automation and extension capabilities.".into();
+                runner.detail = "Installed. Add separate accounts and configure each provider in Jackalope. Task execution support is still in development.".into();
                 return runner;
             }
             let args = if adapter == "codex" {
