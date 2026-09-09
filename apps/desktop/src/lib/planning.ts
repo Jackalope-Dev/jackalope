@@ -31,12 +31,15 @@ export function planningDraft(
     executionMode: isolated ? 'isolated' : 'current',
   }).assembledPrompt;
   const structured = !!task.refinedPrompt && task.refinedPrompt === generated;
+  const automatic = task.clarifications?.some(
+    (item) => item.question === 'Task guideline selection' && item.answer === 'Automatic',
+  );
   return {
     effort: task.effort,
     model: task.model,
     contextSelection: task.contextSelection,
     prompt: structured ? task.rawPrompt : task.refinedPrompt || task.rawPrompt,
-    skills: structured ? skills : [],
+    skills: structured ? (automatic ? undefined : skills) : [],
     agent: task.assignedAgent === 'Unassigned' ? '' : (task.assignedAgent ?? ''),
     isolated,
     connectionIds: task.connectionIds,

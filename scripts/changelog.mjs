@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -81,7 +82,24 @@ if (command === 'check') {
   };
   const next = [entry, ...entries];
   validate(next);
-  await writeFile(file, `${JSON.stringify(next, null, 2)}\n`);
+  const formatted = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(import.meta.resolve('@biomejs/biome/bin/biome')),
+      'format',
+      `--stdin-file-path=${file}`,
+    ],
+    {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      input: `${JSON.stringify(next, null, 2)}\n`,
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      windowsHide: true,
+    },
+  );
+  if (formatted.error || formatted.status !== 0 || !formatted.stdout)
+    fail(formatted.error?.message || formatted.stderr || 'could not format the new entry.');
+  await writeFile(file, formatted.stdout);
   console.log(`Changelog: added ${entry.id}. The website will publish it on its next build.`);
 } else {
   fail('expected check or add.');

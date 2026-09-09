@@ -1,5 +1,16 @@
 [
   {
+    "id": "a-simpler-task-composer",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A simpler task composer",
+    "description": "Task creation puts the project before the prompt and leaves more room for writing.",
+    "items": [
+      "Moved the project selector above the text area and removed repeated tool and lesson summaries."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "reliable-agent-sign-in-links",
     "date": "2026-09-09",
     "status": "In development",

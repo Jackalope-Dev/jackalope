@@ -27,7 +27,7 @@ export interface TaskDraft {
   skills?: string[];
   connectionIds?: string[];
 }
-export const emptyDraft: TaskDraft = { prompt: '', agent: '', isolated: true, skills: [] };
+export const emptyDraft: TaskDraft = { prompt: '', agent: '', isolated: true };
 interface ExecutionState {
   runs: TaskRun[];
   runners: Runner[];

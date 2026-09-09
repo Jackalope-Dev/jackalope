@@ -193,9 +193,12 @@ fn antigravity_uses_literal_stdin_and_explicit_workspace_without_bypassing_permi
 }
 
 #[test]
-fn antigravity_never_invents_isolated_accounts_or_resumed_usage() {
-    let root = std::env::temp_dir().join("jackalope-agy-account-test");
-    assert!(crate::commands::agent_profiles::env_var_for("antigravity").is_none());
+fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
+    let root = std::env::temp_dir().join(format!("jackalope-agy-account-{}", uuid::Uuid::new_v4()));
+    assert_eq!(
+        crate::commands::agent_profiles::env_var_for("antigravity"),
+        Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+    );
     assert!(
         crate::commands::agent_profiles::bind_account(&root, "antigravity", Some("work")).is_err()
     );

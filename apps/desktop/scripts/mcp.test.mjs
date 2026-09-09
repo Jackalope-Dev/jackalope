@@ -21,7 +21,7 @@ test('all built-in agents share discovery with explicit transport and account li
   assert.notEqual(connectionSupport('codex', 'sse', false), null);
   assert.notEqual(connectionSupport('antigravity', 'http', false), null);
   assert.notEqual(connectionSupport('unknown', 'http', true), null);
-  assert.equal(agentCapabilities('antigravity').accounts, false);
+  assert.equal(agentCapabilities('antigravity').accounts, true);
   assert.equal(agentCapabilities('opencode').capacity, false);
 });
 

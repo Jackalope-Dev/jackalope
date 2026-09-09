@@ -6,6 +6,7 @@ import { useAgentModels } from '../../lib/agent-models';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt } from '../../lib/skills/context-assembler';
+import { resolveTaskGuidelines } from '../../lib/skills/task-context';
 import { ideaStageLabels } from '../../lib/task-collection';
 import { effortPrompt } from '../../lib/task-effort';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
@@ -168,7 +169,7 @@ export function CaptureTask({
     if (agent) draft(key, { agent, model: undefined });
   }, [agent, key, draft]);
   const update = (value: Partial<typeof current>) => draft(key, { ...current, ...value });
-  const skills = current.skills ?? [];
+  const skills = resolveTaskGuidelines(current.prompt, current.skills, project?.preferences);
   const assembled = assemblePrompt({
     rawPrompt: current.prompt.trim(),
     selectedSkillIds: skills,
@@ -196,8 +197,15 @@ export function CaptureTask({
       contextSelection: current.contextSelection,
       clarifications: [
         ...(idea?.clarifications?.filter(
-          (item) => !['Active Skill Guidelines', 'Git Execution Mode'].includes(item.question),
+          (item) =>
+            !['Active Skill Guidelines', 'Git Execution Mode', 'Task guideline selection'].includes(
+              item.question,
+            ),
         ) ?? []),
+        {
+          question: 'Task guideline selection',
+          answer: current.skills === undefined ? 'Automatic' : 'Manual',
+        },
         {
           question: 'Active Skill Guidelines',
           answer: VETTED_SKILLS.filter((s) => skills.includes(s.id))

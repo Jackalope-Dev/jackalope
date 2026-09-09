@@ -1,5 +1,6 @@
 import { Check, FileText, Layers } from 'lucide-react';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
+import { Switch } from '../ui/Switch';
 import { CodeSurface } from './CodeSurface';
 import './task-experience.css';
 
@@ -10,6 +11,8 @@ export function TaskContextPanel({
   instructions,
   prompt,
   embedded = false,
+  automatic,
+  onAutomaticChange,
 }: {
   selected: string[];
   suggested: string[];
@@ -17,6 +20,8 @@ export function TaskContextPanel({
   instructions?: string;
   prompt: string;
   embedded?: boolean;
+  automatic?: boolean;
+  onAutomaticChange?: (automatic: boolean) => void;
 }) {
   const active = VETTED_SKILLS.filter((skill) => selected.includes(skill.id));
   const Container = embedded ? 'section' : 'details';
@@ -32,6 +37,20 @@ export function TaskContextPanel({
         </span>
       </Heading>
       <div className="task-context-body">
+        {onAutomaticChange && (
+          <div className="mb-4">
+            <Switch
+              label="Choose task guidelines automatically"
+              checked={automatic === true}
+              onCheckedChange={onAutomaticChange}
+            />
+            <p className="task-muted mt-2">
+              {automatic
+                ? 'Uses project defaults and matches guidance to your prompt. Changing a guideline creates a task override.'
+                : 'This task keeps your selection. Turn on automatic selection to use project defaults again.'}
+            </p>
+          </div>
+        )}
         <div className="task-context-guidelines">
           {VETTED_SKILLS.map((skill) => {
             const included = selected.includes(skill.id);

@@ -17,7 +17,6 @@ pub(super) fn device_name() -> String {
 
 #[tauri::command]
 pub async fn system_get_info() -> Result<SystemInfo, String> {
-
     let git_available = std::process::Command::new("git")
         .arg("--version")
         .output()

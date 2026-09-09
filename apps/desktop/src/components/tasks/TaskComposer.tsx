@@ -118,7 +118,7 @@ export function TaskComposer({
       id: 'context',
       icon: BookOpen,
       label: 'Context',
-      value: `${current.contextSelection?.memoryOff ? 'Lessons off' : 'Matching lessons'}${activeSkills.length ? ` · ${activeSkills.length} guidelines` : ''}`,
+      value: `${current.skills === undefined ? 'Automatic' : 'Custom'}${activeSkills.length ? ` · ${activeSkills.length} guidelines` : ''}`,
     },
     {
       id: 'tools',
@@ -152,6 +152,7 @@ export function TaskComposer({
         }}
       >
         <fieldset disabled={submitting} className="contents">
+          {context}
           <label htmlFor="task-intent" className="sr-only">
             What do you want to accomplish?
           </label>
@@ -178,22 +179,8 @@ export function TaskComposer({
               }
             }}
           />
-          {context}
-          <div className="composer-defaults" aria-label="Task setup summary">
-            {current.agent && current.model && <span>{current.model}</span>}
-            <span>
-              <Plug size={15} aria-hidden="true" />
-              {customTools ? 'Saved tool selection' : 'Project tools included'}
-            </span>
-            <span>
-              <BookOpen size={15} aria-hidden="true" />
-              {current.contextSelection?.memoryOff ? 'Lessons off' : 'Matching project lessons'}
-            </span>
-            {(current.contextSelection?.workflowId ||
-              current.contextSelection?.excludedMemoryIds?.length ||
-              activeSkills.length > 0) && <span>Custom context included</span>}
-          </div>
-          <section className="composer-customization" aria-label="Customize task">
+          <details className="composer-customization">
+            <summary>Customize task</summary>
             <div className="composer-configuration">
               <section
                 className="composer-effort"
@@ -395,6 +382,10 @@ export function TaskComposer({
                     )}
                     <TaskContextPanel
                       embedded
+                      automatic={current.skills === undefined}
+                      onAutomaticChange={(automatic) =>
+                        onChange({ skills: automatic ? undefined : activeSkills })
+                      }
                       selected={activeSkills}
                       suggested={suggestedSkills}
                       onToggle={toggleSkill}
@@ -454,8 +445,6 @@ export function TaskComposer({
                 {(id === 'agent' || id === 'tools') && setup}
               </section>
             ))}
-          </section>
-          {inline ? (
             <details className="composer-outcomes">
               <summary>
                 Requirements
@@ -465,13 +454,10 @@ export function TaskComposer({
               </summary>
               {outcomes}
             </details>
-          ) : (
-            outcomes
-          )}
+          </details>
         </fieldset>
       </form>
       <div className="task-composer-footer">
-        {inline && (
           <span className="composer-dispatch-note">
             {executionReady
               ? current.isolated
@@ -479,7 +465,6 @@ export function TaskComposer({
                 : 'Edits your current checkout'
               : 'Save an idea now. Choose a project when you’re ready.'}
           </span>
-        )}
         <div className="flex flex-wrap gap-2">
           {onSplitTask && current.prompt.trim().length > 25 && (
             <Button type="button" variant="outline" disabled={submitting} onClick={onSplitTask}>

@@ -21,6 +21,8 @@ export interface ProjectPreferences {
    */
   agentAccounts?: Record<string, string>;
   customInstructions?: string;
+  automaticTaskContext?: boolean;
+  taskGuidelines?: string[];
   baseBranch?: string;
   branchPrefix?: string;
   worktreeDir?: string;
