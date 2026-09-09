@@ -282,7 +282,7 @@ export function App({ path = '/' }: { path?: string }) {
               <div>
                 <Dialog.Title>Jackalope walkthrough</Dialog.Title>
                 <Dialog.Description>
-                  32 seconds · Animated app preview · Sample data · Music
+                  {tour.durationSeconds} seconds · Product walkthrough · Sample data · Music
                 </Dialog.Description>
               </div>
               <Dialog.Close className="icon-button" aria-label="Close walkthrough">

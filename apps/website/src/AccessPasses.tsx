@@ -22,13 +22,15 @@ export function AccessPasses({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [copied, setCopied] = useState(false);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const available = member.remaining > 0;
   async function copy() {
     setError('');
+    setCopied(false);
     try {
       await navigator.clipboard.writeText(member.shareUrl);
-      setNotice('Pass link copied. Ready to share.');
+      setCopied(true);
     } catch {
       setError('Couldn’t copy automatically. Select and copy the link below.');
     }
@@ -67,6 +69,7 @@ export function AccessPasses({
           setSelected(number);
           setError('');
           setNotice('');
+          setCopied(false);
         }}
       />
       <Dialog.Portal>
@@ -105,8 +108,14 @@ export function AccessPasses({
               type="button"
               onClick={() => void copy()}
               disabled={busy || !available}
+              aria-live="polite"
             >
-              <Copy size={17} /> Copy share link
+              {copied ? (
+                <Check size={17} aria-hidden="true" />
+              ) : (
+                <Copy size={17} aria-hidden="true" />
+              )}
+              {copied ? 'Pass link copied' : 'Copy share link'}
             </button>
             <label htmlFor="pass-dialog-url">Your shared pass link</label>
             <input
@@ -115,7 +124,7 @@ export function AccessPasses({
               value={member.shareUrl}
               onFocus={(event) => event.currentTarget.select()}
             />
-            <p>Uses one of your available passes when claimed. Copying doesn’t reserve a place.</p>
+            <p>Uses one of your available passes when claimed.</p>
           </div>
           <form onSubmit={send}>
             <label htmlFor="pass-dialog-email">

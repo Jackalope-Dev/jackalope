@@ -1,5 +1,26 @@
 [
   {
+    "id": "clearer-pass-sharing",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Clearer pass sharing.",
+    "description": "Pass links confirm copying directly in the share button.",
+    "items": ["Removed extra pass-sharing copy and simplified website punctuation."],
+    "note": "Website update pending deployment."
+  },
+  {
+    "id": "updated-product-tour",
+    "date": "2026-09-09",
+    "status": "Website",
+    "title": "A fresh look around Jackalope",
+    "description": "Explore the updated app in a new 64-second product tour.",
+    "items": [
+      "See themes, project setup, task dispatch, browser evidence, agent accounts, and the interactive codebase map.",
+      "Watch bold animated feature cards with an original upbeat soundtrack, a new poster, and descriptive captions."
+    ],
+    "note": "The walkthrough uses sample workspace data and scripted browser interactions."
+  },
+  {
     "id": "a-clearer-task-input",
     "date": "2026-09-09",
     "status": "In development",
