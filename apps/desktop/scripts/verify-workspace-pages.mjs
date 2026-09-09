@@ -559,7 +559,7 @@ try {
                 status: 'unresolved',
               },
             ],
-            cycles: [],
+            cycles: [['src/main.ts', 'src/helper.ts']],
             diagnostics: [
               { path: 'src/helper.ts', message: 'Some computed imports could not be analyzed.' },
             ],
@@ -687,6 +687,37 @@ try {
   }
   await navigate('usage');
   await page.screenshot({ path: 'output/playwright/usage-edge-scroll.png' });
+  await page.evaluate(() => {
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = async (command, args) => {
+      if (command !== 'git_list_worktrees') return invoke(command, args);
+      if (args.inspectCleanup)
+        return new Promise((_, reject) => {
+          window.failWorktreeInspection = () => reject(new Error('Cleanup check unavailable'));
+        });
+      return [
+        {
+          path: 'C:/fixture/trail',
+          head: 'abc',
+          branch: 'master',
+          is_bare: false,
+          is_locked: false,
+        },
+      ];
+    };
+  });
+  await navigate('worktrees');
+  await page.getByRole('button', { name: 'Copy path for master' }).waitFor();
+  await page.getByText('Checking merge and cleanup status…', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Loading worktrees…', { exact: true }).count(), 0);
+  for (const width of [1280, 960]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    await page.screenshot({ path: `output/playwright/worktrees-loading-${width}.png` });
+  }
+  await page.evaluate(() => window.failWorktreeInspection());
+  await page.getByRole('alert').filter({ hasText: 'Cleanup check unavailable' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Copy path for master' }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Refresh worktrees' }).isEnabled(), true);
   assert.deepEqual(errors, []);
   console.log(
     'Workspace page browser checks passed: safe TODO clicks, reviewed capture, discard, context detail, agent grid/scroll, MCP page navigation and cancel.',

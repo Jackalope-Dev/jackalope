@@ -42,10 +42,15 @@ export async function openExternalUrl(url: string): Promise<void> {
 export async function listWorktrees(
   repoPath: string,
   targetBranch?: string,
+  inspectCleanup = true,
 ): Promise<WorktreeEntry[]> {
   if (isTauriEnvironment()) {
     const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<WorktreeEntry[]>('git_list_worktrees', { repoPath, targetBranch });
+    return invoke<WorktreeEntry[]>('git_list_worktrees', {
+      repoPath,
+      targetBranch,
+      inspectCleanup,
+    });
   }
   throw new Error('Open the desktop app to read worktrees.');
 }

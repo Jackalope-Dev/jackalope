@@ -17,10 +17,14 @@ pub struct WorktreeEntry {
 pub async fn git_list_worktrees(
     repo_path: String,
     target_branch: Option<String>,
+    inspect_cleanup: Option<bool>,
     state: tauri::State<'_, super::tasks::TaskRuntime>,
 ) -> Result<Vec<WorktreeEntry>, String> {
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        if inspect_cleanup == Some(false) {
+            return list_worktrees(&repo_path);
+        }
         let _guard = super::integration::execution_guard()?;
         super::worktree_cleanup::inspect(
             &repo_path,

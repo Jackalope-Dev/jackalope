@@ -172,8 +172,8 @@ fn dirty_reason(path: &Path) -> Result<Option<String>, String> {
             "status",
             "--porcelain=v1",
             "-z",
-            "--untracked-files=all",
-            "--ignored",
+            "--untracked-files=normal",
+            "--ignored=matching",
             "--ignore-submodules=none",
         ],
     )?;
@@ -704,6 +704,8 @@ mod tests {
             "staged",
             "untracked",
             "ignored",
+            "ignored-directory",
+            "untracked-directory",
             "assume-unchanged",
             "skip-worktree",
         ] {
@@ -712,6 +714,15 @@ mod tests {
             match kind {
                 "untracked" => fs::write(f.worktree.join("new.txt"), "keep").unwrap(),
                 "ignored" => fs::write(f.worktree.join(".env"), "keep").unwrap(),
+                "ignored-directory" | "untracked-directory" => {
+                    let directory = if kind == "ignored-directory" {
+                        "ignored"
+                    } else {
+                        "new"
+                    };
+                    fs::create_dir_all(f.worktree.join(directory).join("nested")).unwrap();
+                    fs::write(f.worktree.join(directory).join("nested/keep.txt"), "keep").unwrap();
+                }
                 _ => {
                     fs::write(f.worktree.join("file.txt"), "keep").unwrap();
                     match kind {

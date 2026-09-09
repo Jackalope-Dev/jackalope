@@ -34,6 +34,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     loadWorktreesForActiveProject,
     spawnTaskWorktree,
     loading,
+    checkingWorktrees,
     worktreesError,
   } = useProjectStore();
   const project = projects.find((p) => p.id === activeProjectId);
@@ -46,6 +47,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const [target, setTarget] = useState('auto');
   const [removing, setRemoving] = useState<string | null>(null);
   const pending = busy || removing !== null;
+  const refreshing = loading || checkingWorktrees;
   const ready = (project?.worktrees ?? []).filter(
     (wt) => wt.cleanup?.merged && !wt.cleanup.blocked_reason,
   );
@@ -188,7 +190,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 aria-label="Refresh worktrees"
                 ref={refreshButton}
                 title="Refresh worktrees"
-                disabled={loading || pending || !desktop}
+                disabled={refreshing || pending || !desktop}
                 onClick={() => void loadWorktreesForActiveProject(targetBranch)}
               >
                 <RefreshCw size={18} />
@@ -252,7 +254,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               busyLabel="Cleaning up…"
               onConfirm={cleanupMerged}
               trigger={
-                <Button disabled={pending || loading || !desktop || !ready.length}>
+                <Button disabled={pending || refreshing || !desktop || !ready.length}>
                   <Trash2 size={18} aria-hidden="true" />
                   Clean up merged ({ready.length})
                 </Button>
@@ -261,15 +263,14 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             {missing.length > 0 && (
               <Button
                 variant="outline"
-                disabled={pending || loading || !desktop}
+                disabled={pending || refreshing || !desktop}
                 onClick={() => void prune()}
               >
                 Remove missing entries ({missing.length})
               </Button>
             )}
             <p className="task-muted">
-              {ready.length} ready to remove · {missing.length} missing. Worktrees with local
-              changes need review, even when their commits are merged.
+              Worktrees with local changes need review, even when their commits are merged.
             </p>
           </div>
           {creating && (
@@ -310,7 +311,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               </div>
             </form>
           )}
-          {loading && <LoadingState label={'Loading worktrees…'} />}
+          {loading && (
+            <LoadingState label="Loading worktrees…" compact={!!project.worktrees.length} />
+          )}
+          {checkingWorktrees && <LoadingState label="Checking merge and cleanup status…" compact />}
           {project.worktrees?.map((wt) => (
             <article key={wt.path} className="worktree-row">
               <GitBranch
@@ -344,7 +348,9 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         ? `Merged into ${wt.cleanup.target_branch}`
                         : wt.cleanup?.merged === false
                           ? `Not merged into ${wt.cleanup.target_branch}`
-                          : 'Merge status unavailable'}
+                          : checkingWorktrees
+                            ? 'Checking merge status…'
+                            : 'Merge status unavailable'}
                   </span>
                 </div>
                 {wt.cleanup?.blocked_reason && (
@@ -355,7 +361,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 {wt.cleanup?.merged && !wt.cleanup.blocked_reason && (
                   <Button
                     variant="outline"
-                    disabled={loading || pending || !desktop}
+                    disabled={refreshing || pending || !desktop}
                     aria-label={`Remove worktree ${wt.branch || wt.path}`}
                     onClick={() => void cleanup(wt)}
                   >
@@ -373,7 +379,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     trigger={
                       <Button
                         variant="outline"
-                        disabled={loading || pending || !desktop}
+                        disabled={refreshing || pending || !desktop}
                         aria-label={`Archive and remove ${wt.branch || wt.path}`}
                       >
                         <Archive size={18} aria-hidden="true" />

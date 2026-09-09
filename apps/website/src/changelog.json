@@ -1,5 +1,18 @@
 [
   {
+    "id": "responsive-worktree-loading",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Worktrees without the wait",
+    "description": "Workspaces appear before cleanup checks finish.",
+    "items": [
+      "Worktrees load independently of merge and cleanup checks, with retryable errors for slow reads.",
+      "Cleanup checks avoid enumerating ignored dependency folders while retaining deletion safeguards.",
+      "The desktop companion sits slightly lower in its footer."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "workspace-controls-and-project-defaults",
     "date": "2026-09-09",
     "status": "In development",

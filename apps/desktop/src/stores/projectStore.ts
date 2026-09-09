@@ -1,7 +1,8 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+import { createWorktree, type WorktreeEntry } from '../lib/tauri-bridge.ts';
+import { readWorktrees } from '../lib/worktree-reads.ts';
 
 export interface ProjectPreferences {
   preferredRunner?: string;
@@ -73,6 +74,7 @@ interface ProjectState {
   projects: Project[];
   activeProjectId: string | null;
   loading: boolean;
+  checkingWorktrees: boolean;
   worktreesError: string | null;
   addProject: (project: Omit<Project, 'worktrees'>) => Promise<void>;
   updateProject: (id: string, partial: Partial<Omit<Project, 'id' | 'worktrees'>>) => void;
@@ -94,6 +96,7 @@ export const useProjectStore = create<ProjectState>()(
       projects: [],
       activeProjectId: null,
       loading: false,
+      checkingWorktrees: false,
       worktreesError: null,
 
       addProject: async (proj) => {
@@ -138,23 +141,29 @@ export const useProjectStore = create<ProjectState>()(
         const request = ++worktreeRequest;
 
         try {
-          set({ loading: true, worktreesError: null });
-          const worktrees = await listWorktrees(active.path, targetBranch);
+          set({ loading: true, checkingWorktrees: false, worktreesError: null });
+          const worktrees = await readWorktrees(active.path, targetBranch, false);
           if (request !== worktreeRequest || get().activeProjectId !== active.id) return;
           set((state) => ({
+            loading: false,
+            checkingWorktrees: true,
             projects: state.projects.map((p) => (p.id === active.id ? { ...p, worktrees } : p)),
+          }));
+          const inspected = await readWorktrees(active.path, targetBranch, true);
+          if (request !== worktreeRequest || get().activeProjectId !== active.id) return;
+          set((state) => ({
+            projects: state.projects.map((p) =>
+              p.id === active.id ? { ...p, worktrees: inspected } : p,
+            ),
           }));
         } catch (e) {
           if (request === worktreeRequest && get().activeProjectId === active.id) {
-            set((state) => ({
+            set({
               worktreesError: e instanceof Error ? e.message : String(e),
-              projects: state.projects.map((p) =>
-                p.id === active.id ? { ...p, worktrees: [] } : p,
-              ),
-            }));
+            });
           }
         } finally {
-          if (request === worktreeRequest) set({ loading: false });
+          if (request === worktreeRequest) set({ loading: false, checkingWorktrees: false });
         }
       },
 

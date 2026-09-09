@@ -630,8 +630,9 @@ mod tests {
             "legacy": {"command":"unused"}
         }});
         let project = json!({"mcpServers": {"local": {"command":"unused", "jackalopeAgents":["claude"], "jackalopeDiscovery":true}}});
-        let (_, codex) =
+        let (_, mut codex) =
             delivery_from_configs("project:test", &global, &project, None, "codex").unwrap();
+        codex.sort_by(|a, b| a.id.cmp(&b.id));
         assert_eq!(
             codex
                 .iter()
