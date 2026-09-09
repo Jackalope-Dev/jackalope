@@ -1,10 +1,18 @@
 import { z } from 'zod';
 import { accessAdminPage } from './admin-page';
+import { MANAGED_TAGS } from './audience';
+import {
+  broadcastEmail,
+  broadcastSchema,
+  changelogEntries,
+  createBroadcastDraft,
+} from './broadcast';
 import { randomToken } from './crypto';
 import { waitlistInsights } from './insights';
 import { accessEmail } from './mail';
 import { checkMailDelivery } from './mail-status';
 import type { Mail } from './mail-templates';
+import { markAudienceStale } from './newsletter';
 import { installerKey, storeUrl } from './routes';
 import { AccessError, approve, requestLink } from './service';
 import { waitlistRankSql } from './waitlist';
@@ -90,7 +98,60 @@ export async function accessAdmin(
       },
     });
   }
+  if (request.method === 'GET' && url.pathname === '/admin/access/broadcast-preview') {
+    const draft = broadcastSchema.safeParse({
+      subject: url.searchParams.get('subject') ?? '',
+      preview: url.searchParams.get('preview') ?? '',
+      headline: url.searchParams.get('headline') ?? '',
+      intro: url.searchParams.get('intro') ?? '',
+      outro: url.searchParams.get('outro') ?? '',
+      entries: url.searchParams.getAll('entry'),
+      extras: url.searchParams.getAll('extra').map((value) => {
+        const [title, ...body] = value.split('\n');
+        return { title: title ?? '', body: body.join('\n') };
+      }),
+      action: url.searchParams.get('actionUrl')
+        ? {
+            label: url.searchParams.get('actionLabel') ?? 'Read more',
+            url: url.searchParams.get('actionUrl') ?? '',
+          }
+        : null,
+      tag: url.searchParams.get('tag') ?? '',
+    });
+    if (!draft.success)
+      return new Response('This preview link is incomplete. Compose the note again.', {
+        status: 400,
+        headers: { ...headers, 'content-type': 'text/plain; charset=utf-8' },
+      });
+    const entries = await changelogEntries(env).catch(() => []);
+    return new Response(broadcastEmail(draft.data, entries, env.ACCESS_WEB_ORIGIN).html, {
+      headers: {
+        ...headers,
+        'content-type': 'text/html; charset=utf-8',
+        'content-security-policy':
+          "default-src 'none'; style-src 'unsafe-inline'; img-src https://jackalope.dev; base-uri 'none'; frame-ancestors 'none'",
+      },
+    });
+  }
   try {
+    if (request.method === 'GET' && url.pathname === '/admin/api/access/broadcast') {
+      const audience = await env.DB.prepare(
+        "SELECT count(*) AS total FROM access_members WHERE newsletter=1 AND status!='revoked' AND sequenzy_state IS NOT NULL",
+      ).first<{ total: number }>();
+      return json({
+        configured: !!(env.SEQUENZY_API_KEY && env.ACCESS_AUDIENCE_LIST && env.ACCESS_EMAIL_FROM),
+        synced: audience?.total ?? 0,
+        tags: MANAGED_TAGS,
+        entries: await changelogEntries(env),
+      });
+    }
+    if (request.method === 'POST' && url.pathname === '/admin/api/access/broadcast') {
+      if (!env.SEQUENZY_API_KEY || !env.ACCESS_AUDIENCE_LIST || !env.ACCESS_EMAIL_FROM)
+        return json({ error: 'access_not_configured' }, 409);
+      const draft = broadcastSchema.parse(await readJson(request));
+      const entries = await changelogEntries(env);
+      return json(await createBroadcastDraft(env, draft, entries));
+    }
     if (request.method === 'GET' && url.pathname === '/admin/api/access/insights')
       return json(await waitlistInsights(env));
     if (request.method === 'GET' && url.pathname === '/admin/api/access/readiness')
@@ -231,11 +292,12 @@ export async function accessAdmin(
           return json({ success: true, mailQueued: !!queued });
         }
         if (action === 'restore')
-          await env.DB.prepare(
-            "UPDATE access_members SET status='waiting',approved_at=NULL,verified_at=NULL,share_code=? WHERE id=? AND status='revoked'",
-          )
-            .bind(randomToken(), id)
-            .run();
+          await env.DB.batch([
+            env.DB.prepare(
+              "UPDATE access_members SET status='waiting',approved_at=NULL,verified_at=NULL,share_code=? WHERE id=? AND status='revoked'",
+            ).bind(randomToken(), id),
+            markAudienceStale(env, id),
+          ]);
         else
           await env.DB.batch([
             env.DB.prepare(
@@ -251,6 +313,7 @@ export async function accessAdmin(
             env.DB.prepare(
               "UPDATE access_invites SET status='revoked' WHERE (owner_id=? OR email=?) AND status='pending'",
             ).bind(id, member.email),
+            markAudienceStale(env, id),
           ]);
         return json({ success: true });
       }
@@ -259,6 +322,8 @@ export async function accessAdmin(
   } catch (error) {
     if (error instanceof AccessError) return json({ error: error.code }, error.status);
     if (error instanceof z.ZodError) return json({ error: 'invalid_request' }, 400);
+    if (error instanceof Error && error.message === 'changelog_unavailable')
+      return json({ error: 'changelog_unavailable' }, 503);
     return json({ error: 'access_unavailable' }, 503);
   }
 }

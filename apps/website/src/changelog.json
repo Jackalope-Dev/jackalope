@@ -1,5 +1,87 @@
 [
   {
+    "id": "easier-agent-accounts",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Work and personal agent accounts",
+    "description": "Add another login for an agent directly from Jackalope.",
+    "items": [
+      "An upfront Add account & sign in flow makes additional accounts easier to discover.",
+      "Label existing and saved accounts as Work, Personal or Other without opening an edit dialog.",
+      "Choose a newly connected account for future tasks from the sign-in screen."
+    ],
+    "note": "In development. Real multi-account sign-in validation remains pending."
+  },
+  {
+    "id": "branded-task-notifications",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Jackalope notification branding",
+    "description": "Windows task notifications now include the Jackalope logo.",
+    "items": [
+      "Test notifications share the same branding as task updates.",
+      "Added breathing room below the notification settings divider."
+    ],
+    "note": "In development. Native visual verification is pending."
+  },
+  {
+    "id": "settings-header-cleanup",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Simpler settings header",
+    "description": "Settings now opens directly at its heading.",
+    "items": [
+      "Removed the extra Back to workspace link."
+    ],
+    "note": "In development."
+  },
+  {
+    "id": "unified-feedback-email-preference",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "One choice for product emails",
+    "description": "The signup product-notes choice now includes a one-time feedback email after trying Jackalope.",
+    "items": [
+      "The signup choice starts checked, and the separate feedback-email switch is removed from account settings.",
+      "Existing opt-outs remain respected, with consent checked again before sending."
+    ],
+    "note": "In development. Matching service and website deployment is pending."
+  },
+  {
+    "id": "concise-privacy-settings",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Simpler privacy settings",
+    "description": "Privacy settings are easier to scan.",
+    "items": [
+      "Short summaries keep the choices clear, with expandable details for settings sync and usage sharing."
+    ],
+    "note": "In development."
+  },
+  {
+    "id": "floating-action-borders",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Clearer floating actions",
+    "description": "Floating action bars are easier to distinguish from the content beneath them.",
+    "items": [
+      "Added subtle theme-aware borders and consistent spacing to task, connection and repository todo actions."
+    ],
+    "note": "In development."
+  },
+  {
+    "id": "worktree-cleanup-ready",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Clearer worktree cleanup",
+    "description": "Clean up merged worktrees when only disposable build output or dependencies remain.",
+    "items": [
+      "See which worktrees are ready and which generated folders cleanup removes.",
+      "Keep local edits, configuration and unrecognized ignored files protected, including during archive and remove."
+    ],
+    "note": "In development. Combined desktop verification is pending."
+  },
+  {
     "id": "more-room-for-task-details",
     "date": "2026-09-09",
     "status": "In development",

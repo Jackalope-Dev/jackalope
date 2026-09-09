@@ -41,26 +41,28 @@ export function NotificationSettings() {
           />
         </div>
       </div>
-      <p className="task-muted">
-        {!status?.supported
-          ? 'Available in the Windows desktop app.'
-          : 'Notifications stop when Jackalope quits.'}
-      </p>
-      {status?.supported && (
-        <Button className="mt-3" variant="outline" disabled={busy} onClick={() => void test()}>
-          {busy ? 'Sending…' : 'Send test notification'}
-        </Button>
-      )}
-      {(error || status?.error) && (
-        <p role="alert" className="task-error">
-          {error || status?.error}
+      <div className="space-y-3 px-5 py-4">
+        <p className="task-muted">
+          {!status?.supported
+            ? 'Available in the Windows desktop app.'
+            : 'Notifications stop when Jackalope quits.'}
         </p>
-      )}
-      {result && (
-        <p role="status" className="task-muted mt-3">
-          {result}
-        </p>
-      )}
+        {status?.supported && (
+          <Button variant="outline" disabled={busy} onClick={() => void test()}>
+            {busy ? 'Sending…' : 'Send test notification'}
+          </Button>
+        )}
+        {(error || status?.error) && (
+          <p role="alert" className="task-error">
+            {error || status?.error}
+          </p>
+        )}
+        {result && (
+          <p role="status" className="task-muted">
+            {result}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

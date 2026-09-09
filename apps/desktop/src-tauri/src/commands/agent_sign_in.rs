@@ -141,14 +141,14 @@ fn size(cols: u16, rows: u16) -> PtySize {
     }
 }
 
-fn login_command(binding: &AccountBinding, executable: &std::path::Path) -> CommandBuilder {
+fn login_command(binding: &AccountBinding, executable: &std::path::Path) -> Result<CommandBuilder, String> {
     let mut command = CommandBuilder::new(executable);
     command.args(agent_profiles::login_args(&binding.adapter));
     command.cwd(&binding.directory);
     command.env("TERM", "xterm-256color");
     // Use the same environment overrides as task execution, including removals.
     let mut environment = std::process::Command::new(executable);
-    agent_profiles::apply_binding(&mut environment, binding);
+    agent_profiles::apply_binding(&mut environment, binding)?;
     for (name, value) in environment.get_envs() {
         if let Some(value) = value {
             command.env(name, value);
@@ -156,7 +156,7 @@ fn login_command(binding: &AccountBinding, executable: &std::path::Path) -> Comm
             command.env_remove(name);
         }
     }
-    command
+    Ok(command)
 }
 
 fn spawn_session(
@@ -179,7 +179,7 @@ fn spawn_session(
         .map_err(|_| "Could not write to the sign-in terminal.")?;
     let mut child = pair
         .slave
-        .spawn_command(login_command(&binding, &executable))
+        .spawn_command(login_command(&binding, &executable)?)
         .map_err(|_| "Could not start sign-in. Check this agent's installation and try again.")?;
     drop(pair.slave);
     let tree = match child
@@ -277,6 +277,9 @@ pub fn agent_profile_sign_in(
     rows: Option<u16>,
 ) -> Result<String, String> {
     runtime.access.ensure()?;
+    if matches!(agent.as_str(), "antigravity" | "aider") {
+        return Err("Connect this account with a provider API key in Jackalope.".into());
+    }
     let _guard = super::integration::execution_guard()?;
     let binding = agent_profiles::bind_account(&runtime.profiles_root(), &agent, Some(&id))?;
     if runtime.integration_runs()?.iter().any(|run| {
@@ -414,7 +417,7 @@ mod tests {
         let mut binding = binding();
         for agent in ["codex", "claude", "grok", "opencode"] {
             binding.adapter = agent.into();
-            let command = login_command(&binding, std::path::Path::new("test"));
+            let command = login_command(&binding, std::path::Path::new("test")).unwrap();
             assert_eq!(
                 command.get_env(agent_profiles::env_var_for(agent).unwrap()),
                 Some(binding.directory.as_os_str())

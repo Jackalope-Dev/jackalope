@@ -32,7 +32,7 @@ impl TaskRuntime {
         let mut cmd = command(executable);
         configure(&mut cmd, &router.adapter, &prompt_path)?;
         agent_profiles::validate_binding(&self.profiles_root(), &router.binding)?;
-        agent_profiles::apply_binding(&mut cmd, &router.binding);
+        agent_profiles::apply_binding(&mut cmd, &router.binding)?;
         if let Some(model) = &router.model {
             cmd.args(["--model", model]);
         }

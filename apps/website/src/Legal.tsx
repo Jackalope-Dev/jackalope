@@ -168,12 +168,13 @@ const privacy: Section[] = [
         <p>
           Quiet feedback invitations use progress stored on your desktop. Invitation preferences,
           cooldowns and completion sync with your account to avoid repeat requests across desktops.
-          An optional email follow-up is off by default. If you enable it in Jackalope account
-          settings, we link active days, up to two opaque result receipts, invitation preferences
-          and response status to your membership. These milestones do not include task contents,
-          project details or agent-provider credentials, and remain separate from anonymous usage
-          reports. Turning the email choice off stops new milestone uploads and cancels unsent
-          invitations; a message already handed to the email provider may still arrive.
+          The product-notes choice on signup includes one feedback email and is checked by default.
+          You can uncheck it before joining. When enabled, we link active days, up to two opaque
+          result receipts, invitation preferences and response status to your membership. These
+          milestones do not include task contents, project details or agent-provider credentials,
+          and remain separate from anonymous usage reports. Stopping feedback emails stops new
+          milestone uploads and cancels unsent invitations; a message already handed to the email
+          provider may still arrive.
         </p>
         <p>
           This feedback round has at most one email and two in-app invitations, with shared

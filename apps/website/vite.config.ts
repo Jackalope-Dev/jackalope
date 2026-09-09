@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
+import changelog from './src/changelog.json' with { type: 'json' };
 import { normalizePath, siteOrigin } from './src/content.ts';
 import { discoveryFiles, pageHtml, routes } from './src/seo.ts';
 
@@ -26,7 +27,12 @@ export default defineConfig(({ mode }) => {
     new URL('../desktop/src-tauri/icons/source-icon.svg', import.meta.url),
     'utf8',
   );
-  const files = discoveryFiles(site.origin, download ? env.VITE_RELEASE_VERSION : undefined);
+  // Published so the admin broadcast composer can read the same product notes
+  // the site shows, instead of keeping a second copy that drifts.
+  const files = {
+    ...discoveryFiles(site.origin, download ? env.VITE_RELEASE_VERSION : undefined),
+    'changelog.json': JSON.stringify(changelog),
+  };
   const icons = {
     'favicon-32.png': readFileSync(
       new URL('../desktop/src-tauri/icons/32x32.png', import.meta.url),
@@ -68,7 +74,9 @@ export default defineConfig(({ mode }) => {
                   ? 'application/xml'
                   : name.endsWith('.webmanifest')
                     ? 'application/manifest+json'
-                    : 'text/plain; charset=utf-8',
+                    : name.endsWith('.json')
+                      ? 'application/json'
+                      : 'text/plain; charset=utf-8',
               );
               response.end(files[name as keyof typeof files]);
             } else next();

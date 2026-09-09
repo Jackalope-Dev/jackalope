@@ -38,7 +38,7 @@ impl Client {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true);
-        super::super::agent_profiles::apply_binding(command.as_std_mut(), binding);
+        super::super::agent_profiles::apply_binding(command.as_std_mut(), binding)?;
         #[cfg(windows)]
         command.creation_flags(0x08000000);
         let mut child = command

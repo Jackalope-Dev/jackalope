@@ -163,8 +163,16 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           </p>
           {accessOrigin && (
             <label className="signup-newsletter">
-              <input name="newsletter" type="checkbox" disabled={state === 'sending'} />
-              <span>Also send me occasional Jackalope product notes. Unsubscribe anytime.</span>
+              <input
+                name="newsletter"
+                type="checkbox"
+                defaultChecked
+                disabled={state === 'sending'}
+              />
+              <span>
+                Send me product notes and one feedback email after I’ve tried Jackalope. Unsubscribe
+                anytime.
+              </span>
             </label>
           )}
           <p className="signup-consent">

@@ -74,6 +74,7 @@ export const builtinAgents = [
     installCommand: '',
     installUrl: 'https://antigravity.google/docs/cli/install/',
     defaultBinary: 'agy',
+    accountEnvVar: 'HOME',
     loginCommand: 'agy',
   },
   {
@@ -87,7 +88,7 @@ export const builtinAgents = [
     installUrl: 'https://github.com/google-gemini/gemini-cli',
     defaultBinary: 'gemini',
     accountEnvVar: 'GEMINI_CLI_HOME',
-    loginCommand: 'gemini login',
+    loginCommand: 'gemini',
   },
   {
     id: 'aider',
@@ -99,7 +100,7 @@ export const builtinAgents = [
     installCommand: 'pipx install aider-chat',
     installUrl: 'https://aider.chat/docs/install.html',
     defaultBinary: 'aider',
-    accountEnvVar: 'AIDER_HOME',
+    accountEnvVar: 'HOME',
   },
   {
     id: 'goose',
@@ -112,7 +113,8 @@ export const builtinAgents = [
       'curl -fsSL https://github.com/block/goose/releases/latest/download/download.sh | bash',
     installUrl: 'https://block.github.io/goose/',
     defaultBinary: 'goose',
-    accountEnvVar: 'GOOSE_HOME',
+    accountEnvVar: 'GOOSE_PATH_ROOT',
+    loginCommand: 'goose configure',
   },
 ] as const;
 

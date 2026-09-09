@@ -83,7 +83,7 @@ async fn read_catalog(
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true);
-        agent_profiles::apply_binding(command.as_std_mut(), binding);
+        agent_profiles::apply_binding(command.as_std_mut(), binding)?;
         #[cfg(windows)]
         command.creation_flags(0x08000000);
         let mut child = command

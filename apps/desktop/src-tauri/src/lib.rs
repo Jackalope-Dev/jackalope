@@ -183,6 +183,7 @@ pub fn run() {
             mcp_probe_server,
             agent_profile_list,
             agent_profile_create,
+            agent_profile_save_key,
             agent_profile_rename,
             agent_profile_delete,
             agent_profile_set_active,

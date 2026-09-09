@@ -22,6 +22,8 @@ pub struct CleanupStatus {
     pub recoverable: bool,
     #[serde(default)]
     pub missing: bool,
+    #[serde(default)]
+    pub generated_paths: Vec<String>,
 }
 
 /// Cap on the untracked content an archive will copy before bailing out.
@@ -163,9 +165,116 @@ fn hard_block(
     Ok(())
 }
 
-/// Recoverable working-tree content: uncommitted changes, untracked or ignored
-/// files. `Some` means archive-and-remove is offered instead of plain cleanup.
-fn dirty_reason(path: &Path) -> Result<Option<String>, String> {
+struct LocalContent {
+    changes: bool,
+    generated_paths: Vec<String>,
+    preserved_path: Option<String>,
+}
+
+fn is_link(metadata: &std::fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes() & 0x400 != 0 {
+            return true;
+        }
+    }
+    metadata.file_type().is_symlink()
+}
+
+// Only ignored output folders with an adjacent project manifest are disposable.
+// Broad ignores such as output/, scratch/ and *.local are never evidence of this.
+fn generated_ignored_path(root: &Path, name: &str) -> Option<String> {
+    let relative = Path::new(name.trim_end_matches('/'));
+    if relative.as_os_str().is_empty()
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return None;
+    }
+    for candidate in relative
+        .ancestors()
+        .filter(|path| !path.as_os_str().is_empty())
+    {
+        let manifest = match candidate.file_name().and_then(|value| value.to_str()) {
+            Some("node_modules" | ".pnpm-store" | "dist" | "dist-ssr" | "dist-lab") => {
+                "package.json"
+            }
+            Some("target") => "Cargo.toml",
+            _ => continue,
+        };
+        let path = root.join(candidate);
+        let metadata = std::fs::symlink_metadata(&path).ok()?;
+        if !metadata.is_dir() || is_link(&metadata) {
+            return None;
+        }
+        if path.parent()?.join(manifest).is_file() {
+            return Some(format!("{}/", candidate.to_string_lossy()));
+        }
+    }
+    None
+}
+
+fn preserved_generated_content(root: &Path, name: &str) -> Result<Option<String>, String> {
+    let mut directories = vec![root.join(name)];
+    let mut inspected = 0usize;
+    while let Some(directory) = directories.pop() {
+        for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            inspected += 1;
+            if inspected > 200_000 {
+                return Err(
+                    "Generated folder is too large to inspect safely; review it manually.".into(),
+                );
+            }
+            let filename = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if matches!(
+                filename.as_str(),
+                ".git"
+                    | ".env"
+                    | ".envrc"
+                    | ".npmrc"
+                    | ".netrc"
+                    | ".pypirc"
+                    | ".dev.vars"
+                    | "credentials"
+                    | "credentials.toml"
+            ) || filename.starts_with(".env.")
+                || filename.starts_with(".dev.vars.")
+                || [
+                    ".key",
+                    ".pem",
+                    ".p12",
+                    ".pfx",
+                    ".keystore",
+                    ".db",
+                    ".sqlite",
+                    ".sqlite3",
+                ]
+                .iter()
+                .any(|suffix| filename.ends_with(suffix))
+            {
+                return Ok(Some(
+                    entry
+                        .path()
+                        .strip_prefix(root)
+                        .map_err(|e| e.to_string())?
+                        .to_string_lossy()
+                        .into_owned(),
+                ));
+            }
+            // Dependency links are removed as links; never follow them outside the worktree.
+            let metadata = std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
+            if metadata.is_dir() && !is_link(&metadata) {
+                directories.push(entry.path());
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn local_content(path: &Path) -> Result<LocalContent, String> {
     let status = git(
         path,
         &[
@@ -173,14 +282,42 @@ fn dirty_reason(path: &Path) -> Result<Option<String>, String> {
             "--porcelain=v1",
             "-z",
             "--untracked-files=normal",
-            "--ignored=matching",
             "--ignore-submodules=none",
         ],
     )?;
-    Ok((!status.is_empty()).then(|| {
-        "Uncommitted changes, untracked or ignored files — archive & remove, or move them out before Clean up."
-            .to_string()
-    }))
+    let ignored = git(
+        path,
+        &[
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--directory",
+            "--no-empty-directory",
+            "-z",
+        ],
+    )?;
+    let mut content = LocalContent {
+        changes: !status.is_empty(),
+        generated_paths: Vec::new(),
+        preserved_path: None,
+    };
+    for name in ignored.split('\0').filter(|name| !name.is_empty()) {
+        if let Some(generated) = generated_ignored_path(path, name) {
+            if content.generated_paths.contains(&generated) {
+                continue;
+            }
+            if let Some(preserved) = preserved_generated_content(path, &generated)? {
+                content.preserved_path = Some(preserved);
+                break;
+            }
+            content.generated_paths.push(generated);
+        } else {
+            content.preserved_path = Some(name.to_owned());
+            break;
+        }
+    }
+    Ok(content)
 }
 
 pub(super) fn inspect(
@@ -198,6 +335,7 @@ pub(super) fn inspect(
             merged: None,
             blocked_reason: None,
             recoverable: false,
+            generated_paths: Vec::new(),
             missing: Path::new(&entries[index].path)
                 .try_exists()
                 .is_ok_and(|exists| !exists),
@@ -222,13 +360,22 @@ pub(super) fn inspect(
         }
         match hard_block(&repo, &entries, index, runs) {
             Err(reason) => status.blocked_reason = Some(reason),
-            Ok(()) => match canonical(&entries[index].path).and_then(|path| dirty_reason(&path)) {
-                Ok(Some(reason)) => {
-                    status.blocked_reason = Some(reason);
-                    status.recoverable = true;
+            Ok(()) => match canonical(&entries[index].path).and_then(|path| local_content(&path)) {
+                Ok(content) => {
+                    status.generated_paths = content.generated_paths;
+                    if let Some(name) = content.preserved_path {
+                        status.blocked_reason = Some(format!(
+                            "Local ignored content needs preserving: {name}. Move it out before cleanup or archiving; ignored files are not archived."
+                        ));
+                    } else if content.changes {
+                        status.blocked_reason = Some(
+                            "Uncommitted changes or untracked files — archive & remove, or preserve them before cleanup.".into(),
+                        );
+                        status.recoverable = true;
+                    } else if status.merged == Some(false) {
+                        status.recoverable = true;
+                    }
                 }
-                Ok(None) if status.merged == Some(false) => status.recoverable = true,
-                Ok(None) => {}
                 Err(reason) => status.blocked_reason = Some(reason),
             },
         }
@@ -481,6 +628,12 @@ fn archive(
     )
     .map_err(|e| e.to_string())?;
 
+    if let Some(name) = local_content(path)?.preserved_path {
+        return Err(abandon(
+            &archive_root,
+            &format!("local ignored content appeared: {name}"),
+        ));
+    }
     // Nothing else can be recovered from disk now — take the worktree down.
     git(
         repo,
@@ -695,6 +848,118 @@ mod tests {
         git(&f.repo, &["commit", "--amend", "-m", "squash merge"]).unwrap();
         assert!(f.remove(&f.entry(), &[]).is_err());
         assert!(f.worktree.exists());
+    }
+
+    #[test]
+    fn merged_generated_folders_are_removed_without_force_and_branches_are_kept() {
+        let f = Fixture::new("main");
+        fs::write(
+            f.worktree.join(".gitignore"),
+            "node_modules/\ndist/\ntarget/\n",
+        )
+        .unwrap();
+        fs::write(f.worktree.join("package.json"), "{}").unwrap();
+        fs::write(f.worktree.join("Cargo.toml"), "[workspace]\n").unwrap();
+        f.commit(&f.worktree, "configured project\n");
+        git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+        for folder in ["node_modules", "dist", "target"] {
+            fs::create_dir_all(f.worktree.join(folder)).unwrap();
+            fs::write(f.worktree.join(folder).join("generated.js"), "generated").unwrap();
+        }
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert!(status.blocked_reason.is_none());
+        assert_eq!(status.generated_paths.len(), 3);
+        assert!(!status.recoverable);
+        f.remove(&entry, &[]).unwrap();
+        assert!(!f.worktree.exists());
+        git(&f.repo, &["show-ref", "--verify", "refs/heads/feature"]).unwrap();
+    }
+
+    #[test]
+    fn local_config_and_unknown_ignored_content_cannot_be_cleaned_or_archived() {
+        for name in [
+            ".env",
+            "ignored/notes.txt",
+            "dist/.env.local",
+            "dist/state.sqlite",
+        ] {
+            let f = Fixture::new("main");
+            fs::write(f.worktree.join(".gitignore"), ".env\nignored/\ndist/\n").unwrap();
+            fs::write(f.worktree.join("package.json"), "{}").unwrap();
+            f.commit(&f.worktree, "configured project\n");
+            git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+            let before = f.entry();
+            let file = f.worktree.join(name);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(&file, "local data").unwrap();
+            let entry = f.entry();
+            let status = entry.cleanup.as_ref().unwrap();
+            assert!(!status.recoverable, "{name}");
+            assert!(status
+                .blocked_reason
+                .as_ref()
+                .unwrap()
+                .contains("preserving"));
+            assert!(f.remove(&before, &[]).is_err(), "{name}");
+            assert!(
+                archive(
+                    f.repo.to_str().unwrap(),
+                    &entry.path,
+                    "main",
+                    &entry.head,
+                    status.target_head.as_deref().unwrap(),
+                    &[],
+                )
+                .is_err(),
+                "{name}"
+            );
+            assert_eq!(fs::read_to_string(file).unwrap(), "local data");
+        }
+    }
+
+    #[test]
+    fn generated_names_require_ignore_rules_and_a_project_manifest() {
+        for ignored in [false, true] {
+            let f = Fixture::new("main");
+            if ignored {
+                fs::write(f.worktree.join(".gitignore"), "dist/\n").unwrap();
+                f.commit(&f.worktree, "ignore output\n");
+                git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+            } else {
+                fs::write(f.worktree.join("package.json"), "{}").unwrap();
+                f.commit(&f.worktree, "project\n");
+                git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+            }
+            fs::create_dir(f.worktree.join("dist")).unwrap();
+            fs::write(f.worktree.join("dist/notes.txt"), "keep").unwrap();
+            let entry = f.entry();
+            assert!(entry.cleanup.as_ref().unwrap().generated_paths.is_empty());
+            assert!(f.remove(&entry, &[]).is_err());
+            assert!(f.worktree.join("dist/notes.txt").exists());
+        }
+    }
+
+    #[test]
+    fn tracked_edits_inside_generated_folders_still_need_archiving() {
+        let f = Fixture::new("main");
+        fs::write(f.worktree.join(".gitignore"), "dist/\n").unwrap();
+        fs::write(f.worktree.join("package.json"), "{}").unwrap();
+        fs::create_dir(f.worktree.join("dist")).unwrap();
+        fs::write(f.worktree.join("dist/tracked.js"), "original").unwrap();
+        git(&f.worktree, &["add", "--force", "dist/tracked.js"]).unwrap();
+        f.commit(&f.worktree, "configured project\n");
+        git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+        fs::write(f.worktree.join("dist/tracked.js"), "local edit").unwrap();
+        fs::write(f.worktree.join("dist/generated.js"), "generated").unwrap();
+        let entry = f.entry();
+        assert!(entry.cleanup.as_ref().unwrap().blocked_reason.is_some());
+        assert!(entry.cleanup.as_ref().unwrap().recoverable);
+        assert!(f.remove(&entry, &[]).is_err());
+        assert_eq!(
+            fs::read_to_string(f.worktree.join("dist/tracked.js")).unwrap(),
+            "local edit"
+        );
     }
 
     #[test]
@@ -914,10 +1179,13 @@ mod tests {
     fn archive_saves_recoverable_content_then_force_removes_a_dirty_unmerged_worktree() {
         let f = Fixture::new("main");
         git(&f.worktree, &["branch", "-m", "jackalope/task-1"]).unwrap();
+        fs::write(f.worktree.join(".gitignore"), "node_modules/\n").unwrap();
+        fs::write(f.worktree.join("package.json"), "{}").unwrap();
         f.commit(&f.worktree, "branch work\n");
         fs::write(f.worktree.join("file.txt"), "uncommitted edit\n").unwrap();
         fs::write(f.worktree.join("scratch.txt"), "untracked note\n").unwrap();
-        fs::write(f.worktree.join(".env"), "SECRET=1\n").unwrap();
+        fs::create_dir(f.worktree.join("node_modules")).unwrap();
+        fs::write(f.worktree.join("node_modules/generated.js"), "generated").unwrap();
 
         let entry = f.entry();
         let status = entry.cleanup.as_ref().unwrap();
@@ -954,8 +1222,8 @@ mod tests {
             serde_json::json!(["scratch.txt"])
         );
         assert!(
-            !dir.join("untracked/.env").exists(),
-            "ignored files stay out"
+            !dir.join("untracked/node_modules").exists(),
+            "disposable dependencies stay out"
         );
         assert!(fs::read_to_string(dir.join("untracked/scratch.txt"))
             .unwrap()

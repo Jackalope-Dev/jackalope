@@ -54,14 +54,23 @@ export function PrivacySettings() {
         />
       </div>
       <p className="settings-row-description">
-        Help improve Jackalope with daily counts of app opens, task outcomes, feature use, and known
-        error categories, grouped by app version, stable or beta build, and operating system.
+        Optional daily counts to improve Jackalope. No prompts, code or account IDs. Kept for 30
+        days.
       </p>
-      <p className="settings-row-description">
-        No installation or account IDs, prompts, code, paths, command output, error messages, or
-        stack traces are sent. Network providers receive your IP address to deliver requests;
-        Jackalope does not save it in these reports. Counts are kept for 30 days.
-      </p>
+      <details className="space-y-2">
+        <summary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
+          What gets shared
+        </summary>
+        <p className="settings-row-description">
+          Counts of app opens, task outcomes and feature use, plus known error categories if
+          enabled. Grouped by app version, release channel and operating system.
+        </p>
+        <p className="settings-row-description">
+          No installation or account IDs, prompts, code, paths, command output, error messages or
+          stack traces. Network providers receive your IP address to deliver requests; Jackalope
+          does not save it in reports. Written feedback is separate.
+        </p>
+      </details>
       <p className="settings-row-description">
         <a
           href="https://jackalope.dev/privacy/"
@@ -80,7 +89,7 @@ export function PrivacySettings() {
             }
           }}
         >
-          Read the full privacy notice (opens in your browser)
+          Full privacy notice ↗
         </a>
       </p>
       {noticeError && (
@@ -90,11 +99,9 @@ export function PrivacySettings() {
       )}
       {community.settings && !community.settings.configured && (
         <p className="settings-disclosure-box">
-          This build has no configured reporting service. These preferences apply if you install a
-          release with the service enabled.
+          Reporting is unavailable in this build. Your choices are saved for supported releases.
         </p>
       )}
-      <p className="settings-row-description">Sharing is optional. Written feedback is separate.</p>
       {community.busy && <p role="status">Saving privacy choices…</p>}
       {community.error && (
         <p role="alert">

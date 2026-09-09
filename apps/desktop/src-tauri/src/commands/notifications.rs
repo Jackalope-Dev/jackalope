@@ -174,8 +174,20 @@ pub fn launch(app: tauri::AppHandle) {
 }
 
 #[cfg(windows)]
+fn notification_icon(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let directory = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let path = directory.join("notification-logo.png");
+    let bytes = include_bytes!("../../icons/128x128.png");
+    if std::fs::read(&path).ok().as_deref() != Some(bytes.as_slice()) {
+        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(dunce::simplified(&path).to_path_buf())
+}
+
+#[cfg(windows)]
 fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Result<(), String> {
-    use tauri_winrt_notification::Toast;
+    use tauri_winrt_notification::{IconCrop, Toast};
     let packaged_id = application_id();
     let id = if let Some(id) = packaged_id.as_deref() {
         id
@@ -185,7 +197,11 @@ fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Result<(
         &app.config().identifier
     };
     let handle = app.clone();
-    Toast::new(id).title("Jackalope").text1(title)
+    let mut toast = Toast::new(id);
+    if let Ok(icon) = notification_icon(app) {
+        toast = toast.icon(&icon, IconCrop::Square, "Jackalope");
+    }
+    toast.title("Jackalope").text1(title)
         .text2("Open Jackalope to view this task. Prompts and project names stay private.")
         .sound(None)
         .on_activated(move |_| {

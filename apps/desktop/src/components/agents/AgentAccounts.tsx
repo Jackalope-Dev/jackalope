@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Circle, KeyRound, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   type AccountStatus,
   type AgentProfile,
@@ -19,9 +19,9 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { LoadingState } from '../ui/LoadingState';
-import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { DetectedKeysModal } from './DetectedKeysModal';
+import { AgentKeySignIn } from './AgentKeySignIn';
 
 const AgentSignIn = lazy(() =>
   import('./AgentSignIn').then((module) => ({ default: module.AgentSignIn })),
@@ -30,21 +30,29 @@ function AccountGroup({
   value,
   onChange,
   label,
+  disabled = false,
 }: {
   value: AgentProfile['group'];
   onChange: (value: AgentProfile['group']) => void;
   label: string;
+  disabled?: boolean;
 }) {
+  const groupId = useId();
   return (
-    <Select
-      aria-label={label}
-      value={value ?? 'none'}
-      onValueChange={(value) => onChange(value === 'none' ? null : (value as 'work' | 'personal'))}
-    >
-      <SelectItem value="work">Work</SelectItem>
-      <SelectItem value="personal">Personal</SelectItem>
-      <SelectItem value="none">Ungrouped</SelectItem>
-    </Select>
+    <fieldset className="agent-account-group" disabled={disabled}>
+      <legend className="sr-only">{label}</legend>
+      {(['work', 'personal', null] as const).map((group) => (
+        <label key={group ?? 'none'}>
+          <input
+            type="radio"
+            name={groupId}
+            checked={(value ?? null) === group}
+            onChange={() => onChange(group)}
+          />
+          <span>{group === 'work' ? 'Work' : group === 'personal' ? 'Personal' : 'Other'}</span>
+        </label>
+      ))}
+    </fieldset>
   );
 }
 function EditAccount({
@@ -117,7 +125,7 @@ function EditAccount({
                 maxLength={40}
               />
             </label>
-            <AccountGroup value={group} onChange={setGroup} label="Account group" />
+            <AccountGroup value={group} onChange={setGroup} label="Account group" disabled={busy} />
             {error && (
               <p role="alert" className="task-error">
                 {error}
@@ -158,6 +166,7 @@ export function AgentAccounts({
   const signInOpener = useRef<HTMLElement | null>(null);
   const [editing, setEditing] = useState<AgentProfile>();
   const desktop = isTauriEnvironment();
+  const keyAccount = agentId === 'antigravity' || agentId === 'aider';
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -238,13 +247,75 @@ export function AgentAccounts({
   const locked = !!busy || loading;
   return (
     <div className="agent-accounts">
-      <p className="task-muted">Keep separate sign-ins for work and personal projects.</p>
       {error && (
         <p role="alert" className="task-error">
           {error}
         </p>
       )}
-      <div className="flex flex-wrap gap-2 mb-3">
+      <form
+        className="agent-account-add"
+        onSubmit={(e) => {
+          e.preventDefault();
+          signInOpener.current =
+            (e.nativeEvent as SubmitEvent).submitter ??
+            (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+          void action('add', async () => {
+            const profile = await createAgentProfile(
+              agentId,
+              name.trim() ||
+                `${group === 'personal' ? 'Personal' : group === 'work' ? 'Work' : agentName} ${view.profiles.length + 1}`,
+              group,
+            );
+            setName('');
+            await load();
+            setSignIn(profile);
+          });
+        }}
+      >
+        <div className="agent-account-add-heading">
+          <h4>Add another {agentName} account</h4>
+          <p className="task-muted">
+            {agentId === 'antigravity' ? 'Add a separate Gemini API-key account. Google subscription logins use the existing CLI account.'
+              : keyAccount ? 'Keep separate provider API keys for work, personal projects or clients.'
+              : 'Keep separate logins for work, personal projects or clients.'}
+          </p>
+        </div>
+        <AccountGroup
+          value={group}
+          onChange={setGroup}
+          label={`New ${agentName} account group`}
+          disabled={locked}
+        />
+        <input
+          className="task-input"
+          disabled={locked}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Account name (optional)"
+          aria-label={`New ${agentName} account name`}
+          maxLength={80}
+        />
+        <Button type="submit" disabled={locked}>
+          <Plus size={16} />
+          {busy === 'add' ? 'Adding…' : keyAccount ? 'Add account & connect' : 'Add account & sign in'}
+        </Button>
+      </form>
+      <div className="agent-accounts-row">
+        <div className="agent-account-identity">
+          <strong>Existing {agentName} CLI login</strong>
+          {!view.activeId && <p className="task-muted text-sm">Default for new tasks</p>}
+          <AccountGroup
+            value={view.defaultGroup}
+            label={`Existing ${agentName} login group`}
+            disabled={locked}
+            onChange={(group) =>
+              void action('default-group', async () => {
+                await setAgentProfileGroup(agentId, null, group);
+                await load();
+              })
+            }
+          />
+        </div>
         <Button
           variant="outline"
           disabled={locked || !view.activeId}
@@ -255,42 +326,19 @@ export function AgentAccounts({
             })
           }
         >
-          {view.activeId ? 'Use normal CLI sign-in' : 'Using normal CLI sign-in'}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={locked}
-          onClick={() =>
-            void action('import-cli', async () => {
-              const status = await checkAgentProfile(agentId, null);
-              const label = status?.identity
-                ? `${agentName} (${status.identity})`
-                : `${agentName} Account ${view.profiles.length + 1}`;
-              const created = await createAgentProfile(agentId, label, 'personal');
-              await setAgentProfileTag(
-                agentId,
-                created.id,
-                status?.identity ? 'Imported' : `Account #${view.profiles.length + 1}`,
-              );
-              await load();
-              await check(created);
-            })
-          }
-        >
-          <Plus size={15} />
-          Import system CLI login as profile
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={locked}
-          onClick={() => setKeyModalOpen(true)}
-        >
-          <KeyRound size={15} />
-          Scan Local Models & Keys
+          {view.activeId ? 'Use existing CLI login' : 'Using existing CLI login'}
         </Button>
       </div>
+      <Button
+        type="button"
+        className="justify-self-start"
+        variant="outline"
+        disabled={locked}
+        onClick={() => setKeyModalOpen(true)}
+      >
+        <KeyRound size={15} />
+        Scan Local Models & Keys
+      </Button>
       <ul className="agent-accounts-list">
         {view.profiles.map((profile) => {
           const status = statuses[profile.id];
@@ -320,11 +368,6 @@ export function AgentAccounts({
                       {profile.tag}
                     </span>
                   )}
-                  {profile.group && (
-                    <span className="task-muted text-xs">
-                      {profile.group === 'work' ? 'Work' : 'Personal'}
-                    </span>
-                  )}
                   {active && <span className="task-muted text-xs">Default for new tasks</span>}
                 </div>
                 <p className="task-muted text-sm" role="status">
@@ -345,6 +388,17 @@ export function AgentAccounts({
                       : ''}
                   </p>
                 )}
+                <AccountGroup
+                  value={profile.group}
+                  label={`${profile.name} account group`}
+                  disabled={locked}
+                  onChange={(group) =>
+                    void action(`group-${profile.id}`, async () => {
+                      await setAgentProfileGroup(agentId, profile.id, group);
+                      await load();
+                    })
+                  }
+                />
               </div>
               <div className="agent-accounts-actions">
                 <Button
@@ -355,7 +409,7 @@ export function AgentAccounts({
                     setSignIn(profile);
                   }}
                 >
-                  Sign in
+                  {keyAccount ? 'Connect API key' : agentId === 'goose' ? 'Set up account' : 'Sign in'}
                 </Button>
                 <Button
                   variant="ghost"
@@ -393,42 +447,7 @@ export function AgentAccounts({
           );
         })}
       </ul>
-      <form
-        className="agent-account-add"
-        onSubmit={(e) => {
-          e.preventDefault();
-          signInOpener.current =
-            (e.nativeEvent as SubmitEvent).submitter ??
-            (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-          void action('add', async () => {
-            const profile = await createAgentProfile(
-              agentId,
-              name.trim() || (group === 'personal' ? 'Personal' : 'Work'),
-              group,
-            );
-            setName('');
-            await load();
-            setSignIn(profile);
-          });
-        }}
-      >
-        <AccountGroup value={group} onChange={setGroup} label={`New ${agentName} account group`} />
-        <input
-          className="task-input"
-          disabled={locked}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={
-            group === 'personal' ? 'Personal' : group === 'work' ? 'Work' : 'Account name'
-          }
-          aria-label={`New ${agentName} account name`}
-          maxLength={80}
-        />
-        <Button type="submit" disabled={locked || (!group && !name.trim())}>
-          <Plus size={16} />
-          {busy === 'add' ? 'Adding…' : 'Add & sign in'}
-        </Button>
-      </form>
+
       {editing && (
         <EditAccount
           profile={editing}
@@ -441,7 +460,19 @@ export function AgentAccounts({
           }}
         />
       )}
-      {signIn && (
+      {signIn && keyAccount && (
+        <AgentKeySignIn
+          agentId={agentId} agentName={agentName} profile={signIn}
+          returnFocus={signInOpener.current}
+          onClose={() => setSignIn(undefined)}
+          onSaved={async (useForTasks) => {
+            if (useForTasks) await setActiveAgentProfile(agentId, signIn.id);
+            await check(signIn);
+            await load();
+          }}
+        />
+      )}
+      {signIn && !keyAccount && (
         <Suspense fallback={<LoadingState label={'Opening sign-in…'} compact />}>
           <AgentSignIn
             agentId={agentId}
@@ -450,6 +481,10 @@ export function AgentAccounts({
             profileName={signIn.name}
             returnFocus={signInOpener.current}
             onClose={() => setSignIn(undefined)}
+            onUse={async () => {
+              await setActiveAgentProfile(agentId, signIn.id);
+              await load();
+            }}
             onStatus={(status) => setStatuses((old) => ({ ...old, [signIn.id]: status }))}
           />
         </Suspense>

@@ -249,15 +249,15 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               <SelectItem value="master">master</SelectItem>
             </Select>
             <ConfirmAction
-              title={`Clean up ${ready.length} merged worktrees?`}
-              description={`Removes only clean folders whose commits are merged into the selected local branch. Branches and task history are kept. Each folder is checked again before removal. ${ready.map((wt) => wt.branch || wt.path).join(', ')}`}
-              label="Clean up merged"
+              title={`Clean up ${ready.length} ready worktrees?`}
+              description={`Removes merged worktrees without local work to preserve, including any listed generated dependency and build folders. Branches and task history are kept. Each folder is checked again before removal. ${ready.map((wt) => wt.branch || wt.path).join(', ')}`}
+              label="Clean up ready"
               busyLabel="Cleaning up…"
               onConfirm={cleanupMerged}
               trigger={
                 <Button disabled={pending || refreshing || !desktop || !ready.length}>
                   <Trash2 size={18} aria-hidden="true" />
-                  Clean up merged ({ready.length})
+                  Clean up ready ({ready.length})
                 </Button>
               }
             />
@@ -271,7 +271,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               </Button>
             )}
             <p className="task-muted">
-              Worktrees with local changes need review, even when their commits are merged.
+              Merged worktrees with only generated dependencies or build output are ready. Local
+              changes and other ignored files need preserving first.
             </p>
           </div>
           {creating && (
@@ -355,6 +356,12 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 {wt.cleanup?.blocked_reason && (
                   <p className="task-muted mt-2">{wt.cleanup.blocked_reason}</p>
                 )}
+                {!!wt.cleanup?.generated_paths?.length && (
+                  <p className="task-muted mt-2">
+                    Generated folders removed during cleanup:{' '}
+                    {wt.cleanup.generated_paths.join(', ')}
+                  </p>
+                )}
               </div>
               <div className="workspace-actions">
                 {wt.cleanup?.merged && !wt.cleanup.blocked_reason && (
@@ -371,7 +378,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 {wt.cleanup?.recoverable && (
                   <ConfirmAction
                     title="Archive and remove this worktree?"
-                    description="Its commits, uncommitted changes and untracked files are saved to .worktrees/.archive first (ignored files such as build output and dependencies are not). The folder is then force-removed and any jackalope/ branch deleted. Restore later with git from the saved bundle."
+                    description="Its commits, uncommitted changes and untracked files are saved to .worktrees/.archive first. Listed generated dependency and build folders are discarded. Other ignored files must be moved out first. The folder is then removed and any jackalope/ branch deleted. Restore later with git from the saved bundle."
                     label="Archive & remove"
                     busyLabel="Archiving…"
                     onConfirm={() => archive(wt)}

@@ -1,4 +1,4 @@
-import { type MemberRow, audienceEligible, audienceState } from './audience';
+import { audienceEligible, audienceState, type MemberRow } from './audience';
 import { providerJson } from './provider';
 
 const RECONCILE_INTERVAL = 6 * 3600000;

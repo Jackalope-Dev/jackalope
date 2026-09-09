@@ -3,13 +3,14 @@
 }
 .waitlist-heading {
   max-width: 700px;
-  margin: 0 0 24px;
+  margin: 0 auto 24px;
+  text-align: center;
 }
 .waitlist-heading > svg {
   width: 52px;
   height: 52px;
   color: var(--color-accent-ink);
-  margin-bottom: 18px;
+  margin: 0 auto 18px;
 }
 .waitlist-heading h1 {
   font-size: clamp(36px, 6vw, 64px);

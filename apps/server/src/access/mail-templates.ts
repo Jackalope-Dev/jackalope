@@ -9,7 +9,7 @@ export type GrowthMail = {
 };
 export type FeedbackMail = { to: string; kind: 'feedback_request'; token: string };
 export type Mail = AccessMail | WaitlistMail | GrowthMail | FeedbackMail;
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value.replace(
     /[&<>"']/g,
     (char) =>
@@ -36,7 +36,9 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'See my place',
       detail:
         'Share with as many people as you like. Each new person who verifies their email adds one day of priority to your signup time. Your number updates as the queue changes.',
-      stamp: 'WAITLIST / MAKE YOUR NEXT HOP',
+      // No stamp: the intro already says what the link does, so the button
+      // stands alone and centred instead of inside a labelled panel.
+      stamp: '',
     },
     welcome: {
       subject: 'You’re in. Welcome to Jackalope',
@@ -122,11 +124,11 @@ export function accessEmail(mail: Mail, origin: string) {
         : '';
   const footer =
     mail.kind === 'feedback_request'
-      ? `You enabled a feedback follow-up in Jackalope. This is a one-time invitation, with no reminders. Stop feedback emails: ${origin}/feedback/#unsubscribe=${mail.token}`
+      ? `Your Jackalope email preferences include this feedback invitation. This is a one-time invitation, with no reminders. Stop feedback emails: ${origin}/feedback/#unsubscribe=${mail.token}`
       : 'If you did not expect this email, you can ignore it. Reply if you need help or want your account removed.';
   const footerHtml =
     mail.kind === 'feedback_request'
-      ? `You enabled a feedback follow-up in Jackalope. This is a one-time invitation, with no reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
+      ? `Your Jackalope email preferences include this feedback invitation. This is a one-time invitation, with no reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
       : footer;
   const address = EMAIL_COMPANY.postalAddress;
   const text = `${copy.title}\n\n${copy.intro}\n\n${copy.action}: ${link}\n\n${copy.detail}\n\n${expiry}\n\n${footer}\n\n${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${origin}/privacy/`;
@@ -151,11 +153,22 @@ ${expiry ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.7;color:${c.f
 
 const c = EMAIL_PALETTE;
 
-/** The one action in a message, set in a stamped panel so it reads as the next step. */
+const button = (action: string, link: string, arrow = false) =>
+  `<a href="${escapeHtml(link)}" style="display:inline-block;padding:15px 28px;border-radius:8px;background:${c.accent};color:${c.onAccent};font-size:16px;font-weight:600;line-height:1;text-decoration:none">${escapeHtml(action)}${arrow ? ' &rarr;' : ''}</a>`;
+
+/**
+ * The one action in a message.
+ *
+ * With a stamp it sits in a labelled panel that names what the link is for.
+ * Without one — where the surrounding copy already says it plainly — the button
+ * stands on its own, centred, with nothing around it.
+ */
 function callout(stamp: string, action: string, link: string) {
+  if (!stamp)
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:34px 0"><tr><td align="center">${button(action, link)}</td></tr></table>`;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0;border-collapse:separate;border:1px solid ${c.borderSubtle};border-left:3px solid ${c.accent};border-radius:12px;background:${c.panel}"><tr><td style="padding:24px">
 <p style="margin:0 0 18px;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${c.faint}">${escapeHtml(stamp)}</p>
-<a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 22px;border-radius:8px;background:${c.accent};color:${c.onAccent};font-size:16px;font-weight:600;line-height:1;text-decoration:none">${escapeHtml(action)} &rarr;</a>
+${button(action, link, true)}
 </td></tr></table>`;
 }
 

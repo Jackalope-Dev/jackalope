@@ -339,7 +339,7 @@ impl TaskRuntime {
                 .as_ref()
                 .ok_or("Account selection is missing. Start a new task.")?;
             crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
-            crate::commands::agent_profiles::apply_binding(&mut cmd, binding);
+            crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
         }
         if adapter == "codex" {
             cmd.args([

@@ -23,6 +23,7 @@ import {
 import {
   acceptWaitlistToken,
   requestWaitlistLink,
+  saveWaitlistPreferences,
   waitingMember,
   waitlistCookie,
   waitlistLogout,
@@ -173,6 +174,13 @@ export async function accessRoutes(
       const session = await acceptWaitlistToken(env, body.token);
       if (ctx) ctx.waitUntil(deliverAccessMail(env));
       return json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
+    }
+    if (request.method === 'POST' && path === '/v1/access/waitlist/preferences') {
+      const body = z
+        .strictObject({ preferences: preferencesSchema })
+        .parse(await readJson(request));
+      await saveWaitlistPreferences(request, env, body.preferences);
+      return json({ success: true }, 200);
     }
     if (request.method === 'POST' && path === '/v1/access/waitlist/logout') {
       await waitlistLogout(request, env);

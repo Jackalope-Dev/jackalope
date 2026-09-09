@@ -24,6 +24,7 @@ export function AgentSignIn({
   returnFocus,
   onStatus,
   onClose,
+  onUse,
 }: {
   agentId: string;
   agentName: string;
@@ -32,6 +33,7 @@ export function AgentSignIn({
   returnFocus: HTMLElement | null;
   onStatus: (status: AccountStatus | undefined) => void;
   onClose: () => void;
+  onUse?: () => Promise<void>;
 }) {
   const dialogFocus = useDialogFocus();
   const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -43,6 +45,7 @@ export function AgentSignIn({
   const [stage, setStage] = useState('Starting sign-in…');
   const [running, setRunning] = useState(true);
   const [checking, setChecking] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AccountStatus>();
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry starts a new owned sign-in session.
@@ -188,6 +191,7 @@ export function AgentSignIn({
     };
   }, [agentId, agentName, profileId, attempt, host]);
   const close = async () => {
+    if (saving) return;
     if (session.current) {
       try {
         await stopSignIn(session.current);
@@ -231,8 +235,9 @@ export function AgentSignIn({
             Sign in to {agentName} · {profileName}
           </Dialog.Title>
           <Dialog.Description className="task-muted mt-2">
-            Follow the prompts here. Your browser may open for provider authorization. When
-            reconnecting, use the same identity to preserve existing task continuations.
+            This account has its own sign-in. Follow the provider prompts below or in your browser.
+            Choose the intended work or personal identity in the browser. When reconnecting, use the
+            same identity to preserve existing task continuations.
           </Dialog.Description>
           <p role="status" className="mt-4">
             {checking ? 'Checking account…' : result ? accountStatusLabel(result) : stage}
@@ -253,6 +258,7 @@ export function AgentSignIn({
             {!running && !checking && (
               <Button
                 variant="outline"
+                disabled={saving}
                 onClick={async () => {
                   try {
                     if (session.current) await stopSignIn(session.current);
@@ -269,10 +275,34 @@ export function AgentSignIn({
             <Button
               ref={finish}
               variant={running ? 'outline' : 'primary'}
+              disabled={saving}
               onClick={() => void close()}
             >
               {running ? 'Cancel sign-in' : 'Done'}
             </Button>
+            {!running &&
+              !checking &&
+              onUse &&
+              (result?.state === 'signedIn' || result?.state === 'configured') && (
+                <Button
+                  disabled={saving}
+                  onClick={async () => {
+                    setSaving(true);
+                    setError('');
+                    try {
+                      if (session.current) await stopSignIn(session.current);
+                      await onUse();
+                      onClose();
+                    } catch (e) {
+                      setError(String(e));
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  {saving ? 'Saving…' : 'Use for new tasks'}
+                </Button>
+              )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

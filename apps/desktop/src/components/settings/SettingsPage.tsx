@@ -1,4 +1,4 @@
-import { ArrowLeft, Search, Settings2 } from 'lucide-react';
+import { Search, Settings2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -140,10 +140,6 @@ export function SettingsPage({
   };
   return (
     <section className="workspace-page settings-page">
-      <Button variant="ghost" onClick={onClose} disabled={resetting}>
-        <ArrowLeft size={16} />
-        Back to workspace
-      </Button>
       <header className="settings-header">
         <div className="flex items-center gap-3">
           <Settings2 size={20} />

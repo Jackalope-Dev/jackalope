@@ -178,14 +178,73 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 8px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-elevated);
+}
+.agent-account-add-heading {
+  flex-basis: 100%;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.agent-account-add-heading h4 {
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.agent-account-group {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+}
+.agent-account-group label {
+  position: relative;
+  cursor: pointer;
+}
+.agent-account-group input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.agent-account-group span {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.agent-account-group input:checked + span {
+  border-color: var(--color-border-focus);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.agent-account-group input:focus-visible + span {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.agent-account-group:disabled {
+  opacity: 0.6;
+}
+.agent-account-group:disabled label {
+  cursor: default;
+}
+.agent-account-identity .agent-account-group {
+  margin-top: 12px;
 }
 .agent-account-add > input {
   flex: 1 1 160px;
   min-width: 0;
-}
-.agent-account-add > [role="combobox"] {
-  flex: 0 1 150px;
 }
 .agent-sign-in-dialog {
   width: min(800px, calc(100vw - 48px));

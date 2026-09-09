@@ -26,30 +26,9 @@ export function FeedbackPreferences() {
           }
         />
       </div>
-      <div className="flex items-center justify-between gap-4">
-        <span>Email me once after I’ve tried Jackalope</span>
-        <Switch
-          label="Email me once after I’ve tried Jackalope"
-          checked={view?.enabled ?? false}
-          disabled={busy || !view || view.completed}
-          onCheckedChange={(enabled) =>
-            void request({
-              action: 'preferences',
-              enabled,
-              promptsEnabled: view?.promptsEnabled ?? true,
-            })
-          }
-        />
-      </div>
       <p className="settings-row-description">
-        Email follow-up is off until you choose it. Enabling it links active days and up to two
-        opened task results to your Jackalope account, along with invitation and response status. No
-        task contents or project details are shared. Anonymous usage sharing stays separate.
-      </p>
-      <p className="settings-row-description">
-        Invitation preferences and responses sync with your account to avoid repeat requests across
-        desktops. At most two in-app invitations and one email, at least seven days apart. Later
-        pauses requests for 14 days. Sending feedback ends this round of invitations.
+        At most two in-app invitations, synced across desktops. Later pauses them for 14 days;
+        sending feedback ends this round.
       </p>
       {view?.completed && (
         <p role="status" className="settings-row-description">

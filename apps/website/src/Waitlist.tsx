@@ -142,23 +142,25 @@ export function WaitlistPage() {
         <section className="access-card access-entry">
           <h2>Make your place yours.</h2>
           <p>Confirm your email to see your number and start earning referral priority.</p>
-          <button
-            className="button button-primary"
-            disabled={busy}
-            onClick={() => void verify()}
-            type="button"
-          >
-            {busy ? 'Confirming…' : 'Confirm email & see my place'}
-            <ArrowRight size={18} />
-          </button>
-          <button
-            className="button button-secondary"
-            disabled={busy}
-            onClick={() => setToken('')}
-            type="button"
-          >
-            Request a different link
-          </button>
+          <div className="access-entry-actions">
+            <button
+              className="button button-primary"
+              disabled={busy}
+              onClick={() => void verify()}
+              type="button"
+            >
+              {busy ? 'Confirming…' : 'Confirm email & see my place'}
+              <ArrowRight size={18} />
+            </button>
+            <button
+              className="button button-secondary"
+              disabled={busy}
+              onClick={() => setToken('')}
+              type="button"
+            >
+              Request a different link
+            </button>
+          </div>
         </section>
       ) : place ? (
         <>

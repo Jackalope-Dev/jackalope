@@ -37,13 +37,13 @@ beforeEach(async () => {
   for (const table of ['access_devices', 'access_mail', 'access_members', 'feedback'])
     await env.DB.prepare(`DELETE FROM ${table}`).run();
 });
-async function member() {
+async function member(newsletter = true) {
   const id = crypto.randomUUID();
   const secret = randomToken();
   await env.DB.prepare(
-    "INSERT INTO access_members(id,email,status,created_at,approved_at,verified_at,source,share_code) VALUES(?,?,'approved',?,?,?,'fixture',?)",
+    "INSERT INTO access_members(id,email,status,created_at,approved_at,verified_at,source,share_code,newsletter) VALUES(?,?,'approved',?,?,?,'fixture',?,?)",
   )
-    .bind(id, `${id}@example.invalid`, start, start, start, randomToken())
+    .bind(id, `${id}@example.invalid`, start, start, start, randomToken(), Number(newsletter))
     .run();
   await env.DB.prepare(
     'INSERT INTO access_devices(id,hash,member_id,created_at,expires_at) VALUES(?,?,?,?,?)',
@@ -71,8 +71,11 @@ async function mail() {
 }
 it('does not infer use from approval, connection, anonymous telemetry, or repeated result opens', async () => {
   const owner = await member();
+  await memberFeedback(bindings, owner.id, { action: 'status' }, start);
+  expect(
+    await env.DB.prepare('SELECT active_days,results FROM access_feedback').first(),
+  ).toMatchObject({ active_days: 0, results: '[]' });
   await memberFeedback(bindings, owner.id, { action: 'activity', result: 'a'.repeat(64) }, start);
-  expect(await env.DB.prepare('SELECT * FROM access_feedback').first()).toBeNull();
   await memberFeedback(
     bindings,
     owner.id,
@@ -201,7 +204,55 @@ it('rechecks opt-outs, revocation, and provider suppression before sending; keep
   expect(await env.DB.prepare('SELECT * FROM access_mail').first()).toBeNull();
   expect(
     await env.DB.prepare('SELECT status,newsletter FROM access_members').first(),
-  ).toMatchObject({ status: 'approved', newsletter: 0 });
+  ).toMatchObject({ status: 'approved', newsletter: 1 });
+});
+
+it('inherits product notes for new campaigns, preserves opt-outs, and rechecks consent before delivery', async () => {
+  const owner = await member();
+  expect(await memberFeedback(bindings, owner.id, { action: 'status' }, start)).toMatchObject({
+    enabled: true,
+  });
+  await memberFeedback(bindings, owner.id, { action: 'activity', result: 'a'.repeat(64) }, start);
+  await memberFeedback(
+    bindings,
+    owner.id,
+    { action: 'activity', result: 'b'.repeat(64) },
+    start + day,
+  );
+  await queueFeedbackMail(bindings, start + 3 * day);
+  const queued = await mail();
+  await env.DB.prepare('UPDATE access_members SET newsletter=0 WHERE id=?').bind(owner.id).run();
+  expect(await feedbackMailAllowed(bindings, queued.id, start + 3 * day)).toBe(false);
+  expect(
+    await memberFeedback(bindings, owner.id, { action: 'status' }, start + 3 * day),
+  ).toMatchObject({ enabled: false });
+
+  const optedOut = await member(false);
+  expect(await memberFeedback(bindings, optedOut.id, { action: 'status' }, start)).toMatchObject({
+    enabled: false,
+  });
+  await memberFeedback(
+    bindings,
+    optedOut.id,
+    { action: 'activity', result: 'c'.repeat(64) },
+    start,
+  );
+  expect(
+    await env.DB.prepare('SELECT active_days,results FROM access_feedback WHERE member_id=?')
+      .bind(optedOut.id)
+      .first(),
+  ).toMatchObject({ active_days: 0, results: '[]' });
+
+  const legacy = await member();
+  await memberFeedback(
+    bindings,
+    legacy.id,
+    { action: 'preferences', enabled: false, promptsEnabled: true },
+    start,
+  );
+  expect(
+    await memberFeedback(bindings, legacy.id, { action: 'status' }, start + day),
+  ).toMatchObject({ enabled: false });
 });
 it('stops both channels after anonymous in-app feedback or a private email response, with idempotent writes', async () => {
   const owner = await member();

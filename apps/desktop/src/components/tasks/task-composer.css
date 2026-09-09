@@ -374,12 +374,12 @@
 }
 .task-inline-capture .task-composer-footer {
   position: sticky;
-  bottom: -24px;
+  bottom: 12px;
   z-index: 2;
   background: var(--color-surface-elevated);
-  border-top: 1px solid var(--color-border-subtle);
-  margin-bottom: -24px;
-  padding: 16px 0 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
   flex-wrap: wrap;
 }
 .composer-dispatch-note {
@@ -399,10 +399,5 @@
   }
   .task-inline-capture .task-composer .composer-intent {
     font-size: var(--text-base);
-  }
-  .task-inline-capture .task-composer-footer {
-    bottom: -18px;
-    margin-bottom: -18px;
-    padding-bottom: 18px;
   }
 }

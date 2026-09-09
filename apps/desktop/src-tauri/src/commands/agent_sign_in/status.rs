@@ -110,11 +110,18 @@ async fn read_rpc(binding: &AccountBinding) -> Result<AccountStatus, String> {
 }
 
 async fn check(binding: AccountBinding) -> Result<AccountStatus, String> {
+    if binding.profile_id.is_some() && matches!(binding.adapter.as_str(), "antigravity" | "aider") {
+        return Ok(if agent_profiles::has_api_key(&binding)? {
+            status("configured", None, "An API key is saved for this account. The provider checks it when a task starts.")
+        } else {
+            status("signedOut", None, "Connect a provider API key for this account.")
+        });
+    }
     if ["codex", "grok"].contains(&binding.adapter.as_str()) {
         return read_rpc(&binding).await;
     }
     if binding.adapter != "claude" {
-        return Ok(status("unknown", None, "OpenCode manages credentials for several providers. Complete sign-in below; provider identities and credential validity are not reported here."));
+        return Ok(status("unknown", None, "This agent does not report a verified account identity here. Complete account setup; the provider validates credentials when a task starts."));
     }
     tokio::task::spawn_blocking(move || {
         let mut command =
@@ -122,7 +129,7 @@ async fn check(binding: AccountBinding) -> Result<AccountStatus, String> {
         command
             .args(["auth", "status"])
             .current_dir(std::env::temp_dir());
-        agent_profiles::apply_binding(&mut command, &binding);
+        agent_profiles::apply_binding(&mut command, &binding)?;
         let output = super::super::process_control::run(command, Duration::from_secs(20))?;
         if output.timed_out || output.truncated {
             return Err("Account check timed out or exceeded its output limit".into());

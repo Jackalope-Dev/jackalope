@@ -21,7 +21,7 @@ export function AgentSupport({ adapter }: { adapter: string }) {
       support.direct.length ? 'Direct and on-demand tools' : 'On-demand tools',
     ],
     ['Continuation, stop & saved history', 'Available'],
-    ['Separate accounts', support.accounts ? 'Available' : 'Current CLI account only'],
+    ['Separate accounts', adapter === 'antigravity' ? 'Gemini API keys; current CLI subscription login' : support.accounts ? 'Available' : 'Current CLI account only'],
     ['Subscription capacity', support.capacity ? 'When reported by the account' : 'Not reported'],
   ];
   return (

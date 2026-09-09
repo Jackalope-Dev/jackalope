@@ -12,6 +12,7 @@ export interface WorktreeEntry {
     /** Blocked only by recoverable content — archive-and-remove is available. */
     recoverable?: boolean;
     missing?: boolean;
+    generated_paths?: string[];
   } | null;
 }
 

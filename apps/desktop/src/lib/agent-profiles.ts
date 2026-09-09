@@ -10,6 +10,7 @@ export interface AgentProfile {
 export interface AgentProfilesView {
   profiles: AgentProfile[];
   activeId: string | null;
+  defaultGroup?: AgentProfile['group'];
   envVar: string | null;
 }
 
@@ -19,8 +20,11 @@ export const listAgentProfiles = (agent: string) =>
 export const createAgentProfile = (agent: string, name: string, group: AgentProfile['group']) =>
   nativeTask<AgentProfile>('agent_profile_create', { agent, name, group });
 
-export const setAgentProfileGroup = (agent: string, id: string, group: AgentProfile['group']) =>
-  nativeTask<void>('agent_profile_set_group', { agent, id, group });
+export const setAgentProfileGroup = (
+  agent: string,
+  id: string | null,
+  group: AgentProfile['group'],
+) => nativeTask<void>('agent_profile_set_group', { agent, id, group });
 
 export const setAgentProfileTag = (agent: string, id: string, tag: string | null) =>
   nativeTask<void>('agent_profile_set_tag', { agent, id, tag });
@@ -46,6 +50,9 @@ export const checkAgentProfile = (agent: string, id: string | null) =>
 
 export const signInAgentProfile = (agent: string, id: string, cols = 80, rows = 16) =>
   nativeTask<string>('agent_profile_sign_in', { agent, id, cols, rows });
+
+export const saveAgentProfileKey = (agent: string, id: string, name: string, value: string) =>
+  nativeTask<void>('agent_profile_save_key', { agent, id, name, value });
 
 export interface SignInView {
   state: 'running' | 'exited' | 'cancelled' | 'timedOut' | 'failed';

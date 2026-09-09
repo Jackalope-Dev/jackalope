@@ -20,13 +20,19 @@ export function SettingsSync() {
         />
       </div>
       <p className="settings-row-description">
-        Sync app appearance, companion reactions and notification preferences. The first sync
-        restores your saved preferences. Credentials, paths, projects and task history stay local.
+        Keep appearance, companion and notification preferences across desktops. Credentials,
+        projects and task history stay local.
       </p>
-      <p className="settings-row-description">
-        Optional on each desktop. Turning it off stops transfers and keeps both local settings and
-        the saved copy. Account access checks continue.
-      </p>
+      <details className="space-y-2">
+        <summary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
+          How sync works
+        </summary>
+        <p className="settings-row-description">
+          The first sync restores saved preferences. Paths stay local. Sync is optional on each
+          desktop; turning it off keeps local settings and the saved copy. Account access checks
+          continue.
+        </p>
+      </details>
       {!sync.owner && (
         <p role="status">
           {sync.enabled
@@ -40,7 +46,7 @@ export function SettingsSync() {
             Delete synced settings
           </Button>
           <p className="settings-row-description">
-            Removes the saved copy and disables sync on all desktops. Local settings stay intact.
+            Deletes the cloud copy and turns sync off everywhere. Keeps local settings.
           </p>
         </div>
       )}

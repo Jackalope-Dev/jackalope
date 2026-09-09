@@ -8,6 +8,13 @@ use tauri::State;
 
 use super::tasks::TaskRuntime;
 
+mod credentials;
+pub use credentials::agent_profile_save_key;
+
+pub(super) fn has_api_key(binding: &AccountBinding) -> Result<bool, String> {
+    credentials::read(binding).map(|key| key.is_some())
+}
+
 static PROFILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -26,6 +33,8 @@ struct AgentEntry {
     profiles: Vec<AgentProfile>,
     #[serde(default)]
     active: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default_group: Option<String>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -39,6 +48,7 @@ struct Manifest {
 pub struct AgentProfilesView {
     pub profiles: Vec<AgentProfile>,
     pub active_id: Option<String>,
+    pub default_group: Option<String>,
     /// The environment variable Jackalope sets to redirect this agent's sign-in
     /// to a profile directory, or None when this agent has no known override
     /// (accounts are unsupported for it — e.g. a manually added custom agent).
@@ -52,8 +62,8 @@ pub fn env_var_for(adapter: &str) -> Option<&'static str> {
         "grok" => Some("GROK_HOME"),
         "opencode" => Some("XDG_DATA_HOME"),
         "gemini" => Some("GEMINI_CLI_HOME"),
-        "aider" => Some("AIDER_HOME"),
-        "goose" => Some("GOOSE_HOME"),
+        "aider" | "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
+        "goose" => Some("GOOSE_PATH_ROOT"),
         _ => None,
     }
 }
@@ -64,7 +74,7 @@ pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
         "grok" => &["login"],
         "opencode" => &["auth", "login"],
         "claude" => &["auth", "login"],
-        "gemini" => &["auth", "login"],
+        "goose" => &["configure"],
         _ => &[],
     }
 }
@@ -136,7 +146,7 @@ pub(in crate::commands) fn routing_accounts(
     explicit: Option<&str>,
 ) -> Result<Vec<AccountBinding>, String> {
     let _guard = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
-    if explicit.is_some() || adapter == "antigravity" {
+    if explicit.is_some() {
         return Ok(vec![bind_account(root, adapter, explicit)?]);
     }
     let manifest = load_checked(root)?;
@@ -159,10 +169,9 @@ pub fn bind_account(
     adapter: &str,
     explicit: Option<&str>,
 ) -> Result<AccountBinding, String> {
-    if adapter == "antigravity" {
-        if explicit.is_some() {
-            return Err("Antigravity uses its current CLI sign-in; separate Jackalope accounts are not supported.".into());
-        }
+    let saved = load_checked(root)?;
+    let selected = explicit.or_else(|| saved.agents.get(adapter).and_then(|entry| entry.active.as_deref()));
+    if adapter == "antigravity" && selected.is_none() {
         let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
             .map(|home| PathBuf::from(home).join(".gemini"))
             .filter(|path| path.is_absolute())
@@ -206,6 +215,7 @@ pub fn bind_account(
             .map(PathBuf::from)
             .or_else(|| {
                 std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(|home| {
+                    if adapter == "gemini" { return PathBuf::from(home) }
                     PathBuf::from(home).join(if adapter == "opencode" {
                         ".local/share".to_string()
                     } else {
@@ -231,14 +241,38 @@ pub fn bind_account(
     })
 }
 
-pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBinding) {
+pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBinding) -> Result<(), String> {
     if binding.profile_id.is_some() {
+        if binding.adapter == "antigravity" {
+            let config: serde_json::Value = serde_json::from_slice(&super::history::read_bounded(&binding.directory.join(".gemini/antigravity-cli/settings.json"), 65536)?)
+                .map_err(|_| "This Antigravity account has invalid settings.")?;
+            if config["modelProvider"] != "gemini" {
+                return Err("Managed Antigravity accounts require Gemini API-key mode to keep logins separate.".into());
+            }
+        }
         for name in credential_env_vars(&binding.adapter) {
             command.env_remove(name);
         }
     }
-    if let Some(name) = env_var_for(&binding.adapter) {
+    if let Some(name) = env_var_for(&binding.adapter).filter(|_| binding.profile_id.is_some()
+        || !matches!(binding.adapter.as_str(), "antigravity" | "aider" | "goose")) {
         command.env(name, &binding.directory);
+    }
+    if binding.profile_id.is_some() {
+        match binding.adapter.as_str() {
+            "antigravity" | "aider" => {
+                command.env("HOME", &binding.directory).env("USERPROFILE", &binding.directory);
+                if binding.adapter == "aider" {
+                    command.env("AIDER_ENV_FILE", binding.directory.join(".env"));
+                    command.env("AIDER_CONFIG", binding.directory.join(".aider.conf.yml"));
+                }
+            }
+            "goose" => {
+                command.env("GOOSE_DISABLE_KEYRING", "1");
+                command.env_remove("GOOSE_ADDITIONAL_CONFIG_FILES");
+            }
+            _ => {}
+        }
     }
     if binding.adapter == "opencode" && binding.profile_id.is_some() {
         for (name, folder) in [
@@ -265,12 +299,18 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
                 }
             }
         }
+        if let Some(key) = credentials::read(binding)? {
+            command.env(&key.name, &key.value);
+        } else if binding.adapter == "antigravity" {
+            return Err("Add a Gemini API key to this Antigravity account before using it.".into());
+        }
     }
+    Ok(())
 }
 
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
     super::agent_sign_in::ensure_idle(binding)?;
-    if binding.adapter == "antigravity" {
+    if binding.adapter == "antigravity" && binding.profile_id.is_none() {
         let current = bind_account(root, &binding.adapter, binding.profile_id.as_deref())?;
         if current.directory != binding.directory {
             return Err("Antigravity's CLI data location changed. Start a new task.".into());
@@ -298,6 +338,7 @@ pub fn agent_profile_list(
     Ok(AgentProfilesView {
         profiles: entry.profiles,
         active_id: entry.active,
+        default_group: entry.default_group,
         env_var: env_var_for(&agent).map(str::to_string),
     })
 }
@@ -329,7 +370,21 @@ pub fn agent_profile_create(
         tag: None,
     };
     entry.profiles.push(profile.clone());
-    fs::create_dir_all(dir_for(&root, &agent, &id)).map_err(|e| e.to_string())?;
+    let directory = dir_for(&root, &agent, &id);
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    }
+    if agent == "antigravity" {
+        let config = directory.join(".gemini/antigravity-cli");
+        fs::create_dir_all(&config).map_err(|e| e.to_string())?;
+        fs::write(config.join("settings.json"), br#"{"modelProvider":"gemini"}"#).map_err(|e| e.to_string())?;
+    } else if agent == "aider" {
+        fs::write(directory.join(".aider.conf.yml"), "{}\n").map_err(|e| e.to_string())?;
+        fs::write(directory.join(".env"), "").map_err(|e| e.to_string())?;
+    }
     save(&root, &manifest)?;
     Ok(profile)
 }
@@ -345,13 +400,18 @@ fn validate_group(group: Option<&str>) -> Result<(), String> {
 pub fn agent_profile_set_group(
     runtime: State<'_, TaskRuntime>,
     agent: String,
-    id: String,
+    id: Option<String>,
     group: Option<String>,
 ) -> Result<(), String> {
     validate_group(group.as_deref())?;
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     let root = runtime.profiles_root();
     let mut manifest = load_checked(&root)?;
+    let Some(id) = id else {
+        env_var_for(&agent).ok_or("Unknown agent")?;
+        manifest.agents.entry(agent).or_default().default_group = group;
+        return save(&root, &manifest);
+    };
     let entry = manifest.agents.get_mut(&agent).ok_or("Unknown account")?;
     let profile = entry
         .profiles
@@ -483,7 +543,9 @@ pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
             "ANTHROPIC_AUTH_TOKEN",
             "CLAUDE_CODE_OAUTH_TOKEN",
         ],
-        "grok" => &["XAI_API_KEY", "GROK_API_KEY"],
+        "grok" => &["XAI_API_KEY", "GROK_API_KEY", "GROK_DEPLOYMENT_KEY"],
+        "gemini" | "antigravity" => &["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_GENAI_USE_GCA", "AGY_ADC_AUTH"],
+        "opencode" | "aider" | "goose" => &["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "XAI_API_KEY", "GROK_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "AZURE_API_KEY", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"],
         _ => &[],
     }
 }
@@ -509,6 +571,10 @@ mod tests {
 
     #[test]
     fn legacy_profiles_keep_their_identity_when_grouping_is_added() {
+        let manifest: Manifest =
+            serde_json::from_str(r#"{"agents":{"grok":{"profiles":[],"active":null}}}"#).unwrap();
+        assert_eq!(manifest.agents["grok"].default_group, None);
+        assert_eq!(manifest.agents["grok"].active, None);
         let profile: AgentProfile =
             serde_json::from_str(r#"{"id":"old-id","name":"Work"}"#).unwrap();
         assert_eq!(profile.group, None);
@@ -541,7 +607,7 @@ mod tests {
             label: "Work".into(),
         };
         let mut command = std::process::Command::new("opencode");
-        apply_binding(&mut command, &binding);
+        apply_binding(&mut command, &binding).unwrap();
         let vars: HashMap<_, _> = command
             .get_envs()
             .map(|(key, value)| {
@@ -560,7 +626,7 @@ mod tests {
         assert_eq!(vars["XDG_STATE_HOME"], directory.join("state").as_os_str());
         binding.profile_id = None;
         let mut default = std::process::Command::new("opencode");
-        apply_binding(&mut default, &binding);
+        apply_binding(&mut default, &binding).unwrap();
         assert_eq!(default.get_envs().count(), 1);
     }
 
@@ -630,6 +696,7 @@ mod tests {
                     },
                 ],
                 active: Some("work".into()),
+                default_group: None,
             },
         );
         save(&root, &manifest).unwrap();

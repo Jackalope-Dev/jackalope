@@ -18,7 +18,9 @@ type Campaign = {
   completed_at: number | null;
   email_id: string | null;
 };
-const eligibleSql = `completed_at IS NULL AND (enabled=0 OR (active_days=2 AND json_array_length(results)=2))`;
+const eligibleSql = `completed_at IS NULL AND (enabled=0
+  OR NOT EXISTS(SELECT 1 FROM access_members WHERE id=member_id AND newsletter=1)
+  OR (active_days=2 AND json_array_length(results)=2))`;
 export const feedbackAction = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('status') }),
   z.strictObject({
@@ -36,9 +38,11 @@ export const feedbackAction = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('completed') }),
 ]);
 async function campaign(env: Env, member: string) {
-  return env.DB.prepare('SELECT * FROM access_feedback WHERE member_id=?')
+  const row = await env.DB.prepare(`SELECT f.*,m.newsletter
+    FROM access_feedback f JOIN access_members m ON m.id=f.member_id WHERE f.member_id=?`)
     .bind(member)
-    .first<Campaign>();
+    .first<Campaign & { newsletter: number }>();
+  return row ? { ...row, enabled: row.newsletter === 1 ? row.enabled : 0 } : null;
 }
 function view(row: Campaign | null, now: number, claimed = false, available = true) {
   return {
@@ -61,6 +65,12 @@ function view(row: Campaign | null, now: number, claimed = false, available = tr
 }
 export async function memberFeedback(env: Env, member: string, input: unknown, now = Date.now()) {
   const action = feedbackAction.parse(input);
+  if (action.action === 'status' || action.action === 'activity') {
+    await env.DB.prepare(`INSERT OR IGNORE INTO access_feedback(member_id,enabled,consent_at,updated_at)
+      SELECT id,newsletter,CASE WHEN newsletter=1 THEN ? ELSE NULL END,? FROM access_members WHERE id=?`)
+      .bind(now, now, member)
+      .run();
+  }
   if (action.action === 'stop' || action.action === 'completed') {
     await env.DB.prepare('INSERT OR IGNORE INTO access_feedback(member_id,updated_at) VALUES(?,?)')
       .bind(member, now)
@@ -86,7 +96,8 @@ export async function memberFeedback(env: Env, member: string, input: unknown, n
     await env.DB.prepare(`UPDATE access_feedback SET first_active_at=coalesce(first_active_at,?),
       active_days=min(2,active_days+CASE WHEN last_active_day IS NULL OR last_active_day<? THEN 1 ELSE 0 END),
       last_active_day=?,results=CASE WHEN ? IS NOT NULL AND json_array_length(results)<2 AND NOT EXISTS(SELECT 1 FROM json_each(results) WHERE value=?) THEN json_insert(results,'$[#]',?) ELSE results END,updated_at=?
-      WHERE member_id=? AND enabled=1 AND completed_at IS NULL`)
+      WHERE member_id=? AND enabled=1 AND completed_at IS NULL
+      AND EXISTS(SELECT 1 FROM access_members WHERE id=member_id AND newsletter=1)`)
       .bind(
         now,
         today,
@@ -145,7 +156,7 @@ export async function queueFeedbackMail(env: Env, now = Date.now()) {
   const rows =
     await env.DB.prepare(`SELECT f.member_id,m.email FROM access_feedback f JOIN access_members m ON m.id=f.member_id
     WHERE f.enabled=1 AND f.completed_at IS NULL AND f.email_id IS NULL AND f.active_days=2 AND json_array_length(f.results)=2
-    AND f.first_active_at<=? AND f.next_prompt_at<=? AND f.last_active_day>=? AND m.status='approved' AND m.verified_at IS NOT NULL
+    AND f.first_active_at<=? AND f.next_prompt_at<=? AND f.last_active_day>=? AND m.status='approved' AND m.verified_at IS NOT NULL AND m.newsletter=1
     AND NOT EXISTS(SELECT 1 FROM access_mail a WHERE a.email=m.email AND a.delivery_status IN ('bounced','complained','suppressed'))
     ORDER BY f.first_active_at LIMIT 20`)
       .bind(now - 3 * day, now, new Date(now - 7 * day).toISOString().slice(0, 10))
@@ -159,7 +170,8 @@ export async function queueFeedbackMail(env: Env, now = Date.now()) {
     );
     await env.DB.batch([
       env.DB.prepare(`UPDATE access_feedback SET email_id=?,token_hash=?,token_expires_at=?,next_prompt_at=?,updated_at=?
-        WHERE member_id=? AND enabled=1 AND ${eligibleSql} AND email_id IS NULL AND next_prompt_at<=?`).bind(
+        WHERE member_id=? AND enabled=1 AND ${eligibleSql} AND email_id IS NULL AND next_prompt_at<=?
+        AND EXISTS(SELECT 1 FROM access_members WHERE id=member_id AND newsletter=1)`).bind(
         id,
         await tokenHash(token),
         now + 90 * day,
@@ -195,7 +207,7 @@ export async function pruneFeedbackInvitations(env: Env, now = Date.now()) {
 export async function feedbackMailAllowed(env: Env, id: string, now = Date.now()) {
   if (env.INGESTION_ENABLED !== 'true') return false;
   return !!(await env.DB.prepare(`SELECT 1 FROM access_feedback f JOIN access_members m ON m.id=f.member_id
-    WHERE f.email_id=? AND f.enabled=1 AND f.completed_at IS NULL AND m.status='approved' AND m.verified_at IS NOT NULL
+    WHERE f.email_id=? AND f.enabled=1 AND f.completed_at IS NULL AND m.status='approved' AND m.verified_at IS NOT NULL AND m.newsletter=1
     AND f.token_expires_at>? AND NOT EXISTS(SELECT 1 FROM access_mail a WHERE a.email=m.email AND a.delivery_status IN ('bounced','complained','suppressed'))`)
     .bind(id, now)
     .first());

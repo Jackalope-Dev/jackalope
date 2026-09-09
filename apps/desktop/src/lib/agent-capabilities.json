@@ -25,7 +25,7 @@
     "bridge": "http",
     "direct": [],
     "discovery": true,
-    "accounts": false,
+    "accounts": true,
     "capacity": false
   },
   "gemini": {

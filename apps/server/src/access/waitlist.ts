@@ -1,5 +1,7 @@
+import { z } from 'zod';
 import { ServiceError } from '../errors';
 import { randomToken, seal, tokenHash } from './crypto';
+import { preferencesSchema } from './insights';
 import type { WaitlistMail } from './mail';
 
 const day = 86400000;
@@ -97,7 +99,7 @@ export async function waitlistStatus(request: Request, env: Env, now = Date.now(
   const raw = sessionToken(request);
   if (!raw) throw new ServiceError(401, 'access_sign_in_required');
   const member = await env.DB.prepare(
-    `SELECT m.id,m.email,m.status,m.share_code,m.referral_count,m.created_at FROM access_members m JOIN access_waitlist_sessions s ON s.member_id=m.id WHERE s.hash=? AND s.expires_at>? AND m.status!='revoked'`,
+    `SELECT m.id,m.email,m.status,m.share_code,m.referral_count,m.created_at,m.preferences FROM access_members m JOIN access_waitlist_sessions s ON s.member_id=m.id WHERE s.hash=? AND s.expires_at>? AND m.status!='revoked'`,
   )
     .bind(await tokenHash(raw), now)
     .first<{
@@ -107,6 +109,7 @@ export async function waitlistStatus(request: Request, env: Env, now = Date.now(
       share_code: string;
       referral_count: number;
       created_at: number;
+      preferences: string | null;
     }>();
   if (!member) throw new ServiceError(401, 'access_sign_in_required');
   const rank =
@@ -128,5 +131,42 @@ export async function waitlistStatus(request: Request, env: Env, now = Date.now(
     pending: pending?.count ?? 0,
     priorityDays: member.referral_count,
     shareUrl: `${env.ACCESS_WEB_ORIGIN}/?ref=${member.share_code}`,
+    preferences: parsePreferences(member.preferences),
   };
+}
+
+const parsePreferences = (value: string | null) => {
+  if (!value) return null;
+  try {
+    const parsed = preferencesSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Saves the waitlist questions for whoever is signed in.
+ *
+ * The signup survey is a one-time capability token that expires, so anyone who
+ * skipped it at signup could never answer afterwards — and the answers are what
+ * the roadmap is built from. A signed-in member can set and revise them here
+ * for as long as they hold a session.
+ */
+export async function saveWaitlistPreferences(
+  request: Request,
+  env: Env,
+  preferences: z.infer<typeof preferencesSchema>,
+  now = Date.now(),
+) {
+  const raw = sessionToken(request);
+  if (!raw) throw new ServiceError(401, 'access_sign_in_required');
+  const result = await env.DB.prepare(
+    `UPDATE access_members SET preferences=?,newsletter_next_at=0,newsletter_attempts=0
+     WHERE id=(SELECT member_id FROM access_waitlist_sessions WHERE hash=? AND expires_at>?)
+       AND status!='revoked'`,
+  )
+    .bind(JSON.stringify(preferences), await tokenHash(raw), now)
+    .run();
+  if (result.meta.changes !== 1) throw new ServiceError(401, 'access_sign_in_required');
 }
