@@ -54,6 +54,10 @@ struct SavedAccount {
     feedback: feedback::LocalFeedback,
     #[serde(default)]
     settings_sync: bool,
+    #[serde(default)]
+    settings_sync_pending: bool,
+    #[serde(default)]
+    settings_sync_automatic: bool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -390,6 +394,7 @@ pub async fn app_account_connect(
                 && *n <= chrono::Utc::now().timestamp_millis() + 11 * 60000
         })
         .ok_or("Invalid connection expiry.")?;
+    let sync_choice = settings_sync::read_choice(&state)?;
     let record = SavedAccount {
         origin: api.to_string(),
         secret,
@@ -399,7 +404,9 @@ pub async fn app_account_connect(
         email: None,
         verified_at: 0,
         feedback: feedback::LocalFeedback::default(),
-        settings_sync: false,
+        settings_sync: sync_choice.enabled,
+        settings_sync_pending: false,
+        settings_sync_automatic: !sync_choice.explicit,
     };
     state.save(&record)?;
     let url = web
@@ -543,6 +550,7 @@ pub async fn app_account_poll(
             record.verified_at = chrono::Utc::now().timestamp_millis();
             record.verification.clear();
             record.user_code.clear();
+            record.settings_sync_pending = record.settings_sync;
             state.save(&record)?;
             state.access.update(record.verified_at, record.expires_at);
             Ok(status("connected", Some(&record)))

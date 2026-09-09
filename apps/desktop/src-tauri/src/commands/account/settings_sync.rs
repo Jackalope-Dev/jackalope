@@ -1,5 +1,20 @@
 use super::*;
 
+#[derive(Serialize, Deserialize)]
+pub(super) struct SyncChoice {
+    pub enabled: bool,
+    pub explicit: bool,
+}
+pub(super) fn read_choice(state: &AccountService) -> Result<SyncChoice, String> {
+    account_storage::read(&state.path.with_file_name("settings-sync-choice.bin"))?
+        .map(|bytes| serde_json::from_slice(&bytes).map_err(|_| "Could not read the settings sync choice.".into()))
+        .unwrap_or(Ok(SyncChoice { enabled: true, explicit: false }))
+}
+fn save_choice(state: &AccountService, enabled: bool) -> Result<(), String> {
+    account_storage::write(&state.path.with_file_name("settings-sync-choice.bin"),
+        &serde_json::to_vec(&SyncChoice { enabled, explicit: true }).map_err(|_| "Could not save the settings sync choice.")?)
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SyncedSettings {
@@ -83,13 +98,26 @@ pub async fn app_settings_sync(
         settings: None,
         conflict: false,
     };
-    let record = state.read()?;
-    let Some(mut record) = record.filter(|r| r.email.is_some()) else {
+    let mut saved = state.read()?;
+    if saved.as_ref().is_none_or(|r| r.email.is_none()) {
+        view.available = cfg!(windows) && endpoints(&app).is_ok();
+        if view.available { view.enabled = read_choice(&state)?.enabled; }
         return match action {
-            Action::Status | Action::Configure { enabled: false, .. } => Ok(view),
+            Action::Status => Ok(view),
+            Action::Configure { enabled, owner } if owner.is_empty() && view.available => {
+                save_choice(&state, enabled)?;
+                if let Some(record) = saved.as_mut() {
+                    record.settings_sync = enabled;
+                    record.settings_sync_automatic = false;
+                    state.save(record)?;
+                }
+                view.enabled = enabled;
+                Ok(view)
+            },
             _ => Err("Connect an approved Jackalope account to sync settings.".into()),
         };
-    };
+    }
+    let mut record = saved.take().unwrap();
     let (api, _) = endpoints(&app)?;
     bound(&record, &api)?;
     let owner = format!(
@@ -97,12 +125,26 @@ pub async fn app_settings_sync(
         Sha256::digest(format!("{}:{}", record.origin, record.secret).as_bytes())
     );
     view.available = true;
+    if record.settings_sync_pending && matches!(action, Action::Status | Action::Read { .. } | Action::Write { .. }) {
+        let (code, data) = request(&api, "/v1/desktop/settings/consent", reqwest::Method::POST,
+            Some(&record.secret), Some(serde_json::json!({"enabled": record.settings_sync, "automatic": record.settings_sync_automatic}))).await?;
+        if code != 200 { return Err("Could not initialize settings sync. Retry when the account service is available.".into()); }
+        record.settings_sync = data["enabled"].as_bool().ok_or("Invalid sync consent response.")?;
+        record.settings_sync_pending = false;
+        if !record.settings_sync { save_choice(&state, false)?; }
+        state.save(&record)?;
+    }
     view.enabled = record.settings_sync;
     view.owner = Some(owner.clone());
     match &action {
         Action::Status => return Ok(view),
-        Action::Configure { enabled, owner: expected } => {
-            if expected != &owner { return Err("The connected account changed. Refresh settings sync.".into()); }
+        Action::Configure {
+            enabled,
+            owner: expected,
+        } => {
+            if expected != &owner {
+                return Err("The connected account changed. Refresh settings sync.".into());
+            }
             if *enabled {
                 let (code, _) = request(
                     &api,
@@ -120,7 +162,10 @@ pub async fn app_settings_sync(
                 }
             }
             record.settings_sync = *enabled;
+            record.settings_sync_pending = false;
+            record.settings_sync_automatic = false;
             state.save(&record)?;
+            save_choice(&state, *enabled)?;
             view.enabled = *enabled;
             if !enabled {
                 let _ = request(
@@ -149,7 +194,9 @@ pub async fn app_settings_sync(
     let (method, body) = match action {
         Action::Delete { .. } => {
             record.settings_sync = false;
+            record.settings_sync_pending = false;
             state.save(&record)?;
+            save_choice(&state, false)?;
             view.enabled = false;
             (reqwest::Method::DELETE, None)
         }
@@ -184,6 +231,7 @@ pub async fn app_settings_sync(
     if code == 403 && data["error"] == "settings_sync_disabled" {
         record.settings_sync = false;
         state.save(&record)?;
+        save_choice(&state, false)?;
         view.enabled = false;
         return Ok(view);
     }

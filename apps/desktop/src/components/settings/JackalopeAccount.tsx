@@ -101,7 +101,7 @@ export function JackalopeAccount({
   const welcome = presentation === 'welcome';
   return (
     <div className={welcome ? 'access-account' : 'space-y-6'}>
-      {!welcome && (
+      {presentation === 'settings' && (
         <p className="settings-row-description">Beta access requires an approved account.</p>
       )}
       {!account && !error && <p role="status">Reading account connection…</p>}

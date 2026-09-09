@@ -20,28 +20,25 @@ export function SettingsSync() {
         />
       </div>
       <p className="settings-row-description">
-        Save your app theme, companion reactions and notification preferences to your Jackalope
-        account and restore them on your other desktops. Existing saved settings are restored when
-        you first turn this on. Credentials, local paths, projects and task history stay on this
-        device.
+        Sync app appearance, companion reactions and notification preferences. The first sync
+        restores your saved preferences. Credentials, paths, projects and task history stay local.
       </p>
       <p className="settings-row-description">
-        Optional on each desktop. Turning it off stops uploads and downloads and keeps your local
-        settings. The saved account copy remains. Account access checks continue independently.
+        Optional on each desktop. Turning it off stops transfers and keeps both local settings and
+        the saved copy. Account access checks continue.
       </p>
-      {!sync.available && <p role="status">Connect an approved account to enable settings sync.</p>}
-      {sync.available && (
+      {!sync.owner && <p role="status">{sync.enabled ? 'Sync starts after you connect an approved account.' : 'Connect an approved account to sync settings.'}</p>}
+      {sync.owner && (
         <div className="space-y-2">
           <Button variant="outline" disabled={sync.busy} onClick={() => void sync.remove()}>
             Delete synced settings
           </Button>
           <p className="settings-row-description">
-            Removes the saved account copy and turns sync off on all connected desktops. Local
-            settings stay intact. Turn sync on again to save a new copy.
+            Removes the saved copy and disables sync on all desktops. Local settings stay intact.
           </p>
         </div>
       )}
-      {sync.enabled && !sync.error && !sync.conflict && (
+      {sync.enabled && sync.owner && !sync.error && !sync.conflict && (
         <p role="status">
           {sync.busy
             ? 'Syncing settings…'
@@ -72,11 +69,7 @@ export function SettingsSync() {
       {sync.error && (
         <div className="space-y-2">
           <p role="alert">{sync.error}</p>
-          <Button
-            variant="outline"
-            disabled={sync.busy}
-            onClick={() => void sync.retry()}
-          >
+          <Button variant="outline" disabled={sync.busy} onClick={() => void sync.retry()}>
             Retry
           </Button>
         </div>

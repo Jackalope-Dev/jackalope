@@ -297,9 +297,10 @@ export function OnboardingFlow({
           </h2>
           {step === 'account' && (
             <>
-              <p className="onboarding-description">
-                Connect your Jackalope account to check whether you have early access.
-              </p>
+            <p className="onboarding-description">
+              Connect your Jackalope account to check whether you have early access.
+            </p>
+            <p className="onboarding-note">Settings sync is on for new connections. You can turn it off in Manage privacy settings below before connecting.</p>
               <JackalopeAccount presentation="onboarding" onStatus={setAccount} />
               <details className="onboarding-privacy-panel">
                 <summary>

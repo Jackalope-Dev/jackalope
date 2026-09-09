@@ -22,6 +22,7 @@ export async function settingsRoute(
 ) {
   if (method === 'DELETE') {
     await env.DB.batch([
+      env.DB.prepare('UPDATE access_members SET settings_sync_deleted=1 WHERE id=?').bind(memberId),
       env.DB.prepare('UPDATE access_devices SET settings_sync=0 WHERE member_id=?').bind(memberId),
       env.DB.prepare('DELETE FROM access_settings WHERE member_id=?').bind(memberId),
     ]);

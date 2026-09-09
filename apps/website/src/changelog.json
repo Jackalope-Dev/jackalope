@@ -1,5 +1,17 @@
 [
   {
+    "id": "account-setup-and-optional-settings-sync",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Account setup and optional settings sync.",
+    "description": "Connect your account first, check early access, and choose whether to sync portable preferences.",
+    "items": [
+      "Sync appearance and notification choices with strict privacy controls and conflict review.",
+      "Delete the saved settings copy and disable sync across connected desktops."
+    ],
+    "note": "Development milestone; updated desktop and hosted application rollout still require acceptance."
+  },
+  {
     "id": "responsive-worktree-loading",
     "date": "2026-09-09",
     "status": "In development",

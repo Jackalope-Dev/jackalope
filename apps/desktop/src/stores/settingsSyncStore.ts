@@ -56,7 +56,8 @@ export const useSettingsSyncStore = create<SyncState>()(
       lastSynced: null,
       retry: async () => {
         if (retryAction === 'delete') return get().remove();
-        if (retryAction === 'enable' || retryAction === 'disable') return get().configure(retryAction === 'enable');
+        if (retryAction === 'enable' || retryAction === 'disable')
+          return get().configure(retryAction === 'enable');
         return get().refresh();
       },
       remove: async () => {
