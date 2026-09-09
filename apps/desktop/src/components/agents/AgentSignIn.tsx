@@ -13,7 +13,9 @@ import {
   stopSignIn,
   writeSignIn,
 } from '../../lib/agent-profiles';
+import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import '@xterm/xterm/css/xterm.css';
 export function AgentSignIn({
@@ -42,6 +44,7 @@ export function AgentSignIn({
   const finishingSetup = useRef(false);
   const completeSetup = useRef<(() => Promise<void>) | null>(null);
   const finish = useRef<HTMLButtonElement>(null);
+  const lastLinkAction = useRef<HTMLButtonElement>(null);
   const report = useRef(onStatus);
   report.current = onStatus;
   const [attempt, setAttempt] = useState(0);
@@ -51,9 +54,27 @@ export function AgentSignIn({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AccountStatus>();
+  const [links, setLinks] = useState<string[]>([]);
+  const [linkMessage, setLinkMessage] = useState('');
+  const linkSession = useRef(0);
+  const openLink = async (uri: string) => {
+    const generation = linkSession.current;
+    const url = signInUrl(uri);
+    if (!url) return;
+    try {
+      const { open } = await import('@tauri-apps/plugin-shell');
+      if (generation !== linkSession.current) return;
+      await open(url);
+      if (generation === linkSession.current) setLinkMessage('Opened in your browser.');
+    } catch {
+      if (generation === linkSession.current)
+        setLinkMessage('Could not open the browser. Copy the link or select it below.');
+    }
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry starts a new owned sign-in session.
   useEffect(() => {
     if (!host) return;
+    linkSession.current++;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     let id: string | null = null;
@@ -63,30 +84,44 @@ export function AgentSignIn({
     setChecking(false);
     setError('');
     setResult(undefined);
+    setLinks([]);
+    setLinkMessage('');
     setStage('Starting sign-in…');
     report.current(undefined);
+    const found = new Set<string>();
+    let openedAutomatically = false;
+    const rememberLink = (uri: string) => {
+      const url = signInUrl(uri);
+      if (disposed || !url || found.has(url)) return;
+      found.add(url);
+      setLinks([...found].slice(-4));
+      if (!openedAutomatically && agentId === 'claude' && isClaudeAuthorizationUrl(url)) {
+        openedAutomatically = true;
+        void openLink(url);
+      }
+    };
+    const activateLink = (event: MouseEvent, uri: string) => {
+      event.preventDefault();
+      void openLink(uri);
+    };
     const terminal = new Terminal({
       cursorBlink: false,
       fontSize: 14,
       scrollback: 500,
       screenReaderMode: true,
       allowProposedApi: false,
+      linkHandler: { activate: activateLink },
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
-    terminal.loadAddon(
-      new WebLinksAddon((event, uri) => {
-        event.preventDefault();
-        const url = new URL(uri);
-        if (url.protocol !== 'https:' || url.username || url.password) return;
-        void import('@tauri-apps/plugin-shell')
-          .then(({ open }) => open(url.href))
-          .catch(() => {
-            if (!disposed)
-              setError('Could not open the browser. Copy the sign-in link from the panel.');
-          });
-      }),
-    );
+    terminal.loadAddon(new WebLinksAddon(activateLink));
+    const hyperlinks = terminal.parser.registerOscHandler(8, (data) => {
+      rememberLink(data.slice(data.indexOf(';') + 1));
+      return false;
+    });
+    const parsed = terminal.onWriteParsed(() => {
+      for (const url of terminalSignInLinks(terminal.buffer.active)) rememberLink(url);
+    });
     terminal.open(host);
     const theme = () => {
       const style = getComputedStyle(document.documentElement);
@@ -112,7 +147,24 @@ export function AgentSignIn({
     resize.observe(host);
     fit.fit();
     terminal.textarea?.setAttribute('aria-label', `${agentName} sign-in input`);
-    terminal.attachCustomKeyEventHandler((event) => event.key !== 'Tab' && event.key !== 'Escape');
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.key === 'Tab' || event.key === 'Escape') return false;
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'c' &&
+        terminal.hasSelection()
+      ) {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          void navigator.clipboard.writeText(terminal.getSelection()).catch(() => {
+            if (!disposed)
+              setLinkMessage('Could not copy the selection. Select the link above instead.');
+          });
+        }
+        return false;
+      }
+      return true;
+    });
     const input = terminal.onData((data) => {
       if (id)
         void writeSignIn(id, data).catch((e) => {
@@ -208,11 +260,14 @@ export function AgentSignIn({
       });
     return () => {
       disposed = true;
+      linkSession.current++;
       completeSetup.current = null;
       clearTimeout(timer);
       session.current = null;
       if (id) void stopSignIn(id).catch(() => {});
       input.dispose();
+      hyperlinks.dispose();
+      parsed.dispose();
       resize.disconnect();
       observer.disconnect();
       terminal.dispose();
@@ -259,7 +314,10 @@ export function AgentSignIn({
             if (event.key === 'Tab' && host?.contains(event.target as Node)) {
               event.preventDefault();
               event.stopPropagation();
-              finish.current?.focus();
+              (event.shiftKey
+                ? (lastLinkAction.current ?? finish.current)
+                : finish.current
+              )?.focus();
             }
           }}
           className="task-dialog appearance-panel agent-sign-in-dialog"
@@ -285,6 +343,49 @@ export function AgentSignIn({
           {error && (
             <p role="alert" className="task-error mt-2">
               {error}
+            </p>
+          )}
+          {links.length > 0 && (
+            <div className="mt-4 grid gap-3">
+              {links.map((url, index) => (
+                <div key={url} className="grid gap-2">
+                  <label className="task-muted" htmlFor={`sign-in-link-${index}`}>
+                    Sign-in link{links.length > 1 ? ` ${index + 1}` : ''}
+                  </label>
+                  <Input
+                    id={`sign-in-link-${index}`}
+                    value={url}
+                    readOnly
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="outline" onClick={() => void openLink(url)}>
+                      Open browser
+                    </Button>
+                    <Button
+                      ref={index === links.length - 1 ? lastLinkAction : undefined}
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(url);
+                          setLinkMessage('Link copied.');
+                        } catch {
+                          setLinkMessage(
+                            'Could not copy the link. Select it above and copy it manually.',
+                          );
+                        }
+                      }}
+                    >
+                      Copy link
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {linkMessage && (
+            <p role="status" className="task-muted mt-2">
+              {linkMessage}
             </p>
           )}
           <div className="agent-sign-in-terminal" ref={setHost} />

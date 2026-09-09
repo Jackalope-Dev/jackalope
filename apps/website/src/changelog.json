@@ -1,5 +1,16 @@
 [
   {
+    "id": "reliable-agent-sign-in-links",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Reliable agent sign-in links",
+    "description": "Agent account setup exposes browser and copy actions so sign-in can continue when a browser does not open.",
+    "items": [
+      "Claude authorization links open through the desktop browser handler, with selectable URLs and clipboard recovery."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "cleaner-account-editing",
     "date": "2026-09-09",
     "status": "In development",
