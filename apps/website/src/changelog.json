@@ -1,5 +1,16 @@
 [
   {
+    "id": "tidier-project-task-context",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Tidier project task context.",
+    "description": "Project settings keep task guidance controls closer together.",
+    "items": [
+      "Reduced spacing before Choose guidelines automatically and removed the divider before Always include guidelines."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "an-echo-in-the-footer",
     "date": "2026-09-09",
     "status": "In development",

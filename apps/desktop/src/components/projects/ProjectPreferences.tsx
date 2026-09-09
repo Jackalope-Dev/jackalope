@@ -90,7 +90,7 @@ export function ProjectPreferences({
               </div>
             </div>
           </section>
-          <section className="project-preferences-section">
+          <section className="project-preferences-section project-task-context">
             <h2>Task context</h2>
             <Setting
               title="Choose guidelines automatically"
