@@ -63,7 +63,7 @@ const scenes = [
     label: 'Agents & accounts',
     title: 'Choose an agent for each task.',
     description:
-      'Use installed Codex, Claude Code, Grok, and OpenCode CLIs with your existing accounts. Choose the right agent for each task.',
+      'Use installed Codex, Claude Code, Grok, OpenCode, and Antigravity CLIs with your existing accounts. Choose the right agent for each task.',
     detail: 'Agents & accounts',
     image: 'agents',
   },
@@ -228,11 +228,20 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
 
 const features = [
   {
+    icon: ScanSearch,
+    title: 'See how the code connects.',
+    description: 'Explore your project and trace the reach of a change.',
+    detail:
+      'Browse the interactive codebase map, follow resolved file dependencies, and inspect related files during review. Use the map to choose what to check next; it does not replace tests.',
+    href: '/features/project-context-for-coding-agents/#section-2',
+    link: 'Explore the codebase map',
+  },
+  {
     icon: GitBranch,
     title: 'Give every agent room to work.',
     description: 'Run independent tasks side by side in separate Git worktrees.',
     detail:
-      'Assign Codex, Claude Code, Grok, or OpenCode to each task. Set dependencies when one change needs another, and follow progress without checking a pile of terminals.',
+      'Assign Codex, Claude Code, Grok, OpenCode, or Antigravity to each task. Set dependencies when one change needs another, and follow progress without checking a pile of terminals.',
     href: '/parallel-coding-agents/',
     link: 'Explore parallel work',
   },
@@ -241,7 +250,7 @@ const features = [
     title: 'Brief once. Build on it.',
     description: 'Carry project instructions and lessons into the next task.',
     detail:
-      'Save the conventions, decisions, and workflows your agents need. Choose the context for each task and see exactly what the agent received.',
+      'Save project guidance once. New tasks match relevant guidelines to your prompt and inherit project defaults. Adjust the selection when needed and inspect what the agent received.',
     href: '/features/project-context-for-coding-agents/',
     link: 'Explore project context',
   },
@@ -269,7 +278,7 @@ const features = [
     description: 'Let agents browse the web and use a Windows app you approve.',
     detail:
       'Built-in agent-browser lets agents navigate pages, fill forms, capture screenshots, and check accessibility in a separate browser session for each task. On Windows, choose an app window for clicks, typing, and scrolling. A visible status bar lets you pause or cancel control; moving your mouse or typing pauses it, and Escape cancels access. Add project tools through MCP connections.',
-    href: '/knowledge/',
+    href: '/knowledge/mcp-and-browser-automation/',
     link: 'Explore browser and computer use',
   },
   {
@@ -277,7 +286,7 @@ const features = [
     title: 'Put repeat work on repeat.',
     description: 'Schedule checks and chores, with a result for every run.',
     detail:
-      'Keep the project, agent, account, and instructions with recurring work. Review each run in its own history. Schedules run while Jackalope is open and your computer is awake.',
+      'Run on a schedule, or check a local branch and launch only when committed code changes. Change checks use no model calls. Review each run in its own history; Jackalope must be open and your computer awake.',
     href: '/features/recurring-coding-agent-tasks/',
     link: 'Explore recurring tasks',
   },
@@ -377,8 +386,8 @@ export function LandingPage({
               </h1>
             </div>
             <p className="hero-description">
-              Run <strong>Codex, Claude Code, Grok, and OpenCode</strong> side by side. One desktop
-              workspace for your projects, parallel tasks, and code review.
+              Run <strong>Codex, Claude Code, Grok, OpenCode, and Antigravity</strong> side by side.
+              One desktop workspace for your projects, parallel tasks, and code review.
             </p>
             <div className="hero-conversion">
               <div className="hero-actions">

@@ -27,6 +27,13 @@ const agents = [
     mark: '[ ]',
     url: 'https://opencode.ai/docs/',
     note: 'Choose your OpenCode provider and model, including available free or local options.',
+    connections: 'Own CLI configuration only',
+  },
+  {
+    name: 'Antigravity',
+    mark: '↑',
+    url: 'https://antigravity.google/docs/cli/install/',
+    note: 'Run agy as a worker. Named accounts use Gemini API keys; subscription login is shared.',
     connections: 'On-demand discovery',
   },
 ];
@@ -68,7 +75,7 @@ export function AgentSupport() {
       </div>
       <div className="agent-support-common">
         <Check size={17} /> Tasks & review <span>·</span> Session continuation <span>·</span>{' '}
-        Account profiles <span>·</span> Reported task usage
+        Reported task usage
       </div>
       <details className="agent-support-details">
         <summary>
@@ -98,9 +105,15 @@ export function AgentSupport() {
         <p>
           Jackalope uses each agent’s installed CLI and permission rules. Connections configured
           inside a CLI remain subject to that CLI’s settings; project connections support Codex and
-          Claude Code, with on-demand discovery for Grok and OpenCode. Usage shows what an agent
-          reports, not complete provider billing. Profiles organize sign-ins; they are not a
-          security sandbox.
+          Claude Code, with on-demand discovery for Grok and Antigravity. OpenCode uses its own CLI
+          tool configuration. Usage shows what an agent reports, not complete provider billing.
+          Profiles organize sign-ins; they are not a security sandbox.
+        </p>
+        <p>
+          Named profiles are available for supported agents. Antigravity profiles use Gemini API
+          billing, separate from a Google subscription; multiple subscription logins are not
+          isolated. Antigravity can run tasks but cannot coordinate automatic routing. Gemini CLI,
+          Aider, and Goose have account setup only; task execution is still in development.
         </p>
         <p>
           Model access and subscription requirements depend on your provider. See the{' '}

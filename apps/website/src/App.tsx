@@ -39,7 +39,7 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
 const faqs = [
   [
     'What is Jackalope?',
-    'A desktop workspace for Codex, Claude Code, Grok, and OpenCode. Run tasks in parallel, keep their project context together, and review the changes in one place.',
+    'A desktop workspace for Codex, Claude Code, Grok, OpenCode, and Antigravity. Run tasks in parallel, keep their project context together, and review the changes in one place.',
   ],
   [
     'Why use it instead of more terminal tabs?',
@@ -55,7 +55,7 @@ const faqs = [
   ],
   [
     'Can I keep work and personal accounts separate?',
-    'Yes. Create named sign-in profiles and choose an account for each project. Task continuations keep their original account. Profiles organize sign-ins; they do not isolate local file access.',
+    'Yes. Create named account profiles and choose project defaults. Continuations retain their selected profile. Antigravity profiles use Gemini API keys; its existing subscription login is shared. Profiles do not isolate local file access.',
   ],
   [
     'What happens after I join?',
@@ -240,9 +240,9 @@ export function App({ path = '/' }: { path?: string }) {
         <JournalPage path={path} />
       )}
 
-      {!['/', '/privacy/', '/terms/', '/access/', '/waitlist/', '/feedback/'].includes(path) && (
-        <Newsletter />
-      )}
+      {!['/', '/privacy/', '/terms/', '/access/', '/waitlist/', '/feedback/', '/roadmap/'].includes(
+        path,
+      ) && <Newsletter />}
 
       <Footer home={home} path={path} />
 

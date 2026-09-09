@@ -5,6 +5,7 @@ pub mod coordination;
 pub mod coordination_mcp;
 pub mod git;
 pub mod harness;
+pub mod helper;
 pub mod integration;
 pub mod mcp;
 pub mod mcp_broker;

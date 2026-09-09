@@ -12,6 +12,12 @@
 - Reserve the public changelog for notable features, meaningful improvements and
   larger milestones. Skip routine copy, spacing, icon and internal maintenance
   changes. Use `pnpm changelog:add`; verification checks structure and ordering.
+- When completing a roadmap capability, changing a current priority, or adding,
+  deferring or removing planned scope, update `apps/website/src/roadmap-content.ts`
+  alongside `docs/STATUS.md`, `docs/TODO.md` and `docs/ROADMAP.md` as relevant.
+  Keep Built, In progress, Up next and Further out accurate; implementation does
+  not imply release acceptance or public availability. Keep copy concise and
+  user-facing, and do not invent dates or promote exploratory work to a promise.
 - Follow CONTRIBUTING.md for checks and docs/ARCHITECTURE.md for ownership. Native
   changes preserve coordinator → execution guard → runtime lock order, reservation,
   process ownership, history recovery and Git safeguards.

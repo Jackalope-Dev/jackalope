@@ -13,6 +13,7 @@ const userCargo = process.env.USERPROFILE
 const cargo = userCargo && existsSync(userCargo) ? userCargo : 'cargo';
 
 const checks = [
+  [process.execPath, ['scripts/knowledge.mjs', '--check']],
   [process.execPath, [pnpm, 'check']],
   [process.execPath, [pnpm, 'check:docs']],
   [process.execPath, [pnpm, 'check:changelog']],

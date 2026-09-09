@@ -1,3 +1,4 @@
+import { knowledgeFiles } from '@jackalope/knowledge';
 import { serializeBlogPost } from './blog-types.ts';
 import { company, normalizePath, pages, posts, siteOrigin, tour, updates } from './content.ts';
 import { knowledgeGuides } from './knowledge-content.ts';
@@ -126,6 +127,10 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
         'Snapshot-bound code review evidence',
         'Recurring tasks and reusable workflows',
         'Agent account profiles and reported usage',
+        'Automatic task guidance and agent selection',
+        'Local change monitors without model calls',
+        'Interactive codebase map and change impact',
+        'Built-in browser automation and accessibility audits',
       ],
       publisher: { '@id': `${origin}/#organization` },
     });
@@ -226,6 +231,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')}</script>`,
     `<link rel="alternate" type="application/rss+xml" title="Jackalope field notes" href="${origin}/feed.xml" />`,
     `<link rel="alternate" type="text/plain" title="About Jackalope for language models" href="${origin}/llms.txt" />`,
+    `<link rel="describedby" href="${origin}/llms.txt" />`,
     `<link rel="sitemap" type="application/xml" href="${origin}/sitemap.xml" />`,
   ].join('\n');
   return html
@@ -276,9 +282,11 @@ export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
     .map((page) => `- [${page.title}](${origin}${page.path}): ${page.description}`)
     .join('\n');
   return {
+    ...knowledgeFiles(origin),
+    'knowledge/llms.txt': `# Jackalope knowledgebase\n\n> Official help for Jackalope and its local agent tools.\n\n## Guides\n\n${knowledgeGuides.map((guide) => `- [${guide.title}](${origin}/knowledge/${guide.slug}/index.md): ${guide.description}`).join('\n')}\n`,
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
     'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${lastModified(page.path) ? `<lastmod>${lastModified(page.path)}</lastmod>` : ''}</url>`).join('')}</urlset>`,
-    'llms.txt': `${intro}## Agent support\n\nNative adapters: Codex, Claude Code, Grok Build, and OpenCode. Tasks, session continuation, managed account profiles, and reported task usage are implemented. Project-selected MCP connections are delivered to Codex and Claude Code; Grok supports on-demand discovery through the HTTP bridge. OpenCode supports on-demand tool discovery. Grok and OpenCode validate provider access on launch. Gemini CLI is under evaluation, not supported yet. See ${origin}/#agents for coverage and limits.\n\n## Knowledgebase & Diagnostics\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: 5-hour quota windows, preflight headroom admission, and 3-attempt failover\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
+    'llms.txt': `${intro}## Agent support\n\nNative task adapters: Codex, Claude Code, Grok Build, OpenCode, and Antigravity. Direct project MCP connections support Codex and Claude Code; on-demand discovery also supports Grok and Antigravity. OpenCode uses its own CLI tool configuration. Antigravity is worker-only; named profiles use Gemini API keys with separate billing, while its subscription login is shared. Gemini CLI, Aider, and Goose offer account setup but not task execution. Provider access and reported usage vary by adapter. See ${origin}/#agents for coverage and limits.\n\n## Knowledgebase & Diagnostics\n\n- [Agent-readable documentation index](${origin}/knowledge/llms.txt)\n- [Ask Jackalope and local MCP tools](${origin}/knowledge/ask-jackalope/index.md)\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: Reported quota windows, preflight headroom estimates, and up to three handoffs\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
     'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => `# ${guide.title}\n${origin}/knowledge/${guide.slug}/\n\n${guide.description}\n\n${guide.sections.map((section) => `## ${section.question}\n\n${section.paragraphs.join('\n\n')}${section.bullets ? `\n\n${section.bullets.map((item) => `- ${item}`).join('\n')}` : ''}${section.codeBox ? `\n\n${section.codeBox.title}:\n\`\`\`\n${section.codeBox.code}\n\`\`\`` : ''}`).join('\n\n')}`).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note ?? ''}`).join('\n\n')}\n`,
     'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
     'site.webmanifest': JSON.stringify({

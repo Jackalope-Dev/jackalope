@@ -1609,6 +1609,11 @@ fieldset {
 .release-status strong {
   color: var(--color-text-primary);
 }
+.release-status a {
+  color: var(--color-accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .change-entry {
   display: grid;
   grid-template-columns: 190px 1fr;

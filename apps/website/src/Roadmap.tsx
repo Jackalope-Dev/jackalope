@@ -3,13 +3,13 @@ import * as Tabs from '@radix-ui/react-tabs';
 import {
   ArrowDown,
   ArrowRight,
+  Bot,
   Check,
   ChevronDown,
   Compass,
-  Bot,
+  Gauge,
   GitBranch,
   GitPullRequest,
-  Gauge,
   Hammer,
   Laptop,
   MoveUpRight,
@@ -52,14 +52,6 @@ export function RoadmapPage() {
             <div className="roadmap-echo">
               <EchoMark animated={false} />
             </div>
-            <div className="roadmap-position">
-              <strong>
-                Built locally.
-                <br />
-                Getting ready for you.
-              </strong>
-              <p>Coming soon. We’re working toward a dependable first release.</p>
-            </div>
           </div>
         </div>
       </header>
@@ -78,10 +70,7 @@ export function RoadmapPage() {
                   </span>
                   <span className="roadmap-stage-label">{stage.label}</span>
                   <span className="roadmap-stage-caption">{stage.caption}</span>
-                  <span className="roadmap-stage-cue">
-                    {stage.id === 'now' ? 'We are here' : 'Explore'}
-                    <ArrowDown size={13} />
-                  </span>
+                  <ArrowDown className="roadmap-stage-cue" size={16} aria-hidden="true" />
                 </Tabs.Trigger>
               );
             })}
@@ -89,36 +78,42 @@ export function RoadmapPage() {
           {roadmapStages.map((stage, stageIndex) => {
             const ChapterIcon = stageIcons[stageIndex];
             return (
-            <Tabs.Content key={stage.id} value={stage.id} className="roadmap-chapter">
-              <div className="roadmap-chapter-intro">
-                <div className="roadmap-chapter-art" aria-hidden="true"><ChapterIcon size={72} strokeWidth={1.25} /><span /><span /></div>
-                <h2>{stage.title}</h2>
-                <p className="roadmap-description">{stage.description}</p>
-                <p className="roadmap-status">{stage.status}</p>
-                <a className="text-link" href={stage.link.href}>
-                  {stage.link.label}
-                  <MoveUpRight size={16} />
-                </a>
-              </div>
-              <div className="roadmap-items">
-                {stage.items.map((item, itemIndex) => {
-                  const ItemIcon = itemIcons[stageIndex][itemIndex];
-                  return (
-                  <details className="roadmap-item" key={item.title}>
-                    <summary>
-                      <span className="roadmap-item-icon"><ItemIcon size={24} strokeWidth={1.6} /></span>
-                      <span className="roadmap-item-copy">
-                        <strong>{item.title}</strong>
-                        <span>{item.summary}</span>
-                      </span>
-                      <ChevronDown size={19} />
-                    </summary>
-                    <p>{item.detail}</p>
-                  </details>
-                  );
-                })}
-              </div>
-            </Tabs.Content>
+              <Tabs.Content key={stage.id} value={stage.id} className="roadmap-chapter">
+                <div className="roadmap-chapter-intro">
+                  <div className="roadmap-chapter-art" aria-hidden="true">
+                    <ChapterIcon size={72} strokeWidth={1.25} />
+                    <span />
+                    <span />
+                  </div>
+                  <h2>{stage.title}</h2>
+                  <p className="roadmap-description">{stage.description}</p>
+                  <p className="roadmap-status">{stage.status}</p>
+                  <a className="text-link" href={stage.link.href}>
+                    {stage.link.label}
+                    <MoveUpRight size={16} />
+                  </a>
+                </div>
+                <div className="roadmap-items">
+                  {stage.items.map((item, itemIndex) => {
+                    const ItemIcon = itemIcons[stageIndex][itemIndex];
+                    return (
+                      <details className="roadmap-item" key={item.title}>
+                        <summary>
+                          <span className="roadmap-item-icon">
+                            <ItemIcon size={24} strokeWidth={1.6} />
+                          </span>
+                          <span className="roadmap-item-copy">
+                            <strong>{item.title}</strong>
+                            <span>{item.summary}</span>
+                          </span>
+                          <ChevronDown size={19} />
+                        </summary>
+                        <p>{item.detail}</p>
+                      </details>
+                    );
+                  })}
+                </div>
+              </Tabs.Content>
             );
           })}
         </Tabs.Root>

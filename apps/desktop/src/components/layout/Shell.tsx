@@ -6,6 +6,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -97,6 +98,10 @@ export function Shell({
   }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
   const openProjectSetup = () => useOnboardingStore.getState().begin();
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
+  useEffect(observeHelper, []);
+  useEffect(() => {
+    useHelperStore.setState({ screen: activeTab });
+  }, [activeTab]);
   const [usageView, setUsageView] = useState<UsageView>('tokens');
   const previousView = useRef<ActiveTab>('kanban');
   useEffect(() => {
@@ -150,6 +155,15 @@ export function Shell({
         : null,
   );
   const [scheduleRunId, setScheduleRunId] = useState<string>();
+  useEffect(() => {
+    const handle = (event: Event) => {
+      const key = (event as CustomEvent<string>).detail;
+      const draft = useExecutionStore.getState().drafts[key];
+      if (key.startsWith('helper-') && draft) setCapture({ draftKey: key });
+    };
+    window.addEventListener('jackalope:helper-draft', handle);
+    return () => window.removeEventListener('jackalope:helper-draft', handle);
+  }, []);
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
     setCapture(null);

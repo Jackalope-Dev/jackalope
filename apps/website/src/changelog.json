@@ -1,5 +1,28 @@
 [
   {
+    "id": "hourly-recurring-tasks",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Hourly recurring tasks",
+    "description": "Schedule regular checks without writing a cron expression.",
+    "items": [
+      "Choose intervals of 1, 2, 3, 4, 6, 8 or 12 hours and a minute past the hour.",
+      "Timing follows clock hours in the selected timezone and retains existing missed-run policies."
+    ]
+  },
+  {
+    "id": "ask-jackalope-from-your-workspace",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Ask Jackalope from your workspace.",
+    "description": "Your companion connects your configured agent to official help and reviewed app actions.",
+    "items": [
+      "Ask questions with documentation sources, preview appearance changes and adjust supported preferences.",
+      "Prepare task drafts, open or stop shared tasks, navigate the app and change the default agent through reviewed actions.",
+      "Connect external agents through an expiring local MCP connection, or copy website guides as Markdown."
+    ]
+  },
+  {
     "id": "explore-where-jackalope-goes-next",
     "date": "2026-09-09",
     "status": "In development",

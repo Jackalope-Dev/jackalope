@@ -175,6 +175,9 @@ importers:
       '@jackalope/brand':
         specifier: workspace:*
         version: link:../../packages/brand
+      '@jackalope/knowledge':
+        specifier: workspace:*
+        version: link:../../packages/knowledge
       '@radix-ui/react-dialog':
         specifier: ^1.1.6
         version: 1.1.23(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -237,6 +240,8 @@ importers:
       '@types/react':
         specifier: ^19.0.4
         version: 19.2.18
+
+  packages/knowledge: {}
 
 packages:
 

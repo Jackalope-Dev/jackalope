@@ -1,3 +1,4 @@
+import { guideMarkdown } from '@jackalope/knowledge';
 import {
   AlertCircle,
   ArrowLeft,
@@ -12,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { siteOrigin } from './content';
 import {
   type GuideCategory,
   guideCategories,
@@ -44,15 +46,17 @@ export function KnowledgebasePage({
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<GuideCategory | 'all'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState('');
   const [activeHeadingId, setActiveHeadingId] = useState<string>('');
 
   const copyToClipboard = async (id: string, text: string) => {
     try {
+      setCopyError('');
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
       setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
     } catch {
-      // Ignore clipboard write failure
+      setCopyError('Copy failed. Open the Markdown version and copy its text.');
     }
   };
 
@@ -140,6 +144,17 @@ export function KnowledgebasePage({
         <header className="knowledge-guide-header">
           <h1>{activeGuide.title}</h1>
           <p className="knowledge-guide-lede">{activeGuide.description}</p>
+          <div className="knowledge-agent-actions">
+            <button
+              type="button"
+              onClick={() => void copyToClipboard('guide', guideMarkdown(activeGuide, siteOrigin))}
+            >
+              {copiedId === 'guide' ? <Check size={16} /> : <Copy size={16} />}{' '}
+              {copiedId === 'guide' ? 'Copied' : 'Copy for your agent'}
+            </button>
+            <a href={`/knowledge/${activeGuide.slug}/index.md`}>Read Markdown</a>
+          </div>
+          {copyError && <p role="alert">{copyError}</p>}
           <div className="knowledge-guide-meta">
             <span>{activeGuide.readingTime}</span>
             <span aria-hidden="true">·</span>
@@ -320,6 +335,10 @@ export function KnowledgebasePage({
             </p>
 
             {/* Streamlined Search Bar */}
+            <div className="knowledge-agent-actions">
+              <a href="/knowledge/ask-jackalope/">Ask Jackalope & local agent tools</a>
+              <a href="/knowledge/llms.txt">Documentation for your agent</a>
+            </div>
             <search className="knowledge-search-bar">
               <Search size={18} className="knowledge-search-icon" aria-hidden="true" />
               <input

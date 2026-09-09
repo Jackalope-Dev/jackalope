@@ -585,10 +585,12 @@ pub fn agent_profile_rename(
 #[tauri::command]
 pub fn agent_profile_delete(
     runtime: State<'_, TaskRuntime>,
+    helper: State<'_, super::helper::Helper>,
     agent: String,
     id: String,
 ) -> Result<(), String> {
     let _guard = super::integration::execution_guard()?;
+    helper.ensure_idle()?;
     let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
     env_var_for(&agent).ok_or("Unknown agent")?;
     if id.is_empty() || !id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {

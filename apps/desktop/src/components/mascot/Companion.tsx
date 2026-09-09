@@ -20,9 +20,11 @@ import {
   useCompanionStore,
 } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useHelperStore } from '../../stores/helperStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { FeedbackDialog } from '../settings/FeedbackDialog';
+import { AskJackalope } from './AskJackalope';
 import { openCompanionTask } from './CompanionSources';
 import { JackalopeMascot } from './JackalopeMascot';
 import { returnToCompanion } from './useCompanionNotices';
@@ -36,6 +38,16 @@ export function Companion({
   onSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [section, setSection] = useState<'ask' | 'activity'>('ask');
+  const helperWorking = useHelperStore((state) =>
+    state.view.turns.some((turn) => turn.status === 'working'),
+  );
+  const proposals = useHelperStore(
+    (state) =>
+      state.view.actions.filter(
+        (action) => action.status === 'proposed' && Date.now() - action.createdAt < 600_000,
+      ).length,
+  );
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const interactedOutside = useRef(false);
   const pendingAction = useRef<(() => void) | null>(null);
@@ -84,7 +96,7 @@ export function Companion({
     ? 'idle'
     : waiting.length
       ? 'thinking'
-      : active.length
+      : active.length || helperWorking
         ? 'working'
         : hint?.kind === 'success'
           ? 'success'
@@ -122,11 +134,11 @@ export function Companion({
               buttonId="jackalope-companion-trigger"
               expanded={open}
               controls={open ? 'jackalope-companion-panel' : undefined}
-              label={`Open Jackalope helper${announce.length ? `, ${announce.length} unread notifications` : ''}. ${activity}`}
+              label={`Open Jackalope helper${announce.length ? `, ${announce.length} unread notifications` : ''}${proposals ? `, ${proposals} actions to review` : ''}. ${activity}`}
             />
-            {!!announce.length && (
+            {!!(announce.length + proposals) && (
               <span className="companion-badge" aria-hidden="true">
-                {announce.length > 99 ? '99+' : announce.length}
+                {announce.length + proposals > 99 ? '99+' : announce.length + proposals}
               </span>
             )}
           </div>
@@ -159,122 +171,150 @@ export function Companion({
         >
           <header className="companion-header">
             <div>
-              <h2>Here when you need me</h2>
+              <h2>Ask Jackalope</h2>
               <p>{activity}</p>
             </div>
             <Popover.Close className="quiet-icon" aria-label="Close Jackalope helper">
               <X size={18} />
             </Popover.Close>
           </header>
-          <button
-            type="button"
-            className="companion-feedback"
-            onClick={() => activate(() => setFeedbackOpen(true))}
-          >
-            <MessageSquare size={18} aria-hidden="true" />
-            <span>Send feedback</span>
-            <ArrowUpRight size={16} aria-hidden="true" />
-          </button>
-          <div className="companion-content">
-            <div className="companion-section-heading">
-              <h3>Notifications</h3>
-              {!!unread.length && (
-                <button type="button" onClick={() => markRead(unread.map((notice) => notice.id))}>
-                  <Check size={14} /> Mark all read
-                </button>
-              )}
-            </div>
-            {notices.length ? (
-              <ul className="companion-notices">
-                {notices.map((notice) => {
-                  const Icon =
-                    notice.kind === 'attention'
-                      ? CircleHelp
-                      : notice.kind === 'success'
-                        ? CircleCheck
-                        : Info;
-                  const isUnread = !readIds.includes(notice.id);
-                  return (
-                    <li key={notice.id} data-kind={notice.kind} data-unread={isUnread}>
-                      <Icon size={18} className="companion-notice-icon" aria-hidden="true" />
-                      <div className="companion-notice-body">
-                        <h4>
-                          {notice.title}
-                          {isUnread && <span className="companion-unread">Unread</span>}
-                        </h4>
-                        <p>{notice.detail}</p>
-                        <div className="companion-notice-actions">
-                          {notice.onOpen && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                markRead([notice.id]);
-                                activate(notice.onOpen as () => void);
-                              }}
-                            >
-                              {notice.actionLabel ?? 'View details'}
-                              <ArrowUpRight size={14} />
-                            </button>
-                          )}
-                          {isUnread && (
-                            <button
-                              type="button"
-                              aria-label={`Mark ${notice.title} as read`}
-                              onClick={() => markRead([notice.id])}
-                            >
-                              Mark read
-                            </button>
-                          )}
-                          {notice.onDismiss && (
-                            <button type="button" onClick={notice.onDismiss}>
-                              Dismiss
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <div className="companion-empty">
-                <CircleCheck size={22} aria-hidden="true" />
-                <p>Nothing needs your attention.</p>
-                <span>Questions, results and app updates will appear here.</span>
+          <nav className="helper-tabs" aria-label="Helper sections">
+            <button
+              type="button"
+              aria-pressed={section === 'ask'}
+              onClick={() => setSection('ask')}
+            >
+              Ask{proposals ? ` (${proposals})` : ''}
+            </button>
+            <button
+              type="button"
+              aria-pressed={section === 'activity'}
+              onClick={() => setSection('activity')}
+            >
+              Activity{unread.length ? ` (${unread.length})` : ''}
+            </button>
+          </nav>
+          {section === 'ask' ? (
+            <AskJackalope onNavigate={() => setOpen(false)} />
+          ) : (
+            <>
+              <button
+                type="button"
+                className="companion-feedback"
+                onClick={() => activate(() => setFeedbackOpen(true))}
+              >
+                <MessageSquare size={18} aria-hidden="true" />
+                <span>Send feedback</span>
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </button>
+              <div className="companion-content">
+                <div className="companion-section-heading">
+                  <h3>Notifications</h3>
+                  {!!unread.length && (
+                    <button
+                      type="button"
+                      onClick={() => markRead(unread.map((notice) => notice.id))}
+                    >
+                      <Check size={14} /> Mark all read
+                    </button>
+                  )}
+                </div>
+                {notices.length ? (
+                  <ul className="companion-notices">
+                    {notices.map((notice) => {
+                      const Icon =
+                        notice.kind === 'attention'
+                          ? CircleHelp
+                          : notice.kind === 'success'
+                            ? CircleCheck
+                            : Info;
+                      const isUnread = !readIds.includes(notice.id);
+                      return (
+                        <li key={notice.id} data-kind={notice.kind} data-unread={isUnread}>
+                          <Icon size={18} className="companion-notice-icon" aria-hidden="true" />
+                          <div className="companion-notice-body">
+                            <h4>
+                              {notice.title}
+                              {isUnread && <span className="companion-unread">Unread</span>}
+                            </h4>
+                            <p>{notice.detail}</p>
+                            <div className="companion-notice-actions">
+                              {notice.onOpen && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    markRead([notice.id]);
+                                    activate(notice.onOpen as () => void);
+                                  }}
+                                >
+                                  {notice.actionLabel ?? 'View details'}
+                                  <ArrowUpRight size={14} />
+                                </button>
+                              )}
+                              {isUnread && (
+                                <button
+                                  type="button"
+                                  aria-label={`Mark ${notice.title} as read`}
+                                  onClick={() => markRead([notice.id])}
+                                >
+                                  Mark read
+                                </button>
+                              )}
+                              {notice.onDismiss && (
+                                <button type="button" onClick={notice.onDismiss}>
+                                  Dismiss
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="companion-empty">
+                    <CircleCheck size={22} aria-hidden="true" />
+                    <p>Nothing needs your attention.</p>
+                    <span>Questions, results and app updates will appear here.</span>
+                  </div>
+                )}
+                {!!active.length && (
+                  <section className="companion-activity">
+                    <h3>{error ? 'Last known activity' : 'In progress'}</h3>
+                    <ul>
+                      {active.map((run) => (
+                        <li key={run.id}>
+                          <button
+                            type="button"
+                            onClick={() => activate(() => openCompanionTask(run))}
+                          >
+                            <span>
+                              {taskTitle(run.prompt)}
+                              <small>
+                                {run.projectName} ·{' '}
+                                {run.prompts?.some((prompt) => prompt.status === 'pending')
+                                  ? 'Waiting for your answer'
+                                  : statusLabel[run.status]}
+                              </small>
+                            </span>
+                            <ArrowUpRight size={16} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
               </div>
-            )}
-            {!!active.length && (
-              <section className="companion-activity">
-                <h3>{error ? 'Last known activity' : 'In progress'}</h3>
-                <ul>
-                  {active.map((run) => (
-                    <li key={run.id}>
-                      <button type="button" onClick={() => activate(() => openCompanionTask(run))}>
-                        <span>
-                          {taskTitle(run.prompt)}
-                          <small>
-                            {run.projectName} ·{' '}
-                            {run.prompts?.some((prompt) => prompt.status === 'pending')
-                              ? 'Waiting for your answer'
-                              : statusLabel[run.status]}
-                          </small>
-                        </span>
-                        <ArrowUpRight size={16} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </div>
-          <div className="companion-shortcuts">
-            <button type="button" onClick={() => activate(onSearch)}>
-              <Search size={16} /> Find anything
-            </button>
-            <button type="button" onClick={() => activate(onSettings)}>
-              <Settings2 size={16} /> Preferences
-            </button>
-          </div>
+              <div className="companion-shortcuts">
+                <button type="button" onClick={() => activate(onSearch)}>
+                  <Search size={16} /> Find anything
+                </button>
+                <button type="button" onClick={() => activate(onSettings)}>
+                  <Settings2 size={16} /> Preferences
+                </button>
+              </div>
+            </>
+          )}
         </Popover.Content>
       </Popover.Portal>
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />

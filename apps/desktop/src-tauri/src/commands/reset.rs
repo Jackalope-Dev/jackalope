@@ -91,6 +91,7 @@ pub async fn app_reset(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     scheduler.ensure_paused()?;
+    app.state::<super::helper::Helper>().ensure_idle()?;
     if confirmation != "RESET" {
         return Err("Type RESET to confirm.".into());
     }

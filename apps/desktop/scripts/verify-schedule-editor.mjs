@@ -8,8 +8,9 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mkdir('output/playwright', { recursive: true });
-  await page.goto('http://localhost:5173');
-  await page.getByRole('heading', { name: 'Set up Jackalope', exact: true }).waitFor();
+  await page.goto(process.env.JACKALOPE_TEST_URL ?? 'http://localhost:5173');
+  await page.getByRole('button', { name: 'Continue in development build', exact: true }).click();
+  await page.waitForTimeout(1500);
   await page.evaluate(async () => {
     const module = (name) =>
       import(
@@ -57,7 +58,7 @@ try {
     };
     useOnboardingStore.getState().finish();
   });
-  await page.getByRole('button', { name: /Schedule work/ }).click();
+  await page.getByRole('button', { name: 'Recurring', exact: true }).click();
   const loading = page.locator('.workspace-loading').filter({ hasText: 'Loading schedules…' });
   await loading.waitFor();
   assert.equal(await loading.locator('.workspace-loading-row').count(), 3);
@@ -157,6 +158,52 @@ try {
     },
   );
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Repeat schedule', exact: true }).click();
+  await page.getByRole('option', { name: 'Every few hours', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Hourly interval', exact: true }).click();
+  await page.getByRole('option', { name: 'Every 4 hours', exact: true }).click();
+  await page.locator('#schedule-minute').fill('17');
+  await page.getByRole('button', { name: 'Save schedule', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(
+    await page.evaluate(() => window.scheduleFixture.saved[0].expression),
+    '17 */4 * * *',
+  );
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  assert.equal(await page.locator('#schedule-minute').inputValue(), '17');
+  assert.match(
+    await page.getByRole('combobox', { name: 'Hourly interval', exact: true }).innerText(),
+    /Every 4 hours/,
+  );
+  assert.match(await dialog.innerText(), /Runs every 4 hours from 00:17/);
+  for (const width of [1280, 960]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    for (const isDark of [false, true]) {
+      await page.evaluate(async (isDark) => {
+        const { useThemeStore } = await import(
+          performance
+            .getEntriesByType('resource')
+            .find((r) => r.name.includes('/src/stores/themeStore.ts')).name
+        );
+        useThemeStore
+          .getState()
+          .setTheme({ ...useThemeStore.getState().currentTheme, appearance: 'manual', isDark });
+      }, isDark);
+      assert.ok(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth));
+      await page.screenshot({
+        path: `output/playwright/hourly-${width}-${isDark ? 'dark' : 'light'}.png`,
+      });
+    }
+  }
+  await page.getByRole('combobox', { name: 'Hourly interval', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  assert.equal(
+    await page
+      .getByRole('combobox', { name: 'Hourly interval', exact: true })
+      .evaluate((e) => e === document.activeElement),
+    true,
+  );
   await page.getByRole('combobox', { name: 'Repeat schedule', exact: true }).click();
   await page.getByRole('option', { name: 'Custom cron', exact: true }).click();
   await page.getByRole('textbox', { name: 'Cron expression', exact: true }).fill('*/15 * * * *');

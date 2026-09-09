@@ -34,9 +34,9 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Product guide',
     title: 'Parallel coding agents with one review workflow | Jackalope',
     description:
-      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees while Jackalope keeps project context, progress, and review together.',
+      'Run Codex, Claude Code, Grok, OpenCode, and Antigravity in parallel Git worktrees while Jackalope keeps project context, progress, and review together.',
     headline: 'Run coding agents in parallel. Keep the work coherent.',
-    lede: 'Jackalope is a desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, and OpenCode, following their progress, and reviewing the combined result before integration.',
+    lede: 'Jackalope is a desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, OpenCode, and Antigravity, following their progress, and reviewing the combined result before integration.',
     image: 'tasks',
     signals: [
       'Multiple agents',
@@ -58,7 +58,7 @@ export const marketingPages: MarketingPage[] = [
           'Each parallel task can receive its own Git worktree and branch, preventing two agents from editing the same checkout. Project instructions and relevant updates keep each agent informed about related work.',
         ],
         bullets: [
-          'Choose Codex, Claude Code, Grok, or OpenCode per task.',
+          'Choose Codex, Claude Code, Grok, OpenCode, or Antigravity per task.',
           'Keep task questions and follow-up attempts attached to the original outcome.',
           'Pause new tasks while active tasks continue.',
           'Inspect each result and the combined patch before changing the target branch.',
@@ -136,23 +136,23 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Agent compatibility',
     title: 'Supported AI coding agents | Jackalope',
     description:
-      'Compare Jackalope support for Codex, Claude Code, Grok, and OpenCode across tasks, project connections, accounts, continuation, and reported usage.',
+      'Compare Jackalope support for Codex, Claude Code, Grok, OpenCode, and Antigravity across tasks, project connections, accounts, continuation, and reported usage.',
     headline: 'Bring the coding agents you already use.',
     lede: 'Jackalope works around installed agent CLIs and their provider accounts. Choose an agent per task while keeping the brief, progress, changes, and review in one project workflow.',
     image: 'agents',
-    signals: ['Codex', 'Claude Code', 'Grok', 'OpenCode'],
+    signals: ['Codex', 'Claude Code', 'Grok', 'OpenCode', 'Antigravity'],
     sections: [
       {
         title: 'One workspace does not mean one provider.',
         paragraphs: [
           'Different tasks benefit from different agents, models, accounts, and tools. Jackalope keeps the task identity stable while allowing each new task to use the agent that fits the work.',
-          'Connect project tools directly to Codex and Claude Code. Grok and OpenCode can discover supported project tools on demand.',
+          'Connect project tools directly to Codex and Claude Code. Grok and Antigravity can discover supported project tools on demand. OpenCode uses tools configured in its own CLI; Jackalope project-tool delivery is not supported.',
         ],
       },
       {
         title: 'Tasks, accounts, and review in one place.',
         paragraphs: [
-          'All four agents support tasks, follow-ups, review, and account profiles. Usage appears when the agent reports it. Provider subscriptions, limits, permissions, and data policies still apply.',
+          'All five adapters support tasks, follow-ups, review, and reported usage. Antigravity runs as a worker; its named accounts use Gemini API keys with separate API billing. Its existing subscription login is shared, without isolated subscription profiles. Provider limits and permissions still apply.',
         ],
         bullets: [
           'Use named work and personal sign-in profiles for supported agents.',
@@ -164,7 +164,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Start with your existing setup.',
         paragraphs: [
-          'Install and sign in to Codex, Claude Code, Grok, or OpenCode, then choose your agent in Jackalope. You keep your existing provider account and permissions.',
+          'Install and sign in to Codex, Claude Code, Grok, OpenCode, or Antigravity, then choose your agent in Jackalope. You keep your existing provider account and permissions.',
         ],
       },
     ],
@@ -329,7 +329,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Add structure around the agent session.',
         paragraphs: [
           'Launch OpenCode for one task or assign it beside other agents in a plan. Jackalope owns the worktree and task lifecycle while OpenCode continues to use its own CLI configuration and permissions.',
-          'Choose project connections in Jackalope for on-demand tool discovery. Tools configured in OpenCode remain subject to its own CLI settings.',
+          'Jackalope does not currently deliver project-selected MCP connections or on-demand discovery to OpenCode. Configure tools in OpenCode itself; its CLI settings and permissions still apply.',
         ],
       },
       {
@@ -466,8 +466,14 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Context belongs to the project and the task.',
         paragraphs: [
-          'Save stable project guidance once, then decide what a new task should receive. You can inspect the instructions, history, lessons, and tools included with each task.',
+          'Save stable project guidance once. New tasks automatically match guidelines to your prompt and inherit project defaults. Under Customize task, review or override that selection; manual choices remain explicit until reset.',
           'Select the context relevant to the work. Your agent may also have tools configured outside Jackalope; review those in its CLI settings.',
+        ],
+      },
+      {
+        title: 'Explore the codebase map.',
+        paragraphs: [
+          'Open Project → Codebase to explore folders and resolved file dependencies. During review, impact inspection follows references back from changed files to help you choose related checks. The map has language and resolution limits; it is guidance, not proof that tests passed.',
         ],
       },
       {
@@ -485,7 +491,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Connect tools to the agents that use them.',
         paragraphs: [
-          'Codex and Claude Code support direct project connection delivery. Grok and OpenCode support on-demand tool discovery. See the agent guide for setup details.',
+          'Codex and Claude Code support direct project connection delivery. Grok and Antigravity support on-demand discovery. OpenCode uses its own CLI tool configuration. See the agent guide for setup details.',
         ],
       },
     ],
@@ -509,8 +515,14 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Set the schedule and the project.',
         paragraphs: [
-          'Choose the project, agent, account, execution target, timezone, and missed-run policy for recurring work. Each run keeps its result and history with the task.',
+          'Choose the project, agent, account, execution target, timezone, and missed-run policy. Use daily, weekday, weekly, hourly, or custom cron timing. New schedules start paused; review the settings before enabling them. Each run keeps its own result and history.',
           'New schedules begin paused. Jackalope does not wake a closed app or sleeping computer, and it does not silently replay interrupted dispatch after a restart.',
+        ],
+      },
+      {
+        title: 'Run only when something changes.',
+        paragraphs: [
+          'Watch committed content on a local branch or path. Choose to notify you or launch the saved task only after a change. The first check records a baseline; unchanged checks make no model calls. Monitors do not fetch remote branches or watch uncommitted edits.',
         ],
       },
       {

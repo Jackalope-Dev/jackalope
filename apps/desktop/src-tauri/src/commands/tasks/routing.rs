@@ -6,7 +6,7 @@ use crate::commands::{
 };
 use serde::{Deserialize, Serialize};
 
-mod process;
+pub(super) mod process;
 #[cfg(test)]
 mod tests;
 

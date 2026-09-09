@@ -508,6 +508,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 @radix-ui/react-select 2.3.7 (LICENSE)
 @radix-ui/react-slot 1.3.3 (LICENSE)
 @radix-ui/react-tabs 1.1.21 (LICENSE)
+@radix-ui/react-tooltip 1.2.16 (LICENSE)
 @radix-ui/react-use-callback-ref 1.1.4 (LICENSE)
 @radix-ui/react-use-controllable-state 1.2.6 (LICENSE)
 @radix-ui/react-use-effect-event 0.0.5 (LICENSE)

@@ -47,6 +47,9 @@ pub fn run() {
                 .unwrap_or(directory);
             let resetting = reset_on_startup(&directory)?;
             let runtime = TaskRuntime::new(directory.clone())?;
+            let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
+            helper.launch();
+            app.manage(helper);
             let preferences = directory.join("preferences");
             std::fs::create_dir_all(&preferences)?;
             app.manage(commands::account::AccountService::new(preferences.join("account.bin"), runtime.access.clone()));
@@ -86,6 +89,13 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::helper::helper_snapshot,
+            commands::helper::helper_sync,
+            commands::helper::helper_send,
+            commands::helper::helper_stop,
+            commands::helper::helper_new_conversation,
+            commands::helper::helper_action,
+            commands::helper::helper_connection,
             commands::execution_access::app_execution_access,
             commands::account::app_account_status,
             commands::account::settings_sync::app_settings_sync,
@@ -204,6 +214,7 @@ pub fn run() {
         .expect("error while building jackalope application")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+                app.state::<commands::helper::Helper>().stop();
                 app.state::<Scheduler>().shutdown();
                 app.state::<commands::notifications::Notifications>().shutdown();
                 commands::browser::close_all();

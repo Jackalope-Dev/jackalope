@@ -51,7 +51,7 @@ export const posts: BlogPost[] = [
       {
         title: '02. Set the project’s account and context.',
         paragraphs: [
-          'Open Project → Context. Choose the default task agent, restrict which agents are available for that project, and select an account for each supported agent. Pin Work for your client project and Personal for your own project instead of leaving both on “Whichever account is active.”',
+          'Open Project → Settings. Choose the default task agent, restrict which agents are available for that project, and select an account for each supported agent. Pin Work for your client project and Personal for your own project instead of leaving both on “Whichever account is active.”',
           'Add the project instructions and review the context included with a new task. Select the tools the task needs. Project-selected connections are additional to the agent’s existing configuration, so review any inherited provider or CLI-global tools too.',
         ],
       },
@@ -133,7 +133,7 @@ export const posts: BlogPost[] = [
         title: '02. Describe the outcome.',
         paragraphs: [
           'Open New task and describe what should be different when the work is done. For example: “Make search usable from the keyboard. Arrow keys should move through results, Enter should open the selected result, and Escape should close the list.”',
-          'Choose the agent and execution target. A separate worktree is useful when you want an experiment to have its own working directory. Save an idea for later when you are still shaping the brief.',
+          'Open Customize task to review automatic guidance, agent selection, and the execution target. A separate worktree is useful when you want an experiment to have its own working directory. Save an idea for later when you are still shaping the brief.',
         ],
       },
       {
@@ -168,7 +168,7 @@ export const pages: SitePage[] = [
     path: '/',
     title: 'Jackalope: Run AI coding agents in parallel',
     description:
-      'Run Codex, Claude Code, Grok, and OpenCode in parallel Git worktrees. Coordinate tasks, keep project context, and review code in one desktop workspace.',
+      'Run coding agents in parallel Git worktrees. Match project guidance, automate checks, explore code dependencies, and review changes in one desktop workspace.',
   },
   {
     path: '/tour/',

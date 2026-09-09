@@ -71,6 +71,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | @radix-ui/react-select | 2.3.7 | MIT |
 | @radix-ui/react-slot | 1.3.3 | MIT |
 | @radix-ui/react-tabs | 1.1.21 | MIT |
+| @radix-ui/react-tooltip | 1.2.16 | MIT |
 | @radix-ui/react-use-callback-ref | 1.1.4 | MIT |
 | @radix-ui/react-use-controllable-state | 1.2.6 | MIT |
 | @radix-ui/react-use-effect-event | 0.0.5 | MIT |

@@ -21,7 +21,7 @@ pub struct UsageObservation {
     pub output: u64,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]

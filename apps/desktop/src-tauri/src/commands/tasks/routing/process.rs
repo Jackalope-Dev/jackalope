@@ -1,7 +1,11 @@
 use super::*;
 use crate::commands::process_control::{read_bounded, ProcessTree};
 
-fn configure(cmd: &mut Command, adapter: &str, prompt_path: &Path) -> Result<(), String> {
+pub(in crate::commands::tasks) fn configure(
+    cmd: &mut Command,
+    adapter: &str,
+    prompt_path: &Path,
+) -> Result<(), String> {
     match adapter {
         "codex" => { cmd.args(["exec", "--disable", "shell_tool", "--disable", "apps", "--disable", "plugins", "--disable", "multi_agent", "--json", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}", "-c", "web_search=\"disabled\"", "-"]); }
         "claude" => { cmd.args(["--print", "--verbose", "--output-format", "stream-json", "--no-session-persistence", "--tools", "", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}", "--max-turns", "1"]); }

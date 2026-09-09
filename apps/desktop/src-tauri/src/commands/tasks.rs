@@ -1,5 +1,6 @@
 mod antigravity;
 mod events;
+pub(super) mod helper_process;
 mod models;
 mod project_setup;
 mod routing;
