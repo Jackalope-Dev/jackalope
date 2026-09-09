@@ -3,26 +3,6 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.comparison-page .acquisition-related {
-  border-radius: 18px;
-  padding: 20px;
-  max-height: calc(100dvh - 150px);
-  overflow-y: auto;
-}
-.comparison-page .acquisition-related a {
-  border: 0;
-  border-radius: 10px;
-  padding: 12px;
-  min-height: 44px;
-  align-items: center;
-}
-.comparison-page .acquisition-related a:hover,
-.comparison-page .acquisition-related a:focus-visible {
-  background: var(--color-bg);
-}
-.comparison-page .acquisition-related svg {
-  flex-shrink: 0;
-}
 .comparison-byline {
   margin-top: 20px;
   color: var(--color-text-secondary);
@@ -76,9 +56,4 @@
 .comparison-page :where(a, button, [tabindex]):focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 3px;
-}
-@media (max-width: 760px) {
-  .comparison-page .acquisition-related {
-    max-height: none;
-  }
 }

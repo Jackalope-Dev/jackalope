@@ -386,9 +386,12 @@
   position: sticky;
   top: 125px;
   align-self: start;
-  padding: 28px;
+  padding: 20px;
   border: 1px solid var(--color-border);
+  border-radius: 18px;
   background: var(--color-shell);
+  max-height: calc(100dvh - 150px);
+  overflow-y: auto;
 }
 .acquisition-related > p {
   color: var(--color-accent-ink);
@@ -396,12 +399,19 @@
 }
 .acquisition-related a {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 0;
-  border-top: 1px solid var(--color-border);
+  min-height: 44px;
+  padding: 12px;
+  border-radius: 10px;
+  outline-offset: 3px;
   font-size: 12px;
   line-height: 1.5;
+}
+.acquisition-related a:hover,
+.acquisition-related a:focus-visible {
+  background: var(--color-bg);
 }
 .acquisition-related > span {
   display: block;
@@ -524,6 +534,7 @@
   }
   .acquisition-related {
     position: static;
+    max-height: none;
   }
 }
 
