@@ -97,12 +97,6 @@
 .connection-resources small {
   margin-top: 5px;
 }
-.connection-map figcaption {
-  padding-block: 14px;
-  font-size: 11px;
-  line-height: 1.7;
-  color: var(--color-text-secondary);
-}
 .connected-strengths {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

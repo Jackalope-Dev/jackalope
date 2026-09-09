@@ -369,7 +369,6 @@ button:disabled {
     transparent
   );
   backdrop-filter: blur(16px);
-  box-shadow: var(--shadow-header-search);
 }
 .command-trigger.command-jump kbd {
   margin-left: auto;

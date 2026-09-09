@@ -278,7 +278,7 @@
 .landing-story .workbench [role="tabpanel"] :is(.agent-node, .trace-window, .layout-study) {
   animation: story-arrive 450ms ease-out both;
 }
-.landing-story .workbench [role="tabpanel"] :is(.result-poster, .finding-card, .idea-verdict) {
+.landing-story .workbench [role="tabpanel"] :is(.result-poster, .finding-card) {
   animation: story-arrive 600ms ease-out both;
 }
 @keyframes story-arrive {
@@ -615,7 +615,7 @@
   .landing-story
     .workbench
     [role="tabpanel"]
-    :is(.agent-node, .trace-window, .layout-study, .result-poster, .finding-card, .idea-verdict) {
+    :is(.agent-node, .trace-window, .layout-study, .result-poster, .finding-card) {
     animation: none;
   }
   .landing-story .hero-window,

@@ -1,4 +1,4 @@
-import { PRESET_THEMES, themeTokens } from '@jackalope/brand/tokens';
+import { EMAIL_COMPANY, EMAIL_FONT, EMAIL_PALETTE } from '@jackalope/brand/email';
 
 export type AccessMail = { to: string; kind: 'welcome' | 'invite' | 'login'; token: string };
 export type WaitlistMail = { to: string; kind: 'waitlist'; token?: string };
@@ -17,7 +17,6 @@ const escapeHtml = (value: string) =>
   );
 
 export function accessEmail(mail: Mail, origin: string) {
-  const colors = themeTokens({ ...PRESET_THEMES[0], isDark: false });
   const copy = {
     feedback_request: {
       subject: 'How is Jackalope working for you?',
@@ -129,9 +128,68 @@ export function accessEmail(mail: Mail, origin: string) {
     mail.kind === 'feedback_request'
       ? `You enabled a feedback follow-up in Jackalope. This is a one-time invitation, with no reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
       : footer;
-  const text = `${copy.title}\n\n${copy.intro}\n\n${copy.action}: ${link}\n\n${copy.detail}\n\n${expiry}\n\n${footer}\n\nJackalope Digital LLC · https://jackalope.digital\nPrivacy: ${origin}/privacy/`;
-  const ink = colors['--color-text-primary'];
-  const muted = colors['--color-text-secondary'];
-  const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.subject)}</title><style>@media(max-width:480px){.note-title{font-size:40px!important}.note-content{padding:24px 20px!important}}</style></head><body style="margin:0;background:${colors['--color-bg']};color:${ink};font-family:Arial,Helvetica,sans-serif"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${escapeHtml(copy.intro)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 0"><table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px"><tr><td class="note-content" style="padding:32px"><table role="presentation" width="100%"><tr><td style="padding-bottom:24px;border-bottom:2px solid ${ink};font-size:22px;font-weight:700">Jackalope</td><td align="right" style="padding-bottom:24px;border-bottom:2px solid ${ink}"><img src="${escapeHtml(origin)}/icon-128.png" width="40" height="40" alt="" style="display:block"></td></tr></table><h1 class="note-title" style="font-size:52px;line-height:1.05;letter-spacing:-2px;margin:36px 0 24px">${escapeHtml(copy.title)}</h1><p style="font-size:16px;line-height:1.8;color:${muted}">${escapeHtml(copy.intro)}</p><table role="presentation" width="100%" style="margin:28px 0;border:1px solid ${colors['--color-border']};border-left:4px solid ${colors['--color-accent']};border-radius:12px;background:${colors['--color-surface']}"><tr><td style="padding:22px"><p style="margin:0 0 20px;font-size:11px;letter-spacing:1.5px;color:${muted}">${escapeHtml(copy.stamp)}</p><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 18px;border-radius:8px;background:${colors['--color-accent']};color:${colors['--color-on-accent']};font-size:16px;font-weight:700;text-decoration:none">${escapeHtml(copy.action)} →</a></td></tr></table><p style="font-size:15px;line-height:1.8;color:${muted}">${escapeHtml(copy.detail)}</p>${expiry ? `<p style="font-size:12px;line-height:1.8;color:${muted}">${escapeHtml(expiry)} Keep this link private.</p>` : ''}<p style="margin:28px 0;font-size:15px;line-height:1.8">See you in there,<br><strong>Jackalope</strong></p><p style="padding-top:20px;border-top:1px solid ${colors['--color-border']};font-size:11px;line-height:1.8;color:${muted}">${footerHtml}<br><br>Jackalope Digital LLC · <a href="https://jackalope.digital" style="color:inherit">jackalope.digital</a> · <a href="${escapeHtml(origin)}/privacy/" style="color:inherit">Privacy</a></p></td></tr></table></td></tr></table></body></html>`;
-  return { subject: copy.subject, preview: copy.intro, text, body };
+  const address = EMAIL_COMPANY.postalAddress;
+  const text = `${copy.title}\n\n${copy.intro}\n\n${copy.action}: ${link}\n\n${copy.detail}\n\n${expiry}\n\n${footer}\n\n${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${origin}/privacy/`;
+  return {
+    subject: copy.subject,
+    preview: copy.intro,
+    text,
+    body: emailShell({
+      subject: copy.subject,
+      preheader: copy.intro,
+      origin,
+      content: `<h1 class="lead-title" style="margin:0 0 22px;font-size:44px;line-height:1.06;letter-spacing:-1.6px;font-weight:600;color:${c.ink}">${escapeHtml(copy.title)}</h1>
+<p style="margin:0;font-size:17px;line-height:1.75;color:${c.muted}">${escapeHtml(copy.intro)}</p>
+${callout(copy.stamp, copy.action, link)}
+<p style="margin:0;font-size:15px;line-height:1.8;color:${c.muted}">${escapeHtml(copy.detail)}</p>
+${expiry ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.7;color:${c.faint}">${escapeHtml(expiry)} Keep this link private.</p>` : ''}
+<p style="margin:30px 0 0;font-size:15px;line-height:1.8;color:${c.muted}">See you in there,<br><strong style="color:${c.ink}">Jackalope</strong></p>`,
+      footer: footerHtml,
+    }),
+  };
+}
+
+const c = EMAIL_PALETTE;
+
+/** The one action in a message, set in a stamped panel so it reads as the next step. */
+function callout(stamp: string, action: string, link: string) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0;border-collapse:separate;border:1px solid ${c.borderSubtle};border-left:3px solid ${c.accent};border-radius:12px;background:${c.panel}"><tr><td style="padding:24px">
+<p style="margin:0 0 18px;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${c.faint}">${escapeHtml(stamp)}</p>
+<a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 22px;border-radius:8px;background:${c.accent};color:${c.onAccent};font-size:16px;font-weight:600;line-height:1;text-decoration:none">${escapeHtml(action)} &rarr;</a>
+</td></tr></table>`;
+}
+
+/**
+ * Shared chrome for every Jackalope email: wordmark, rule, letter surface, footer.
+ * Broadcasts pass their own `content`, so a product note and an access link
+ * arrive looking like the same studio wrote them.
+ */
+export function emailShell({
+  subject,
+  preheader,
+  origin,
+  content,
+  footer,
+}: {
+  subject: string;
+  preheader: string;
+  origin: string;
+  content: string;
+  footer: string;
+}) {
+  const address = EMAIL_COMPANY.postalAddress;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"><title>${escapeHtml(subject)}</title><style>:root{color-scheme:light only}@media(max-width:480px){.lead-title{font-size:34px!important;letter-spacing:-1px!important}.letter{padding:28px 22px!important}}</style></head><body style="margin:0;padding:0;background:${c.bg};color:${c.ink};font-family:${EMAIL_FONT};-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${escapeHtml(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${c.bg}"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:separate;background:${c.surface};border:1px solid ${c.border};border-radius:16px">
+<tr><td class="letter" style="padding:40px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="padding-bottom:22px;border-bottom:1px solid ${c.border};font-size:19px;font-weight:700;letter-spacing:-.3px;color:${c.ink}">Jackalope</td>
+<td align="right" style="padding-bottom:22px;border-bottom:1px solid ${c.border}"><img src="${escapeHtml(origin)}/icon-128.png" width="34" height="34" alt="" style="display:block;border:0"></td>
+</tr></table>
+<div style="height:34px;line-height:34px">&nbsp;</div>
+${content}
+<p style="margin:32px 0 0;padding-top:22px;border-top:1px solid ${c.borderSubtle};font-size:12px;line-height:1.8;color:${c.faint}">${footer}<br><br>${escapeHtml(EMAIL_COMPANY.legalName)}${address ? ` &middot; ${escapeHtml(address)}` : ''} &middot; <a href="${EMAIL_COMPANY.companySite}" style="color:${c.faint};text-decoration:underline">jackalope.digital</a> &middot; <a href="${escapeHtml(origin)}/privacy/" style="color:${c.faint};text-decoration:underline">Privacy</a></p>
+</td></tr></table>
+</td></tr></table></body></html>`;
 }

@@ -18,23 +18,27 @@ export function ProjectPreferences({
   return (
     <section className={embedded ? 'project-preferences' : 'workspace-page project-preferences'}>
       {!embedded && <h1 className="text-2xl">Project settings</h1>}
-      {project && <p className="task-muted mt-2">{project.name}</p>}
+      {!embedded && project && <p className="task-muted mt-2">{project.name}</p>}
       {!project ? (
         <p className="settings-section-subtitle mt-4">
           Open a repository to configure project preferences.
         </p>
       ) : (
         <>
-          <div className="settings-group">
-            <Setting title="Project name">
+          <div className="project-workspace-fields project-identity-fields">
+            <div className="project-preference-field">
+              <label htmlFor="project-name">Project name</label>
               <input
+                id="project-name"
                 className="settings-input"
-                aria-label="Project name"
                 value={project.name}
                 onChange={(e) => updateProject(project.id, { name: e.target.value })}
               />
-            </Setting>
-            <Setting title="Repository path" description={project.path} />
+            </div>
+            <div className="project-preference-field">
+              <span className="project-field-label">Repository path</span>
+              <p className="project-repository-path">{project.path}</p>
+            </div>
           </div>
           {section === 'all' && (
             <>
@@ -49,17 +53,16 @@ export function ProjectPreferences({
             </>
           )}
           <section className="project-preferences-section">
-            <h2>Workspace and verification</h2>
+            <h2>Task instructions</h2>
             <div className="project-workspace-fields">
               <div className="project-preference-field">
-                <label className="block text-sm font-medium" htmlFor="project-instructions">
-                  Project instructions
-                </label>
-                <p className="settings-row-description mb-3">
+                <label htmlFor="project-instructions">Project instructions</label>
+                <p id="project-instructions-help" className="settings-row-description">
                   Appended to prompts launched from the task composer.
                 </p>
                 <textarea
                   id="project-instructions"
+                  aria-describedby="project-instructions-help"
                   className="settings-textarea"
                   rows={5}
                   value={project.preferences?.customInstructions ?? ''}
@@ -70,15 +73,19 @@ export function ProjectPreferences({
                   }
                 />
               </div>
+            </div>
+          </section>
+          <section className="project-preferences-section">
+            <h2>Workspace</h2>
+            <div className="project-workspace-fields">
               <div className="project-preference-field">
-                <label className="block text-sm font-medium mt-6" htmlFor="project-base-branch">
-                  Target branch
-                </label>
-                <p className="settings-row-description mb-3">
+                <label htmlFor="project-base-branch">Target branch</label>
+                <p id="project-base-branch-help" className="settings-row-description">
                   Starting branch for new tasks and their review.
                 </p>
                 <input
                   id="project-base-branch"
+                  aria-describedby="project-base-branch-help"
                   className="settings-input w-full"
                   value={project.preferences?.baseBranch ?? ''}
                   placeholder={project.gitBranch}
@@ -88,15 +95,14 @@ export function ProjectPreferences({
                 />
               </div>
               <div className="project-preference-field">
-                <label className="block text-sm font-medium mt-6" htmlFor="preparation-command">
-                  Workspace preparation
-                </label>
-                <p className="settings-row-description mb-3">
+                <label htmlFor="preparation-command">Workspace preparation</label>
+                <p id="preparation-command-help" className="settings-row-description">
                   Runs before new tasks, with your OS permissions. Five-minute limit; skipped for
                   continuations.
                 </p>
                 <input
                   id="preparation-command"
+                  aria-describedby="preparation-command-help"
                   className="settings-input w-full"
                   value={project.preferences?.prepareCommand ?? ''}
                   placeholder="pnpm install --frozen-lockfile"
@@ -105,15 +111,19 @@ export function ProjectPreferences({
                   }
                 />
               </div>
+            </div>
+          </section>
+          <section className="project-preferences-section">
+            <h2>Verification</h2>
+            <div className="project-workspace-fields">
               <div className="project-preference-field">
-                <label className="block text-sm font-medium mt-6" htmlFor="verification-command">
-                  Verification command
-                </label>
-                <p className="settings-row-description mb-3">
+                <label htmlFor="verification-command">Verification command</label>
+                <p id="verification-command-help" className="settings-row-description">
                   Runs with your OS permissions. Five-minute limit.
                 </p>
                 <input
                   id="verification-command"
+                  aria-describedby="verification-command-help"
                   className="settings-input w-full"
                   value={project.preferences?.verifyCommand ?? ''}
                   placeholder="pnpm build"

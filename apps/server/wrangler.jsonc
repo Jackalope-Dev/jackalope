@@ -34,7 +34,7 @@
     "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
     "ACCESS_INSTALLER_KEY": "",
     "ACCESS_STORE_URL": "",
-    "ACCESS_NEWSLETTER_FORM": ""
+    "ACCESS_AUDIENCE_LIST": ""
   },
   "d1_databases": [
     {
@@ -101,7 +101,7 @@
         "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
         "ACCESS_INSTALLER_KEY": "",
         "ACCESS_STORE_URL": "",
-        "ACCESS_NEWSLETTER_FORM": ""
+        "ACCESS_AUDIENCE_LIST": ""
       },
       "d1_databases": [
         {
@@ -183,7 +183,7 @@
         "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
         "ACCESS_INSTALLER_KEY": "",
         "ACCESS_STORE_URL": "",
-        "ACCESS_NEWSLETTER_FORM": ""
+        "ACCESS_AUDIENCE_LIST": ""
       },
       "d1_databases": [
         {

@@ -137,6 +137,13 @@ export function Shell({
         : null,
   );
   const [scheduleRunId, setScheduleRunId] = useState<string>();
+  const [composerFocus, setComposerFocus] = useState(0);
+  const focusComposer = useCallback(() => {
+    setCapture(null);
+    useExecutionStore.getState().select(null);
+    setActiveTab('kanban');
+    setComposerFocus((value) => value + 1);
+  }, []);
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
   const project = projects.find((item) => item.id === activeProjectId);
@@ -172,7 +179,7 @@ export function Shell({
         event.key.toLowerCase() === 'n'
       ) {
         event.preventDefault();
-        setCapture({});
+        focusComposer();
       } else if ((event.metaKey || event.ctrlKey) && event.key === ',') {
         event.preventDefault();
         setActiveTab((current) =>
@@ -182,7 +189,7 @@ export function Shell({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [focusComposer]);
 
   return (
     <div className="workspace-shell">
@@ -239,7 +246,7 @@ export function Shell({
               <button
                 type="button"
                 className="command-trigger"
-                onClick={() => setCapture({})}
+                onClick={focusComposer}
                 aria-label="Capture a task"
               >
                 <Plus size={16} />
@@ -349,8 +356,9 @@ export function Shell({
           <Suspense fallback={<LoadingState label={`Opening ${view.label}…`} />}>
             {activeTab === 'kanban' && (
               <TaskWorkspace
-                onOpenProject={openProjectSetup}
-                onCapture={(ideaId) => setCapture({ ideaId })}
+                composerVisible={!capture}
+                composerFocus={composerFocus}
+                onCapture={(ideaId) => (ideaId ? setCapture({ ideaId }) : focusComposer())}
                 onSchedule={(id) => {
                   const run = useExecutionStore.getState().runs.find((r) => r.id === id);
                   if (run) selectProject(run.projectId);
@@ -461,7 +469,7 @@ export function Shell({
             isOpen={commandsOpen}
             onClose={() => setCommandsOpen(false)}
             onNavigate={navigate}
-            onCapture={() => setCapture({})}
+            onCapture={focusComposer}
             onOpenSettings={() => setActiveTab('preferences')}
           />
         )}

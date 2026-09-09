@@ -10,6 +10,7 @@ import { effortPrompt } from '../../lib/task-effort';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
+import { useMascotStore } from '../../stores/mascotStore';
 import {
   agentAccountFor,
   isAgentAllowedForProject,
@@ -35,12 +36,14 @@ export function CaptureTask({
   draftKey,
   onClose,
   onStarted,
+  inline = false,
 }: {
   ideaId?: string;
   agent?: string;
   draftKey?: string;
   onClose: () => void;
   onStarted: () => void;
+  inline?: boolean;
 }) {
   const focus = useDialogFocus();
   const { projects, activeProjectId, selectProject } = useProjectStore();
@@ -134,8 +137,9 @@ export function CaptureTask({
   const desktop = isTauriEnvironment();
   useEffect(() => {
     // Freeze the suggested destination with the draft; navigation must not retarget it.
-    if (useExecutionStore.getState().drafts[key]?.projectId === undefined) draft(key, current);
-  }, [key, current, draft]);
+    if (!inline && useExecutionStore.getState().drafts[key]?.projectId === undefined)
+      draft(key, current);
+  }, [inline, key, current, draft]);
   useEffect(() => {
     if (!project || !desktop) return;
     let alive = true;
@@ -250,6 +254,224 @@ export function CaptureTask({
       setError(String(cause));
     }
   };
+  const content = (
+    <>
+      <TaskComposer
+        inline={inline}
+        workspaceSetup={project && <WorkspaceReadiness key={project.id} project={project} />}
+        setup={
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-3"
+            onClick={() => {
+              if (project) selectProject(project.id);
+              setToolsOpen(true);
+            }}
+          >
+            Agent & tool settings
+          </Button>
+        }
+        projectId={project?.id ?? ''}
+        projectPath={project?.path ?? ''}
+        executionReady={!!project}
+        context={
+          <>
+            <div className="capture-destination">
+              <label className="task-label" htmlFor="capture-project">
+                Project
+              </label>
+              <Select
+                id="capture-project"
+                aria-label="Task project"
+                disabled={submitting}
+                value={current.projectId || 'unassigned'}
+                onValueChange={(id) =>
+                  update({
+                    projectId: id === 'unassigned' ? '' : id,
+                    model: undefined,
+                    connectionIds: undefined,
+                    contextSelection: undefined,
+                  })
+                }
+              >
+                <SelectItem value="unassigned">Choose later · save an idea</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setSetupProject(activeProjectId);
+                  setSetup(true);
+                }}
+              >
+                <FolderOpen size={16} />
+                Open project
+              </Button>
+            </div>
+            {!project && (
+              <p className="task-muted mb-4">
+                {current.projectId
+                  ? 'Project unavailable. Choose another project.'
+                  : 'Choose a project to start, or save for later.'}
+              </p>
+            )}
+          </>
+        }
+        current={current}
+        models={models}
+        defaultModel={defaultModel}
+        automaticAgent={runners.find((r) => r.id === defaultAgent)?.name}
+        onSplitTask={project ? () => setSplitOpen(true) : undefined}
+        runner={runner}
+        allowedRunners={allowed}
+        submitting={submitting}
+        desktop={
+          desktop &&
+          !!project &&
+          loadedProject === `${project.id}:${toolRevision}` &&
+          !connectionError &&
+          !modelError &&
+          !toolError
+        }
+        activeSkills={skills}
+        suggestedSkills={detectSkillsFromPrompt(current.prompt).map((s) => s.id)}
+        projectInstructions={instructions}
+        finalPrompt={finalPrompt}
+        projectConnections={connections}
+        connectionIssues={connectionIssues}
+        editingIdea={!!idea}
+        toggleSkill={(id) =>
+          update({
+            skills: skills.includes(id) ? skills.filter((s) => s !== id) : [...skills, id],
+          })
+        }
+        onChange={update}
+        onLaunch={launch}
+        onSave={() => {
+          saveIdea();
+          clear();
+          if (inline) {
+            useMascotStore.getState().say('Idea saved for later.', 3500);
+            requestAnimationFrame(() => document.getElementById('task-intent')?.focus());
+          }
+          onClose();
+        }}
+      />
+      {idea && (
+        <details className="mt-4">
+          <summary>Idea details</summary>
+          <label className="task-label mt-4" htmlFor="capture-title">
+            Title
+          </label>
+          <input
+            id="capture-title"
+            className="task-input w-full"
+            value={current.title ?? ''}
+            maxLength={160}
+            onChange={(event) => update({ title: event.target.value })}
+          />
+          <label className="task-label mt-4" htmlFor="capture-stage">
+            Planning stage
+          </label>
+          <Select
+            id="capture-stage"
+            aria-label="Planning stage"
+            value={current.planningStatus ?? 'backlog'}
+            onValueChange={(status) => update({ planningStatus: status as TaskStatus })}
+          >
+            {Object.entries(ideaStageLabels).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </Select>
+          <ConfirmAction
+            title="Delete this idea?"
+            description="The planning record will be removed. Agent tasks and worktrees are kept."
+            onConfirm={() => {
+              useTaskStore.getState().deleteTask(idea.id);
+              clear();
+              onClose();
+            }}
+            trigger={
+              <Button variant="ghost" className="mt-4" disabled={submitting}>
+                Delete idea
+              </Button>
+            }
+          />
+        </details>
+      )}
+      {toolsOpen && (
+        <Suspense fallback={null}>
+          <TaskTools
+            onClose={() => {
+              setToolsOpen(false);
+              setLoadedProject(null);
+              setToolRevision((n) => n + 1);
+              if (desktop) void discover();
+            }}
+          />
+        </Suspense>
+      )}
+      {project && !runner?.available && (
+        <div className="task-notice mt-4">
+          <span>{runner?.detail || 'Connect an agent to start. You can save this idea now.'}</span>
+          <Button
+            variant="ghost"
+            disabled={!desktop || discovering}
+            onClick={() => void discover()}
+          >
+            {discovering ? 'Checking…' : 'Refresh agents'}
+          </Button>
+        </div>
+      )}
+      {connectionError && (
+        <Button variant="ghost" onClick={() => setToolRevision((n) => n + 1)}>
+          Retry loading connections
+        </Button>
+      )}
+      {(error || connectionError || modelError || toolError) && (
+        <p role="alert" className="task-error mt-4">
+          {error || connectionError || modelError || toolError}
+        </p>
+      )}
+      <ProjectSetup
+        open={setup}
+        onClose={() => {
+          setSetup(false);
+          const id = useProjectStore.getState().activeProjectId;
+          if (id && id !== setupProject)
+            update({
+              projectId: id,
+              model: undefined,
+              connectionIds: undefined,
+              contextSelection: undefined,
+            });
+        }}
+      />
+      {project && (
+        <MultiAgentSplitDialog
+          open={splitOpen}
+          onClose={() => setSplitOpen(false)}
+          goal={current.prompt}
+          project={project}
+          runners={allowed}
+          onImported={() => {
+            setSplitOpen(false);
+            clear();
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+  if (inline) return <div className="task-inline-capture">{content}</div>;
   return (
     <Dialog.Root
       open
@@ -283,215 +505,7 @@ export function CaptureTask({
           <Dialog.Description className="sr-only">
             Configure a task or save an idea.
           </Dialog.Description>
-          <TaskComposer
-            workspaceSetup={project && <WorkspaceReadiness key={project.id} project={project} />}
-            setup={
-              <Button
-                type="button"
-                variant="ghost"
-                className="mt-3"
-                onClick={() => {
-                  if (project) selectProject(project.id);
-                  setToolsOpen(true);
-                }}
-              >
-                Agent & tool settings
-              </Button>
-            }
-            projectId={project?.id ?? ''}
-            projectPath={project?.path ?? ''}
-            executionReady={!!project}
-            context={
-              <>
-                <div className="capture-destination">
-                  <label className="task-label" htmlFor="capture-project">
-                    Project
-                  </label>
-                  <Select
-                    id="capture-project"
-                    aria-label="Task project"
-                    disabled={submitting}
-                    value={current.projectId || 'unassigned'}
-                    onValueChange={(id) =>
-                      update({
-                        projectId: id === 'unassigned' ? '' : id,
-                        model: undefined,
-                        connectionIds: undefined,
-                        contextSelection: undefined,
-                      })
-                    }
-                  >
-                    <SelectItem value="unassigned">Choose later · save an idea</SelectItem>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setSetupProject(activeProjectId);
-                      setSetup(true);
-                    }}
-                  >
-                    <FolderOpen size={16} />
-                    Open project
-                  </Button>
-                </div>
-                {!project && (
-                  <p className="task-muted mb-4">
-                    {current.projectId
-                      ? 'Project unavailable. Choose another project.'
-                      : 'Choose a project to start, or save for later.'}
-                  </p>
-                )}
-              </>
-            }
-            current={current}
-            models={models}
-            defaultModel={defaultModel}
-            automaticAgent={runners.find((r) => r.id === defaultAgent)?.name}
-            onSplitTask={project ? () => setSplitOpen(true) : undefined}
-            runner={runner}
-            allowedRunners={allowed}
-            submitting={submitting}
-            desktop={
-              desktop &&
-              !!project &&
-              loadedProject === `${project.id}:${toolRevision}` &&
-              !connectionError &&
-              !modelError &&
-              !toolError
-            }
-            activeSkills={skills}
-            suggestedSkills={detectSkillsFromPrompt(current.prompt).map((s) => s.id)}
-            projectInstructions={instructions}
-            finalPrompt={finalPrompt}
-            projectConnections={connections}
-            connectionIssues={connectionIssues}
-            editingIdea={!!idea}
-            toggleSkill={(id) =>
-              update({
-                skills: skills.includes(id) ? skills.filter((s) => s !== id) : [...skills, id],
-              })
-            }
-            onChange={update}
-            onLaunch={launch}
-            onSave={() => {
-              saveIdea();
-              clear();
-              onClose();
-            }}
-          />
-          {idea && (
-            <details className="mt-4">
-              <summary>Idea details</summary>
-              <label className="task-label mt-4" htmlFor="capture-title">
-                Title
-              </label>
-              <input
-                id="capture-title"
-                className="task-input w-full"
-                value={current.title ?? ''}
-                maxLength={160}
-                onChange={(event) => update({ title: event.target.value })}
-              />
-              <label className="task-label mt-4" htmlFor="capture-stage">
-                Planning stage
-              </label>
-              <Select
-                id="capture-stage"
-                aria-label="Planning stage"
-                value={current.planningStatus ?? 'backlog'}
-                onValueChange={(status) => update({ planningStatus: status as TaskStatus })}
-              >
-                {Object.entries(ideaStageLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </Select>
-              <ConfirmAction
-                title="Delete this idea?"
-                description="The planning record will be removed. Agent tasks and worktrees are kept."
-                onConfirm={() => {
-                  useTaskStore.getState().deleteTask(idea.id);
-                  clear();
-                  onClose();
-                }}
-                trigger={
-                  <Button variant="ghost" className="mt-4" disabled={submitting}>
-                    Delete idea
-                  </Button>
-                }
-              />
-            </details>
-          )}
-          {toolsOpen && (
-            <Suspense fallback={null}>
-              <TaskTools
-                onClose={() => {
-                  setToolsOpen(false);
-                  setLoadedProject(null);
-                  setToolRevision((n) => n + 1);
-                  if (desktop) void discover();
-                }}
-              />
-            </Suspense>
-          )}
-          {project && !runner?.available && (
-            <div className="task-notice mt-4">
-              <span>
-                {runner?.detail || 'Connect an agent to start. You can save this idea now.'}
-              </span>
-              <Button
-                variant="ghost"
-                disabled={!desktop || discovering}
-                onClick={() => void discover()}
-              >
-                {discovering ? 'Checking…' : 'Refresh agents'}
-              </Button>
-            </div>
-          )}
-          {connectionError && (
-            <Button variant="ghost" onClick={() => setToolRevision((n) => n + 1)}>
-              Retry loading connections
-            </Button>
-          )}
-          {(error || connectionError || modelError || toolError) && (
-            <p role="alert" className="task-error mt-4">
-              {error || connectionError || modelError || toolError}
-            </p>
-          )}
-          <ProjectSetup
-            open={setup}
-            onClose={() => {
-              setSetup(false);
-              const id = useProjectStore.getState().activeProjectId;
-              if (id && id !== setupProject)
-                update({
-                  projectId: id,
-                  model: undefined,
-                  connectionIds: undefined,
-                  contextSelection: undefined,
-                });
-            }}
-          />
-          {project && (
-            <MultiAgentSplitDialog
-              open={splitOpen}
-              onClose={() => setSplitOpen(false)}
-              goal={current.prompt}
-              project={project}
-              runners={allowed}
-              onImported={() => {
-                clear();
-                onClose();
-              }}
-            />
-          )}
+          {content}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

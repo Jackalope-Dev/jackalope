@@ -3,13 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
-import { type MascotMood, useMascotStore } from '../../stores/mascotStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
-import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ProjectPreferences } from '../projects/ProjectPreferences';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
@@ -71,8 +69,6 @@ export function SettingsPage({
     scope === 'project'
       ? categories.filter((c) => ['Project', 'Appearance', 'Agents'].includes(c))
       : categories.filter((c) => c !== 'Project');
-  const { pet } = useMascotStore();
-  const [previewMood, setPreviewMood] = useState<MascotMood>('idle');
   const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
   );
@@ -96,7 +92,7 @@ export function SettingsPage({
         Diagnostics: 'activity log routing events errors codebase',
         General:
           'window close exit system tray background quit minimize guided setup onboarding notifications companion animations quiet',
-        Appearance: 'theme color light dark atmosphere mascot companion moods reactions',
+        Appearance: 'theme color light dark atmosphere picker toolbar',
         Agents: 'default models allowed restrict manual cli command executable configuration',
         Privacy: 'marketplace MCP network telemetry crash reporting',
         Project: 'repository name path agent instructions verification command',
@@ -294,32 +290,6 @@ export function SettingsPage({
                       projectId={scope === 'project' ? project?.id : undefined}
                     />
                   )}
-                  <div className="settings-companion-box mt-6">
-                    <div className="settings-companion-avatar">
-                      <JackalopeMascot size="md" overrideMood={previewMood} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">Companion preview</p>
-                      <div className="settings-mood-chips">
-                        {(['idle', 'thinking', 'working', 'success', 'sleep'] as MascotMood[]).map(
-                          (m) => (
-                            <button
-                              key={m}
-                              type="button"
-                              aria-pressed={previewMood === m}
-                              className={`settings-mood-chip ${previewMood === m ? 'is-active' : ''}`}
-                              onClick={() => setPreviewMood(m)}
-                            >
-                              {m}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={pet}>
-                        Pet companion
-                      </Button>
-                    </div>
-                  </div>
                 </>
               )}
               {c === 'Agents' && (scope === 'app' || project) && (

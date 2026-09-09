@@ -52,7 +52,7 @@
 .task-composer:focus-within {
   border-color: var(--color-accent-ink);
 }
-.task-composer textarea {
+.task-composer .composer-intent {
   display: block;
   padding: 25px 26px 12px;
   width: 100%;
@@ -64,7 +64,7 @@
   min-height: 144px;
   max-height: 340px;
 }
-.task-composer textarea::placeholder {
+.task-composer .composer-intent::placeholder {
   color: var(--color-text-muted);
 }
 .task-composer-footer {

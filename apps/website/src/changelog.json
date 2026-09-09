@@ -1,5 +1,52 @@
 [
   {
+    "id": "more-room-for-task-details",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "More room for task details.",
+    "description": "Expanded task controls have clearer spacing and more consistent field sizes.",
+    "items": [
+      "Separate workflow labels and inputs, space context sections consistently and keep guideline cards from stretching with their neighbors.",
+      "Keep the large prompt style on task intent, with normal sizing for workflow fields."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
+    "id": "tidier-project-preferences",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Tidier project preferences.",
+    "description": "Project settings are easier to scan and appearance settings have more breathing room.",
+    "items": [
+      "Align project fields in a consistent column, grouped into instructions, workspace and verification.",
+      "Add spacing before the project theme picker and remove companion previews from appearance settings."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
+    "id": "a-flatter-command-shortcut",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A flatter command shortcut.",
+    "description": "The top-bar Jump to control fits more quietly into the workspace.",
+    "items": [
+      "Removed the inset shadow from the Jump to search control."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
+    "id": "start-with-what-you-want-to-do",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Start with what you want to do.",
+    "description": "Create and dispatch tasks directly from the Tasks page.",
+    "items": [
+      "A large inline composer puts your intent, project and start action first, with compact effort and configuration controls.",
+      "Keep drafts, save ideas for later and find existing work below the composer. New task shortcuts focus the prompt directly."
+    ],
+    "note": "In development. Included in the next desktop release."
+  },
+  {
     "id": "clearer-helper-bubbles",
     "date": "2026-09-09",
     "status": "In development",

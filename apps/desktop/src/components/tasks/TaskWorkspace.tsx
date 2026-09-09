@@ -1,17 +1,7 @@
 import { LoadingState } from '../ui/LoadingState';
 import './core-workflow.css';
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import {
-  ArrowUpRight,
-  Bot,
-  CalendarClock,
-  FolderOpen,
-  MoreHorizontal,
-  Network,
-  Plug,
-  Plus,
-  Workflow,
-} from 'lucide-react';
+import { FolderOpen, MoreHorizontal, Workflow } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
 import { collectWork } from '../../lib/task-collection';
@@ -19,10 +9,10 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
+import { CaptureTask } from './CaptureTask';
 import { ProjectQueue } from './ProjectQueue';
 import { ProjectReturn } from './ProjectReturn';
 import { TaskCollection, type TaskCollectionView } from './TaskCollection';
@@ -31,17 +21,29 @@ import { TaskDetail } from './TaskDetail';
 export function TaskWorkspace({
   onCapture,
   onSchedule,
-  onOpenProject,
+  composerVisible = true,
+  composerFocus = 0,
 }: {
   onCapture: (ideaId?: string) => void;
   onSchedule: (runId: string) => void;
-  onOpenProject: () => void;
+  composerVisible?: boolean;
+  composerFocus?: number;
 }) {
   const { projects, activeProjectId } = useProjectStore();
   const { runs, runners, selectedId, select, loading, error } = useExecutionStore();
   const ideas = useTaskStore((state) => state.tasks);
   const [projectFilter, setProjectFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
+  useEffect(() => {
+    if (!composerFocus) return;
+    setParallel(false);
+    const frame = requestAnimationFrame(() => {
+      const input = document.getElementById('task-intent');
+      input?.focus();
+      input?.scrollIntoView({ block: 'center' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [composerFocus]);
   const [view, setView] = useState<TaskCollectionView>({
     filter: 'all',
     layout: 'list',
@@ -104,23 +106,20 @@ export function TaskWorkspace({
     <section className="task-page task-home">
       <div className="task-introduction workspace-section-heading">
         <div>
-          <h1 className="task-hero-title">Tasks</h1>
+          <h1 className="task-hero-title">What do you want to accomplish?</h1>
+          <p className="task-muted mt-3">Describe what to build, fix, or explore.</p>
           {!!(needsInput || ready) && (
-            <p className="task-muted mt-3">
+            <a className="task-attention-link" href="#task-work">
               {[
                 needsInput ? `${needsInput} ${needsInput === 1 ? 'needs' : 'need'} attention` : '',
                 ready ? `${ready} ready to review` : '',
               ]
                 .filter(Boolean)
                 .join(' · ')}
-            </p>
+            </a>
           )}
         </div>
         <div className="task-home-actions">
-          <Button onClick={() => onCapture()}>
-            <Plus size={18} />
-            New task
-          </Button>
           {project && (
             <Menu.Root>
               <Menu.Trigger asChild>
@@ -145,6 +144,12 @@ export function TaskWorkspace({
           )}
         </div>
       </div>
+      {composerVisible && <CaptureTask inline onClose={() => {}} onStarted={() => {}} />}
+      {(runs.length > 0 || ideas.length > 0) && (
+        <h2 id="task-work" className="task-work-heading">
+          Your work
+        </h2>
+      )}
       {project && (
         <ProjectReturn
           key={project.id}
@@ -198,58 +203,6 @@ export function TaskWorkspace({
             else if (item.idea) onCapture(item.idea.id);
           }}
         />
-      ) : !loading && !error ? (
-        <div className="task-welcome">
-          <div className="task-welcome-intro">
-            <h2>What will you build next?</h2>
-            <p className="task-muted">Give Jackalope something to build, fix, or explore.</p>
-            <Button onClick={() => onCapture()}>
-              <Plus size={18} />
-              Start a task
-            </Button>
-          </div>
-          <nav className="task-welcome-links" aria-label="Get started">
-            <button
-              type="button"
-              onClick={() => (project ? navigateWorkspace('topology') : onOpenProject())}
-            >
-              {project ? <Network size={20} /> : <FolderOpen size={20} />}
-              <span>
-                <strong>{project ? 'Explore your codebase' : 'Add a project'}</strong>
-                <small>
-                  {project
-                    ? 'See how files and dependencies fit together.'
-                    : 'Choose a repository or start something new.'}
-                </small>
-              </span>
-              <ArrowUpRight size={16} />
-            </button>
-            <button type="button" onClick={() => navigateWorkspace('agents')}>
-              <Bot size={20} />
-              <span>
-                <strong>Choose your agents</strong>
-                <small>Manage the agents and accounts you work with.</small>
-              </span>
-              <ArrowUpRight size={16} />
-            </button>
-            <button type="button" onClick={() => navigateWorkspace('mcps')}>
-              <Plug size={20} />
-              <span>
-                <strong>Connect your tools</strong>
-                <small>Give agents access to the services you use.</small>
-              </span>
-              <ArrowUpRight size={16} />
-            </button>
-            <button type="button" onClick={() => navigateWorkspace('schedules')}>
-              <CalendarClock size={20} />
-              <span>
-                <strong>Schedule work</strong>
-                <small>Make room for tasks that repeat.</small>
-              </span>
-              <ArrowUpRight size={16} />
-            </button>
-          </nav>
-        </div>
       ) : null}
     </section>
   );

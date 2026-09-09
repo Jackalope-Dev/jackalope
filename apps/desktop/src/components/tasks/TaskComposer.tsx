@@ -24,6 +24,7 @@ import { TaskContextPanel } from './TaskContextPanel';
 import './task-composer.css';
 
 interface Props {
+  inline?: boolean;
   context?: ReactNode;
   setup?: ReactNode;
   workspaceSetup?: ReactNode;
@@ -57,6 +58,7 @@ interface Props {
 const effortIcons = [Zap, Layers, ShieldCheck];
 
 export function TaskComposer({
+  inline = false,
   context,
   setup,
   workspaceSetup,
@@ -119,6 +121,19 @@ export function TaskComposer({
       value: `${toolCount} project ${toolCount === 1 ? 'tool' : 'tools'}`,
     },
   ];
+  const outcomes = (
+    <>
+      <OutcomeEditor
+        values={current.contextSelection?.outcomes ?? []}
+        onChange={(outcomes) =>
+          onChange({ contextSelection: { ...current.contextSelection, outcomes } })
+        }
+      />
+      <p className="task-muted mb-4">
+        Added requirements need your evidence review before review or integration.
+      </p>
+    </>
+  );
   return (
     <>
       <form
@@ -136,10 +151,11 @@ export function TaskComposer({
           </label>
           <textarea
             id="task-intent"
+            className="composer-intent"
             value={current.prompt}
             onChange={(event) => onChange({ prompt: event.target.value })}
             placeholder="Describe a change, investigate a problem, or explore an idea…"
-            rows={3}
+            rows={inline ? 4 : 3}
             maxLength={24000}
             onKeyDown={(event) => {
               if (
@@ -164,9 +180,7 @@ export function TaskComposer({
               style={{ '--effort-position': `${effortIndex * 50}%` } as CSSProperties}
             >
               <div className="composer-section-heading">
-                <label id="effort-label" htmlFor="task-effort">
-                  Level of effort
-                </label>
+                <span id="effort-label">Level of effort</span>
                 <span>More depth, more time & usage</span>
               </div>
               <div className="composer-effort-choices">
@@ -177,6 +191,7 @@ export function TaskComposer({
                       key={option.id}
                       type="button"
                       aria-pressed={effort.id === option.id}
+                      title={option.description}
                       onClick={() => onChange({ effort: option.id })}
                     >
                       <Icon size={18} aria-hidden="true" />
@@ -186,20 +201,23 @@ export function TaskComposer({
                   );
                 })}
               </div>
-              <input
-                id="task-effort"
-                className="composer-effort-slider"
-                type="range"
-                min={0}
-                max={2}
-                step={1}
-                value={effortIndex}
-                aria-valuetext={`${effort.name}: ${effort.description}`}
-                aria-describedby="effort-description"
-                onChange={(event) =>
-                  onChange({ effort: taskEfforts[Number(event.target.value)].id })
-                }
-              />
+              {!inline && (
+                <input
+                  id="task-effort"
+                  aria-labelledby="effort-label"
+                  className="composer-effort-slider"
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={1}
+                  value={effortIndex}
+                  aria-valuetext={`${effort.name}: ${effort.description}`}
+                  aria-describedby="effort-description"
+                  onChange={(event) =>
+                    onChange({ effort: taskEfforts[Number(event.target.value)].id })
+                  }
+                />
+              )}
               <p id="effort-description" className="composer-effort-description" aria-live="polite">
                 {effort.description}
               </p>
@@ -394,18 +412,31 @@ export function TaskComposer({
               {(id === 'agent' || id === 'tools') && setup}
             </section>
           ))}
-          <OutcomeEditor
-            values={current.contextSelection?.outcomes ?? []}
-            onChange={(outcomes) =>
-              onChange({ contextSelection: { ...current.contextSelection, outcomes } })
-            }
-          />
-          <p className="task-muted mb-4">
-            Optional. Added requirements need your evidence review before review or integration.
-          </p>
+          {inline ? (
+            <details className="composer-outcomes">
+              <summary>
+                Requirements
+                {current.contextSelection?.outcomes?.length
+                  ? ` · ${current.contextSelection.outcomes.length}`
+                  : ' · optional'}
+              </summary>
+              {outcomes}
+            </details>
+          ) : (
+            outcomes
+          )}
         </fieldset>
       </form>
       <div className="task-composer-footer">
+        {inline && (
+          <span className="composer-dispatch-note">
+            {executionReady
+              ? current.isolated
+                ? 'Runs in a separate worktree'
+                : 'Edits your current checkout'
+              : 'Save an idea now. Choose a project when you’re ready.'}
+          </span>
+        )}
         <div className="flex flex-wrap gap-2">
           {onSplitTask && current.prompt.trim().length > 25 && (
             <Button type="button" variant="outline" disabled={submitting} onClick={onSplitTask}>

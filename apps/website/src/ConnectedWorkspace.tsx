@@ -100,10 +100,6 @@ export function ConnectedWorkspace() {
             </div>
           </div>
         </div>
-        <figcaption>
-          Illustrated project setup: choose the accounts and agents, connect tools, and share
-          project context.
-        </figcaption>
       </figure>
       <div className="connected-strengths">
         {strengths.map(({ icon: Icon, title, description, href, link }) => (

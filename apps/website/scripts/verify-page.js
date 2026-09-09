@@ -66,12 +66,12 @@ async function _verifyPage(page) {
     for (const [label, task, file] of [
       ['Build a feature', 'Build keyboard search', 'Search.tsx'],
       ['Find a stubborn bug', 'Investigate lost drafts', 'TaskComposer.tsx'],
-      ['Explore a new direction', 'Explore navigation', 'Navigation.tsx'],
+      ['Explore a new direction', 'Explore navigation'],
     ]) {
       await page.getByRole('tab', { name: label }).click();
       const panel = page.getByRole('tabpanel', { name: label });
       await panel.getByText(task, { exact: true }).waitFor();
-      await panel.getByText(file, { exact: false }).waitFor();
+      if (file) await panel.getByText(file, { exact: false }).waitFor();
       assert(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         `Use case overflow at ${width}: ${label}`,

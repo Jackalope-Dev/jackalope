@@ -15,7 +15,6 @@ import {
   Plug,
   Plus,
   ScanSearch,
-  Sparkles,
   Sun,
   Users,
 } from 'lucide-react';
@@ -100,9 +99,7 @@ const examples = [
     prompt: 'Try a simpler navigation and a new settings layout.',
     tasks: ['Explore navigation', 'Rethink settings'],
     agents: ['OpenCode', 'Grok'],
-    outcome: 'Keep what works. Iterate on the rest.',
     context: 'Design brief + project instructions',
-    file: 'Navigation.tsx',
     diff: '+ <ProjectNavigation />\n+ <QuickActions />',
   },
 ];
@@ -227,15 +224,7 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
             <span />
           </div>
         </div>
-        <div className="idea-verdict">
-          <Sparkles size={17} />
-          <span>
-            <small>COMPARE</small>
-            <b>{item.file}</b>
-          </span>
-        </div>
       </div>
-      <p className="case-outcome">{item.outcome}</p>
     </div>
   );
 }

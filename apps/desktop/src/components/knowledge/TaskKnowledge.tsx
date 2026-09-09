@@ -5,6 +5,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
+import './task-knowledge.css';
 
 export function TaskKnowledge({
   projectId,
@@ -56,13 +57,13 @@ export function TaskKnowledge({
   const Container = embedded ? 'section' : 'details';
   const Heading = embedded ? 'div' : 'summary';
   return (
-    <Container className="my-3">
-      <Heading className="min-h-11 py-3">
+    <Container className="task-knowledge">
+      <Heading className="task-knowledge-heading">
         Saved project context{receipt ? ` · ${receipt.entries.length} included` : ''}
       </Heading>
-      <div className="space-y-3">
-        <label className="block" htmlFor="task-workflow">
-          Workflow
+      <div className="task-knowledge-body">
+        <label className="task-knowledge-field" htmlFor="task-workflow">
+          <span>Workflow</span>
           <Select
             id="task-workflow"
             aria-label="Workflow"
@@ -85,8 +86,8 @@ export function TaskKnowledge({
           </Select>
         </label>
         {workflow?.process?.inputs.map((name, index) => (
-          <label key={name} className="block" htmlFor={`workflow-input-${index}`}>
-            {name}
+          <label key={name} className="task-knowledge-field" htmlFor={`workflow-input-${index}`}>
+            <span>{name}</span>
             <textarea
               id={`workflow-input-${index}`}
               className="task-input w-full"
