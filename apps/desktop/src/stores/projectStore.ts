@@ -1,9 +1,12 @@
+import type { ThemePalette } from '@jackalope/brand/theme';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { createWorktree, listWorktrees, type WorktreeEntry } from '../lib/tauri-bridge.ts';
 
 export interface ProjectPreferences {
   preferredRunner?: string;
+  theme?: ThemePalette;
+  disabledAccounts?: Record<string, string[]>;
   /**
    * Undefined allows every app-enabled agent. An explicit list restricts tasks
    * to those agent IDs; an empty list blocks launches.

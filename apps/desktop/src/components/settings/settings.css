@@ -650,3 +650,29 @@
     width: auto;
   }
 }
+
+.settings-scope-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 8px 0 24px; }
+.settings-scope-bar .task-select-trigger { max-width: 280px; }
+.settings-scope-pill { min-height: 44px; }
+.settings-scope-bar p { flex-basis: 100%; font-size: var(--text-xs); }
+.agent-preferences { display: grid; gap: 20px; min-width: 0; }
+.agent-preferences-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; align-items: start; }
+.agent-preference-card { min-width: 0; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); padding: 16px 20px; }
+.agent-preference-heading, .agent-account-permission { display: flex; gap: 16px; justify-content: space-between; align-items: center; }
+.agent-preference-heading h3 { font-size: var(--text-base); font-weight: 600; }
+.agent-preference-heading > div, .agent-account-permission > span { min-width: 0; overflow-wrap: anywhere; }
+.agent-preference-accounts { display: grid; gap: 8px; margin-top: 12px; border-top: 1px solid var(--color-border-subtle); padding-top: 16px; }
+.agent-account-permission { font-size: var(--text-sm); min-height: 44px; }
+.agent-account-permission small { display: block; color: var(--color-text-muted); }
+.project-preferences { min-width: 0; }
+.project-preferences-section { margin-top: 28px; }
+.project-preferences-section > h2 { font-size: var(--text-lg); font-weight: 600; margin-bottom: 16px; }
+.project-workspace-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.project-preference-field:first-child { grid-column: 1 / -1; }
+.project-preference-field .settings-input { width: 100%; }
+.project-preference-field > label { margin-top: 0; }
+.project-preferences .settings-row-info, .agent-preferences .settings-row-info { min-width: 0; flex: 1; }
+.project-preferences .settings-row-description { overflow-wrap: anywhere; }
+.project-preferences .settings-control-wrapper, .agent-preferences .settings-control-wrapper { min-width: 0; max-width: 55%; }
+.settings-content .activity-log { padding: 0; max-width: none; }
+@media (max-width: 800px) { .project-workspace-fields { grid-template-columns: minmax(0, 1fr); } }

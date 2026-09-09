@@ -315,6 +315,14 @@ impl TaskRuntime {
         }
         let mut cmd = command(executable);
         if let Some(binding) = &req.account_binding {
+            if !self
+                .policy()?
+                .account_allowed(&req.project_id, &req.agent, binding)
+            {
+                return Err(
+                    "This account is disabled in Settings. Choose an enabled account.".into(),
+                );
+            }
             crate::commands::agent_profiles::validate_binding(&self.profiles_root(), binding)?;
         }
         if crate::commands::agent_profiles::env_var_for(&adapter).is_some() {
@@ -855,6 +863,15 @@ impl TaskRuntime {
                     request.agent_profile_id.as_deref(),
                 )?
             };
+            if request.agent != "auto"
+                && !self
+                    .policy()?
+                    .account_allowed(&request.project_id, &request.agent, &binding)
+            {
+                return Err(
+                    "This account is disabled in Settings. Choose an enabled account.".into(),
+                );
+            }
             request.target_branch = Some(if let Some(old) = &previous {
                 old.target_branch.clone().unwrap_or_else(|| "master".into())
             } else {

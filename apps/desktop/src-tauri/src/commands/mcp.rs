@@ -32,6 +32,10 @@ pub struct McpServerConfig {
     #[serde(default)]
     pub discovery: bool,
     #[serde(default)]
+    pub managed: bool,
+    #[serde(default)]
+    pub agents: Option<Vec<String>>,
+    #[serde(default)]
     pub extra: serde_json::Map<String, Value>,
 }
 
@@ -140,6 +144,8 @@ fn parse_server_spec(id: &str, spec: &Value, scope: &str) -> McpServerConfig {
         "transport",
         "name",
         "jackalopeDiscovery",
+        "jackalopeManaged",
+        "jackalopeAgents",
     ] {
         extra.remove(key);
     }
@@ -163,6 +169,8 @@ fn parse_server_spec(id: &str, spec: &Value, scope: &str) -> McpServerConfig {
         description: spec["description"].as_str().map(str::to_string),
         enabled: Some(spec["enabled"].as_bool().unwrap_or(true)),
         discovery: spec["jackalopeDiscovery"].as_bool().unwrap_or(false),
+        managed: spec["jackalopeManaged"].as_bool().unwrap_or(false),
+        agents: serde_json::from_value(spec["jackalopeAgents"].clone()).unwrap_or(None),
         extra,
     }
 }
@@ -207,6 +215,12 @@ fn spec(server: &McpServerConfig, scope: &str) -> Value {
     if scope == "global" || scope.starts_with("project:") {
         value["name"] = json!(server.name);
         value["jackalopeDiscovery"] = json!(server.discovery);
+        if server.managed {
+            value["jackalopeManaged"] = json!(true);
+        }
+        if let Some(agents) = &server.agents {
+            value["jackalopeAgents"] = json!(agents);
+        }
         if let Some(desc) = &server.description {
             value["description"] = json!(desc);
         }
@@ -270,6 +284,18 @@ fn write_config(path: &Path, text: &str) -> Result<(), String> {
 }
 
 fn validate(server: &McpServerConfig) -> Result<(), String> {
+    if server.agents.as_ref().is_some_and(|agents| {
+        agents.is_empty()
+            || agents
+                .iter()
+                .any(|agent| !super::tasks::BUILTIN_AGENTS.contains(&agent.as_str()))
+    }) {
+        return Err("Select at least one supported agent.".into());
+    }
+    if server.managed && server.scope != "global" && !server.scope.starts_with("project:") {
+        return Err("Managed connections require global or project scope.".into());
+    }
+
     if server.discovery {
         super::mcp_broker::validate_connection(server)?;
     }
@@ -359,7 +385,7 @@ fn apply_writes(writes: Vec<(PathBuf, Option<String>, String)>) -> Result<(), St
 pub async fn mcp_save_server(server: McpServerConfig) -> Result<(), String> {
     validate(&server)?;
     let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
-    let scopes = if server.scope == "global" {
+    let scopes = if server.scope == "global" && !server.managed {
         vec!["global", "codex", "claude", "grok"]
     } else {
         vec![server.scope.as_str()]
@@ -405,7 +431,7 @@ pub async fn mcp_delete_server(id: String, scope: String) -> Result<(), String> 
     let path = config_path(&scope)?;
     let (_, root) = read_config(&path)?;
     let original_spec = root[servers_key(&path)][&id].clone();
-    let scopes = if scope == "global" {
+    let scopes = if scope == "global" && original_spec["jackalopeManaged"] != true {
         vec!["global", "codex", "claude", "grok"]
     } else {
         vec![scope.as_str()]
@@ -736,20 +762,49 @@ pub(super) fn project_delivery(
 ) -> Result<(serde_json::Map<String, Value>, Vec<McpServerConfig>), String> {
     let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
     let scope = format!("project:{project_id}");
-    let path = config_path(&scope)?;
-    let (_, root) = read_config(&path)?;
+    let (_, global) = read_config(&config_path("global")?)?;
+    let mut entries = global["mcpServers"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    entries.retain(|_, value| value["jackalopeManaged"] == true);
+    let mut project_ids = std::collections::HashSet::new();
+    if !project_id.is_empty() {
+        let (_, project) = read_config(&config_path(&scope)?)?;
+        for (id, value) in project["mcpServers"].as_object().into_iter().flatten() {
+            project_ids.insert(id.clone());
+            entries.insert(id.clone(), value.clone());
+        }
+    }
     let mut result = serde_json::Map::new();
     let mut optimized = Vec::new();
     let mut selected = std::collections::HashSet::new();
-    if let Some(servers) = root["mcpServers"].as_object() {
-        for (id, value) in servers {
-            if selection.is_some_and(|ids| !ids.contains(id)) || value["enabled"] == false {
+    {
+        for (id, value) in &entries {
+            if (project_ids.contains(id) && selection.is_some_and(|ids| !ids.contains(id)))
+                || value["enabled"] == false
+            {
                 continue;
             }
             if id == "jackalope" {
                 return Err("The jackalope server name is reserved for task coordination.".into());
             }
-            let server = parse_server_spec(id, value, &scope);
+            let server = parse_server_spec(
+                id,
+                value,
+                if project_ids.contains(id) {
+                    &scope
+                } else {
+                    "global"
+                },
+            );
+            if server
+                .agents
+                .as_ref()
+                .is_some_and(|agents| !agents.iter().any(|agent| agent == adapter))
+            {
+                continue;
+            }
             validate(&server)?;
             selected.insert(id.clone());
             if server.discovery {

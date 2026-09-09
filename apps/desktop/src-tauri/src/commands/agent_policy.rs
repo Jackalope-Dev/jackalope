@@ -30,6 +30,7 @@ pub struct CustomAgent {
 pub struct AgentPolicy {
     pub automatic_quota_handoff: Option<bool>,
     pub enabled_agents: HashMap<String, bool>,
+    pub disabled_accounts: HashMap<String, Vec<String>>,
     pub allowed_models: HashMap<String, bool>,
     pub default_meta_agent: String,
     pub custom_agents: Vec<CustomAgent>,
@@ -41,11 +42,33 @@ pub struct AgentPolicy {
 #[serde(rename_all = "camelCase", default)]
 pub struct ProjectAgentPolicy {
     pub allowed_agents: Option<Vec<String>>,
+    pub disabled_accounts: HashMap<String, Vec<String>>,
     pub agent_accounts: HashMap<String, String>,
     pub preferred_runner: Option<String>,
 }
 
 impl AgentPolicy {
+    pub fn account_allowed(
+        &self,
+        project: &str,
+        agent: &str,
+        binding: &super::agent_profiles::AccountBinding,
+    ) -> bool {
+        let id = binding.profile_id.as_deref().unwrap_or("__default");
+        let blocked = |accounts: &HashMap<String, Vec<String>>| {
+            [agent, binding.adapter.as_str()].iter().any(|key| {
+                accounts
+                    .get(*key)
+                    .is_some_and(|ids| ids.iter().any(|value| value == id))
+            })
+        };
+        !blocked(&self.disabled_accounts)
+            && !self
+                .projects
+                .get(project)
+                .is_some_and(|project| blocked(&project.disabled_accounts))
+    }
+
     pub fn load(path: &Path) -> Result<Self, String> {
         let _guard = POLICY_LOCK.lock().map_err(|e| e.to_string())?;
         match std::fs::read(path) {

@@ -75,6 +75,7 @@ export interface AllMcpsDetails {
 const marketplaceCache = createReadCache<AllMcpsServer[]>(5 * 60_000);
 const detailsCache = createReadCache<AllMcpsDetails>(5 * 60_000);
 const connectionsCache = createReadCache<McpServerConfig[]>(30_000, 8);
+let connectionsVersion = 0;
 let searchVersion = 0;
 let inspectVersion = 0;
 
@@ -129,6 +130,7 @@ export const useMcpStore = create<McpState>((set, get) => ({
   loadingMarkdown: false,
 
   loadServers: async (projectId = useProjectStore.getState().activeProjectId, force = false) => {
+    const version = ++connectionsVersion;
     const key = projectId ?? '';
     const cached = connectionsCache.peek(key);
     set({ servers: cached ?? [], loadingServers: !cached, serversError: null });
@@ -138,9 +140,10 @@ export const useMcpStore = create<McpState>((set, get) => ({
         () => listMcpServers(projectId ?? undefined),
         force,
       );
-      if (projectId !== useProjectStore.getState().activeProjectId) return;
+      if (version !== connectionsVersion || projectId !== useProjectStore.getState().activeProjectId) return;
       set({ servers, loadingServers: false });
     } catch (e) {
+      if (version !== connectionsVersion) return;
       set({
         serversError: e instanceof Error ? e.message : String(e),
         loadingServers: false,

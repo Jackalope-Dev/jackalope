@@ -189,7 +189,7 @@ export function AuditLogWorkspace() {
             {/* Category Chips */}
             <fieldset
               aria-label="Filter by category"
-              className="flex h-11 min-w-0 max-w-full items-center gap-1 overflow-x-auto bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-0.5"
+              className="flex min-h-11 min-w-0 max-w-full flex-wrap items-center gap-1 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg p-0.5"
             >
               {(
                 [

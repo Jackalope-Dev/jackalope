@@ -1,44 +1,15 @@
-import { useState } from 'react';
-import { builtinAgents } from '../../lib/agent-catalog';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
-import { isAgentAllowedForProject, useProjectStore } from '../../stores/projectStore';
-import { ProjectAgentAccount } from '../settings/ProjectAgentAccount';
+import { useProjectStore } from '../../stores/projectStore';
+import { AgentPreferences } from '../settings/AgentPreferences';
+import { AppearancePreferences } from '../settings/AppearancePreferences';
 import { Setting } from '../settings/Setting';
-import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
-import { ProjectAccountGroup } from './ProjectAccountGroup';
 import '../settings/settings.css';
-export function ProjectPreferences() {
-  const agents = useAgentConfigStore();
-  const {
-    projects,
-    activeProjectId,
-    updateProject,
-    updateProjectPreferences: savePreferences,
-  } = useProjectStore();
-  const [syncError, setSyncError] = useState('');
-  const updateProjectPreferences: typeof savePreferences = (id, prefs) => {
-    savePreferences(id, prefs);
-    if (
-      isTauriEnvironment() &&
-      ['allowedAgents', 'agentAccounts', 'preferredRunner'].some((key) => key in prefs)
-    ) {
-      setSyncError('');
-      void syncAgentConfig().catch((cause) =>
-        setSyncError(`Routing settings could not be saved: ${String(cause)}`),
-      );
-    }
-  };
-  const project = projects.find((p) => p.id === activeProjectId);
+export function ProjectPreferences({ embedded = false, projectId, section = 'all' }: { embedded?: boolean; projectId?: string; section?: 'all' | 'repository' }) {
+  const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
+  const project = projects.find((p) => p.id === (projectId ?? activeProjectId));
   return (
-    <section className="workspace-page">
-      <h1 className="text-2xl">Project settings</h1>
-      {syncError && (
-        <p role="alert" className="task-error">
-          {syncError}
-        </p>
-      )}
+    <section className={embedded ? "project-preferences" : "workspace-page project-preferences"}>
+      {!embedded && <h1 className="text-2xl">Project settings</h1>}
       {project && <p className="task-muted mt-2">{project.name}</p>}
       {!project ? (
         <p className="settings-section-subtitle mt-4">
@@ -56,101 +27,14 @@ export function ProjectPreferences() {
               />
             </Setting>
             <Setting title="Repository path" description={project.path} />
-            <Setting
-              title="Preferred task agent"
-              description="A preference for automatic routing; task fit and available quota can select another enabled agent."
-            >
-              <Select
-                aria-label="Preferred task agent"
-                value={project.preferences?.preferredRunner ?? 'inherit'}
-                onValueChange={(value) =>
-                  updateProjectPreferences(project.id, { preferredRunner: value })
-                }
-              >
-                <SelectItem value="inherit">Let Jackalope choose</SelectItem>
-                {[...builtinAgents, ...agents.customAgents].map((a) => (
-                  <SelectItem
-                    key={a.id}
-                    value={a.id}
-                    disabled={
-                      !agents.isAgentEnabled(a.id) || !isAgentAllowedForProject(project, a.id)
-                    }
-                  >
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </Select>
-            </Setting>
           </div>
-          <ProjectAccountGroup
-            key={project.id}
-            agents={builtinAgents.filter(
-              (agent) =>
-                agents.isAgentEnabled(agent.id) && isAgentAllowedForProject(project, agent.id),
-            )}
-            value={project.preferences?.agentAccounts ?? {}}
-            onChange={(agentAccounts) => updateProjectPreferences(project.id, { agentAccounts })}
-          />
-          <div className="settings-group">
-            <Setting title="Agents available here" />
-            {[...builtinAgents, ...agents.customAgents].map((a) => {
-              const allIds = [
-                ...builtinAgents.map((a) => a.id),
-                ...agents.customAgents.map((c) => c.id),
-              ];
-              const restricted = project.preferences?.allowedAgents;
-              const isOn = restricted === undefined || restricted.includes(a.id);
-              return (
-                <Setting
-                  key={a.id}
-                  title={a.name}
-                  description={
-                    !agents.isAgentEnabled(a.id)
-                      ? 'Disabled app-wide in Agent settings.'
-                      : undefined
-                  }
-                >
-                  <Switch
-                    checked={isOn}
-                    onCheckedChange={(checked) => {
-                      const current = restricted ?? allIds;
-                      const next = checked
-                        ? [...new Set([...current, a.id])]
-                        : current.filter((id) => id !== a.id);
-                      updateProjectPreferences(project.id, {
-                        allowedAgents: next.length === allIds.length ? undefined : next,
-                      });
-                    }}
-                    label={`Allow ${a.name} for ${project.name}`}
-                  />
-                  {!('isCustom' in a) && isOn && agents.isAgentEnabled(a.id) && (
-                    <ProjectAgentAccount
-                      agentId={a.id}
-                      agentName={a.name}
-                      projectName={project.name}
-                      value={project.preferences?.agentAccounts?.[a.id]}
-                      onChange={(id) => {
-                        const next = {
-                          ...(project.preferences?.agentAccounts ?? {}),
-                        };
-                        if (id) next[a.id] = id;
-                        else delete next[a.id];
-                        updateProjectPreferences(project.id, {
-                          agentAccounts: next,
-                        });
-                      }}
-                    />
-                  )}
-                </Setting>
-              );
-            })}
-            {project.preferences?.allowedAgents?.length === 0 && (
-              <p className="task-error">
-                No agents are allowed here — tasks can’t start until you enable at least one.
-              </p>
-            )}
-          </div>
-          <label className="block text-sm font-medium" htmlFor="project-instructions">
+          {section === 'all' && <>
+            <section className="project-preferences-section"><h2>Agents and accounts</h2><AgentPreferences projectId={project.id} /></section>
+            <section className="project-preferences-section"><h2>Appearance</h2><AppearancePreferences projectId={project.id} /></section>
+          </>}
+          <section className="project-preferences-section"><h2>Workspace and verification</h2>
+          <div className="project-workspace-fields">
+          <div className="project-preference-field"><label className="block text-sm font-medium" htmlFor="project-instructions">
             Project instructions
           </label>
           <p className="settings-row-description mb-3">
@@ -166,8 +50,8 @@ export function ProjectPreferences() {
                 customInstructions: e.target.value,
               })
             }
-          />
-          <label className="block text-sm font-medium mt-6" htmlFor="project-base-branch">
+          /></div>
+          <div className="project-preference-field"><label className="block text-sm font-medium mt-6" htmlFor="project-base-branch">
             Target branch
           </label>
           <p className="settings-row-description mb-3">
@@ -179,8 +63,8 @@ export function ProjectPreferences() {
             value={project.preferences?.baseBranch ?? ''}
             placeholder={project.gitBranch}
             onChange={(e) => updateProjectPreferences(project.id, { baseBranch: e.target.value })}
-          />
-          <label className="block text-sm font-medium mt-6" htmlFor="preparation-command">
+          /></div>
+          <div className="project-preference-field"><label className="block text-sm font-medium mt-6" htmlFor="preparation-command">
             Workspace preparation
           </label>
           <p className="settings-row-description mb-3">
@@ -195,8 +79,8 @@ export function ProjectPreferences() {
             onChange={(event) =>
               updateProjectPreferences(project.id, { prepareCommand: event.target.value })
             }
-          />
-          <label className="block text-sm font-medium mt-6" htmlFor="verification-command">
+          /></div>
+          <div className="project-preference-field"><label className="block text-sm font-medium mt-6" htmlFor="verification-command">
             Verification command
           </label>
           <p className="settings-row-description mb-3">
@@ -212,7 +96,8 @@ export function ProjectPreferences() {
                 verifyCommand: e.target.value,
               })
             }
-          />
+          /></div>
+          </div>
           <Setting
             title="Check results automatically"
             description="Run this command after new tasks and scheduled runs finish successfully."
@@ -223,6 +108,7 @@ export function ProjectPreferences() {
               onCheckedChange={(autoVerify) => updateProjectPreferences(project.id, { autoVerify })}
             />
           </Setting>
+          </section>
         </>
       )}
     </section>

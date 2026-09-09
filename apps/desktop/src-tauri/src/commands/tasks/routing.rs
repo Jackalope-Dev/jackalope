@@ -414,6 +414,9 @@ impl TaskRuntime {
                     .or_else(|| project.agent_accounts.get(&agent))
                     .map(String::as_str),
             )? {
+                if !policy.account_allowed(&req.project_id, &agent, &binding) {
+                    continue;
+                }
                 if started.elapsed() > Duration::from_secs(60) {
                     return Err(
                         "Quota discovery took too long. Retry after checking the enabled accounts."
@@ -577,6 +580,11 @@ impl TaskRuntime {
                 .collect()
         };
         let latest = self.policy()?;
+        if !history.handoffs.is_empty() && latest.automatic_quota_handoff == Some(false) {
+            return Err(
+                "Automatic quota handoff was disabled. Progress is preserved for review.".into(),
+            );
+        }
         let fresh = self.routing_candidates(req, &latest, false)?;
         let mut refreshed: Vec<Candidate> = candidates
             .iter()

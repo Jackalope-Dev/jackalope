@@ -9,9 +9,10 @@ import { useProjectStore } from '../../stores/projectStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { AuditLogWorkspace } from '../audit/AuditLogWorkspace';
-import { navigateWorkspace } from '../layout/navigation';
+import { ProjectPreferences } from '../projects/ProjectPreferences';
+import { AgentPreferences } from './AgentPreferences';
+import { AppearancePreferences } from './AppearancePreferences';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
-import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
@@ -59,7 +60,12 @@ export function SettingsPage({
   }, []);
   const settings = useSettingsStore();
   const agents = useAgentConfigStore();
-  const { currentTheme, setTheme } = useThemeStore();
+  const { currentTheme } = useThemeStore();
+  const { projects, activeProjectId } = useProjectStore();
+  const [scope, setScope] = useState<'app' | 'project'>(initialScope);
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId ?? activeProjectId ?? '');
+  const project = projects.find((project) => project.id === selectedProjectId);
+  const scopedCategories = scope === 'project' ? categories.filter((c) => ['Project', 'Appearance', 'Agents'].includes(c)) : categories.filter((c) => c !== 'Project');
   const { pet } = useMascotStore();
   const [previewMood, setPreviewMood] = useState<MascotMood>('idle');
   const [category, setCategory] = useState<SettingsCategory>(
@@ -74,7 +80,7 @@ export function SettingsPage({
     query.trim()
       ? `${section} ${words}`.toLowerCase().includes(query.trim().toLowerCase())
       : section === category;
-  const visible = categories.filter((c) =>
+  const visible = scopedCategories.filter((c) =>
     matches(
       c,
       {
@@ -159,9 +165,19 @@ export function SettingsPage({
         General, appearance, agents, privacy, project preferences and local data. Changes save
         immediately unless a Save button is shown.
       </p>
+      <div className="settings-scope-bar">
+        <div className="settings-scope-switcher" aria-label="Settings scope">
+          {(['app', 'project'] as const).map((value) => <button type="button" key={value} className={`settings-scope-pill ${scope === value ? 'is-active' : ''}`} aria-pressed={scope === value} onClick={() => { setScope(value); setCategory(value === 'app' ? 'General' : 'Project'); setQuery(''); }}>{value === 'app' ? 'App-wide' : 'Per project'}</button>)}
+        </div>
+        {scope === 'project' && <Select aria-label="Project to configure" value={selectedProjectId || '__none'} onValueChange={setSelectedProjectId}>
+          {!projects.length && <SelectItem value="__none" disabled>No projects added</SelectItem>}
+          {projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
+        </Select>}
+        <p className="task-muted">{scope === 'app' ? 'Defaults for Jackalope and projects without overrides.' : 'Overrides for this project. App-wide restrictions still apply.'}</p>
+      </div>
       <div className="settings-body">
         <nav className="settings-sidebar" aria-label="Settings categories">
-          {categories.map((c) => (
+          {scopedCategories.map((c) => (
             <button
               key={c}
               type="button"
@@ -236,7 +252,7 @@ export function SettingsPage({
               )}
               {c === 'Appearance' && (
                 <>
-                  <ThemeEditor value={currentTheme} onChange={setTheme} />
+                  {(scope === 'app' || project) && <AppearancePreferences projectId={scope === 'project' ? project?.id : undefined} />}
                   <div className="settings-companion-box mt-6">
                     <div className="settings-companion-avatar">
                       <JackalopeMascot size="md" overrideMood={previewMood} />
@@ -265,16 +281,7 @@ export function SettingsPage({
                   </div>
                 </>
               )}
-              {c === 'Agents' && (
-                <Button
-                  onClick={() => {
-                    onClose();
-                    navigateWorkspace('agent-settings');
-                  }}
-                >
-                  Open agent configuration
-                </Button>
-              )}
+              {c === 'Agents' && (scope === 'app' || project) && <AgentPreferences key={scope === 'project' ? project?.id : 'app'} projectId={scope === 'project' ? project?.id : undefined} />}
               {c === 'Privacy' && (
                 <>
                   <PrivacySettings />
@@ -291,24 +298,13 @@ export function SettingsPage({
                     </Setting>
                   </div>
                   <p className="settings-disclosure-box">
-                    Marketplace searches go to AllMCPs, which publicly logs requests, with
+                    Publisher avatars load from GitHub. Marketplace searches go to AllMCPs, which publicly logs requests, with
                     User-Agent Jackalope/0.1.0. Your connected agents and MCP servers use their own
                     services.
                   </p>
                 </>
               )}
-              {c === 'Project' && (
-                <Button
-                  onClick={() => {
-                    if (initialProjectId)
-                      useProjectStore.getState().selectProject(initialProjectId);
-                    onClose();
-                    navigateWorkspace('project-settings');
-                  }}
-                >
-                  Open project context
-                </Button>
-              )}
+              {c === 'Project' && <ProjectPreferences embedded section="repository" projectId={project?.id ?? '__none'} />}
               {c === 'System' && <SystemInfoView />}
               {c === 'Diagnostics' && <AuditLogWorkspace />}
               {c === 'Updates & support' && <ReleaseSupport />}

@@ -117,6 +117,8 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 }
 
 export interface McpServerConfig {
+  managed?: boolean;
+  agents?: string[] | null;
   discovery?: boolean;
   extra?: Record<string, unknown>;
   id: string;

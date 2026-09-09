@@ -51,6 +51,7 @@ interface AgentConfigState {
   >;
   setRunnerOptions: (id: string, options: AgentConfigState['runnerOptions'][string]) => void;
   enabledAgents: Record<string, boolean>;
+  disabledAccounts: Record<string, string[]>;
   allowedModels: Record<string, boolean>;
   defaultMetaAgent: string;
   automaticQuotaHandoff: boolean;
@@ -75,6 +76,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
       runnerOptions: {},
       setRunnerOptions: (id, options) =>
         set((state) => ({ runnerOptions: { ...state.runnerOptions, [id]: options } })),
+      disabledAccounts: {},
       enabledAgents: {
         codex: true,
         claude: true,
@@ -181,6 +183,7 @@ async function syncAgentConfigNow() {
     allowedModels,
     defaultMetaAgent,
     automaticQuotaHandoff,
+    disabledAccounts,
     customAgents,
     runnerOptions,
   } = useAgentConfigStore.getState();
@@ -213,6 +216,7 @@ async function syncAgentConfigNow() {
       allowedModels,
       defaultMetaAgent,
       automaticQuotaHandoff,
+      disabledAccounts,
       customAgents,
       runnerOptions: normalizedOptions,
       projects: Object.fromEntries(
@@ -220,6 +224,7 @@ async function syncAgentConfigNow() {
           project.id,
           {
             allowedAgents: project.preferences?.allowedAgents,
+            disabledAccounts: project.preferences?.disabledAccounts ?? {},
             agentAccounts: project.preferences?.agentAccounts ?? {},
             preferredRunner: project.preferences?.preferredRunner,
           },
