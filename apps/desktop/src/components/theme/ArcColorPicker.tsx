@@ -14,7 +14,9 @@ export function ArcColorPicker() {
   useEffect(() => {
     if (!open) return;
     useThemeStore.setState({ previewing: true });
-    return () => { useThemeStore.setState({ previewing: false }); };
+    return () => {
+      useThemeStore.setState({ previewing: false });
+    };
   }, [open]);
 
   useEffect(() => {

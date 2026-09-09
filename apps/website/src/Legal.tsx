@@ -119,6 +119,16 @@ const privacy: Section[] = [
           your local projects or link your agent-provider credentials to your Jackalope membership.
         </p>
         <p>
+          Optional settings sync saves your app colors, appearance, companion reactions and
+          notification choices under your existing membership. This version accepts only these
+          listed preferences; it does not copy names, emails, credentials, paths, projects or task
+          history into the settings record. We retain one current copy with a revision and update
+          time. Turn sync off on a desktop to stop transfers while keeping its local settings.
+          Settings → Privacy → Delete synced settings removes the saved copy and disables sync
+          across your connected desktops. Local settings remain, and uploading again requires
+          turning sync back on. Deletion from provider backups follows the provider’s retention.
+        </p>
+        <p>
           Update checks and downloads contact the configured release service and expose the network
           information needed to deliver those requests. For invited members, we retain the time of
           the first authenticated download request and first desktop connection as referral

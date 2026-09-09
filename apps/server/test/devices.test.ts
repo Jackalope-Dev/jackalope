@@ -73,6 +73,181 @@ async function start() {
 async function approve(session: string, verification: string) {
   return call('/v1/access/desktop/approve', 'POST', { verification }, session, true);
 }
+const preferences = {
+  version: 1,
+  accentHex: '#6366f1',
+  isDark: true,
+  appearance: 'automatic',
+  atmosphere: 12,
+  harmony: 'single',
+  mascotReactions: true,
+  notifications: 'all',
+  osNotifications: true,
+};
+async function connectedDevice(owner: Awaited<ReturnType<typeof member>>) {
+  const flow = await start();
+  await approve(owner.session, flow.verification);
+  expect((await call('/v1/desktop/exchange', 'POST', undefined, flow.secret)).status).toBe(200);
+  return flow.secret;
+}
+async function enableSync(secret: string) {
+  expect(
+    (await call('/v1/desktop/settings/consent', 'POST', { enabled: true }, secret)).status,
+  ).toBe(200);
+}
+it('sync requires per-device consent and isolates accounts with strict versioned payloads', async () => {
+  const secret = await connectedDevice(await member());
+  const other = await connectedDevice(await member());
+  expect((await call('/v1/desktop/settings')).status).toBe(401);
+  expect((await call('/v1/desktop/settings', 'GET', undefined, secret)).status).toBe(403);
+  await enableSync(secret);
+  expect(await (await call('/v1/desktop/settings', 'GET', undefined, secret)).json()).toEqual({
+    revision: 0,
+    settings: null,
+  });
+  for (const settings of [
+    { ...preferences, email: 'private@example.invalid' },
+    { ...preferences, apiKey: 'secret' },
+    { ...preferences, path: '/private/repo' },
+    { ...preferences, version: 2 },
+    { ...preferences, atmosphere: 65 },
+  ]) {
+    expect(
+      (await call('/v1/desktop/settings', 'PUT', { revision: 0, settings }, secret)).status,
+    ).toBe(400);
+  }
+  expect(
+    (await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, secret))
+      .status,
+  ).toBe(200);
+  await enableSync(other);
+  expect(await (await call('/v1/desktop/settings', 'GET', undefined, other)).json()).toEqual({
+    revision: 0,
+    settings: null,
+  });
+  expect((await call('/v1/desktop/settings', 'GET', undefined, secret, true)).status).toBe(403);
+});
+it('sync rejects stale concurrent writes without silently replacing settings', async () => {
+  const owner = await member();
+  const a = await connectedDevice(owner);
+  const b = await connectedDevice(owner);
+  await enableSync(a);
+  await enableSync(b);
+  const writes = await Promise.all(
+    [a, b].map((secret, index) =>
+      call(
+        '/v1/desktop/settings',
+        'PUT',
+        {
+          revision: 0,
+          settings: { ...preferences, atmosphere: index + 1 },
+        },
+        secret,
+      ),
+    ),
+  );
+  expect(writes.map((r) => r.status).sort()).toEqual([200, 409]);
+  expect(
+    (await call('/v1/desktop/settings', 'PUT', { revision: 1, settings: preferences }, a)).status,
+  ).toBe(200);
+  expect(
+    (
+      await call(
+        '/v1/desktop/settings',
+        'PUT',
+        { revision: 1, settings: { ...preferences, atmosphere: 60 } },
+        b,
+      )
+    ).status,
+  ).toBe(409);
+  expect(await (await call('/v1/desktop/settings', 'GET', undefined, b)).json()).toEqual({
+    revision: 2,
+    settings: preferences,
+  });
+});
+it('deletion removes the copy, stops every device and prevents stale uploads from recreating it', async () => {
+  const owner = await member();
+  const a = await connectedDevice(owner);
+  const b = await connectedDevice(owner);
+  await enableSync(a);
+  await enableSync(b);
+  await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, a);
+  expect((await call('/v1/desktop/settings', 'DELETE', undefined, a)).status).toBe(200);
+  expect((await call('/v1/desktop/settings', 'DELETE', undefined, a)).status).toBe(200);
+  for (const secret of [a, b]) {
+    expect((await call('/v1/desktop/settings', 'GET', undefined, secret)).status).toBe(403);
+    expect(
+      (await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, secret))
+        .status,
+    ).toBe(403);
+    expect((await call('/v1/desktop/me', 'GET', undefined, secret)).status).toBe(200);
+  }
+  expect(
+    await env.DB.prepare('SELECT member_id FROM access_settings WHERE member_id=?')
+      .bind(owner.id)
+      .first(),
+  ).toBeNull();
+  await enableSync(b);
+  expect(
+    (await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, b)).status,
+  ).toBe(200);
+});
+it('turning sync off preserves the saved copy; deleting the member cascades to that copy', async () => {
+  const owner = await member();
+  const secret = await connectedDevice(owner);
+  await enableSync(secret);
+  await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, secret);
+  await call('/v1/desktop/settings/consent', 'POST', { enabled: false }, secret);
+  expect((await call('/v1/desktop/settings', 'GET', undefined, secret)).status).toBe(403);
+  expect(
+    await env.DB.prepare('SELECT revision FROM access_settings WHERE member_id=?')
+      .bind(owner.id)
+      .first(),
+  ).toEqual({ revision: 1 });
+  await env.DB.prepare('DELETE FROM access_sessions WHERE member_id=?').bind(owner.id).run();
+  await env.DB.prepare('DELETE FROM access_members WHERE id=?').bind(owner.id).run();
+  expect(
+    await env.DB.prepare('SELECT revision FROM access_settings WHERE member_id=?')
+      .bind(owner.id)
+      .first(),
+  ).toBeNull();
+});
+it('verified waitlist pairing reports waiting without issuing device or sync access', async () => {
+  const owner = await member();
+  await env.DB.prepare(
+    "UPDATE access_members SET status='waiting',waitlist_verified_at=? WHERE id=?",
+  )
+    .bind(Date.now(), owner.id)
+    .run();
+  const session = randomToken();
+  await env.DB.prepare(
+    'INSERT INTO access_waitlist_sessions(hash,member_id,expires_at) VALUES(?,?,?)',
+  )
+    .bind(await tokenHash(session), owner.id, Date.now() + 60000)
+    .run();
+  const flow = await start();
+  const response = await worker.fetch(
+    new Request('https://api.jackalope.dev/v1/access/waitlist/desktop/approve', {
+      method: 'POST',
+      headers: {
+        origin: 'https://jackalope.dev',
+        'content-type': 'application/json',
+        cookie: `__Host-jackalope-waitlist=${session}`,
+      },
+      body: JSON.stringify({ verification: flow.verification }),
+    }),
+    bindings,
+  );
+  expect(response.status).toBe(200);
+  const poll = await call('/v1/desktop/exchange', 'POST', undefined, flow.secret);
+  expect(poll.status).toBe(202);
+  expect(await poll.json()).toEqual({ status: 'waiting' });
+  expect((await call('/v1/desktop/me', 'GET', undefined, flow.secret)).status).toBe(401);
+  expect((await call('/v1/desktop/settings', 'GET', undefined, flow.secret)).status).toBe(401);
+  expect(
+    (await call('/v1/desktop/settings/consent', 'POST', { enabled: true }, flow.secret)).status,
+  ).toBe(401);
+});
 it('requires browser approval and native proof; retrying a lost exchange response creates one revocable device', async () => {
   const owner = await member();
   const flow = await start();

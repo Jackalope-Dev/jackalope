@@ -8,7 +8,14 @@ import { Button } from '../ui/button';
 import { FeedbackPreferences } from './FeedbackPreferences';
 
 export interface AccountStatus {
-  state: 'unavailable' | 'disconnected' | 'pending' | 'waiting' | 'connected' | 'offline' | 'expired';
+  state:
+    | 'unavailable'
+    | 'disconnected'
+    | 'pending'
+    | 'waiting'
+    | 'connected'
+    | 'offline'
+    | 'expired';
   email: string | null;
   userCode: string | null;
   expiresAt: number | null;
@@ -18,7 +25,7 @@ export function JackalopeAccount({
   onInvitations,
   onStatus,
 }: {
-  presentation?: 'settings' | 'welcome';
+  presentation?: 'settings' | 'welcome' | 'onboarding';
   onInvitations?: () => void;
   onStatus?: (status: AccountStatus) => void;
 }) {
@@ -113,7 +120,11 @@ export function JackalopeAccount({
       )}
       {(account?.state === 'pending' || account?.state === 'waiting') && (
         <div className={welcome ? 'access-pairing' : 'space-y-4'}>
-          <p role="status">{account.state === 'waiting' ? 'Your email is verified. Early access is still waiting for approval.' : 'Continue in your browser'}</p>
+          <p role="status">
+            {account.state === 'waiting'
+              ? 'Your email is verified. Early access is still waiting for approval.'
+              : 'Continue in your browser'}
+          </p>
           <p className="settings-row-description">Only approve if this code matches:</p>
           <p className={welcome ? 'access-code' : 'font-mono text-xl tracking-widest'}>
             {account.userCode?.slice(0, 4)}–{account.userCode?.slice(4)}
@@ -171,7 +182,11 @@ export function JackalopeAccount({
             variant="outline"
             disabled={busy}
             onClick={() =>
-              void act(account?.state === 'pending' || account?.state === 'waiting' ? 'app_account_poll' : 'app_account_status')
+              void act(
+                account?.state === 'pending' || account?.state === 'waiting'
+                  ? 'app_account_poll'
+                  : 'app_account_status',
+              )
             }
           >
             Retry
@@ -183,7 +198,7 @@ export function JackalopeAccount({
           {error}
         </p>
       )}
-      {connected && <FeedbackPreferences />}
+      {connected && presentation === 'settings' && <FeedbackPreferences />}
     </div>
   );
 }

@@ -60,14 +60,23 @@ export async function deviceRoutes(
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
       const { enabled } = z.strictObject({ enabled: z.boolean() }).parse(await readJson(request));
-      await env.DB.prepare('UPDATE access_devices SET settings_sync=? WHERE id=?').bind(enabled ? 1 : 0, member.id).run();
+      await env.DB.prepare('UPDATE access_devices SET settings_sync=? WHERE id=?')
+        .bind(enabled ? 1 : 0, member.id)
+        .run();
       return json({ enabled });
     }
     if (url.pathname === '/v1/desktop/settings') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
-      return json(await settingsRoute(env, member.memberId, member.id, request.method,
-        request.method === 'PUT' ? await readJson(request) : undefined));
+      return json(
+        await settingsRoute(
+          env,
+          member.memberId,
+          member.id,
+          request.method,
+          request.method === 'PUT' ? await readJson(request) : undefined,
+        ),
+      );
     }
     if (request.method === 'POST' && url.pathname === '/v1/desktop/feedback') {
       const member = await deviceMember(env, hash, now);
@@ -114,8 +123,11 @@ export async function deviceRoutes(
       .run();
     if (claimed.meta.changes !== 1) throw new AccessError(429, 'slow_down');
     if (!link.member_id) return json({ status: 'pending' }, 202);
-    const waiting = await env.DB.prepare("SELECT id FROM access_members WHERE id=? AND status='waiting' AND waitlist_verified_at IS NOT NULL")
-      .bind(link.member_id).first();
+    const waiting = await env.DB.prepare(
+      "SELECT id FROM access_members WHERE id=? AND status='waiting' AND waitlist_verified_at IS NOT NULL",
+    )
+      .bind(link.member_id)
+      .first();
     if (waiting) return json({ status: 'waiting' }, 202);
     await env.DB.batch([
       env.DB.prepare(
@@ -140,7 +152,13 @@ export async function deviceRoutes(
   }
 }
 
-export async function browserDeviceAction(env: Env, member: Pick<Member, 'id'>, action: string, body: unknown, waiting = false) {
+export async function browserDeviceAction(
+  env: Env,
+  member: Pick<Member, 'id'>,
+  action: string,
+  body: unknown,
+  waiting = false,
+) {
   const now = Date.now();
   if (action === 'revoke') {
     if (waiting) throw new AccessError(403, 'access_not_approved');

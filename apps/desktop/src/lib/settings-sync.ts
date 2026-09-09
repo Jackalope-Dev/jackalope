@@ -25,9 +25,14 @@ export function portableSettings(
 ): SyncedSettings {
   return {
     version: 1,
-    accentHex: theme.accentHex.length === 4
-      ? `#${theme.accentHex.slice(1).split('').map((c) => c + c).join('')}`
-      : theme.accentHex,
+    accentHex:
+      theme.accentHex.length === 4
+        ? `#${theme.accentHex
+            .slice(1)
+            .split('')
+            .map((c) => c + c)
+            .join('')}`
+        : theme.accentHex,
     isDark: theme.isDark,
     appearance: theme.appearance ?? 'manual',
     atmosphere: theme.atmosphere ?? 12,
@@ -40,16 +45,33 @@ export function portableSettings(
 export function syncedTheme(settings: SyncedSettings): ThemePalette {
   const { h, s, l } = hexToHsl(settings.accentHex);
   return {
-    id: 'synced', name: 'Synced theme', accentHue: h, accentSat: s, accentLight: l,
-    accentHex: settings.accentHex, isDark: settings.isDark,
-    appearance: settings.appearance, atmosphere: settings.atmosphere, harmony: settings.harmony,
+    id: 'synced',
+    name: 'Synced theme',
+    accentHue: h,
+    accentSat: s,
+    accentLight: l,
+    accentHex: settings.accentHex,
+    isDark: settings.isDark,
+    appearance: settings.appearance,
+    atmosphere: settings.atmosphere,
+    harmony: settings.harmony,
   };
 }
 export function sameSettings(a: SyncedSettings | null, b: SyncedSettings | null) {
-  return a === b || (!!a && !!b && Object.keys(a).every((key) =>
-    a[key as keyof SyncedSettings] === b[key as keyof SyncedSettings]));
+  return (
+    a === b ||
+    (!!a &&
+      !!b &&
+      Object.keys(a).every(
+        (key) => a[key as keyof SyncedSettings] === b[key as keyof SyncedSettings],
+      ))
+  );
 }
-export function syncDecision(local: SyncedSettings, base: SyncedSettings | null, remote: SyncedSettings | null) {
+export function syncDecision(
+  local: SyncedSettings,
+  base: SyncedSettings | null,
+  remote: SyncedSettings | null,
+) {
   if (sameSettings(local, remote)) return 'same';
   if (!remote) return 'upload';
   if (!base || sameSettings(local, base)) return 'download';

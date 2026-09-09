@@ -27,8 +27,8 @@ import { useThemeStore } from '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
+import { type AccountStatus, JackalopeAccount } from '../settings/JackalopeAccount';
 import { PrivacySettings } from '../settings/PrivacySettings';
-import { JackalopeAccount, type AccountStatus } from '../settings/JackalopeAccount';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { ThemeEditor } from '../theme/ThemeEditor';
 import { Button } from '../ui/button';
@@ -111,21 +111,36 @@ export function OnboardingFlow({
     let canceled = false;
     const check = async () => {
       try {
-        const value = desktop ? await nativeTask<{ required: boolean; allowed: boolean }>('app_execution_access') : { required: false, allowed: true };
+        const value = desktop
+          ? await nativeTask<{ required: boolean; allowed: boolean }>('app_execution_access')
+          : { required: false, allowed: true };
         if (!canceled) setAccess(value);
-      } catch { if (!canceled) setAccess(null); }
+      } catch {
+        if (!canceled) setAccess(null);
+      }
     };
     void check();
     const timer = setInterval(() => void check(), 2000);
-    return () => { canceled = true; clearInterval(timer); };
+    return () => {
+      canceled = true;
+      clearInterval(timer);
+    };
   }, [desktop]);
   const needsAccount = !access || (access.required && !access.allowed);
-  const step = needsAccount || onboarding.step === 'account' ? 'account'
-    : onboarding.step === 'theme' ? 'theme' : !project ? 'project' : onboarding.step;
+  const step =
+    needsAccount || onboarding.step === 'account'
+      ? 'account'
+      : onboarding.step === 'theme'
+        ? 'theme'
+        : !project
+          ? 'project'
+          : onboarding.step;
   useEffect(() => {
     if (step !== 'theme') return;
     useThemeStore.setState({ previewing: true });
-    return () => { useThemeStore.setState({ previewing: false }); };
+    return () => {
+      useThemeStore.setState({ previewing: false });
+    };
   }, [step]);
   const index = steps.findIndex((item) => item.id === step);
   const draft = project ? (execution.drafts[project.id]?.prompt ?? '') : '';
@@ -270,35 +285,70 @@ export function OnboardingFlow({
             )}
           </div>
           <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
-            {step === 'account' ? 'Connect your account' : step === 'theme'
-              ? 'Choose your theme'
-              : step === 'project'
-                ? 'Choose a project'
-                : step === 'agent'
-                  ? 'Choose a default agent for Jackalope'
-                  : 'Describe your first task'}
+            {step === 'account'
+              ? 'Connect your account'
+              : step === 'theme'
+                ? 'Choose your theme'
+                : step === 'project'
+                  ? 'Choose a project'
+                  : step === 'agent'
+                    ? 'Choose a default agent for Jackalope'
+                    : 'Describe your first task'}
           </h2>
-          {step === 'account' && <>
-            <p className="onboarding-description">Connect your Jackalope account to check whether you have early access.</p>
-            <JackalopeAccount onStatus={setAccount} />
-            <details className="onboarding-privacy-panel">
-              <summary><ShieldCheck size={20} aria-hidden="true" /><span><strong>Manage privacy settings</strong><small>Choose settings sync and usage sharing.</small></span><ChevronDown size={18} className="onboarding-privacy-chevron" aria-hidden="true" /></summary>
-              <div className="onboarding-privacy-controls"><PrivacySettings /></div>
-            </details>
-            {!access && <p role="status">Checking access…</p>}
-            {access?.required && !access.allowed && account?.state === 'offline' && <p role="status">Reconnect online to verify access before continuing setup.</p>}
-            {access && !access.required && account?.state !== 'connected' && <p className="onboarding-note">This development build can continue without an account.</p>}
-            <div className="onboarding-actions">
-              <Button disabled={busy || !access || (access.required && !access.allowed)} onClick={() => advance(() => onboarding.go('theme'))}>
-                {account?.state === 'connected' ? 'Continue' : access && !access.required ? 'Continue without an account' : 'Continue after approval'}<ArrowRight size={16} />
-              </Button>
-            </div>
-          </>}
+          {step === 'account' && (
+            <>
+              <p className="onboarding-description">
+                Connect your Jackalope account to check whether you have early access.
+              </p>
+              <JackalopeAccount presentation="onboarding" onStatus={setAccount} />
+              <details className="onboarding-privacy-panel">
+                <summary>
+                  <ShieldCheck size={20} aria-hidden="true" />
+                  <span>
+                    <strong>Manage privacy settings</strong>
+                    <small>Choose settings sync and usage sharing.</small>
+                  </span>
+                  <ChevronDown
+                    size={18}
+                    className="onboarding-privacy-chevron"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div className="onboarding-privacy-controls">
+                  <PrivacySettings />
+                </div>
+              </details>
+              {!access && <p role="status">Checking access…</p>}
+              {access?.required && !access.allowed && account?.state === 'offline' && (
+                <p role="status">Reconnect online to verify access before continuing setup.</p>
+              )}
+              {access && !access.required && account?.state !== 'connected' && (
+                <p className="onboarding-note">
+                  This development build can continue without an account.
+                </p>
+              )}
+              <div className="onboarding-actions">
+                <Button
+                  disabled={busy || !access || (access.required && !access.allowed)}
+                  onClick={() => advance(() => onboarding.go('theme'))}
+                >
+                  {account?.state === 'connected'
+                    ? 'Continue'
+                    : access && !access.required
+                      ? 'Continue without an account'
+                      : 'Continue after approval'}
+                  <ArrowRight size={16} />
+                </Button>
+              </div>
+            </>
+          )}
           {step === 'theme' && (
             <>
               <ThemeEditor value={themeDraft} onChange={setThemeDraft} />
               <div className="onboarding-actions">
-                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('account')}>Back</Button>
+                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('account')}>
+                  Back
+                </Button>
                 <Button
                   variant="ghost"
                   disabled={busy}

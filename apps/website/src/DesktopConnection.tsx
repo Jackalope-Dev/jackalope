@@ -136,7 +136,9 @@ export function DesktopConnection({
       setVerification('');
       setDone(
         action === 'approve'
-          ? waiting ? 'Your verified waitlist status was shared with this desktop. Early access still needs approval.' : 'Desktop approved. Return to Jackalope to finish connecting.'
+          ? waiting
+            ? 'Your verified waitlist status was shared with this desktop. Early access still needs approval.'
+            : 'Desktop approved. Return to Jackalope to finish connecting.'
           : 'Connection canceled. This desktop has not been connected.',
       );
     } catch (cause) {
@@ -157,10 +159,19 @@ export function DesktopConnection({
     <section className="access-card access-entry" aria-label="Connect desktop">
       <h2>Connect your desktop</h2>
       {!signedIn ? (
-        <div><p>
-          Sign in below using your invited email. If the email opens another tab, return here to
-          approve the connection.
-        </p><p>Still on the waitlist? <a className="text-link" href="/waitlist/">Verify your waitlist email</a> to share your acceptance status with the app.</p></div>
+        <div>
+          <p>
+            Sign in below using your invited email. If the email opens another tab, return here to
+            approve the connection.
+          </p>
+          <p>
+            Still on the waitlist?{' '}
+            <a className="text-link" href="/waitlist/">
+              Verify your waitlist email
+            </a>{' '}
+            to share your acceptance status with the app.
+          </p>
+        </div>
       ) : (
         <>
           <p>
