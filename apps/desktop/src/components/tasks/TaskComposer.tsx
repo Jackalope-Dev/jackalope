@@ -458,13 +458,13 @@ export function TaskComposer({
         </fieldset>
       </form>
       <div className="task-composer-footer">
-          <span className="composer-dispatch-note">
-            {executionReady
-              ? current.isolated
-                ? 'Runs in a separate worktree'
-                : 'Edits your current checkout'
-              : 'Save an idea now. Choose a project when you’re ready.'}
-          </span>
+        <span className="composer-dispatch-note">
+          {executionReady
+            ? current.isolated
+              ? 'Runs in a separate worktree'
+              : 'Edits your current checkout'
+            : 'Save an idea now. Choose a project when you’re ready.'}
+        </span>
         <div className="flex flex-wrap gap-2">
           {onSplitTask && current.prompt.trim().length > 25 && (
             <Button type="button" variant="outline" disabled={submitting} onClick={onSplitTask}>

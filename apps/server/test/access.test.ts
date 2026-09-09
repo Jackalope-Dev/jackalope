@@ -459,7 +459,7 @@ it('keeps newsletter consent and retries independent of signup confirmation mail
     expect(request.redirect).toBe('manual');
     calls++;
     bodies.push(JSON.parse(String(init?.body)));
-    return Response.json({ success: true, optIn: { required: true } });
+    return Response.json({ success: true, subscriber: { tags: bodies.at(-1)?.tags ?? [] } });
   }) as typeof fetch;
   await syncNewsletter(bindings, (async () => new Response(null, { status: 503 })) as typeof fetch);
   expect(
@@ -471,16 +471,19 @@ it('keeps newsletter consent and retries independent of signup confirmation mail
     syncNewsletter(bindings, send, Date.now() + 3600000),
     syncNewsletter(bindings, send, Date.now() + 3600000),
   ]);
-  expect(calls).toBe(1);
+  expect(calls).toBe(2);
   // Only the consenting member is described, and they arrive tagged with where
   // they signed up rather than as a bare address.
   expect(bodies[0]).toMatchObject({
     email: 'yes@example.com',
-    listIds: ['fixturelist12345678901234'],
+    lists: ['fixturelist12345678901234'],
+    duplicateStrategy: 'merge',
+    optInMode: 'confirmed',
     enrollInSequences: false,
   });
   expect(bodies[0].tags).toContain('signup-website-popup');
   expect(bodies[0].tags).toContain('jackalope-waitlist');
+  expect(bodies[0]).not.toHaveProperty('listIds');
   expect(
     await env.DB.prepare('SELECT newsletter_synced_at FROM access_members WHERE email=?')
       .bind('yes@example.com')
@@ -501,36 +504,94 @@ it('reconciles the audience only when a member actually changes', async () => {
   bindings.ACCESS_AUDIENCE_LIST = 'fixturelist12345678901234';
   await register(bindings, 'reconcile@example.com', true, 'inline');
   const bodies: Record<string, unknown>[] = [];
-  const send = (async (_url, init) => {
-    bodies.push(JSON.parse(String(init?.body)));
-    return Response.json({ success: true });
+  let tags = ['operator-tag', 'jackalope-waitlist'];
+  let attributes: Record<string, unknown> = { operator_note: 'keep' };
+  let status = 'unsubscribed';
+  const send = (async (url, init) => {
+    const request = new Request(url, init);
+    const body = JSON.parse(String(init?.body));
+    bodies.push(body);
+    if (request.method === 'POST') {
+      expect(body).toMatchObject({ duplicateStrategy: 'merge', enrollInSequences: false });
+      tags = [...new Set([...tags, ...body.tags])];
+    } else {
+      expect(request.method).toBe('PATCH');
+      expect(request.url).toBe(
+        'https://api.sequenzy.com/api/v1/subscribers/reconcile%40example.com',
+      );
+      if (body.tags) tags = body.tags;
+      if (body.customAttributes) {
+        expect(body.customAttributesStrategy).toBe('merge');
+        attributes = { ...attributes, ...body.customAttributes };
+      }
+      if (body.status) status = body.status;
+    }
+    return Response.json({ success: true, subscriber: { tags, status } });
   }) as typeof fetch;
   const at = (hours: number) => Date.now() + hours * 3600000;
 
   await syncNewsletter(bindings, send, at(1));
-  expect(bodies).toHaveLength(1);
+  expect(bodies).toHaveLength(2);
   expect(bodies[0].tags).toContain('jackalope-waitlist');
+  expect(tags).toContain('operator-tag');
+  expect(status).toBe('unsubscribed');
 
   // Nothing about the member moved, so a later sweep spends no provider call.
   await syncNewsletter(bindings, send, at(8));
-  expect(bodies).toHaveLength(1);
+  expect(bodies).toHaveLength(2);
 
   // Approval changes what the member is, so the audience is told.
   await env.DB.prepare("UPDATE access_members SET status='approved',approved_at=? WHERE email=?")
     .bind(Date.now(), 'reconcile@example.com')
     .run();
   await syncNewsletter(bindings, send, at(15));
-  expect(bodies).toHaveLength(2);
-  expect(bodies[1].tags).toContain('jackalope-early-access');
-  expect(bodies[1].tags).not.toContain('jackalope-waitlist');
+  expect(bodies).toHaveLength(4);
+  expect(tags).toContain('jackalope-early-access');
+  expect(tags).not.toContain('jackalope-waitlist');
+  expect(tags).toContain('operator-tag');
+  expect(attributes).toMatchObject({ operator_note: 'keep', lifecycle: 'early-access' });
+  expect(status).toBe('unsubscribed');
 
   // Losing access suppresses them rather than leaving them on the list.
   await env.DB.prepare("UPDATE access_members SET status='revoked' WHERE email=?")
     .bind('reconcile@example.com')
     .run();
   await syncNewsletter(bindings, send, at(22));
-  expect(bodies).toHaveLength(3);
-  expect(bodies[2]).toEqual({ email: 'reconcile@example.com', status: 'unsubscribed' });
+  expect(bodies).toHaveLength(5);
+  expect(bodies[4]).toEqual({ status: 'unsubscribed' });
+  bindings.ACCESS_AUDIENCE_LIST = '';
+});
+
+it('retries partial audience updates and refreshes legacy sync state without losing removed attributes', async () => {
+  bindings.ACCESS_AUDIENCE_LIST = 'fixturelist12345678901234';
+  await register(bindings, 'partial@example.com', true, 'inline');
+  const previous = JSON.stringify({ tags: [], attributes: { platforms: 'linux' } });
+  await env.DB.prepare('UPDATE access_members SET sequenzy_state=? WHERE email=?')
+    .bind(previous, 'partial@example.com')
+    .run();
+  let failPatch = true;
+  const send = (async (url, init) => {
+    const request = new Request(url, init);
+    if (request.method === 'POST')
+      return Response.json({ success: true, subscriber: { tags: ['operator-tag'] } });
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      customAttributes: { platforms: null },
+      customAttributesStrategy: 'merge',
+    });
+    return failPatch ? new Response(null, { status: 503 }) : Response.json({ success: true });
+  }) as typeof fetch;
+  const now = Date.now();
+  await syncNewsletter(bindings, send, now);
+  expect(
+    await env.DB.prepare('SELECT sequenzy_state,newsletter_attempts FROM access_members').first(),
+  ).toEqual({ sequenzy_state: previous, newsletter_attempts: 1 });
+  failPatch = false;
+  await syncNewsletter(bindings, send, now + 3600000);
+  const updated = await env.DB.prepare(
+    'SELECT sequenzy_state,newsletter_attempts FROM access_members',
+  ).first<{ sequenzy_state: string; newsletter_attempts: number }>();
+  expect(updated?.newsletter_attempts).toBe(0);
+  expect(JSON.parse(updated?.sequenzy_state ?? '{}')).toMatchObject({ syncVersion: 2 });
   bindings.ACCESS_AUDIENCE_LIST = '';
 });
 

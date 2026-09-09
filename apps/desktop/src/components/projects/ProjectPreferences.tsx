@@ -1,3 +1,4 @@
+import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings } from '../layout/navigation';
 import { Setting } from '../settings/Setting';
@@ -88,6 +89,39 @@ export function ProjectPreferences({
                 />
               </div>
             </div>
+          </section>
+          <section className="project-preferences-section">
+            <h2>Task context</h2>
+            <Setting
+              title="Choose guidelines automatically"
+              description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Customize task → Context."
+            >
+              <Switch
+                label="Choose guidelines automatically"
+                checked={project.preferences?.automaticTaskContext !== false}
+                onCheckedChange={(automaticTaskContext) =>
+                  updateProjectPreferences(project.id, { automaticTaskContext })
+                }
+              />
+            </Setting>
+            <details>
+              <summary className="min-h-11 cursor-pointer py-3">Always include guidelines</summary>
+              {VETTED_SKILLS.map((skill) => (
+                <Setting key={skill.id} title={skill.shortLabel} description={skill.description}>
+                  <Switch
+                    label={`Always include ${skill.shortLabel}`}
+                    checked={project.preferences?.taskGuidelines?.includes(skill.id) ?? false}
+                    onCheckedChange={(include) =>
+                      updateProjectPreferences(project.id, {
+                        taskGuidelines: include
+                          ? [...(project.preferences?.taskGuidelines ?? []), skill.id]
+                          : project.preferences?.taskGuidelines?.filter((id) => id !== skill.id),
+                      })
+                    }
+                  />
+                </Setting>
+              ))}
+            </details>
           </section>
           <section className="project-preferences-section">
             <h2>Workspace</h2>

@@ -649,7 +649,7 @@ export function LandingPage({
             <BrandMark className="finale-mark" />
           </div>
           <div className="finale-wordmark" aria-hidden="true">
-            jackalope<span>↗</span>
+            jackalope<span>⁂</span>
           </div>
         </div>
       </section>

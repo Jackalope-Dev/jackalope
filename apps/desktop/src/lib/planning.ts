@@ -30,10 +30,12 @@ export function planningDraft(
     selectedSkillIds: skills,
     executionMode: isolated ? 'isolated' : 'current',
   }).assembledPrompt;
-  const structured = !!task.refinedPrompt && task.refinedPrompt === generated;
   const automatic = task.clarifications?.some(
     (item) => item.question === 'Task guideline selection' && item.answer === 'Automatic',
   );
+  const structured = task.refinedPrompt
+    ? task.refinedPrompt === generated
+    : automatic && task.rawPrompt === generated;
   return {
     effort: task.effort,
     model: task.model,

@@ -792,8 +792,13 @@
   padding-bottom: 20px;
 }
 .finale-wordmark > span {
-  font-weight: 350;
-  font-size: 0.55em;
+  align-self: center;
+  flex-shrink: 0;
+  font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", sans-serif;
+  font-weight: 400;
+  font-size: 0.48em;
+  letter-spacing: 0;
+  line-height: 1;
 }
 .sr-only {
   position: absolute;

@@ -117,7 +117,7 @@ export const VETTED_SKILLS: SkillDefinition[] = [
       'OWASP-aligned inspection preventing secret leaks, injection, and path traversal vulnerabilities.',
     category: 'security',
     triggers: [
-      /\b(security|audit|vulnerability|cve|sanitize|auth|jwt|token|secret|leak|permission)\b/i,
+      /\b(security|audit|vulnerabilit(?:y|ies)|cve|sanitize|auth(?:entication|orization)?|jwt|tokens?|secrets?|permissions?|credentials?|passwords?)\b/i,
     ],
     guidelines: [
       'Never log, persist, or commit API keys, auth tokens, passwords, or sensitive credentials.',
@@ -158,9 +158,9 @@ export const VETTED_SKILLS: SkillDefinition[] = [
       /\b(git|worktree|branch|merge|rebase|conflict|pr|pull request|commit|cherry-pick)\b/i,
     ],
     guidelines: [
-      'Work in the assigned task worktree. Do not create another worktree or modify the project checkout.',
-      'Author commits exclusively under the active working user (never add bot or co-authored trailers).',
-      'Write clear, imperative conventional commit messages (feat:, fix:, docs:, refactor:).',
+      'Use the assigned workspace and respect the chosen execution mode. Preserve existing changes and other active worktrees.',
+      'Commit, push, or integrate only when the user has authorized it and project instructions permit it.',
+      'When commits are authorized, follow the project conventions and configured author identity.',
       'Ensure the combined workspace builds and passes all checks before requesting integration.',
     ],
     suggestedTools: ['git'],
@@ -177,10 +177,10 @@ export const VETTED_SKILLS: SkillDefinition[] = [
       /\b(validate ui|verify ui|visual test|screenshot|check component|ui change|appearance|layout|styling)\b/i,
     ],
     guidelines: [
-      'Use browser_navigate to load the UI at http://localhost:5173 or the designated route.',
-      'Capture visual screenshot evidence before and after changes using browser_screenshot.',
-      'Record structured validation checkpoints using record_validation_step.',
-      'Prompt the user proactively via ask_user if layout decisions or visual choices need review.',
+      'Find the project preview command and relevant route, then use available browser tools to inspect the affected UI.',
+      'Check keyboard focus, error states, narrow layouts, supported themes and reduced motion where relevant.',
+      'Capture screenshot evidence and report what was checked, including unavailable environments or tools.',
+      'Use project design conventions for routine choices; ask only when a missing decision blocks the work.',
     ],
     suggestedTools: ['browser', 'filesystem'],
   },
@@ -197,9 +197,9 @@ export const VETTED_SKILLS: SkillDefinition[] = [
     ],
     guidelines: [
       'Navigate step-by-step through the onboarding registration or welcome flow.',
-      'Prompt the user proactively via ask_user for test credentials, bypass keys, or environment settings.',
+      'Use an isolated test profile and existing test fixtures. Ask for missing access only when required; never use live credentials in prompts or logs.',
       'Verify form error validation on invalid inputs and successful transition to the next step.',
-      'Record each verified step via record_validation_step and capture screenshot evidence.',
+      'Check back, cancel, retry, reload and completion behavior while preserving unfinished input. Record verified steps and screenshot evidence with available tools.',
     ],
     suggestedTools: ['browser', 'filesystem'],
   },

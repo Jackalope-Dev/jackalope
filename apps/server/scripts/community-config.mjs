@@ -8,6 +8,7 @@ export function applyCommunityConfig(settings, environment, source = process.env
     'ACCESS_INSTALLER_KEY',
     'ACCESS_STORE_URL',
     'ACCESS_NEWSLETTER_FORM',
+    'ACCESS_AUDIENCE_LIST',
     'ADMIN_EMAIL',
     'ACCESS_ISSUER',
     'ACCESS_AUD',

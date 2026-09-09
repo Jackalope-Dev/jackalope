@@ -18,7 +18,7 @@ export interface AssembledPromptResult {
 }
 
 /**
- * Assembles a user's task prompt with transparent, opt-in guidelines and capabilities.
+ * Assembles a user's task prompt with inspectable guidelines and capabilities.
  * Invariant: The rawPrompt is never altered or replaced; supplemental context is purely additive.
  */
 export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptResult {

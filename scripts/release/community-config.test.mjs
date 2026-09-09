@@ -63,3 +63,22 @@ test('empty CI variables preserve bundled configuration and disabled defaults', 
   });
   assert.equal(settings.vars.ACCESS_INSTALLER_KEY, '');
 });
+
+test('audience list survives deployment with scoped overrides and can be explicitly cleared', () => {
+  const settings = defaults();
+  applyCommunityConfig(settings, 'production', {
+    PRODUCTION_COMMUNITY_CONFIG: JSON.stringify({ ACCESS_AUDIENCE_LIST: 'production-list' }),
+    PRODUCTION_ACCESS_AUDIENCE_LIST: '',
+    STAGING_ACCESS_AUDIENCE_LIST: 'staging-list',
+  });
+  assert.equal(settings.vars.ACCESS_AUDIENCE_LIST, 'production-list');
+  applyCommunityConfig(settings, 'production', {
+    PRODUCTION_COMMUNITY_CONFIG: JSON.stringify({ ACCESS_AUDIENCE_LIST: 'production-list' }),
+    PRODUCTION_ACCESS_AUDIENCE_LIST: 'replacement-list',
+  });
+  assert.equal(settings.vars.ACCESS_AUDIENCE_LIST, 'replacement-list');
+  applyCommunityConfig(settings, 'production', {
+    PRODUCTION_COMMUNITY_CONFIG: JSON.stringify({ ACCESS_AUDIENCE_LIST: '' }),
+  });
+  assert.equal(settings.vars.ACCESS_AUDIENCE_LIST, '');
+});

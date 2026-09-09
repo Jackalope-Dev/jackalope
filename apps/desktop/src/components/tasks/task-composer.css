@@ -27,25 +27,23 @@
   border-radius: 14px;
   background: linear-gradient(120deg, var(--color-accent-subtle), var(--color-surface-sunken));
 }
-.composer-defaults {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 20px;
-  padding: 12px 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-}
-.composer-defaults > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.composer-defaults svg,
 .composer-tool-list svg {
   flex-shrink: 0;
 }
 .composer-customization {
   margin-top: 12px;
+}
+.composer-customization > summary {
+  width: fit-content;
+  min-height: 44px;
+  padding: 12px 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.composer-customization > summary:focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 3px;
 }
 .composer-tool-list {
   display: grid;

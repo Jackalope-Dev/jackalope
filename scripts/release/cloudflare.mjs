@@ -2,19 +2,20 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { applyCommunityConfig } from '../../apps/server/scripts/community-config.mjs';
 import { origin, root } from './catalog.mjs';
+import { assertServiceReadiness, expectedIngestion } from './service-readiness.mjs';
 
 const environment = process.env.DEPLOY_ENV;
 if (!['staging', 'production'].includes(environment))
   throw new Error('Invalid Cloudflare environment');
 const base = origin(process.env.UPDATE_BASE_URL);
+const ingestionEnabled = expectedIngestion(environment);
 if (process.argv[2] === 'verify') {
   const ready = await fetch(`${base}/readyz`, {
     signal: AbortSignal.timeout(30000),
     redirect: 'error',
   });
   const body = await ready.json();
-  if (!ready.ok || body.status !== 'ready' || body.schemaVersion !== 2)
-    throw new Error('Deployed service failed readiness');
+  assertServiceReadiness(ready.ok, body, ingestionEnabled);
   console.log(`Verified ${environment} readiness; ingestion enabled: ${body.ingestionEnabled}`);
 } else if (process.argv[2] === 'prepare') {
   if (!/^[a-f0-9]{32}$/.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? ''))

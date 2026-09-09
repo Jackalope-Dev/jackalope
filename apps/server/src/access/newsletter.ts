@@ -1,4 +1,4 @@
-import { audienceEligible, audienceState, type MemberRow } from './audience';
+import { audienceEligible, audienceState, MANAGED_TAGS, type MemberRow } from './audience';
 import { providerJson } from './provider';
 
 const RECONCILE_INTERVAL = 6 * 3600000;
@@ -39,7 +39,10 @@ export async function syncNewsletter(env: Env, request = fetch, now = Date.now()
       if (!member) return;
 
       const eligible = audienceEligible(member);
-      const desired = eligible ? JSON.stringify(audienceState(member)) : null;
+      // Refresh snapshots recorded before existing provider contacts were updated.
+      const desired = eligible
+        ? JSON.stringify({ ...audienceState(member), syncVersion: 2 })
+        : null;
       const settle = (next: number) =>
         env.DB.prepare(
           'UPDATE access_members SET newsletter_next_at=?,newsletter_attempts=0,newsletter_synced_at=?,sequenzy_state=? WHERE id=?',
@@ -57,32 +60,60 @@ export async function syncNewsletter(env: Env, request = fetch, now = Date.now()
 
       try {
         const state = eligible ? audienceState(member) : null;
-        const body = state
-          ? {
-              email: member.email,
-              tags: state.tags,
-              customAttributes: state.attributes,
-              listIds: [env.ACCESS_AUDIENCE_LIST],
-              // Consent was captured on the Jackalope form; a second
-              // confirmation email would be a duplicate the member did not ask
-              // for. Enrollment stays off so this sync never starts a sequence.
-              optInMode: 'confirmed',
-              enrollInSequences: false,
-            }
-          : { email: member.email, status: 'unsubscribed' };
-
-        const response = await request('https://api.sequenzy.com/api/v1/subscribers', {
-          method: 'POST',
-          redirect: 'manual',
-          signal: AbortSignal.timeout(15000),
-          headers: {
-            Authorization: `Bearer ${env.SEQUENZY_API_KEY}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        });
-        const result = await providerJson(response);
-        if (result.success !== true) throw new Error('audience_rejected');
+        const send = async (method: string, path: string, body: unknown) => {
+          const response = await request(`https://api.sequenzy.com/api/v1/subscribers${path}`, {
+            method,
+            redirect: 'manual',
+            signal: AbortSignal.timeout(15000),
+            headers: {
+              Authorization: `Bearer ${env.SEQUENZY_API_KEY}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          });
+          const result = await providerJson(response);
+          if (result.success !== true) throw new Error('audience_rejected');
+          return result;
+        };
+        const path = `/${encodeURIComponent(member.email)}`;
+        if (state) {
+          const result = await send('POST', '', {
+            email: member.email,
+            tags: state.tags,
+            customAttributes: state.attributes,
+            lists: [env.ACCESS_AUDIENCE_LIST],
+            duplicateStrategy: 'merge',
+            // Consent was captured on the Jackalope form; a second
+            // confirmation email would be a duplicate the member did not ask
+            // for. Enrollment stays off so this sync never starts a sequence.
+            optInMode: 'confirmed',
+            enrollInSequences: false,
+          });
+          const subscriber = result.subscriber as { tags?: unknown } | undefined;
+          if (
+            !Array.isArray(subscriber?.tags) ||
+            subscriber.tags.some((tag) => typeof tag !== 'string')
+          )
+            throw new Error('audience_response_invalid');
+          const previous = member.sequenzy_state ? JSON.parse(member.sequenzy_state) : null;
+          const cleared = Object.fromEntries(
+            Object.keys(previous?.attributes ?? {}).map((key) => [key, null]),
+          );
+          await send('PATCH', path, {
+            tags: [
+              ...new Set([
+                ...subscriber.tags.filter(
+                  (tag: string) => !MANAGED_TAGS.some((managed) => managed === tag),
+                ),
+                ...state.tags,
+              ]),
+            ],
+            customAttributes: { ...cleared, ...state.attributes },
+            customAttributesStrategy: 'merge',
+          });
+        } else {
+          await send('PATCH', path, { status: 'unsubscribed' });
+        }
         await settle(now + RECONCILE_INTERVAL).run();
       } catch {
         console.error('access_audience_sync_failed', { attempt: member.newsletter_attempts });

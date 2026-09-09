@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { characterPaths } from '@jackalope/brand/character';
+import { Resvg } from '@resvg/resvg-js';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 import changelog from './src/changelog.json' with { type: 'json' };
@@ -23,10 +25,12 @@ export default defineConfig(({ mode }) => {
       'VITE_SITE_URL must be an HTTPS site origin, without a path, credentials, query or fragment.',
     );
   }
-  const favicon = readFileSync(
-    new URL('../desktop/src-tauri/icons/source-icon.svg', import.meta.url),
-    'utf8',
-  );
+  const mark = (['antler', 'farEar', 'nearEar', 'head'] as const)
+    .map((key) => `<path d="${characterPaths[key]}"/>`)
+    .join('');
+  const favicon = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="25 -8 128 128"><title>Jackalope</title><rect x="25" y="-8" width="128" height="128" rx="26" fill="#ffffff"/><g fill="#171717">${mark}</g></svg>`;
+  const renderIcon = (size: number) =>
+    new Resvg(favicon, { fitTo: { mode: 'width', value: size } }).render().asPng();
   // Published so the admin broadcast composer can read the same product notes
   // the site shows, instead of keeping a second copy that drifts.
   const files = {
@@ -34,15 +38,9 @@ export default defineConfig(({ mode }) => {
     'changelog.json': JSON.stringify(changelog),
   };
   const icons = {
-    'favicon-32.png': readFileSync(
-      new URL('../desktop/src-tauri/icons/32x32.png', import.meta.url),
-    ),
-    'icon-128.png': readFileSync(
-      new URL('../desktop/src-tauri/icons/128x128.png', import.meta.url),
-    ),
-    'icon-256.png': readFileSync(
-      new URL('../desktop/src-tauri/icons/128x128@2x.png', import.meta.url),
-    ),
+    'favicon-32.png': renderIcon(32),
+    'icon-128.png': renderIcon(128),
+    'icon-256.png': renderIcon(256),
   };
   if (download) {
     const url = new URL(download);

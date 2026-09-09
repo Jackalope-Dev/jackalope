@@ -1,12 +1,46 @@
 [
   {
+    "id": "a-quieter-footer-signature",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A quieter footer signature.",
+    "description": "The homepage wordmark pairs Jackalope with a small constellation symbol.",
+    "items": [
+      "Replaced the decorative arrow with an asterism that does not suggest a clickable action."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "a-favicon-that-matches-the-site",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "A favicon that matches the site.",
+    "description": "The website now uses the black Jackalope logo.",
+    "items": ["Browser tabs, bookmarks and home-screen icons share the same monochrome artwork."],
+    "note": "Development milestone, not a public release."
+  },
+  {
+    "id": "service-feedback-audience-reliability",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "More reliable feedback and product updates",
+    "description": "Feedback stays available across configured deployments, and consented product-update preferences stay in sync.",
+    "items": [
+      "Catch disabled feedback ingestion during deployment checks.",
+      "Keep audience selection and subscriber preferences consistent through deployments and retries."
+    ],
+    "note": "In development; deployment and live service acceptance remain pending."
+  },
+  {
     "id": "a-simpler-task-composer",
     "date": "2026-09-09",
     "status": "In development",
     "title": "A simpler task composer",
-    "description": "Task creation puts the project before the prompt and leaves more room for writing.",
+    "description": "Task creation puts the project before the prompt and chooses relevant guidance automatically.",
     "items": [
-      "Moved the project selector above the text area and removed repeated tool and lesson summaries."
+      "Moved the project selector above the text area and removed repeated tool and lesson summaries.",
+      "Match guidance to new tasks, with project defaults and per-task overrides.",
+      "Keep detailed setup under Customize task so the default view stays focused on writing."
     ],
     "note": "Development milestone, not a public release."
   },

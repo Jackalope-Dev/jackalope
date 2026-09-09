@@ -289,8 +289,8 @@ export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
       start_url: '/',
       display: 'browser',
       icons: [
-        { src: '/icon-128.png', sizes: '128x128', type: 'image/png' },
-        { src: '/icon-256.png', sizes: '256x256', type: 'image/png' },
+        { src: '/icon-128.png?v=2', sizes: '128x128', type: 'image/png' },
+        { src: '/icon-256.png?v=2', sizes: '256x256', type: 'image/png' },
       ],
     }),
   };
