@@ -5,6 +5,7 @@ import { chromium } from 'playwright-core';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
+  page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mkdir('output/playwright', { recursive: true });
@@ -38,6 +39,58 @@ try {
       transformCallback: () => 0,
       invoke: async (command, args) => {
         window.pagesFixture.calls.push(command);
+        if (command === 'app_account_referrals')
+          return {
+            remaining: 3,
+            limit: 5,
+            accepted: 2,
+            downloaded: 1,
+            connected: 1,
+            shareUrl: 'https://example.com/pass',
+            invites: [],
+          };
+        if (command === 'agent_models')
+          return {
+            models: [
+              { id: 'code-model', name: 'Code model', isDefault: true },
+              { id: 'reason-model', name: 'Reasoning model', isDefault: false },
+            ],
+            detail: 'Models reported by the current CLI account.',
+            source: 'fixture',
+          };
+        if (command === 'agent_profile_list')
+          return {
+            profiles: [{ id: 'fixture-account', name: 'Work account', group: 'work' }],
+            activeId: null,
+            envVar: 'FIXTURE_HOME',
+          };
+        if (command === 'codebase_scan')
+          return {
+            root: 'C:/fixture/trail',
+            scannedAt: new Date().toISOString(),
+            durationMs: 100,
+            files: [
+              {
+                path: 'src/main.ts',
+                language: 'TypeScript',
+                lines: 42,
+                bytes: 400,
+                analyzed: true,
+              },
+            ],
+            references: [],
+            cycles: [],
+            diagnostics: [],
+            truncated: false,
+          };
+        if (command === 'mcp_save_server') {
+          window.pagesFixture.mcpSaved = args.server;
+          return;
+        }
+        if (command === 'agent_save_policy') {
+          window.pagesFixture.policy = args.policy;
+          return;
+        }
         if (command === 'schedule_list') return { schedules: [], error: null };
         if (command === 'capacity_snapshot')
           return [
@@ -234,13 +287,18 @@ try {
     }
   }
   await navigate('agents');
-  await page.getByRole('button', { name: 'Check agents', exact: true }).click();
+  await page.getByRole('button', { name: 'Configure Codex', exact: true }).waitFor();
   await page.getByText('CLI setup needed', { exact: true }).waitFor();
   await page.setViewportSize({ width: 1280, height: 840 });
   assert.equal(await page.locator('.agent-roster-row').count(), 4);
   await page.screenshot({ path: 'output/playwright/agents-grid.png' });
-  await navigate('agent-settings');
-  await page.getByRole('heading', { name: 'Agent configuration', exact: true }).waitFor();
+  assert.equal(await page.getByText('Ready', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Configure Codex', exact: true }).click();
+  await page.getByRole('heading', { name: 'Configure Codex', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Add code-model to model list', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Remove code-model from model list', exact: true })
+    .waitFor();
   await page.setViewportSize({ width: 960, height: 640 });
   assert.ok(
     await page.locator('.agent-settings-page').evaluate((element) => {
@@ -334,7 +392,7 @@ try {
   await page.getByRole('button', { name: 'Configure server', exact: true }).click();
   await page.getByRole('heading', { name: 'Configure Trail Search', exact: true }).waitFor();
   assert.equal(await page.getByRole('dialog').count(), 0);
-  await page.getByLabel('API_TOKEN', { exact: true }).fill('fixture-token');
+  await page.getByLabel('Variable 1 value', { exact: true }).fill('fixture-token');
   await page.screenshot({ path: 'output/playwright/mcp-configure-page.png' });
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByRole('button', { name: 'Back to marketplace', exact: true }).click();
@@ -343,6 +401,119 @@ try {
     await page.evaluate(() => window.pagesFixture.calls.includes('mcp_save_server')),
     false,
   );
+
+  await page.getByRole('button', { name: 'Invitations, 3 left to give' }).waitFor();
+  await navigate('mcps');
+  await page.getByRole('button', { name: 'Add connection', exact: true }).click();
+  const connectionDialog = page.getByRole('dialog');
+  await connectionDialog.getByLabel('Name', { exact: true }).fill('Fixture tool');
+  await connectionDialog.getByRole('button', { name: 'Remote URL', exact: true }).click();
+  await connectionDialog.getByLabel('Endpoint URL').fill('https://example.com/mcp');
+  await connectionDialog.getByRole('button', { name: 'All projects', exact: true }).click();
+  await connectionDialog.getByRole('button', { name: 'Specific agents', exact: true }).click();
+  await connectionDialog.getByRole('checkbox', { name: 'Claude Code', exact: true }).uncheck();
+  assert.equal(
+    await page.evaluate(
+      () => window.pagesFixture.calls.filter((call) => call === 'mcp_save_server').length,
+    ),
+    0,
+  );
+  await page.setViewportSize({ width: 960, height: 640 });
+  await page.screenshot({ path: 'output/playwright/mcp-add-960.png' });
+  assert.ok(
+    await connectionDialog.evaluate((element) => element.scrollWidth <= element.clientWidth),
+  );
+  await connectionDialog.getByRole('button', { name: 'Add connection', exact: true }).click();
+  await connectionDialog.waitFor({ state: 'hidden' });
+  const savedConnection = await page.evaluate(() => window.pagesFixture.mcpSaved);
+  assert.equal(savedConnection.scope, 'global');
+  assert.deepEqual(savedConnection.agents, ['codex']);
+  assert.equal(savedConnection.managed, true);
+  assert.equal(savedConnection.discovery, true);
+  await page.getByRole('button', { name: 'Browse marketplace', exact: true }).first().click();
+  await page.getByRole('heading', { name: 'MCP marketplace', exact: true }).waitFor();
+  await navigate('preferences');
+  await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
+  assert.equal(await page.getByRole('dialog').count(), 0);
+  await page
+    .getByRole('navigation', { name: 'Settings categories' })
+    .getByRole('button', { name: 'Agents', exact: true })
+    .click();
+  await page.getByRole('switch', { name: 'Allow Codex app-wide', exact: true }).waitFor();
+  const permission = page.getByRole('switch', {
+    name: 'Allow Codex account Work account',
+    exact: true,
+  });
+  await permission.click();
+  await page.waitForFunction(() =>
+    window.pagesFixture.policy?.disabledAccounts?.codex?.includes('fixture-account'),
+  );
+  await permission.click();
+  await page.getByRole('button', { name: 'Per project', exact: true }).click();
+  await page.getByLabel('Project name', { exact: true }).fill('Trail renamed');
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('switch', { name: 'Use app theme', exact: true }).click();
+  await page.getByRole('slider', { name: 'Color field', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  assert.equal(
+    await page.evaluate(async () => {
+      const { useProjectStore } = await window.storeModule('projectStore');
+      return !!useProjectStore.getState().projects[0].preferences.theme;
+    }),
+    true,
+  );
+  await page.getByRole('switch', { name: 'Use app theme', exact: true }).click();
+  await page.getByRole('button', { name: 'App-wide', exact: true }).click();
+  await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
+  assert.equal(
+    await page
+      .locator('.activity-log [role="group"]')
+      .evaluateAll((elements) =>
+        elements.some((element) => element.scrollWidth > element.clientWidth),
+      ),
+    false,
+  );
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('button', { name: 'working', exact: true }).click();
+  await page.locator('[data-mascot-effort]').waitFor();
+  for (const width of [1280, 960, 700]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    for (const isDark of [false, true]) {
+      await page.evaluate(async (isDark) => {
+        const { useThemeStore } = await window.storeModule('themeStore');
+        useThemeStore
+          .getState()
+          .setTheme({ ...useThemeStore.getState().currentTheme, appearance: 'manual', isDark });
+      }, isDark);
+      await page.screenshot({
+        path: `output/playwright/settings-${isDark ? 'dark' : 'light'}-${width}.png`,
+      });
+      assert.ok(
+        await page
+          .locator('.settings-page')
+          .evaluate((element) => element.scrollWidth <= element.clientWidth),
+      );
+    }
+  }
+  await navigate('project-settings');
+  await page.getByLabel('Project name', { exact: true }).waitFor();
+  assert.equal(
+    await page.getByLabel('Project name', { exact: true }).inputValue(),
+    'Trail renamed',
+  );
+  await page.screenshot({ path: 'output/playwright/project-settings-700.png' });
+  await navigate('topology');
+  await page.getByRole('heading', { name: 'Codebase', exact: true }).waitFor();
+  await page.getByRole('navigation', { name: 'Project shortcuts' }).waitFor();
+  await page.getByRole('textbox', { name: 'Find a file', exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(
+      () => window.pagesFixture.calls.filter((call) => call === 'codebase_scan').length,
+    ),
+    1,
+  );
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.screenshot({ path: 'output/playwright/codebase-ready.png' });
   await navigate('usage');
   await page.getByRole('heading', { name: 'Usage & Intelligence', exact: true }).waitFor();
   await page.getByText('80% remaining', { exact: true }).waitFor();

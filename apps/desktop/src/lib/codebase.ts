@@ -30,7 +30,7 @@ export interface CodebaseSnapshot {
 
 const snapshots = new Map<string, { value: CodebaseSnapshot; at: number }>();
 const scans = new Map<string, Promise<CodebaseSnapshot>>();
-let prepared: { path: string; result: Promise<CodebaseSnapshot> } | undefined;
+let prepared: { path: string; result: Promise<CodebaseSnapshot>; at: number } | undefined;
 
 export function scanCodebase(repoPath: string, force = true): Promise<CodebaseSnapshot> {
   const cached = snapshots.get(repoPath);
@@ -42,7 +42,8 @@ export function scanCodebase(repoPath: string, force = true): Promise<CodebaseSn
     if (!isTauriEnvironment()) throw new Error('Open the desktop app to analyze local files.');
     const { invoke } = await import('@tauri-apps/api/core');
     const value = await invoke<CodebaseSnapshot>('codebase_scan', { repoPath });
-    if (snapshots.size >= 8) snapshots.delete(snapshots.keys().next().value!);
+    const oldest = snapshots.keys().next().value;
+    if (snapshots.size >= 8 && oldest !== undefined) snapshots.delete(oldest);
     snapshots.set(repoPath, { value, at: Date.now() });
     return value;
   })().finally(() => scans.delete(repoPath));
@@ -52,12 +53,14 @@ export function scanCodebase(repoPath: string, force = true): Promise<CodebaseSn
 
 export function prepareCodebase(repoPath: string): Promise<CodebaseSnapshot> {
   const result = scanCodebase(repoPath);
-  prepared = { path: repoPath, result };
+  prepared = { path: repoPath, result, at: Date.now() };
   return result;
 }
 
 export function preparedCodebase(repoPath: string): Promise<CodebaseSnapshot> | undefined {
-  return prepared?.path === repoPath ? prepared.result : undefined;
+  return prepared?.path === repoPath && Date.now() - prepared.at < 120_000
+    ? prepared.result
+    : undefined;
 }
 
 export async function watchCodebase(repoPath: string, onChange: (unavailable: boolean) => void) {

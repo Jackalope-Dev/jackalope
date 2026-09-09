@@ -65,7 +65,7 @@
 .codebase-explorer {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
-  height: clamp(300px, calc(100dvh - 480px), 600px);
+  height: clamp(360px, calc(100dvh - 370px), 720px);
   overflow: hidden;
   border-radius: 16px;
   background: linear-gradient(to bottom, var(--color-surface), var(--color-surface-sunken));
@@ -431,4 +431,27 @@
   .codebase-landing {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.codebase-page > .workspace-heading {
+  margin-bottom: 12px;
+}
+.codebase-toolbar {
+  margin-bottom: 12px;
+}
+.codebase-inline-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.codebase-search {
+  position: relative;
+}
+.codebase-search > svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+}
+.codebase-search input {
+  padding-left: 38px;
 }

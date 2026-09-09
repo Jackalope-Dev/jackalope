@@ -821,7 +821,7 @@
   min-width: 0;
   width: 100%;
 }
-.mcp-variable-row button {
+.mcp-connection-form .mcp-variable-row button {
   flex-shrink: 0;
 }
 .mcp-agent-options {

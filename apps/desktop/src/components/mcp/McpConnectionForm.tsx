@@ -78,26 +78,24 @@ export function McpConnectionForm({
           'Use unique environment variable names with letters, numbers and underscores.',
         );
       setBusy(true);
-      await useMcpStore
-        .getState()
-        .saveServer({
-          ...initial,
-          id,
-          name: name.trim(),
-          scope,
-          managed: !legacy,
-          agents: legacy ? initial?.agents : agents,
-          transport,
-          command: transport === 'stdio' ? command.trim() : undefined,
-          args: transport === 'stdio' ? args.map((item) => item.value) : [],
-          url: transport !== 'stdio' ? url.trim() : undefined,
-          env: Object.fromEntries(
-            env.filter((item) => item.key.trim()).map((item) => [item.key.trim(), item.value]),
-          ),
-          extra: parsed as Record<string, unknown>,
-          enabled: initial?.enabled ?? true,
-          discovery: !legacy && transport !== 'sse' && discovery,
-        });
+      await useMcpStore.getState().saveServer({
+        ...initial,
+        id,
+        name: name.trim(),
+        scope,
+        managed: !legacy,
+        agents: legacy ? initial?.agents : agents,
+        transport,
+        command: transport === 'stdio' ? command.trim() : undefined,
+        args: transport === 'stdio' ? args.map((item) => item.value) : [],
+        url: transport !== 'stdio' ? url.trim() : undefined,
+        env: Object.fromEntries(
+          env.filter((item) => item.key.trim()).map((item) => [item.key.trim(), item.value]),
+        ),
+        extra: parsed as Record<string, unknown>,
+        enabled: initial?.enabled ?? true,
+        discovery: !legacy && transport !== 'sse' && discovery,
+      });
       onSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -139,7 +137,7 @@ export function McpConnectionForm({
               />
             </label>
           </div>
-          <div className="mcp-scope-options" aria-label="Connection type">
+          <fieldset className="mcp-scope-options" aria-label="Connection type">
             {[
               { id: 'stdio', label: 'Local command' },
               { id: 'http', label: 'Remote URL' },
@@ -155,7 +153,7 @@ export function McpConnectionForm({
                 {item.label}
               </Button>
             ))}
-          </div>
+          </fieldset>
           {transport === 'stdio' ? (
             <>
               <label className="task-label">

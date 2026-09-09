@@ -1,28 +1,10 @@
 import { ArrowUpRight, Check, Copy, Mail, RefreshCw, Ticket } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useReferralStore } from '../../stores/referralStore';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
-
-interface ReferralInvite {
-  id: string;
-  email: string;
-  status: 'pending' | 'accepted';
-  expiresAt: number;
-  acceptedAt: number | null;
-  downloadedAt: number | null;
-  connectedAt: number | null;
-}
-interface ReferralView {
-  limit: number;
-  remaining: number;
-  accepted: number;
-  downloaded: number;
-  connected: number;
-  shareUrl: string;
-  invites: ReferralInvite[];
-}
 
 const invitationMessage =
   'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an Instant Access Pass for you to skip the waitlist after email verification, while a pass is available.';
@@ -35,25 +17,11 @@ async function openExternal(url: string) {
 }
 
 export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
-  const [referrals, setReferrals] = useState<ReferralView | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { referrals, loading, error: fetchError, load } = useReferralStore();
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      if (!isTauriEnvironment()) throw new Error('Open the desktop app to manage passes.');
-      setReferrals(await nativeTask<ReferralView>('app_account_referrals'));
-    } catch (cause) {
-      setReferrals(null);
-      setError(typeof cause === 'string' ? cause : String(cause));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
   const copy = async (value: string, success: string) => {
     try {
@@ -88,12 +56,12 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
       setError(typeof cause === 'string' ? cause : 'Could not open invitation management.');
     }
   };
-  if (loading) return <LoadingState label={'Loading passes…'} />;
+  if (loading && !referrals) return <LoadingState label={'Loading passes…'} />;
   if (!referrals)
     return (
       <div className="space-y-4">
         <p role="alert" className="settings-row-description">
-          {error || 'Passes are unavailable.'}
+          {error || fetchError || 'Passes are unavailable.'}
         </p>
         <div className="flex flex-wrap gap-3">
           <Button onClick={onAccount}>Open account settings</Button>

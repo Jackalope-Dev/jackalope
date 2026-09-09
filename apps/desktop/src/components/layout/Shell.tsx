@@ -1,14 +1,5 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import {
-  Check,
-  ChevronDown,
-  GitBranch,
-  LifeBuoy,
-  Plus,
-  Search,
-  Settings2,
-  UsersRound,
-} from 'lucide-react';
+import { Check, ChevronDown, GitBranch, LifeBuoy, Plus, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
@@ -28,6 +19,7 @@ import { TaskWorkspace } from '../tasks/TaskWorkspace';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { LoadingState } from '../ui/LoadingState';
 import { Tooltip } from '../ui/Tooltip';
+import { InvitationsButton } from './InvitationsButton';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
@@ -302,17 +294,12 @@ export function Shell({
             </button>
           ))}
         </nav>
-        <button
-          type="button"
-          className="workspace-nav-item workspace-invitations"
+        <InvitationsButton
           onClick={() => {
             setSettingsCategory('Invitations');
             setActiveTab('preferences');
           }}
-        >
-          <UsersRound className="size-3.5" />
-          <span>Invitations</span>
-        </button>
+        />
       </div>
       <main
         ref={canvas}

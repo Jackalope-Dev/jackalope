@@ -616,6 +616,28 @@ pub(super) async fn connect(
 mod tests {
     use super::*;
     #[test]
+    fn managed_connections_preserve_location_agent_selection_and_legacy_clients() {
+        let global = json!({"mcpServers": {
+            "shared": {"command":"unused", "jackalopeManaged":true, "jackalopeDiscovery":true},
+            "codex-only": {"command":"unused", "jackalopeManaged":true, "jackalopeAgents":["codex"], "jackalopeDiscovery":true},
+            "legacy": {"command":"unused"}
+        }});
+        let project = json!({"mcpServers": {"local": {"command":"unused", "jackalopeAgents":["claude"], "jackalopeDiscovery":true}}});
+        let (_, codex) = delivery_from_configs("project:test", &global, &project, None, "codex").unwrap();
+        assert_eq!(codex.iter().map(|server| server.id.as_str()).collect::<Vec<_>>(), vec!["codex-only", "shared"]);
+        let (_, claude) = delivery_from_configs("project:test", &global, &project, None, "claude").unwrap();
+        assert_eq!(claude.len(), 2);
+        assert!(claude.iter().any(|server| server.id == "local"));
+        let (_, selected) = delivery_from_configs("project:test", &global, &project, Some(&[]), "claude").unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].id, "shared");
+        assert!(delivery_from_configs("project:test", &global, &project, Some(&["local".into()]), "codex").is_err());
+        let spec = spec(&codex[0], "global");
+        assert_eq!(parse_server_spec("codex-only", &spec, "global").agents, Some(vec!["codex".into()]));
+        assert!(spec.get("jackalopeManaged").is_some());
+        assert!(super::spec(&codex[0], "codex").get("jackalopeAgents").is_none());
+    }
+    #[test]
     fn project_delivery_preserves_selection_and_adapter_authentication() {
         let id = uuid::Uuid::new_v4().to_string();
         let path = config_path(&format!("project:{id}")).unwrap();
@@ -763,18 +785,17 @@ pub(super) fn project_delivery(
     let _guard = CONFIG_LOCK.lock().map_err(|e| e.to_string())?;
     let scope = format!("project:{project_id}");
     let (_, global) = read_config(&config_path("global")?)?;
-    let mut entries = global["mcpServers"]
-        .as_object()
-        .cloned()
-        .unwrap_or_default();
+    let project = if project_id.is_empty() { json!({}) } else { read_config(&config_path(&scope)?)?.1 };
+    delivery_from_configs(&scope, &global, &project, selection, adapter)
+}
+
+fn delivery_from_configs(scope: &str, global: &Value, project: &Value, selection: Option<&[String]>, adapter: &str) -> Result<(serde_json::Map<String, Value>, Vec<McpServerConfig>), String> {
+    let mut entries = global["mcpServers"].as_object().cloned().unwrap_or_default();
     entries.retain(|_, value| value["jackalopeManaged"] == true);
     let mut project_ids = std::collections::HashSet::new();
-    if !project_id.is_empty() {
-        let (_, project) = read_config(&config_path(&scope)?)?;
-        for (id, value) in project["mcpServers"].as_object().into_iter().flatten() {
-            project_ids.insert(id.clone());
-            entries.insert(id.clone(), value.clone());
-        }
+    for (id, value) in project["mcpServers"].as_object().into_iter().flatten() {
+        project_ids.insert(id.clone());
+        entries.insert(id.clone(), value.clone());
     }
     let mut result = serde_json::Map::new();
     let mut optimized = Vec::new();

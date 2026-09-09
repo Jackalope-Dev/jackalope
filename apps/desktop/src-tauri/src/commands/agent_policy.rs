@@ -220,6 +220,24 @@ pub async fn agent_save_policy(
 mod tests {
     use super::*;
     #[test]
+    fn account_restrictions_apply_to_app_project_and_custom_adapters() {
+        let mut policy = AgentPolicy::default();
+        let mut binding = super::super::agent_profiles::AccountBinding { adapter: "codex".into(), profile_id: Some("work".into()), directory: PathBuf::new(), label: "fixture".into() };
+        assert!(policy.account_allowed("project", "custom", &binding));
+        policy.disabled_accounts.insert("codex".into(), vec!["work".into()]);
+        assert!(!policy.account_allowed("project", "custom", &binding));
+        policy.disabled_accounts.clear();
+        let mut project = ProjectAgentPolicy::default();
+        project.disabled_accounts.insert("codex".into(), vec!["work".into(), "__default".into()]);
+        policy.projects.insert("project".into(), project);
+        assert!(!policy.account_allowed("project", "codex", &binding));
+        assert!(policy.account_allowed("other", "codex", &binding));
+        binding.profile_id = None;
+        assert!(!policy.account_allowed("project", "codex", &binding));
+        let legacy: AgentPolicy = serde_json::from_str("{}").unwrap();
+        assert!(legacy.account_allowed("project", "codex", &binding));
+    }
+    #[test]
     fn older_policy_keeps_quota_handoff_enabled() {
         let policy: AgentPolicy = serde_json::from_str("{}").unwrap();
         assert_ne!(policy.automatic_quota_handoff, Some(false));

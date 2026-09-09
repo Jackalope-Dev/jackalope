@@ -293,54 +293,17 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
             )}
             <Button onClick={() => void scan()} disabled={busy || !isTauriEnvironment()}>
               <RefreshCw size={16} />
-              {busy ? 'Analyzing…' : snapshot ? 'Refresh map' : 'Analyze repository'}
+              {busy
+                ? 'Analyzing…'
+                : stale
+                  ? 'Update map'
+                  : snapshot
+                    ? 'Refresh map'
+                    : 'Analyze repository'}
             </Button>
           </div>
         }
       />
-      <p className="task-path codebase-root" title={project.path}>
-        {project.path}
-      </p>
-      <div className="codebase-landing">
-        <div className="codebase-intro">
-          <h2>{project.name}</h2>
-          <p className="task-muted">
-            {memory?.summary ||
-              project.description ||
-              'Explore this repository, review its context, and turn open work into tasks.'}
-          </p>
-          {memory?.techStack?.length ? (
-            <div className="codebase-stack">
-              {memory.techStack.slice(0, 6).map((tech) => (
-                <span key={tech}>{tech}</span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <nav className="codebase-shortcuts" aria-label="Project shortcuts">
-          <Button variant="outline" onClick={() => navigateWorkspace('project-knowledge')}>
-            <BookOpen size={18} />
-            <span>
-              Project context<small>Instructions and saved knowledge</small>
-            </span>
-            <ArrowRight size={16} />
-          </Button>
-          <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
-            <ListTodo size={18} />
-            <span>
-              Repo TODOs<small>Review open work and start a task</small>
-            </span>
-            <ArrowRight size={16} />
-          </Button>
-          <Button variant="outline" onClick={() => navigateWorkspace('project-settings')}>
-            <Settings2 size={18} />
-            <span>
-              Project settings<small>Agents, appearance and workflow</small>
-            </span>
-            <ArrowRight size={16} />
-          </Button>
-        </nav>
-      </div>
       {error && (
         <p role="alert" className="task-error">
           {error}
@@ -351,11 +314,6 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
       {watchError && (
         <p role="status" className="task-muted">
           {watchError}
-        </p>
-      )}
-      {snapshot && stale && (
-        <p role="status" className="task-notice">
-          Files may have changed since this scan. Refresh to update the map.
         </p>
       )}
       {!snapshot ? (
@@ -372,24 +330,15 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
         )
       ) : (
         <>
-          <div className="codebase-summary">
-            <p>
-              {snapshot.files.length.toLocaleString()} files <span>·</span>{' '}
-              {snapshot.references.filter((ref) => ref.target).length.toLocaleString()} resolved
-              references <span>·</span> Read{' '}
-              {new Date(snapshot.scannedAt).toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </p>
-            <span>Refresh after changes</span>
-          </div>
           {snapshot.truncated && (
             <p className="task-error" role="status">
               Partial snapshot: a scan limit was reached. Some files or references are missing.
             </p>
           )}
           <div className="codebase-toolbar">
+            <span className="codebase-inline-count">
+              {snapshot.files.length.toLocaleString()} files
+            </span>
             <fieldset className="codebase-switch" aria-label="Codebase views">
               <Button
                 variant={mode === 'map' ? 'secondary' : 'ghost'}
@@ -501,24 +450,26 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
             </div>
           ) : (
             <>
-              <div className="codebase-breadcrumb">
-                <Button
-                  variant="ghost"
-                  onClick={reset}
-                  disabled={!folder && !selected && !query && language === 'all'}
-                >
-                  <ArrowLeft size={16} />
-                  All directories
-                </Button>
-                <p title={selected ?? folder ?? ''}>
-                  {selected ? selected : (folder ?? 'Directory relationships')}
-                </p>
-                {selected && (
-                  <Button variant="ghost" onClick={() => setSelected(null)}>
-                    Clear selection
+              {(folder || selected || query || language !== 'all') && (
+                <div className="codebase-breadcrumb">
+                  <Button
+                    variant="ghost"
+                    onClick={reset}
+                    disabled={!folder && !selected && !query && language === 'all'}
+                  >
+                    <ArrowLeft size={16} />
+                    All directories
                   </Button>
-                )}
-              </div>
+                  <p title={selected ?? folder ?? ''}>
+                    {selected ? selected : (folder ?? 'Directory relationships')}
+                  </p>
+                  {selected && (
+                    <Button variant="ghost" onClick={() => setSelected(null)}>
+                      Clear selection
+                    </Button>
+                  )}
+                </div>
+              )}
               <div className="codebase-explorer">
                 <aside className="codebase-files" aria-label="Repository files">
                   <p className="codebase-list-heading">
@@ -670,15 +621,52 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
             <p>
               Respects repository ignore files. Skips symlinks, dependency, build and output
               directories. Limits: 6,000 files, 512 KiB per analyzed file, 32 MiB of source, 30,000
-              references, 20 seconds. Read in {(snapshot.durationMs / 1000).toFixed(2)} seconds. The
-              snapshot is kept only while this view is open.
+              references, 20 seconds. Read in {(snapshot.durationMs / 1000).toFixed(2)} seconds.
+              Recent snapshots are cached briefly for return visits.
             </p>
           </details>
         </>
       )}
-      <Button variant="ghost" onClick={() => navigateWorkspace('project-knowledge')}>
-        Open project context
-      </Button>
+      <div className="codebase-landing">
+        <div className="codebase-intro">
+          <h2>{project.name}</h2>
+          <p className="task-muted">
+            {memory?.summary ||
+              project.description ||
+              'Explore this repository, review its context, and turn open work into tasks.'}
+          </p>
+          {memory?.techStack?.length ? (
+            <div className="codebase-stack">
+              {memory.techStack.slice(0, 6).map((tech) => (
+                <span key={tech}>{tech}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <nav className="codebase-shortcuts" aria-label="Project shortcuts">
+          <Button variant="outline" onClick={() => navigateWorkspace('project-knowledge')}>
+            <BookOpen size={18} />
+            <span>
+              Project context<small>Instructions and saved knowledge</small>
+            </span>
+            <ArrowRight size={16} />
+          </Button>
+          <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
+            <ListTodo size={18} />
+            <span>
+              Repo TODOs<small>Review open work and start a task</small>
+            </span>
+            <ArrowRight size={16} />
+          </Button>
+          <Button variant="outline" onClick={() => navigateWorkspace('project-settings')}>
+            <Settings2 size={18} />
+            <span>
+              Project settings<small>Agents, appearance and workflow</small>
+            </span>
+            <ArrowRight size={16} />
+          </Button>
+        </nav>
+      </div>
     </div>
   );
 }

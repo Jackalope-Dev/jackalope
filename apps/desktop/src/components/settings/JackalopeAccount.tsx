@@ -2,6 +2,7 @@ import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useReferralStore } from '../../stores/referralStore';
 import { Button } from '../ui/button';
 import { FeedbackPreferences } from './FeedbackPreferences';
 
@@ -79,6 +80,11 @@ export function JackalopeAccount({
       if (mounted.current) setBusy(false);
     }
   }
+  useEffect(() => {
+    if (!account) return;
+    useReferralStore.getState().clear();
+    if (account.state === 'connected') void useReferralStore.getState().load(false);
+  }, [account]);
   const connected = account?.state === 'connected' || account?.state === 'offline';
   const welcome = presentation === 'welcome';
   return (

@@ -197,9 +197,11 @@ function AccountPreferences({
   const agents = useAgentConfigStore();
   const { projects, updateProjectPreferences } = useProjectStore();
   const project = projects.find((item) => item.id === projectId);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Account mutations and retry refresh the profile list.
   useEffect(() => {
     let alive = true;
-    if (revision < 0 || !isTauriEnvironment()) return;
+    if (!isTauriEnvironment()) return;
+    setView(undefined);
     setError('');
     void listAgentProfiles(agentId)
       .then((result) => {
