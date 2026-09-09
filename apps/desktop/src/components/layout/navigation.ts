@@ -158,6 +158,22 @@ export function openSettings(
   window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: category }));
 }
 
+export interface ProjectSettingsDestination {
+  projectId: string;
+  category: 'Project' | 'Appearance' | 'Agents';
+}
+
+export function openProjectSettings(
+  projectId: string,
+  category: ProjectSettingsDestination['category'] = 'Project',
+) {
+  window.dispatchEvent(
+    new CustomEvent<ProjectSettingsDestination>('jackalope:open-settings', {
+      detail: { projectId, category },
+    }),
+  );
+}
+
 export function openAgentConfiguration(agentId: string) {
   window.dispatchEvent(new CustomEvent('jackalope:configure-agent', { detail: agentId }));
 }

@@ -1,6 +1,5 @@
 import { useProjectStore } from '../../stores/projectStore';
-import { AgentPreferences } from '../settings/AgentPreferences';
-import { AppearancePreferences } from '../settings/AppearancePreferences';
+import { openProjectSettings } from '../layout/navigation';
 import { Setting } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
@@ -10,11 +9,9 @@ import '../settings/settings.css';
 export function ProjectPreferences({
   embedded = false,
   projectId,
-  section = 'all',
 }: {
   embedded?: boolean;
   projectId?: string;
-  section?: 'all' | 'repository';
 }) {
   const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
   const project = projects.find((p) => p.id === (projectId ?? activeProjectId));
@@ -42,17 +39,32 @@ export function ProjectPreferences({
               <p className="project-repository-path">{project.path}</p>
             </div>
           </div>
-          {section === 'all' && (
-            <>
-              <section className="project-preferences-section">
-                <h2>Agents and accounts</h2>
-                <AgentPreferences projectId={project.id} />
-              </section>
-              <section className="project-preferences-section">
-                <h2>Appearance</h2>
-                <AppearancePreferences projectId={project.id} />
-              </section>
-            </>
+          {!embedded && (
+            <section className="project-preferences-section project-settings-links">
+              <Setting
+                title="Appearance"
+                description={
+                  project.preferences?.theme
+                    ? `Project theme: ${project.preferences.theme.name}`
+                    : 'Using the app theme.'
+                }
+              >
+                <Button
+                  variant="outline"
+                  onClick={() => openProjectSettings(project.id, 'Appearance')}
+                >
+                  Edit appearance
+                </Button>
+              </Setting>
+              <Setting
+                title="Agents and accounts"
+                description="Choose project defaults and available accounts."
+              >
+                <Button variant="outline" onClick={() => openProjectSettings(project.id, 'Agents')}>
+                  Configure agents
+                </Button>
+              </Setting>
+            </section>
           )}
           <section className="project-preferences-section">
             <h2>Task instructions</h2>

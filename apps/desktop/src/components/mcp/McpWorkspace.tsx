@@ -185,6 +185,11 @@ export function McpWorkspace({
         <>
           <WorkspaceHeading
             title={activeTab === 'configured' ? 'MCP connections' : 'MCP marketplace'}
+            description={
+              activeTab === 'marketplace'
+                ? 'Third-party tools are not provided or audited by Jackalope. Use at your own risk; Jackalope is not responsible for their safety, reliability or data handling.'
+                : undefined
+            }
             action={
               <div className="flex flex-wrap items-center gap-2">
                 {activeTab === 'configured' && (

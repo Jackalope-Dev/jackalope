@@ -25,7 +25,13 @@ import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import { InvitationsButton } from './InvitationsButton';
-import { type ActiveTab, USAGE_VIEWS, type UsageView, WORKSPACE_VIEWS } from './navigation';
+import {
+  type ActiveTab,
+  type ProjectSettingsDestination,
+  USAGE_VIEWS,
+  type UsageView,
+  WORKSPACE_VIEWS,
+} from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
 
@@ -106,6 +112,7 @@ export function Shell({
     return () => window.removeEventListener('jackalope:configure-agent', handle);
   }, []);
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
+  const [settingsProjectId, setSettingsProjectId] = useState<string>();
   useEffect(() => {
     const feature: Partial<Record<ActiveTab, Feature>> = {
       kanban: 'tasks',
@@ -163,6 +170,10 @@ export function Shell({
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const navigate = useCallback((tab: ActiveTab) => {
+    if (tab === 'preferences' || tab === 'audit' || tab === 'mesh') {
+      setSettingsProjectId(undefined);
+      setSettingsCategory('General');
+    }
     if (tab === 'audit' || tab === 'mesh') {
       setSettingsCategory(tab === 'audit' ? 'Diagnostics' : 'System');
       setActiveTab('preferences');
@@ -175,7 +186,10 @@ export function Shell({
   }, [navigate]);
   useEffect(() => {
     const handle = (event: Event) => {
-      setSettingsCategory((event as CustomEvent<SettingsCategory>).detail);
+      const destination = (event as CustomEvent<SettingsCategory | ProjectSettingsDestination>)
+        .detail;
+      setSettingsCategory(typeof destination === 'string' ? destination : destination.category);
+      setSettingsProjectId(typeof destination === 'string' ? undefined : destination.projectId);
       setActiveTab('preferences');
     };
     window.addEventListener('jackalope:open-settings', handle);
@@ -196,14 +210,13 @@ export function Shell({
         focusComposer();
       } else if ((event.metaKey || event.ctrlKey) && event.key === ',') {
         event.preventDefault();
-        setActiveTab((current) =>
-          current === 'preferences' ? previousView.current : 'preferences',
-        );
+        if (activeTab === 'preferences') setActiveTab(previousView.current);
+        else navigate('preferences');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusComposer]);
+  }, [activeTab, focusComposer, navigate]);
 
   return (
     <div className="workspace-shell">
@@ -211,7 +224,7 @@ export function Shell({
         Skip to workspace
       </a>
       <ResizeHandles />
-      <TitleBar onSettings={() => setActiveTab('preferences')} />
+      <TitleBar onSettings={() => navigate('preferences')} />
       <header className="workspace-chrome">
         <div className="flex items-center gap-4 min-w-0">
           <img src="/mascot.svg" alt="Jackalope" className="size-8 shrink-0" />
@@ -298,7 +311,7 @@ export function Shell({
             <Tooltip content="Settings (Ctrl+,)">
               <button
                 type="button"
-                onClick={() => setActiveTab('preferences')}
+                onClick={() => navigate('preferences')}
                 className="quiet-icon"
                 aria-label="Settings and preferences"
               >
@@ -418,8 +431,10 @@ export function Shell({
             )}
             {activeTab === 'preferences' && (
               <SettingsPage
-                key={settingsCategory}
+                key={`${settingsCategory}:${settingsProjectId ?? 'app'}`}
                 initialCategory={settingsCategory}
+                initialScope={settingsProjectId ? 'project' : 'app'}
+                initialProjectId={settingsProjectId}
                 onClose={() => setActiveTab(previousView.current)}
               />
             )}

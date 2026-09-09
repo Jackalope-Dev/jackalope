@@ -280,14 +280,8 @@ export function SettingsPage({
                   </Setting>
                 </>
               )}
-              {c === 'Appearance' && (
-                <>
-                  {(scope === 'app' || project) && (
-                    <AppearancePreferences
-                      projectId={scope === 'project' ? project?.id : undefined}
-                    />
-                  )}
-                </>
+              {c === 'Appearance' && (scope === 'app' || project) && (
+                <AppearancePreferences projectId={scope === 'project' ? project?.id : undefined} />
               )}
               {c === 'Agents' && (scope === 'app' || project) && (
                 <AgentPreferences
@@ -318,11 +312,7 @@ export function SettingsPage({
                 </>
               )}
               {c === 'Project' && (
-                <ProjectPreferences
-                  embedded
-                  section="repository"
-                  projectId={project?.id ?? '__none'}
-                />
+                <ProjectPreferences embedded projectId={project?.id ?? '__none'} />
               )}
               {c === 'System' && <SystemInfoView />}
               {c === 'Diagnostics' && <AuditLogWorkspace />}

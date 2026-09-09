@@ -5,10 +5,6 @@
 .appearance-preferences {
   max-width: 760px;
 }
-.appearance-preferences > .settings-row {
-  padding: 0 0 24px;
-  margin-bottom: 28px;
-}
 .appearance-toolbar-toggle {
   display: flex;
   align-items: center;
@@ -209,6 +205,11 @@
 
 .settings-row:last-child {
   border-bottom: none;
+}
+
+.appearance-preferences > .settings-row {
+  padding: 0 0 24px;
+  margin-bottom: 28px;
 }
 
 .settings-row-info {
@@ -662,6 +663,9 @@
   min-width: 0;
   max-width: 760px;
 }
+.project-preferences > :not(.workspace-heading) {
+  max-width: 760px;
+}
 .project-preferences-section {
   margin-top: 32px;
   padding-top: 28px;
@@ -676,6 +680,15 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
+}
+.project-identity-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+@media (max-width: 600px) {
+  .project-identity-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .project-preference-field {
   display: grid;
@@ -703,6 +716,13 @@
 .project-preferences-section > .settings-row {
   padding: 20px 0 0;
   margin-top: 8px;
+}
+.project-settings-links {
+  padding-top: 8px;
+}
+.project-settings-links > .settings-row {
+  margin: 0;
+  padding: 16px 0;
 }
 .project-preferences .settings-row-info,
 .agent-preferences .settings-row-info {
