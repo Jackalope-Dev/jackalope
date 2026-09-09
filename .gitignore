@@ -45,6 +45,9 @@ exports/
 secrets/
 .private/
 docs/internal/
+/publication/
+/docs/releases/*
+!/docs/releases/RELEASE-RECORD-TEMPLATE.md
 *.db
 *.db-*
 *.sqlite
