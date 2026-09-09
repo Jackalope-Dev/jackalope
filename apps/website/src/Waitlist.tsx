@@ -243,7 +243,7 @@ export function WaitlistPage() {
               </h2>
               <p>
                 {place.status === 'approved'
-                  ? 'Keep sharing the waitlist with as many people as you like. Your referral total keeps growing, and your five Instant Access Passes stay separate.'
+                  ? 'Keep sharing the waitlist with as many people as you like. Your referral total keeps growing.'
                   : 'Invite as many people to the waitlist as you like. Every new signup that verifies their email through your link earns you one day of priority.'}
               </p>
               <p className="access-fine">
@@ -253,7 +253,7 @@ export function WaitlistPage() {
               </p>
             </div>
             <div>
-              <label htmlFor="waitlist-share">Your unlimited waitlist link</label>
+              <label htmlFor="waitlist-share">Share your link with others to move up the waitlist</label>
               <input
                 id="waitlist-share"
                 value={place.shareUrl}
@@ -285,10 +285,6 @@ export function WaitlistPage() {
                   Copy link
                 </button>
               </div>
-              <small>
-                Your link shares the waitlist, never your private sign-in. It keeps working after
-                acceptance and uses none of your five passes.
-              </small>
             </div>
           </section>
           <aside className="waitlist-next">
@@ -301,8 +297,7 @@ export function WaitlistPage() {
               </h2>
               <p>
                 Accepted members get five Instant Access Passes. Each lets one person skip the line
-                after email verification. Unlimited waitlist referrals and your five passes are
-                separate.
+                after email verification.
               </p>
             </div>
           </aside>
