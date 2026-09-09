@@ -612,6 +612,8 @@ mod tests {
             verified_at: 0,
             feedback: feedback::LocalFeedback::default(),
             settings_sync: false,
+            settings_sync_pending: false,
+            settings_sync_automatic: false,
         };
         let result = serde_json::to_string(&status("pending", Some(&record))).unwrap();
         assert!(!result.contains(&record.secret));
@@ -631,6 +633,8 @@ mod tests {
             verified_at: 0,
             feedback: feedback::LocalFeedback::default(),
             settings_sync: false,
+            settings_sync_pending: false,
+            settings_sync_automatic: false,
         };
         assert!(bound(
             &record,

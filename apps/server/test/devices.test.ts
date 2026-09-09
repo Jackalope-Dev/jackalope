@@ -192,6 +192,17 @@ it('deletion removes the copy, stops every device and prevents stale uploads fro
     (await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, b)).status,
   ).toBe(200);
 });
+it('default-on connections honor account deletion until the user explicitly enables sync', async () => {
+  const owner = await member();
+  const first = await connectedDevice(owner);
+  expect(await (await call('/v1/desktop/settings/consent', 'POST', { enabled: true, automatic: true }, first)).json()).toEqual({ enabled: true });
+  await call('/v1/desktop/settings', 'DELETE', undefined, first);
+  const replacement = await connectedDevice(owner);
+  expect(await (await call('/v1/desktop/settings/consent', 'POST', { enabled: true, automatic: true }, replacement)).json()).toEqual({ enabled: false });
+  expect((await call('/v1/desktop/settings', 'GET', undefined, replacement)).status).toBe(403);
+  await enableSync(replacement);
+  expect((await call('/v1/desktop/settings', 'PUT', { revision: 0, settings: preferences }, replacement)).status).toBe(200);
+});
 it('turning sync off preserves the saved copy; deleting the member cascades to that copy', async () => {
   const owner = await member();
   const secret = await connectedDevice(owner);
