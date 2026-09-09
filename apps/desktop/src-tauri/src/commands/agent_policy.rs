@@ -182,7 +182,30 @@ impl TaskRuntime {
             }
             request.agent = policy.default_meta_agent.clone();
         }
-        policy.resolve(&request.agent)?;
+        let (adapter, _) = policy.resolve(&request.agent)?;
+        if let Some(project) = policy.projects.get(&request.project_id) {
+            if project
+                .allowed_agents
+                .as_ref()
+                .is_some_and(|agents| !agents.contains(&request.agent))
+            {
+                return Err("This agent is disabled for this project in Settings.".into());
+            }
+            if let Some(account) = project
+                .agent_accounts
+                .get(&adapter)
+                .or_else(|| project.agent_accounts.get(&request.agent))
+            {
+                if request
+                    .agent_profile_id
+                    .as_ref()
+                    .is_some_and(|id| id != account)
+                {
+                    return Err("Choose the account assigned to this project in Settings.".into());
+                }
+                request.agent_profile_id = Some(account.clone());
+            }
+        }
         request.model = policy.model(&request.agent, request.model.as_deref())?;
         Ok(())
     }
@@ -222,13 +245,22 @@ mod tests {
     #[test]
     fn account_restrictions_apply_to_app_project_and_custom_adapters() {
         let mut policy = AgentPolicy::default();
-        let mut binding = super::super::agent_profiles::AccountBinding { adapter: "codex".into(), profile_id: Some("work".into()), directory: PathBuf::new(), label: "fixture".into() };
+        let mut binding = super::super::agent_profiles::AccountBinding {
+            adapter: "codex".into(),
+            profile_id: Some("work".into()),
+            directory: PathBuf::new(),
+            label: "fixture".into(),
+        };
         assert!(policy.account_allowed("project", "custom", &binding));
-        policy.disabled_accounts.insert("codex".into(), vec!["work".into()]);
+        policy
+            .disabled_accounts
+            .insert("codex".into(), vec!["work".into()]);
         assert!(!policy.account_allowed("project", "custom", &binding));
         policy.disabled_accounts.clear();
         let mut project = ProjectAgentPolicy::default();
-        project.disabled_accounts.insert("codex".into(), vec!["work".into(), "__default".into()]);
+        project
+            .disabled_accounts
+            .insert("codex".into(), vec!["work".into(), "__default".into()]);
         policy.projects.insert("project".into(), project);
         assert!(!policy.account_allowed("project", "codex", &binding));
         assert!(policy.account_allowed("other", "codex", &binding));

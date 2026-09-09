@@ -6,19 +6,7 @@ import {
   ReactFlow,
   type ReactFlowInstance,
 } from '@xyflow/react';
-import {
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Download,
-  FileCode2,
-  Folder,
-  ListTodo,
-  Network,
-  RefreshCw,
-  Search,
-  Settings2,
-} from 'lucide-react';
+import { ArrowLeft, Download, FileCode2, Folder, Network, RefreshCw, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type CodebaseReference,
@@ -29,9 +17,7 @@ import {
 } from '../../lib/codebase';
 import { dependencyCycles, directoryOf, GRAPH_LIMIT, mapGraph } from '../../lib/codebase-graph';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Input } from '../ui/input';
@@ -39,10 +25,10 @@ import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import '@xyflow/react/dist/style.css';
+import { CodebaseChecks } from './CodebaseChecks';
 import './codebase.css';
 
 export default function CodebaseExplorer({ project }: { project: Project }) {
-  const memory = useContextMemoryStore((state) => state.memories[project.id]);
   const [snapshot, setSnapshot] = useState<CodebaseSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -56,7 +42,6 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
   const [mode, setMode] = useState<'map' | 'checks'>('map');
   const [flow, setFlow] = useState<ReactFlowInstance | null>(null);
   const [page, setPage] = useState(1);
-  const [checkLimit, setCheckLimit] = useState(100);
   const mounted = useRef(true);
   const running = useRef(false);
   const mapRegion = useRef<HTMLElement>(null);
@@ -355,99 +340,48 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
                 Checks <span className="codebase-count">{checkCount}</span>
               </Button>
             </fieldset>
-            <div className="codebase-search">
-              <Search size={17} aria-hidden="true" />
-              <Input
-                aria-label="Find a file"
-                placeholder="Find a file or directory…"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setSelected(null);
-                  setMode('map');
-                  setPage(1);
-                }}
-              />
-            </div>
-            <Select
-              aria-label="File language"
-              value={language}
-              onValueChange={(value) => {
-                setLanguage(value);
-                setSelected(null);
-                setPage(1);
-              }}
-            >
-              <SelectItem value="all">All languages</SelectItem>
-              {languages.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {value}
-                </SelectItem>
-              ))}
-            </Select>
+            {mode === 'map' && (
+              <>
+                <div className="codebase-search">
+                  <Search size={17} aria-hidden="true" />
+                  <Input
+                    aria-label="Find a file"
+                    placeholder="Find a file or directory…"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setSelected(null);
+                      setMode('map');
+                      setPage(1);
+                    }}
+                  />
+                </div>
+                <Select
+                  aria-label="File language"
+                  value={language}
+                  onValueChange={(value) => {
+                    setLanguage(value);
+                    setSelected(null);
+                    setPage(1);
+                  }}
+                >
+                  <SelectItem value="all">All languages</SelectItem>
+                  {languages.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </>
+            )}
           </div>
           {mode === 'checks' ? (
-            <div className="codebase-checks">
-              <p className="task-muted">
-                Checks cover the relationships resolved in this snapshot. Cycles include type-only
-                and dynamic imports; they are review candidates, not proof of a runtime fault.
-              </p>
-              <h2>
-                Dependency cycles <span>{cycles.length}</span>
-              </h2>
-              {cycles.length === 0 && (
-                <p className="task-muted">No cycles found among resolved file imports.</p>
-              )}
-              {cycles.slice(0, checkLimit).map((cycle) => (
-                <div key={cycle.join('|')} className="codebase-cycle">
-                  <span>Mutually reachable files</span>
-                  {cycle.map((path) => (
-                    <button type="button" key={path} onClick={() => inspect(path)}>
-                      {path}
-                      <ArrowRight size={14} />
-                    </button>
-                  ))}
-                </div>
-              ))}
-              <h2>
-                Unresolved local references <span>{unresolved.length}</span>
-              </h2>
-              <p className="task-muted">
-                These may refer to generated, excluded, missing, or custom-resolved files. They are
-                not compiler errors.
-              </p>
-              {unresolved.slice(0, checkLimit).map((ref) => (
-                <button
-                  type="button"
-                  className="codebase-check-row"
-                  key={`${ref.source}:${ref.line}:${ref.specifier}`}
-                  onClick={() => inspect(ref.source)}
-                >
-                  <span>
-                    {ref.source}:{ref.line}
-                  </span>
-                  <code>{ref.specifier}</code>
-                  <small>{ref.status}</small>
-                </button>
-              ))}
-              <h2>
-                Analysis notes <span>{snapshot.diagnostics.length}</span>
-              </h2>
-              {snapshot.diagnostics.length === 0 && (
-                <p className="task-muted">No file-reading or parsing problems reported.</p>
-              )}
-              {snapshot.diagnostics.slice(0, checkLimit).map((item) => (
-                <p className="codebase-note" key={`${item.path}:${item.message}`}>
-                  <strong>{item.path}</strong> {item.message}
-                </p>
-              ))}
-              {Math.max(cycles.length, unresolved.length, snapshot.diagnostics.length) >
-                checkLimit && (
-                <Button variant="ghost" onClick={() => setCheckLimit(checkLimit + 100)}>
-                  Show more checks
-                </Button>
-              )}
-            </div>
+            <CodebaseChecks
+              snapshot={snapshot}
+              cycles={cycles}
+              unresolved={unresolved}
+              inspect={inspect}
+            />
           ) : (
             <>
               {(folder || selected || query || language !== 'all') && (
@@ -627,46 +561,6 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
           </details>
         </>
       )}
-      <div className="codebase-landing">
-        <div className="codebase-intro">
-          <h2>{project.name}</h2>
-          <p className="task-muted">
-            {memory?.summary ||
-              project.description ||
-              'Explore this repository, review its context, and turn open work into tasks.'}
-          </p>
-          {memory?.techStack?.length ? (
-            <div className="codebase-stack">
-              {memory.techStack.slice(0, 6).map((tech) => (
-                <span key={tech}>{tech}</span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <nav className="codebase-shortcuts" aria-label="Project shortcuts">
-          <Button variant="outline" onClick={() => navigateWorkspace('project-knowledge')}>
-            <BookOpen size={18} />
-            <span>
-              Project context<small>Instructions and saved knowledge</small>
-            </span>
-            <ArrowRight size={16} />
-          </Button>
-          <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
-            <ListTodo size={18} />
-            <span>
-              Repo TODOs<small>Review open work and start a task</small>
-            </span>
-            <ArrowRight size={16} />
-          </Button>
-          <Button variant="outline" onClick={() => navigateWorkspace('project-settings')}>
-            <Settings2 size={18} />
-            <span>
-              Project settings<small>Agents, appearance and workflow</small>
-            </span>
-            <ArrowRight size={16} />
-          </Button>
-        </nav>
-      </div>
     </div>
   );
 }

@@ -12,11 +12,13 @@ export function McpConnectionForm({
   editing = false,
   onCancel,
   onSaved,
+  onBusyChange,
 }: {
   initial?: Partial<McpServerConfig>;
   editing?: boolean;
   onCancel: () => void;
   onSaved: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const { projects, activeProjectId } = useProjectStore();
   const project = projects.find((project) => project.id === activeProjectId);
@@ -78,6 +80,7 @@ export function McpConnectionForm({
           'Use unique environment variable names with letters, numbers and underscores.',
         );
       setBusy(true);
+      onBusyChange?.(true);
       await useMcpStore.getState().saveServer({
         ...initial,
         id,
@@ -101,6 +104,7 @@ export function McpConnectionForm({
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   };
   return (

@@ -411,7 +411,7 @@ export function RepoTodos({
                                     </div>
                                     <div className="repo-todo-actions">
                                       <Button
-                                        variant="ghost"
+                                        variant="primary"
                                         disabled={saving}
                                         onClick={() => {
                                           const draftKey = `repo-todo:${JSON.stringify([project.id, selected, item.line, item.title])}`;

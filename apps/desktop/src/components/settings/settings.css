@@ -764,3 +764,13 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.project-preferences .settings-input {
+  min-width: 0;
+}
+@container (max-width: 520px) {
+  .project-preferences .settings-control-wrapper,
+  .agent-preferences .settings-control-wrapper {
+    max-width: 100%;
+  }
+}

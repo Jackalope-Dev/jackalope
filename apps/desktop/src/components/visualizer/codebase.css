@@ -381,58 +381,6 @@
   }
 }
 
-.codebase-landing {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
-  gap: 28px;
-  padding: 24px 0;
-}
-.codebase-intro h2 {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-.codebase-intro p {
-  line-height: 1.7;
-  max-width: 62ch;
-}
-.codebase-stack {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 18px;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-}
-.codebase-shortcuts {
-  display: grid;
-  gap: 10px;
-}
-.codebase-shortcuts button {
-  height: auto;
-  min-height: 68px;
-  justify-content: start;
-  padding: 12px 16px;
-  gap: 14px;
-}
-.codebase-shortcuts span {
-  flex: 1;
-  text-align: left;
-  min-width: 0;
-}
-.codebase-shortcuts small {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  font-weight: 400;
-  margin-top: 4px;
-}
-@media (max-width: 800px) {
-  .codebase-landing {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .codebase-page > .workspace-heading {
   margin-bottom: 12px;
 }
@@ -454,4 +402,168 @@
 }
 .codebase-search input {
   padding-left: 38px;
+}
+
+.codebase-checks-visual {
+  display: grid;
+  gap: 20px;
+}
+.codebase-check-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.codebase-check-overview > button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  text-align: left;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 16px;
+  cursor: pointer;
+}
+.codebase-check-overview > button[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-selection);
+}
+.codebase-check-overview svg {
+  color: var(--color-accent-ink);
+}
+.codebase-check-overview strong {
+  font-size: var(--text-xl);
+}
+.codebase-check-overview h2,
+.codebase-check-overview p {
+  grid-column: 1 / -1;
+}
+.codebase-check-overview h2 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.codebase-check-overview p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+.codebase-check-filter {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.codebase-check-filter label {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+}
+.codebase-check-filter svg {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  color: var(--color-text-muted);
+}
+.codebase-check-filter input {
+  padding-left: 38px;
+  width: 100%;
+}
+.codebase-finding-section > h2 {
+  font-size: var(--text-lg);
+  margin: 8px 0 14px;
+  font-weight: 600;
+}
+.codebase-finding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+}
+.codebase-finding {
+  min-width: 0;
+  padding: 18px;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+.codebase-finding header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: var(--text-sm);
+}
+.codebase-finding header svg {
+  flex-shrink: 0;
+  color: var(--color-accent-ink);
+}
+.codebase-finding h3 {
+  font-weight: 600;
+  min-width: 0;
+}
+.codebase-finding p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+.codebase-cycle-files {
+  display: grid;
+  margin-top: 12px;
+  gap: 6px;
+}
+.codebase-cycle-files button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px;
+  text-align: left;
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.codebase-cycle-files button span {
+  flex: 1;
+  min-width: 0;
+}
+.codebase-finding .codebase-cycle-files svg {
+  flex-shrink: 0;
+}
+.codebase-reference-finding {
+  cursor: pointer;
+}
+.codebase-reference-finding header > span {
+  flex: 1;
+}
+.codebase-reference-finding > strong {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  margin: 12px 0;
+}
+.codebase-reference-finding p span {
+  display: block;
+  margin-top: 4px;
+}
+.codebase-check-empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+.codebase-check-empty h3 {
+  font-size: var(--text-lg);
+  color: var(--color-text-primary);
+}
+.codebase-check-empty p {
+  font-size: var(--text-sm);
+}
+@media (max-width: 700px) {
+  .codebase-check-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -504,7 +504,7 @@ try {
   await page.screenshot({ path: 'output/playwright/project-settings-700.png' });
   await navigate('topology');
   await page.getByRole('heading', { name: 'Codebase', exact: true }).waitFor();
-  await page.getByRole('navigation', { name: 'Project shortcuts' }).waitFor();
+  assert.equal(await page.getByRole('navigation', { name: 'Project shortcuts' }).count(), 0);
   await page.getByRole('textbox', { name: 'Find a file', exact: true }).waitFor();
   assert.equal(
     await page.evaluate(
@@ -514,6 +514,96 @@ try {
   );
   await page.setViewportSize({ width: 1280, height: 840 });
   await page.screenshot({ path: 'output/playwright/codebase-ready.png' });
+  await page.getByRole('button', { name: /^Checks/ }).click();
+  await page.getByRole('heading', { name: 'No findings in this snapshot' }).waitFor();
+  await page.screenshot({ path: 'output/playwright/codebase-checks-empty.png' });
+  await page.evaluate(() => {
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = async (command, args) =>
+      command === 'codebase_scan'
+        ? {
+            root: 'C:/fixture/trail',
+            scannedAt: new Date().toISOString(),
+            durationMs: 10,
+            truncated: false,
+            files: ['src/main.ts', 'src/helper.ts'].map((path) => ({
+              path,
+              language: 'TypeScript',
+              lines: 10,
+              bytes: 100,
+              analyzed: true,
+            })),
+            references: [
+              {
+                source: 'src/main.ts',
+                target: 'src/helper.ts',
+                specifier: './helper',
+                line: 1,
+                kind: 'import',
+                status: 'resolved',
+              },
+              {
+                source: 'src/helper.ts',
+                target: 'src/main.ts',
+                specifier: './main',
+                line: 1,
+                kind: 'import',
+                status: 'resolved',
+              },
+              {
+                source: 'src/main.ts',
+                target: null,
+                specifier: './missing',
+                line: 3,
+                kind: 'import',
+                status: 'unresolved',
+              },
+            ],
+            cycles: [],
+            diagnostics: [
+              { path: 'src/helper.ts', message: 'Some computed imports could not be analyzed.' },
+            ],
+          }
+        : invoke(command, args);
+  });
+  await page.getByRole('button', { name: /Refresh map|Update map/ }).click();
+  await page.getByRole('heading', { name: '2 connected files', exact: true }).waitFor();
+  await page.getByRole('textbox', { name: 'Search checks' }).fill('missing');
+  await page.getByRole('button', { name: /Target not resolved.*missing/ }).waitFor();
+  await page.getByRole('textbox', { name: 'Search checks' }).fill('');
+
+  for (const width of [1280, 960]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    for (const isDark of [false, true]) {
+      await page.evaluate(async (isDark) => {
+        const { useThemeStore } = await window.storeModule('themeStore');
+        useThemeStore
+          .getState()
+          .setTheme({ ...useThemeStore.getState().currentTheme, appearance: 'manual', isDark });
+      }, isDark);
+      await page.screenshot({
+        path: `output/playwright/checks-${isDark ? 'dark' : 'light'}-${width}.png`,
+      });
+      assert.ok(
+        await page
+          .locator('.codebase-page')
+          .evaluate((element) => element.scrollWidth <= element.clientWidth),
+      );
+    }
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await navigate('preferences');
+  await page
+    .getByRole('navigation', { name: 'Settings categories' })
+    .getByRole('button', { name: 'Appearance', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'working', exact: true }).click();
+  await page.waitForTimeout(400);
+  const pose = await page.locator('[data-mascot-effort] path').first().getAttribute('style');
+  await page.waitForTimeout(450);
+  assert.equal(await page.locator('[data-mascot-effort] path').first().getAttribute('style'), pose);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+
   await navigate('usage');
   await page.getByRole('heading', { name: 'Usage & Intelligence', exact: true }).waitFor();
   await page.getByText('80% remaining', { exact: true }).waitFor();

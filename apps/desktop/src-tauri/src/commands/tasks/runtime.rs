@@ -313,6 +313,14 @@ impl TaskRuntime {
                 }
             }
         }
+        if policy
+            .projects
+            .get(&req.project_id)
+            .and_then(|project| project.allowed_agents.as_ref())
+            .is_some_and(|agents| !agents.contains(&req.agent))
+        {
+            return Err("This agent was disabled for the project before launch.".into());
+        }
         let mut cmd = command(executable);
         if let Some(binding) = &req.account_binding {
             if !self

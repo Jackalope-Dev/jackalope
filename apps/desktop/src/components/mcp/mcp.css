@@ -862,3 +862,13 @@
     padding: 24px;
   }
 }
+
+.mcp-connection-form .task-label {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.mcp-connection-form .task-label .task-input {
+  width: 100%;
+  min-width: 0;
+}

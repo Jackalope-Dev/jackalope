@@ -1,5 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
+import { useState } from 'react';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { McpConnectionForm } from './McpConnectionForm';
@@ -12,18 +13,19 @@ export function McpAddCustomModal({
   onClose: () => void;
   existingServer?: McpServerConfig | null;
 }) {
+  const [busy, setBusy] = useState(false);
   const focus = useDialogFocus();
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open && !busy) onClose();
       }}
     >
       <Dialog.Portal>
         <Dialog.Overlay className="task-dialog-overlay" />
         <Dialog.Content {...focus} className="task-dialog appearance-panel mcp-connection-dialog">
-          <Dialog.Close className="task-close" aria-label="Close dialog">
+          <Dialog.Close disabled={busy} className="task-close" aria-label="Close dialog">
             <X size={18} />
           </Dialog.Close>
           <Dialog.Title className="text-xl font-medium">
@@ -37,6 +39,7 @@ export function McpAddCustomModal({
             editing={!!existingServer}
             onCancel={onClose}
             onSaved={onClose}
+            onBusyChange={setBusy}
           />
         </Dialog.Content>
       </Dialog.Portal>

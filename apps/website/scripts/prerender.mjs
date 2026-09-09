@@ -4,7 +4,7 @@ import { createServer, loadEnv } from 'vite';
 
 const server = await createServer({
   mode: 'production',
-  server: { middlewareMode: true },
+  server: { middlewareMode: true, watch: null },
   appType: 'custom',
 });
 try {

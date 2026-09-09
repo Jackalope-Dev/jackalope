@@ -9,7 +9,7 @@
       "Share project settings between Settings and the project workspace, with agent and account permissions and optional project themes.",
       "Open agent configuration directly from its card and discover model catalogs from supported CLIs.",
       "Use one MCP connection editor for the marketplace and custom connections, with project and agent scope controls.",
-      "Open an automatically prepared codebase map, with context and project shortcuts beneath it.",
+      "Open an automatically prepared codebase map with a compact toolbar and visual checks.",
       "Warm account quotas, model catalogs and tool settings during setup; show remaining invitations and a livelier working companion."
     ],
     "note": "In development. CLI support and account access determine available models and connections."
@@ -354,9 +354,7 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": [
-      "A Follow on X link is available in the shared footer."
-    ],
+    "items": ["A Follow on X link is available in the shared footer."],
     "note": "Website milestone, not a public product release."
   },
   {

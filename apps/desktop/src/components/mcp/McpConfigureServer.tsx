@@ -17,6 +17,7 @@ export function McpConfigureServer({
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const projectId = useProjectStore((state) => state.activeProjectId);
+  const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     heading.current?.focus();
@@ -28,7 +29,7 @@ export function McpConfigureServer({
   };
   return (
     <section className="mcp-configure-page" aria-label={`Configure ${marketplaceName(server)}`}>
-      <Button variant="ghost" onClick={onClose}>
+      <Button variant="ghost" disabled={busy} onClick={onClose}>
         <ArrowLeft size={16} />
         Back to server
       </Button>
@@ -77,6 +78,7 @@ export function McpConfigureServer({
             }}
             onCancel={onClose}
             onSaved={() => setSaved(true)}
+            onBusyChange={setBusy}
           />
         </>
       )}
