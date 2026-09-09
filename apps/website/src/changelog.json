@@ -1,11 +1,24 @@
 [
   {
+    "id": "cleaner-tour-preview",
+    "date": "2026-09-09",
+    "status": "Website",
+    "title": "A cleaner tour preview",
+    "description": "The app tour opens with less surrounding text.",
+    "items": [
+      "Removed the duration, preview, sample-data and music metadata line from the video dialog and tour page."
+    ],
+    "note": "Video controls, descriptive captions and the transcript remain available."
+  },
+  {
     "id": "clearer-pass-sharing",
     "date": "2026-09-09",
     "status": "In development",
     "title": "Clearer pass sharing.",
     "description": "Pass links confirm copying directly in the share button.",
-    "items": ["Removed extra pass-sharing copy and simplified website punctuation."],
+    "items": [
+      "Removed extra pass-sharing copy and simplified website punctuation."
+    ],
     "note": "Website update pending deployment."
   },
   {
@@ -209,7 +222,9 @@
     "status": "In development",
     "title": "Simpler settings header",
     "description": "Settings now opens directly at its heading.",
-    "items": ["Removed the extra Back to workspace link."],
+    "items": [
+      "Removed the extra Back to workspace link."
+    ],
     "note": "In development."
   },
   {
@@ -288,7 +303,9 @@
     "status": "In development",
     "title": "A flatter command shortcut.",
     "description": "The top-bar Jump to control fits more quietly into the workspace.",
-    "items": ["Removed the inset shadow from the Jump to search control."],
+    "items": [
+      "Removed the inset shadow from the Jump to search control."
+    ],
     "note": "In development. Included in the next desktop release."
   },
   {
@@ -768,7 +785,9 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": ["A Follow on X link is available in the shared footer."],
+    "items": [
+      "A Follow on X link is available in the shared footer."
+    ],
     "note": "Website milestone, not a public product release."
   },
   {

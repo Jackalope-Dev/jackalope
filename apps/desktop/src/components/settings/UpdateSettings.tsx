@@ -1,13 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useUpdateStore } from '../../stores/updateStore';
 import { Button } from '../ui/button';
+import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { ReleaseNotes } from './ReleaseNotes';
 
-export function UpdateSettings() {
+export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }) {
   const update = useUpdateStore();
+  const channelId = useId();
   const runs = useExecutionStore((state) => state.runs);
   const desktop = isTauriEnvironment();
   const blocked = runs.some(
@@ -25,40 +27,39 @@ export function UpdateSettings() {
     : null;
   return (
     <section className="space-y-3" aria-label="App updates">
-      <h3 className="text-base font-medium">
-        App updates{release ? ` · ${release.currentVersion}` : ''}
-      </h3>
-      <p className="settings-row-description">
-        {!desktop
-          ? 'Updates are available in the desktop app.'
-          : !release
-            ? 'Reading update settings…'
-            : release.storeManaged
-              ? 'Microsoft Store manages updates for this installation. Open Microsoft Store > Library to check for updates.'
-              : !release.configured
-                ? 'This local build has no configured update service.'
-                : 'Get new improvements without reinstalling manually. You choose when to install; Jackalope closes and reopens.'}
-      </p>
+      {showHeading && <h3 className="text-base font-medium">App updates</h3>}
+      {release && <p className="settings-row-description">Version {release.currentVersion}</p>}
+      {(!desktop || !release || release.storeManaged || !release.configured) && (
+        <p className="settings-row-description">
+          {!desktop
+            ? 'Updates are available in the desktop app.'
+            : !release
+              ? 'Reading update settings…'
+              : release.storeManaged
+                ? 'Check for updates in Microsoft Store → Library.'
+                : 'Updates aren’t configured for this build.'}
+        </p>
+      )}
       {release?.configured && release.betaAvailable && (
         <div className="space-y-2">
-          <label htmlFor="update-channel" className="block text-sm font-medium">
+          <label htmlFor={channelId} className="block text-sm font-medium">
             Update channel
           </label>
-          <select
-            id="update-channel"
+          <Select
+            id={channelId}
             className="settings-input"
             value={release.channel}
             disabled={busy}
-            onChange={(event) => void update.setChannel(event.target.value as 'stable' | 'beta')}
+            onValueChange={(value) => void update.setChannel(value as 'stable' | 'beta')}
           >
-            <option value="stable">Stable</option>
-            <option value="beta">Beta — early access</option>
-          </select>
-          <p className="settings-row-description">
-            Beta releases may have unfinished features or regressions. Switching back waits for a
-            newer stable release; it does not downgrade. Usage sharing is controlled separately in
-            Privacy.
-          </p>
+            <SelectItem value="stable">Stable</SelectItem>
+            <SelectItem value="beta">Beta</SelectItem>
+          </Select>
+          {release.channel === 'beta' && (
+            <p className="settings-row-description">
+              Beta includes early changes. Switching to Stable waits for a newer release.
+            </p>
+          )}
         </div>
       )}
       {release?.configured && (
@@ -66,9 +67,7 @@ export function UpdateSettings() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Automatically check for updates</p>
-              <p className="settings-row-description">
-                Check on startup and every six hours. Install updates manually.
-              </p>
+              <p className="settings-row-description">You choose when to install.</p>
             </div>
             <Switch
               label="Automatically check for updates"
@@ -79,14 +78,12 @@ export function UpdateSettings() {
           <Button variant="outline" disabled={busy} onClick={() => void update.check()}>
             {update.checking ? 'Checking…' : 'Check for updates'}
           </Button>
-          {update.lastChecked !== null && !update.checking && (
-            <p className="settings-row-description">
-              Last checked {new Date(update.lastChecked).toLocaleString()}.
-              {!release.availableVersion && !update.error
-                ? ' You have the latest available version.'
-                : ''}
-            </p>
-          )}
+          {update.lastChecked !== null &&
+            !update.checking &&
+            !update.error &&
+            !release.availableVersion && (
+              <p className="settings-row-description">You’re up to date.</p>
+            )}
         </>
       )}
       {release?.availableVersion && (
@@ -100,8 +97,7 @@ export function UpdateSettings() {
           )}
           {blocked && (
             <p className="text-sm" role="status">
-              Finish active tasks, resolve interrupted work, and save task history before
-              installing.
+              Finish active tasks, resolve interrupted work and save task history to install.
             </p>
           )}
           <Button disabled={busy || blocked} onClick={() => void update.install()}>
@@ -111,12 +107,12 @@ export function UpdateSettings() {
                 : percent === null
                   ? 'Downloading update…'
                   : `Downloading update… ${percent}%`
-              : 'Install update and reopen'}
+              : 'Install and restart'}
           </Button>
           {update.installing && (
             <p className="settings-row-description" role="status">
               {progress?.phase === 'installing'
-                ? 'Download complete. Verifying and installing the signed update…'
+                ? 'Installing update…'
                 : 'Keep Jackalope open while the update downloads.'}
             </p>
           )}

@@ -45,7 +45,7 @@ export function UpdateNotice() {
               title: update.installing
                 ? 'Updating Jackalope…'
                 : `Jackalope ${version} is available`,
-              detail: 'Review what’s new and install when your work is saved.',
+              detail: 'Ready to install when your work is saved.',
               kind: 'info',
               actionLabel: 'Review update',
               onOpen: () => setOpen(true),
@@ -61,17 +61,13 @@ export function UpdateNotice() {
         <Dialog.Content
           className="task-dialog appearance-panel history-recovery-dialog"
           onCloseAutoFocus={returnToCompanion}
+          aria-describedby={undefined}
         >
           <Dialog.Close className="task-close" aria-label="Close update details">
             <X size={18} />
           </Dialog.Close>
-          <Dialog.Title className="text-xl font-medium pr-10">
-            Keep Jackalope up to date
-          </Dialog.Title>
-          <Dialog.Description className="task-muted mt-3 mb-6">
-            Review what’s new and install when your work is saved.
-          </Dialog.Description>
-          <UpdateSettings />
+          <Dialog.Title className="text-xl font-medium pr-10 mb-6">App updates</Dialog.Title>
+          <UpdateSettings showHeading={false} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

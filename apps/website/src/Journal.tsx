@@ -66,9 +66,6 @@ export function JournalPage({ path }: { path: string }) {
           <p className="article-deck">
             Make it yours, put your agents to work, and explore how your code fits together.
           </p>
-          <p className="article-byline">
-            {tour.durationSeconds} seconds · Product walkthrough · Sample data · Music
-          </p>
         </header>
         <video
           className="tour-player"

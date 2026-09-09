@@ -281,8 +281,8 @@ export function App({ path = '/' }: { path?: string }) {
             <div className="video-heading">
               <div>
                 <Dialog.Title>Jackalope walkthrough</Dialog.Title>
-                <Dialog.Description>
-                  {tour.durationSeconds} seconds · Product walkthrough · Sample data · Music
+                <Dialog.Description className="sr-only">
+                  Explore the Jackalope workspace.
                 </Dialog.Description>
               </div>
               <Dialog.Close className="icon-button" aria-label="Close walkthrough">
