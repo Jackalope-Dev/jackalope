@@ -160,7 +160,7 @@ const button = (action: string, link: string, arrow = false) =>
  * The one action in a message.
  *
  * With a stamp it sits in a labelled panel that names what the link is for.
- * Without one — where the surrounding copy already says it plainly — the button
+ * Without one - where the surrounding copy already says it plainly - the button
  * stands on its own, centred, with nothing around it.
  */
 function callout(stamp: string, action: string, link: string) {

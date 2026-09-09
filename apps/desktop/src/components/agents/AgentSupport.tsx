@@ -4,6 +4,12 @@ export function AgentSupport({ adapter }: { adapter: string }) {
   const support = agentCapabilities(adapter);
   if (!support)
     return <p className="task-muted">Choose a supported adapter to see its capabilities.</p>;
+  if (['gemini', 'aider', 'goose'].includes(adapter))
+    return (
+      <p className="task-muted mt-4">
+        Separate account setup is available. Running tasks with this agent is still in development.
+      </p>
+    );
   const rows = [
     ['Project context, task awareness & messages', 'Available'],
     [
@@ -21,7 +27,14 @@ export function AgentSupport({ adapter }: { adapter: string }) {
       support.direct.length ? 'Direct and on-demand tools' : 'On-demand tools',
     ],
     ['Continuation, stop & saved history', 'Available'],
-    ['Separate accounts', adapter === 'antigravity' ? 'Gemini API keys; current CLI subscription login' : support.accounts ? 'Available' : 'Current CLI account only'],
+    [
+      'Separate accounts',
+      adapter === 'antigravity'
+        ? 'Gemini API keys; current CLI subscription login'
+        : support.accounts
+          ? 'Available'
+          : 'Current CLI account only',
+    ],
     ['Subscription capacity', support.capacity ? 'When reported by the account' : 'Not reported'],
   ];
   return (

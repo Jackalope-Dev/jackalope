@@ -8,7 +8,7 @@
  * attributes and keeps them reconciled.
  *
  * Tags answer "who is this"; attributes answer "with what detail". Segments in
- * Sequenzy are built on top of both, so keep the vocabulary small and stable —
+ * Sequenzy are built on top of both, so keep the vocabulary small and stable -
  * renaming a tag silently empties every segment that referenced it.
  */
 

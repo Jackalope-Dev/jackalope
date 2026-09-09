@@ -16,7 +16,14 @@ const providers = [
   ['MISTRAL_API_KEY', 'Mistral'],
 ] as const;
 
-export function AgentKeySignIn({ agentId, agentName, profile, onSaved, onClose, returnFocus }: {
+export function AgentKeySignIn({
+  agentId,
+  agentName,
+  profile,
+  onSaved,
+  onClose,
+  returnFocus,
+}: {
   agentId: string;
   agentName: string;
   profile: AgentProfile;
@@ -31,49 +38,107 @@ export function AgentKeySignIn({ agentId, agentName, profile, onSaved, onClose, 
   const [useForTasks, setUseForTasks] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  return <Dialog.Root open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
-    <Dialog.Portal>
-      <Dialog.Overlay className="task-dialog-overlay" />
-      <Dialog.Content {...focus} className="task-dialog appearance-panel confirm-action-dialog"
-        onCloseAutoFocus={(event) => {
-          if (returnFocus?.isConnected) { event.preventDefault(); returnFocus.focus(); }
-          else focus.onCloseAutoFocus(event);
-        }}>
-        <Dialog.Title className="text-xl font-medium">Connect {agentName} · {profile.name}</Dialog.Title>
-        <Dialog.Description className="task-muted mt-2">
-          {antigravity
-            ? 'Separate Antigravity accounts use Gemini API keys, with separate API billing. Google subscription logins still use the existing CLI account.'
-            : 'Connect a provider API key for this account. Each account keeps its own credentials and provider billing.'}
-        </Dialog.Description>
-        <form className="grid gap-4 mt-4" onSubmit={async (event) => {
-          event.preventDefault(); setBusy(true); setError('');
-          try {
-            await saveAgentProfileKey(agentId, profile.id, provider, key);
-            setKey('');
-            await onSaved(useForTasks);
-            onClose();
-          } catch (error) { setError(String(error)); }
-          finally { setBusy(false); }
-        }}>
-          {!antigravity && <Select aria-label="API provider" value={provider} onValueChange={setProvider} disabled={busy}>
-            {providers.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-          </Select>}
-          <label className="task-label">API key
-            <input className="task-input" type="password" autoComplete="off" spellCheck={false}
-              value={key} onChange={(event) => setKey(event.target.value)} required disabled={busy} maxLength={8192} />
-          </label>
-          <p className="task-muted text-sm">Stored locally. Sent only to the selected agent for authentication.</p>
-          <label className="flex items-center gap-3 min-h-11">
-            <input type="checkbox" checked={useForTasks} onChange={(event) => setUseForTasks(event.target.checked)} disabled={busy} />
-            Use for new tasks
-          </label>
-          {error && <p role="alert" className="task-error">{error}</p>}
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={busy || !key.trim()}>{busy ? 'Saving…' : 'Connect account'}</Button>
-          </div>
-        </form>
-      </Dialog.Content>
-    </Dialog.Portal>
-  </Dialog.Root>;
+  return (
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="task-dialog-overlay" />
+        <Dialog.Content
+          {...focus}
+          className="task-dialog appearance-panel confirm-action-dialog"
+          onCloseAutoFocus={(event) => {
+            if (returnFocus?.isConnected) {
+              event.preventDefault();
+              returnFocus.focus();
+            } else focus.onCloseAutoFocus(event);
+          }}
+        >
+          <Dialog.Title className="text-xl font-medium">
+            Connect {agentName} · {profile.name}
+          </Dialog.Title>
+          <Dialog.Description className="task-muted mt-2">
+            {antigravity
+              ? 'Separate Antigravity accounts use Gemini API keys, with separate API billing. Google subscription logins still use the existing CLI account.'
+              : 'Connect a provider API key for this account. Each account keeps its own credentials and provider billing.'}
+          </Dialog.Description>
+          <form
+            className="grid gap-4 mt-4"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy(true);
+              setError('');
+              try {
+                await saveAgentProfileKey(agentId, profile.id, provider, key);
+                setKey('');
+                await onSaved(useForTasks);
+                onClose();
+              } catch (error) {
+                setError(String(error));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {!antigravity && (
+              <Select
+                aria-label="API provider"
+                value={provider}
+                onValueChange={setProvider}
+                disabled={busy}
+              >
+                {providers.map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </Select>
+            )}
+            <label className="task-label">
+              API key
+              <input
+                className="task-input"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={key}
+                onChange={(event) => setKey(event.target.value)}
+                required
+                disabled={busy}
+                maxLength={8192}
+              />
+            </label>
+            <p className="task-muted text-sm">
+              Stored locally. Sent only to the selected agent for authentication.
+            </p>
+            <label className="flex items-center gap-3 min-h-11">
+              <input
+                type="checkbox"
+                checked={useForTasks}
+                onChange={(event) => setUseForTasks(event.target.checked)}
+                disabled={busy}
+              />
+              Use for new tasks
+            </label>
+            {error && (
+              <p role="alert" className="task-error">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy || !key.trim()}>
+                {busy ? 'Saving…' : 'Connect account'}
+              </Button>
+            </div>
+          </form>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
 }

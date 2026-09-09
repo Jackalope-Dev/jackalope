@@ -201,7 +201,7 @@ export function WaitlistPage() {
             <section className="queue-ticket" aria-label="Your waitlist position">
               <div className="queue-ticket-number">
                 <span>Your place in line</span>
-                <strong>#{place.position?.toLocaleString() ?? '—'}</strong>
+                <strong>#{place.position?.toLocaleString() ?? '-'}</strong>
                 <span>Every good introduction brings you closer.</span>
               </div>
               <div className="queue-ticket-progress">
@@ -255,7 +255,9 @@ export function WaitlistPage() {
               </p>
             </div>
             <div>
-              <label htmlFor="waitlist-share">Share your link with others to move up the waitlist</label>
+              <label htmlFor="waitlist-share">
+                Share your link with others to move up the waitlist
+              </label>
               <input
                 id="waitlist-share"
                 value={place.shareUrl}

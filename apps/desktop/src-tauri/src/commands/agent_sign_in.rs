@@ -141,7 +141,10 @@ fn size(cols: u16, rows: u16) -> PtySize {
     }
 }
 
-fn login_command(binding: &AccountBinding, executable: &std::path::Path) -> Result<CommandBuilder, String> {
+fn login_command(
+    binding: &AccountBinding,
+    executable: &std::path::Path,
+) -> Result<CommandBuilder, String> {
     let mut command = CommandBuilder::new(executable);
     command.args(agent_profiles::login_args(&binding.adapter));
     command.cwd(&binding.directory);
@@ -415,7 +418,7 @@ mod tests {
     #[test]
     fn terminal_uses_the_same_isolation_as_tasks() {
         let mut binding = binding();
-        for agent in ["codex", "claude", "grok", "opencode"] {
+        for agent in ["codex", "claude", "grok", "opencode", "gemini", "goose"] {
             binding.adapter = agent.into();
             let command = login_command(&binding, std::path::Path::new("test")).unwrap();
             assert_eq!(

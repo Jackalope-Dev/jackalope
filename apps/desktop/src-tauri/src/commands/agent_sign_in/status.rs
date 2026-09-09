@@ -112,22 +112,39 @@ async fn read_rpc(binding: &AccountBinding) -> Result<AccountStatus, String> {
 async fn check(binding: AccountBinding) -> Result<AccountStatus, String> {
     if binding.profile_id.is_some() && matches!(binding.adapter.as_str(), "gemini" | "goose") {
         let files: &[&str] = if binding.adapter == "gemini" {
-            &[".gemini/oauth_creds.json", ".gemini/gemini-credentials.json"]
+            &[
+                ".gemini/oauth_creds.json",
+                ".gemini/gemini-credentials.json",
+            ]
         } else {
             &["config/config.yaml"]
         };
-        let configured = files.iter().any(|file| binding.directory.join(file).is_file());
+        let configured = files
+            .iter()
+            .any(|file| binding.directory.join(file).is_file());
         return Ok(if configured {
             status("configured", None, "Local account setup is saved. Account identity and credential validity have not been verified.")
         } else {
-            status("signedOut", None, "Complete account setup in the provider terminal.")
+            status(
+                "signedOut",
+                None,
+                "Complete account setup in the provider terminal.",
+            )
         });
     }
     if binding.profile_id.is_some() && matches!(binding.adapter.as_str(), "antigravity" | "aider") {
         return Ok(if agent_profiles::has_api_key(&binding)? {
-            status("configured", None, "An API key is saved for this account. The provider checks it when a task starts.")
+            status(
+                "configured",
+                None,
+                "An API key is saved for this account. The provider checks it when a task starts.",
+            )
         } else {
-            status("signedOut", None, "Connect a provider API key for this account.")
+            status(
+                "signedOut",
+                None,
+                "Connect a provider API key for this account.",
+            )
         });
     }
     if ["codex", "grok"].contains(&binding.adapter.as_str()) {

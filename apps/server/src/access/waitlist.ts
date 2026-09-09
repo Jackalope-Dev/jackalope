@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import { ServiceError } from '../errors';
 import { randomToken, seal, tokenHash } from './crypto';
 import { preferencesSchema } from './insights';
@@ -149,7 +149,7 @@ const parsePreferences = (value: string | null) => {
  * Saves the waitlist questions for whoever is signed in.
  *
  * The signup survey is a one-time capability token that expires, so anyone who
- * skipped it at signup could never answer afterwards — and the answers are what
+ * skipped it at signup could never answer afterwards - and the answers are what
  * the roadmap is built from. A signed-in member can set and revise them here
  * for as long as they hold a session.
  */

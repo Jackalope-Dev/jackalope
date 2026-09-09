@@ -48,18 +48,22 @@ pub(super) fn discover_runner(
         }
         Ok((adapter, path)) => {
             runner.available = true;
-            if let Ok(binding) = crate::commands::agent_profiles::bind_account(profiles_root, &adapter, None) {
-                runner.account = binding.label;
-            }
+            let binding = match crate::commands::agent_profiles::bind_account(
+                profiles_root,
+                &adapter,
+                None,
+            ) {
+                Ok(binding) => binding,
+                Err(error) => {
+                    runner.detail = error;
+                    return runner;
+                }
+            };
+            runner.account = binding.label.clone();
             if adapter == "antigravity" {
                 runner.detail = "Uses agy. Add separate Gemini API-key accounts in Jackalope, or use the existing CLI subscription login. Access is checked when a task starts; multiple subscription logins are not isolated.".into();
                 return runner;
             }
-            let profile_env =
-                crate::commands::agent_profiles::env_var_for(&adapter).and_then(|name| {
-                    crate::commands::agent_profiles::active_profile_dir(profiles_root, &adapter)
-                        .map(|dir| (name, dir))
-                });
             if adapter == "grok" {
                 runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into();
                 return runner;
@@ -85,7 +89,7 @@ pub(super) fn discover_runner(
             } else {
                 vec!["auth", "status"]
             };
-            match probe_auth(path, args, profile_env) {
+            match probe_auth(path, args, Some(&binding)) {
                 Ok(out) => {
                     if adapter == "claude" {
                         if let Ok(auth) = serde_json::from_slice::<Value>(&out.stdout) {

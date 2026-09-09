@@ -100,12 +100,14 @@ fn valid_id(id: &str) -> bool {
 pub(super) fn probe_auth(
     path: PathBuf,
     args: Vec<&str>,
-    env: Option<(&str, PathBuf)>,
+    binding: Option<&crate::commands::agent_profiles::AccountBinding>,
 ) -> Result<std::process::Output, std::io::Error> {
     let mut cmd = command(path);
     cmd.args(args);
-    if let Some((name, dir)) = env {
-        cmd.env(name, dir);
+    if let Some(binding) = binding {
+        crate::commands::agent_sign_in::ensure_idle(binding).map_err(std::io::Error::other)?;
+        crate::commands::agent_profiles::apply_binding(&mut cmd, binding)
+            .map_err(std::io::Error::other)?;
     }
     let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
     let stdout = child.stdout.take().unwrap();

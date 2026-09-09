@@ -77,7 +77,7 @@ export function WaitlistQuestions({
       await accessRequest('waitlist/preferences', { preferences });
       onSaved(preferences);
       setOpen(false);
-      setMessage('Saved. Thanks — this is what we plan against.');
+      setMessage('Saved. Thanks - this is what we plan against.');
     } catch (error) {
       setMessage(accessMessage(error));
     } finally {
@@ -87,21 +87,16 @@ export function WaitlistQuestions({
   }
 
   const chosen = (name: string) => (answers?.[name as keyof Preferences] ?? []) as string[];
-  const answered = groups.flatMap((group) => chosen(group.name)).length;
 
   return (
     <section className="access-card waitlist-questions" aria-labelledby={`${id}-title`}>
       <h2 id={`${id}-title`}>Help us decide what to build next.</h2>
       <p>
-        Three optional questions. Windows is furthest along — if you are on macOS or Linux, saying so
-        is the most useful thing you can do right now.
+        Three optional questions. Windows is furthest along, so if you are on macOS or Linux, saying
+        so is the most useful thing you can do right now.
       </p>
       {!open ? (
         <div className="preference-actions">
-          <p className="access-fine">
-            You answered {answered} {answered === 1 ? 'option' : 'options'}. You can change them any
-            time.
-          </p>
           <button type="button" className="button button-secondary" onClick={() => setOpen(true)}>
             Update my answers
           </button>

@@ -275,9 +275,11 @@ export function AgentAccounts({
         <div className="agent-account-add-heading">
           <h4>Add another {agentName} account</h4>
           <p className="task-muted">
-            {agentId === 'antigravity' ? 'Add a separate Gemini API-key account. Google subscription logins use the existing CLI account.'
-              : keyAccount ? 'Keep separate provider API keys for work, personal projects or clients.'
-              : 'Keep separate logins for work, personal projects or clients.'}
+            {agentId === 'antigravity'
+              ? 'Add a separate Gemini API-key account. Google subscription logins use the existing CLI account.'
+              : keyAccount
+                ? 'Keep separate provider API keys for work, personal projects or clients.'
+                : 'Keep separate logins for work, personal projects or clients.'}
           </p>
         </div>
         <AccountGroup
@@ -297,7 +299,11 @@ export function AgentAccounts({
         />
         <Button type="submit" disabled={locked}>
           <Plus size={16} />
-          {busy === 'add' ? 'Adding…' : keyAccount ? 'Add account & connect' : 'Add account & sign in'}
+          {busy === 'add'
+            ? 'Adding…'
+            : keyAccount
+              ? 'Add account & connect'
+              : 'Add account & sign in'}
         </Button>
       </form>
       <div className="agent-accounts-row">
@@ -409,7 +415,11 @@ export function AgentAccounts({
                     setSignIn(profile);
                   }}
                 >
-                  {keyAccount ? 'Connect API key' : agentId === 'goose' ? 'Set up account' : 'Sign in'}
+                  {keyAccount
+                    ? 'Connect API key'
+                    : agentId === 'goose'
+                      ? 'Set up account'
+                      : 'Sign in'}
                 </Button>
                 <Button
                   variant="ghost"
@@ -462,7 +472,9 @@ export function AgentAccounts({
       )}
       {signIn && keyAccount && (
         <AgentKeySignIn
-          agentId={agentId} agentName={agentName} profile={signIn}
+          agentId={agentId}
+          agentName={agentName}
+          profile={signIn}
           returnFocus={signInOpener.current}
           onClose={() => setSignIn(undefined)}
           onSaved={async (useForTasks) => {

@@ -83,6 +83,7 @@ fn manifest_path(root: &Path) -> PathBuf {
     root.join("manifest.json")
 }
 
+#[cfg(test)]
 fn load(root: &Path) -> Manifest {
     fs::read_to_string(manifest_path(root))
         .ok()
@@ -116,11 +117,8 @@ fn dir_for(root: &Path, agent: &str, id: &str) -> PathBuf {
     root.join(agent).join(id)
 }
 
-/// The active profile directory for `agent`, if the user configured one.
-/// Callers pass this to the agent's `env_var_for` variable before spawning it.
-/// None means unconfigured: fall back to the CLI's own default location,
-/// which is today's (and every existing user's) unchanged behavior.
-pub fn active_profile_dir(root: &Path, agent: &str) -> Option<PathBuf> {
+#[cfg(test)]
+fn active_profile_dir(root: &Path, agent: &str) -> Option<PathBuf> {
     let manifest = load(root);
     let entry = manifest.agents.get(agent)?;
     let active = entry.active.as_ref()?;
@@ -170,7 +168,12 @@ pub fn bind_account(
     explicit: Option<&str>,
 ) -> Result<AccountBinding, String> {
     let saved = load_checked(root)?;
-    let selected = explicit.or_else(|| saved.agents.get(adapter).and_then(|entry| entry.active.as_deref()));
+    let selected = explicit.or_else(|| {
+        saved
+            .agents
+            .get(adapter)
+            .and_then(|entry| entry.active.as_deref())
+    });
     if adapter == "antigravity" && selected.is_none() {
         let directory = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
             .map(|home| PathBuf::from(home).join(".gemini"))
@@ -184,16 +187,7 @@ pub fn bind_account(
         });
     }
     let env_name = env_var_for(adapter).ok_or("This agent does not support account isolation.")?;
-    let manifest = if manifest_path(root).exists() {
-        serde_json::from_slice::<Manifest>(
-            &fs::read(manifest_path(root)).map_err(|e| e.to_string())?,
-        )
-        .map_err(|_| {
-            "Account settings cannot be read. Restore them before running work.".to_string()
-        })?
-    } else {
-        Manifest::default()
-    };
+    let manifest = saved;
     let entry = manifest.agents.get(adapter);
     let id = explicit.or_else(|| entry.and_then(|e| e.active.as_deref()));
     let (profile_id, directory, label) = if let Some(id) = id {
@@ -215,7 +209,9 @@ pub fn bind_account(
             .map(PathBuf::from)
             .or_else(|| {
                 std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(|home| {
-                    if adapter == "gemini" { return PathBuf::from(home) }
+                    if adapter == "gemini" {
+                        return PathBuf::from(home);
+                    }
                     PathBuf::from(home).join(if adapter == "opencode" {
                         ".local/share".to_string()
                     } else {
@@ -241,11 +237,19 @@ pub fn bind_account(
     })
 }
 
-pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBinding) -> Result<(), String> {
+pub fn apply_binding(
+    command: &mut std::process::Command,
+    binding: &AccountBinding,
+) -> Result<(), String> {
     if binding.profile_id.is_some() {
         if binding.adapter == "antigravity" {
-            let config: serde_json::Value = serde_json::from_slice(&super::history::read_bounded(&binding.directory.join(".gemini/antigravity-cli/settings.json"), 65536)?)
-                .map_err(|_| "This Antigravity account has invalid settings.")?;
+            let config: serde_json::Value = serde_json::from_slice(&super::history::read_bounded(
+                &binding
+                    .directory
+                    .join(".gemini/antigravity-cli/settings.json"),
+                65536,
+            )?)
+            .map_err(|_| "This Antigravity account has invalid settings.")?;
             if config["modelProvider"] != "gemini" {
                 return Err("Managed Antigravity accounts require Gemini API-key mode to keep logins separate.".into());
             }
@@ -254,8 +258,10 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
             command.env_remove(name);
         }
     }
-    if let Some(name) = env_var_for(&binding.adapter).filter(|_| binding.profile_id.is_some()
-        || !matches!(binding.adapter.as_str(), "antigravity" | "aider" | "goose")) {
+    if let Some(name) = env_var_for(&binding.adapter).filter(|_| {
+        binding.profile_id.is_some()
+            || !matches!(binding.adapter.as_str(), "antigravity" | "aider" | "goose")
+    }) {
         command.env(name, &binding.directory);
     }
     if binding.profile_id.is_some() {
@@ -282,7 +288,9 @@ pub fn apply_binding(command: &mut std::process::Command, binding: &AccountBindi
     if binding.profile_id.is_some() {
         match binding.adapter.as_str() {
             "antigravity" | "aider" => {
-                command.env("HOME", &binding.directory).env("USERPROFILE", &binding.directory);
+                command
+                    .env("HOME", &binding.directory)
+                    .env("USERPROFILE", &binding.directory);
                 if binding.adapter == "antigravity" {
                     for name in credential_env_vars("antigravity") {
                         command.env_remove(name);
@@ -390,12 +398,17 @@ pub fn agent_profile_create(
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))
+            .map_err(|e| e.to_string())?;
     }
     if agent == "antigravity" {
         let config = directory.join(".gemini/antigravity-cli");
         fs::create_dir_all(&config).map_err(|e| e.to_string())?;
-        fs::write(config.join("settings.json"), br#"{"modelProvider":"gemini"}"#).map_err(|e| e.to_string())?;
+        fs::write(
+            config.join("settings.json"),
+            br#"{"modelProvider":"gemini"}"#,
+        )
+        .map_err(|e| e.to_string())?;
     } else if agent == "aider" {
         fs::write(directory.join(".aider.conf.yml"), "{}\n").map_err(|e| e.to_string())?;
         fs::write(directory.join(".env"), "").map_err(|e| e.to_string())?;
@@ -559,8 +572,34 @@ pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
             "CLAUDE_CODE_OAUTH_TOKEN",
         ],
         "grok" => &["XAI_API_KEY", "GROK_API_KEY", "GROK_DEPLOYMENT_KEY"],
-        "gemini" | "antigravity" => &["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_GENAI_USE_GCA", "AGY_ADC_AUTH"],
-        "opencode" | "aider" | "goose" => &["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "XAI_API_KEY", "GROK_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "AZURE_API_KEY", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"],
+        "gemini" | "antigravity" => &[
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+            "GOOGLE_APPLICATION_CREDENTIALS",
+            "GOOGLE_GENAI_USE_VERTEXAI",
+            "GOOGLE_GENAI_USE_GCA",
+            "AGY_ADC_AUTH",
+        ],
+        "opencode" | "aider" | "goose" => &[
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+            "GOOGLE_APPLICATION_CREDENTIALS",
+            "XAI_API_KEY",
+            "GROK_API_KEY",
+            "OPENROUTER_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "GROQ_API_KEY",
+            "MISTRAL_API_KEY",
+            "AZURE_API_KEY",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_SESSION_TOKEN",
+            "AWS_PROFILE",
+        ],
         _ => &[],
     }
 }
@@ -625,11 +664,8 @@ mod tests {
         apply_binding(&mut command, &binding).unwrap();
         let vars: HashMap<_, _> = command
             .get_envs()
-            .map(|(key, value)| {
-                (
-                    key.to_string_lossy().to_string(),
-                    value.unwrap().to_os_string(),
-                )
+            .filter_map(|(key, value)| {
+                value.map(|value| (key.to_string_lossy().to_string(), value.to_os_string()))
             })
             .collect();
         assert_eq!(vars["XDG_DATA_HOME"], directory.as_os_str());
@@ -643,6 +679,83 @@ mod tests {
         let mut default = std::process::Command::new("opencode");
         apply_binding(&mut default, &binding).unwrap();
         assert_eq!(default.get_envs().count(), 1);
+    }
+
+    #[test]
+    fn managed_provider_storage_cannot_be_redirected_by_legacy_settings() {
+        let directory = temp_root();
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join(".env"), "GEMINI_CLI_HOME=elsewhere\nGEMINI_FORCE_FILE_STORAGE=false\nGOOSE_PATH_ROOT=elsewhere\nGOOSE_DISABLE_KEYRING=0\nHOME=elsewhere\nAIDER_CONFIG=elsewhere\n").unwrap();
+        for (adapter, variable) in [
+            ("gemini", "GEMINI_CLI_HOME"),
+            ("goose", "GOOSE_PATH_ROOT"),
+            ("aider", "HOME"),
+        ] {
+            let binding = AccountBinding {
+                adapter: adapter.into(),
+                profile_id: Some("work".into()),
+                directory: directory.clone(),
+                label: "Work".into(),
+            };
+            let mut command = std::process::Command::new(adapter);
+            apply_binding(&mut command, &binding).unwrap();
+            let vars: HashMap<_, _> = command
+                .get_envs()
+                .map(|(key, value)| {
+                    (
+                        key.to_string_lossy().to_string(),
+                        value.map(|v| v.to_string_lossy().to_string()),
+                    )
+                })
+                .collect();
+            assert_eq!(vars[variable].as_deref(), directory.to_str());
+            match adapter {
+                "gemini" => assert_eq!(vars["GEMINI_FORCE_FILE_STORAGE"].as_deref(), Some("true")),
+                "goose" => assert_eq!(vars["GOOSE_DISABLE_KEYRING"].as_deref(), Some("1")),
+                "aider" => assert_eq!(
+                    vars["AIDER_CONFIG"].as_deref(),
+                    directory.join(".aider.conf.yml").to_str()
+                ),
+                _ => unreachable!(),
+            }
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn antigravity_managed_accounts_require_api_mode_and_never_fall_back_to_cli_login() {
+        let directory = temp_root();
+        fs::create_dir_all(directory.join(".gemini/antigravity-cli")).unwrap();
+        let binding = AccountBinding {
+            adapter: "antigravity".into(),
+            profile_id: Some("work".into()),
+            directory: directory.clone(),
+            label: "Work".into(),
+        };
+        let settings = directory.join(".gemini/antigravity-cli/settings.json");
+        fs::write(&settings, r#"{"modelProvider":"antigravity"}"#).unwrap();
+        assert!(
+            apply_binding(&mut std::process::Command::new("agy"), &binding)
+                .unwrap_err()
+                .contains("API-key mode")
+        );
+        fs::write(&settings, r#"{"modelProvider":"gemini"}"#).unwrap();
+        assert!(
+            apply_binding(&mut std::process::Command::new("agy"), &binding)
+                .unwrap_err()
+                .contains("Add a Gemini API key")
+        );
+        let mut default = std::process::Command::new("agy");
+        apply_binding(
+            &mut default,
+            &AccountBinding {
+                profile_id: None,
+                ..binding
+            },
+        )
+        .unwrap();
+        assert_eq!(default.get_envs().count(), 0);
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

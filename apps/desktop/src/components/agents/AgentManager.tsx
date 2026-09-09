@@ -159,19 +159,17 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
               {agent.id === 'antigravity' && !runner?.available && (
                 <AgentInstallGuide desktopInstalled={runner?.desktopInstalled} />
               )}
-              {(
-                <section aria-label="Agent accounts">
-                  <h3 className="text-base font-medium mt-6">Accounts</h3>
-                  <div className="agent-config-fields">
-                    <AgentAccounts
-                      key={agent.id}
-                      agentId={('adapter' in agent ? agent.adapter : undefined) || agent.id}
-                      agentName={agent.name}
-                      onChanged={refreshModels}
-                    />
-                  </div>
-                </section>
-              )}
+              <section aria-label="Agent accounts">
+                <h3 className="text-base font-medium mt-6">Accounts</h3>
+                <div className="agent-config-fields">
+                  <AgentAccounts
+                    key={agent.id}
+                    agentId={('adapter' in agent ? agent.adapter : undefined) || agent.id}
+                    agentName={agent.name}
+                    onChanged={refreshModels}
+                  />
+                </div>
+              </section>
               <AgentSupport
                 adapter={('adapter' in agent ? agent.adapter : undefined) ?? agent.id}
               />

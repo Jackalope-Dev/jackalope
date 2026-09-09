@@ -1,5 +1,18 @@
 [
   {
+    "id": "managed-agent-accounts",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "More ways to keep agent accounts separate",
+    "description": "Set up work and personal accounts from agent settings with provider-specific login and API-key options.",
+    "items": [
+      "Add isolated Gemini and Goose account setup, and separate provider API keys for Aider.",
+      "Use separate Gemini API-key accounts with Antigravity while keeping the existing CLI subscription login available.",
+      "Finish interactive account setup and select an account for new tasks without changing existing task bindings."
+    ],
+    "note": "In development. Antigravity subscription logins are not separately isolated. Gemini, Aider and Goose task execution remains in development; real multi-account acceptance is pending."
+  },
+  {
     "id": "easier-agent-accounts",
     "date": "2026-09-09",
     "status": "In development",
@@ -30,9 +43,7 @@
     "status": "In development",
     "title": "Simpler settings header",
     "description": "Settings now opens directly at its heading.",
-    "items": [
-      "Removed the extra Back to workspace link."
-    ],
+    "items": ["Removed the extra Back to workspace link."],
     "note": "In development."
   },
   {
@@ -111,9 +122,7 @@
     "status": "In development",
     "title": "A flatter command shortcut.",
     "description": "The top-bar Jump to control fits more quietly into the workspace.",
-    "items": [
-      "Removed the inset shadow from the Jump to search control."
-    ],
+    "items": ["Removed the inset shadow from the Jump to search control."],
     "note": "In development. Included in the next desktop release."
   },
   {
@@ -593,9 +602,7 @@
     "status": "Website",
     "title": "Follow Jackalope on X.",
     "description": "The website now makes Jackalope's official X profile easy to find from every page.",
-    "items": [
-      "A Follow on X link is available in the shared footer."
-    ],
+    "items": ["A Follow on X link is available in the shared footer."],
     "note": "Website milestone, not a public product release."
   },
   {

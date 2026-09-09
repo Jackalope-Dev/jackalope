@@ -324,3 +324,41 @@ it('retains original ordering for existing members with no referrals', async () 
   expect(rows.results.map((x) => x.position)).toEqual([1, 2]);
   expect(rows.results.every((x) => x.referral_count === 0)).toBe(true);
 });
+
+it('lets a signed-in member answer and revise the waitlist questions', async () => {
+  const { session } = await verified('questions@example.com');
+  const answers = {
+    platforms: ['windows', 'linux'],
+    agents: ['codex', 'claude'],
+    priorities: ['parallel'],
+  };
+
+  // Nothing answered yet, so the page has nothing to prefill.
+  expect(await waitlistStatus(browser(session), bindings)).toMatchObject({ preferences: null });
+
+  expect((await publicCall('waitlist/preferences', { preferences: answers }, session)).status).toBe(
+    200,
+  );
+  expect(await waitlistStatus(browser(session), bindings)).toMatchObject({ preferences: answers });
+
+  // Answers are revisable: the signup survey's one-time token is not involved.
+  const revised = { ...answers, platforms: ['macos'] };
+  expect((await publicCall('waitlist/preferences', { preferences: revised }, session)).status).toBe(
+    200,
+  );
+  expect(await waitlistStatus(browser(session), bindings)).toMatchObject({ preferences: revised });
+
+  // The audience sync is told to re-describe them, so the platform tags follow.
+  expect(
+    await env.DB.prepare('SELECT newsletter_next_at FROM access_members WHERE email=?')
+      .bind('questions@example.com')
+      .first(),
+  ).toEqual({ newsletter_next_at: 0 });
+
+  // Without a session it is not an anonymous write path.
+  expect((await publicCall('waitlist/preferences', { preferences: answers })).status).toBe(401);
+  expect(
+    (await publicCall('waitlist/preferences', { preferences: { platforms: ['bsd'] } }, session))
+      .status,
+  ).toBe(400);
+});
