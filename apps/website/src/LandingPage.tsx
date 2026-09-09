@@ -76,7 +76,6 @@ const examples = [
     prompt: 'Add keyboard search and polish the settings.',
     tasks: ['Build keyboard search', 'Polish the settings'],
     agents: ['Codex', 'Claude Code'],
-    outcome: 'Review both changes before bringing them together.',
     context: 'Project instructions + selected tools',
     file: 'Search.tsx',
     diff: '+ onKeyDown={navigate}\n+ onClose={returnFocus}',
@@ -88,7 +87,6 @@ const examples = [
     prompt: 'Find why drafts disappear. Check for related regressions.',
     tasks: ['Investigate lost drafts', 'Check draft recovery'],
     agents: ['Claude Code', 'Codex'],
-    outcome: 'Inspect the fix and the regression checks together.',
     context: 'Bug report + project lessons',
     file: 'TaskComposer.tsx',
     diff: '+ const draft = useSavedDraft()\n+ restoreOnOpen(draft)',
@@ -151,7 +149,6 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
             </strong>
           </div>
         </div>
-        <p className="case-outcome">{item.outcome}</p>
       </div>
     );
   }
@@ -188,7 +185,6 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
             </strong>
           </div>
         </div>
-        <p className="case-outcome">{item.outcome}</p>
       </div>
     );
   }
@@ -408,7 +404,6 @@ export function LandingPage({
             >
               <span className="hero-window-meta">
                 <span>More room to build.</span>
-                <span>Atlas sample project</span>
               </span>
               <img
                 src={tour.poster}

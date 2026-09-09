@@ -673,17 +673,6 @@
   font-size: 11px;
   color: var(--color-text-secondary);
 }
-.case-outcome {
-  position: absolute;
-  z-index: 3;
-  right: clamp(28px, 4vw, 52px);
-  bottom: 24px;
-  max-width: 360px;
-  font-size: 11px;
-  line-height: 1.6;
-  color: var(--color-text-secondary);
-  text-align: right;
-}
 .feature-art,
 .bug-art,
 .idea-art {
@@ -1085,12 +1074,6 @@
   }
   .case-copy > p {
     font-size: 28px;
-  }
-  .case-outcome {
-    right: 20px;
-    bottom: 20px;
-    left: 20px;
-    text-align: left;
   }
   .feature-art {
     min-height: 400px;

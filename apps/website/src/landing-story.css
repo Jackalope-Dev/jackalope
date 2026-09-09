@@ -176,9 +176,6 @@
   line-height: 1.25;
   letter-spacing: -0.045em;
 }
-.landing-story .case-outcome {
-  font-size: 15px;
-}
 .landing-story .finding-card > small {
   color: var(--color-accent-ink);
 }
