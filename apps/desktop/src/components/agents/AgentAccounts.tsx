@@ -137,7 +137,15 @@ function EditAccount({
     </Dialog.Root>
   );
 }
-export function AgentAccounts({ agentId, agentName }: { agentId: string; agentName: string }) {
+export function AgentAccounts({
+  agentId,
+  agentName,
+  onChanged,
+}: {
+  agentId: string;
+  agentName: string;
+  onChanged?: () => void;
+}) {
   const [view, setView] = useState<AgentProfilesView>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -154,10 +162,11 @@ export function AgentAccounts({ agentId, agentName }: { agentId: string; agentNa
     setLoading(true);
     try {
       setView(await listAgentProfiles(agentId));
+      onChanged?.();
     } finally {
       setLoading(false);
     }
-  }, [agentId]);
+  }, [agentId, onChanged]);
   useEffect(() => {
     let cancelled = false;
     setView(undefined);

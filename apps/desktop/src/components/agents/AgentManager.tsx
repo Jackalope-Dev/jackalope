@@ -1,5 +1,5 @@
 import { ArrowLeft, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -10,17 +10,20 @@ import { Switch } from '../ui/Switch';
 import { AddAgentForm } from './AddAgentForm';
 import { AgentAccounts } from './AgentAccounts';
 import { AgentInstallGuide } from './AgentInstallGuide';
+import { AgentModels } from './AgentModels';
 import { AgentSupport } from './AgentSupport';
 import './agent-manager.css';
 
-export function AgentManager({initialAgentId}: {initialAgentId?: string}) {
+export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const config = useAgentConfigStore();
   const { runners, discovering, discover } = useExecutionStore();
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [modelsRevision, setModelsRevision] = useState(0);
+  const refreshModels = useCallback(() => setModelsRevision((value) => value + 1), []);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState(initialAgentId ?? config.defaultMetaAgent);
+  const [selectedAgent] = useState(initialAgentId ?? config.defaultMetaAgent);
   const desktop = isTauriEnvironment();
   const agents = [...builtinAgents, ...config.customAgents];
   const selected = agents.find((agent) => agent.id === selectedAgent) ?? agents[0];
@@ -32,6 +35,7 @@ export function AgentManager({initialAgentId}: {initialAgentId?: string}) {
       await syncAgentConfig();
       await discover();
       setSaved(true);
+      refreshModels();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -40,7 +44,10 @@ export function AgentManager({initialAgentId}: {initialAgentId?: string}) {
   };
   return (
     <div className="agent-manager">
-      <Button variant="ghost" className="self-start" onClick={() => navigateWorkspace('agents')}><ArrowLeft size={16} />Back to agents</Button>
+      <Button variant="ghost" className="self-start" onClick={() => navigateWorkspace('agents')}>
+        <ArrowLeft size={16} />
+        Back to agents
+      </Button>
       <h1 className="text-2xl font-medium">Configure {selected?.name ?? 'agent'}</h1>
       <div className="flex flex-wrap gap-3">
         <Button
@@ -156,7 +163,12 @@ export function AgentManager({initialAgentId}: {initialAgentId?: string}) {
                 <section aria-label="Agent accounts">
                   <h3 className="text-base font-medium mt-6">Accounts</h3>
                   <div className="agent-config-fields">
-                    <AgentAccounts key={agent.id} agentId={agent.id} agentName={agent.name} />
+                    <AgentAccounts
+                      key={agent.id}
+                      agentId={agent.id}
+                      agentName={agent.name}
+                      onChanged={refreshModels}
+                    />
                   </div>
                 </section>
               )}
@@ -175,6 +187,15 @@ export function AgentManager({initialAgentId}: {initialAgentId?: string}) {
                       placeholder="Leave empty to auto-detect"
                     />
                   </label>
+                  <AgentModels
+                    key={agent.id}
+                    agentId={agent.id}
+                    revision={modelsRevision}
+                    selected={options.models}
+                    defaultModel={options.defaultModel}
+                    restricted={options.restrictModels}
+                    onChange={update}
+                  />
                   <div className="agent-model-restriction">
                     <span>Allow only the listed models</span>
                     <Switch

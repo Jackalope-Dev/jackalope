@@ -154,5 +154,5 @@ export function openSettings(
 }
 
 export function openAgentConfiguration(agentId: string) {
-  window.dispatchEvent(new CustomEvent('jackalope:configure-agent', {detail: agentId}));
+  window.dispatchEvent(new CustomEvent('jackalope:configure-agent', { detail: agentId }));
 }

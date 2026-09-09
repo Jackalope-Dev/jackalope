@@ -45,11 +45,11 @@ const mascotMotion = {
     transition: { duration: 3.5, repeat: Infinity, repeatDelay: 1.5 },
   },
   working: {
-    y: [0, -1.5, 0],
-    scaleY: 1,
-    rotate: 0,
+    y: [0, -2.5, 0, -1, 0],
+    scaleY: [1, 1.015, 1, 1.008, 1],
+    rotate: [0, -2, 0, 1, 0],
     opacity: 1,
-    transition: { duration: 1.6, repeat: Infinity },
+    transition: { duration: 2.4, repeat: Infinity },
   },
   success: {
     y: [0, -9, 0, -3, 0],
@@ -241,6 +241,39 @@ export function JackalopeMascot({
                 style={{ transformOrigin: '83px 63px' }}
               />
               <path d={paths.head} mask={`url(#${faceMask})`} />
+              {currentMood === 'working' && (
+                <g data-mascot-effort="" fill="var(--color-accent-ink)">
+                  {[0, 1].map((drop) => (
+                    <motion.path
+                      key={drop}
+                      d="M120 57 C118 60 116 63 116 65 A4 4 0 0 0 124 65 C124 63 122 60 120 57Z"
+                      initial={false}
+                      animate={
+                        reduceMotion
+                          ? { x: 0, y: 0, opacity: drop === 0 ? 0.85 : 0, scale: 0.85 }
+                          : {
+                              x: [0, 7 + drop * 3, 12 + drop * 3],
+                              y: [0, -3, 10],
+                              opacity: [0, 0.9, 0],
+                              scale: [0.65, 1, 0.75],
+                            }
+                      }
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : {
+                              duration: 1.25,
+                              delay: drop * 0.7,
+                              repeat: Infinity,
+                              repeatDelay: 1.15,
+                              times: [0, 0.35, 1],
+                            }
+                      }
+                      style={{ transformOrigin: '120px 63px' }}
+                    />
+                  ))}
+                </g>
+              )}
             </motion.g>
           </motion.g>
         </svg>

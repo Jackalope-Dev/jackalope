@@ -185,7 +185,13 @@ export function McpWorkspace({
           <WorkspaceHeading
             title={activeTab === 'configured' ? 'MCP connections' : 'MCP marketplace'}
             action={
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {activeTab === 'configured' && (
+                  <Button variant="outline" onClick={() => setActiveTab('marketplace')}>
+                    <Globe size={16} />
+                    Browse marketplace
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => {

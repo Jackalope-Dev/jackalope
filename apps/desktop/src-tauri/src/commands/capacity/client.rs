@@ -18,7 +18,19 @@ impl Client {
         binding: &super::super::agent_profiles::AccountBinding,
         args: &[&str],
     ) -> Result<Self, String> {
-        let mut command = Command::new(super::super::tasks::executable(&binding.adapter)?);
+        Self::spawn_executable(
+            binding,
+            &super::super::tasks::executable(&binding.adapter)?,
+            args,
+        )
+    }
+
+    pub(crate) fn spawn_executable(
+        binding: &super::super::agent_profiles::AccountBinding,
+        executable: &std::path::Path,
+        args: &[&str],
+    ) -> Result<Self, String> {
+        let mut command = Command::new(executable);
         command
             .args(args)
             .current_dir(std::env::temp_dir())

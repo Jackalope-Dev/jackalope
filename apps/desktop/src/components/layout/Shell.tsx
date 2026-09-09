@@ -98,7 +98,10 @@ export function Shell({
   }, [activeTab]);
   const [configuredAgent, setConfiguredAgent] = useState<string>();
   useEffect(() => {
-    const handle = (event: Event) => { setConfiguredAgent((event as CustomEvent<string>).detail); setActiveTab('agent-settings'); };
+    const handle = (event: Event) => {
+      setConfiguredAgent((event as CustomEvent<string>).detail);
+      setActiveTab('agent-settings');
+    };
     window.addEventListener('jackalope:configure-agent', handle);
     return () => window.removeEventListener('jackalope:configure-agent', handle);
   }, []);
@@ -318,7 +321,8 @@ export function Shell({
         className="workspace-canvas"
         aria-label={view.label}
       >
-        {view.group !== 'settings' && view.group !== 'agents' &&
+        {view.group !== 'settings' &&
+          view.group !== 'agents' &&
           WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
             <div>
               <nav aria-label={`${view.group} views`} className="workspace-subnavigation">

@@ -235,3 +235,38 @@
 .agent-install-compact > button {
   width: 100%;
 }
+
+.agent-model-catalog {
+  display: grid;
+  gap: 14px;
+  padding-block: 12px;
+}
+.agent-detected-models {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 10px;
+}
+.agent-detected-models button {
+  height: auto;
+  min-height: 56px;
+  justify-content: start;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  white-space: normal;
+}
+.agent-detected-models button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.agent-detected-models strong {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  display: block;
+}
+.agent-detected-models small {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  display: block;
+  margin-top: 4px;
+}

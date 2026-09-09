@@ -34,6 +34,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(SignInService::default())
         .manage(CapacityService::default())
+        .manage(commands::agent_models::ModelCatalogService::default())
         .setup(move |app| {
             commands::browser::set_resource_directory(app.path().resource_dir()?);
             let directory = profile
@@ -173,6 +174,7 @@ pub fn run() {
             integration_apply,
             integration_plans,
             capacity_snapshot,
+            commands::agent_models::agent_models,
             mcp_authenticate,
             mcp_list_servers,
             mcp_save_server,

@@ -219,7 +219,16 @@ export function RunnerConnections({
                     )}
                   </div>
                   <div className="agent-roster-action">
-                    {canStart && <Button variant="ghost" onClick={() => openAgentConfiguration(runner.id)} aria-label={`Configure ${custom?.name ?? runner.name}`}><Settings2 size={16} />Configure</Button>}
+                    {canStart && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => openAgentConfiguration(runner.id)}
+                        aria-label={`Configure ${custom?.name ?? runner.name}`}
+                      >
+                        <Settings2 size={16} />
+                        Configure
+                      </Button>
+                    )}
                     {canStart ? (
                       <Button
                         variant="outline"

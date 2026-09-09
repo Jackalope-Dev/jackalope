@@ -217,9 +217,10 @@ mod desktop_detection_tests {
 
     #[test]
     fn antigravity_desktop_detection_requires_an_app_executable() {
-        let root = tempfile::tempdir().unwrap();
-        let local = root.path().join("local");
-        let programs = root.path().join("programs");
+        let root = std::env::temp_dir()
+            .join(format!("jackalope-antigravity-detection-{}", uuid::Uuid::new_v4()));
+        let local = root.join("local");
+        let programs = root.join("programs");
         let gui = local.join("Programs/Antigravity/Antigravity.exe");
         std::fs::create_dir_all(gui.parent().unwrap()).unwrap();
         assert!(!antigravity_desktop_at(Some(&local), Some(&programs)));
@@ -230,5 +231,6 @@ mod desktop_detection_tests {
         std::fs::create_dir_all(system_gui.parent().unwrap()).unwrap();
         std::fs::write(&system_gui, b"fixture").unwrap();
         assert!(antigravity_desktop_at(None, Some(&programs)));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

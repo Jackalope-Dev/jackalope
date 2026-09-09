@@ -368,21 +368,6 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
         }
         std::thread::sleep(Duration::from_millis(100));
     };
-    if !enabled {
-        assert_eq!(settled.status, "failed");
-        assert!(settled
-            .error
-            .as_deref()
-            .unwrap_or_default()
-            .contains("handoff is turned off"));
-        assert!(settled.quota_failure.is_some());
-        assert!(settled.routing.as_ref().unwrap().handoffs.is_empty());
-        assert_eq!(settled.routing.as_ref().unwrap().decisions.len(), 1);
-        assert!(Path::new(&settled.workspace).join("partial.txt").is_file());
-        assert!(!Path::new(&settled.workspace).join("completed.txt").exists());
-        assert!(runtime.inner.lock().unwrap().processes.is_empty());
-        return;
-    }
     assert_eq!(
         settled.status,
         "review",
