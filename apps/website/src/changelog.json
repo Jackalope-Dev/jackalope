@@ -1,5 +1,17 @@
 [
   {
+    "id": "explore-where-jackalope-goes-next",
+    "date": "2026-09-09",
+    "status": "In development",
+    "title": "Explore where Jackalope goes next.",
+    "description": "An interactive roadmap connects the workspace we have built with the release work and ideas ahead.",
+    "items": [
+      "Explore built, in-progress, planned, and exploratory work with expandable feature details.",
+      "A branded journey makes current priorities and future possibilities easier to follow."
+    ],
+    "note": "Development milestone, not a public release."
+  },
+  {
     "id": "smarter-project-settings",
     "date": "2026-09-09",
     "status": "In development",
@@ -19,7 +31,7 @@
     "title": "A simpler waitlist signup.",
     "description": "The newsletter area keeps the focus on joining the waitlist.",
     "items": [
-      "Removed the email-provider credit and extra availability copy, consolidated signup text, and stacked the email field and button on mobile."
+      "Removed the email-provider credit and extra availability copy, consolidated signup text across the website, and stacked the email field and button on mobile."
     ],
     "note": "Development milestone, not a public release."
   },

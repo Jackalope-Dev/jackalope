@@ -1,5 +1,6 @@
 import { comparisonLinks } from './comparison-content.ts';
 import type { MarketingPage } from './marketing-content.ts';
+import { roadmapHeadline, roadmapLede, roadmapStages } from './roadmap-content.ts';
 
 export const growthPages: MarketingPage[] = [
   {
@@ -8,41 +9,15 @@ export const growthPages: MarketingPage[] = [
     title: 'Jackalope roadmap | What comes next',
     description:
       'Follow plans for Jackalope desktop releases, coding-agent support, project tools, and remote work.',
-    headline: 'Where we go next.',
-    lede: 'Our priorities for Jackalope. In development means work is underway; planned and exploring items are not available features or promised release dates.',
+    headline: roadmapHeadline,
+    lede: roadmapLede,
     image: 'tasks',
-    signals: ['In development', 'Planned', 'Exploring'],
-    sections: [
-      {
-        title: 'In development: the desktop launch.',
-        paragraphs: [
-          'We are preparing Jackalope for macOS, Windows, and Linux, including installation, updates, agent sign-in, and recovery of saved work. Public downloads are not yet open; join the waitlist for an invitation when access is ready.',
-        ],
-      },
-      {
-        title: 'Planned: more agents and richer project tools.',
-        paragraphs: [
-          'We want to expand agent support beyond Codex, Claude Code, Grok, and OpenCode, and improve tool connections and usage reporting. Gemini CLI is under evaluation. Goose and Aider execution support is on the backlog.',
-        ],
-        bullets: [
-          'More agent-specific tools, questions, and account controls.',
-          'GitHub pull requests, CI checks, and issue intake.',
-          'Better project understanding and guidance on usage and capacity.',
-        ],
-      },
-      {
-        title: 'Exploring: work beyond your desktop.',
-        paragraphs: [
-          'Remote hosts, phone access, and shared team workspaces are future work. We are exploring ways to steer and review tasks across machines while keeping control of projects and connected services clear.',
-        ],
-      },
-      {
-        title: 'Follow the progress.',
-        paragraphs: [
-          'The changelog records completed development milestones. This roadmap records intent and may change as we learn from early users. We have not announced a public launch date or price.',
-        ],
-      },
-    ],
+    signals: roadmapStages.map((stage) => stage.label),
+    sections: roadmapStages.map((stage) => ({
+      title: `${stage.label}: ${stage.title}`,
+      paragraphs: [stage.status, stage.description, stage.next],
+      bullets: stage.items.map((item) => `${item.title} ${item.summary} ${item.detail}`),
+    })),
     related: [
       {
         href: '/changelog/',

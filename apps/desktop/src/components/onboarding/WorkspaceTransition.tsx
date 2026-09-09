@@ -62,7 +62,7 @@ export function WorkspaceTransition({
   useEffect(() => {
     let disposed = false;
     setSlow(false);
-    const jobs = prepareWorkspace(project);
+    const jobs = prepareWorkspace(project, !!pendingProject);
     setChecks(jobs.map(({ id, label, optional }) => ({ id, label, optional, state: 'running' })));
     const update = (id: string, state: 'complete' | 'failed', cause?: unknown) => {
       if (!disposed)

@@ -28,7 +28,10 @@ function job(id: string, label: string, run: () => Promise<unknown>): Preparatio
   return { id, label, result };
 }
 
-export function prepareWorkspace(project: Project | undefined): PreparationJob[] {
+export function prepareWorkspace(
+  project: Project | undefined,
+  provisional = false,
+): PreparationJob[] {
   const jobs = [
     job('history', 'Loading task history', async () => {
       await useExecutionStore.getState().refresh();
@@ -87,8 +90,10 @@ export function prepareWorkspace(project: Project | undefined): PreparationJob[]
             .getState()
             .updateProject(project.id, { gitBranch: info.branch || 'Detached HEAD' });
       }),
-      job(`context:${key}`, 'Reading repository instructions and context', () =>
-        useContextMemoryStore.getState().refreshMemory(project, { silent: true }),
+      job(`context:${key}:${provisional}`, 'Reading repository instructions and context', () =>
+        useContextMemoryStore
+          .getState()
+          .refreshMemory(project, { silent: true, applyDefaults: !provisional }),
       ),
       job(`map:${key}`, 'Building the local codebase map', () => prepareCodebase(project.path)),
     );

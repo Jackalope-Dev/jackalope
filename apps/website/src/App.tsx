@@ -14,6 +14,7 @@ import { LandingPage } from './LandingPage';
 import { LegalPage } from './Legal';
 import { MarketingPage } from './MarketingPage';
 import { marketingPages } from './marketing-content';
+import { RoadmapPage } from './Roadmap';
 import { waitlistReferral } from './referral';
 import { Newsletter, Signup, WaitlistButton } from './Signup';
 import { WaitlistPage } from './Waitlist';
@@ -231,6 +232,8 @@ export function App({ path = '/' }: { path?: string }) {
         <KnowledgebasePage path={path} dark={dark} />
       ) : path === '/privacy/' || path === '/terms/' ? (
         <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
+      ) : path === '/roadmap/' ? (
+        <RoadmapPage />
       ) : marketingPage ? (
         <MarketingPage page={marketingPage} dark={dark} />
       ) : (

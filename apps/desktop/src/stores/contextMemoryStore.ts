@@ -13,7 +13,7 @@ interface ContextMemoryState {
   getMemory: (projectId: string) => DiscoveredCodebaseMemory | undefined;
   refreshMemory: (
     project: { id: string; name: string; path: string },
-    options?: { silent?: boolean },
+    options?: { silent?: boolean; applyDefaults?: boolean },
   ) => Promise<DiscoveredCodebaseMemory>;
   updateConventions: (projectId: string, conventions: string[]) => void;
   removeMemory: (projectId: string) => void;
@@ -49,7 +49,7 @@ export const useContextMemoryStore = create<ContextMemoryState>()(
           }));
 
           const current = useProjectStore.getState().projects.find((item) => item.id === id);
-          if (current?.path === path) {
+          if (options.applyDefaults !== false && current?.path === path) {
             const defaults = missingProjectDefaults(current.preferences, memory.projectDefaults);
             if (Object.keys(defaults).length)
               useProjectStore.getState().updateProjectPreferences(id, defaults);

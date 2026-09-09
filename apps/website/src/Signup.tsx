@@ -229,9 +229,7 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
           </div>
           <div className="waitlist-body">
             <Dialog.Title>Join the Jackalope waitlist</Dialog.Title>
-            <Dialog.Description>
-              Get an email when your access is ready. No payment to join.
-            </Dialog.Description>
+            <Dialog.Description>We’ll email you when access opens.</Dialog.Description>
             <Signup popup />
           </div>
         </Dialog.Content>
@@ -245,7 +243,7 @@ export function Newsletter() {
     <section id="newsletter" className="newsletter page-width" aria-labelledby="newsletter-title">
       <div>
         <h2 id="newsletter-title">Get early access.</h2>
-        <p>Join the waitlist. We’ll email you when access opens.</p>
+        <p>We’ll email you when access opens.</p>
       </div>
       <Signup />
     </section>
