@@ -29,8 +29,6 @@ pub fn run() {
         context.config_mut().app.windows[0].create = false;
     }
     let builder = tauri::Builder::default();
-    #[cfg(unix)]
-    let builder = builder.plugin(tauri_plugin_notification::init());
     builder
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())

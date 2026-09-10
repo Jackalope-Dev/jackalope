@@ -113,20 +113,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-executor"
-version = "1.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c96bf972d85afc50bf5ab8fe2d54d1586b4e0b46c97c50a0c9e71e2f7bcd812a"
-dependencies = [
- "async-task",
- "concurrent-queue",
- "fastrand",
- "futures-lite",
- "pin-project-lite",
- "slab",
-]
-
-[[package]]
 name = "async-io"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3068,6 +3054,7 @@ name = "jackalope-desktop"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "block2",
  "chrono",
  "chrono-tz",
  "cron",
@@ -3077,6 +3064,10 @@ dependencies = [
  "keyring",
  "libc",
  "notify-debouncer-mini",
+ "notify-rust",
+ "objc2",
+ "objc2-foundation",
+ "objc2-user-notifications",
  "oxc_resolver",
  "petgraph",
  "portable-pty",
@@ -3088,7 +3079,6 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
- "tauri-plugin-notification",
  "tauri-plugin-shell",
  "tauri-plugin-updater",
  "tauri-winrt-notification 0.8.1",
@@ -4000,7 +3990,10 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9df9128cbbfef73cda168416ccf7f837b62737d748333bfe9ab71c245d76613e"
 dependencies = [
+ "bitflags 2.13.1",
+ "block2",
  "objc2",
+ "objc2-core-location",
  "objc2-foundation",
 ]
 
@@ -4626,18 +4619,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
  "libc",
- "rand_chacha 0.3.1",
+ "rand_chacha",
  "rand_core 0.6.4",
-]
-
-[[package]]
-name = "rand"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
-dependencies = [
- "rand_chacha 0.9.0",
- "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -4662,31 +4645,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_chacha"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
-dependencies = [
- "ppv-lite86",
- "rand_core 0.9.5",
-]
-
-[[package]]
 name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.17",
-]
-
-[[package]]
-name = "rand_core"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
-dependencies = [
- "getrandom 0.3.4",
 ]
 
 [[package]]
@@ -6056,25 +6020,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-notification"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad2fd40946aef810c4be9fd33a2d1b9b397cb79042b2d21c81a0a8f204354fd1"
-dependencies = [
- "log",
- "notify-rust",
- "rand 0.9.5",
- "serde",
- "serde_json",
- "serde_repr",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.20",
- "time",
- "url",
-]
-
-[[package]]
 name = "tauri-plugin-shell"
 version = "2.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6390,6 +6335,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
+ "tracing",
  "windows-sys 0.61.2",
 ]
 
@@ -7826,14 +7772,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5db4be7c075cb421e4b7ee645541604239bd243ba7c357511f4ff3a74b555907"
 dependencies = [
  "async-broadcast",
- "async-executor",
- "async-io",
- "async-lock",
- "async-process",
  "async-recursion",
- "async-task",
  "async-trait",
- "blocking",
  "enumflags2",
  "event-listener",
  "futures-core",
@@ -7844,6 +7784,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_repr",
+ "tokio",
  "tracing",
  "uds_windows",
  "uuid",

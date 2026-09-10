@@ -10,6 +10,13 @@ use std::{
 };
 use tauri::{Emitter, Manager, State};
 
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(any(unix, test))]
+mod responses;
+
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Preferences {
@@ -31,6 +38,8 @@ pub struct Notifications {
     error: Mutex<Option<String>>,
     pending_open: Mutex<Option<String>>,
     alive: AtomicBool,
+    #[cfg(unix)]
+    responses: responses::Responses,
 }
 
 #[derive(Clone)]
@@ -118,11 +127,15 @@ impl Notifications {
             error: Mutex::new(error),
             pending_open: Mutex::new(None),
             alive: AtomicBool::new(true),
+            #[cfg(unix)]
+            responses: responses::Responses::default(),
         }
     }
 
     pub fn shutdown(&self) {
         self.alive.store(false, Ordering::Relaxed);
+        #[cfg(unix)]
+        self.responses.close();
     }
 
     fn status(&self) -> NotificationStatus {
@@ -154,15 +167,11 @@ pub fn launch(app: tauri::AppHandle) {
             let preferences = service.preferences.lock().unwrap().clone();
             for notice in &current {
                 if seen.insert(notice.key.clone()) && permitted(&preferences, notice, focused) {
-                    let app = app.clone();
-                    let notice = notice.clone();
-                    let _ = tauri::async_runtime::spawn_blocking(move || {
-                        if let Err(error) = show(&app, notice.title, Some(notice.run_id)) {
-                            *app.state::<Notifications>().error.lock().unwrap() = Some(error);
-                            let _ = app.emit("jackalope-notification-status", ());
-                        }
-                    })
-                    .await;
+                    if let Err(error) = show(&app, notice.title, Some(notice.run_id.clone())).await
+                    {
+                        *service.error.lock().unwrap() = Some(error);
+                        let _ = app.emit("jackalope-notification-status", ());
+                    }
                 }
             }
             // Resolved questions cannot become pending again; retired attempts never replay.
@@ -186,7 +195,7 @@ fn notification_icon(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 #[cfg(windows)]
-fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Result<(), String> {
+fn show_windows(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Result<(), String> {
     use tauri_winrt_notification::{IconCrop, Toast};
     let packaged_id = application_id();
     let id = if let Some(id) = packaged_id.as_deref() {
@@ -205,13 +214,7 @@ fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Result<(
         .text2("Open Jackalope to view this task. Prompts and project names stay private.")
         .sound(None)
         .on_activated(move |_| {
-            *handle.state::<Notifications>().pending_open.lock().unwrap() = run_id.clone();
-            if let Some(window) = handle.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
-            let _ = handle.emit("jackalope-notification-open", ());
+            activate(&handle, run_id.clone());
             Ok(())
         }).show().map_err(|_| "Windows could not deliver the notification. Check system notification settings and the installed app identity. In-app notices remain available.".into())
 }
@@ -234,11 +237,37 @@ fn application_id() -> Option<String> {
     }
 }
 
-#[cfg(not(windows))]
-fn show(app: &tauri::AppHandle, title: &str, _: Option<String>) -> Result<(), String> {
-    use tauri_plugin_notification::NotificationExt;
-    app.notification().builder().title("Jackalope").body(title).show()
-        .map_err(|_| "Could not show a notification. Check Jackalope's notification permission in system settings.".into())
+fn activate(app: &tauri::AppHandle, run_id: Option<String>) {
+    let service = app.state::<Notifications>();
+    if !service.alive.load(Ordering::Relaxed) {
+        return;
+    }
+    *service.pending_open.lock().unwrap() = run_id;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+    let _ = app.emit("jackalope-notification-open", ());
+}
+
+async fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let app = app.clone();
+        let title = title.to_owned();
+        tauri::async_runtime::spawn_blocking(move || show_windows(&app, &title, run_id))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    #[cfg(target_os = "linux")]
+    {
+        linux::show(app, title, run_id).await
+    }
+    #[cfg(target_os = "macos")]
+    {
+        macos::show(app, title, run_id).await
+    }
 }
 
 #[tauri::command]
@@ -265,9 +294,7 @@ pub fn notification_configure(
 
 #[tauri::command]
 pub async fn notification_test(app: tauri::AppHandle) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || show(&app, "Task notifications are ready", None))
-        .await
-        .map_err(|e| e.to_string())?
+    show(&app, "Task notifications are ready", None).await
 }
 
 #[tauri::command]

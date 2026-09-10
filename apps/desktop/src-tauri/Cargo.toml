@@ -60,10 +60,14 @@ windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "W
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-tauri-plugin-notification = "=2.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "=3.6.3", features = ["apple-native"] }
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-user-notifications = "0.3"
+block2 = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "=3.6.3", features = ["sync-secret-service", "crypto-rust"] }
+notify-rust = { version = "=4.18.0", default-features = false, features = ["z-with-tokio"] }
