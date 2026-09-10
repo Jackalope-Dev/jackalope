@@ -275,6 +275,7 @@
 }
 .local-ai-install-row > div:nth-child(2) {
   flex: 1;
+  min-width: 0;
 }
 .local-ai-install-row small {
   display: block;
@@ -312,28 +313,52 @@
   padding: 12px;
   animation: local-ai-appear 0.3s ease-out;
 }
-.local-ai-progress {
-  padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+.local-ai-activity {
+  margin-top: 12px;
+  min-width: 0;
 }
-.local-ai-progress > div {
+.local-ai-activity-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
-.local-ai-progress p,
-.local-ai-progress small {
+.local-ai-activity-heading svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--color-accent-ink);
+}
+.local-ai-activity small {
+  display: block;
   color: var(--color-text-secondary);
   font-size: 12px;
-  margin: 8px 0;
+  margin: 4px 0;
 }
-.local-ai-progress progress {
+.local-ai-activity progress {
+  appearance: none;
   display: block;
   width: 100%;
   height: 8px;
-  accent-color: var(--color-accent);
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+  color: var(--color-accent);
   margin: 12px 0;
+}
+.local-ai-activity progress::-webkit-progress-bar {
+  background: var(--color-surface-sunken);
+  border-radius: 999px;
+}
+.local-ai-activity progress::-webkit-progress-value {
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+.local-ai-activity progress::-moz-progress-bar {
+  background: var(--color-accent);
+  border-radius: 999px;
 }
 .local-ai-error {
   display: flex;

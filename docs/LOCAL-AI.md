@@ -19,6 +19,9 @@ Open **Agents → Try a local agent**, or use the same entry during onboarding.
    downloads as a fallback. macOS/Linux use the official setup links. Open Ollama
    and recheck if its local service is not running. WinGet may require system
    approval or a restart; stopping it cannot roll back completed installations.
+   Download and installer progress, elapsed time, cancellation and failures appear
+   within the selected tool or model row. A quiet installer does not report a percentage;
+   its elapsed time stays visible until it finishes or reaches the installation timeout.
 4. Run the local check. Jackalope creates an Ollama alias with a 65,536-token
    context, asks OpenCode to edit a file in an owned disposable folder, and
    continues the same session to create a second file. A matching session ID,
@@ -48,7 +51,9 @@ check; a locked leftover may remain under the native profiles `local-checks` dir
 Connecting creates or reuses a named OpenCode account and selects it for future
 OpenCode work. It preserves other accounts and their model preferences. Onboarding
 pins the chosen local account to the pending project. Outside onboarding, choose
-the account in project settings. If the app's default agent is unavailable,
+the account in project settings. Finishing local setup refreshes agent detection and
+selects OpenCode and the new local account in onboarding, including after a reload.
+If the app's default agent is unavailable,
 setup selects OpenCode for Ask Jackalope. Existing sessions retain their saved
 account; model and account restrictions still apply.
 

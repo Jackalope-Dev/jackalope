@@ -7,6 +7,14 @@ use std::{
 pub const OUTPUT_LIMIT: usize = 128_000;
 
 pub fn read_bounded(mut reader: impl Read, limit: usize) -> std::io::Result<(String, bool)> {
+    read_observed(&mut reader, limit, |_| {})
+}
+
+fn read_observed(
+    mut reader: impl Read,
+    limit: usize,
+    mut observe: impl FnMut(&[u8]),
+) -> std::io::Result<(String, bool)> {
     let mut kept = Vec::new();
     let mut buffer = [0; 8192];
     let mut truncated = false;
@@ -15,6 +23,7 @@ pub fn read_bounded(mut reader: impl Read, limit: usize) -> std::io::Result<(Str
         if count == 0 {
             break;
         }
+        observe(&buffer[..count]);
         let take = count.min(limit.saturating_sub(kept.len()));
         kept.extend_from_slice(&buffer[..take]);
         truncated |= take < count;
@@ -206,9 +215,18 @@ pub fn run(command: Command, timeout: Duration) -> Result<CommandResult, String>
 }
 
 pub fn run_cancellable(
+    command: Command,
+    timeout: Duration,
+    canceled: impl Fn() -> bool,
+) -> Result<CommandResult, String> {
+    run_cancellable_with_output(command, timeout, canceled, |_, _| {})
+}
+
+pub fn run_cancellable_with_output(
     mut command: Command,
     timeout: Duration,
     canceled: impl Fn() -> bool,
+    observe: impl Fn(&[u8], bool) + Send + Sync + 'static,
 ) -> Result<CommandResult, String> {
     command
         .stdin(Stdio::null())
@@ -238,8 +256,14 @@ pub fn run_cancellable(
     };
     let stdout = child.stdout.take().ok_or("Missing command output")?;
     let stderr = child.stderr.take().ok_or("Missing command diagnostics")?;
-    let out = std::thread::spawn(move || read_bounded(stdout, OUTPUT_LIMIT));
-    let err = std::thread::spawn(move || read_bounded(stderr, OUTPUT_LIMIT));
+    let observe = std::sync::Arc::new(observe);
+    let observe_stdout = observe.clone();
+    let out = std::thread::spawn(move || {
+        read_observed(stdout, OUTPUT_LIMIT, |bytes| observe_stdout(bytes, false))
+    });
+    let err = std::thread::spawn(move || {
+        read_observed(stderr, OUTPUT_LIMIT, |bytes| observe(bytes, true))
+    });
     let (status, timed_out) = loop {
         if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
             break (status, false);
@@ -275,6 +299,38 @@ pub fn run_cancellable(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[cfg(windows)]
+    fn live_output_can_cancel_before_the_command_exits() {
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+        let seen = Arc::new(AtomicBool::new(false));
+        let observed = seen.clone();
+        let mut command = Command::new("cmd.exe");
+        command.args([
+            "/D",
+            "/C",
+            "echo installer-progress & ping -n 30 127.0.0.1 >nul",
+        ]);
+        let result = run_cancellable_with_output(
+            command,
+            Duration::from_secs(5),
+            || seen.load(Ordering::SeqCst),
+            move |bytes, stderr| {
+                if !stderr && !bytes.is_empty() {
+                    observed.store(true, Ordering::SeqCst);
+                }
+            },
+        )
+        .unwrap();
+        assert!(seen.load(Ordering::SeqCst));
+        assert!(result.stdout.contains("installer-progress"));
+        assert!(!result.timed_out);
+        assert!(!result.success);
+        assert!(result.duration_ms < 3000);
+    }
     #[test]
     fn huge_lines_are_drained_without_losing_the_next_event() {
         let mut data = vec![b'x'; 1_000_000];

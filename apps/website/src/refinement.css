@@ -208,6 +208,9 @@
   align-items: center;
   gap: 16px;
 }
+.waitlist-preferences .preference-actions {
+  margin-top: 20px;
+}
 .preference-actions .text-link {
   min-height: 44px;
   background: transparent;

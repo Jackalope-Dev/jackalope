@@ -37,15 +37,18 @@ import { Button } from '../ui/button';
 import './local-ai.css';
 
 const stages = ['Your computer', 'Choose a model', 'Install & download', 'Check & connect'];
+type SetupActivity = 'inspect' | 'ollama' | 'opencode' | 'model' | 'verify' | 'connect';
 
 export function LocalAiSetup({
   onConnected,
   compact = false,
   preview,
+  projectSetup = false,
 }: {
-  onConnected?: (profileId: string) => void;
+  onConnected?: (profileId: string) => void | Promise<void>;
   compact?: boolean;
   preview?: LocalInspection;
+  projectSetup?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -89,6 +92,7 @@ export function LocalAiSetup({
           {open && (
             <LocalAiSteps
               preview={preview}
+              projectSetup={projectSetup}
               onConnected={onConnected}
               onClose={() => setOpen(false)}
             />
@@ -103,15 +107,19 @@ export function LocalAiSteps({
   onConnected,
   onClose,
   preview,
+  projectSetup = false,
 }: {
-  onConnected?: (profileId: string) => void;
+  onConnected?: (profileId: string) => void | Promise<void>;
   onClose: () => void;
   preview?: LocalInspection;
+  projectSetup?: boolean;
 }) {
   const [inspection, setInspection] = useState<LocalInspection | null>(preview ?? null);
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState('qwen3.5:4b');
   const [busy, setBusy] = useState('');
+  const [activity, setActivity] = useState<SetupActivity>('inspect');
+  const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState<LocalProgress | null>(null);
   const [verification, setVerification] = useState<LocalVerification | null>(null);
@@ -123,35 +131,45 @@ export function LocalAiSteps({
   const desktop = isTauriEnvironment() && !preview;
   const model = inspection?.models.find((m) => m.id === selected);
   const installed = inspection?.installedModels.includes(selected);
-  const percent = downloadPercent(progress);
   const inspect = useCallback(async () => {
     const found = await nativeTask<LocalInspection>('local_ai_inspect');
     if (active.current) setInspection(found);
     return found;
   }, []);
-  const perform = useCallback(async (label: string, action: () => Promise<void>) => {
-    if (working.current) return;
-    working.current = true;
-    setBusy(label);
-    setError('');
-    setProgress(null);
-    setStopping(false);
-    try {
-      await action();
-    } catch (cause) {
-      if (active.current) setError(String(cause));
-    } finally {
-      working.current = false;
-      if (active.current) {
-        setBusy('');
-        setStopping(false);
+  const perform = useCallback(
+    async (target: SetupActivity, label: string, action: () => Promise<void>) => {
+      if (working.current) return;
+      working.current = true;
+      setActivity(target);
+      setElapsed(0);
+      setBusy(label);
+      setError('');
+      setProgress(null);
+      setStopping(false);
+      try {
+        await action();
+      } catch (cause) {
+        if (active.current) setError(String(cause));
+      } finally {
+        working.current = false;
+        if (active.current) {
+          setBusy('');
+          setStopping(false);
+        }
       }
-    }
-  }, []);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!busy) return;
+    const started = Date.now();
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [busy]);
   useEffect(() => {
     active.current = true;
     if (desktop)
-      void perform('Checking your computer…', async () => {
+      void perform('inspect', 'Checking your computer…', async () => {
         await inspect();
       });
     return () => {
@@ -162,16 +180,17 @@ export function LocalAiSteps({
   useEffect(() => {
     if (heading.current?.dataset.step === String(step)) heading.current.focus();
   }, [step]);
-  const withProgress = async <T,>(command: string) => {
+  const withProgress = async <T,>(command: string, args: Record<string, unknown> = {}) => {
     const { Channel } = await import('@tauri-apps/api/core');
     if (!active.current) throw new Error('Setup closed. Reopen it to continue.');
     const channel = new Channel<LocalProgress>();
     channel.onmessage = (event) => {
       if (active.current) setProgress(event);
     };
-    return nativeTask<T>(command, { modelId: selected, progress: channel });
+    return nativeTask<T>(command, { modelId: selected, ...args, progress: channel });
   };
-  const openLink = async (url: string) => {
+  const openLink = async (url: string, target: SetupActivity) => {
+    setActivity(target);
     try {
       if (desktop) {
         const { open } = await import('@tauri-apps/plugin-shell');
@@ -181,13 +200,17 @@ export function LocalAiSteps({
       setError(String(cause));
     }
   };
-  const install = (tool: string) =>
-    void perform(`Installing ${tool === 'ollama' ? 'Ollama' : 'OpenCode'}…`, async () => {
-      await nativeTask('local_ai_install', { tool });
-      await inspect();
-    });
+  const install = (tool: 'ollama' | 'opencode') =>
+    void perform(
+      tool,
+      `Preparing ${tool === 'ollama' ? 'Ollama' : 'OpenCode'} installation…`,
+      async () => {
+        await withProgress('local_ai_install', { tool });
+        await inspect();
+      },
+    );
   const connect = () =>
-    void perform('Connecting your local agent…', async () => {
+    void perform('connect', 'Connecting your local agent…', async () => {
       const profile = await nativeTask<{ id: string }>('local_ai_connect', { modelId: selected });
       const config = useAgentConfigStore.getState();
       const options = config.runnerOptions.opencode ?? {
@@ -201,6 +224,7 @@ export function LocalAiSteps({
         ...options,
         models: [...new Set([...options.models, id])],
       });
+      await syncAgentConfig();
       await useExecutionStore.getState().discover();
       if (
         !useExecutionStore
@@ -212,10 +236,33 @@ export function LocalAiSteps({
       await syncAgentConfig();
       await useAgentAccountsStore.getState().load('opencode', true);
       if (active.current) {
-        setConnected(true);
-        onConnected?.(profile.id);
+        await onConnected?.(profile.id);
+        if (active.current) setConnected(true);
       }
     });
+  const status = (target: SetupActivity) =>
+    activity === target && (busy || error) ? (
+      <SetupStatus
+        label={busy}
+        progress={progress}
+        elapsed={elapsed}
+        stopping={stopping}
+        error={error}
+        onStop={
+          target === 'inspect' || target === 'connect'
+            ? undefined
+            : async () => {
+                setStopping(true);
+                try {
+                  await nativeTask('local_ai_cancel');
+                } catch (cause) {
+                  setError(String(cause));
+                  setStopping(false);
+                }
+              }
+        }
+      />
+    ) : null;
   return (
     <>
       <ol className="local-ai-steps" aria-label="Setup progress">
@@ -282,7 +329,7 @@ export function LocalAiSteps({
               variant="ghost"
               disabled={!desktop || !!busy}
               onClick={() =>
-                void perform('Checking your computer…', async () => {
+                void perform('inspect', 'Checking your computer…', async () => {
                   await inspect();
                 })
               }
@@ -290,6 +337,7 @@ export function LocalAiSteps({
               <RefreshCw size={16} />
               Check again
             </Button>
+            {status('inspect')}
           </>
         )}
         {step === 1 && inspection && (
@@ -331,6 +379,8 @@ export function LocalAiSteps({
                 title="Ollama"
                 detail="Runs the model · allow at least 4 GB of additional disk space"
                 done={inspection.ollamaOnline}
+                activity={status('ollama')}
+                pending={activity === 'ollama' && !!busy}
               >
                 {inspection.canInstall && (
                   <Button
@@ -344,7 +394,7 @@ export function LocalAiSteps({
                 <Button
                   variant="ghost"
                   disabled={!!busy}
-                  onClick={() => void openLink('https://ollama.com/download')}
+                  onClick={() => void openLink('https://ollama.com/download', 'ollama')}
                 >
                   Official download
                   <ExternalLink size={14} />
@@ -354,6 +404,8 @@ export function LocalAiSteps({
                 title="OpenCode"
                 detail="Connects the model to file edits and agent tools · installer size varies"
                 done={inspection.opencodeInstalled}
+                activity={status('opencode')}
+                pending={activity === 'opencode' && !!busy}
               >
                 {inspection.canInstall && (
                   <Button
@@ -367,7 +419,7 @@ export function LocalAiSteps({
                 <Button
                   variant="ghost"
                   disabled={!!busy}
-                  onClick={() => void openLink('https://opencode.ai/docs/')}
+                  onClick={() => void openLink('https://opencode.ai/docs/', 'opencode')}
                 >
                   Official setup
                   <ExternalLink size={14} />
@@ -381,11 +433,13 @@ export function LocalAiSteps({
                     : `About ${formatSize(model.downloadBytes)} to download`
                 }
                 done={!!installed}
+                activity={status('model')}
+                pending={activity === 'model' && !!busy}
               >
                 <Button
                   disabled={!desktop || !!busy || !inspection.ollamaOnline}
                   onClick={() =>
-                    void perform('Downloading your model…', async () => {
+                    void perform('model', 'Downloading your model…', async () => {
                       await withProgress('local_ai_pull');
                       await inspect();
                     })
@@ -405,7 +459,7 @@ export function LocalAiSteps({
             {inspection.canInstall && (
               <p className="local-ai-caption">
                 Install buttons use Windows Package Manager and accept the selected package’s
-                installation agreements. Installed tools remain on your computer if you leave setup.
+                installation agreements.
               </p>
             )}
             {inspection.hardware.freeDiskBytes !== null &&
@@ -421,7 +475,7 @@ export function LocalAiSteps({
               variant="ghost"
               disabled={!desktop || !!busy}
               onClick={() =>
-                void perform('Checking installed tools…', async () => {
+                void perform('inspect', 'Checking installed tools…', async () => {
                   await inspect();
                 })
               }
@@ -429,6 +483,7 @@ export function LocalAiSteps({
               <RefreshCw size={16} />
               Check again
             </Button>
+            {status('inspect')}
           </>
         )}
         {step === 3 && !connected && (
@@ -458,7 +513,7 @@ export function LocalAiSteps({
               <Button
                 disabled={!desktop || !!busy}
                 onClick={() =>
-                  void perform('Checking your local agent…', async () => {
+                  void perform('verify', 'Checking your local agent…', async () => {
                     const result = await withProgress<LocalVerification>('local_ai_verify');
                     if (active.current) setVerification(result);
                   })
@@ -468,11 +523,16 @@ export function LocalAiSteps({
                 Run local check
               </Button>
             )}
+            {status('verify')}
+            {status('connect')}
             <p className="local-ai-caption">
               Connecting selects this local account and model for future OpenCode tasks. Other
               agents and existing sessions keep their settings. If your default agent is
-              unavailable, OpenCode also becomes the default for Ask Jackalope. Choose its local
-              account in your project to try it. This profile has no automatic paid-model fallback.
+              unavailable, OpenCode also becomes the default for Ask Jackalope.{' '}
+              {projectSetup
+                ? 'Its local account will be selected for this project.'
+                : 'Choose its local account in your project to try it.'}{' '}
+              This profile has no automatic paid-model fallback.
             </p>
           </>
         )}
@@ -482,9 +542,10 @@ export function LocalAiSteps({
               <CheckCircle2 size={42} />
             </div>
             <p>
-              Choose <strong>OpenCode</strong> and <strong>Local · {selected}</strong> in your
-              project. Start with a small, reviewable task. You can manage its account and model in
-              Agents.
+              {projectSetup ? 'Selected' : 'Choose'} <strong>OpenCode</strong> and{' '}
+              <strong>Local · {selected}</strong>{' '}
+              {projectSetup ? 'for this project.' : 'in your project.'} Start with a small,
+              reviewable task. You can manage its account and model in Agents.
             </p>
             <p className="local-ai-caption">
               To reclaim model space later, remove the downloaded model and its Jackalope copy in
@@ -492,61 +553,24 @@ export function LocalAiSteps({
             </p>
           </>
         )}
-        {!!busy && (
-          <div className="local-ai-progress" role="status">
-            <div>
-              <Loader2 size={17} className="local-ai-spin" />
-              <strong>{stopping ? 'Stopping…' : busy}</strong>
-            </div>
-            <p>{progress?.message || 'You can leave setup and return later.'}</p>
-            {progress?.phase === 'download' && (
-              <>
-                <progress aria-label="Model download" value={percent} max={100} />
-                <small>
-                  {formatSize(progress.completed)}
-                  {progress.total ? ` of ${formatSize(progress.total)}` : ' received'}
-                </small>
-              </>
-            )}
-            <Button
-              variant="ghost"
-              disabled={stopping}
-              onClick={async () => {
-                setStopping(true);
-                try {
-                  await nativeTask('local_ai_cancel');
-                } catch (cause) {
-                  setError(String(cause));
-                  setStopping(false);
-                }
-              }}
-            >
-              Stop
-            </Button>
-          </div>
-        )}
-        {error && (
-          <p role="alert" className="local-ai-error">
-            <CircleAlert size={18} />
-            {error}
-          </p>
-        )}
       </div>
       <footer className="local-ai-footer">
-        <Button
-          variant="ghost"
-          onClick={step > 0 && !connected ? () => setStep(step - 1) : onClose}
-          disabled={!!busy && step > 0}
-        >
-          {step > 0 && !connected ? (
-            <>
-              <ArrowLeft size={16} />
-              Back
-            </>
-          ) : (
-            'Set up later'
-          )}
-        </Button>
+        {!connected && (
+          <Button
+            variant="ghost"
+            onClick={step > 0 && !connected ? () => setStep(step - 1) : onClose}
+            disabled={!!busy && step > 0}
+          >
+            {step > 0 && !connected ? (
+              <>
+                <ArrowLeft size={16} />
+                Back
+              </>
+            ) : (
+              'Cancel setup'
+            )}
+          </Button>
+        )}
         {connected ? (
           <Button onClick={onClose}>
             Done
@@ -645,11 +669,15 @@ function InstallRow({
   title,
   detail,
   done,
+  activity,
+  pending,
   children,
 }: {
   title: string;
   detail: string;
   done: boolean;
+  activity?: React.ReactNode;
+  pending?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -660,10 +688,71 @@ function InstallRow({
       <div>
         <strong>{title}</strong>
         <small>{detail}</small>
+        {activity}
       </div>
-      <div className="local-ai-install-actions">
-        {done ? <span className="local-ai-fit">Detected</span> : children}
-      </div>
+      {!pending && (
+        <div className="local-ai-install-actions">
+          {done ? <span className="local-ai-fit">Detected</span> : children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SetupStatus({
+  label,
+  progress,
+  elapsed,
+  stopping,
+  error,
+  onStop,
+}: {
+  label: string;
+  progress: LocalProgress | null;
+  elapsed: number;
+  stopping: boolean;
+  error: string;
+  onStop?: () => Promise<void>;
+}) {
+  const percent = downloadPercent(progress);
+  return (
+    <div className="local-ai-activity">
+      {label && (
+        <>
+          <div className="local-ai-activity-heading" role="status">
+            <Loader2 size={16} className="local-ai-spin" />
+            <span>{stopping ? 'Stopping…' : progress?.message || label}</span>
+          </div>
+          <small>
+            {elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`}{' '}
+            elapsed
+          </small>
+          {progress && (progress.total || progress.phase === 'download') && (
+            <>
+              <progress
+                aria-label={progress.phase === 'download' ? 'Model download' : 'Installer download'}
+                value={percent}
+                max={100}
+              />
+              <small>
+                {formatSize(progress.completed)}
+                {progress.total ? ` of ${formatSize(progress.total)}` : ' received'}
+              </small>
+            </>
+          )}
+          {onStop && (
+            <Button variant="ghost" disabled={stopping} onClick={() => void onStop()}>
+              Stop
+            </Button>
+          )}
+        </>
+      )}
+      {error && (
+        <p role="alert" className="local-ai-error">
+          <CircleAlert size={18} />
+          {error}
+        </p>
+      )}
     </div>
   );
 }

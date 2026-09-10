@@ -14,6 +14,7 @@ use tauri::{ipc::Channel, State};
 
 mod check;
 mod hardware;
+mod install;
 #[cfg(test)]
 mod tests;
 
@@ -204,7 +205,11 @@ pub fn local_ai_cancel(service: State<'_, LocalAi>) {
 }
 
 #[tauri::command]
-pub async fn local_ai_install(tool: String, service: State<'_, LocalAi>) -> Result<(), String> {
+pub async fn local_ai_install(
+    tool: String,
+    progress: Channel<Progress>,
+    service: State<'_, LocalAi>,
+) -> Result<(), String> {
     let package = match tool.as_str() {
         "ollama" => "Ollama.Ollama",
         "opencode" => "SST.opencode",
@@ -219,9 +224,18 @@ pub async fn local_ai_install(tool: String, service: State<'_, LocalAi>) -> Resu
     tauri::async_runtime::spawn_blocking(move || {
         let mut command = Command::new(executable);
         command.args(["install", "--id", package, "--exact", "--source", "winget", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"]);
-        let result = process_control::run_cancellable(command, Duration::from_secs(1200), || canceled.load(Ordering::SeqCst))?;
+        let output = Mutex::new(install::Output::new(if tool == "ollama" { "Ollama" } else { "OpenCode" }));
+        let closed = canceled.clone();
+        let result = process_control::run_cancellable_with_output(command, Duration::from_secs(1200), || canceled.load(Ordering::SeqCst), move |bytes, stderr| {
+            if let Ok(mut output) = output.lock() {
+                for event in output.consume(bytes, stderr) {
+                    if progress.send(event).is_err() { closed.store(true, Ordering::SeqCst); }
+                }
+            }
+        })?;
         if canceled.load(Ordering::SeqCst) { return Err("Stopped waiting for installation. Windows may still be finishing it; check again before retrying.".into()); }
-        if !result.success { return Err("Installation did not complete. Use the official installer, then check again. Windows may require an administrator or a restart.".into()); }
+        if result.timed_out { return Err("Installation timed out after 20 minutes. Check Windows for an approval prompt, then check installed tools before retrying.".into()); }
+        if !result.success { return Err(format!("Installation did not complete (code {}). Check Windows for an approval prompt or use the official installer, then check again.", result.exit_code.map(|code| format!("0x{:08X}", code as u32)).unwrap_or_else(|| "unavailable".into()))); }
         Ok(())
     }).await.map_err(|e| e.to_string())?
 }

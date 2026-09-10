@@ -480,7 +480,11 @@ export function OnboardingFlow({
                     config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
                   const meta = getAgentMetadata(item.id);
                   return (
-                    <div className="onboarding-agent-card" key={item.id}>
+                    <div
+                      className="onboarding-agent-card"
+                      key={item.id}
+                      data-selected={agent === item.id && projectEnabled(item.id)}
+                    >
                       <div className="onboarding-agent-choice">
                         <button
                           type="button"
@@ -545,13 +549,19 @@ export function OnboardingFlow({
               <div className="onboarding-local-agent">
                 <LocalAiSetup
                   compact
+                  projectSetup
                   onConnected={(profileId) => {
                     setAgent('opencode');
+                    const nextAllowed =
+                      allowedAgents === null ? null : [...new Set([...allowedAgents, 'opencode'])];
+                    setAllowedAgents(nextAllowed);
                     if (project) {
                       onboarding.stageProject({
                         ...project,
                         preferences: {
                           ...project.preferences,
+                          preferredRunner: 'opencode',
+                          allowedAgents: nextAllowed ?? undefined,
                           agentAccounts: {
                             ...project.preferences?.agentAccounts,
                             opencode: profileId,
@@ -559,9 +569,6 @@ export function OnboardingFlow({
                         },
                       });
                     }
-                    setAllowedAgents((ids) =>
-                      ids === null ? null : [...new Set([...ids, 'opencode'])],
-                    );
                   }}
                 />
               </div>
