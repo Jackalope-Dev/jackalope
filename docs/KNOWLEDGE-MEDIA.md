@@ -65,6 +65,33 @@ an isolated Edge browser context and the existing sample IPC fixture; it does
 not access a native profile or start a scheduled task. The capture bounds show
 the heading and schedule list, excluding unrelated workspace notifications.
 
+## Landing-page workspace clips
+
+The workspace explorer uses focused recordings of Tasks, Changes & review,
+Agents & accounts, Project context and Recurring tasks. `WorkspaceClip.tsx` loads
+each video only after a play click, with native controls, English captions,
+an accessible written description and a direct-link fallback on playback failure.
+Changing the view or appearance resets playback. No captions or labels sit beneath
+the preview.
+
+To regenerate the light and dark clips from the current desktop frontend, start
+its Vite preview on port 5197 and run:
+
+```powershell
+node apps/website/scripts/capture-workspace-clips.mjs
+```
+
+The capture requires Edge and FFmpeg on PATH. Set `JACKALOPE_CAPTURE_ORIGIN` for
+another preview URL, or `JACKALOPE_CAPTURE_SCENE` to regenerate one of `tasks`,
+`review`, `agents`, `context` or `recurring`. Outputs are H.264 MP4s, JPEG posters
+and timed WebVTT captions in `apps/website/public/media/workspace/`; intermediate
+frames stay in ignored `output/playwright/workspace-clips/`.
+
+`workspace-capture-setup.mjs` extends the isolated Atlas browser fixture with
+sample accounts, saved knowledge and paused schedules. It blocks task launch and
+schedule saves. The clips show frontend interactions with fictional data, not
+provider authentication, native execution or installed-app acceptance.
+
 ## Verification
 
 The website build checks local page links, anchors, linked files, and embedded

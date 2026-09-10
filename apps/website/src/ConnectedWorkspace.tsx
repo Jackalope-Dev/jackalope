@@ -51,10 +51,6 @@ export function ConnectedWorkspace() {
           <br />
           <span>whole setup.</span>
         </h2>
-        <p>
-          Your work accounts. Your personal projects. Your preferred agents and tools. Give them a
-          shared place to work, with you in control.
-        </p>
       </div>
       <figure className="connection-map">
         <div className="connection-map-layout" aria-hidden="true">

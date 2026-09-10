@@ -21,6 +21,7 @@ import type { EditorialCover } from './blog-types';
 import { ConnectedWorkspace } from './ConnectedWorkspace';
 import { tour } from './content';
 import { EditorialArt } from './EditorialArt';
+import { WorkspaceClip } from './WorkspaceClip';
 
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
@@ -44,8 +45,7 @@ const scenes = [
     title: 'Track tasks across your projects.',
     description:
       'Capture a thought. Start a task in a local project. See what is running, what needs an answer, and what is ready for review.',
-    detail: 'Tasks & ideas',
-    image: 'tasks',
+    walkthrough: 'Switch between the board and list, then draft a brief for a new task.',
   },
   {
     id: 'review',
@@ -53,8 +53,8 @@ const scenes = [
     title: 'Review the patch and its checks.',
     description:
       'Read the patch alongside the task and its checks. Ask for another iteration, or choose what to integrate into your project.',
-    detail: 'Changes & review',
-    image: 'review',
+    walkthrough:
+      'Open a completed task, inspect its changes, and expand the patch to review the code.',
   },
   {
     id: 'agents',
@@ -62,8 +62,25 @@ const scenes = [
     title: 'Choose an agent for each task.',
     description:
       'Use installed Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity CLIs with your existing accounts. Choose the right agent for each task.',
-    detail: 'Agents & accounts',
-    image: 'agents',
+    walkthrough:
+      'Explore installed agents, then open account profiles to see the sign-ins available for your projects.',
+  },
+  {
+    id: 'context',
+    label: 'Project context',
+    title: 'Give the next task a head start.',
+    description:
+      'Keep project guidance, reusable workflows, and editable lessons together. Inspect the context that carries into new tasks.',
+    walkthrough: 'Open project context, read a saved lesson, and browse reusable workflows.',
+  },
+  {
+    id: 'recurring',
+    label: 'Recurring tasks',
+    title: 'Make time for the work that repeats.',
+    description:
+      'Schedule regular checks, or watch a local branch for changes. Review each run in its own history while Jackalope is open and your computer is awake.',
+    walkthrough:
+      'Browse two paused sample schedules and open a schedule to inspect its prompt and timing. No tasks are launched.',
   },
 ];
 const examples = [
@@ -412,11 +429,11 @@ export function LandingPage({
                   Watch the {tour.durationSeconds}-second tour
                 </button>
               </div>
-              <span className="availability">
-                {available
-                  ? `Windows x64 · ${releaseVersion ?? 'Available now'}`
-                  : 'Early access waitlist · No payment to join'}
-              </span>
+              {available && (
+                <span className="availability">
+                  Windows x64 · {releaseVersion ?? 'Available now'}
+                </span>
+              )}
             </div>
           </div>
           <div className="hero-visual">
@@ -496,19 +513,15 @@ export function LandingPage({
       <Workbench />
 
       <section
-        className="workspace-section"
+        className="workspace-section section-echo"
         id="inside"
         aria-labelledby="inside-title"
         data-reveal=""
       >
+        <EchoMark animated={false} className="section-echo-mark" />
         <div className="landing-width">
           <div className="workspace-heading">
             <h2 id="inside-title">Meet your new workspace.</h2>
-            <p>
-              Your tasks, agents, and changes share one workspace.
-              <br />
-              Choose a view to take a closer look.
-            </p>
           </div>
           <Tabs.Root defaultValue="tasks" className="product-explorer">
             <Tabs.List aria-label="Explore the workspace" className="product-tabs">
@@ -525,28 +538,7 @@ export function LandingPage({
                   <h3>{scene.title}</h3>
                   <p>{scene.description}</p>
                 </div>
-                <button
-                  type="button"
-                  className="product-capture"
-                  aria-label={`Play the Jackalope product walkthrough from ${scene.detail}`}
-                  onClick={onPlay}
-                >
-                  <img
-                    src={`/media/${scene.image}${dark ? '' : '-light'}.png`}
-                    width="1440"
-                    height="840"
-                    loading="lazy"
-                    alt={`Actual Jackalope ${scene.detail.toLowerCase()} interface with Atlas sample project data`}
-                  />
-                  <span className="capture-play">
-                    <Play size={15} fill="currentColor" />
-                    See it in motion
-                  </span>
-                </button>
-                <p className="capture-caption">
-                  <span>{scene.detail}</span>
-                  <span>Actual app · Atlas sample project</span>
-                </p>
+                <WorkspaceClip key={`${scene.id}-${dark}`} scene={scene} dark={dark} />
               </Tabs.Content>
             ))}
           </Tabs.Root>
@@ -554,11 +546,12 @@ export function LandingPage({
       </section>
 
       <section
-        className="atmosphere-section"
+        className="atmosphere-section section-echo"
         id="atmosphere"
         aria-labelledby="atmosphere-title"
         data-reveal=""
       >
+        <EchoMark animated={false} className="section-echo-mark" />
         <div className="landing-width atmosphere-layout">
           <div>
             <h2 id="atmosphere-title">

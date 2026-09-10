@@ -6,7 +6,6 @@
   width: min(var(--landing-width), calc(100% - var(--landing-gutter) * 2));
   margin-inline: auto;
 }
-.capture-caption,
 .example-note,
 .palette-name,
 .availability {
@@ -262,18 +261,20 @@
   transform: rotate(-35deg);
 }
 .product-caption {
-  min-height: 116px;
   display: grid;
-  grid-template-columns: 1fr 1.3fr;
-  gap: 28px;
+  gap: 10px;
+  margin-bottom: 24px;
 }
 .product-caption h3 {
+  margin: 0;
   font-size: 21px;
   line-height: 1.45;
   letter-spacing: -0.055em;
   font-weight: 550;
 }
 .product-caption p {
+  margin: 0;
+  max-width: 640px;
   font-size: 12px;
   color: var(--color-text-secondary);
   line-height: 1.85;
@@ -289,8 +290,38 @@
   background: var(--color-surface);
   box-shadow: var(--shadow-surface);
 }
-.product-capture img {
+.product-capture img,
+.product-capture video {
+  display: block;
   width: 100%;
+  height: auto;
+  aspect-ratio: 12 / 7;
+}
+.product-capture > button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.product-capture :is(button, video):focus-visible {
+  outline: 3px solid var(--color-accent-ink);
+  outline-offset: -3px;
+}
+.capture-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: var(--color-surface);
+  text-align: center;
+}
+.capture-error a {
+  padding: 12px;
+  color: var(--color-accent-ink);
+  text-decoration: underline;
 }
 .capture-play {
   display: flex;
@@ -310,14 +341,6 @@
 }
 .product-capture:hover .capture-play {
   translate: 0 -4px;
-}
-.capture-caption {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  margin-top: 16px;
-  font-size: 11px;
-  color: var(--color-text-secondary);
 }
 .landing-section {
   padding-block: 100px;
@@ -965,7 +988,6 @@
     display: none;
   }
   .product-caption {
-    min-height: 142px;
     gap: 12px;
   }
   .product-caption h3 {
@@ -981,12 +1003,6 @@
     bottom: 12px;
     padding: 9px 11px;
     font-size: 11px;
-  }
-  .capture-caption {
-    font-size: 11px;
-  }
-  .capture-caption > span:first-child {
-    display: none;
   }
   .landing-section {
     padding-block: 65px;
