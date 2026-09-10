@@ -73,7 +73,7 @@ jobs:
         if: env.CLOUD_MODE == 'candidate'
         shell: pwsh
         run: ./scripts/release/cloud-tools.ps1 -Azure
-      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6
+      - uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c
         if: env.CLOUD_MODE == 'candidate'
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
