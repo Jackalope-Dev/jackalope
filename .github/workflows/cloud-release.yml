@@ -46,7 +46,7 @@ jobs:
           if ($env:CN_APPLICATION -ne 'jackalope-digital/jackalope') { throw 'Set CN_APPLICATION to jackalope-digital/jackalope.' }
           if ($env:CLOUD_MODE -eq 'candidate' -and $env:CLOUD_SIGNING_READY -ne 'true') { throw 'Complete Azure signing setup before requesting a candidate.' }
           if ($env:REQUESTED_MODE -eq 'draft' -and $env:CLOUD_DRAFT_UPLOAD_ENABLED -ne 'true') { throw 'Configure Cloud draft access before requesting an upload.' }
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
