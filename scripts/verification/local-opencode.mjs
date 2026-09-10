@@ -65,8 +65,9 @@ const server = createServer(async (request, response) => {
     );
     response.end('data: [DONE]\n\n');
   } catch (error) {
+    console.error('Local protocol probe failed:', error);
     response.writeHead(500);
-    response.end(String(error));
+    response.end('Local protocol probe failed.');
   }
 });
 await new Promise((ready) => server.listen(0, '127.0.0.1', ready));

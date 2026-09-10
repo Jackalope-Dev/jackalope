@@ -19,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
+    name: Verify server
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

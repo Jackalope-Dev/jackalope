@@ -21,9 +21,9 @@ if (
 const auditOrigin = base.origin;
 const decode = (value) =>
   value
-    .replace(/&amp;/g, '&')
     .replace(/&#x27;|&#39;/g, "'")
-    .replace(/&quot;/g, '"');
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&');
 const plain = (html) =>
   decode(
     html

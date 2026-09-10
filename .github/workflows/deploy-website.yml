@@ -33,6 +33,7 @@ concurrency:
 
 jobs:
   verify:
+    name: Verify website
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
