@@ -111,6 +111,14 @@ pub(super) fn probe_auth(
             .map_err(std::io::Error::other)?;
     }
     let mut child = cmd.stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+    let tree = match super::process_control::ProcessTree::attach(&child) {
+        Ok(tree) => tree,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(std::io::Error::other(error));
+        }
+    };
     let stdout = child.stdout.take().unwrap();
     let reader = std::thread::spawn(move || {
         let mut data = Vec::new();
@@ -120,6 +128,7 @@ pub(super) fn probe_auth(
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     loop {
         if let Some(status) = child.try_wait()? {
+            tree.terminate();
             return Ok(std::process::Output {
                 status,
                 stdout: reader.join().unwrap_or_default(),
@@ -127,6 +136,7 @@ pub(super) fn probe_auth(
             });
         }
         if std::time::Instant::now() >= deadline {
+            tree.terminate();
             let _ = child.kill();
             let _ = child.wait();
             return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Sign-in check timed out. Open the agent CLI to check its configuration, then refresh."));

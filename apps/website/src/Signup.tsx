@@ -69,7 +69,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
       setSurveyToken(result.surveyToken ?? '');
       setMessage(
         accessOrigin
-          ? 'Check your email to confirm your place and get your referral link. If you chose product notes, confirm that subscription separately.'
+          ? 'Check your email to confirm your place and get your referral link.'
           : result.optIn?.required
             ? 'Check your inbox to confirm your email and finish joining the list.'
             : 'Thanks for making room for Jackalope. Watch your inbox for launch news and occasional product notes.',
@@ -160,12 +160,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           </p>
           {accessOrigin && (
             <label className="signup-newsletter">
-              <input
-                name="newsletter"
-                type="checkbox"
-                defaultChecked
-                disabled={state === 'sending'}
-              />
+              <input name="newsletter" type="checkbox" disabled={state === 'sending'} />
               <span>
                 Optional: product notes and one feedback email after trying Jackalope. Unsubscribe
                 anytime.

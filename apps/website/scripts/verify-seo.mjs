@@ -116,6 +116,15 @@ export async function verifySeo(directory, pages, origin) {
     );
     assert.match(html, /<html lang="en"/);
     const body = html.slice(html.indexOf('<body'));
+    for (const tag of body.matchAll(/<(?:img|video|source|track)\b[^>]*>/g)) {
+      for (const attribute of tag[0].matchAll(/\b(?:src|poster)="([^"]+)"/g)) {
+        const asset = new URL(decode(attribute[1]), `${origin}${page.path}`);
+        if (asset.origin !== origin) continue;
+        await readFile(resolve(directory, asset.pathname.slice(1))).catch(() => {
+          assert.fail(`${page.path}: missing media asset ${asset.pathname}`);
+        });
+      }
+    }
     documents.set(page.path, body);
     links.set(
       page.path,
@@ -127,7 +136,12 @@ export async function verifySeo(directory, pages, origin) {
   for (const [path, targets] of links) {
     for (const target of targets) {
       if (target.origin !== origin) continue;
-      if (/\.[a-z0-9]+$/i.test(target.pathname)) continue;
+      if (/\.[a-z0-9]+$/i.test(target.pathname)) {
+        await readFile(resolve(directory, target.pathname.slice(1))).catch(() => {
+          assert.fail(`${path}: missing linked file ${target.pathname}`);
+        });
+        continue;
+      }
       assert.ok(documents.has(target.pathname), `${path}: unregistered page ${target.pathname}`);
       if (target.hash) {
         const id = decodeURIComponent(target.hash.slice(1));

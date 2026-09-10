@@ -19,6 +19,7 @@
     "verify": "node scripts/verify.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:docs": "node scripts/check-docs.mjs",
+    "check:links:website": "node apps/website/scripts/audit-links.mjs",
     "check:changelog": "node scripts/changelog.mjs check",
     "changelog:add": "node scripts/changelog.mjs add",
     "licenses:generate": "node scripts/licenses.mjs"

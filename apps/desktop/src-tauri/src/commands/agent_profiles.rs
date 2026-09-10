@@ -623,6 +623,7 @@ pub fn agent_profile_delete(
         {
             return Err("The account directory resolves outside its managed location.".into());
         }
+        super::account_storage::remove(&directory.join("api-key.bin"))?;
         fs::remove_dir_all(&directory)
             .map_err(|e| format!("Account files could not be removed: {e}"))?;
     }

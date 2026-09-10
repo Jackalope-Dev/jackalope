@@ -31,7 +31,9 @@ with an instrumental soundtrack and English captions. It demonstrates the fronte
 not native task execution or desktop-control acceptance. The player has native
 controls and error recovery; a text transcript is available on the tour page.
 The soundtrack was synthesized for this project without third-party recordings or
-samples. Retain the bundled font licenses when redistributing the website.
+samples. Retain the files in `public/licenses` when redistributing the website:
+they include Jackalope's Apache-2.0 license, the bundled font licenses and the
+website's production dependency notices. Refresh them with `pnpm licenses:generate`.
 
 Keep only media used by the current site here. Campaign exports, editable film
 masters, submission kits and generation scratch belong outside the public source

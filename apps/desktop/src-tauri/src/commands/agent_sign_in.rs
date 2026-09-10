@@ -202,6 +202,7 @@ fn spawn_session(
             writer,
             master: pair.master,
             child,
+            tree: None,
         }),
         tree: Some(tree),
         lease: Some(lease),

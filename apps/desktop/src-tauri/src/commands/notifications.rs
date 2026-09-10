@@ -127,7 +127,7 @@ impl Notifications {
 
     fn status(&self) -> NotificationStatus {
         NotificationStatus {
-            supported: cfg!(windows),
+            supported: cfg!(any(windows, target_os = "macos", target_os = "linux")),
             enabled: self.preferences.lock().unwrap().enabled,
             error: self.error.lock().unwrap().clone(),
         }
@@ -235,11 +235,10 @@ fn application_id() -> Option<String> {
 }
 
 #[cfg(not(windows))]
-fn show(_: &tauri::AppHandle, _: &str, _: Option<String>) -> Result<(), String> {
-    Err(
-        "OS notifications are currently supported on Windows. In-app notices remain available."
-            .into(),
-    )
+fn show(app: &tauri::AppHandle, title: &str, _: Option<String>) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+    app.notification().builder().title("Jackalope").body(title).show()
+        .map_err(|_| "Could not show a notification. Check Jackalope's notification permission in system settings.".into())
 }
 
 #[tauri::command]

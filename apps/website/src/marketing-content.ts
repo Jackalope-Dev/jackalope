@@ -22,6 +22,7 @@ export type MarketingPage = {
     paragraphs: string[];
     bullets?: string[];
     links?: Array<{ href: string; label: string }>;
+    table?: { columns: string[]; rows: string[][] };
   }>;
   related: Array<{ href: string; label: string }>;
 };
@@ -68,6 +69,32 @@ export const marketingPages: MarketingPage[] = [
         title: 'Return to one review queue.',
         paragraphs: [
           'A finished response is not the finish line. Jackalope keeps the result, patch, reported checks, evidence, and attempt history together. When several tasks belong together, review preparation checks their current source state and produces a combined result without silently modifying your main checkout.',
+        ],
+      },
+      {
+        title: 'Split by independent outcomes.',
+        paragraphs: [
+          'For a search feature, one task can investigate a ranking regression while another updates help text that does not depend on the fix. If a third task changes the API consumed by the interface, decide the contract first and make the interface task depend on that integration.',
+          'Give each task a file scope, an expected behavior, and a check it can run. Start with two workers and increase concurrency only when their scopes remain understandable. Shared files, database migrations, generated outputs, and fixed development-server ports can create dependencies even when the prompts sound independent.',
+        ],
+        links: [
+          {
+            href: '/guides/run-codex-and-claude-code-in-parallel/',
+            label: 'Work through a two-agent plan',
+          },
+        ],
+      },
+      {
+        title: 'When sequential work is the better fit.',
+        paragraphs: [
+          'Keep a task sequential when the next step depends on a decision you have not made, or when every proposed worker would edit the same module. A separate worktree prevents checkout collisions but cannot supply an unresolved product requirement.',
+          'If a prerequisite fails, inspect and correct that task before starting its dependents. If it succeeds, review and integrate the prerequisite first so downstream work starts from the accepted code. Completion messages alone do not release dependencies.',
+        ],
+        links: [
+          {
+            href: '/knowledge/git-worktrees/',
+            label: 'Dependency and integration safeguards',
+          },
         ],
       },
     ],
@@ -121,6 +148,36 @@ export const marketingPages: MarketingPage[] = [
           'Worktrees separate working directories. They do not restrict an agent’s access to other local files. Your agent permissions still apply; review the code and run project checks before merging.',
         ],
       },
+      {
+        title: 'Prepare more than the branch.',
+        paragraphs: [
+          'A worktree contains checked-in files, but it may not contain installed packages, ignored environment files, or a running database. Record the setup commands in project guidance and establish the same build in the new checkout before asking an agent to diagnose application behavior.',
+          'Give local servers distinct ports and check whether tools write to shared caches or external services. Worktrees share Git repository data; they do not create separate operating-system accounts or automatically isolate services.',
+        ],
+        links: [
+          {
+            href: 'https://git-scm.com/docs/git-worktree',
+            label: 'Git’s worktree reference',
+          },
+        ],
+      },
+      {
+        title: 'Review cleanup as carefully as creation.',
+        paragraphs: [
+          'After integration, confirm which branch contains the accepted change and inspect remaining uncommitted and untracked work. A branch being merged does not establish that every file in its working directory was included. Keep active or interrupted tasks until their state is understood.',
+          'If a worktree is locked, identify the process using it before attempting cleanup. Stop the process you own, preserve any needed output, and retry. A lock error is a recovery problem, not a reason to discard task history or force removal.',
+        ],
+        links: [
+          {
+            href: '/knowledge/resolving-git-worktree-locks/',
+            label: 'Diagnose worktree locks',
+          },
+          {
+            href: '/knowledge/git-worktrees/',
+            label: 'Jackalope integration and cleanup rules',
+          },
+        ],
+      },
     ],
     related: [
       { href: '/parallel-coding-agents/', label: 'Parallel coding agents' },
@@ -143,28 +200,111 @@ export const marketingPages: MarketingPage[] = [
     signals: ['Codex', 'Claude Code', 'Grok', 'OpenCode', 'Antigravity'],
     sections: [
       {
-        title: 'One workspace does not mean one provider.',
+        title: 'Choose by the connection your task needs.',
         paragraphs: [
-          'Different tasks benefit from different agents, models, accounts, and tools. Jackalope keeps the task identity stable while allowing each new task to use the agent that fits the work.',
-          'Connect project tools directly to Codex and Claude Code. Grok and Antigravity can discover supported project tools on demand. OpenCode uses tools configured in its own CLI; Jackalope project-tool delivery is not supported.',
+          'Jackalope runs installed coding-agent CLIs. Start with your required provider, account, model, and tools, then check the adapter below. An agent logo or successful account setup does not establish that Jackalope can execute tasks with it.',
+          'All five native adapters implement tasks, continuation, review, and reported task usage. The tool and account differences are important when moving a working CLI setup into a project.',
         ],
       },
       {
-        title: 'Tasks, accounts, and review in one place.',
+        title: 'Current agent compatibility',
         paragraphs: [
-          'All five adapters support tasks, follow-ups, review, and reported usage. Antigravity runs as a worker; its named accounts use Gemini API keys with separate API billing. Its existing subscription login is shared, without isolated subscription profiles. Provider limits and permissions still apply.',
+          'These are implemented capabilities. Jackalope is coming soon; validate your installed CLI version, sign-in, and required tool flow when you receive access.',
         ],
-        bullets: [
-          'Use named work and personal sign-in profiles for supported agents.',
-          'Choose allowed agents and default accounts per project.',
-          'Keep continuations on the account that started the attempt.',
-          'See reported usage for each task.',
+        table: {
+          columns: ['Agent', 'Project tools', 'Account behavior'],
+          rows: [
+            [
+              'Codex',
+              'Direct stdio and HTTP connections.',
+              'Named sign-ins; CLI status check; reported capacity windows.',
+            ],
+            [
+              'Claude Code',
+              'Direct stdio, HTTP, and SSE connections.',
+              'Named sign-ins; CLI status check; continuations retain their account.',
+            ],
+            [
+              'Grok Build',
+              'On-demand discovery through the HTTP bridge; no direct injection.',
+              'Named profiles; provider access checked at launch.',
+            ],
+            [
+              'OpenCode',
+              'Configure tools in the CLI; project delivery and discovery unsupported.',
+              'Named profiles separate configuration and data; access checked at launch.',
+            ],
+            [
+              'Antigravity',
+              'On-demand discovery; worker tasks, not automatic routing coordination.',
+              'Named profiles use Gemini API keys. Subscription login is shared.',
+            ],
+          ],
+        },
+        links: [
+          {
+            href: '/agents/codex/',
+            label: 'Codex setup',
+          },
+          {
+            href: '/agents/claude-code/',
+            label: 'Claude Code setup',
+          },
+          {
+            href: '/agents/grok/',
+            label: 'Grok Build setup',
+          },
+          {
+            href: '/agents/opencode/',
+            label: 'OpenCode setup',
+          },
         ],
       },
       {
-        title: 'Start with your existing setup.',
+        title: 'Antigravity and setup-only candidates.',
         paragraphs: [
-          'Install and sign in to Codex, Claude Code, Grok, OpenCode, or Antigravity, then choose your agent in Jackalope. You keep your existing provider account and permissions.',
+          'Antigravity uses the agy CLI for worker tasks. Its named profiles use Gemini API keys with separate API billing; they do not create isolated subscription sign-ins. Use its existing subscription login only with that shared-login limitation in mind.',
+          'Gemini CLI, Aider, and Goose offer account setup in the catalog but do not have native task execution adapters. Hermes and other unlisted agents are not supported task runners. Use the roadmap to follow planned support rather than assuming a configured executable can run as another agent.',
+        ],
+        links: [
+          {
+            href: 'https://antigravity.google/docs/cli/install/',
+            label: 'Antigravity installation and authentication',
+          },
+          {
+            href: '/roadmap/',
+            label: 'Planned agent support',
+          },
+        ],
+      },
+      {
+        title: 'Check a new setup in three steps.',
+        paragraphs: [
+          'First, confirm the CLI and chosen account work on the host. Next, launch a small task against a project with passing baseline checks. Finally, continue the task with one correction and verify that the account and history remain attached to the original attempt.',
+          'If the task needs a connected service, include a harmless read from that service. Test that exact agent and connection instead of relying on the connection’s saved state. A missing tool, an expired sign-in, and a failing repository build need different fixes.',
+        ],
+        links: [
+          {
+            href: '/knowledge/multi-account-and-agents/',
+            label: 'Accounts and credential boundaries',
+          },
+          {
+            href: '/knowledge/connecting-custom-mcp-servers/',
+            label: 'Project connection setup',
+          },
+        ],
+      },
+      {
+        title: 'Keep model access and workspace access distinct.',
+        paragraphs: [
+          'Jackalope does not include a model subscription. Your provider determines available models, permissions, and charges. Task usage shows reported activity from Jackalope attempts; account capacity can include other clients and is not a complete billing statement.',
+          'Choose the account deliberately for each project. Changing a default affects future tasks, while a continuation retains its original account. Profiles organize sign-ins and settings; they do not restrict an agent’s access to local files.',
+        ],
+        links: [
+          {
+            href: '/knowledge/task-routing-and-quotas/',
+            label: 'Capacity, routing, and explicit assignments',
+          },
         ],
       },
     ],
@@ -189,28 +329,72 @@ export const marketingPages: MarketingPage[] = [
     signals: ['Installed Codex CLI', 'Project MCP', 'Account profiles', 'Usage windows'],
     sections: [
       {
-        title: 'Start Codex with the right project context.',
+        title: 'Connect the Codex CLI you already use.',
         paragraphs: [
-          'Save project instructions, lessons, and reusable workflows once. For each task, choose the context and project connections that belong with the brief. Jackalope records what was delivered so the result remains inspectable.',
-          'Codex supports project-selected stdio and HTTP MCP connections through Jackalope. Existing Codex configuration remains subject to the CLI’s own settings and permissions.',
+          'Jackalope launches your installed Codex CLI. An OpenAI account in a browser is not enough: the executable and the account selected for the task must be usable on the machine running Jackalope. Start with the official CLI installation and sign-in instructions, then check Codex in Agents → Configuration.',
+          'Choose a local Git project whose normal build already works. Add the build command and project conventions to its instructions. Your first task should have one observable result, such as fixing a failing parser test, so you can separate setup problems from implementation problems.',
+        ],
+        links: [
+          {
+            href: 'https://learn.chatgpt.com/docs/codex/cli',
+            label: 'Install and sign in to Codex CLI',
+          },
+          {
+            href: '/knowledge/fixing-cli-path-on-windows/',
+            label: 'Fix a CLI that Jackalope cannot find',
+          },
         ],
       },
       {
-        title: 'Use the right account for the project.',
+        title: 'Pin the account before starting client work.',
         paragraphs: [
-          'Create named Codex sign-in profiles, select one for a project, and keep continuations on the account that began the work. See available account limits and reported task usage in one place.',
+          'Named Codex profiles let you organize work and personal sign-ins separately. Choose the project’s Codex account in Project → Settings. Changing the active account affects new tasks; continuing an existing task retains the profile that started it.',
+          'If a task reports an authentication problem, inspect the selected profile instead of assuming the normal terminal login is the one being used. Account labels are names you assign, not verification of the provider identity. Check the identity during sign-in before sending project context.',
         ],
-        bullets: [
-          'Run one task directly or assign Codex inside a parallel plan.',
-          'Receive updates from related project tasks.',
-          'Inspect the result, patch, evidence, and attempt history together.',
-          'Export reported usage by project and account profile.',
+        links: [
+          {
+            href: '/knowledge/multi-account-and-agents/',
+            label: 'Configure accounts and understand profile boundaries',
+          },
         ],
       },
       {
-        title: 'Codex still owns model access and permissions.',
+        title: 'Bring the tools the task needs.',
         paragraphs: [
-          'Jackalope does not include an OpenAI subscription or bypass Codex permissions. Availability, model access, connected tools, and provider-side limits remain part of your Codex setup.',
+          'Codex supports Jackalope project connections over stdio and HTTP. Select the connection for the project and task, then start with a read operation that confirms the expected service is available. Tools already configured in Codex remain subject to its own configuration and permissions.',
+          'A useful first brief is: “Find the parser case that rejects a valid empty list, add a regression test, and fix it without changing the public API. Run the parser tests and show the changed files.” Add the relevant project guidance; avoid attaching unrelated tools just because they are available.',
+        ],
+        links: [
+          {
+            href: '/knowledge/connecting-custom-mcp-servers/',
+            label: 'Set up and select project MCP connections',
+          },
+        ],
+      },
+      {
+        title: 'Read capacity and task usage separately.',
+        paragraphs: [
+          'Jackalope can show Codex account usage windows when the CLI reports them, alongside usage recorded for Jackalope attempts. Account limits can include activity outside Jackalope; a task’s token total describes that attempt. Neither is a complete invoice or a promise of remaining model access.',
+          'When capacity is unavailable, keep it unknown. Check the account’s reported reset information and whether the task has an explicit agent assignment before expecting automatic routing to use another worker.',
+        ],
+        links: [
+          {
+            href: '/knowledge/task-routing-and-quotas/',
+            label: 'Understand usage windows and routing',
+          },
+        ],
+      },
+      {
+        title: 'Continue, check, and review the change.',
+        paragraphs: [
+          'Ask for a correction under the same task to retain its account and history. Inspect the patch and the parser test output, then try a nearby edge case. For work alongside Claude Code, give each task a separate scope and make dependent changes wait for integration.',
+          'Jackalope is coming soon. These are implemented adapter capabilities; your installed CLI version, account, model, and tool combination still need a real task check. Jackalope does not include an OpenAI subscription or remove Codex permission requirements.',
+        ],
+        links: [
+          {
+            href: '/guides/run-codex-and-claude-code-in-parallel/',
+            label: 'Plan a feature across Codex and Claude Code',
+          },
         ],
       },
     ],
@@ -235,28 +419,70 @@ export const marketingPages: MarketingPage[] = [
     signals: ['Installed Claude Code', 'Project MCP', 'In-app questions', 'Account profiles'],
     sections: [
       {
-        title: 'Move from prompt to task.',
+        title: 'Start with a working Claude Code sign-in.',
         paragraphs: [
-          'A Jackalope task can launch Claude Code with selected project instructions and tools, surface questions while it runs, and retain follow-up attempts under the same outcome. The task remains understandable after the terminal session ends.',
-          'Claude Code supports project-selected stdio, HTTP, and SSE connections through Jackalope. Existing Claude configuration and provider permissions remain in effect.',
+          'Install Claude Code from Anthropic’s documentation and complete its own sign-in flow. In Jackalope, open Agents → Configuration and check the detected CLI. Choose an existing login or create a named account profile, then select that account for the project.',
+          'Use a project that builds before the agent edits it. Put its setup and test commands in project guidance. If Claude Code is not found after installation, check the executable path and restart Jackalope so it receives the updated environment.',
+        ],
+        links: [
+          {
+            href: 'https://code.claude.com/docs/en/overview',
+            label: 'Claude Code installation and getting started',
+          },
+          {
+            href: '/knowledge/fixing-cli-path-on-windows/',
+            label: 'Resolve CLI detection problems',
+          },
         ],
       },
       {
-        title: 'Use Claude Code alone or beside another agent.',
+        title: 'Keep questions attached to the requested change.',
         paragraphs: [
-          'Assign Claude Code to a focused worktree while Codex, Grok, or OpenCode handles independent work. Jackalope tracks scopes and dependencies, delivers relevant coordination messages, and returns every result to the same review workflow.',
-        ],
-        bullets: [
-          'Create separate named sign-in profiles for work and personal projects.',
-          'Keep task continuation tied to its original account profile.',
-          'See task usage when Claude Code reports it.',
-          'Review the combined patch before integrating related tasks.',
+          'Claude Code can surface task questions in Jackalope. This is useful when a change has a product decision inside it: for example, whether an expired invitation should offer a resend action or send someone back to sign-in. Answer in the task so the decision stays with the resulting patch.',
+          'Start with a concrete request: “Improve the expired-invitation screen. Preserve the existing token validation, explain the recovery action, and test an expired token and a valid token. Ask before changing the resend policy.” A second pass should refine that same task instead of losing the original constraint in a new conversation.',
         ],
       },
       {
-        title: 'Bring your existing Anthropic access.',
+        title: 'Choose the right MCP connection and scope.',
         paragraphs: [
-          'Jackalope does not include Claude model access. Your Claude Code installation, subscription, organization policies, tools, and usage limits continue to govern the agent.',
+          'The Claude Code adapter supports project-selected stdio, HTTP, and SSE connections. Select only the services needed for this task. Check which tools come from Jackalope and which are already configured in Claude Code, particularly when the same server appears in several configuration scopes.',
+          'Begin with a small read request and confirm the service and account it reaches. A saved connection does not prove that authentication succeeded or that a particular tool is permitted. If access fails, fix that connection before asking the agent to rely on its output.',
+        ],
+        links: [
+          {
+            href: 'https://code.claude.com/docs/en/mcp',
+            label: 'Claude Code MCP transports and configuration scopes',
+          },
+          {
+            href: '/knowledge/connecting-custom-mcp-servers/',
+            label: 'Select MCP tools in Jackalope',
+          },
+        ],
+      },
+      {
+        title: 'Keep follow-ups on the original account.',
+        paragraphs: [
+          'Work and personal profiles use separate Claude configuration directories. Pin a profile in Project → Settings when a project requires a specific account. Continuing an existing task retains its original profile even if you change the active account for new work.',
+          'Task usage reflects what Claude Code reports. Model access, organizational restrictions, and billing remain with your provider setup. A profile organizes credentials and settings; it does not restrict the local files a permitted tool can read.',
+        ],
+        links: [
+          {
+            href: '/knowledge/multi-account-and-agents/',
+            label: 'Account selection and continuation',
+          },
+        ],
+      },
+      {
+        title: 'Use a second agent where the work is independent.',
+        paragraphs: [
+          'While Claude Code fixes the invitation screen, another agent can update unrelated documentation in its own worktree. If the documentation depends on a new resend contract, make it wait until that change is accepted. Review both outputs together and exercise the invitation flow before integration.',
+          'Jackalope is coming soon. Its Claude Code adapter implements tasks, questions, continuation, and review; installed-version and account acceptance remain separate from the sample interface tour.',
+        ],
+        links: [
+          {
+            href: '/guides/review-ai-generated-code/',
+            label: 'Review behavior and evidence together',
+          },
         ],
       },
     ],
@@ -278,28 +504,62 @@ export const marketingPages: MarketingPage[] = [
     signals: ['Installed Grok CLI', 'HTTP tool discovery', 'Isolated attempts', 'Review history'],
     sections: [
       {
-        title: 'Keep Grok work connected to the task.',
+        title: 'Connect Grok Build, the coding CLI.',
         paragraphs: [
-          'Assign Grok a focused outcome inside a standalone task or a parallel plan. Jackalope prepares the worktree, records the selected project context, and keeps follow-up attempts attached to the original request.',
-          'Grok can discover supported HTTP project tools on demand. Use your Grok configuration for other tools and your provider account for billing details.',
+          'This integration uses the installed Grok Build CLI, rather than a Grok chat in a browser. Follow the official installation and authentication instructions, confirm a small request works in your local project, then choose Grok in Jackalope’s agent configuration.',
+          'Grok validates provider access when a task launches. Finding an executable or saving an account profile does not establish a successful sign-in. If the first task fails immediately, inspect its authentication error before changing the task brief or project code.',
+        ],
+        links: [
+          {
+            href: 'https://docs.x.ai/build/overview',
+            label: 'Install and authenticate Grok Build',
+          },
         ],
       },
       {
-        title: 'Review every agent in one place.',
+        title: 'Use discovery for supported project tools.',
         paragraphs: [
-          'Review Grok results alongside your other agents. Inspect each patch, ask for changes, and combine related results before you merge.',
+          'Grok can discover supported project connections on demand through Jackalope’s HTTP bridge. That differs from directly injecting every selected MCP server into a CLI configuration. Direct project connection delivery is not supported for this adapter.',
+          'For a task that needs an external service, select a connection configured for on-demand discovery and first request a small read. Other tools may come from Grok’s own configuration. Check which path supplies a tool when troubleshooting missing access.',
         ],
-        bullets: [
-          'Run work in a project-owned Git worktree.',
-          'Keep task attempts and corrections together.',
-          'Coordinate discoveries with related project tasks.',
-          'Review the changes before merging.',
+        links: [
+          {
+            href: '/knowledge/mcp-and-browser-automation/',
+            label: 'Understand project tool delivery and discovery',
+          },
         ],
       },
       {
-        title: 'Bring your existing xAI access.',
+        title: 'Try a bounded investigation before a large change.',
         paragraphs: [
-          'Jackalope does not include model access or bypass Grok permissions. CLI availability, provider access, configuration, and limits remain part of your Grok setup.',
+          'For example: “Find why this command reports success when its output file is missing. Trace the exit-code handling, identify a reproducible case, and propose a focused fix. Preserve the existing command-line flags.” This gives you a concrete artifact to inspect before expanding the work.',
+          'Jackalope retains the selected project context, worktree, attempts, and result. Review the reproduction, then continue the task with the chosen fix. A related task can update command documentation after the behavior is accepted, without editing the same checkout.',
+        ],
+      },
+      {
+        title: 'Check the account and the reported usage.',
+        paragraphs: [
+          'Named Grok profiles let projects select different accounts. Continuations retain their original profile. Confirm the selected account when diagnosing a provider error; switching the default for future tasks does not move an existing conversation to another identity.',
+          'Jackalope can display Grok capacity when its billing interface provides it and can record reported task usage. Missing or stale information remains distinct from available capacity. Use the provider’s billing view for charges and allowances beyond recorded Jackalope attempts.',
+        ],
+        links: [
+          {
+            href: '/knowledge/task-routing-and-quotas/',
+            label: 'Read quota information and routing decisions',
+          },
+        ],
+      },
+      {
+        title: 'Validate the actual command behavior.',
+        paragraphs: [
+          'For the missing-output example, run the command with a writable destination and with a failing destination. Check the file, exit status, and error message together. A successful agent response alone cannot establish that the command now reports failures correctly.',
+          'Jackalope is coming soon. Grok tasks, continuation, and review are implemented; provider permissions, installed CLI compatibility, and model access still apply. Jackalope does not include xAI model usage.',
+        ],
+        links: [
+          {
+            href: '/guides/review-ai-generated-code/',
+            label: 'A practical review workflow',
+          },
         ],
       },
     ],
@@ -326,28 +586,62 @@ export const marketingPages: MarketingPage[] = [
     ],
     sections: [
       {
-        title: 'Add structure around the agent session.',
+        title: 'Choose the provider before the task.',
         paragraphs: [
-          'Launch OpenCode for one task or assign it beside other agents in a plan. Jackalope owns the worktree and task lifecycle while OpenCode continues to use its own CLI configuration and permissions.',
-          'Jackalope does not currently deliver project-selected MCP connections or on-demand discovery to OpenCode. Configure tools in OpenCode itself; its CLI settings and permissions still apply.',
+          'OpenCode can connect to different model providers. Install its CLI, configure a provider through OpenCode, and confirm the model you intend to use can answer a small request. In Jackalope, select OpenCode and use its provider/model identifier format when choosing a model.',
+          'A model appearing in discovery does not establish that the selected account can use it. If access fails, check the provider configuration and credentials in the same OpenCode profile before replacing the model name or retrying a large task.',
+        ],
+        links: [
+          {
+            href: 'https://opencode.ai/docs/',
+            label: 'Install OpenCode and connect a provider',
+          },
         ],
       },
       {
-        title: 'Keep the output connected to its intent.',
+        title: 'Understand what a named profile changes.',
         paragraphs: [
-          'The brief, attempts, questions, result, patch, and integration decision stay together after the process exits. Related tasks can exchange coordination messages and wait for integrated dependencies rather than process completion alone.',
+          'Jackalope’s default OpenCode profile preserves the existing CLI configuration. Named profiles separate OpenCode’s data, configuration, cache, and state directories. A provider or tool configured under your normal login may therefore need setup in a new named profile.',
+          'Choose the account for the project and confirm it on a small task. Follow-ups retain the profile that began the attempt, even after a different profile becomes the default. These directories organize configuration; they do not create separate operating-system permissions.',
         ],
-        bullets: [
-          'Run in a separate project-owned Git worktree.',
-          'Continue or correct work under the same task.',
-          'Review changes with the requested outcome in view.',
-          'Combine selected task results before integration.',
+        links: [
+          {
+            href: '/knowledge/multi-account-and-agents/',
+            label: 'Understand named account profiles',
+          },
         ],
       },
       {
-        title: 'OpenCode remains independently configured.',
+        title: 'Configure tools in OpenCode itself.',
         paragraphs: [
-          'Jackalope does not bundle provider access or rewrite OpenCode configuration. Models, credentials, tools, permissions, and provider limits remain part of your OpenCode setup.',
+          'Jackalope does not deliver project-selected MCP servers or on-demand discovery connections to OpenCode. Configure required tools in OpenCode’s own settings. Selecting a project connection in Jackalope is not a substitute for that setup.',
+          'If a task can read repository files but cannot reach a connected service, verify the tool in the selected OpenCode profile. Keep a local-only first task available so a provider or tool problem does not get confused with a worktree or build problem.',
+        ],
+        links: [
+          {
+            href: '/agents/',
+            label: 'Compare project connection support across agents',
+          },
+        ],
+      },
+      {
+        title: 'Start with a provider-independent result.',
+        paragraphs: [
+          'A useful trial is: “Add a regression test for sorting names that differ only by case. Keep the public API unchanged, use the existing test framework, and show the test result and patch.” Evaluate the behavior against the same expected output regardless of the chosen provider.',
+          'Jackalope records OpenCode text, tool activity, session identity, errors, and reported usage. Inspect the actual test output and changed files. An empty response or a provider error should be diagnosed before treating the task as ready for review.',
+        ],
+      },
+      {
+        title: 'Continue the task, then inspect the combination.',
+        paragraphs: [
+          'Ask for a missed edge case under the same task to preserve its history and account binding. If another agent is changing a caller of the sorting function, review that interaction before integration; two separate worktrees can still disagree about expected behavior.',
+          'Jackalope is coming soon. The OpenCode adapter implements execution and continuation, while real provider and installed-version checks remain necessary. Free model availability can change, and Jackalope does not supply provider access or a complete billing record.',
+        ],
+        links: [
+          {
+            href: '/guides/review-ai-generated-code/',
+            label: 'Check an agent result before accepting it',
+          },
         ],
       },
     ],
@@ -392,6 +686,45 @@ export const marketingPages: MarketingPage[] = [
         paragraphs: [
           'Passing checks in two worktrees does not prove the patches work together. Inspect each result, prepare the combined patch, and run the checks that matter against the integrated state before accepting it.',
           'Jackalope keeps integration explicit and stops when the target or source state has changed. It does not automatically stash, reset, or overwrite unrelated work.',
+        ],
+      },
+      {
+        title: 'Example: add a saved search filter.',
+        paragraphs: [
+          'Agree that a saved filter contains a name and a query before dispatch. Use that decision to distinguish the work that can start now from the work that needs an accepted prerequisite. Agent assignments are examples, not a ranking of model strengths.',
+        ],
+        table: {
+          columns: ['Task', 'Scope and worker', 'Ready when'],
+          rows: [
+            [
+              'Persist filters',
+              'Codex: storage module and its tests.',
+              'Existing saved data loads and a new filter survives a restart.',
+            ],
+            [
+              'Document the behavior',
+              'Claude Code: user guide, using the agreed name/query contract.',
+              'Create, select, and remove actions are explained without inventing UI behavior.',
+            ],
+            [
+              'Build the selector',
+              'Either agent: UI and integration tests, after storage integration.',
+              'The UI reads the accepted storage contract and handles an empty list.',
+            ],
+          ],
+        },
+      },
+      {
+        title: 'Handle a changed assumption explicitly.',
+        paragraphs: [
+          'If the storage task discovers that names must be unique, pause the dependent selector task and update the contract. Ask the documentation task to revise its explanation. Preserve those corrections in task history so review explains why the behavior changed.',
+          'Before accepting the combined result, create a filter, restart, select it, and remove it. Check the empty list and an existing saved-data fixture. A clean merge and independent unit tests do not cover that complete workflow.',
+        ],
+        links: [
+          {
+            href: '/knowledge/git-worktrees/',
+            label: 'How dependent tasks wait for integration',
+          },
         ],
       },
     ],
@@ -440,6 +773,30 @@ export const marketingPages: MarketingPage[] = [
         title: 'Check how the changes work together.',
         paragraphs: [
           'Independent patches can conflict semantically even when Git can combine them. Jackalope prepares a combined review from the selected task results and rechecks the source and target state before an explicit integration action.',
+        ],
+      },
+      {
+        title: 'Example: a settings value that disappears after restart.',
+        paragraphs: [
+          'Suppose the task was to save a notification preference. A screenshot of the new toggle proves that a control rendered. A passing component test may show that clicking it changes local state. Neither establishes that the preference was stored, read on restart, or migrated from an older profile.',
+          'Trace the control through its persistence call, inspect the saved-data handling, and exercise a restart. If the agent changed only the visible toggle, ask for the missing persistence path and a check that would have caught the original bug.',
+        ],
+      },
+      {
+        title: 'Make the next review decision concrete.',
+        paragraphs: [
+          'Accept when the requested behavior, compatibility constraints, current patch, and relevant evidence agree. Request a correction when the implementation is incomplete. Record a specific unverified condition when the needed environment is unavailable; do not convert it into a passing check.',
+          'After a follow-up, check the new patch and rerun checks affected by those edits. For parallel results, include callers of shared types and services. The useful question is what evidence would reveal a wrong assumption in this change.',
+        ],
+        links: [
+          {
+            href: 'https://google.github.io/eng-practices/review/reviewer/looking-for.html',
+            label: 'Google’s code review guidance',
+          },
+          {
+            href: '/features/browser-automation-for-coding-agents/',
+            label: 'Capture useful browser evidence',
+          },
         ],
       },
     ],
@@ -494,6 +851,30 @@ export const marketingPages: MarketingPage[] = [
           'Codex and Claude Code support direct project connection delivery. Grok and Antigravity support on-demand discovery. OpenCode uses its own CLI tool configuration. See the agent guide for setup details.',
         ],
       },
+      {
+        title: 'Choose where each piece of knowledge belongs.',
+        paragraphs: [
+          'Put stable conventions in project instructions: the build command, supported data formats, and ownership boundaries. Keep a task-specific requirement in the brief. Record a discovered constraint as a lesson only when its evidence and scope are clear, so a temporary workaround does not become a rule for every future task.',
+          'For example, a checkout’s temporary port conflict belongs to that run. A documented requirement to preserve old preference files belongs in durable project guidance. Review or remove lessons when the code changes; saved context is useful only while its assumptions remain true.',
+        ],
+      },
+      {
+        title: 'Inspect the context when a result misses the mark.',
+        paragraphs: [
+          'If an agent used the wrong test command, inspect what the task received before adding more instructions. Check the project default, automatic matches, and any explicit override in Customize task. Updating a project rule helps future tasks; it does not rewrite the context already delivered to an earlier attempt.',
+          'Keep secrets in the relevant private configuration instead of a reusable prompt. Selected tools and an agent’s own CLI settings can add access beyond the text in the brief, so check both when diagnosing an unexpected dependency.',
+        ],
+        links: [
+          {
+            href: '/knowledge/task-composer-and-effort-levels/',
+            label: 'Inspect automatic guidance and task overrides',
+          },
+          {
+            href: '/knowledge/mcp-and-browser-automation/',
+            label: 'Understand the selected tool boundary',
+          },
+        ],
+      },
     ],
     related: [
       { href: '/features/recurring-coding-agent-tasks/', label: 'Repeat work with context intact' },
@@ -516,7 +897,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Set the schedule and the project.',
         paragraphs: [
           'Choose the project, agent, account, execution target, timezone, and missed-run policy. Use daily, weekday, weekly, hourly, or custom cron timing. New schedules start paused; review the settings before enabling them. Each run keeps its own result and history.',
-          'New schedules begin paused. Jackalope does not wake a closed app or sleeping computer, and it does not silently replay interrupted dispatch after a restart.',
+          'Jackalope does not wake a closed app or sleeping computer, and it does not silently replay interrupted dispatch after a restart.',
         ],
       },
       {
@@ -541,6 +922,26 @@ export const marketingPages: MarketingPage[] = [
         title: 'Review scheduled work, too.',
         paragraphs: [
           'Open a scheduled result, inspect its changes and checks, and ask for corrections when needed. You decide when it is ready to merge.',
+        ],
+      },
+      {
+        title: 'Example: a weekly dependency review.',
+        paragraphs: [
+          'Save a task that reports outdated dependencies, release notes that affect the project, and recommended checks. Make version changes a separate decision. Select the project account, choose the timezone, set a missed-run policy, and inspect the first occurrence before relying on the schedule.',
+          'If your laptop was asleep, “skip” avoids replaying an old occurrence; a catch-up policy can run one missed occurrence when eligible. Review the resulting history so a missed run is not confused with a successful check that found no work.',
+        ],
+        links: [
+          {
+            href: '/knowledge/recurring-schedules-and-automation/',
+            label: 'Schedule timing and missed-run behavior',
+          },
+        ],
+      },
+      {
+        title: 'Choose a monitor for a content trigger.',
+        paragraphs: [
+          'A clock schedule asks for work at a time. A local monitor reacts to committed content changing on a selected branch or path. For a documentation audit after API changes, a monitor can avoid repeated model calls while the watched content stays unchanged.',
+          'The first monitor check establishes its baseline. Commit a small relevant change to try the trigger, then inspect the notification or task it produces. Remote changes must reach the local repository separately, and uncommitted edits do not count as a monitor trigger.',
         ],
       },
     ],

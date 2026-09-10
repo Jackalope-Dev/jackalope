@@ -3,8 +3,6 @@ use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-#[cfg(unix)]
-use std::process::Command;
 use std::sync::Mutex;
 use std::time::Duration;
 use uuid::Uuid;
@@ -210,17 +208,43 @@ pub fn harness() -> &'static HarnessState {
 
 /// Discovers the Edge/Chromium executable on the current system
 pub fn find_browser_executable() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("JACKALOPE_BROWSER_EXECUTABLE").map(PathBuf::from) {
+        return (path.is_absolute() && super::platform::is_executable(&path)).then_some(path);
+    }
     #[cfg(windows)]
     {
-        let candidates = [
-            PathBuf::from(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-            PathBuf::from(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
-            PathBuf::from(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
-            PathBuf::from(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
-        ];
-        for candidate in &candidates {
-            if candidate.exists() {
-                return Some(candidate.clone());
+        for root in ["ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"]
+            .into_iter()
+            .filter_map(std::env::var_os)
+        {
+            for relative in [
+                "Microsoft/Edge/Application/msedge.exe",
+                "Google/Chrome/Application/chrome.exe",
+                "Chromium/Application/chrome.exe",
+            ] {
+                let candidate = PathBuf::from(&root).join(relative);
+                if super::platform::is_executable(&candidate) {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let mut roots = vec![PathBuf::from("/Applications")];
+        if let Some(home) = std::env::var_os("HOME") {
+            roots.push(PathBuf::from(home).join("Applications"));
+        }
+        for root in roots {
+            for (app, binary) in [
+                ("Google Chrome", "Google Chrome"),
+                ("Microsoft Edge", "Microsoft Edge"),
+                ("Chromium", "Chromium"),
+            ] {
+                let candidate = root.join(format!("{app}.app/Contents/MacOS/{binary}"));
+                if super::platform::is_executable(&candidate) {
+                    return Some(candidate);
+                }
             }
         }
     }
@@ -232,13 +256,8 @@ pub fn find_browser_executable() -> Option<PathBuf> {
             "microsoft-edge",
             "chromium-browser",
         ] {
-            if let Ok(output) = Command::new("which").arg(binary).output() {
-                if output.status.success() {
-                    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    if !path.is_empty() {
-                        return Some(PathBuf::from(path));
-                    }
-                }
+            if let Some(path) = super::platform::find_on_path(binary) {
+                return Some(path);
             }
         }
     }

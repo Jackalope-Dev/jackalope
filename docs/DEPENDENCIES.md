@@ -10,7 +10,7 @@ The application code uses [Apache-2.0](../LICENSE). Shared vector branding is in
 `packages/brand`. Plus Jakarta Sans and JetBrains Mono are bundled under OFL-1.1;
 their full license texts are included in both apps' `public/licenses` directories.
 Website screenshots and walkthroughs use explicit fictional sample data.
-Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
+See [licensing and redistribution](LICENSING.md) for project materials and trademarks.
 The desktop bundles agent-browser's native executable, Apache-2.0 license and
 embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
@@ -352,6 +352,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | Package | Version | Declared license |
 | --- | --- | --- |
 | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
+| aes | 0.8.4 | MIT OR Apache-2.0 |
 | aho-corasick | 1.1.5 | Unlicense OR MIT |
 | alloc-no-stdlib | 2.0.4 | BSD-3-Clause |
 | alloc-stdlib | 0.2.4 | BSD-3-Clause |
@@ -361,6 +362,15 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | arbitrary | 1.4.2 | MIT OR Apache-2.0 |
 | arc-swap | 1.9.2 | MIT OR Apache-2.0 |
 | arrayvec | 0.7.8 | MIT OR Apache-2.0 |
+| async-broadcast | 0.7.2 | MIT OR Apache-2.0 |
+| async-channel | 2.5.0 | Apache-2.0 OR MIT |
+| async-executor | 1.14.0 | Apache-2.0 OR MIT |
+| async-io | 2.6.0 | Apache-2.0 OR MIT |
+| async-lock | 3.4.2 | Apache-2.0 OR MIT |
+| async-process | 2.5.0 | Apache-2.0 OR MIT |
+| async-recursion | 1.1.1 | MIT OR Apache-2.0 |
+| async-signal | 0.2.14 | Apache-2.0 OR MIT |
+| async-task | 4.7.1 | Apache-2.0 OR MIT |
 | async-trait | 0.1.92 | MIT OR Apache-2.0 |
 | atk | 0.18.2 | MIT |
 | atk-sys | 0.18.2 | MIT |
@@ -379,7 +389,9 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | bitflags | 2.13.1 | MIT OR Apache-2.0 |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 |
 | block-buffer | 0.12.1 | MIT OR Apache-2.0 |
+| block-padding | 0.3.3 | MIT OR Apache-2.0 |
 | block2 | 0.6.2 | MIT |
+| blocking | 1.7.0 | Apache-2.0 OR MIT |
 | brotli | 8.0.4 | BSD-3-Clause AND MIT |
 | brotli-decompressor | 5.0.3 | BSD-3-Clause/MIT |
 | bs58 | 0.5.1 | MIT/Apache-2.0 |
@@ -395,6 +407,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | cargo_toml | 0.22.3 | Apache-2.0 OR MIT |
 | cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
 | castaway | 0.2.4 | MIT |
+| cbc | 0.1.2 | MIT OR Apache-2.0 |
 | cc | 1.4.5 | MIT OR Apache-2.0 |
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
 | cfb | 0.7.3 | MIT |
@@ -404,10 +417,12 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
 | chrono-tz | 0.10.4 | MIT OR Apache-2.0 |
+| cipher | 0.4.4 | MIT OR Apache-2.0 |
 | clru | 0.6.3 | MIT |
 | cmake | 0.1.58 | MIT OR Apache-2.0 |
 | combine | 4.6.8 | MIT |
 | compact_str | 0.10.0 | MIT |
+| concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
 | cookie | 0.18.2 | MIT OR Apache-2.0 |
 | core-foundation | 0.9.4 | MIT OR Apache-2.0 |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 |
@@ -436,6 +451,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | darling_macro | 0.24.1 | MIT |
 | dashmap | 6.2.1 | MIT |
 | dbus | 0.9.12 | Apache-2.0/MIT |
+| dbus-secret-service | 4.1.0 | MIT OR Apache-2.0 |
 | defmt | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-macros | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-parser | 1.0.0 | MIT OR Apache-2.0 |
@@ -463,9 +479,14 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 |
 | embed-resource | 3.0.11 | MIT |
 | encoding_rs | 0.8.35 | (Apache-2.0 OR MIT) AND BSD-3-Clause |
+| endi | 1.1.1 | MIT |
+| enumflags2 | 0.7.12 | MIT OR Apache-2.0 |
+| enumflags2_derive | 0.7.12 | MIT OR Apache-2.0 |
 | equivalent | 1.0.2 | Apache-2.0 OR MIT |
 | erased-serde | 0.4.10 | MIT OR Apache-2.0 |
 | errno | 0.3.14 | MIT OR Apache-2.0 |
+| event-listener | 5.4.2 | Apache-2.0 OR MIT |
+| event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT |
 | fast-glob | 1.1.1 | MIT |
 | faster-hex | 0.10.0 | MIT |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
@@ -491,6 +512,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | futures-core | 0.3.34 | MIT OR Apache-2.0 |
 | futures-executor | 0.3.34 | MIT OR Apache-2.0 |
 | futures-io | 0.3.34 | MIT OR Apache-2.0 |
+| futures-lite | 2.6.1 | Apache-2.0 OR MIT |
 | futures-macro | 0.3.34 | MIT OR Apache-2.0 |
 | futures-sink | 0.3.34 | MIT OR Apache-2.0 |
 | futures-task | 0.3.34 | MIT OR Apache-2.0 |
@@ -570,7 +592,10 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | heapless | 0.8.0 | MIT OR Apache-2.0 |
 | heck | 0.4.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
+| hermit-abi | 0.5.3 | MIT OR Apache-2.0 |
 | hex | 0.4.3 | MIT OR Apache-2.0 |
+| hkdf | 0.12.4 | MIT OR Apache-2.0 |
+| hmac | 0.12.1 | MIT OR Apache-2.0 |
 | html5ever | 0.38.0 | MIT OR Apache-2.0 |
 | http | 1.5.0 | MIT OR Apache-2.0 |
 | http-body | 1.1.0 | MIT |
@@ -600,6 +625,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | infer | 0.19.0 | MIT |
 | inotify | 0.11.5 | ISC |
 | inotify-sys | 0.1.8 | ISC |
+| inout | 0.1.4 | MIT OR Apache-2.0 |
 | ioctl-rs | 0.1.6 | MIT |
 | ipnet | 2.12.1 | MIT OR Apache-2.0 |
 | is-docker | 0.2.0 | MIT |
@@ -624,6 +650,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | json-strip-comments | 3.1.2 | Apache-2.0 |
 | jsonptr | 0.6.3 | MIT OR Apache-2.0 |
 | keyboard-types | 0.7.0 | MIT OR Apache-2.0 |
+| keyring | 3.6.3 | MIT OR Apache-2.0 |
 | kqueue | 1.2.1 | MIT |
 | kqueue-sys | 1.1.2 | MIT |
 | lazy_static | 1.5.0 | MIT OR Apache-2.0 |
@@ -638,6 +665,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | lock_api | 0.4.14 | MIT OR Apache-2.0 |
 | log | 0.4.34 | MIT OR Apache-2.0 |
 | lru-slab | 0.1.2 | MIT OR Apache-2.0 OR Zlib |
+| mac-notification-sys | 0.6.15 | MIT/Apache-2.0 |
 | markup5ever | 0.38.0 | MIT OR Apache-2.0 |
 | matchit | 0.8.4 | MIT AND BSD-3-Clause |
 | memchr | 2.8.3 | Unlicense OR MIT |
@@ -654,15 +682,23 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
 | new_debug_unreachable | 1.0.6 | MIT |
 | nix | 0.25.1 | MIT |
+| nix | 0.29.0 | MIT |
 | nix | 0.31.3 | MIT |
 | nodejs-built-in-modules | 1.0.0 | MIT |
 | nonempty | 0.12.0 | MIT |
 | notify | 8.2.0 | CC0-1.0 |
 | notify-debouncer-mini | 0.7.0 | MIT OR Apache-2.0 |
+| notify-rust | 4.18.0 | MIT OR Apache-2.0 |
 | notify-types | 2.1.0 | MIT OR Apache-2.0 |
+| num | 0.4.3 | MIT OR Apache-2.0 |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
+| num-bigint | 0.4.8 | MIT OR Apache-2.0 |
+| num-complex | 0.4.6 | MIT OR Apache-2.0 |
 | num-conv | 0.2.2 | MIT OR Apache-2.0 |
+| num-integer | 0.1.47 | MIT OR Apache-2.0 |
+| num-iter | 0.1.46 | MIT OR Apache-2.0 |
+| num-rational | 0.4.2 | MIT OR Apache-2.0 |
 | num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | objc2 | 0.6.4 | MIT |
 | objc2-app-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
@@ -686,11 +722,13 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | open | 5.4.3 | MIT |
 | openssl-probe | 0.2.1 | MIT OR Apache-2.0 |
 | option-ext | 0.2.0 | MPL-2.0 |
+| ordered-stream | 0.2.0 | MIT OR Apache-2.0 |
 | os_pipe | 1.2.3 | MIT |
 | osakit | 0.3.1 | MIT OR Apache-2.0 |
 | oxc_resolver | 11.24.3 | MIT |
 | pango | 0.18.3 | MIT |
 | pango-sys | 0.18.0 | MIT |
+| parking | 2.2.1 | Apache-2.0 OR MIT |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 |
 | pastey | 0.2.3 | MIT OR Apache-2.0 |
@@ -709,15 +747,18 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | phf_shared | 0.13.1 | MIT |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | pin-utils | 0.1.0 | MIT OR Apache-2.0 |
+| piper | 0.2.5 | MIT OR Apache-2.0 |
 | pkg-config | 0.3.34 | MIT OR Apache-2.0 |
 | plist | 1.10.0 | MIT |
 | png | 0.17.16 | MIT OR Apache-2.0 |
 | png | 0.18.1 | MIT OR Apache-2.0 |
+| polling | 3.11.0 | Apache-2.0 OR MIT |
 | portable-atomic | 1.15.0 | Apache-2.0 OR MIT |
 | portable-atomic-util | 0.2.8 | Apache-2.0 OR MIT |
 | portable-pty | 0.8.1 | MIT |
 | potential_utf | 0.1.6 | Unicode-3.0 |
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 |
+| ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 |
 | precomputed-hash | 0.1.1 | MIT |
 | proc-macro-crate | 1.3.1 | MIT OR Apache-2.0 |
 | proc-macro-crate | 2.0.2 | MIT OR Apache-2.0 |
@@ -735,8 +776,12 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | rand | 0.8.8 | MIT OR Apache-2.0 |
+| rand | 0.9.5 | MIT OR Apache-2.0 |
 | rand | 0.10.2 | MIT OR Apache-2.0 |
+| rand_chacha | 0.3.1 | MIT OR Apache-2.0 |
+| rand_chacha | 0.9.0 | MIT OR Apache-2.0 |
 | rand_core | 0.6.4 | MIT OR Apache-2.0 |
+| rand_core | 0.9.5 | MIT OR Apache-2.0 |
 | rand_core | 0.10.1 | MIT OR Apache-2.0 |
 | rand_pcg | 0.10.2 | MIT OR Apache-2.0 |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
@@ -771,6 +816,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | schemars_derive | 0.8.22 | MIT |
 | schemars_derive | 1.2.2 | MIT |
 | scopeguard | 1.2.0 | MIT OR Apache-2.0 |
+| secret-service | 4.0.0 | MIT OR Apache-2.0 |
+| security-framework | 2.11.1 | MIT OR Apache-2.0 |
 | security-framework | 3.7.0 | MIT OR Apache-2.0 |
 | security-framework-sys | 2.17.0 | MIT OR Apache-2.0 |
 | selectors | 0.36.1 | MPL-2.0 |
@@ -847,12 +894,14 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | tauri-plugin | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-plugin-dialog | 2.7.3 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.5.2 | Apache-2.0 OR MIT |
+| tauri-plugin-notification | 2.4.0 | Apache-2.0 OR MIT |
 | tauri-plugin-shell | 2.3.6 | Apache-2.0 OR MIT |
 | tauri-plugin-updater | 2.11.0 | Apache-2.0 OR MIT |
 | tauri-runtime | 2.11.3 | Apache-2.0 OR MIT |
 | tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |
 | tauri-utils | 2.9.3 | Apache-2.0 OR MIT |
 | tauri-winres | 0.3.6 | MIT |
+| tauri-winrt-notification | 0.7.3 | MIT OR Apache-2.0 |
 | tauri-winrt-notification | 0.8.1 | MIT OR Apache-2.0 |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
@@ -899,6 +948,7 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | try-lock | 0.2.5 | MIT |
 | typeid | 1.0.3 | MIT OR Apache-2.0 |
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
+| uds_windows | 1.2.1 | MIT |
 | unic-char-property | 0.9.0 | MIT/Apache-2.0 |
 | unic-char-range | 0.9.0 | MIT/Apache-2.0 |
 | unic-common | 0.9.0 | MIT/Apache-2.0 |
@@ -1006,14 +1056,31 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | x11 | 2.21.0 | MIT |
 | x11-dl | 2.21.0 | MIT |
 | xattr | 1.6.1 | MIT OR Apache-2.0 |
+| xdg-home | 1.3.0 | MIT |
 | yoke | 0.8.3 | Unicode-3.0 |
 | yoke-derive | 0.8.2 | Unicode-3.0 |
+| zbus | 4.4.0 | MIT |
+| zbus | 5.19.0 | MIT |
+| zbus_macros | 4.4.0 | MIT |
+| zbus_macros | 5.19.0 | MIT |
+| zbus_names | 3.0.0 | MIT |
+| zbus_names | 4.3.4 | MIT |
+| zcheapstr | 1.1.0 | MIT |
+| zerocopy | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT |
+| zerocopy-derive | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | zerofrom | 0.1.8 | Unicode-3.0 |
 | zerofrom-derive | 0.1.7 | Unicode-3.0 |
 | zeroize | 1.9.0 | Apache-2.0 OR MIT |
+| zeroize_derive | 1.5.0 | Apache-2.0 OR MIT |
 | zerotrie | 0.2.5 | Unicode-3.0 |
 | zerovec | 0.11.8 | Unicode-3.0 |
 | zerovec-derive | 0.11.6 | Unicode-3.0 |
 | zip | 4.6.1 | MIT |
 | zlib-rs | 0.6.7 | Zlib |
 | zmij | 1.0.23 | MIT |
+| zvariant | 4.2.0 | MIT |
+| zvariant | 5.15.0 | MIT |
+| zvariant_derive | 4.2.0 | MIT |
+| zvariant_derive | 5.15.0 | MIT |
+| zvariant_utils | 2.1.0 | MIT |
+| zvariant_utils | 4.2.0 | MIT |

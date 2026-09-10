@@ -1,3 +1,4 @@
+#[cfg(windows)]
 use std::path::Path;
 
 #[cfg(windows)]
@@ -48,10 +49,10 @@ fn transform(bytes: &[u8], protect: bool) -> Result<Vec<u8>, String> {
     }
     Ok(result)
 }
-#[cfg(not(windows))]
-fn transform(_: &[u8], _: bool) -> Result<Vec<u8>, String> {
-    Err("Secure Jackalope account storage is currently available on Windows.".into())
-}
+#[cfg(any(unix, test))]
+mod keychain;
+
+#[cfg(windows)]
 pub(super) fn read(path: &Path) -> Result<Option<Vec<u8>>, String> {
     use std::io::Read;
     let bytes = std::fs::File::open(path).and_then(|file| {
@@ -66,10 +67,15 @@ pub(super) fn read(path: &Path) -> Result<Option<Vec<u8>>, String> {
         Err(_) => Err("The secure account record could not be read.".into()),
     }
 }
+#[cfg(unix)]
+pub(super) use keychain::{read, remove, write};
+
+#[cfg(windows)]
 pub(super) fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     super::history::write_atomic(path, &transform(bytes, true)?)
         .map_err(|_| "The account could not be saved securely. Try connecting again.".into())
 }
+#[cfg(windows)]
 pub(super) fn remove(path: &Path) -> Result<(), String> {
     match std::fs::remove_file(path) {
         Ok(()) => Ok(()),

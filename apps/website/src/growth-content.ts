@@ -45,31 +45,132 @@ export const growthPages: MarketingPage[] = [
     signals: ['Your agent accounts', 'Project context', 'Parallel worktrees', 'Combined review'],
     sections: [
       {
-        title: 'Keep the whole task together.',
+        title: 'Choose the requirement you cannot compromise on.',
         paragraphs: [
-          'Jackalope brings project instructions, agent accounts, independent tasks, and combined code review into one desktop workspace. Give each task the context it needs, follow questions and results, and decide which changes to bring together.',
+          'Start with where the code must run, who needs access, and which agents and accounts you already use. Then compare how a change reaches review. A remote host, a shared human conversation, and a local plan of dependent agent tasks solve different problems.',
+          'The table below is an editorial starting point based on official product documentation reviewed September 9, 2026. It is not a performance ranking or a claim that other products lack unlisted features. Open a detailed comparison for the relevant sources and tradeoffs.',
         ],
       },
       {
-        title: 'Find the workflow that fits.',
+        title: 'Match the workspace to the requirement.',
         paragraphs: [
-          'Explore the detailed comparisons for workflow tables, evaluation guidance, and official sources reviewed September 9, 2026. Each page explains where the alternative fits and which Jackalope capabilities remain future work.',
+          'Use this to narrow a trial to the workflows you actually need. Jackalope’s current focus is local task continuity, project context, and combined review; remote hosts and shared human teams remain future work.',
         ],
-        bullets: [
-          'Superset: a workspace for different coding agents, parallel tasks, recurring work, and remote hosts.',
-          'Orca: an agent workspace with terminals, browser tools, diffs, and a mobile companion.',
-          'Conductor: parallel coding agents with cloud workspaces and shared sessions.',
-          'Emdash: parallel agents, scheduled work, an in-app browser, and reusable prompts and tools.',
-          'Braid: parallel agent sessions with integrated terminals, editing, and GitHub review controls.',
-          'Worktree: shared agent conversations and code review for human teams.',
-          'Codius: desktop, web, and phone access to coding agents on hosts you control.',
-          'Hermes by Nous Research: an agent with persistent memory and automation, rather than a workspace primarily for supervising different coding agents.',
+        table: {
+          columns: ['Requirement', 'Products to examine', 'What to check'],
+          rows: [
+            [
+              'Remote machines and scheduled work',
+              'Superset, Codius, Emdash',
+              'Where the task runs, whether it survives disconnects, and how you recover a result.',
+            ],
+            [
+              'Browser feedback beside terminals and diffs',
+              'Orca, Emdash',
+              'How a selected UI element, screenshot, or failed check reaches the agent and its review.',
+            ],
+            [
+              'Shared human participation',
+              'Conductor, Worktree',
+              'Who can join, send instructions, access files, and continue while the owner is offline.',
+            ],
+            [
+              'Project setup and branch review',
+              'Braid',
+              'Dependency installation, local configuration, branch status, and the full PR lifecycle.',
+            ],
+            [
+              'A persistent agent with messaging',
+              'Hermes Agent',
+              'Memory ownership, execution backends, scheduled delivery, and approval boundaries.',
+            ],
+            [
+              'Local tasks with dependent changes',
+              'Jackalope',
+              'Account binding, frozen task context, prerequisite integration, and combined patch review.',
+            ],
+            [
+              'One focused coding session',
+              'Your terminal and editor',
+              'Whether manual worktrees and existing review tools already cover the coordination you need.',
+            ],
+          ],
+        },
+        links: [
+          {
+            href: '/compare/superset/',
+            label: 'Jackalope vs Superset',
+          },
+          {
+            href: '/compare/orca/',
+            label: 'Jackalope vs Orca',
+          },
+          {
+            href: '/compare/conductor/',
+            label: 'Jackalope vs Conductor',
+          },
+          {
+            href: '/compare/emdash/',
+            label: 'Jackalope vs Emdash',
+          },
+          {
+            href: '/compare/braid/',
+            label: 'Jackalope vs Braid',
+          },
+          {
+            href: '/compare/worktree/',
+            label: 'Jackalope vs Worktree',
+          },
+          {
+            href: '/compare/codius/',
+            label: 'Jackalope vs Codius',
+          },
+          {
+            href: '/compare/hermes/',
+            label: 'Jackalope vs Hermes Agent',
+          },
+          {
+            href: '/compare/terminal-tabs/',
+            label: 'Jackalope and terminal tabs',
+          },
         ],
       },
       {
-        title: 'See Jackalope in action.',
+        title: 'Use the same small trial for each candidate.',
         paragraphs: [
-          'Watch the app tour, explore agent compatibility, or join the early-access waitlist. Use the roadmap to follow plans for additional platforms, integrations, and remote work.',
+          'Pick a feature with one shared contract, one consumer, and an independent documentation change. Record the baseline build, give the workers explicit scopes, and request one correction after their first results. Keep the model and test conditions comparable where the products permit it.',
+          'At review, record whether you can recover the original request, identify the account used, find the current patch, and match the checks to that patch. Include a failed setup or disconnected session in the trial. Measure time spent repeating context and repairing the workflow, rather than counting open agents.',
+        ],
+        links: [
+          {
+            href: '/guides/run-codex-and-claude-code-in-parallel/',
+            label: 'A worked parallel plan',
+          },
+          {
+            href: '/guides/review-ai-generated-code/',
+            label: 'What to inspect in the result',
+          },
+        ],
+      },
+      {
+        title: 'Separate availability from a roadmap.',
+        paragraphs: [
+          'Jackalope is coming soon. Its tour uses sample data, and public pricing has not been announced. Your installed agents and provider accounts supply model access. Check current downloads and plans on each alternative’s own site before making a purchase or migration decision.',
+          'Treat workspace fees, model usage, and remote compute as separate costs. A documented feature is a reason to run a trial, not evidence that a particular account, repository, or deployment has passed one.',
+        ],
+        links: [
+          {
+            href: '/agents/',
+            label: 'Check Jackalope agent compatibility',
+          },
+          {
+            href: '/tour/',
+            label: 'Watch the sample workspace tour',
+          },
+          {
+            href: '/roadmap/',
+            label: 'See what remains planned',
+          },
         ],
       },
     ],
@@ -114,6 +215,30 @@ export const growthPages: MarketingPage[] = [
         paragraphs: [
           'Two isolated tasks can still make incompatible assumptions. Jackalope prepares a combined patch for review and rechecks the source and target before integration. The final decision stays explicit.',
           'The interface tour uses sample project data. Try this same workflow on a disposable repository when you receive early access.',
+        ],
+      },
+      {
+        title: 'Recognize the point where bookkeeping becomes work.',
+        paragraphs: [
+          'Try your next two tasks with a short record beside each terminal: project, branch, account, requested result, and current blocker. If that is easy to maintain and your review tools preserve the evidence you need, a terminal workflow may be enough.',
+          'A workspace becomes more useful when you repeatedly reopen sessions to remember a decision, miss a waiting question, or lose track of which patch a test run covered. Those are observable costs you can compare with Jackalope’s task history and review flow when early access is available.',
+        ],
+      },
+      {
+        title: 'Move one workflow at a time.',
+        paragraphs: [
+          'Keep your existing editor and CLI configuration while trying one local project. Reproduce its build in a fresh task worktree, complete a small change, ask for a follow-up, and inspect the result. Include cleanup in the trial so you know where unfinished files remain.',
+          'You can still inspect worktrees with ordinary Git tools. Review project instructions and tool configuration in both places; adding a workspace does not remove the agent’s existing permissions or provider costs.',
+        ],
+        links: [
+          {
+            href: 'https://git-scm.com/docs/git-worktree',
+            label: 'Manage worktrees with Git',
+          },
+          {
+            href: '/agents/',
+            label: 'Check the agent you already use',
+          },
         ],
       },
     ],
@@ -161,6 +286,30 @@ export const growthPages: MarketingPage[] = [
         title: 'Evidence supports a decision.',
         paragraphs: [
           'Review the states that matter: keyboard navigation, small screens, and error recovery. A screenshot shows one moment; try the changed behavior before accepting the work.',
+        ],
+      },
+      {
+        title: 'Example: verify a broken search dropdown.',
+        paragraphs: [
+          'Include the page URL, a query with several results, and the expected keyboard behavior in the task. Ask the agent to reproduce the failure, make the change, and then check Arrow keys, Enter, Escape, and focus after the dropdown closes.',
+          'Capture the open list and a narrow layout. Also check zero results and a failed search request. These states answer different questions: a screenshot can show clipping, while an actual keyboard interaction checks whether selection and focus work.',
+        ],
+      },
+      {
+        title: 'Keep browser and native acceptance separate.',
+        paragraphs: [
+          'The selected agent needs a supported path to the browser tools. Check connection support before assigning the task; OpenCode uses its own CLI tools rather than Jackalope project-tool delivery. Use a test account and environment appropriate to the actions in the brief.',
+          'A browser preview does not exercise a packaged desktop application’s native permissions or operating-system integration. For a change that crosses that boundary, retain the browser evidence and name the additional installed-app check needed before acceptance.',
+        ],
+        links: [
+          {
+            href: '/knowledge/mcp-and-browser-automation/',
+            label: 'Browser sessions and agent tool support',
+          },
+          {
+            href: '/agents/',
+            label: 'Compare adapter capabilities',
+          },
         ],
       },
     ],

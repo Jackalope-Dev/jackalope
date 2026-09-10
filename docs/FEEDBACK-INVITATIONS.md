@@ -28,8 +28,10 @@ the message is reviewed before Send.
   response consumes its slot instead of risking another prompt.
 
 Settings → Jackalope account exposes both invitation choices, including during account
-connection. Email follow-up is off by default and separate from anonymous telemetry
-and newsletter preferences. Enabling it permits account-linked active-day milestones
+connection. The optional product-notes checkbox on signup starts unchecked and
+includes one feedback email. Email enrollment follows that newsletter choice;
+members can subsequently stop feedback invitations in account settings without
+enabling anonymous telemetry. Enabling follow-up permits account-linked active-day milestones
 and up to two opaque result receipts. It does not transmit prompts, code, project
 paths, task IDs, results, provider accounts or transcripts. First/last activity days,
 bounded counts, preferences, cooldowns and response status can be inspected in the

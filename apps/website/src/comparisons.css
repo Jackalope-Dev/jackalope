@@ -1,4 +1,4 @@
-.comparison-page article a {
+.acquisition-body article a {
   color: var(--color-accent-ink);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -43,7 +43,7 @@
   width: 38%;
   color: var(--color-text-secondary);
 }
-.comparison-page .comparison-sources {
+.acquisition-body .comparison-sources {
   font-size: 12px;
 }
 .comparison-faq h3 {

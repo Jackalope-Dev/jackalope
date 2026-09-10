@@ -50,7 +50,8 @@ release dates.
 - [ ] Validate multi-device settings sync, account changes, offline/conflict
   recovery, deletion and saved opt-outs.
 - [ ] Verify signup, referrals, passes, feedback and consent through actual
-  delivery and installed clients, including retries and suppression.
+  delivery and installed clients, including retries, suppression and optional
+  email enrollment remaining off until selected.
 - [ ] Complete reporting, retention/deletion and installed-channel acceptance.
 - [ ] Keep independent setup reproducible without Jackalope's private accounts.
 
@@ -58,10 +59,14 @@ release dates.
 
 - [ ] Check navigation, forms, clipboard recovery and media in Safari and touch
   browsers, including keyboard focus and reduced motion.
-- [ ] Verify captions, playback and failure recovery for the product tour.
+- [ ] Verify captions, playback and failure recovery for the product tour and
+  knowledgebase clips across supported browsers. Keep sample footage aligned
+  with the current interface; see [media guidance](KNOWLEDGE-MEDIA.md).
 - [ ] Keep public guides, comparison sources and discovery output accurate.
 - [ ] Run route, metadata, header and link checks against deployed builds, including
-  the footer's Reddit community link.
+  the footer's Reddit community link. Recheck live destinations with
+  `pnpm check:links:website` after a website build, and review source content
+  alongside HTTP status when updating public claims.
 
 ## Platform releases
 

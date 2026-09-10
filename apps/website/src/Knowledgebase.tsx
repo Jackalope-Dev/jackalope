@@ -1,137 +1,155 @@
 import { guideMarkdown } from '@jackalope/knowledge';
-import {
-  AlertCircle,
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  CheckCheck,
-  Copy,
-  Info,
-  Lightbulb,
-  Search,
-  Wrench,
-  X,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, Copy, Info, Play, Search, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { siteOrigin } from './content';
+import { KnowledgeMedia } from './KnowledgeMedia';
 import {
   type GuideCategory,
   guideCategories,
-  type KnowledgeGuide,
   type KnowledgeGuideSection,
   knowledgeGuides,
-  likelyArticleSlugs,
   troubleshootingScenarios,
 } from './knowledge-content';
+import { knowledgeClips } from './knowledge-media';
 
-function normalizeKnowledgePath(path: string) {
-  const trimmed = path.replace(/\/index\.html$/, '/').replace(/\/+$/, '');
-  return trimmed ? `${trimmed}/` : '/knowledge/';
+const guideHref = (slug: string) => `/knowledge/${slug}/`;
+const categoryLabel = (category: GuideCategory) =>
+  guideCategories.find((item) => item.id === category)?.label;
+const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+const matchesTerms = (text: string, terms: string[]) => {
+  const tokens = words(text);
+  return terms.every((term) => tokens.some((token) => token.startsWith(term)));
+};
+const sectionText = (section: KnowledgeGuideSection) =>
+  [
+    section.question,
+    ...section.paragraphs,
+    ...(section.bullets ?? []),
+    ...(section.steps ?? []),
+    section.codeBox?.code,
+    section.callout?.text,
+    ...(section.links?.map((link) => link.label) ?? []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+const startingPoints = [
+  {
+    slug: 'multi-account-and-agents',
+    title: 'Connect an agent',
+    description: 'Install a CLI, choose an account, and check access.',
+  },
+  {
+    slug: 'task-composer-and-effort-levels',
+    title: 'Run your first task',
+    description: 'Write a useful brief and review the result.',
+  },
+  {
+    slug: 'git-worktrees',
+    title: 'Work in parallel',
+    description: 'Separate changes and bring them back together.',
+  },
+];
+
+function SupportLinks() {
+  return (
+    <section className="knowledge-footer-card" aria-labelledby="knowledge-help-title">
+      <div>
+        <h2 id="knowledge-help-title">Still need a hand?</h2>
+        <p>
+          Ask the in-app helper for a guide, or preview a support report in Settings → Updates &amp;
+          support before sharing feedback.
+        </p>
+      </div>
+      <div className="knowledge-footer-actions">
+        <a className="button button-primary button-compact" href="/feedback/">
+          Send feedback <ArrowRight size={14} />
+        </a>
+        <a href="/knowledge/ask-jackalope/">Meet the helper</a>
+      </div>
+    </section>
+  );
 }
 
 export function KnowledgebasePage({
   path = '/knowledge/',
-  dark: _dark = false,
+  dark = false,
 }: {
   path?: string;
   dark?: boolean;
 }) {
-  const normalizedPath = normalizeKnowledgePath(path);
-  const slug = normalizedPath.replace(/^\/knowledge\//, '').replace(/\/$/, '');
-  const activeGuide = useMemo(
-    () => (slug ? (knowledgeGuides.find((g) => g.slug === slug) ?? null) : null),
-    [slug],
-  );
-
+  const normalized = path.replace(/\/index\.html$/, '/').replace(/\/+$/, '');
+  const slug = normalized.replace(/^\/knowledge\/?/, '');
+  const activeGuide = knowledgeGuides.find((guide) => guide.slug === slug);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<GuideCategory | 'all'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copyError, setCopyError] = useState('');
-  const [activeHeadingId, setActiveHeadingId] = useState<string>('');
-
+  const [activeHeadingId, setActiveHeadingId] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    },
+    [],
+  );
   const copyToClipboard = async (id: string, text: string) => {
     try {
       setCopyError('');
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
-      setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopiedId(null), 2000);
     } catch {
       setCopyError('Copy failed. Open the Markdown version and copy its text.');
     }
   };
-
-  // Scroll spy for active table of contents heading on dedicated guide pages
   useEffect(() => {
     if (!activeGuide) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveHeadingId(entry.target.id);
-          }
-        }
+        for (const entry of entries) if (entry.isIntersecting) setActiveHeadingId(entry.target.id);
       },
-      { rootMargin: '-80px 0px -60% 0px' },
+      { rootMargin: '-100px 0px -55% 0px' },
     );
-
     for (const section of activeGuide.sections) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
+      const element = document.getElementById(section.id);
+      if (element) observer.observe(element);
     }
-
     return () => observer.disconnect();
   }, [activeGuide]);
-
-  // Search results across all guides and sections
   const searchResults = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed) return [];
-
-    const results: {
-      guide: KnowledgeGuide;
-      section: KnowledgeGuideSection;
-    }[] = [];
-
-    for (const guide of knowledgeGuides) {
-      for (const section of guide.sections) {
-        const questionMatch = section.question.toLowerCase().includes(trimmed);
-        const paragraphMatch = section.paragraphs.some((p) => p.toLowerCase().includes(trimmed));
-        const bulletMatch = section.bullets?.some((b) => b.toLowerCase().includes(trimmed));
-        const codeMatch = section.codeBox?.code.toLowerCase().includes(trimmed);
-
-        if (questionMatch || paragraphMatch || bulletMatch || codeMatch) {
-          results.push({ guide, section });
-        }
-      }
-    }
-    return results;
+    const terms = words(query);
+    if (!terms.length) return [];
+    return knowledgeGuides
+      .flatMap((guide) => {
+        const title = `${guide.title} ${guide.shortTitle} ${guide.description}`.toLowerCase();
+        const sections = guide.sections.map((section) => ({ section, text: sectionText(section) }));
+        if (!matchesTerms(`${title} ${sections.map((item) => item.text).join(' ')}`, terms))
+          return [];
+        const matching = sections.find((item) => matchesTerms(item.text, terms));
+        return [
+          {
+            guide,
+            section: matching?.section,
+            score: terms.filter((term) => matchesTerms(title, [term])).length,
+          },
+        ];
+      })
+      .sort((a, b) => b.score - a.score);
   }, [query]);
+  const filteredGuides = knowledgeGuides.filter(
+    (guide) => selectedCategory === 'all' || guide.category === selectedCategory,
+  );
+  const clearSearch = () => {
+    setQuery('');
+    searchRef.current?.focus();
+  };
 
-  // Filtered guides for the hub view
-  const filteredGuides = useMemo(() => {
-    if (selectedCategory === 'all') return knowledgeGuides;
-    return knowledgeGuides.filter((g) => g.category === selectedCategory);
-  }, [selectedCategory]);
-
-  // Likely articles
-  const likelyArticles = useMemo(() => {
-    return likelyArticleSlugs
-      .map((slug) => knowledgeGuides.find((g) => g.slug === slug))
-      .filter((g): g is KnowledgeGuide => Boolean(g));
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // View 1: Dedicated Guide Page
-  // ---------------------------------------------------------------------------
   if (activeGuide) {
-    const guideIndex = knowledgeGuides.findIndex((g) => g.slug === activeGuide.slug);
-    const prevGuide = guideIndex > 0 ? knowledgeGuides[guideIndex - 1] : null;
-    const nextGuide =
-      guideIndex < knowledgeGuides.length - 1 ? knowledgeGuides[guideIndex + 1] : null;
-
     return (
       <main id="main" className="knowledge-guide-page page-width">
-        {/* Breadcrumb Navigation */}
         <nav className="article-breadcrumbs" aria-label="Breadcrumb">
           <a href="/">Jackalope</a>
           <span aria-hidden="true">/</span>
@@ -139,101 +157,87 @@ export function KnowledgebasePage({
           <span aria-hidden="true">/</span>
           <span>{activeGuide.shortTitle}</span>
         </nav>
-
-        {/* Guide Article Header */}
         <header className="knowledge-guide-header">
+          <div className="knowledge-eyebrow">
+            {categoryLabel(activeGuide.category)} <span>· {activeGuide.readingTime}</span>
+          </div>
           <h1>{activeGuide.title}</h1>
           <p className="knowledge-guide-lede">{activeGuide.description}</p>
           <div className="knowledge-agent-actions">
             <button
               type="button"
+              className="button button-primary button-compact"
               onClick={() => void copyToClipboard('guide', guideMarkdown(activeGuide, siteOrigin))}
             >
-              {copiedId === 'guide' ? <Check size={16} /> : <Copy size={16} />}{' '}
+              {copiedId === 'guide' ? <Check size={16} /> : <Copy size={16} />}
               {copiedId === 'guide' ? 'Copied' : 'Copy for your agent'}
             </button>
-            <a href={`/knowledge/${activeGuide.slug}/index.md`}>Read Markdown</a>
+            <a className="knowledge-agent-markdown" href={`${guideHref(activeGuide.slug)}index.md`}>
+              Read Markdown
+            </a>
           </div>
+          <p className="knowledge-copy-status" role="status">
+            {copiedId ? 'Copied to clipboard.' : ''}
+          </p>
           {copyError && <p role="alert">{copyError}</p>}
-          <div className="knowledge-guide-meta">
-            <span>{activeGuide.readingTime}</span>
-            <span aria-hidden="true">·</span>
-            <span>{activeGuide.sections.length} core topics covered</span>
-            <span aria-hidden="true">·</span>
-            <span>Jackalope Architecture</span>
-          </div>
         </header>
-
-        {/* Two-Column Layout: Sticky Sidebar TOC + Long-Form Article Body */}
         <div className="knowledge-guide-layout">
-          {/* Sticky Table of Contents Sidebar */}
-          <aside className="knowledge-guide-sidebar" aria-label="Table of contents">
-            <div className="knowledge-toc-sticky">
-              <a href="/knowledge/" className="knowledge-back-link">
-                <ArrowLeft size={14} /> Back to all guides
-              </a>
-              <div className="knowledge-toc-heading">On this page</div>
-              <nav className="knowledge-toc-nav">
+          <aside className="knowledge-guide-sidebar">
+            <a href="/knowledge/" className="knowledge-back-link">
+              <ArrowLeft size={14} /> All guides
+            </a>
+            <details className="knowledge-toc" open>
+              <summary>On this page</summary>
+              <nav aria-label="On this page">
                 {activeGuide.sections.map((section) => (
                   <a
                     key={section.id}
                     href={`#${section.id}`}
-                    className={`knowledge-toc-link ${
-                      activeHeadingId === section.id ? 'active' : ''
-                    }`}
+                    aria-current={activeHeadingId === section.id ? 'location' : undefined}
                   >
                     {section.question}
                   </a>
                 ))}
               </nav>
-            </div>
+            </details>
           </aside>
-
-          {/* Guide Article Body */}
-          <div className="knowledge-guide-content">
+          <article className="knowledge-guide-content" aria-label={activeGuide.shortTitle}>
             {activeGuide.sections.map((section) => (
               <section key={section.id} id={section.id} className="knowledge-guide-section">
                 <h2>{section.question}</h2>
-
+                <KnowledgeMedia slug={activeGuide.slug} section={section.id} dark={dark} />
                 {section.paragraphs.map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
                 ))}
-
-                {section.bullets && section.bullets.length > 0 && (
+                {section.steps && (
+                  <ol className="knowledge-steps">
+                    {section.steps.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                )}
+                {section.bullets && (
                   <ul className="knowledge-bullet-list">
                     {section.bullets.map((bullet) => (
-                      <li key={bullet}>
-                        <Check size={16} className="knowledge-bullet-icon" />
-                        <span>{bullet}</span>
-                      </li>
+                      <li key={bullet}>{bullet}</li>
                     ))}
                   </ul>
                 )}
-
                 {section.callout && (
                   <div className={`knowledge-callout knowledge-callout-${section.callout.kind}`}>
-                    <div className="knowledge-callout-icon" aria-hidden="true">
-                      {section.callout.kind === 'important' ? (
-                        <AlertCircle size={18} />
-                      ) : section.callout.kind === 'tip' ? (
-                        <Lightbulb size={18} />
-                      ) : (
-                        <Info size={18} />
-                      )}
-                    </div>
-                    <div className="knowledge-callout-body">
+                    <Info size={19} aria-hidden="true" />
+                    <div>
                       <strong>
                         {section.callout.kind === 'important'
                           ? 'Important'
                           : section.callout.kind === 'tip'
                             ? 'Tip'
-                            : 'Note'}
+                            : 'Good to know'}
                       </strong>
                       <p>{section.callout.text}</p>
                     </div>
                   </div>
                 )}
-
                 {section.codeBox && (
                   <div className="knowledge-code-box">
                     <div className="knowledge-code-header">
@@ -242,19 +246,12 @@ export function KnowledgebasePage({
                         type="button"
                         className="knowledge-copy-btn"
                         onClick={() =>
-                          copyToClipboard(`${section.id}-code`, section.codeBox?.code || '')
+                          void copyToClipboard(section.id, section.codeBox?.code ?? '')
                         }
                         aria-label={`Copy ${section.codeBox.title}`}
                       >
-                        {copiedId === `${section.id}-code` ? (
-                          <>
-                            <CheckCheck size={13} /> Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} /> Copy
-                          </>
-                        )}
+                        {copiedId === section.id ? <Check size={14} /> : <Copy size={14} />}
+                        {copiedId === section.id ? 'Copied' : 'Copy'}
                       </button>
                     </div>
                     <pre>
@@ -262,305 +259,242 @@ export function KnowledgebasePage({
                     </pre>
                   </div>
                 )}
+                {section.links && (
+                  <nav
+                    className="knowledge-section-links"
+                    aria-label={`Related help: ${section.question}`}
+                  >
+                    {section.links.map((link) => (
+                      <a key={link.href} href={link.href}>
+                        {link.label}
+                        <ArrowRight size={14} />
+                      </a>
+                    ))}
+                  </nav>
+                )}
               </section>
             ))}
-
-            {/* Pagination Navigation Between Guides */}
-            <nav className="knowledge-guide-pagination" aria-label="Guides pagination">
-              {prevGuide ? (
-                <a href={`/knowledge/${prevGuide.slug}/`} className="knowledge-page-nav-link prev">
-                  <span className="knowledge-page-nav-label">Previous Guide</span>
-                  <span className="knowledge-page-nav-title">
-                    <ArrowLeft size={14} /> {prevGuide.shortTitle}
-                  </span>
-                </a>
-              ) : (
-                <div />
-              )}
-              {nextGuide && (
-                <a href={`/knowledge/${nextGuide.slug}/`} className="knowledge-page-nav-link next">
-                  <span className="knowledge-page-nav-label">Next Guide</span>
-                  <span className="knowledge-page-nav-title">
-                    {nextGuide.shortTitle} <ArrowRight size={14} />
-                  </span>
-                </a>
-              )}
-            </nav>
-          </div>
+            <a className="knowledge-back-link" href="/knowledge/">
+              <ArrowLeft size={15} /> Browse all guides
+            </a>
+          </article>
         </div>
-
-        {/* Clean Support Diagnostics Callout */}
-        <section className="knowledge-footer-cta" aria-labelledby="knowledge-help-title">
-          <div className="knowledge-footer-card">
-            <div>
-              <h3 id="knowledge-help-title">Need help with something not covered here?</h3>
-              <p>
-                Export an anonymized diagnostics report under Settings → Updates &amp; support, or
-                share private feedback directly with the Jackalope maintainers.
-              </p>
-            </div>
-            <div className="knowledge-footer-actions">
-              <a className="button button-primary button-compact" href="/feedback/">
-                Send feedback <ArrowRight size={14} />
-              </a>
-              <a className="button button-quiet button-compact" href="/knowledge/">
-                Browse all guides
-              </a>
-            </div>
-          </div>
-        </section>
+        <SupportLinks />
       </main>
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // View 2: Knowledgebase Hub Overview (/knowledge/)
-  // ---------------------------------------------------------------------------
   return (
-    <main id="main" className="knowledge-hub-page">
-      {/* Clean Hero Header */}
+    <main id="main" className="knowledge-hub-page page-width">
       <header className="knowledge-hero">
-        <div className="page-width">
-          <nav className="article-breadcrumbs" aria-label="Breadcrumb">
-            <a href="/">Jackalope</a>
-            <span aria-hidden="true">/</span>
-            <span>Knowledgebase</span>
-          </nav>
-
-          <div className="knowledge-hero-content">
-            <h1>Guides, Architecture &amp; Troubleshooting</h1>
+        <nav className="article-breadcrumbs" aria-label="Breadcrumb">
+          <a href="/">Jackalope</a>
+          <span aria-hidden="true">/</span>
+          <span>Knowledgebase</span>
+        </nav>
+        <div className="knowledge-hero-layout">
+          <div>
+            <div className="knowledge-eyebrow">The Jackalope field guide</div>
+            <h1>
+              A little help.
+              <br />
+              More room to build.
+            </h1>
             <p className="knowledge-lede">
-              In-depth architecture documentation, quick troubleshooting playbooks, and how-tos for
-              building thoughtfully with coding agents in Jackalope.
+              Get your first task moving, find your way around, or work through a snag. Start here.
             </p>
-
-            {/* Streamlined Search Bar */}
-            <div className="knowledge-agent-actions">
-              <a href="/knowledge/ask-jackalope/">Ask Jackalope & local agent tools</a>
-              <a href="/knowledge/llms.txt">Documentation for your agent</a>
-            </div>
             <search className="knowledge-search-bar">
-              <Search size={18} className="knowledge-search-icon" aria-hidden="true" />
+              <Search size={20} aria-hidden="true" />
               <input
+                ref={searchRef}
                 type="search"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search documentation, topics, or errors…"
-                className="knowledge-search-input"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search guides, tools, or an error…"
                 aria-label="Search knowledgebase"
+                aria-controls="knowledge-results"
               />
               {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery('')}
-                  className="knowledge-search-clear"
-                  aria-label="Clear search"
-                >
-                  <X size={16} />
+                <button type="button" onClick={clearSearch} aria-label="Clear search">
+                  <X size={18} />
                 </button>
               )}
             </search>
           </div>
+          <aside className="knowledge-helper-card" aria-labelledby="helper-card-title">
+            <span className="knowledge-eyebrow">Help inside your workspace</span>
+            <h2 id="helper-card-title">You can ask Jackalope.</h2>
+            <p>Find a guide, prepare a task, or preview a theme with your configured agent.</p>
+            <a href="/knowledge/ask-jackalope/">
+              Meet your helper <ArrowRight size={16} />
+            </a>
+            <a className="knowledge-helper-docs" href="/knowledge/llms.txt">
+              Documentation for your agent
+            </a>
+          </aside>
         </div>
       </header>
-
-      {/* Main Content Area */}
-      <div className="page-width">
-        {query.trim() ? (
-          /* Live Search Results View */
-          <section className="knowledge-search-results" aria-label="Search results">
-            <div className="knowledge-results-header">
-              <h2>Results for &ldquo;{query}&rdquo;</h2>
-              <span className="knowledge-results-count">
-                Found {searchResults.length} matching{' '}
-                {searchResults.length === 1 ? 'topic' : 'topics'}
-              </span>
-            </div>
-
-            {searchResults.length === 0 ? (
-              <div className="knowledge-empty">
-                <h3>No matching guides or answers found</h3>
-                <p>
-                  Try searching for a different keyword or error phrase, or browse the complete
-                  guides below.
-                </p>
-                <button
-                  type="button"
-                  className="button button-primary button-compact"
-                  onClick={() => setQuery('')}
-                >
-                  Clear search
-                </button>
-              </div>
-            ) : (
-              <div className="knowledge-search-list">
-                {searchResults.map(({ guide, section }) => (
-                  <a
-                    key={`${guide.slug}-${section.id}`}
-                    href={`/knowledge/${guide.slug}/#${section.id}`}
-                    className="knowledge-search-item"
-                  >
-                    <div className="knowledge-search-item-guide">{guide.title}</div>
-                    <h3>{section.question}</h3>
-                    <p>{section.paragraphs[0]}</p>
-                    <span className="knowledge-search-item-link">
-                      Read in guide <ArrowRight size={14} />
-                    </span>
-                  </a>
-                ))}
-              </div>
-            )}
-          </section>
-        ) : (
-          <>
-            {/* 1. Quick Troubleshooting Diagnostic Helper */}
-            <section className="knowledge-diagnostic-helper" aria-label="Troubleshooting assistant">
-              <div className="knowledge-helper-header">
-                <div className="knowledge-helper-badge">
-                  <Wrench size={16} /> Quick Diagnostic Assistant
-                </div>
-                <h2>What problem are you trying to solve?</h2>
-                <p>
-                  Instant diagnosis and resolution recipes for the most common local developer
-                  environment and agent execution scenarios.
-                </p>
-              </div>
-
-              <div className="knowledge-scenario-grid">
-                {troubleshootingScenarios.map((scenario) => {
-                  const targetHref = `/knowledge/${scenario.targetSlug}/${
-                    scenario.targetAnchor ? `#${scenario.targetAnchor}` : ''
-                  }`;
-
-                  return (
-                    <a key={scenario.id} href={targetHref} className="knowledge-scenario-card">
-                      <h3>{scenario.title}</h3>
-                      <p className="knowledge-scenario-symptom">{scenario.symptom}</p>
-                      <p className="knowledge-scenario-quickfix">{scenario.quickFix}</p>
-                      <span className="knowledge-scenario-action">
-                        View resolution steps <ArrowRight size={14} />
-                      </span>
-                    </a>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* 2. Likely Articles You May Be Looking For */}
-            <section className="knowledge-likely-section" aria-label="Frequently visited guides">
-              <div className="knowledge-section-intro">
-                <h2>Frequently Visited Guides</h2>
-                <p>Essential architecture references, configuration steps, and safety contracts.</p>
-              </div>
-
-              <div className="knowledge-likely-grid">
-                {likelyArticles.map((guide) => (
-                  <a
-                    key={guide.slug}
-                    href={`/knowledge/${guide.slug}/`}
-                    className="knowledge-likely-card"
-                  >
-                    <span className="knowledge-likely-reading-time">{guide.readingTime}</span>
-                    <h3>{guide.title}</h3>
-                    <p>{guide.description}</p>
-                    <span className="knowledge-likely-link">
-                      Read guide <ArrowRight size={14} />
-                    </span>
-                  </a>
-                ))}
-              </div>
-            </section>
-
-            {/* 3. Category Filter Buttons & Guides Grid */}
-            <section className="knowledge-hub-guides" aria-label="Documentation guides by category">
-              <div className="knowledge-section-intro">
-                <h2>Browse by Topic</h2>
-                <p>
-                  Explore all {knowledgeGuides.length} official technical guides and architectural
-                  specifications.
-                </p>
-              </div>
-
-              {/* Clean Category Filter Buttons */}
-              <nav className="knowledge-category-bar" aria-label="Filter by topic">
-                <button
-                  type="button"
-                  className={`knowledge-category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory('all')}
-                >
-                  All Topics ({knowledgeGuides.length})
-                </button>
-                {guideCategories.map((cat) => {
-                  const count = knowledgeGuides.filter((g) => g.category === cat.id).length;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      className={`knowledge-category-btn ${
-                        selectedCategory === cat.id ? 'active' : ''
-                      }`}
-                      onClick={() => setSelectedCategory(cat.id)}
-                    >
-                      {cat.label} ({count})
-                    </button>
-                  );
-                })}
-              </nav>
-
-              {/* Guide Cards Grid */}
-              <div className="knowledge-hub-grid">
-                {filteredGuides.map((guide) => (
-                  <article key={guide.slug} className="knowledge-hub-card">
-                    <div className="knowledge-card-reading-time">{guide.readingTime}</div>
-                    <h3>
-                      <a href={`/knowledge/${guide.slug}/`}>{guide.title}</a>
-                    </h3>
-                    <p>{guide.description}</p>
-
-                    <div className="knowledge-card-topics">
-                      <span className="knowledge-card-topics-label">Key topics covered:</span>
-                      <ul>
-                        {guide.sections.slice(0, 3).map((section) => (
-                          <li key={section.id}>
-                            <a href={`/knowledge/${guide.slug}/#${section.id}`}>
-                              {section.question}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <a href={`/knowledge/${guide.slug}/`} className="knowledge-card-footer-link">
-                      Read guide <ArrowRight size={14} />
-                    </a>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* Clean Support Diagnostics Callout */}
-        <section className="knowledge-footer-cta" aria-labelledby="knowledge-help-title-hub">
-          <div className="knowledge-footer-card">
-            <div>
-              <h3 id="knowledge-help-title-hub">Need help with something not covered here?</h3>
-              <p>
-                Export an anonymized diagnostics report under Settings → Updates &amp; support, or
-                share private feedback directly with the Jackalope maintainers.
-              </p>
-            </div>
-            <div className="knowledge-footer-actions">
-              <a className="button button-primary button-compact" href="/feedback/">
-                Send feedback <ArrowRight size={14} />
-              </a>
-              <a className="button button-quiet button-compact" href="/tour/">
-                Watch app tour
-              </a>
-            </div>
+      {query.trim() ? (
+        <section
+          id="knowledge-results"
+          className="knowledge-search-results"
+          aria-label="Search results"
+        >
+          <div className="knowledge-section-intro">
+            <h2>Results for “{query}”</h2>
+            <p role="status">
+              {searchResults.length} matching {searchResults.length === 1 ? 'guide' : 'guides'}
+            </p>
           </div>
+          {searchResults.length ? (
+            <div className="knowledge-search-list">
+              {searchResults.map(({ guide, section }) => (
+                <a
+                  key={guide.slug}
+                  className="knowledge-search-item"
+                  href={`${guideHref(guide.slug)}${section ? `#${section.id}` : ''}`}
+                >
+                  <span className="knowledge-eyebrow">
+                    {categoryLabel(guide.category)} · {guide.readingTime}
+                  </span>
+                  <h3>{guide.shortTitle}</h3>
+                  <p>{section?.paragraphs[0] ?? guide.description}</p>
+                  <span className="knowledge-card-link">
+                    {section?.question ?? 'Read guide'} <ArrowRight size={15} />
+                  </span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="knowledge-empty">
+              <h3>No guides found yet</h3>
+              <p>Try a shorter phrase such as “account”, “Git lock”, or “browser”.</p>
+              <button
+                type="button"
+                className="button button-primary button-compact"
+                onClick={clearSearch}
+              >
+                Browse all guides
+              </button>
+            </div>
+          )}
         </section>
-      </div>
+      ) : (
+        <div id="knowledge-results">
+          <section className="knowledge-start" aria-labelledby="knowledge-start-title">
+            <div className="knowledge-section-intro">
+              <h2 id="knowledge-start-title">A good place to start</h2>
+              <p>From setting up to bringing your changes home.</p>
+            </div>
+            <div className="knowledge-start-grid">
+              {startingPoints.map((point, index) => (
+                <a key={point.slug} href={guideHref(point.slug)}>
+                  <span className="knowledge-start-number">0{index + 1}</span>
+                  <div>
+                    <h3>{point.title}</h3>
+                    <p>{point.description}</p>
+                  </div>
+                  <ArrowRight size={18} />
+                </a>
+              ))}
+            </div>
+          </section>
+          <section className="knowledge-watch" aria-labelledby="knowledge-watch-title">
+            <div className="knowledge-section-intro">
+              <h2 id="knowledge-watch-title">See where things happen</h2>
+              <p>Short, captioned walkthroughs with sample data. Play them inside each guide.</p>
+            </div>
+            <div className="knowledge-watch-grid">
+              {knowledgeClips.map((clip) => (
+                <a key={clip.id} href={`${guideHref(clip.slug)}#${clip.section}`}>
+                  <div className="knowledge-watch-image">
+                    <img
+                      src={`/media/knowledge/${clip.id}.jpg`}
+                      alt=""
+                      width={1280}
+                      height={720}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <span>
+                      <Play size={12} aria-hidden="true" />
+                      {clip.seconds}s demo
+                    </span>
+                  </div>
+                  <h3>{clip.title}</h3>
+                  <p>{clip.description}</p>
+                  <span className="knowledge-card-link">
+                    Open guide <ArrowRight size={14} />
+                  </span>
+                </a>
+              ))}
+            </div>
+          </section>
+          <section className="knowledge-hub-guides" aria-labelledby="knowledge-browse-title">
+            <div className="knowledge-section-intro">
+              <h2 id="knowledge-browse-title">Find your next step</h2>
+              <p>Practical guides for your workspace.</p>
+            </div>
+            <nav className="knowledge-category-bar" aria-label="Filter guides by topic">
+              <button
+                type="button"
+                aria-pressed={selectedCategory === 'all'}
+                onClick={() => setSelectedCategory('all')}
+              >
+                All guides
+              </button>
+              {guideCategories.map((category) => (
+                <button
+                  type="button"
+                  key={category.id}
+                  aria-pressed={selectedCategory === category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </nav>
+            <p className="knowledge-filter-count" role="status">
+              {filteredGuides.length} {filteredGuides.length === 1 ? 'guide' : 'guides'}
+            </p>
+            <div className="knowledge-hub-grid">
+              {filteredGuides.map((guide) => (
+                <a key={guide.slug} className="knowledge-hub-card" href={guideHref(guide.slug)}>
+                  <div className="knowledge-eyebrow">
+                    {categoryLabel(guide.category)} <span>· {guide.readingTime}</span>
+                  </div>
+                  <h3>{guide.shortTitle}</h3>
+                  <p>{guide.description}</p>
+                  <span className="knowledge-card-link">
+                    Read guide <ArrowRight size={14} />
+                  </span>
+                </a>
+              ))}
+            </div>
+          </section>
+          <section className="knowledge-troubleshooting" aria-labelledby="knowledge-fix-title">
+            <div className="knowledge-section-intro">
+              <span className="knowledge-eyebrow">Hit a snag?</span>
+              <h2 id="knowledge-fix-title">Start with what you’re seeing</h2>
+              <p>Find the cause before retrying or changing your setup.</p>
+            </div>
+            <div className="knowledge-scenario-grid">
+              {troubleshootingScenarios.map((scenario) => (
+                <a
+                  key={scenario.id}
+                  href={`${guideHref(scenario.targetSlug)}${scenario.targetAnchor ? `#${scenario.targetAnchor}` : ''}`}
+                >
+                  <div>
+                    <h3>{scenario.title}</h3>
+                    <p>{scenario.quickFix}</p>
+                  </div>
+                  <ArrowRight size={18} />
+                </a>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+      <SupportLinks />
     </main>
   );
 }

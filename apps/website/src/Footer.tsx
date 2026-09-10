@@ -23,6 +23,7 @@ const groups = [
       ['Field notes', '/blog/'],
       ['Changelog', '/changelog/'],
       ['Roadmap', '/roadmap/'],
+      ['Source & contributing', 'https://github.com/Jackalope-Dev/jackalope'],
     ],
   },
   {
@@ -88,6 +89,7 @@ export function Footer({ home, path }: { home: boolean; path: string }) {
             Terms
           </a>
           <a href="/sitemap.xml">Sitemap</a>
+          <a href="/licenses/dependencies.txt">Licenses</a>
         </nav>
       </div>
     </footer>

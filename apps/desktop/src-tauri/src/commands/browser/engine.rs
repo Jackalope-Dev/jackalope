@@ -52,9 +52,8 @@ impl Engine {
     pub fn start(slot: Arc<Slot>) -> Result<Self, String> {
         check_canceled(&slot.canceled)?;
         let browser = crate::commands::harness::find_browser_executable()
-            .ok_or("Install Edge or Chrome to use browser verification.")?;
-        let directory = std::env::temp_dir().join(format!("jl-{}", uuid::Uuid::new_v4().simple()));
-        std::fs::create_dir(&directory).map_err(|e| e.to_string())?;
+            .ok_or("Install Chrome, Edge or Chromium, or set JACKALOPE_BROWSER_EXECUTABLE to its executable, then restart Jackalope.")?;
+        let directory = create_session_directory()?;
         let result = Self::spawn(slot, directory.clone(), browser);
         if result.is_err() {
             let _ = std::fs::remove_dir_all(directory);
@@ -84,6 +83,8 @@ impl Engine {
             "DISPLAY",
             "WAYLAND_DISPLAY",
             "XDG_RUNTIME_DIR",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "XAUTHORITY",
             "LANG",
         ] {
             if let Some(value) = std::env::var_os(key) {
@@ -230,6 +231,38 @@ impl Engine {
                 Err(error) => return Err(format!("Browser connection failed: {error}")),
             }
         }
+    }
+}
+
+fn create_session_directory() -> Result<PathBuf, String> {
+    #[cfg(unix)]
+    let root = PathBuf::from("/tmp");
+    #[cfg(windows)]
+    let root = std::env::temp_dir();
+    let directory = root.join(format!("jl-{}", uuid::Uuid::new_v4().simple()));
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        // macOS TMPDIR can exceed the Unix socket path limit. Keep the socket short and private.
+        builder.mode(0o700);
+    }
+    builder.create(&directory).map_err(|e| e.to_string())?;
+    Ok(directory)
+}
+
+#[cfg(all(test, unix))]
+mod platform_tests {
+    #[test]
+    fn session_directory_is_private_and_socket_path_fits_macos() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = super::create_session_directory().unwrap();
+        assert!(directory.join("task.sock").as_os_str().len() < 104);
+        assert_eq!(
+            directory.metadata().unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        std::fs::remove_dir(directory).unwrap();
     }
 }
 

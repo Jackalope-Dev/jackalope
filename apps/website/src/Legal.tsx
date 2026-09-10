@@ -11,9 +11,10 @@ const privacy: Section[] = [
     content: (
       <>
         <p>
-          Jackalope Digital LLC operates Jackalope. This policy covers our website, waitlist,
-          early-access service, and the information our desktop app sends to us. Contact {contact}{' '}
-          with privacy questions or requests.
+          Jackalope Digital LLC, a Colorado limited liability company in the United States, operates
+          Jackalope. This policy covers our website, waitlist, early-access service, and the
+          information our desktop app sends to us. Contact {contact} with privacy questions or
+          requests.
         </p>
         <p>
           Coding agents and other services you connect have their own privacy policies. This policy
@@ -84,8 +85,10 @@ const privacy: Section[] = [
         </p>
         <p>
           Sequenzy processes recipient addresses, email contents, and delivery information to send
-          our messages. Newsletter subscribers also have a record with Sequenzy. Depending on the
-          message and email-service settings, delivery, open, and link activity may be recorded.
+          our messages. For newsletter subscribers, we also sync signup source and campaign labels,
+          membership and referral status, download and connection milestones, and optional survey
+          preferences to organize relevant messages. We do not enable email open or click tracking.
+          Delivery, bounce, complaint, subscription, and unsubscribe records may still be processed.
           Unsubscribe using a newsletter’s link or contact us. Unsubscribing from newsletters does
           not cancel access or prevent sign-in messages you request.
         </p>
@@ -99,9 +102,10 @@ const privacy: Section[] = [
       <>
         <p>
           The desktop app stores project settings, tasks, history, and related workspace data on
-          your computer. Using local projects and installed agents does not require a Jackalope
-          cloud account. We do not receive your repository contents, prompts, agent transcripts,
-          local paths, or provider credentials through our usage-reporting system.
+          your computer. Contributor builds can use local projects and installed agents without a
+          Jackalope cloud account. Official early-access builds may require an approved membership.
+          We do not receive your repository contents, prompts, agent transcripts, local paths, or
+          provider credentials through our usage-reporting system.
         </p>
         <p>
           Agents can read files, run commands, and send prompts, code, and other context to their
@@ -111,13 +115,12 @@ const privacy: Section[] = [
           sandboxes. Review the permissions and policies of each service you use.
         </p>
         <p>
-          If you choose to connect your Jackalope membership to the desktop, we store a device
-          identifier, its computer name, a hash of its credential, your membership association, and
-          connection and expiry times. Connection requests expire after ten minutes; device
-          credentials expire after 90 days and can be revoked from the app or your account page. The
-          Windows app encrypts its local credential using Windows user protection. Connecting does
-          not upload your local projects or link your agent-provider credentials to your Jackalope
-          membership.
+          When you connect your Jackalope membership to the desktop, we store a device identifier,
+          its computer name, a hash of its credential, your membership association, and connection
+          and expiry times. Connection requests expire after ten minutes; device credentials expire
+          after 90 days and can be revoked from the app or your account page. The Windows app
+          encrypts its local credential using Windows user protection. Connecting does not upload
+          your local projects or link your agent-provider credentials to your Jackalope membership.
         </p>
         <p>
           Optional settings sync saves your app colors, appearance, companion reactions and
@@ -168,13 +171,13 @@ const privacy: Section[] = [
         <p>
           Quiet feedback invitations use progress stored on your desktop. Invitation preferences,
           cooldowns and completion sync with your account to avoid repeat requests across desktops.
-          The product-notes choice on signup includes one feedback email and is checked by default.
-          You can uncheck it before joining. When enabled, we link active days, up to two opaque
-          result receipts, invitation preferences and response status to your membership. These
-          milestones do not include task contents, project details or agent-provider credentials,
-          and remain separate from anonymous usage reports. Stopping feedback emails stops new
-          milestone uploads and cancels unsent invitations; a message already handed to the email
-          provider may still arrive.
+          The optional product-notes choice on signup includes one feedback email and starts
+          unchecked. Joining the waitlist does not require it. When enabled, we link active days, up
+          to two opaque result receipts, invitation preferences and response status to your
+          membership. These milestones do not include task contents, project details or
+          agent-provider credentials, and remain separate from anonymous usage reports. Stopping
+          feedback emails stops new milestone uploads and cancels unsent invitations; a message
+          already handed to the email provider may still arrive.
         </p>
         <p>
           This feedback round has at most one email and two in-app invitations, with shared
@@ -215,10 +218,11 @@ const privacy: Section[] = [
       <>
         <p>
           We use Cloudflare for hosting, database storage, downloads, security, and service
-          infrastructure; Sequenzy for customer email; and our mailbox provider to handle support
+          infrastructure; Sequenzy for customer email; and Purelymail to handle support
           correspondence. These providers process information needed for those functions. See{' '}
           <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare’s privacy policy</a> and{' '}
-          <a href="https://www.sequenzy.com/privacy">Sequenzy’s privacy policy</a>.
+          <a href="https://www.sequenzy.com/privacy">Sequenzy’s privacy policy</a>, and{' '}
+          <a href="https://purelymail.com/privacy">Purelymail’s privacy policy</a>.
         </p>
         <p>
           Access is limited to people and providers who need it to operate or support Jackalope. We
@@ -230,6 +234,30 @@ const privacy: Section[] = [
           Our providers operate internationally, including in the United States. Information may be
           processed outside your home country, where laws differ. Contact us for information about
           the providers and transfer protections relevant to your information.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'community',
+    title: 'Open-source contributions and community',
+    content: (
+      <>
+        <p>
+          Issues, pull requests, comments, and contributions you publish in our public GitHub
+          repository can include your profile, Git author information, and anything you attach.
+          These contributions are public and may be copied or indexed by others. GitHub and other
+          community platforms handle information under their own privacy policies; see{' '}
+          <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">
+            GitHub’s privacy statement
+          </a>
+          .
+        </p>
+        <p>
+          Review diagnostics and screenshots before posting. Send private support and privacy
+          requests to {contact}, and vulnerabilities to{' '}
+          <a href="mailto:security@jackalope.dev">security@jackalope.dev</a>. We cannot recall
+          copies of material that others have already downloaded or archived.
         </p>
       </>
     ),
@@ -310,7 +338,7 @@ const privacy: Section[] = [
         <p>
           We use safeguards including encrypted connections, restricted administrative access, and
           expiring sign-in credentials. No system is completely secure. Report a suspected security
-          issue privately through {contact}.
+          issue privately to <a href="mailto:security@jackalope.dev">security@jackalope.dev</a>.
         </p>
         <p>
           We update the date on this page when the policy changes. For material changes, we will
@@ -329,10 +357,11 @@ const terms: Section[] = [
     content: (
       <>
         <p>
-          These terms are between you and Jackalope Digital LLC and cover jackalope.dev, our
-          waitlist, hosted early-access member area, invitations, and download service. Please read
-          them before requesting or using access. If you use the service for an organization, you
-          must have authority to act on its behalf.
+          These terms are between you and Jackalope Digital LLC, a Colorado limited liability
+          company in the United States, and cover jackalope.dev, our waitlist, hosted early-access
+          member area, invitations, and download service. Please read them before requesting or
+          using access. If you use the service for an organization, you must have authority to act
+          on its behalf.
         </p>
         <p>
           Our hosted early-access service is for people aged 18 or older who can enter a binding
@@ -396,11 +425,15 @@ const terms: Section[] = [
     content: (
       <>
         <p>
-          The Jackalope desktop software is licensed under the{' '}
-          <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>. Bundled
-          components may have separate licenses and notices. Those licenses govern use,
-          modification, and distribution of the software; these hosted-service terms do not restrict
-          the rights they grant. Our name and logo are not licensed for implying our endorsement.
+          Jackalope’s project-authored software, documentation, and included media are licensed
+          under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>.
+          Bundled components may have separate licenses and notices. See the{' '}
+          <a href="https://github.com/Jackalope-Dev/jackalope/blob/master/docs/LICENSING.md">
+            repository’s licensing guide
+          </a>
+          . Those licenses govern use, modification, and distribution of the software; these
+          hosted-service terms do not restrict the rights they grant. Our name and logo are not
+          licensed for implying our endorsement.
         </p>
         <p>
           You retain your rights in your projects and content. We do not claim ownership of code
@@ -517,7 +550,7 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
             ? 'How we handle information across the website, early access, and desktop app.'
             : 'Using Jackalope’s website and hosted early-access service.'}
         </p>
-        <p className="article-byline">Updated September 7, 2026 · Jackalope Digital LLC</p>
+        <p className="article-byline">Updated September 9, 2026 · Jackalope Digital LLC</p>
       </header>
       <div className="article-body">
         <nav className="legal-nav" aria-label="On this page">

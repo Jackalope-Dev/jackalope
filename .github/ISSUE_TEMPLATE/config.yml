@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and user guides
+    url: https://jackalope.dev/knowledge/
+    about: Find setup, workflow and troubleshooting guides.
+  - name: Private security report
+    url: https://github.com/Jackalope-Dev/jackalope/blob/master/SECURITY.md
+    about: Report vulnerabilities privately, without posting sensitive details in an issue.
+  - name: Community questions
+    url: https://www.reddit.com/r/JackalopeDev/
+    about: Discuss workflows and ask the community for help.

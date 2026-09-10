@@ -125,6 +125,37 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
                 {section.paragraphs.map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
                 ))}
+                {section.table && (
+                  <section
+                    className="comparison-table-scroll"
+                    aria-label={section.title}
+                    // biome-ignore lint/a11y/noNoninteractiveTabindex: Wide tables need keyboard scrolling.
+                    tabIndex={0}
+                  >
+                    <table>
+                      <caption>{section.title}</caption>
+                      <thead>
+                        <tr>
+                          {section.table.columns.map((column) => (
+                            <th scope="col" key={column}>
+                              {column}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {section.table.rows.map(([heading, ...cells]) => (
+                          <tr key={heading}>
+                            <th scope="row">{heading}</th>
+                            {cells.map((cell) => (
+                              <td key={cell}>{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                )}
                 {section.bullets && (
                   <ul>
                     {section.bullets.map((bullet) => (

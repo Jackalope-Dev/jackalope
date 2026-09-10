@@ -9,6 +9,16 @@ pub struct PtySession {
     pub writer: Box<dyn std::io::Write + Send>,
     pub master: Box<dyn MasterPty + Send>,
     pub child: Box<dyn Child + Send + Sync>,
+    pub tree: Option<crate::commands::process_control::ProcessTree>,
+}
+
+impl PtySession {
+    pub fn stop(&mut self) -> std::io::Result<()> {
+        if let Some(tree) = &self.tree { tree.terminate(); }
+        self.child.kill()?;
+        self.child.wait()?;
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -25,7 +35,7 @@ impl AppState {
     pub fn kill_all_pty_sessions(&self) {
         if let Ok(mut sessions) = self.pty_sessions.lock() {
             for (_, mut session) in sessions.drain() {
-                let _ = session.child.kill();
+                let _ = session.stop();
             }
         }
     }
@@ -85,6 +95,7 @@ mod tests {
             .expect("failed to spawn command in pty");
         drop(pair.slave);
         let pid = child.process_id().expect("spawned child has no pid");
+        let tree = crate::commands::process_control::ProcessTree::attach_pid(pid).unwrap();
         let writer = pair
             .master
             .take_writer()
@@ -97,6 +108,7 @@ mod tests {
                 writer,
                 master: pair.master,
                 child,
+                tree: Some(tree),
             },
         );
         assert!(

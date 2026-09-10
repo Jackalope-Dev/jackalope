@@ -18,6 +18,7 @@ use tauri::Manager;
 use window_behavior::{desktop_set_close_to_tray, desktop_settings, setup_tray, WindowBehavior};
 
 pub fn run() {
+    commands::platform::initialize_environment();
     let mut context = tauri::generate_context!();
     context.config_mut().app.windows[0].user_agent =
         Some(format!("Jackalope/{}", env!("CARGO_PKG_VERSION")));
@@ -27,7 +28,10 @@ pub fn run() {
         assert!(path.is_absolute(), "JACKALOPE_PROFILE_DIR must be absolute");
         context.config_mut().app.windows[0].create = false;
     }
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(unix)]
+    let builder = builder.plugin(tauri_plugin_notification::init());
+    builder
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

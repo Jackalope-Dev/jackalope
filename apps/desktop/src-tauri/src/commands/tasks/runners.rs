@@ -185,7 +185,7 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
     for dir in &dirs {
         for candidate in &candidates {
             let target = dir.join(candidate);
-            if target.is_file() {
+            if dir.is_absolute() && crate::commands::platform::is_executable(&target) {
                 return Ok(target);
             }
         }

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,7 +51,7 @@ The application code uses [Apache-2.0](../LICENSE). Shared vector branding is in
 \`packages/brand\`. Plus Jakarta Sans and JetBrains Mono are bundled under OFL-1.1;
 their full license texts are included in both apps' \`public/licenses\` directories.
 Website screenshots and walkthroughs use explicit fictional sample data.
-Task interaction patterns reference Beautiful UI; see [DESIGN.md](DESIGN.md).
+See [licensing and redistribution](LICENSING.md) for project materials and trademarks.
 The desktop bundles agent-browser's native executable, Apache-2.0 license and
 embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
@@ -81,24 +81,67 @@ const packages = [
       name: `${item.name} ${item.version}`,
     })),
 ];
-const notices = new Map();
-for (const item of packages) {
-  for (const entry of readdirSync(item.directory, { withFileTypes: true })) {
-    if (!entry.isFile() || !/^(?:licen[sc]e|copying|notice|unlicense)(?:[.-]|$)/i.test(entry.name))
-      continue;
-    const text = readFileSync(path.join(item.directory, entry.name), 'utf8').trim();
-    if (!text) continue;
-    const owners = notices.get(text) ?? new Set();
-    owners.add(`${item.name} (${entry.name})`);
-    notices.set(text, owners);
+function collectNotices(packages, requireNotice = false) {
+  const notices = new Map();
+  for (const item of packages) {
+    let found = false;
+    if (item.name === 'react-remove-scroll-bar 2.3.8') {
+      const text = readFileSync(
+        new URL('license-notices/react-remove-scroll-bar-2.3.8.txt', import.meta.url),
+        'utf8',
+      ).trim();
+      notices.set(text, new Set([`${item.name} (upstream LICENSE)`]));
+      found = true;
+    }
+    for (const entry of readdirSync(item.directory, { withFileTypes: true })) {
+      if (
+        !entry.isFile() ||
+        !/^(?:licen[sc]e|copying|notice|unlicense)(?:[.-]|$)/i.test(entry.name)
+      )
+        continue;
+      const text = readFileSync(path.join(item.directory, entry.name), 'utf8').trim();
+      if (!text) continue;
+      found = true;
+      const owners = notices.get(text) ?? new Set();
+      owners.add(`${item.name} (${entry.name})`);
+      notices.set(text, owners);
+    }
+    if (requireNotice && !found) throw new Error(`Missing license/notice text for ${item.name}`);
   }
+  const sections = [...notices].map(
+    ([text, owners]) => `${[...owners].sort().join('\n')}\n\n${text}`,
+  );
+  sections.sort();
+  return sections.join('\n\n============================================================\n\n');
 }
-const sections = [...notices].map(
-  ([text, owners]) => `${[...owners].sort().join('\n')}\n\n${text}`,
-);
-sections.sort();
 writeFileSync(
   new URL('../apps/desktop/public/licenses/dependencies.txt', import.meta.url),
-  `Dependency license and notice files\n\nGenerated from installed production JavaScript packages and the locked Rust dependency graph.\nIncludes optional target dependencies. Identical texts are grouped; package declarations are listed in docs/DEPENDENCIES.md.\n\n${sections.join('\n\n============================================================\n\n')}\n`,
+  `Dependency license and notice files\n\nGenerated from installed production JavaScript packages and the locked Rust dependency graph.\nIncludes optional target dependencies. Identical texts are grouped; package declarations are listed in docs/DEPENDENCIES.md.\n\n${collectNotices(packages)}\n`,
 );
+const website = execute(process.execPath, [
+  pnpm,
+  'licenses',
+  'list',
+  '--prod',
+  '--filter',
+  '@jackalope/website...',
+  '--json',
+]);
+const websitePackages = Object.values(website)
+  .flat()
+  .flatMap((item) =>
+    item.paths.map((directory) => ({
+      directory,
+      name: `${item.name} ${item.versions.join(', ')}`,
+    })),
+  );
+writeFileSync(
+  new URL('../apps/website/public/licenses/dependencies.txt', import.meta.url),
+  `Website dependency license and notice files\n\nGenerated from the website's installed production dependency graph.\nIdentical texts are grouped. Jackalope's own license is in jackalope.txt.\n\n${collectNotices(websitePackages, true)}\n`,
+);
+for (const app of ['desktop', 'website'])
+  copyFileSync(
+    new URL('../LICENSE', import.meta.url),
+    new URL(`../apps/${app}/public/licenses/jackalope.txt`, import.meta.url),
+  );
 console.log(`Recorded ${jsRows.length} JavaScript and ${rustRows.length} Rust packages.`);

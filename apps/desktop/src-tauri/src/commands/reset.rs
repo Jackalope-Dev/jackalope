@@ -74,8 +74,14 @@ pub fn reset_on_startup(directory: &Path) -> Result<bool, String> {
 
 fn remove_entry(path: &Path) -> Result<(), String> {
     if path.is_dir() {
-        std::fs::remove_dir_all(path)
+        for child in std::fs::read_dir(path).map_err(|e| e.to_string())? {
+            remove_entry(&child.map_err(|e| e.to_string())?.path())?;
+        }
+        std::fs::remove_dir(path)
     } else {
+        if path.file_name().is_some_and(|name| name == "account.bin" || name == "api-key.bin") {
+            return super::account_storage::remove(path);
+        }
         std::fs::remove_file(path)
     }
     .map_err(|e| e.to_string())

@@ -57,7 +57,8 @@ cookie. They cannot authorize downloads, device connections or pass grants.
 Tokens are hashed at rest; private links live only in encrypted outbox payloads
 and URL fragments cleared before explicit confirmation. Status pages are private,
 uncached and excluded from search discovery. Revocation removes both session types
-and outstanding tokens. Newsletter double opt-in remains independent.
+and outstanding tokens. Newsletter enrollment remains optional and independent
+of waitlist verification; see [email synchronization](EARLY-ACCESS.md).
 
 ## Rollout and verification
 

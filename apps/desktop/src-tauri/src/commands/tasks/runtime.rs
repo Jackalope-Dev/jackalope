@@ -108,9 +108,7 @@ impl TaskRuntime {
                 }
                 #[cfg(unix)]
                 {
-                    let _ = command("kill")
-                        .args(["-TERM", "--", &format!("-{}", child.id())])
-                        .output();
+                    super::super::process_control::ProcessTree::attach(&child)?.terminate();
                 }
                 let _ = child.kill();
             }

@@ -19,8 +19,14 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 - Ask Jackalope documentation answers and reviewed local actions.
 - Shared appearance controls, onboarding and optional portable settings sync.
 - An optional account/access, feedback, reporting and update service, plus a
-  product website with public guides, sample-workspace media and a Reddit community link.
+  product website with agent-specific setup, worked workflow guides, sourced
+  comparisons, sample-workspace media and a Reddit community link. The knowledgebase
+  has practical steps, related help, searchable guides, captioned short demos and
+  contextual screenshots.
 - Windows installer, Microsoft Store and cloud-release preparation tooling.
+
+The [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
+[licensing guide](LICENSING.md) cover source development and redistribution.
 
 ## Known limits
 

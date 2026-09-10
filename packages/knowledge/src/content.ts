@@ -17,17 +17,17 @@ export interface CategoryInfo {
 export const guideCategories: CategoryInfo[] = [
   {
     id: 'workflows',
-    label: 'Workflows & How-To',
+    label: 'Workflows',
     description: 'Task composer, effort tiers, Pierre diffs, and recurring schedules.',
   },
   {
     id: 'architecture',
-    label: 'Architecture',
+    label: 'Git worktrees',
     description: 'Isolated Git worktrees, concurrency locks, and integration safeguards.',
   },
   {
     id: 'routing',
-    label: 'Routing & Quotas',
+    label: 'Routing & limits',
     description: 'Automatic agent selection, reported quota windows, and bounded handoff.',
   },
   {
@@ -37,7 +37,7 @@ export const guideCategories: CategoryInfo[] = [
   },
   {
     id: 'mcp',
-    label: 'MCP & Tools',
+    label: 'Tools & browser',
     description: 'Central Model Context Protocol broker, tool gating, and headless browser.',
   },
   {
@@ -52,7 +52,7 @@ export const guideCategories: CategoryInfo[] = [
   },
   {
     id: 'themes',
-    label: 'Themes & Atmosphere',
+    label: 'Appearance',
     description: 'Color harmonies, 64-step atmosphere, and mascot companion reactions.',
   },
 ];
@@ -73,7 +73,7 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
     symptom:
       'Desktop app reports "CLI not found" or "Command failed: codex/claude not recognized".',
     quickFix:
-      'Windows GUI apps do not inherit PATH modifications made in open terminals without restarting Explorer or the Jackalope desktop app.',
+      'Check the installed command in a fresh terminal, verify persistent PATH, and fully restart Jackalope before checking discovery again.',
     targetSlug: 'fixing-cli-path-on-windows',
   },
   {
@@ -81,7 +81,7 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
     title: 'Git index or worktree is locked',
     symptom: 'Unable to create or checkout worktree with error "fatal: .git/index.lock exists".',
     quickFix:
-      'Confirm no background git or agent processes are running, then remove stale lockfiles and run git worktree prune.',
+      'Identify the affected checkout and confirm lock ownership before changing files. Use the guide to distinguish an index lock from a protected worktree.',
     targetSlug: 'resolving-git-worktree-locks',
   },
   {
@@ -107,7 +107,7 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
     title: 'MCP tool connection failed or timed out',
     symptom: 'Agent fails to discover or execute tools configured in MCP → Connections.',
     quickFix:
-      'Verify the local stdio command exists in PATH and check JSON-RPC port availability for SSE servers.',
+      'Check the executable or endpoint, authentication, and selected agent’s transport support. Then verify a real tool request.',
     targetSlug: 'mcp-and-browser-automation',
     targetAnchor: 'debugging-mcp',
   },
@@ -136,6 +136,8 @@ export interface KnowledgeGuideSection {
   question: string;
   paragraphs: string[];
   bullets?: string[];
+  steps?: string[];
+  links?: { label: string; href: string }[];
   codeBox?: {
     title: string;
     code: string;
@@ -164,7 +166,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     shortTitle: 'Ask Jackalope',
     description:
       'Use your configured agent to find answers, personalize Jackalope and prepare work. Connect external agents to the same local tools.',
-    readingTime: '4 min',
+    readingTime: '4 min read',
     sections: [
       {
         id: 'open-helper',
@@ -173,6 +175,28 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Open the Jackalope companion at the bottom right and choose Ask. Ask a question, request an appearance change, or prepare a task. Activity retains notifications, feedback and task shortcuts.',
           'The helper uses your default agent, configured model and active account. Codex, Claude Code, Grok and OpenCode have helper adapters; unsupported defaults show a configuration message. Messages and shared context go to that provider and may count toward its usage limits. A question can require several model requests as the helper reads tools and documentation.',
           'The helper works without an open project. It uses an app-owned working directory and does not attach repository files. It retains its own local conversation and reported token usage. Stop ends the active response; interrupted requests are never automatically replayed. New conversation archives the previous record locally.',
+        ],
+      },
+      {
+        id: 'try-a-question',
+        question: 'Try it: ask for a theme preview',
+        paragraphs: [
+          'Start with a small request whose result you can see. This example uses appearance context and leaves the final choice with you.',
+        ],
+        steps: [
+          'Open Ask and review Context & connections. Include appearance if you want advice about your current palette.',
+          'Ask: “Preview a calm dark theme with a blue accent and low atmosphere.”',
+          'Read the proposed values and open the preview. Try reading a task and its controls before choosing Keep theme, or cancel to restore your saved choice.',
+        ],
+        callout: {
+          kind: 'tip',
+          text: 'If the helper only describes a change, look for an actual proposal before assuming anything changed. For an answer about the app, ask it to cite the bundled guide it used.',
+        },
+        links: [
+          {
+            label: 'Understand appearance previews',
+            href: '/knowledge/theme-editor-and-atmosphere/',
+          },
         ],
       },
       {
@@ -226,15 +250,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
     ],
   },
-  // 1. Git Worktrees (Architecture)
   {
     slug: 'git-worktrees',
     category: 'architecture',
-    title: 'Isolated Git Worktrees, Concurrency & Integration Safeguards',
-    shortTitle: 'Git Worktrees & Concurrency',
+    title: 'Work on separate branches with Git worktrees',
+    shortTitle: 'Git worktrees',
     description:
       'How Jackalope uses native Git worktrees to isolate parallel coding agents, prevent dirty checkout collisions, and enforce guarded fast-forward integration.',
-    readingTime: '2 min read',
+    readingTime: '3 min read',
     sections: [
       {
         id: 'why-worktrees',
@@ -242,6 +265,29 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Separate worktrees give independent tasks their own files, index, and branch while sharing the repository’s Git object database. Each checkout still uses disk space for working files, dependencies, and build output.',
           'Choose an isolated worktree for independent work or use the current checkout deliberately. Worktrees do not sandbox processes: agents retain their local permissions, and shared services, ports, and external resources can still conflict.',
+        ],
+      },
+      {
+        id: 'parallel-example',
+        question: 'Try it: separate two independent changes',
+        paragraphs: [
+          'Suppose one task adds an empty state while another updates API documentation. Give each task its own worktree and identify its intended files. If the documentation needs an API change from the first task, record that dependency instead of starting both against an outdated interface.',
+        ],
+        steps: [
+          'Check the project branch and its uncommitted changes. Choose the intended starting state for each task.',
+          'Describe each outcome and select a separate worktree. Tell the tasks about shared services or files that could still collide.',
+          'Review each result and its checks, then prepare the combined patch in Review & merge. Run the checks needed for the combined result before merging.',
+          'Keep the worktrees until the integrated result is verified. Review their remaining files before choosing cleanup.',
+        ],
+        links: [
+          {
+            label: 'Diagnose a blocked worktree',
+            href: '/knowledge/resolving-git-worktree-locks/',
+          },
+          {
+            label: 'Write a task with clear acceptance checks',
+            href: '/knowledge/task-composer-and-effort-levels/',
+          },
         ],
       },
       {
@@ -281,16 +327,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
     ],
   },
-
-  // 2. Task Routing & Quotas (Routing)
   {
     slug: 'task-routing-and-quotas',
     category: 'routing',
-    title: 'Automatic Task Routing, Quota Windows & Failover Handoff',
-    shortTitle: 'Task Routing & Quotas',
+    title: 'Choose agents and handle usage limits',
+    shortTitle: 'Routing & usage limits',
     description:
       'Choose eligible agents using reported capacity, preserve work during quota handoff, and understand pinned tasks and limits.',
-    readingTime: '2 min read',
+    readingTime: '3 min read',
     sections: [
       {
         id: 'lock-hierarchy',
@@ -332,18 +376,39 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'An explicitly chosen agent stays pinned, as does a continuing session. Quota exhaustion does not silently switch its provider or account. Inspect the error and capacity before retrying; use a new task when a different account is needed.',
         ],
       },
+      {
+        id: 'capacity-check',
+        question: 'What should I do when a task cannot start?',
+        paragraphs: [
+          'Separate an unavailable worker from an exhausted account. An installed agent can still be excluded by project settings, a missing tool transport, an expired sign-in, or a reported quota window.',
+        ],
+        steps: [
+          'Open the task and read the routing or launch error. Check whether the assignment is Automatic or explicitly pinned.',
+          'Check the selected account and its reported capacity. A reset time only describes the provider’s reported window; it does not reserve future capacity.',
+          'Review project agent, model, and account restrictions. If the task needs MCP tools, check that the candidate adapter supports their delivery.',
+          'Retry after correcting the cause. For a pinned session, create a new task if you deliberately want another account; review and preserve existing work first.',
+        ],
+        links: [
+          {
+            label: 'Repair the correct account profile',
+            href: '/knowledge/multi-account-and-agents/',
+          },
+          {
+            label: 'Check tool delivery by agent',
+            href: '/knowledge/mcp-and-browser-automation/',
+          },
+        ],
+      },
     ],
   },
-
-  // 3. Agents & Multi-Account (Agents)
   {
     slug: 'multi-account-and-agents',
     category: 'agents',
-    title: 'Configuring Agents, Multi-Account Profiles & Credentials',
-    shortTitle: 'Set up coding agents & account profiles',
+    title: 'Set up agents and account profiles',
+    shortTitle: 'Agents & accounts',
     description:
       'Set up Codex, Claude Code, Grok, OpenCode, and Antigravity, choose project accounts, and understand credential storage limits.',
-    readingTime: '2 min read',
+    readingTime: '3 min read',
     sections: [
       {
         id: 'supported-adapters',
@@ -351,6 +416,29 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Codex, Claude Code, Grok Build, OpenCode, and Antigravity have native task adapters. Install the corresponding CLI and configure provider access. Model access, permissions, and billing remain with your provider.',
           'Antigravity uses agy and is worker-only. Gemini CLI, Aider, and Goose appear in account setup but do not yet have task execution adapters. Discovery of an executable is not proof of valid authentication.',
+        ],
+      },
+      {
+        id: 'first-account',
+        question: 'How do I check a new account before using it?',
+        paragraphs: [
+          'Use a small task in a project that is appropriate for the account. This helps distinguish CLI discovery, successful sign-in, and the ability to run your chosen model.',
+        ],
+        steps: [
+          'Install the agent CLI and open Agents → Configuration. Select the agent and the intended default or named account.',
+          'Complete that profile’s sign-in or key setup. Review provider billing and model access for the selected account.',
+          'Choose the account in the project settings, then create an explicitly assigned task: “Read the project instructions and summarize how to run the tests. Do not change files.”',
+          'Inspect the bound agent/account and the result. If access fails, repair that same profile before trying a larger task.',
+        ],
+        links: [
+          {
+            label: 'Fix an executable Jackalope cannot find',
+            href: '/knowledge/fixing-cli-path-on-windows/',
+          },
+          {
+            label: 'Use automatic routing after setup',
+            href: '/knowledge/task-routing-and-quotas/',
+          },
         ],
       },
       {
@@ -388,16 +476,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
     ],
   },
-
-  // 4. MCP Hub & Browser Automation (MCP)
   {
     slug: 'mcp-and-browser-automation',
     category: 'mcp',
-    title: 'Central Model Context Protocol (MCP) & Built-in Browser Engine',
-    shortTitle: 'MCP & Browser Automation',
+    title: 'Use project tools and the built-in browser',
+    shortTitle: 'Tools & browser automation',
     description:
-      'Centralized Model Context Protocol configuration, tool gating, local headless browser daemon, and interactive human-in-the-loop dialogs.',
-    readingTime: '2 min read',
+      'Choose tools for a task, check agent compatibility, and inspect browser results with useful evidence.',
+    readingTime: '3 min read',
     sections: [
       {
         id: 'central-broker',
@@ -425,6 +511,28 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'browser-check-example',
+        question: 'Try it: verify a local page with browser evidence',
+        paragraphs: [
+          'Start the project’s development server and include its exact local URL in the task. A fresh browser profile will not carry over sign-ins from your personal browser. Use a page and test data the task can access.',
+          'Review which URL and state each screenshot represents. A picture of a success message proves the rendered state; verifying delivery, persistence, or a backend side effect requires separate evidence. If the server is unreachable, fix the preview before treating the page as tested.',
+        ],
+        codeBox: {
+          title: 'Example browser-check brief',
+          code: 'Open the local preview URL I provide. Check the sign-up form at desktop and narrow widths.\nUse test data to trigger required-field and invalid-email errors.\nCheck labels, keyboard navigation, visible focus, and console errors.\nSave screenshots of the observed states and report what passed, failed, or could not be checked.\nDo not submit a real registration.',
+        },
+        links: [
+          {
+            label: 'Add a project MCP connection',
+            href: '/knowledge/connecting-custom-mcp-servers/',
+          },
+          {
+            label: 'Use a native Windows window instead',
+            href: '/knowledge/windows-desktop-control/',
+          },
+        ],
+      },
+      {
         id: 'question-bridge',
         question: 'How can agents ask for input?',
         paragraphs: [
@@ -442,15 +550,13 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
     ],
   },
-
-  // 5. Windows Desktop Control (Desktop Control)
   {
     slug: 'windows-desktop-control',
     category: 'desktop-control',
-    title: 'Windows Desktop Control, Window Grants & Input Safeguards',
-    shortTitle: 'Windows Desktop Control',
+    title: 'Let an agent work in a Windows app',
+    shortTitle: 'Windows desktop control',
     description:
-      'Attempt-scoped window grants, desktop visual indicators, physical mouse interruption, and native input lease safeguards.',
+      'Select a window for a task, understand its control status, and pause or cancel when you need your computer.',
     readingTime: '2 min read',
     sections: [
       {
@@ -491,49 +597,86 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Only one task can hold Jackalope’s desktop input lease at a time. A conflicting request cannot take over the active lease. Stop or cancel the current grant before granting another task control.',
         ],
       },
+      {
+        id: 'first-window-task',
+        question: 'How do I start and check a window task?',
+        paragraphs: [
+          'Begin with an inspection task, such as reading the labels in a sample app. Browser pages usually fit the built-in browser tools; native desktop control is for an explicitly selected Windows application window.',
+        ],
+        steps: [
+          'Open the application in your Windows session and select its window for the current task attempt. State the intended action and anything that requires your review.',
+          'Keep the target visible and watch the control status. If you need the computer, pause or cancel through the status bar.',
+          'After an interruption, review the current window before resuming. The agent needs a fresh snapshot because the UI may have changed.',
+          'Read the task result and inspect the application itself. A completed input action is not proof that an external service accepted or saved it.',
+        ],
+        links: [
+          {
+            label: 'Run a browser-only check',
+            href: '/knowledge/mcp-and-browser-automation/',
+          },
+        ],
+      },
     ],
   },
-
-  // 6. Troubleshooting Playbook (Troubleshooting)
   {
     slug: 'troubleshooting-and-diagnostics',
     category: 'troubleshooting',
-    title: 'Diagnostic Playbook, Worktree Locks & History Recovery',
-    shortTitle: 'Troubleshooting & Diagnostics',
+    title: 'Find the cause of a stopped or failed task',
+    shortTitle: 'Troubleshooting & diagnostics',
     description:
-      'Resolving missing CLI PATH on Windows, clearing stale Git index locks, recovering interrupted task history, and generating support reports.',
-    readingTime: '3 min read',
+      'Narrow a failure to setup, routing, execution, or recovery, then collect the right evidence for support.',
+    readingTime: '2 min read',
     sections: [
       {
         id: 'missing-cli-path',
-        question:
-          'Why does the desktop app report "CLI not found" and how do I fix Windows PATH inheritance?',
+        question: 'Did the task fail before the agent started?',
         paragraphs: [
-          'A frequent issue on Windows occurs when an agent CLI (like codex, claude, or grok) is installed via npm or cargo in a terminal session, but the desktop application was launched from the Windows Start menu or Taskbar before the system PATH environment variable was broadcast.',
-          'Applications launched by Windows Explorer inherit the environment variables that existed when the Explorer shell process started. If you recently modified your PATH in a terminal, restart the Jackalope desktop app so it inherits your updated User and System PATH variables.',
+          'Read the first launch error. “Executable not found” points to installation or discovery; an authentication error points to the selected account; a capacity or eligibility message points to routing. Repeated retries will not fix a missing executable or an expired sign-in.',
         ],
-        codeBox: {
-          title: 'Verifying Executables in PowerShell',
-          code: `# Verify the CLI executable is discoverable in your PATH
-Get-Command codex | Select-Object -ExpandProperty Source
-Get-Command claude | Select-Object -ExpandProperty Source
-
-# If installed via npm global, verify your npm prefix is in User PATH
-npm config get prefix
-# Should output: C:\\Users\\<user>\\AppData\\Roaming\\npm`,
-        },
+        links: [
+          {
+            label: 'Follow the Windows CLI discovery steps',
+            href: '/knowledge/fixing-cli-path-on-windows/',
+          },
+          {
+            label: 'Check account sign-in',
+            href: '/knowledge/multi-account-and-agents/',
+          },
+          {
+            label: 'Inspect routing and capacity',
+            href: '/knowledge/task-routing-and-quotas/',
+          },
+        ],
       },
       {
         id: 'stale-git-locks',
-        question: 'How do I diagnose a Git lock safely?',
+        question: 'Did workspace preparation fail?',
         paragraphs: [
-          'Inspect the affected checkout with git status and git worktree list. Confirm that no task, editor, or Git process is still using it before changing lock files. A linked worktree’s .git may be a file, not a directory.',
-          'Use git rev-parse --git-path index.lock from that checkout to locate its index lock. Remove only a lock you have confirmed is stale. Worktree locks can be intentional; do not bulk-delete locks or force-remove a checkout to clear an error.',
+          'Check the task’s target checkout and the exact Git error. A lock, a dirty target, and a branch mismatch require different fixes. Preserve changes and inspect worktree ownership before attempting cleanup.',
         ],
-        codeBox: {
-          title: 'Locate the affected lock',
-          code: 'git status --short\ngit worktree list\ngit rev-parse --git-path index.lock',
-        },
+        links: [
+          {
+            label: 'Locate and diagnose a Git lock',
+            href: '/knowledge/resolving-git-worktree-locks/',
+          },
+          {
+            label: 'Understand integration and cleanup checks',
+            href: '/knowledge/git-worktrees/',
+          },
+        ],
+      },
+      {
+        id: 'execution-failure',
+        question: 'The agent ran, but the task failed. What evidence helps?',
+        paragraphs: [
+          'Find the earliest substantive error in the result or command output. Later failures may only be consequences: for example, a test command cannot assess the code if dependencies never installed.',
+        ],
+        bullets: [
+          'Record the failing command, its working directory, exit status, and relevant error. Distinguish “could not run” from a test assertion failure.',
+          'Check which files changed before retrying. An unsuccessful task may still have useful work or an unfinished edit.',
+          'For browser or MCP failures, record the connection, requested action, and observed error. Remove tokens, private URLs, and personal data from anything you share.',
+          'For support, explain the expected result, what actually happened, and the smallest steps that reproduce it. Include the app version from the support report.',
+        ],
       },
       {
         id: 'history-recovery',
@@ -560,13 +703,11 @@ npm config get prefix
       },
     ],
   },
-
-  // 7. Dedicated How-To: Fixing Windows PATH (Troubleshooting)
   {
     slug: 'fixing-cli-path-on-windows',
     category: 'troubleshooting',
-    title: 'How to Fix "CLI Not Found" & Windows Environment PATH Inheritance',
-    shortTitle: 'Fix agent CLI not found on Windows',
+    title: 'Fix “CLI not found” on Windows',
+    shortTitle: 'Fix CLI discovery',
     description:
       'Step-by-step instructions for ensuring agent executables (Codex, Claude Code, Grok, OpenCode) are properly discovered by Jackalope on Windows.',
     readingTime: '2 min read',
@@ -575,50 +716,51 @@ npm config get prefix
         id: 'root-cause',
         question: 'Why does a CLI work in my terminal but fail inside the desktop app?',
         paragraphs: [
-          'When you install a tool using npm install -g or cargo install in an active Windows PowerShell window, that terminal process updates its local environment. However, applications already running - or applications launched by the Windows Explorer shell - do not immediately receive WM_SETTINGCHANGE environment broadcast signals.',
-          'As a result, Jackalope’s native process runner searches the older PATH that existed when Windows Explorer started. When Jackalope calls where codex or spawns the agent binary, the operating system returns Error 2: The system cannot find the file specified.',
+          'A running app keeps the environment it inherited when it started. Installing a CLI or changing PATH does not update every already-running process. A terminal may also define a shell alias or profile command that is unavailable to Jackalope’s process runner.',
+          'First check from a newly opened, non-administrator PowerShell window under the same Windows account. Locate the real executable or command shim, not just an alias. If the command fails there too, repair the CLI installation before troubleshooting Jackalope.',
         ],
+        codeBox: {
+          title: 'Find the command in a fresh PowerShell window',
+          code: 'Get-Command codex -All | Select-Object CommandType, Source\nwhere.exe codex\n# Replace codex with the CLI you installed.',
+        },
       },
       {
         id: 'npm-global-path',
-        question: 'How do I add npm and cargo global paths to Windows User PATH?',
+        question: 'How do I check the installed command directory?',
         paragraphs: [
-          'Ensure your user-specific npm and cargo bin directories are permanently listed in your User PATH variable:',
+          'Use the installation method you actually chose. For npm, inspect its configured global prefix; for another installer, locate its executable directory. Do not add every common package-manager directory just in case.',
+          'Open Windows “Edit environment variables for your account”, edit the User Path, and add the verified directory if it is missing. Keep existing entries. The commands below inspect values; they do not change PATH.',
         ],
         codeBox: {
-          title: 'Adding Directories to User PATH (PowerShell)',
-          code: `# Check your current npm global prefix
-$npmPrefix = npm config get prefix
-Write-Host "npm path: $npmPrefix"
-
-# Standard paths that should exist in your User PATH:
-# npm:   %APPDATA%\\npm
-# cargo: %USERPROFILE%\\.cargo\\bin
-# pnpm:  %LOCALAPPDATA%\\pnpm
-
-# Verify they exist in your current user environment
-[Environment]::GetEnvironmentVariable("Path", "User") -split ";"`,
+          title: 'Inspect npm and User PATH',
+          code: 'npm config get prefix\n[Environment]::GetEnvironmentVariable("Path", "User") -split ";"',
         },
       },
       {
         id: 'desktop-refresh',
-        question: 'How do I force Jackalope to reload system environment variables?',
+        question: 'How do I verify the repair?',
         paragraphs: [
-          'After modifying environment variables or installing a new CLI adapter:',
-          '1. Close the Jackalope desktop app completely (check system tray to ensure background processes are terminated).',
-          '2. If you installed the CLI in an elevated terminal, ensure your normal user account has execution permissions on the target directory.',
-          '3. Re-launch Jackalope. On startup, the native coordinator scans system PATH directories and refreshes CLI discovery in Agents. Detection alone does not prove valid sign-in.',
+          'Save work before restarting the app. Closing a terminal alone does not refresh Jackalope’s inherited environment.',
+        ],
+        steps: [
+          'Fully quit Jackalope, including its tray instance, and reopen it after saving the persistent PATH change.',
+          'Check discovery in Agents → Configuration. If the app still inherits an old environment, save your other work and sign out of Windows, then sign back in.',
+          'Select the intended account and run a small task. If discovery succeeds but the provider rejects the request, continue with account setup rather than changing PATH again.',
+        ],
+        links: [
+          {
+            label: 'Validate the account after discovery',
+            href: '/knowledge/multi-account-and-agents/',
+          },
         ],
       },
     ],
   },
-
-  // 8. Dedicated How-To: Resolving Git Locks (Troubleshooting)
   {
     slug: 'resolving-git-worktree-locks',
     category: 'troubleshooting',
-    title: 'How to Clear Stale .git/index.lock & Worktree Lockfiles',
-    shortTitle: 'Resolving Git Worktree Locks',
+    title: 'Resolve a Git lock without losing work',
+    shortTitle: 'Resolve Git locks',
     description:
       'How to safely diagnose, remove, and prevent stale Git index locks and orphaned worktrees left by abnormal system termination.',
     readingTime: '2 min read',
@@ -627,8 +769,8 @@ Write-Host "npm path: $npmPrefix"
         id: 'what-are-git-locks',
         question: 'What causes "Unable to create .git/index.lock: File exists" errors?',
         paragraphs: [
-          'Git creates atomic lockfiles (such as index.lock, HEAD.lock, or refs/heads/<branch>.lock) to guarantee that only one process writes to the repository index at a time. Under normal conditions, Git deletes this lockfile within milliseconds once the transaction finishes.',
-          'However, if an operating system reboots unexpectedly, an agent process is killed forcefully through Task Manager, or an antivirus process holds a file handle open on Windows, Git cannot clean up the lockfile. Any subsequent Git command aborts immediately.',
+          'Git uses lockfiles while updating repository data. A lock may mean an operation is still active; after an interrupted write, a stale file may remain. The exact error identifies which operation and path were blocked.',
+          'An index.lock and a locked worktree registration are different. A registration can be deliberately locked to protect a checkout on a temporarily unavailable drive. The existence or age of a lock alone does not establish that it is safe to remove.',
         ],
       },
       {
@@ -650,18 +792,38 @@ Write-Host "npm path: $npmPrefix"
           'Avoid overlapping Git operations in the same checkout. Close tools holding the affected files after saving work, then retry. Keep independent tasks in separate worktrees and investigate recurring errors before changing system settings.',
         ],
       },
+      {
+        id: 'after-unlock',
+        question: 'What should I check after resolving the lock?',
+        paragraphs: [
+          'Only remove the exact lock after confirming its owning operation has ended. Do not use a recursive “delete all lockfiles” command. If ownership is uncertain, leave it in place while you investigate.',
+        ],
+        steps: [
+          'Run git status in the affected checkout and inspect remaining changes. Retry the single operation that was blocked.',
+          'If the lock returns, identify what is writing to that checkout: an agent, editor, Git command, or another tool. Repeated deletion hides the underlying conflict.',
+          'If the problem is a missing worktree folder, inspect git worktree list --porcelain and the registration’s lock reason. Use Project → Worktrees to review eligible cleanup; pruning is not a remedy for an active index lock.',
+        ],
+        links: [
+          {
+            label: 'Review worktree cleanup safeguards',
+            href: '/knowledge/git-worktrees/',
+          },
+          {
+            label: 'Prepare a support report if the error persists',
+            href: '/knowledge/troubleshooting-and-diagnostics/',
+          },
+        ],
+      },
     ],
   },
-
-  // 9. Dedicated How-To: Connecting Custom MCP Servers (MCP)
   {
     slug: 'connecting-custom-mcp-servers',
     category: 'mcp',
-    title: 'How to Connect Custom MCP Servers (stdio & SSE) with Tool Gating',
-    shortTitle: 'Connect custom MCP servers',
+    title: 'Connect a custom MCP server',
+    shortTitle: 'Connect MCP tools',
     description:
-      'Step-by-step instructions for adding custom Model Context Protocol tools, configuring stdio/SSE transports, and enforcing project tool gating.',
-    readingTime: '1 min read',
+      'Add local commands or remote HTTP endpoints, choose the project and agent, and verify a real tool request.',
+    readingTime: '2 min read',
     sections: [
       {
         id: 'mcp-overview',
@@ -674,14 +836,26 @@ Write-Host "npm path: $npmPrefix"
         id: 'stdio-setup',
         question: 'How do I add a local stdio server?',
         paragraphs: [
-          'In MCP → Connections, add a stdio connection with the executable and arguments documented by the server. Use environment references for credentials where supported; verify the command exists and review what it can access before testing it.',
+          'Choose Local command in the connection form. Use the executable and arguments from the server’s own documentation; installing a package does not tell Jackalope which resources it should expose.',
         ],
+        steps: [
+          'Give the connection a recognizable Name and unique Identifier. Choose its project or global scope and eligible agents.',
+          'Put only the executable in Command. Add each command-line argument separately under Arguments; do not paste a whole shell command into Command.',
+          'Configure the environment values the server requires. Check that the executable is discoverable under the same user account as Jackalope.',
+          'Save the connection and use its probe. Then select it for a small task that requests a specific, read-only tool action.',
+        ],
+        callout: {
+          kind: 'note',
+          text: 'A server process can start successfully without exposing the tool you need. Confirm the requested tool returns the expected data before giving it a larger task.',
+        },
       },
       {
         id: 'sse-setup',
-        question: 'How do I add a remote MCP server?',
+        question: 'How do I add a remote connection?',
         paragraphs: [
-          'Use the server’s documented HTTP or SSE endpoint and configure its authentication. Codex direct delivery supports HTTP; Claude Code supports HTTP and SSE. On-demand discovery supports HTTP and stdio, not SSE.',
+          'Choose Remote URL and use the server’s documented HTTP MCP endpoint. A product homepage, dashboard URL, or ordinary REST endpoint is not necessarily an MCP endpoint. Configure the authentication and client options the server documents.',
+          'Codex direct delivery supports HTTP; Claude Code supports HTTP and legacy SSE. On-demand discovery supports HTTP and stdio, not SSE. The form retains Legacy SSE for existing SSE connections; new connections use Local command or Remote URL.',
+          'Use the probe for configured header or environment authentication. For a CLI-owned OAuth session, complete sign-in in the correct CLI account. Check redirects and expired authentication if the endpoint returns a login page instead of a protocol response.',
         ],
       },
       {
@@ -691,18 +865,39 @@ Write-Host "npm path: $npmPrefix"
           'Review project connections and use Customize task to select those the task needs. Check CLI-global configuration separately. A connection selection is not a guarantee that the agent has no other tools or local permissions.',
         ],
       },
+      {
+        id: 'verify-connection',
+        question: 'How do I tell whether the task can use the connection?',
+        paragraphs: [
+          'Ask for one known record or a read-only list from the connected service. Specify the connection name and expected kind of result, then inspect the task’s tool result. An agent saying it has access is not a connection test.',
+        ],
+        bullets: [
+          '“Command not found”: verify the local executable and its arguments.',
+          'Authentication failure: check the server credential or the bound CLI account, including its permissions.',
+          'Connection probes successfully but no tool appears: review project scope, task selection, agent eligibility, and transport support.',
+          'Tool returns the wrong data: check the server’s account, workspace, resource scope, and request arguments.',
+        ],
+        links: [
+          {
+            label: 'Check agent transport support',
+            href: '/knowledge/mcp-and-browser-automation/',
+          },
+          {
+            label: 'Repair local command discovery',
+            href: '/knowledge/fixing-cli-path-on-windows/',
+          },
+        ],
+      },
     ],
   },
-
-  // 10. Dedicated Feature Guide: Recurring Schedules (Workflows)
   {
     slug: 'recurring-schedules-and-automation',
     category: 'workflows',
-    title: 'Recurring Task Schedules, Cron Intervals & Automation',
-    shortTitle: 'Schedule recurring coding-agent tasks',
+    title: 'Set up a recurring task',
+    shortTitle: 'Recurring tasks',
     description:
-      'Configuring scheduled code audits, security scans, dependency updates, and recurring maintenance tasks using cron expressions and time cadences.',
-    readingTime: '2 min read',
+      'Create a repeatable check, choose a timezone and missed-run policy, and inspect each scheduled result.',
+    readingTime: '3 min read',
     sections: [
       {
         id: 'why-schedules',
@@ -711,6 +906,23 @@ Write-Host "npm path: $npmPrefix"
           'Certain engineering tasks should happen proactively rather than waiting for user requests: daily dependency vulnerability checks, nightly test suite refactors, documentation drift scans, or automated codebase health reports.',
           'Jackalope keeps recurring work with its project, instructions, account, and execution target. Each agent run has its own result and review history. Choose the checks in your instructions and inspect their evidence when the task returns.',
         ],
+      },
+      {
+        id: 'first-schedule',
+        question: 'Try it: a weekday documentation check',
+        paragraphs: [
+          'Start with a report-only task so you can inspect its output before giving recurring work permission to edit. In Tasks → Recurring, create a schedule for the intended project.',
+        ],
+        steps: [
+          'Choose the agent/account and execution target. Write a narrow brief that identifies the files to inspect and the expected report.',
+          'Select Weekdays, a local time, and the schedule timezone. Check the missed-run policy and choose skip or a single catch-up deliberately.',
+          'Save the schedule paused and review its configuration. Enable automatic runs when you are ready, with Jackalope open and the computer awake.',
+          'After a run, inspect its outcome and evidence. Pause the schedule before changing a brief that repeatedly fails or produces noise.',
+        ],
+        codeBox: {
+          title: 'Example recurring brief',
+          code: 'Compare README setup instructions with package scripts and the documented development workflow.\nReport outdated commands with file references and a suggested correction.\nDo not edit, commit, push, install dependencies, or contact external services.\nIf nothing changed, say which files and scripts you checked.',
+        },
       },
       {
         id: 'cadence-options',
@@ -729,19 +941,51 @@ Write-Host "npm path: $npmPrefix"
           'For lighter monitoring, choose to notify about committed local branch/path changes or run an agent only after a change. Baseline and unchanged checks make no model calls and do not fetch from remotes.',
         ],
       },
+      {
+        id: 'missed-run',
+        question: 'Why did my scheduled check not produce an agent result?',
+        paragraphs: [
+          'Check that the schedule is enabled, the app was open, and the computer was awake at the due time in the selected timezone. Then inspect the saved outcome for eligibility, capacity, or overlap failures.',
+          'A local change monitor can legitimately produce no agent result when the watched committed branch/path is unchanged. It does not fetch remote branches or treat an uncommitted edit as a new remote change. Choose an always-run agent task when you need an inspection regardless of changes.',
+        ],
+        links: [
+          {
+            label: 'Check account capacity and eligibility',
+            href: '/knowledge/task-routing-and-quotas/',
+          },
+          {
+            label: 'Investigate a failed run',
+            href: '/knowledge/troubleshooting-and-diagnostics/',
+          },
+        ],
+      },
     ],
   },
-
-  // 11. Dedicated Feature Guide: Task Composer & Effort Levels (Workflows)
   {
     slug: 'task-composer-and-effort-levels',
     category: 'workflows',
-    title: 'Task Composer, Automatic Guidance & Effort Levels',
-    shortTitle: 'Coding-agent tasks & effort levels',
+    title: 'Write, run, and review your first task',
+    shortTitle: 'Your first task',
     description:
       'Describe outcomes, match project guidance, choose effort, and review changes with their saved evidence.',
-    readingTime: '1 min read',
+    readingTime: '2 min read',
     sections: [
+      {
+        id: 'first-task',
+        question: 'Try it: improve one empty state',
+        paragraphs: [
+          'Use a small visible change for a first task. Describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
+        ],
+        codeBox: {
+          title: 'Example task brief',
+          code: 'On the saved-items page, show a helpful empty state when the list has no items.\nExplain what belongs here and include a link to the existing browse page.\nUse the shared controls and theme tokens. Preserve loading and error states.\nCheck the empty and populated states, keyboard focus, and a narrow layout.\nReport changed files, checks actually run, and any remaining uncertainty.',
+        },
+        steps: [
+          'Choose the project and confirm the target branch or workspace. A separate worktree is useful when other work is in progress.',
+          'Pick an effort level and review Customize task for agent, account, context, and tools. Include a reachable preview URL when you expect browser checks.',
+          'Start the task and respond if it asks for missing information. Read the result and actual checks before deciding whether it is ready to integrate.',
+        ],
+      },
       {
         id: 'effort-tiers',
         question: 'What do Quick, Balanced, and Thorough change?',
@@ -760,25 +1004,53 @@ Write-Host "npm path: $npmPrefix"
       },
       {
         id: 'pierre-diffs',
-        question: 'How does Pierre Diffs streamline code review in Jackalope?',
+        question: 'What should I inspect before integrating a result?',
         paragraphs: [
-          'Reviewing AI-generated code should be comfortable, visual, and fast. Jackalope integrates Pierre Diffs for rich, syntax-highlighted side-by-side and unified diff views.',
-          'You can inspect changes file by file, collapse unmodified context lines, inspect terminal test receipts, and verify that no unintended files were modified before clicking Apply.',
+          'Open the result and review changes file by file in the unified or side-by-side diff. Compare the patch with your requested outcome, including accidental changes outside the scope.',
+          'Read the saved command output and checks. Confirm they ran in the intended checkout and exercised the changed behavior. A successful build does not establish that a browser flow or native application worked.',
+          'For worktree tasks, Review & merge prepares the combined patch and checks integration preconditions. Review that combined result before merging it into the target branch.',
+        ],
+        links: [
+          {
+            label: 'Understand Review & merge',
+            href: '/knowledge/git-worktrees/',
+          },
         ],
       },
     ],
   },
-
-  // 12. Dedicated Feature Guide: Theme Harmonies & Atmosphere (Themes)
   {
     slug: 'theme-editor-and-atmosphere',
     category: 'themes',
-    title: 'Theme Harmonies, Atmosphere Tuning & Mascot Reactions',
-    shortTitle: 'Themes & Atmosphere',
+    title: 'Make Jackalope feel like your workspace',
+    shortTitle: 'Appearance & themes',
     description:
-      'Customizing Single, Duo, and Trio color harmonies, adjusting the 64-step atmosphere slider, and understanding the five mascot companion activity moods.',
-    readingTime: '1 min read',
+      'Preview colors, appearance, and atmosphere, keep a comfortable theme, and understand companion activity.',
+    readingTime: '2 min read',
     sections: [
+      {
+        id: 'try-a-theme',
+        question: 'Try it: build a comfortable reading theme',
+        paragraphs: [
+          'Open the appearance picker and start with the mode you use most often. Make one change at a time so you can judge its effect on real content.',
+        ],
+        steps: [
+          'Choose light, dark, or automatic appearance and an accent you can recognize in links and selected controls.',
+          'Start with Single harmony and low atmosphere. Preview Duo or Trio if you want more color, then check a dense task list and a code diff.',
+          'Adjust atmosphere while checking text, borders, selected states, and keyboard focus. Keep theme saves the preview; cancel restores the previous choice.',
+          'If motion distracts you, use the companion animation preference and your operating system’s reduced-motion setting. Activity and notices remain available.',
+        ],
+        callout: {
+          kind: 'tip',
+          text: 'You can ask the helper to propose a theme in plain language. Review its preview in the same way before keeping it.',
+        },
+        links: [
+          {
+            label: 'Ask the helper for an appearance change',
+            href: '/knowledge/ask-jackalope/#try-a-question',
+          },
+        ],
+      },
       {
         id: 'harmonies',
         question: 'What are Single, Duo, and Trio color harmonies?',
@@ -789,7 +1061,7 @@ Write-Host "npm path: $npmPrefix"
       },
       {
         id: 'atmosphere-slider',
-        question: 'What does the 64-step Atmosphere slider control?',
+        question: 'What does the Atmosphere slider change?',
         paragraphs: [
           'Atmosphere controls the color saturation and visual depth of background surfaces, sidebars, and elevation layers. At low atmosphere (8–12), the interface is whisper-quiet and neutral. At higher atmosphere (up to 64), your chosen accent tint gently permeates cards, elevated surfaces, and window glass.',
         ],

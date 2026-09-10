@@ -109,9 +109,12 @@ Access-link requests are capped at one per minute and ten per day. Members can
 create at most 25 invitations per day, including withdrawn invitations.
 
 Newsletter consent is optional and unchecked. D1 accepts the admission request
-before attempting newsletter delivery. Consented addresses sync through the saved
-Sequenzy form with its double-opt-in and unsubscribe behavior. Sync has independent
-bounded retries. Existing active subscribers must be imported only from the exact
+before attempting newsletter synchronization. Consented addresses sync through
+Sequenzy's subscriber API with the signup choice recorded as confirmed opt-in;
+this path does not send a separate newsletter confirmation or start a sequence.
+The email-only website fallback uses a saved form with its own provider-managed
+confirmation settings. Sync has independent bounded retries. Existing active
+subscribers must be imported only from the exact
 Jackalope waitlist audience, never the company's entire subscriber database.
 
 After five failures, inspect the sender/provider configuration first. The private

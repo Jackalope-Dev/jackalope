@@ -22,6 +22,8 @@ const comparisons: Comparison[] = [
     sources: [
       { label: 'Superset product overview', href: 'https://superset.sh/' },
       { label: 'Superset documentation', href: 'https://docs.superset.sh/' },
+      { label: 'Superset automations', href: 'https://docs.superset.sh/automations' },
+      { label: 'Superset remote access', href: 'https://docs.superset.sh/remote-access' },
     ],
     rows: [
       {
@@ -54,9 +56,11 @@ const comparisons: Comparison[] = [
         links: [
           { label: 'Read Superset’s product overview', href: 'https://superset.sh/' },
           {
-            label: 'Read the workspace and automation documentation',
+            label: 'Browse Superset’s documentation',
             href: 'https://docs.superset.sh/',
           },
+          { label: 'Superset automations', href: 'https://docs.superset.sh/automations' },
+          { label: 'Superset remote access', href: 'https://docs.superset.sh/remote-access' },
         ],
       },
       {
@@ -76,6 +80,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Accounts, automation, and cost',
         paragraphs: [
+          'Superset’s automation documentation distinguishes a created workspace from a successful agent outcome: run history records dispatch, while the workspace contains the resulting work. It also documents failed dispatch to offline hosts. Include both the scheduled run and the agent’s actual result when evaluating recurring work.',
           'For either workspace, list the agents and accounts you actually need before choosing. In Jackalope, provider support differs by adapter, and a catalog entry does not by itself mean task execution is implemented. Use the compatibility page to check your required agent and tool flow.',
           'Jackalope uses your installed agents and provider access; model usage is not included. Its public price has not been announced. Separate workspace charges, model usage, and any remote compute when estimating cost. For unattended local tasks, include the practical requirement that the host and required services remain available.',
         ],
@@ -117,6 +122,8 @@ const comparisons: Comparison[] = [
     sources: [
       { label: 'Orca product overview', href: 'https://www.onorca.dev/' },
       { label: 'What is Orca? Official documentation', href: 'https://www.onorca.dev/docs' },
+      { label: 'Orca Design Mode', href: 'https://www.onorca.dev/docs/browser/design-mode' },
+      { label: 'Orca mobile companion', href: 'https://www.onorca.dev/docs/mobile' },
     ],
     rows: [
       {
@@ -149,6 +156,8 @@ const comparisons: Comparison[] = [
         links: [
           { label: 'Explore Orca’s published features', href: 'https://www.onorca.dev/' },
           { label: 'Read Orca’s workspace model', href: 'https://www.onorca.dev/docs' },
+          { label: 'Orca Design Mode', href: 'https://www.onorca.dev/docs/browser/design-mode' },
+          { label: 'Orca mobile companion', href: 'https://www.onorca.dev/docs/mobile' },
         ],
       },
       {
@@ -175,6 +184,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Choose around your daily loop',
         paragraphs: [
+          'Orca’s mobile companion documentation labels it beta and describes pairing to a desktop, with status, recent output, and selected controls available from a phone. Check the required host connection and the actions you need before treating mobile access as a replacement for the desktop review workflow.',
           'Our assessment: Orca deserves consideration if a pane-based development environment, direct visual feedback to agents, or access to remote work is essential. Jackalope is worth evaluating if you want project context, task continuity, and combined review to organize your local agent work.',
           'Keep account requirements in the trial as well. Jackalope supports named agent profiles where the adapter permits them, but provider coverage differs. Model access comes from your own provider, and public Jackalope pricing has not been announced. Start with a disposable project and one familiar agent before moving a demanding workflow.',
         ],
@@ -214,6 +224,10 @@ const comparisons: Comparison[] = [
     sources: [
       { label: 'Conductor product overview', href: 'https://www.conductor.build/' },
       { label: 'Conductor documentation', href: 'https://www.conductor.build/docs' },
+      {
+        label: 'Conductor multiplayer',
+        href: 'https://www.conductor.build/docs/cloud/collaboration',
+      },
     ],
     rows: [
       {
@@ -249,6 +263,10 @@ const comparisons: Comparison[] = [
             href: 'https://www.conductor.build/',
           },
           { label: 'Read Conductor’s introduction', href: 'https://www.conductor.build/docs' },
+          {
+            label: 'Conductor multiplayer',
+            href: 'https://www.conductor.build/docs/cloud/collaboration',
+          },
         ],
       },
       {
@@ -261,6 +279,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Choose the execution environment before the interface',
         paragraphs: [
+          'Conductor’s multiplayer documentation describes organization members opening shared workspaces and chats, seeing live output and presence, and reassigning work to teammates. Its direct workspace link is for organization members. That is a concrete human handoff flow to test if collaboration is your reason for choosing cloud execution.',
           'List what your project needs to run: a database, private packages, environment variables, a browser preview, and any platform-specific tooling. Then decide which of those can move to another environment. A remote workspace is useful only if it can reproduce the conditions under which your changes need to work.',
           'For a local Jackalope trial, start with a working checkout and establish a baseline build before asking an agent to edit it. Give each task clear setup and validation instructions. Local execution keeps the files on the host, but agents may still send code and context to their model providers.',
         ],
@@ -309,6 +328,8 @@ const comparisons: Comparison[] = [
     sources: [
       { label: 'Emdash product overview', href: 'https://emdash.com/' },
       { label: 'Emdash official documentation', href: 'https://emdash.com/docs' },
+      { label: 'Emdash remote development', href: 'https://emdash.com/docs/remote-development' },
+      { label: 'Emdash MCP library', href: 'https://emdash.com/docs/library/mcp' },
     ],
     rows: [
       {
@@ -341,6 +362,11 @@ const comparisons: Comparison[] = [
         links: [
           { label: 'Explore Emdash’s product', href: 'https://emdash.com/' },
           { label: 'Read Emdash’s capability overview', href: 'https://emdash.com/docs' },
+          {
+            label: 'Emdash remote development',
+            href: 'https://emdash.com/docs/remote-development',
+          },
+          { label: 'Emdash MCP library', href: 'https://emdash.com/docs/library/mcp' },
         ],
       },
       {
@@ -353,6 +379,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Tool availability is a contract to check',
         paragraphs: [
+          'Emdash’s MCP library writes configuration into the selected agents’ native config files, making those connections available in sessions outside Emdash too. Jackalope’s project selection is a different delivery model. When evaluating either, check whether a tool should follow the account everywhere or be selected for a particular project and task.',
           'Jackalope’s MCP support depends on the selected agent adapter and connection. It manages project-selected tools centrally, but that does not mean every provider supports the same delivery method or interaction. Check compatibility for the exact agent and service combination you plan to use.',
           'Use a harmless read operation in your first trial. Confirm which project supplied the connection, whether the agent can discover the relevant capability, and what happens when access fails. Keep credentials and production write permissions out of a comparison exercise until you understand the flow.',
         ],
@@ -499,6 +526,8 @@ const comparisons: Comparison[] = [
     sources: [
       { label: 'Worktree product overview', href: 'https://tryworktree.com/' },
       { label: 'Worktree documentation', href: 'https://tryworktree.com/docs' },
+      { label: 'Worktree cloud workspaces', href: 'https://tryworktree.com/docs/cloud-workspaces' },
+      { label: 'Worktree providers and MCP', href: 'https://tryworktree.com/docs/connections' },
     ],
     rows: [
       {
@@ -534,6 +563,11 @@ const comparisons: Comparison[] = [
             label: 'Read the Local, Shared Local, and Cloud documentation',
             href: 'https://tryworktree.com/docs',
           },
+          {
+            label: 'Worktree cloud workspaces',
+            href: 'https://tryworktree.com/docs/cloud-workspaces',
+          },
+          { label: 'Worktree providers and MCP', href: 'https://tryworktree.com/docs/connections' },
         ],
       },
       {
@@ -546,6 +580,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Decide who needs the execution environment',
         paragraphs: [
+          'Worktree’s connection documentation says Cloud and shared Local Threads accept API connections, while supported personal OAuth connections remain available in private Local Threads. Check this distinction if your current workflow depends on a subscription sign-in; do not assume that sharing a workspace preserves the same authentication option.',
           'If the same developer always runs and reviews the project, a local workflow may be sufficient. If a teammate needs to continue while that developer is offline, the lifetime and accessibility of the environment become part of the product choice. Write down those requirements before trialing tools.',
           'In Jackalope, repositories and task workspaces live on your computer. Agents and connected services can still transmit context according to their configuration. Local storage does not imply that no data reaches a provider, and separate account profiles do not isolate access to local files.',
         ],
@@ -689,6 +724,14 @@ const comparisons: Comparison[] = [
     sources: [
       { label: 'Hermes Agent by Nous Research', href: 'https://hermes-agent.nousresearch.com/' },
       { label: 'Hermes Agent documentation', href: 'https://hermes-agent.nousresearch.com/docs' },
+      {
+        label: 'Hermes memory system',
+        href: 'https://hermes-agent.nousresearch.com/docs/user-guide/features/memory',
+      },
+      {
+        label: 'Hermes tools and execution backends',
+        href: 'https://hermes-agent.nousresearch.com/docs/user-guide/features/tools',
+      },
     ],
     rows: [
       {
@@ -724,6 +767,14 @@ const comparisons: Comparison[] = [
             label: 'Read the official Hermes documentation',
             href: 'https://hermes-agent.nousresearch.com/docs',
           },
+          {
+            label: 'Hermes memory system',
+            href: 'https://hermes-agent.nousresearch.com/docs/user-guide/features/memory',
+          },
+          {
+            label: 'Hermes tools and execution backends',
+            href: 'https://hermes-agent.nousresearch.com/docs/user-guide/features/tools',
+          },
         ],
       },
       {
@@ -736,6 +787,7 @@ const comparisons: Comparison[] = [
       {
         title: 'Memory and project context are related but different',
         paragraphs: [
+          'Hermes documents bounded memory files that are loaded as a snapshot at the start of a session. Updates persist for later sessions, and separate agents should use separate profiles. Compare those ownership and update rules with the project guidance you want a coding task to receive, instead of treating every form of persistent context as interchangeable.',
           'A useful comparison asks what information should persist, who controls it, and how it affects the next task. Personal preferences, project architecture, a reusable procedure, and evidence from a failed attempt are different kinds of context. Putting them all in one conversation can make later work harder to understand.',
           'Jackalope keeps project context and task history connected to the relevant project and outcome. When trialing it, return to an unfinished task after completing unrelated work. Check that the original request, account, and previous result remain identifiable, and that the agent receives the instructions appropriate to that project.',
         ],

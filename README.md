@@ -1,80 +1,102 @@
+<p align="center">
+  <img src="apps/desktop/public/app-icon.png" alt="Jackalope logo" width="96" height="96" />
+</p>
+
 # Jackalope
 
-Jackalope brings coding agents, tasks, Git worktrees and review into one cross-platform
-workspace. Use your installed agent CLIs and existing sign-ins, keep changes
-isolated, and review the result before integrating it.
+A desktop workspace for coding agents. Bring your installed agents and existing
+sign-ins, run tasks in parallel Git worktrees, and review changes before merging.
 
-**Prerelease.** The first launch is planned for macOS, Windows, and Linux. Signed update,
-clean-profile and external beta acceptance remain in progress; see the
-[current status](docs/STATUS.md) and [release gates](docs/RELEASE.md).
+[Website](https://jackalope.dev/) · [App tour](https://jackalope.dev/tour/) ·
+[User guides](https://jackalope.dev/knowledge/) · [Documentation](docs/README.md) ·
+[Contributing](CONTRIBUTING.md) · [Apache-2.0](LICENSE)
 
-## What works today
+**Prerelease · coming soon for macOS, Windows and Linux.** You can build from source
+today. Signed installers and platform acceptance remain in progress; see
+[current status](docs/STATUS.md) and [release requirements](docs/CROSS-PLATFORM-RELEASES.md).
+Joining the [waitlist](https://jackalope.dev/#newsletter) is optional for contributors.
 
-- Project setup and saved ideas, with list and board views over the same tasks.
-- Codex, Claude Code and Grok execution, account profiles, questions, stop and supported continuation.
-- Parallel queues, isolated worktrees, saved checks, patch review and guarded Git integration.
-- Recurring tasks with timezones, missed-run policy and pause controls while the app runs.
-- Project-scoped MCP connections and per-task selection for supported adapters.
-- Task-owned Chromium sessions and a local codebase map with bounded import resolution.
-- Reported usage, connected capacity, persistent history and recovery notices.
-- Light/dark/automatic appearance, shared theme controls and local fonts.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/website/public/media/tasks.png" />
+  <source media="(prefers-color-scheme: light)" srcset="apps/website/public/media/tasks-light.png" />
+  <img src="apps/website/public/media/tasks.png" alt="Jackalope task workspace showing work awaiting input, results ready for review, running tasks and saved ideas" width="1440" />
+</picture>
 
-Automatic agent/model/account routing and bounded quota handoff are implemented;
-see [routing behavior and limits](docs/USAGE-AND-ROUTING.md).
-Remote execution, monetary budgets and broader recovery remain planned.
-Developer builds have no configured reporting endpoint. Official builds can
-configure opt-out usage reporting and explicit feedback through the optional
-service; see [monitoring and privacy](docs/BETA-MONITORING.md).
-Read [feature coverage](docs/FEATURE-COMPLETION.md) for adapter limits.
-Worktrees isolate Git changes, not the privileges of an agent or its tools.
+*Sample workspace with fictional projects and activity. [Watch the tour](https://jackalope.dev/tour/).*
+
+## What you can do
+
+- Work with Codex, Claude Code, Grok Build, OpenCode and Antigravity, with
+  [provider-specific capabilities and limits](docs/AGENT-SUPPORT.md).
+- Organize projects, tasks and saved ideas, then run parallel queues in isolated worktrees.
+- Respond to agent questions, inspect results, run checks and review patches before integration.
+- Connect MCP tools and task-owned browser sessions, and schedule recurring local work.
+- Keep project guidance, codebase context, reported usage and recoverable task history together.
+- Choose accounts and models, with capacity-aware routing and bounded quota handoff.
+
+Agents use your own provider accounts and may incur provider charges. Worktrees
+isolate Git changes, not the operating-system privileges of agents or tools.
+Remote execution, monetary budgets and team collaboration remain future work;
+see the [roadmap](docs/ROADMAP.md).
 
 ## Run from source
 
-Use Node 24.18+ within Node 24 and the pnpm version pinned in package.json.
-Native builds additionally need Rust 1.98.1, MSVC C++ build tools and WebView2 on
-Windows. Install and sign in to the agent CLI you want to use.
+Install Node 24.18+ within Node 24 and pnpm 10.11.0. Native development also needs
+Rust 1.98.1 and your platform's [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
+On Windows, install the MSVC C++ build tools and WebView2. Install and sign in to
+the supported agent CLI you want to use.
 
-~~~powershell
+```sh
+git clone https://github.com/Jackalope-Dev/jackalope.git
+cd jackalope
 pnpm install --frozen-lockfile
 pnpm tauri dev
-~~~
+```
 
-For UI development, pnpm dev starts the desktop browser preview on port 5173;
-it cannot execute native tasks. /design-lab.html contains component fixtures.
-pnpm dev:website starts the marketing site on port 5180.
+For interface development, run `pnpm dev` for the desktop browser preview or
+`pnpm dev:website` for the website. Run them in separate terminals on ports 5173
+and 5180. The desktop browser preview cannot execute native tasks.
 
-The website statically prerenders the product tour plus focused discovery pages for
-parallel coding agents, Git worktrees, Codex, Claude Code, Grok, OpenCode, project
-context, recurring tasks and agent-code review. Route metadata, structured data,
-the sitemap, RSS and LLM-readable indexes are generated from the same content map.
+Contributor builds do not require a Jackalope cloud account, deployment secrets,
+or a reporting endpoint. Official early-access builds can require approved
+membership. See [privacy and reporting](docs/BETA-MONITORING.md).
 
-Run pnpm verify for formatting/lint, documentation links, frontend builds,
-server checks and native unit tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for
-prerequisites, secret checks and rendered/native verification. Builds do not
-substitute for installed-app acceptance.
+Run `pnpm verify` before submitting changes. [CONTRIBUTING.md](CONTRIBUTING.md)
+covers the toolchain, focused tests, secret checks and pull-request workflow.
 
-## Repository map
+## Find your way around
 
-| Location | Responsibility |
+| Location | What lives here |
 | --- | --- |
-| apps/desktop/src | React UI, state and typed native clients |
-| apps/desktop/src-tauri | Native task runtime, coordination, Git, browser and filesystem access |
-| apps/website | Marketing site, screenshots and walkthrough |
-| apps/server | Optional Cloudflare ingestion and R2 update service |
-| packages/brand | Shared theme tokens, vector geometry and fonts |
-| scripts | Verification, notices and release preparation |
+| [apps/desktop](apps/desktop) | React interface and Tauri/Rust task runtime |
+| [apps/website](apps/website) | Product website, guides and sample media |
+| [apps/server](apps/server) | Optional account, access, feedback and update service |
+| [packages](packages) | Shared branding, knowledge and packages |
+| [docs](docs/README.md) | User workflows, architecture and contributor reference |
+| [scripts](scripts) | Verification, dependency notices and release tooling |
 
-Start with [Getting started](docs/GETTING-STARTED.md),
-[Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md) or
-[the backlog](docs/TODO.md). Operators can read the
-[server setup](apps/server/README.md) and [release guide](docs/RELEASE.md).
+Start with [your first task](docs/GETTING-STARTED.md),
+[the architecture](docs/ARCHITECTURE.md), or [contributor priorities](docs/TODO.md).
+Fork operators should read [deployment and source boundaries](docs/DEPLOYMENT-AND-SOURCE.md)
+before enabling signups or publishing a build.
 
-## Participate
+## Get involved
 
 [Report a bug or request a feature](https://github.com/Jackalope-Dev/jackalope/issues/new/choose),
-or read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
-Review and redact diagnostics before attaching them. Report vulnerabilities to
-**security@jackalope.dev**; see [SECURITY.md](SECURITY.md).
+join the [community](https://www.reddit.com/r/JackalopeDev/), or send a focused pull
+request. Please follow our [community guidelines](CODE_OF_CONDUCT.md).
+For private support, email [contact@jackalope.dev](mailto:contact@jackalope.dev).
+Report vulnerabilities privately to [security@jackalope.dev](mailto:security@jackalope.dev);
+see [SECURITY.md](SECURITY.md).
 
-Licensed under [Apache-2.0](LICENSE). See the [dependency inventory](docs/DEPENDENCIES.md)
-for third-party packages and bundled font notices.
+## License and privacy
+
+Project-authored code, documentation and included media use [Apache-2.0](LICENSE),
+except where a separate notice applies. Third-party packages and fonts retain
+their own licenses. The copyright license does not grant trademark rights or
+imply endorsement. See [licensing and redistribution](docs/LICENSING.md) and
+the [dependency inventory](docs/DEPENDENCIES.md).
+
+The [Privacy Policy](https://jackalope.dev/privacy/) and
+[Terms of Service](https://jackalope.dev/terms/) cover Jackalope's hosted services.
+Those terms do not replace or restrict the software's open-source license.

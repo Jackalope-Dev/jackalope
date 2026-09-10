@@ -3,7 +3,20 @@
 Bug reports, focused fixes and improvements to the documentation are welcome.
 For a larger feature, open an issue describing the workflow and proposed behavior
 before investing in an implementation. Please keep discussion respectful and
-reviewable changes focused on one problem.
+reviewable changes focused on one problem. Follow our [community guidelines](CODE_OF_CONDUCT.md).
+
+## Your first contribution
+
+1. Read the [current status](docs/STATUS.md) and [open priorities](docs/TODO.md).
+2. Fork the repository, clone your fork and create a branch from current `master`.
+3. Make a focused change with the relevant checks and documentation.
+4. Open a pull request against `Jackalope-Dev/jackalope:master`, describing the
+   problem, resulting behavior and what you verified.
+
+Documentation fixes, reproducible bug reports, accessibility work and tests are
+welcome alongside features. Maintainers review contributions before merging;
+discuss larger changes before investing in an implementation. No hosted Jackalope
+account, signing key or deployment credential is needed for source contributions.
 
 ## Development
 
@@ -62,6 +75,16 @@ separate secret check; it scans reachable history and current nonignored files.
 CI runs both checks without deployment credentials. `pnpm licenses:generate` regenerates
 the [dependency inventory](docs/DEPENDENCIES.md) after dependency changes.
 
+After `pnpm build:website`, run `pnpm check:links:website` to check live HTTP(S)
+destinations linked by the rendered pages. It writes statuses, redirects, headings,
+anchors and referring labels to `scratch/website-link-audit.json`. This network
+check is separate from `verify`; review source content as well, because a working
+URL does not establish that a linked page supports a claim. The build checks local
+routes, anchors and linked files, including Markdown guides and embedded media.
+To audit an unpublished production preview, pass `--origin http://127.0.0.1:<port>`;
+external sources are still checked live. See [knowledgebase content and media](docs/KNOWLEDGE-MEDIA.md)
+for guide ownership, clip provenance and accessibility checks.
+
 Reserve public changelog entries for notable features, meaningful improvements
 and larger milestones readers would care about. Group related work into one
 concise update; omit routine copy, spacing, icon and internal maintenance changes.
@@ -106,3 +129,15 @@ native platform support. See [TODO.md](docs/TODO.md) for current priorities.
 Use the issue forms for bugs and feature requests. Review support reports before
 sharing them; omit credentials, private prompts and personal paths. Report
 vulnerabilities privately using [SECURITY.md](SECURITY.md).
+
+## Contribution license
+
+You retain ownership of your contributions. Unless explicitly stated otherwise,
+work intentionally submitted for inclusion is contributed under the repository's
+[Apache License 2.0](LICENSE), as described in section 5. Submit only work you
+have permission to contribute under that license, including any employer-owned
+or third-party material. Preserve applicable copyright and license notices.
+
+If you use coding agents, review their output and verify its behavior and
+provenance before submitting it. You remain responsible for the contribution.
+See [licensing and redistribution](docs/LICENSING.md) for asset and dependency scope.

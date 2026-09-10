@@ -9,6 +9,7 @@ pub mod helper;
 pub mod integration;
 pub mod mcp;
 pub mod mcp_broker;
+pub mod platform;
 pub mod pty;
 pub mod repo_todos;
 pub mod system;

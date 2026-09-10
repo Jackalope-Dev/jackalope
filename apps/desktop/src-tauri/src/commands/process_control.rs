@@ -113,25 +113,36 @@ impl ProcessTree {
     }
 }
 
-#[cfg(not(windows))]
-pub struct ProcessTree(u32);
+#[cfg(unix)]
+pub struct ProcessTree {
+    group: i32,
+    terminated: std::sync::atomic::AtomicBool,
+}
 
-#[cfg(not(windows))]
+#[cfg(unix)]
 impl ProcessTree {
     pub fn attach(child: &Child) -> Result<Self, String> {
-        Ok(Self(child.id()))
+        Self::attach_pid(child.id())
     }
     pub fn attach_pid(pid: u32) -> Result<Self, String> {
-        Ok(Self(pid))
+        let group = i32::try_from(pid).map_err(|_| "Invalid child process ID")?;
+        if group <= 1 || unsafe { libc::getpgrp() } == group {
+            return Err("Cannot contain the application's own process group.".into());
+        }
+        let actual = unsafe { libc::getpgid(group) };
+        if actual != group && !(actual == -1 && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)) {
+            return Err("The child does not own an isolated process group.".into());
+        }
+        Ok(Self { group, terminated: std::sync::atomic::AtomicBool::new(false) })
     }
     pub fn terminate(&self) {
-        let _ = Command::new("kill")
-            .args(["-KILL", "--", &format!("-{}", self.0)])
-            .output();
+        if !self.terminated.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            unsafe { libc::kill(-self.group, libc::SIGKILL); }
+        }
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(unix)]
 impl Drop for ProcessTree {
     fn drop(&mut self) {
         self.terminate();
@@ -252,5 +263,27 @@ mod tests {
         assert!(result.timed_out);
         assert!(!result.success);
         assert!(result.duration_ms < 3000);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_and_exit_close_descendant_pipes_without_external_kill() {
+        for (script, timeout, timed_out) in [
+            ("sleep 30 & wait", Duration::from_millis(150), true),
+            ("sleep 30 & exit 0", Duration::from_secs(3), false),
+        ] {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", script]).env("PATH", "/usr/bin:/bin");
+            let result = run(command, timeout).unwrap();
+            assert_eq!(result.timed_out, timed_out);
+            assert!(result.duration_ms < 3000);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cannot_attach_to_own_process_group() {
+        assert!(ProcessTree::attach_pid(unsafe { libc::getpgrp() } as u32).is_err());
+        assert!(ProcessTree::attach_pid(0).is_err());
     }
 }

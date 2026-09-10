@@ -51,13 +51,23 @@ pub async fn pty_spawn(
     cmd.args(&args);
     cmd.cwd(&working_dir);
 
-    let child = pair
+    let mut child = pair
         .slave
         .spawn_command(cmd)
         .map_err(|e| format!("Failed to spawn '{program}' in pty: {e}"))?;
     // The slave end belongs to the child process now; drop our copy so
     // reading the master side actually reaches EOF once the child exits.
     drop(pair.slave);
+
+    let tree = match child.process_id().ok_or("Terminal process has no identity".into())
+        .and_then(super::process_control::ProcessTree::attach_pid) {
+        Ok(tree) => tree,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+    };
 
     let pid = child
         .process_id()
@@ -85,10 +95,24 @@ pub async fn pty_spawn(
                 writer,
                 master: pair.master,
                 child,
+                tree: Some(tree),
             },
         );
     }
 
+    let monitor_app = app.clone();
+    let monitor_id = session_id.clone();
+    std::thread::spawn(move || loop {
+        let state = monitor_app.state::<AppState>();
+        let Ok(mut sessions) = state.pty_sessions.lock() else { break };
+        let Some(session) = sessions.get_mut(&monitor_id) else { break };
+        if session.child.try_wait().ok().flatten().is_some() {
+            if let Some(tree) = &session.tree { tree.terminate(); }
+            break;
+        }
+        drop(sessions);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    });
     let event_session_id = session_id.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
@@ -249,8 +273,7 @@ pub async fn pty_kill(session_id: String, state: State<'_, AppState>) -> Result<
         .remove(&session_id)
         .ok_or_else(|| format!("No active pty session '{session_id}'"))?;
     session
-        .child
-        .kill()
+        .stop()
         .map_err(|e| format!("Failed to kill pty session '{session_id}': {e}"))
 }
 

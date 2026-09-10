@@ -28,14 +28,20 @@ fn allowed(agent: &str, name: &str) -> bool {
 
 pub(super) fn read(binding: &AccountBinding) -> Result<Option<ApiKey>, String> {
     let path = binding.directory.join("api-key.bin");
-    #[cfg(windows)]
-    let bytes = crate::commands::account_storage::read(&path)?;
-    #[cfg(not(windows))]
-    let bytes = if path.exists() {
-        Some(crate::commands::history::read_bounded(&path, 16384)?)
+    #[cfg(unix)]
+    let legacy = if path.exists() {
+        let bytes = crate::commands::history::read_bounded(&path, 16384)?;
+        serde_json::from_slice::<ApiKey>(&bytes).ok().map(|_| bytes)
     } else {
         None
     };
+    #[cfg(unix)]
+    let bytes = match &legacy {
+        Some(bytes) => Some(bytes.clone()),
+        None => crate::commands::account_storage::read(&path)?,
+    };
+    #[cfg(windows)]
+    let bytes = crate::commands::account_storage::read(&path)?;
     let Some(bytes) = bytes else { return Ok(None) };
     let key: ApiKey = serde_json::from_slice(&bytes).map_err(|_| {
         "This account's saved API key is unreadable. Reconnect it before running tasks."
@@ -48,6 +54,10 @@ pub(super) fn read(binding: &AccountBinding) -> Result<Option<ApiKey>, String> {
         return Err(
             "This account's saved API key is invalid. Reconnect it before running tasks.".into(),
         );
+    }
+    #[cfg(unix)]
+    if legacy.is_some() {
+        crate::commands::account_storage::write(&path, &bytes)?;
     }
     Ok(Some(key))
 }
@@ -89,29 +99,5 @@ pub fn agent_profile_save_key(
     })
     .map_err(|_| "Could not prepare the API key.")?;
     let path = binding.directory.join("api-key.bin");
-    #[cfg(windows)]
-    {
-        crate::commands::account_storage::write(&path, &bytes)
-    }
-    #[cfg(not(windows))]
-    {
-        use std::io::Write;
-        use std::os::unix::fs::OpenOptionsExt;
-        let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
-        let result = (|| {
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&temporary)?;
-            file.write_all(&bytes)?;
-            file.sync_all()?;
-            drop(file);
-            std::fs::rename(&temporary, &path)
-        })();
-        if result.is_err() {
-            let _ = std::fs::remove_file(&temporary);
-        }
-        result.map_err(|_: std::io::Error| "Could not save this account's API key.".into())
-    }
+    crate::commands::account_storage::write(&path, &bytes)
 }

@@ -17,11 +17,12 @@ pub(super) fn device_name() -> String {
 
 #[tauri::command]
 pub async fn system_get_info() -> Result<SystemInfo, String> {
-    let git_available = std::process::Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+    let git_available = tauri::async_runtime::spawn_blocking(|| {
+        let mut command = std::process::Command::new("git");
+        command.arg("--version");
+        super::process_control::run(command, std::time::Duration::from_secs(5))
+            .is_ok_and(|output| output.success)
+    }).await.map_err(|e| e.to_string())?;
 
     Ok(SystemInfo {
         os: std::env::consts::OS.to_string(),

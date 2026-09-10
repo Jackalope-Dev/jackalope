@@ -4,7 +4,7 @@ const agents = [
   {
     name: 'Codex',
     mark: '</>',
-    url: 'https://developers.openai.com/codex/cli/',
+    url: 'https://learn.chatgpt.com/docs/codex/cli',
     note: 'Your OpenAI coding agent, with project connections and reported usage.',
     connections: 'stdio · HTTP',
   },

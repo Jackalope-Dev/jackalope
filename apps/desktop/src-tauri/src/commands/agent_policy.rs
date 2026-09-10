@@ -99,7 +99,7 @@ impl AgentPolicy {
         let path = match configured {
             Some(value) => {
                 let path = PathBuf::from(value);
-                if !path.is_absolute() || !path.is_file() {
+                if !path.is_absolute() || !super::platform::is_executable(&path) {
                     return Err(format!("Set an absolute executable path for {agent}."));
                 }
                 path
