@@ -189,7 +189,10 @@ fn commit_tree(path: &Path, tree: &str, parents: &[&str], message: &str) -> Resu
     for parent in parents {
         cmd.args(["-p", parent]);
     }
+    // Stable synthetic parents preserve ancestry when a dependent edits predecessor files.
     cmd.args(["-m", message])
+        .env("GIT_AUTHOR_DATE", "2000-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2000-01-01T00:00:00Z")
         .env("GIT_AUTHOR_NAME", &name)
         .env("GIT_COMMITTER_NAME", &name)
         .env("GIT_AUTHOR_EMAIL", &email)
@@ -970,6 +973,17 @@ mod tests {
             "verified parent"
         );
         let mut child = fixture.run(2, "child.txt", "child\n");
+        git(
+            Path::new(&child.workspace),
+            &["reset", "--hard", &dependency.base],
+        )
+        .unwrap();
+        fs::write(
+            Path::new(&child.workspace).join("parent.txt"),
+            "reviewed parent\n",
+        )
+        .unwrap();
+        child.base_head = dependency.base.clone();
         child.dependency_snapshot = dependency;
         assert!(
             validate_dependencies(&fixture.plans, &[parent.clone(), child.clone()], &child).is_ok()
@@ -981,6 +995,25 @@ mod tests {
         )
         .unwrap_err()
         .contains("every predecessor"));
+        let runs = [parent.clone(), child.clone()];
+        let plan = prepare(
+            &fixture.plans,
+            &runs,
+            &[child.id.clone(), parent.id.clone()],
+        )
+        .unwrap();
+        assert_eq!(
+            apply(&fixture.plans, &runs, &plan.id).unwrap().status,
+            "applied"
+        );
+        assert_eq!(
+            fs::read_to_string(fixture.project.join("parent.txt")).unwrap(),
+            "reviewed parent\n"
+        );
+        assert_eq!(
+            fs::read_to_string(fixture.project.join("child.txt")).unwrap(),
+            "child\n"
+        );
         fs::write(Path::new(&parent.workspace).join("parent.txt"), "changed\n").unwrap();
         assert!(
             validate_dependencies(&fixture.plans, &[parent, child.clone()], &child)

@@ -3055,6 +3055,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "block2",
+ "cc",
  "chrono",
  "chrono-tz",
  "cron",
@@ -3070,6 +3071,7 @@ dependencies = [
  "objc2-user-notifications",
  "oxc_resolver",
  "petgraph",
+ "pkg-config",
  "portable-pty",
  "reqwest",
  "rmcp",

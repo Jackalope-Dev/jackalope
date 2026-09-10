@@ -13,6 +13,24 @@ fn fixture() -> (PathBuf, TaskRuntime, String) {
 }
 
 #[test]
+fn writer_shutdown_releases_history_ownership_after_pending_writes() {
+    let (directory, runtime, id) = fixture();
+    assert_eq!(Arc::strong_count(&runtime._owner), 1);
+    let mut run = runtime.inner.lock().unwrap().runs[&id].clone();
+    run.result = "queued before shutdown".into();
+    let pending = runtime.writer.submit(run, false).unwrap();
+    drop(runtime);
+    journal::Writer::wait(pending).unwrap();
+    let restored = TaskRuntime::new(directory.clone()).unwrap();
+    assert_eq!(
+        restored.inner.lock().unwrap().runs[&id].result,
+        "queued before shutdown"
+    );
+    drop(restored);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
 fn output_journal_recovers_unicode_and_compacts_at_a_checkpoint() {
     let (directory, runtime, id) = fixture();
     for _ in 0..20 {

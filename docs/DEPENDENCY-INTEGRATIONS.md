@@ -28,7 +28,7 @@ still increase distribution size; measure packaged size when changing bundles.
 
 The desktop bundle retains every language and only its existing GitHub light/dark
 code themes. Markdown uses a view-owned worker with a shared highlighter and a bounded
-renderer cache keyed by complete options. Patch parsing and diff highlighting use
+renderer cache keyed by complete options. Large patch parsing and diff highlighting use
 workers; retain original-patch access on failure. The upstream cache regression stays
 as a dependency check, and the production browser fixture checks the active renderer.
 See [performance checks](PERFORMANCE.md).

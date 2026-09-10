@@ -267,11 +267,11 @@ fn native_command(script: &str, payload: Value) -> Result<std::process::Command,
     Ok(command)
 }
 
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 fn native(payload: Value, canceled: &AtomicBool) -> Result<Value, String> {
     #[cfg(windows)]
     let command = native_command(include_str!("desktop_control/windows.ps1"), payload)?;
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     let command = platform::command(payload)?;
     if canceled.load(Ordering::SeqCst) {
         return Err("Desktop access was revoked.".into());
@@ -298,7 +298,7 @@ fn native(payload: Value, canceled: &AtomicBool) -> Result<Value, String> {
         .map_err(|_| "Desktop helper returned invalid output.".into())
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 fn native(_: Value, _: &AtomicBool) -> Result<Value, String> {
     Err("Guarded native desktop control is unavailable on this desktop. Task browser automation is available separately.".into())
 }

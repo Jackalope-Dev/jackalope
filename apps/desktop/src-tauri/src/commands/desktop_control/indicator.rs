@@ -1,5 +1,5 @@
 use super::*;
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 use std::process::Stdio;
 use std::{path::PathBuf, process::Child};
 
@@ -132,7 +132,7 @@ impl Indicator {
         Err("Desktop indicator did not become ready. No input was enabled.".into())
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     pub fn start(window: &Window) -> Result<Self, String> {
         use std::os::unix::fs::DirBuilderExt;
         let directory =
@@ -141,15 +141,15 @@ impl Indicator {
             .mode(0o700)
             .create(&directory)
             .map_err(|e| e.to_string())?;
-        let result = Self::start_macos(window, directory.clone());
+        let result = Self::start_unix(window, directory.clone());
         if result.is_err() {
             let _ = std::fs::remove_dir_all(directory);
         }
         result
     }
 
-    #[cfg(target_os = "macos")]
-    fn start_macos(window: &Window, directory: PathBuf) -> Result<Self, String> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn start_unix(window: &Window, directory: PathBuf) -> Result<Self, String> {
         let accent = ACCENT
             .get_or_init(|| Mutex::new("#6366f1".into()))
             .lock()
@@ -202,7 +202,7 @@ impl Indicator {
         Err("Desktop indicator did not become ready. No input was enabled.".into())
     }
 
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     pub fn start(_: &Window) -> Result<Self, String> {
         Err("A guarded native desktop backend is unavailable on this desktop.".into())
     }

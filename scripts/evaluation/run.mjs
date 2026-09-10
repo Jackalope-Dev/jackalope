@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +40,49 @@ const output = path.join(
   new Date().toISOString().replaceAll(':', '-'),
 );
 await mkdir(output, { recursive: true });
+const nativeSource = await new Promise((resolve, reject) => {
+  const child = spawn(
+    'cargo',
+    [
+      'test',
+      '--locked',
+      '--manifest-path',
+      'apps/desktop/src-tauri/Cargo.toml',
+      '--lib',
+      '--no-default-features',
+      '--no-run',
+      '--message-format=json',
+    ],
+    { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'inherit'] },
+  );
+  let output = '';
+  child.stdout.on('data', (chunk) => {
+    output += chunk.toString();
+  });
+  child.on('error', reject);
+  child.on('exit', (code) => {
+    const artifacts = output.split('\n').flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    });
+    const executable = artifacts.findLast(
+      (item) =>
+        item.reason === 'compiler-artifact' &&
+        item.target?.name === 'jackalope_lib' &&
+        item.executable,
+    )?.executable;
+    if (code !== 0 || !executable) reject(new Error(`Evaluation build failed (${code}).`));
+    else resolve(executable);
+  });
+});
+const nativeBinary = path.join(
+  output,
+  process.platform === 'win32' ? 'evaluation.exe' : 'evaluation',
+);
+await copyFile(nativeSource, nativeBinary);
 const receipts = [];
 for (const id of cases)
   for (let repetition = 0; repetition < repeats; repetition++) {
@@ -52,16 +95,9 @@ for (const id of cases)
       console.log(`Evaluating ${id} / ${mode} / repetition ${repetition + 1}`);
       const receipt = await new Promise((resolve, reject) => {
         const child = spawn(
-          'cargo',
+          nativeBinary,
           [
-            'test',
-            '--locked',
-            '--manifest-path',
-            'apps/desktop/src-tauri/Cargo.toml',
-            '--lib',
-            '--no-default-features',
             'commands::coordination::evaluation_trial::installed_execution_evaluation',
-            '--',
             '--ignored',
             '--exact',
             '--nocapture',

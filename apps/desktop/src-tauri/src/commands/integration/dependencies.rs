@@ -76,7 +76,7 @@ pub fn prepare_dependencies(
             &project,
             &source.tree,
             &[&run.base_head],
-            "Jackalope verified feature snapshot",
+            &format!("feat: integrate completed task {}", run.id),
         )?;
         let output = command(
             &project,

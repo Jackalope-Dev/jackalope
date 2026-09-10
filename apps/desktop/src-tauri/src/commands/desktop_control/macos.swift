@@ -82,8 +82,8 @@ struct SelectedWindow {
         guard let window = visibleWindows().first(where: { ($0[kCGWindowNumber as String] as? UInt32) == id }),
               (window[kCGWindowOwnerPID as String] as? Int32) == pid,
               (window[kCGWindowLayer as String] as? Int) == 0,
-              let dictionary = window[kCGWindowBounds as String] as? CFDictionary,
-              let rect = CGRect(dictionaryRepresentation: dictionary), rect.width > 0, rect.height > 0 else {
+              let dictionary = window[kCGWindowBounds as String] as? [String: Any],
+              let rect = CGRect(dictionaryRepresentation: dictionary as CFDictionary), rect.width > 0, rect.height > 0 else {
             throw ControlError("The selected window is hidden, minimized, closed or replaced.")
         }
         return rect
@@ -123,8 +123,8 @@ struct SelectedWindow {
         let point = CGPoint(x: rect.minX + x, y: rect.minY + y)
         let hit = visibleWindows().first { window in
             guard (window[kCGWindowAlpha as String] as? Double ?? 1) > 0,
-                  let dictionary = window[kCGWindowBounds as String] as? CFDictionary,
-                  let bounds = CGRect(dictionaryRepresentation: dictionary) else { return false }
+                  let dictionary = window[kCGWindowBounds as String] as? [String: Any],
+                  let bounds = CGRect(dictionaryRepresentation: dictionary as CFDictionary) else { return false }
             return bounds.contains(point)
         }
         try require((hit?[kCGWindowNumber as String] as? UInt32) == id, "Another window covers the target point.")
@@ -240,6 +240,12 @@ let keyCodes: [String: CGKeyCode] = ["Tab": 48, "Enter": 36, "Escape": 53, "Spac
 func operation(_ request: [String: Any]) throws -> [String: Any] {
     let action = request["action"] as? String ?? ""
     if action == "permissions" { return permissions() }
+    if action == "request_permissions" {
+        _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
+        _ = CGRequestScreenCaptureAccess()
+        _ = CGRequestListenEventAccess()
+        return permissions()
+    }
     try checkPermissions()
     if action == "list" {
         let windows: [[String: Any]] = visibleWindows().compactMap { value in
@@ -343,6 +349,7 @@ final class Indicator: NSObject {
     var tap: CFMachPort?
     var timer: Timer?
     var start = ""
+    var resumeTicket: UInt64 = 0
 
     init(_ request: [String: Any]) throws {
         guard let identity = request["window"] as? [String: Any], let file = request["file"] as? String,
@@ -353,7 +360,7 @@ final class Indicator: NSObject {
     }
 
     func save() {
-        let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(reason)"
+        let text = "\(status)|\(epoch)|\(Int64(Date().timeIntervalSince1970 * 1000))|\(getpid())|\(start)|\(reason.replacingOccurrences(of: "|", with: "/"))"
         do { try text.write(to: stateFile, atomically: true, encoding: .utf8) }
         catch { NSApp.terminate(nil) }
         label.stringValue = status == "active" ? "Jackalope controls this window · Esc to cancel" : "Paused · \(reason)"
@@ -377,11 +384,15 @@ final class Indicator: NSObject {
             try require(CGEvent.tapIsEnabled(tap: tap), "Input monitor unavailable")
             try require(!heldInput(), "Release keys and mouse buttons")
             try selected.focus()
+            resumeTicket += 1
+            let ticket = resumeTicket
             // Activation completes asynchronously; input remains paused until focus is verified.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                guard let self = self, self.status == "paused" else { return }
+                guard let self = self, self.status == "paused", self.resumeTicket == ticket else { return }
                 do {
                     let bounds = try self.selected.bounds()
+                    try checkPermissions()
+                    try require(self.tap.map { CGEvent.tapIsEnabled(tap: $0) } == true, "Input monitor unavailable")
                     _ = try self.selected.foreground(bounds)
                     try require(!heldInput(), "Release keys and mouse buttons")
                     self.previousBounds = bounds; self.status = "active"; self.reason = ""; self.epoch += 1; self.save()
@@ -391,8 +402,9 @@ final class Indicator: NSObject {
     }
 
     func event(_ type: CGEventType, _ event: CGEvent) {
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { pause("Input monitor interrupted"); return }
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { resumeTicket += 1; pause("Input monitor interrupted"); return }
         if event.getIntegerValueField(.eventSourceUserData) == tag { return }
+        resumeTicket += 1
         if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 { cancel(); return }
         pause("Physical input detected")
     }
@@ -426,9 +438,9 @@ final class Indicator: NSObject {
         label.lineBreakMode = .byTruncatingTail
         toggle.frame = NSRect(x: 368, y: 12, width: 88, height: 32)
         toggle.bezelStyle = .rounded; toggle.target = self; toggle.action = #selector(change)
-        let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancel))
-        cancel.frame = NSRect(x: 462, y: 12, width: 82, height: 32); cancel.bezelStyle = .rounded
-        panel.contentView?.addSubview(label); panel.contentView?.addSubview(toggle); panel.contentView?.addSubview(cancel)
+        let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancel))
+        cancelButton.frame = NSRect(x: 462, y: 12, width: 82, height: 32); cancelButton.bezelStyle = .rounded
+        panel.contentView?.addSubview(label); panel.contentView?.addSubview(toggle); panel.contentView?.addSubview(cancelButton)
         let bounds = try selected.bounds()
         let top = NSScreen.screens.first?.frame.maxY ?? 0
         let cocoaPoint = NSPoint(x: bounds.midX, y: top - bounds.midY)

@@ -6,6 +6,7 @@ pub struct SystemInfo {
     pub arch: String,
     pub device_name: String,
     pub git_available: bool,
+    pub desktop_control: super::desktop_control::platform::Readiness,
 }
 
 pub(super) fn device_name() -> String {
@@ -31,11 +32,12 @@ pub(super) fn device_name() -> String {
 
 #[tauri::command]
 pub async fn system_get_info() -> Result<SystemInfo, String> {
-    let git_available = tauri::async_runtime::spawn_blocking(|| {
+    let (git_available, desktop_control) = tauri::async_runtime::spawn_blocking(|| {
         let mut command = std::process::Command::new("git");
         command.arg("--version");
-        super::process_control::run(command, std::time::Duration::from_secs(5))
-            .is_ok_and(|output| output.success)
+        let git = super::process_control::run(command, std::time::Duration::from_secs(5))
+            .is_ok_and(|output| output.success);
+        (git, super::desktop_control::platform::readiness())
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -45,5 +47,6 @@ pub async fn system_get_info() -> Result<SystemInfo, String> {
         arch: std::env::consts::ARCH.to_string(),
         device_name: device_name(),
         git_available,
+        desktop_control,
     })
 }

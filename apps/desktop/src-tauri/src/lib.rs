@@ -140,6 +140,7 @@ pub fn run() {
             commands::release::app_release_status,
             commands::release::app_install_update,
             system_get_info,
+            commands::desktop_control::platform::desktop_control_request_permissions,
             pty_spawn,
             pty_write,
             pty_resize,

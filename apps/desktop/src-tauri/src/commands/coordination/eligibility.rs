@@ -90,31 +90,35 @@ pub(super) fn ready_items(
             *value = (*value).max(depth);
         }
     }
-    let mut pending: Vec<_> = inner.ledger.items.iter().collect();
+    let mut pending: Vec<_> = inner
+        .ledger
+        .items
+        .iter()
+        .filter(|item| {
+            inner.enabled.contains(&item.project_id)
+                && !item.canceled
+                && item.run_id.is_none()
+                && item.error.is_none()
+        })
+        .collect();
     let mut counts: HashMap<String, usize> = HashMap::new();
     for run in &active_runs {
         *counts.entry(run.project_id.clone()).or_default() += 1;
     }
-    while !pending.is_empty() {
-        pending.sort_by_key(|item| {
-            (
-                counts.get(&item.project_id).copied().unwrap_or(0),
-                std::cmp::Reverse(priority.get(&item.id).copied().unwrap_or(0)),
-                item.created_at.clone(),
-                item.id.clone(),
-            )
-        });
-        let item = pending.remove(0);
-        if reserved.len() >= slots {
-            break;
+    let mut reorder = true;
+    while !pending.is_empty() && reserved.len() < slots {
+        if reorder {
+            pending.sort_by_key(|item| {
+                std::cmp::Reverse((
+                    counts.get(&item.project_id).copied().unwrap_or(0),
+                    std::cmp::Reverse(priority.get(&item.id).copied().unwrap_or(0)),
+                    item.created_at.clone(),
+                    item.id.clone(),
+                ))
+            });
+            reorder = false;
         }
-        if !inner.enabled.contains(&item.project_id)
-            || item.canceled
-            || item.run_id.is_some()
-            || item.error.is_some()
-        {
-            continue;
-        }
+        let item = pending.pop().unwrap();
         if !item.dependencies.iter().all(|id| {
             inner
                 .ledger
@@ -137,13 +141,17 @@ pub(super) fn ready_items(
         }) {
             continue;
         }
+        let predecessors = if item.staged_dependencies {
+            ancestors(&inner.ledger.items, item)
+        } else {
+            HashSet::new()
+        };
         let pending_overlap = inner.ledger.items.iter().any(|other| {
             other.id != item.id
                 && other.project_id == item.project_id
                 && other.run_id.as_ref().is_some_and(|id| !merged.contains(id))
                 && !other.canceled
-                && !(item.staged_dependencies
-                    && ancestors(&inner.ledger.items, item).contains(&other.id))
+                && !(item.staged_dependencies && predecessors.contains(&other.id))
                 && overlaps(&item.scopes, &other.scopes)
         });
         let active_overlap = active_runs.iter().any(|run| {
@@ -164,6 +172,7 @@ pub(super) fn ready_items(
         }
         *counts.entry(item.project_id.clone()).or_default() += 1;
         reserved.push(item);
+        reorder = true;
     }
     reserved.into_iter().cloned().collect()
 }

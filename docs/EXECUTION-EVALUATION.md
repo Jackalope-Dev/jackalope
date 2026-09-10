@@ -12,7 +12,7 @@ they do not establish causal superiority or a specialty from a small sample.
 
 Queue admission favors longer remaining dependency paths and balances active work
 across projects. Finishing attempts retain workspace ownership while releasing the
-agent slot. Verification commands have a separate two-command limit. They reserve
+agent slot. Preparation and verification commands share a separate two-command limit. They reserve
 their own canonical workspace, release the global execution guard while running,
 and retain before/after file snapshots. Launch, integration, previews, cleanup,
 reset and updates honor those reservations. Checks remain cancelable for active
@@ -65,7 +65,8 @@ pnpm evaluate:execution -- --execute '--case=small-fix,layered-feature' --repeat
 ```
 
 Modes are `single`, `serial` and `staged`; select a subset with `'--modes=single,staged'`.
-The driver rotates mode order across repetitions. Each trial retains native journals,
+The driver builds once and runs a private executable copy for consistent comparisons
+and to avoid locking the shared Windows test binary. It rotates mode order across repetitions. Each trial retains native journals,
 stage timings, usage, its independent behavioral oracle, limits and failures.
 Comparisons are saved under `scratch/execution-evaluation`. Profiles are retained
 under the OS temporary directory; their full journals can contain task/account data.
@@ -80,3 +81,16 @@ by the provider. A model may report usage only at turn completion. It cannot enf
 provider spending limit. Human review minutes, acceptance and escaped defects need
 an independent reviewer and remain unknown in automated receipts. A passing oracle
 is not product acceptance. Repeat trials before claiming a speed or quality gain.
+
+## Local validation — September 10, 2026
+
+Browser fixtures passed at 1280×840 and 960×640 in both themes with reduced motion,
+including full request retention, staged import, independent review, focus return,
+timing display and sanitized evaluation copying. These are browser-only checks.
+
+Installed Codex smoke runs retained budget failures rather than treating agent output
+as acceptance. The staged trial verified both helper worktrees and launched the final
+worker with both dependency receipts, then reached its 300-second limit. The retained
+incomplete result did not pass the behavioral oracle. Initial single and serial trials
+hit their 100,000 reported-token limit. These runs establish neither a quality gain nor
+a speed ranking; repeated completed trials and installed-app acceptance remain open.

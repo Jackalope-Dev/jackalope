@@ -26,7 +26,8 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
   const immediate = useMemo(() => {
     if (!small) return undefined;
     try {
-      return parsePatchFiles(patch, undefined, true).flatMap((entry) => entry.files);
+      const files = parsePatchFiles(patch, undefined, true).flatMap((entry) => entry.files);
+      return files.length ? files : undefined;
     } catch {
       return undefined;
     }
@@ -36,6 +37,7 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
     let worker: Worker | undefined;
     let timer: ReturnType<typeof setTimeout>;
     const fail = () => {
+      clearTimeout(timer);
       worker?.terminate();
       setParse({ patch });
     };

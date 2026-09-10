@@ -1,6 +1,11 @@
 import { Monitor, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getSystemInfo, isTauriEnvironment, type SystemInfo } from '../../lib/tauri-bridge';
+import {
+  getSystemInfo,
+  isTauriEnvironment,
+  requestDesktopControlPermissions,
+  type SystemInfo,
+} from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 
@@ -8,6 +13,7 @@ export function SystemInfoView() {
   const [host, setHost] = useState<SystemInfo | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [requestingPermissions, setRequestingPermissions] = useState(false);
   const request = useRef(0);
   const desktop = isTauriEnvironment();
   const load = useCallback(async () => {
@@ -24,6 +30,18 @@ export function SystemInfoView() {
       if (id === request.current) setLoading(false);
     }
   }, []);
+  const requestPermissions = async () => {
+    setRequestingPermissions(true);
+    setError('');
+    try {
+      const readiness = await requestDesktopControlPermissions();
+      setHost((current) => (current ? { ...current, desktop_control: readiness } : current));
+    } catch (error) {
+      setError(String(error));
+    } finally {
+      setRequestingPermissions(false);
+    }
+  };
   useEffect(() => {
     void load();
     return () => {
@@ -54,6 +72,25 @@ export function SystemInfoView() {
             <p className="task-muted mt-2">
               This device · {host.os} · {host.arch}
             </p>
+            {host.desktop_control && (
+              <div className="mt-6 max-w-2xl">
+                <h3 className="font-medium">Native window control</h3>
+                <p className="task-muted mt-2" role="status">
+                  {host.desktop_control.message}
+                </p>
+                {host.desktop_control.can_request_permissions &&
+                  !host.desktop_control.available && (
+                    <Button
+                      className="mt-3"
+                      variant="outline"
+                      disabled={requestingPermissions}
+                      onClick={() => void requestPermissions()}
+                    >
+                      {requestingPermissions ? 'Checking permissions…' : 'Set up macOS permissions'}
+                    </Button>
+                  )}
+              </div>
+            )}
             <p className="task-muted mt-2">
               {host.git_available
                 ? 'Git is available for project work.'

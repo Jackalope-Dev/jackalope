@@ -22,6 +22,18 @@ export interface SystemInfo {
   arch: string;
   device_name: string;
   git_available: boolean;
+  desktop_control?: DesktopControlReadiness;
+}
+
+export interface DesktopControlReadiness {
+  available: boolean;
+  message: string;
+  can_request_permissions: boolean;
+}
+
+export async function requestDesktopControlPermissions(): Promise<DesktopControlReadiness> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<DesktopControlReadiness>('desktop_control_request_permissions');
 }
 
 export const isTauriEnvironment = (): boolean => {

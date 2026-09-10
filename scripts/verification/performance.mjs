@@ -44,7 +44,7 @@ function Fixture() {
     mode === 'markdown' ? React.createElement(TaskMarkdown, { content: markdown(text, language), active: true, onOpenLink: url => f.link = url }) :
     React.createElement(RichDiff, { patch }));
 }
-(window.fixtureRoot ??= ReactDOM.createRoot(document.getElementById('root'))).render(React.createElement(Fixture));
+(window.fixtureRoot ??= ReactDOM.createRoot(document.getElementById('root'))).render(React.createElement(React.StrictMode, null, React.createElement(Fixture)));
 `;
 
 const fixtureDirectory = join(
@@ -152,7 +152,7 @@ try {
   const diffStart = performance.now();
   await page.evaluate(() => window.performanceFixture.mode('diff'));
   await page.getByRole('region', { name: 'Code changes' }).waitFor();
-  const diffReadyMs = performance.now() - diffStart;
+  const diffControlsReadyMs = performance.now() - diffStart;
   await page.getByRole('button', { name: 'Unified view' }).click();
   await page.getByRole('button', { name: 'Wrap lines' }).click();
   await page.getByRole('button', { name: 'Original patch' }).click();
@@ -163,6 +163,7 @@ try {
       element.shadowRoot?.querySelector('code')?.textContent?.includes('value0'),
     ),
   );
+  const diffHighlightedMs = performance.now() - diffStart;
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const theme of ['light', 'dark']) {
@@ -179,7 +180,8 @@ try {
   const receipt = {
     kind: 'Browser fixtures; no native execution or installed acceptance',
     listReadyMs,
-    diffReadyMs,
+    diffControlsReadyMs,
+    diffHighlightedMs,
     longTasks,
     errors,
   };
