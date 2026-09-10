@@ -1,9 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
-import { multiAgentPlanningPrompt } from '../../lib/task-decomposition';
 import { type FeatureStep, featurePlanningPrompt, readFeaturePlan } from '../../lib/feature-plan';
 import { queueCommand } from '../../lib/queue';
+import { multiAgentPlanningPrompt } from '../../lib/task-decomposition';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -42,7 +42,7 @@ export function FeaturePlanner({
   const available = runners.filter(
     (r) => r.available && config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
-  const storageKey = `jackalope-feature-plan:${project.id}${multiAgent ? ":multi" : ""}`;
+  const storageKey = `jackalope-feature-plan:${project.id}${multiAgent ? ':multi' : ''}`;
   const [draft, setDraft] = useState<Draft>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
@@ -113,7 +113,8 @@ export function FeaturePlanner({
           </Dialog.Close>
           <Dialog.Title className="text-xl">Plan a feature</Dialog.Title>
           <Dialog.Description className="task-muted mt-3">
-            Plan from the repository and the complete request. Review ownership, outcomes and dependencies before dispatch.
+            Plan from the repository and the complete request. Review ownership, outcomes and
+            dependencies before dispatch.
           </Dialog.Description>
           <fieldset
             disabled={busy || submitting || !!planning || draft.added}
@@ -138,7 +139,7 @@ export function FeaturePlanner({
                 onValueChange={(agent) => update({ agent })}
               >
                 <SelectItem value="auto">Let Jackalope choose</SelectItem>
-                      {available.map((r) => (
+                {available.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.name}
                   </SelectItem>
@@ -165,7 +166,9 @@ export function FeaturePlanner({
                             : agentAccountFor(project, draft.agent),
                         targetBranch: project.preferences?.baseBranch || project.gitBranch,
                         isolated: true,
-                        prompt: multiAgent ? multiAgentPlanningPrompt(draft.goal, available) : featurePlanningPrompt(draft.goal),
+                        prompt: multiAgent
+                          ? multiAgentPlanningPrompt(draft.goal, available)
+                          : featurePlanningPrompt(draft.goal),
                       },
                       { background: true },
                     );
@@ -234,7 +237,7 @@ export function FeaturePlanner({
             </div>
           )}
           {draft.steps.length > 1 && (
-            <div className="flex justify-end mt-4">
+            <div className="flex flex-wrap gap-2 justify-end mt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -244,6 +247,40 @@ export function FeaturePlanner({
               >
                 <Sparkles size={14} />
                 Use automatic routing
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={
+                  busy ||
+                  draft.added ||
+                  draft.steps.length >= 12 ||
+                  draft.steps.some((s) => s.key === 'independent-review')
+                }
+                onClick={() =>
+                  update({
+                    steps: [
+                      ...draft.steps,
+                      {
+                        key: 'independent-review',
+                        title: 'Review and verify the combined feature',
+                        agent: 'auto',
+                        scopes: ['.'],
+                        dependsOn: draft.steps.map((s) => s.key),
+                        prompt:
+                          'Independently inspect the combined implementation against every requirement in the original request. Verify behavior and meaningful regressions. Treat previous agent reports as unverified claims. Fix confirmed defects within scope, rerun relevant checks, and report remaining limitations with evidence.',
+                        contextSelection: {
+                          outcomes: [
+                            'The combined feature satisfies the original request, with recorded verification and explicit remaining limitations.',
+                          ],
+                        },
+                      },
+                    ],
+                  })
+                }
+              >
+                Add independent review
               </Button>
             </div>
           )}
@@ -303,7 +340,11 @@ export function FeaturePlanner({
                   />
                 </label>
                 <fieldset>
-                  <legend>{draft.stagedDependencies ? "Starts from these verified snapshots" : "Starts after these tasks are integrated"}</legend>
+                  <legend>
+                    {draft.stagedDependencies
+                      ? 'Starts from these verified snapshots'
+                      : 'Starts after these tasks are integrated'}
+                  </legend>
                   {draft.steps
                     .filter((s) => s.key !== step.key)
                     .map((other) => (
@@ -353,9 +394,16 @@ export function FeaturePlanner({
             </p>
           )}
           <label className="flex items-center gap-2 mt-4 min-h-11">
-            <input type="checkbox" checked={draft.stagedDependencies ?? false} disabled={busy || draft.added}
-              onChange={(event) => update({ stagedDependencies: event.target.checked })} />
-            <span>Continue dependencies from verified snapshots before final merge. Requires a saved project check. Changed predecessors require a new plan.</span>
+            <input
+              type="checkbox"
+              checked={draft.stagedDependencies ?? false}
+              disabled={busy || draft.added}
+              onChange={(event) => update({ stagedDependencies: event.target.checked })}
+            />
+            <span>
+              Continue dependencies from verified snapshots before final merge. Requires a saved
+              project check. Changed predecessors require a new plan.
+            </span>
           </label>
           {!!draft.steps.length && (
             <div className="mt-5 space-y-3">
@@ -368,10 +416,12 @@ export function FeaturePlanner({
                 onClick={() =>
                   void act(async () => {
                     if (!draft.added) {
-                      const items = readFeaturePlan(JSON.stringify(draft.steps), draft.agent).map((step) => ({
-                        ...step,
-                        prompt: `${step.prompt}\n\nComplete feature request (shared context; perform only your assigned work):\n${draft.goal}`,
-                      }));
+                      const items = readFeaturePlan(JSON.stringify(draft.steps), draft.agent).map(
+                        (step) => ({
+                          ...step,
+                          prompt: `${step.prompt}\n\nComplete feature request (shared context; perform only your assigned work):\n${draft.goal}`,
+                        }),
+                      );
                       localStorage.setItem(storageKey, JSON.stringify(draft));
                       await queueCommand('queue_import', {
                         request: {

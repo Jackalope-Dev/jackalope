@@ -13,6 +13,15 @@ interface Props {
 
 export function MultiAgentSplitDialog({ open, onClose, goal, project, onImported }: Props) {
   if (!open) return null;
-  return <FeaturePlanner project={project} initialGoal={goal} multiAgent onClose={onClose}
-    onAdded={async () => { onImported?.(); }} />;
+  return (
+    <FeaturePlanner
+      project={project}
+      initialGoal={goal}
+      multiAgent
+      onClose={onClose}
+      onAdded={async () => {
+        onImported?.();
+      }}
+    />
+  );
 }

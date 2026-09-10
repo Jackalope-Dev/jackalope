@@ -13,6 +13,11 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   bounded quota handoff. Explicit assignments and continuation identities stay pinned.
 - Parallel queues, isolated worktrees, task checkpoints, checks, patch review and
   guarded integration with recoverable cleanup.
+- Repository-aware feature planning with complete request preservation, optional verified
+  predecessor snapshots, critical-path scheduling, structured coordination reports and
+  workspace-scoped verification. Execution timings and repeatable evaluation trials are
+  implemented; measured quality improvements and installed acceptance remain open. See
+  [execution evaluation](EXECUTION-EVALUATION.md).
 - Project guidance, editable lessons, codebase maps and task outcome insights.
 - Recurring schedules and local monitors that act on committed content changes.
 - MCP connections, task-owned browser sessions and Windows desktop-control grants.

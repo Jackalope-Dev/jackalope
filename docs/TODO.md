@@ -23,6 +23,10 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Compare repeated single, serial and staged evaluations with matched provider/model
+  budgets and independent human review. Validate feature snapshot recovery, shared
+  verification reservations, structured reports and bounded inbox waits in installed builds.
+
 - [ ] Validate Kimi Code OAuth account switching and real task execution in the installed app,
   including session approvals, structured questions, direct MCP, usage deltas, quota refresh,
   routing, helper requests and exact-session resume. Protocol tests and isolated local-provider

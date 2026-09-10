@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { executionEvaluation } from '../../lib/execution-evaluation';
 import { computeAgentAnalytics } from '../../lib/agent-analytics';
 import { generateAgentInsights, type WorkflowInsight } from '../../lib/agent-insights';
+import { executionEvaluation } from '../../lib/execution-evaluation';
 import type { KnowledgeEntry } from '../../lib/knowledge';
 import { openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
 import type { TaskRun } from '../../lib/task-runtime';
@@ -84,11 +84,26 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
       </p>
       <section className="space-y-3">
         <h2>Execution time</h2>
-        <p className="task-muted">Recorded work time across attempts. Parallel stages overlap in wall time; older tasks may have no timing records.</p>
-        {Object.entries(evaluation.stageTotalsMs).map(([stage, ms]) => <p key={stage}>{stage.replaceAll('_', ' ')}: {(ms / 1000).toFixed(1)}s</p>)}
-        <Button variant="outline" onClick={() => {
-          void navigator.clipboard.writeText(JSON.stringify(evaluation, null, 2)).then(() => setCopied(true)).catch((error) => setSourceError(String(error)));
-        }}>{copied ? 'Copied evaluation data' : 'Copy evaluation data'}</Button>
+        <p className="task-muted">
+          Recorded work time across attempts. Parallel stages overlap in wall time; older tasks may
+          have no timing records.
+        </p>
+        {Object.entries(evaluation.stageTotalsMs).map(([stage, ms]) => (
+          <p key={stage}>
+            {stage.replaceAll('_', ' ')}: {(ms / 1000).toFixed(1)}s
+          </p>
+        ))}
+        <Button
+          variant="outline"
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(JSON.stringify(evaluation, null, 2))
+              .then(() => setCopied(true))
+              .catch((error) => setSourceError(String(error)));
+          }}
+        >
+          {copied ? 'Copied evaluation data' : 'Copy evaluation data'}
+        </Button>
       </section>
       <dl className="grid grid-cols-2 gap-4">
         {[

@@ -240,6 +240,22 @@ export function TaskDetail({
         </div>
       )}
       <TaskSaveRecovery run={run} />
+      {run.dependencyInvalidated && (
+        <p role="alert" className="task-error">
+          A predecessor was retried. Preserve this work and create a fresh feature plan before
+          continuing or integrating.
+        </p>
+      )}
+      {!!run.dependencySnapshot?.sources.length && (
+        <details className="task-notice">
+          <summary>Verified feature inputs ({run.dependencySnapshot.sources.length})</summary>
+          {run.dependencySnapshot.sources.map((source) => (
+            <p key={source.runId}>
+              {source.runId} · {source.tree.slice(0, 12)}
+            </p>
+          ))}
+        </details>
+      )}
       {!!run.contract?.requirements.length && (
         <Button variant="ghost" onClick={() => setTab('outcomes')}>
           Review {run.contract.requirements.length} outcomes and checkpoints

@@ -1,5 +1,16 @@
 [
   {
+    "id": "better-coordination-from-request-to-review",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Better coordination from request to review.",
+    "description": "Feature plans preserve the complete request and can continue from verified predecessor snapshots.",
+    "items": [
+      "Independent work shares capacity fairly, while verification reserves only its workspace.",
+      "Structured handoffs and execution timings make progress and results easier to inspect."
+    ]
+  },
+  {
     "id": "kimi-code-joins-the-workspace",
     "date": "2026-09-10",
     "status": "In development",

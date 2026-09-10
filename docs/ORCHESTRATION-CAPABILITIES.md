@@ -155,7 +155,7 @@ real notification click acceptance must be tested separately from source tests.
 ## Remaining improvements
 
 Directed wake/steering needs provider protocol support and explicit scheduling
-policy. Structured completion reports could build on saved validation/evidence
-receipts. Automatic routing needs capacity freshness, budgets and account limits;
+policy. Structured completion reports, explicit message resolution and bounded inbox
+waits are implemented; see [execution evaluation](EXECUTION-EVALUATION.md). Automatic routing needs capacity freshness, budgets and account limits;
 no automatic spending or scheduling is introduced here. Expand native transport
 coverage only with live permission and continuation trials.

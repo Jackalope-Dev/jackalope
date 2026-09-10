@@ -24,7 +24,7 @@ export const roadmapStages = [
         title: 'Room to work in parallel.',
         summary: 'Separate worktrees. Shared context. Review before integration.',
         detail:
-          'Parallel queues coordinate file scopes and dependencies. Tasks save checkpoints with project-level commit attribution. Review the patch and message, then merge as one commit and clean up finished worktrees and branches. Worktrees separate changes; they do not sandbox an agent’s access to your computer.',
+          'Repository-aware plans preserve the full request. Parallel queues prioritize dependencies and share capacity across projects. Optional verified snapshots let dependent tasks continue before final review, with structured progress reports and recorded execution timings. Installed acceptance and repeated quality evaluations remain in progress. Tasks save checkpoints with project-level commit attribution. Review the patch and message, then merge as one commit and clean up finished worktrees and branches. Worktrees separate changes; they do not sandbox an agent’s access to your computer.',
       },
       {
         title: 'Tools that travel with the work.',

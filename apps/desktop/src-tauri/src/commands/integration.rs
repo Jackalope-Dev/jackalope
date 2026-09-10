@@ -131,8 +131,6 @@ impl Drop for TemporaryIndex {
 }
 
 pub(super) fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSource, String> {
-    super::verification::ensure_idle(&run.workspace)?;
-    super::verification::ensure_idle(&run.project_path)?;
     let workspace = canonical(&run.workspace)?;
     let head = git(&workspace, &["rev-parse", "HEAD"])?;
     let status = git(
@@ -948,6 +946,7 @@ mod tests {
     fn feature_snapshots_preserve_target_and_reject_changed_predecessors() {
         let fixture = Fixture::new();
         let mut parent = fixture.run(1, "parent.txt", "verified parent\n");
+        fs::create_dir_all(&fixture.plans).unwrap();
         let tree = workspace_tree(&parent, &fixture.plans).unwrap();
         parent.verify_command = Some("fixture check".into());
         parent.verification = Some(serde_json::from_value(serde_json::json!({"command":"fixture check","checkedAt":"now","tree":tree,"result":{"success":true,"exitCode":0,"stdout":"","stderr":"","durationMs":1,"timedOut":false,"truncated":false}})).unwrap());

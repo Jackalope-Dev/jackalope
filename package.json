@@ -18,6 +18,7 @@
     "build:website": "pnpm --filter @jackalope/website build",
     "verify": "node scripts/verify.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "evaluate:execution": "node scripts/evaluation/run.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:links:website": "node apps/website/scripts/audit-links.mjs",
     "check:changelog": "node scripts/changelog.mjs check",

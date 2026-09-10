@@ -18,6 +18,7 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  dependencyInvalidated?: boolean;
   stages?: {
     stage: string;
     startedAt: string;

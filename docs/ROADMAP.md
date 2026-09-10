@@ -22,6 +22,11 @@ monitors, MCP connections, browser sessions, project lessons, codebase maps,
 capacity-aware routing and Ask Jackalope. Provider and platform limits apply;
 implementation does not establish release acceptance.
 
+Repository-aware plans preserve full requests; optional verified predecessor snapshots,
+critical-path admission, structured reports, workspace verification reservations and
+execution timing are implemented. Repeated [execution evaluations](EXECUTION-EVALUATION.md)
+and installed acceptance are required before claiming throughput or quality gains.
+
 ## In progress: dependable everyday use
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and

@@ -16,31 +16,22 @@
           "key": "normalize",
           "title": "Normalize numeric values",
           "prompt": "Implement normalize(values) in normalize.mjs. Retain finite numbers, ignore all other values, preserve order and input immutability.",
-          "scopes": [
-            "normalize.mjs"
-          ],
+          "scopes": ["normalize.mjs"],
           "dependsOn": []
         },
         {
           "key": "label",
           "title": "Format the count label",
           "prompt": "Implement label(count) in label.mjs: item for 1, items otherwise.",
-          "scopes": [
-            "label.mjs"
-          ],
+          "scopes": ["label.mjs"],
           "dependsOn": []
         },
         {
           "key": "summary",
           "title": "Integrate and verify summary",
           "prompt": "Implement summary(values) in summary.mjs using normalize and label. Verify the complete original request including empty inputs and mutation. Correct only summary.mjs; report upstream defects as blockers.",
-          "scopes": [
-            "summary.mjs"
-          ],
-          "dependsOn": [
-            "normalize",
-            "label"
-          ]
+          "scopes": ["summary.mjs"],
+          "dependsOn": ["normalize", "label"]
         }
       ],
       "oracle": "const assert = require('node:assert/strict'); const {pathToFileURL} = require('node:url'); const path = require('node:path'); (async()=> { const base=process.argv[2]; const {normalize}=await import(pathToFileURL(path.join(base,'normalize.mjs'))); const {label}=await import(pathToFileURL(path.join(base,'label.mjs'))); const {summary}=await import(pathToFileURL(path.join(base,'summary.mjs'))); const input=[1,'2',NaN,Infinity,-3,null,0]; assert.deepEqual(normalize(input),[1,-3,0]); assert.equal(input.length,7); assert.equal(label(1),'item'); assert.equal(label(0),'items'); assert.deepEqual(summary(input),{count:3,total:-2,label:'items'}); assert.deepEqual(summary([]),{count:0,total:0,label:'items'}); assert.deepEqual(summary([4]),{count:1,total:4,label:'item'}); })().catch(e=>{console.error(e.message);process.exitCode=1});"
@@ -58,9 +49,7 @@
           "key": "fix",
           "title": "Fix clamp boundaries",
           "prompt": "Fix clamp.mjs and check its boundary cases against the full request.",
-          "scopes": [
-            "clamp.mjs"
-          ],
+          "scopes": ["clamp.mjs"],
           "dependsOn": []
         }
       ],

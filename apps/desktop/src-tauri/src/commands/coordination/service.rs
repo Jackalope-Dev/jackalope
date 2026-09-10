@@ -298,6 +298,9 @@ impl Coordinator {
                             &request.id,
                         )?;
                 }
+                if !request.dependency_snapshot.sources.is_empty() {
+                    request.coordination.as_mut().unwrap().instructions.push_str(&format!("\nThis workspace includes verified predecessor snapshots, not just the target branch. Inspect these immutable input receipts and perform only your assigned work: {}\n", serde_json::to_string(&request.dependency_snapshot).map_err(|e| e.to_string())?));
+                }
                 let snapshot = self.startup(&mut inner, &request, Some(&assigned))?;
                 request
                     .coordination

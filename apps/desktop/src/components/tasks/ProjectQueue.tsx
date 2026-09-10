@@ -107,7 +107,11 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
     const original = runs.find((r) => r.id === item.runId);
     const run = original ? runs.find((r) => r.taskId === original.taskId) : undefined;
     if (item.runId && queue.mergedRunIds.includes(item.runId)) return 'merged';
-    if (item.error || (run && ['failed', 'stopped', 'interrupted'].includes(run.status)))
+    if (
+      item.error ||
+      run?.dependencyInvalidated ||
+      (run && ['failed', 'stopped', 'interrupted'].includes(run.status))
+    )
       return 'attention';
     if (run && isActive(run)) return 'active';
     if (run && ['review', 'reviewed'].includes(run.status)) return 'review';
@@ -115,6 +119,8 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
     return 'queued';
   };
   const reason = (item: QueueItem) => {
+    if (item.stagedDependencies && item.dependencies.length)
+      return 'Waiting for verified predecessor snapshots and an available slot';
     const dep = item.dependencies.find(
       (id) => !queue.mergedRunIds.includes(queue.items.find((i) => i.id === id)?.runId ?? ''),
     );
@@ -434,12 +440,14 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                   </small>
                   <p>{m.text}</p>
                   {m.resolvedBy && <span className="task-muted"> · Resolved</span>}
-                  {m.report && <div className="task-muted">
-                    <p>Completed: {m.report.completed.join('; ') || 'None reported'}</p>
-                    <p>Remaining: {m.report.remaining.join('; ') || 'None reported'}</p>
-                    <p>Artifacts: {m.report.artifacts.join(', ') || 'None reported'}</p>
-                    <p>Agent report · Snapshot {m.sourceTree?.slice(0, 12) ?? 'unavailable'}</p>
-                  </div>}
+                  {m.report && (
+                    <div className="task-muted">
+                      <p>Completed: {m.report.completed.join('; ') || 'None reported'}</p>
+                      <p>Remaining: {m.report.remaining.join('; ') || 'None reported'}</p>
+                      <p>Artifacts: {m.report.artifacts.join(', ') || 'None reported'}</p>
+                      <p>Agent report · Snapshot {m.sourceTree?.slice(0, 12) ?? 'unavailable'}</p>
+                    </div>
+                  )}
                   <small>
                     {m.recipientTaskId
                       ? `To ${items.find((item) => item.id === m.recipientTaskId)?.title ?? 'task'}`

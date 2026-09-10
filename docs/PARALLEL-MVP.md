@@ -29,6 +29,12 @@ It is not an automatic launch. Edit agents, scopes and prompts for your project
 and review every task before dispatch. Native schedules use the same guarded
 runtime; proactive proposals and remote execution remain roadmap work.
 
+Optional feature staging consumes verified immutable predecessor snapshots before final
+integration. Queue admission favors critical paths and fair project access; finishing
+attempts keep workspace ownership while verification uses separate capacity. See
+[execution quality and evaluation](EXECUTION-EVALUATION.md) for opt-in staging,
+reservations, structured reports and measurements. Legacy plans retain merge dependencies.
+
 ## Coordination contract
 
 The native `Coordinator` owns a durable queue. It validates a complete imported plan,
