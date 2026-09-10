@@ -17,7 +17,9 @@ import { marketingPages } from './marketing-content';
 import { RoadmapPage } from './Roadmap';
 import { waitlistReferral } from './referral';
 import { Newsletter, Signup, WaitlistButton } from './Signup';
+import { TourPage } from './TourPage';
 import { DEFAULT_WEBSITE_THEME, readWebsiteTheme, saveWebsiteTheme } from './theme';
+import { setInitialVideoVolume } from './video-volume';
 import { WaitlistPage } from './Waitlist';
 import './knowledge.css';
 
@@ -182,7 +184,7 @@ export function App({ path = '/' }: { path?: string }) {
                     ['Your waitlist place', '/waitlist/'],
                     ['Member access', '/access/'],
                     ['Compare workflows', '/compare/'],
-                    ['Product tour', '/#inside'],
+                    ['Product tour', '/tour/'],
                     ['Knowledgebase & Guides', '/knowledge/'],
                     ['Parallel coding agents', '/parallel-coding-agents/'],
                     ['Git worktrees for agents', '/git-worktrees-for-ai-agents/'],
@@ -230,6 +232,8 @@ export function App({ path = '/' }: { path?: string }) {
           }}
           faqs={faqs}
         />
+      ) : path === '/tour/' ? (
+        <TourPage dark={dark} available={Boolean(downloadUrl)} />
       ) : path === '/feedback/' ? (
         <FeedbackPage />
       ) : path === '/waitlist/' ? (
@@ -248,9 +252,16 @@ export function App({ path = '/' }: { path?: string }) {
         <JournalPage path={path} />
       )}
 
-      {!['/', '/privacy/', '/terms/', '/access/', '/waitlist/', '/feedback/', '/roadmap/'].includes(
-        path,
-      ) && <Newsletter />}
+      {![
+        '/',
+        '/tour/',
+        '/privacy/',
+        '/terms/',
+        '/access/',
+        '/waitlist/',
+        '/feedback/',
+        '/roadmap/',
+      ].includes(path) && <Newsletter />}
 
       <Footer home={home} path={path} />
 
@@ -292,6 +303,7 @@ export function App({ path = '/' }: { path?: string }) {
               </div>
             ) : (
               <video
+                onLoadedMetadata={setInitialVideoVolume}
                 controls
                 playsInline
                 preload="metadata"

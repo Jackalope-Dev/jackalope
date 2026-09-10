@@ -20,6 +20,9 @@ light/dark sample workspace image. Clips have native controls, captions, a
 written walkthrough and a direct video link; they do not autoplay or preload
 video data.
 
+Website players initialize at 25% volume when media loads. Visitors can adjust
+volume through the native controls; seeking and chapter changes keep that choice.
+
 The clips are silent excerpts from the existing
 `apps/website/public/media/launch-v4-720p.mp4` sample-data tour:
 
@@ -41,6 +44,14 @@ sequence is scripted. They do not establish provider authentication, real
 bookings, native task execution, or installed-app acceptance. Keep that context
 in the captions and walkthroughs. Do not use this footage to illustrate native
 Windows control or helper actions that it does not show.
+
+## Product tour
+
+`TourPage.tsx` presents the launch film with click-to-play chapter shortcuts,
+native controls, English captions, a transcript and a direct-video fallback.
+Its workflow explorer reuses the context, tasks and review workspace clips below,
+including their light/dark captures. Film and clip data load only after a play
+action. Keep chapter times aligned with `launch-v4.vtt` when replacing the film.
 
 ## Feature-page media
 

@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUpRight, Play } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { featureMedia } from './feature-media';
 import { knowledgeClips } from './knowledge-media';
+import { setInitialVideoVolume } from './video-volume';
 import './feature-media.css';
 
 export function FeatureMedia({ path, dark }: { path: string; dark: boolean }) {
@@ -45,6 +46,7 @@ export function FeatureMedia({ path, dark }: { path: string; dark: boolean }) {
               </button>
             ) : clip ? (
               <video
+                onLoadedMetadata={setInitialVideoVolume}
                 controls
                 playsInline
                 autoPlay

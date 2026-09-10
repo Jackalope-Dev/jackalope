@@ -1,5 +1,6 @@
 import { Play } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
+import { setInitialVideoVolume } from './video-volume';
 
 export function WorkspaceClip({
   scene,
@@ -20,6 +21,7 @@ export function WorkspaceClip({
       </span>
       {started ? (
         <video
+          onLoadedMetadata={setInitialVideoVolume}
           ref={focusPlayer}
           controls
           playsInline

@@ -1,7 +1,7 @@
 import { ArrowRight, Mail } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { BlogSection } from './blog-types';
-import { posts, tour, updates } from './content';
+import { posts, updates } from './content';
 import { EditorialArt } from './EditorialArt';
 import { PublishedReleases } from './PublishedReleases';
 import './blog.css';
@@ -125,66 +125,6 @@ export function JournalTeaser({ all = false }: { all?: boolean }) {
 }
 
 export function JournalPage({ path }: { path: string }) {
-  if (path === '/tour/')
-    return (
-      <main id="main" className="article page-width">
-        <nav className="article-breadcrumbs" aria-label="Breadcrumb">
-          <a href="/">Jackalope</a>
-          <span aria-hidden="true">/</span>
-          <span>App tour</span>
-        </nav>
-        <header className="article-heading">
-          <h1>{tour.title}</h1>
-          <p className="article-deck">
-            Make it yours, put your agents to work, and explore how your code fits together.
-          </p>
-        </header>
-        <video
-          className="tour-player"
-          controls
-          playsInline
-          preload="metadata"
-          poster={tour.poster}
-          aria-label="Jackalope desktop app tour"
-        >
-          <source src={tour.video} type="video/mp4" />
-          <track kind="captions" src={tour.captions} srcLang="en" label="English descriptions" />
-          <a href={tour.video}>Watch the launch film</a>
-        </video>
-        <div className="article-body">
-          <section>
-            <h2>What happens in the tour</h2>
-            <p>{tour.transcript}</p>
-          </section>
-          <section>
-            <h2>Try this workflow with your own project</h2>
-            <p>
-              Start with a local Git repository and a configured coding agent, such as Codex or
-              Claude Code. Describe the outcome, follow the attempt, and inspect the result before
-              integrating changes. You bring your existing agent accounts and subscriptions.
-            </p>
-            <p>
-              <a href="/blog/from-brief-to-review/">Read the guide from brief to review</a> for the
-              full workflow.
-            </p>
-          </section>
-          <section>
-            <h2>When can I download Jackalope?</h2>
-            <p>
-              {publishedVersion ? (
-                <>
-                  <a href="/#download">Jackalope {publishedVersion} for Windows</a> is available.
-                </>
-              ) : (
-                'Coming soon.'
-              )}{' '}
-              <a href="/#newsletter">Join the waitlist</a> for launch news, or{' '}
-              <a href="/changelog/">follow the development changelog</a>.
-            </p>
-          </section>
-        </div>
-      </main>
-    );
   const post = posts.find((item) => path === `/blog/${item.slug}/`);
   if (post)
     return (

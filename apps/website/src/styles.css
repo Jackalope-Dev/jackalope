@@ -1604,15 +1604,6 @@ fieldset {
 .article-breadcrumbs a:hover {
   color: var(--color-text-primary);
 }
-.tour-player {
-  display: block;
-  width: 100%;
-  aspect-ratio: 12 / 7;
-  margin-top: 36px;
-  border-radius: 16px;
-  background: var(--color-surface-sunken);
-  box-shadow: var(--shadow-pop);
-}
 .article-body section {
   margin-bottom: 44px;
 }

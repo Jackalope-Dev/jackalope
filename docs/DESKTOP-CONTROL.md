@@ -151,8 +151,10 @@ screen capture. Selected text is replaced explicitly; uncertain or partial input
 must be inspected before continuing.
 
 Run `bash scripts/verification/linux-desktop-control.sh` after a native build.
-The fixture needs `python3-gi xvfb openbox xcompmgr xdotool` and its own private
-D-Bus session; the script creates those desktop/session resources and closes only
+The fixture needs `python3-gi gir1.2-atspi-2.0 at-spi2-core xvfb openbox xcompmgr xdotool`
+and its own private D-Bus session. `at-spi2-core` supplies the accessibility bus
+service; the development library alone is insufficient. The script creates those
+desktop/session resources and closes only
 its own processes. It exercises native Resume, Unicode typing, text replacement,
 click, scroll, nonblank PNG capture, password rejection, focus/movement pause,
 epoch invalidation and Escape. Xvfb device events exercise the physical-input

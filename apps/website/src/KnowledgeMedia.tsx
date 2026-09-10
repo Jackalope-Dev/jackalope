@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { knowledgeClips, knowledgeScreenshots } from './knowledge-media';
+import { setInitialVideoVolume } from './video-volume';
 
 export function KnowledgeMedia({
   slug,
@@ -22,6 +23,7 @@ export function KnowledgeMedia({
           <span>{clip.seconds}s · silent demo</span>
         </div>
         <video
+          onLoadedMetadata={setInitialVideoVolume}
           controls
           playsInline
           preload="none"

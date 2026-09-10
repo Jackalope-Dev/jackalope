@@ -71,6 +71,7 @@ api(`${prefix}/branches/${repository.default_branch}/protection`, 'PUT', {
     contexts: [
       'verify',
       'dependencies',
+      'codeql',
       'secrets',
       'Verify ubuntu-22.04',
       'Verify ubuntu-24.04',
