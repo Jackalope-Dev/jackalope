@@ -774,9 +774,12 @@ static void update_devices(void) {
   int count;
   XIDeviceInfo *devices = XIQueryDevice(display, XIAllDevices, &count);
   check(devices && x_ok(), "Input device inventory is unavailable.");
-  for (int i = 0; i < count; i++)
+  for (int i = 0; i < count; i++) {
+    check(g_ascii_strncasecmp(devices[i].name, "xwayland", 8) != 0,
+          "XWayland cannot monitor physical input across a Wayland desktop.");
     if (strstr(devices[i].name, "XTEST"))
       g_array_append_val(synthetic_devices, devices[i].deviceid);
+  }
   XIFreeDeviceInfo(devices);
   check(synthetic_devices->len >= 2, "XTEST input devices are unavailable.");
 }
@@ -935,6 +938,7 @@ int main(void) {
       int event, error, opcode, major = 2, minor = 0, composite_major,
                                 composite_minor;
       available =
+          !XQueryExtension(probe, "XWAYLAND", &opcode, &event, &error) &&
           XTestQueryExtension(probe, &event, &error, &composite_major,
                               &composite_minor) &&
           XQueryExtension(probe, "XInputExtension", &opcode, &event, &error) &&
@@ -959,6 +963,9 @@ int main(void) {
   root = DefaultRootWindow(display);
   XSetErrorHandler(x_error);
   int event, error, major, minor;
+  check(!XQueryExtension(display, "XWAYLAND", &major, &event, &error),
+        "XWayland cannot monitor physical input across a Wayland desktop. Use "
+        "an X11 session.");
   check(XTestQueryExtension(display, &event, &error, &major, &minor),
         "XTEST input support is unavailable.");
   if (!strcmp(action, "list"))

@@ -53,7 +53,11 @@ export function SystemInfoView() {
       <WorkspaceHeading
         title="Devices"
         action={
-          <Button variant="outline" disabled={!desktop || loading || requestingPermissions} onClick={() => void load()}>
+          <Button
+            variant="outline"
+            disabled={!desktop || loading || requestingPermissions}
+            onClick={() => void load()}
+          >
             <RefreshCw size={16} />
             {loading ? 'Reading…' : 'Refresh device'}
           </Button>
