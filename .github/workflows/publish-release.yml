@@ -37,7 +37,7 @@ jobs:
       UPDATE_BASE_URL: ${{ inputs.channel == 'stable' && 'https://api.jackalope.dev' || 'https://staging-api.jackalope.dev' }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Verify reviewed candidate provenance
@@ -51,7 +51,7 @@ jobs:
           if ($run.conclusion -ne 'success' -or $run.head_branch -ne $expectedBranch -or $run.event -ne 'workflow_dispatch' -or $run.path -ne '.github/workflows/desktop-release.yml' -or $run.repository.full_name -ne $env:GH_REPO) { throw 'Expected a successful manually built candidate from the matching release branch in this repository' }
           "source=$($run.head_sha)" >> $env:GITHUB_OUTPUT
           "EXPECTED_SOURCE=$($run.head_sha)" >> $env:GITHUB_ENV
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ steps.candidate.outputs.source }}
           persist-credentials: false
@@ -114,7 +114,7 @@ jobs:
       group: website-refs/heads/master
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: master
           persist-credentials: false
