@@ -97,7 +97,7 @@ pub fn readiness() -> Readiness {
                     .iter()
                     .all(|key| value[key] == true)
             } else {
-                value["available"] == true
+                value["available"] == true && (!wayland_session() || value["protocol"] == 1)
             }
         });
         Readiness {
@@ -167,8 +167,6 @@ pub async fn desktop_control_request_permissions() -> Result<Readiness, String> 
 
 #[cfg(target_os = "linux")]
 fn install_gnome_extension() -> Result<(), String> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
     let data = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
@@ -176,6 +174,13 @@ fn install_gnome_extension() -> Result<(), String> {
         .filter(|path| path.is_absolute())
         .ok_or("The user data directory is unavailable.")?;
     let directory = data.join("gnome-shell/extensions/desktop-control@jackalope.dev");
+    write_gnome_extension(&directory)
+}
+
+#[cfg(target_os = "linux")]
+fn write_gnome_extension(directory: &std::path::Path) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
     if std::fs::symlink_metadata(&directory)
         .is_ok_and(|metadata| !metadata.is_dir() || metadata.file_type().is_symlink())
     {
@@ -279,6 +284,36 @@ pub(super) fn key(key: &str) -> String {
 mod tests {
     use super::*;
     use std::os::unix::fs::{symlink, PermissionsExt};
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn gnome_install_preserves_other_files_and_rejects_links() {
+        let directory =
+            std::env::temp_dir().join(format!("jackalope-gnome-install-{}", uuid::Uuid::new_v4()));
+        write_gnome_extension(&directory).unwrap();
+        let custom = directory.join("custom.txt");
+        std::fs::write(&custom, "preserve").unwrap();
+        write_gnome_extension(&directory).unwrap();
+        assert_eq!(std::fs::read_to_string(&custom).unwrap(), "preserve");
+        let metadata: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(directory.join("metadata.json")).unwrap())
+                .unwrap();
+        assert_eq!(metadata["shell-version"], serde_json::json!(["46"]));
+        let guard = directory.join("guard.js");
+        assert_eq!(
+            std::fs::metadata(&guard).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        std::fs::remove_file(&guard).unwrap();
+        symlink(&custom, &guard).unwrap();
+        assert!(write_gnome_extension(&directory).is_err());
+        assert_eq!(std::fs::read_to_string(&custom).unwrap(), "preserve");
+        let link = directory.with_extension("link");
+        symlink(&directory, &link).unwrap();
+        assert!(write_gnome_extension(&link).is_err());
+        std::fs::remove_file(link).unwrap();
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn desktop_lease_rejects_links_and_shared_permissions() {

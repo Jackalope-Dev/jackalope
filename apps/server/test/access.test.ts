@@ -10,6 +10,7 @@ import {
   type WaitlistMail,
 } from '../src/access/mail';
 import { syncNewsletter } from '../src/access/newsletter';
+import {acceptWaitlistToken} from '../src/access/waitlist';
 import {
   acceptToken,
   approve,
@@ -85,6 +86,12 @@ async function admitted(email: string) {
     ),
     session,
   };
+}
+async function confirmNewsletter(email: string) {
+  const row = await env.DB.prepare("SELECT payload FROM access_mail WHERE email=? AND kind='waitlist' ORDER BY created_at DESC,rowid DESC LIMIT 1").bind(email).first<{payload: string}>();
+  const message = await unseal<WaitlistMail>(required(row).payload, bindings.ACCESS_SECRET);
+  expect(message.newsletter).toBe(true);
+  await acceptWaitlistToken(bindings, required(message.token));
 }
 async function request(
   path: string,
@@ -230,9 +237,9 @@ it('confirms a new signup once under contention, without issuing access or requi
   expect(content.text).toContain('Each new person who verifies their email');
   await env.DB.prepare('DELETE FROM access_mail').run();
   await register(bindings, message.to, true, 'inline');
-  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 0 });
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM access_mail').first()).toEqual({ n: 1 });
   expect(await env.DB.prepare('SELECT newsletter FROM access_members').first()).toEqual({
-    newsletter: 1,
+    newsletter: 0,
   });
 });
 it('retries confirmation failures and preserves one queue claim across competing deliveries', async () => {
@@ -448,10 +455,14 @@ it('queues branded transactional mail once with encrypted tokens and retries pro
   ).toMatchObject({ state: 'queued' });
 });
 
-it('keeps newsletter consent and retries independent of signup confirmation mail', async () => {
+it('requires confirmation of newsletter consent before provider sync and preserves bounded retries', async () => {
   bindings.ACCESS_AUDIENCE_LIST = 'fixturelist12345678901234';
   await register(bindings, 'no@example.com', false, 'inline');
   await register(bindings, 'yes@example.com', true, 'popup');
+  const neverSend = vi.fn();
+  await syncNewsletter(bindings, neverSend);
+  expect(neverSend).not.toHaveBeenCalled();
+  await confirmNewsletter('yes@example.com');
   let calls = 0;
   const bodies: Record<string, unknown>[] = [];
   const send = (async (url, init) => {
@@ -503,6 +514,7 @@ it('keeps newsletter consent and retries independent of signup confirmation mail
 it('reconciles the audience only when a member actually changes', async () => {
   bindings.ACCESS_AUDIENCE_LIST = 'fixturelist12345678901234';
   await register(bindings, 'reconcile@example.com', true, 'inline');
+  await confirmNewsletter('reconcile@example.com');
   const bodies: Record<string, unknown>[] = [];
   let tags = ['operator-tag', 'jackalope-waitlist'];
   let attributes: Record<string, unknown> = { operator_note: 'keep' };
@@ -565,6 +577,7 @@ it('reconciles the audience only when a member actually changes', async () => {
 it('retries partial audience updates and refreshes legacy sync state without losing removed attributes', async () => {
   bindings.ACCESS_AUDIENCE_LIST = 'fixturelist12345678901234';
   await register(bindings, 'partial@example.com', true, 'inline');
+  await confirmNewsletter('partial@example.com');
   const previous = JSON.stringify({ tags: [], attributes: { platforms: 'linux' } });
   await env.DB.prepare('UPDATE access_members SET sequenzy_state=? WHERE email=?')
     .bind(previous, 'partial@example.com')

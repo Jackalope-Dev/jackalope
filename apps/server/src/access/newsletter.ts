@@ -3,7 +3,7 @@ import { providerJson } from './provider';
 
 const RECONCILE_INTERVAL = 6 * 3600000;
 const COLUMNS =
-  'email,status,source,newsletter,created_at,approved_at,verified_at,waitlist_verified_at,first_download_at,first_desktop_at,referral_count,waitlist_referrer_id,invited_by,preferences,campaign';
+  'email,status,source,newsletter,newsletter_confirmed_at,created_at,approved_at,verified_at,waitlist_verified_at,first_download_at,first_desktop_at,referral_count,waitlist_referrer_id,invited_by,preferences,campaign';
 
 /**
  * Pushes consented members into the Sequenzy audience with the tags and
@@ -21,7 +21,7 @@ export async function syncNewsletter(env: Env, request = fetch, now = Date.now()
     return;
   const rows = await env.DB.prepare(
     `SELECT id FROM access_members WHERE newsletter_next_at<=? AND newsletter_attempts<5
-       AND (sequenzy_state IS NOT NULL OR (newsletter=1 AND status!='revoked'))
+       AND (sequenzy_state IS NOT NULL OR (newsletter=1 AND newsletter_confirmed_at IS NOT NULL AND status!='revoked'))
      ORDER BY newsletter_next_at LIMIT 10`,
   )
     .bind(now)
@@ -83,9 +83,7 @@ export async function syncNewsletter(env: Env, request = fetch, now = Date.now()
             customAttributes: state.attributes,
             lists: [env.ACCESS_AUDIENCE_LIST],
             duplicateStrategy: 'merge',
-            // Consent was captured on the Jackalope form; a second
-            // confirmation email would be a duplicate the member did not ask
-            // for. Enrollment stays off so this sync never starts a sequence.
+            // The single-use email link confirms this specific newsletter request.
             optInMode: 'confirmed',
             enrollInSequences: false,
           });

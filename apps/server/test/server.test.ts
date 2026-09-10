@@ -315,6 +315,17 @@ describe('resource and retention controls', () => {
         .status,
     ).toBe(403);
   });
+  it('does not spend shared capacity on rejected callers and separates account traffic from ingestion', async () => {
+    const global = vi.fn(async () => ({success: true}));
+    for (const rejected of ['IP_LIMITER', 'FEEDBACK_LIMITER'] as const) {
+      const response = await request('/v2/feedback', feedback(), {}, testEnv({GLOBAL_LIMITER: {limit: global}, [rejected]: {limit: async () => ({success: false})}}));
+      expect(response.status).toBe(429);
+    }
+    expect(global).not.toHaveBeenCalled();
+    await request('/v2/telemetry', telemetry(), {}, testEnv({GLOBAL_LIMITER: {limit: global}}));
+    await request('/v1/desktop/me', undefined, {}, testEnv({EARLY_ACCESS_ENABLED: 'true', GLOBAL_LIMITER: {limit: global}}));
+    expect(global.mock.calls).toEqual([[{key: 'ingestion'}], [{key: 'desktop-session'}]]);
+  });
   it('fails closed on missing configuration and paused ingestion', async () => {
     for (const bindings of [
       testEnv({ RATE_SECRET: '' }),

@@ -15,11 +15,12 @@ export async function waitlistMailStatements(
   memberId: string,
   now = Date.now(),
   fresh = false,
+  newsletter = false,
 ) {
   const token = randomToken();
   const hash = await tokenHash(token);
   const payload = await seal(
-    { to: email, kind: 'waitlist', token } satisfies WaitlistMail,
+    { to: email, kind: 'waitlist', token, newsletter } satisfies WaitlistMail,
     env.ACCESS_SECRET,
   );
   const guard = `EXISTS(SELECT 1 FROM access_members WHERE id=? AND email=? AND status!='revoked')
@@ -28,8 +29,8 @@ export async function waitlistMailStatements(
   const values = [memberId, email, email, now - 60000, email, now - day];
   return [
     env.DB.prepare(
-      `INSERT INTO access_waitlist_tokens(hash,member_id,created_at,expires_at) SELECT ?,?,?,? WHERE ${guard}`,
-    ).bind(hash, memberId, now, now + (fresh ? 7 * day : 1800000), ...values),
+      `INSERT INTO access_waitlist_tokens(hash,member_id,created_at,expires_at,newsletter_requested) SELECT ?,?,?,?,? WHERE ${guard}`,
+    ).bind(hash, memberId, now, now + (fresh ? 7 * day : 1800000), Number(newsletter), ...values),
     env.DB.prepare(
       `INSERT INTO access_mail(id,email,kind,payload,created_at) SELECT ?,?,'waitlist',?,? WHERE ${guard}`,
     ).bind(crypto.randomUUID(), email, payload, now, ...values),
@@ -51,6 +52,10 @@ export async function acceptWaitlistToken(env: Env, raw: string, now = Date.now(
   const sessionHash = await tokenHash(session);
   const active = `SELECT member_id FROM access_waitlist_tokens WHERE hash=? AND used_at IS NULL AND expires_at>?`;
   await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE access_members SET newsletter=1,newsletter_confirmed_at=?,newsletter_next_at=0,newsletter_attempts=0
+       WHERE id IN (${active} AND newsletter_requested=1) AND status!='revoked'`,
+    ).bind(now, hash, now),
     env.DB.prepare(
       `UPDATE access_members SET waitlist_verified_at=coalesce(waitlist_verified_at,?) WHERE id IN (${active}) AND status!='revoked'`,
     ).bind(now, hash, now),

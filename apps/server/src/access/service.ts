@@ -25,7 +25,7 @@ export function memberInsert(
   id = crypto.randomUUID(),
 ) {
   return env.DB.prepare(
-    'INSERT INTO access_members(id,email,created_at,source,share_code,newsletter,waitlist_joined_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET newsletter=max(newsletter,excluded.newsletter),waitlist_joined_at=coalesce(waitlist_joined_at,excluded.waitlist_joined_at)',
+    'INSERT INTO access_members(id,email,created_at,source,share_code,newsletter,waitlist_joined_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET waitlist_joined_at=coalesce(waitlist_joined_at,excluded.waitlist_joined_at)',
   ).bind(
     id,
     email,
@@ -47,6 +47,8 @@ export async function register(
   const id = crypto.randomUUID();
   const now = Date.now();
   const surveyToken = randomToken();
+  const existing = await env.DB.prepare('SELECT id FROM access_members WHERE email=?')
+    .bind(email).first<{id: string}>();
   await env.DB.batch([
     memberInsert(env, email, source, newsletter, now, id),
     env.DB.prepare(
@@ -60,7 +62,7 @@ export async function register(
     env.DB.prepare(
       "UPDATE access_members SET waitlist_referrer_id=(SELECT id FROM access_members WHERE share_code=? AND id!=? AND status!='revoked' AND waitlist_verified_at IS NOT NULL) WHERE id=?",
     ).bind(referral ?? '', id, id),
-    ...(await waitlistMailStatements(env, email, id, now, true)),
+    ...(await waitlistMailStatements(env, email, newsletter ? existing?.id ?? id : id, now, true, newsletter)),
   ]);
   return surveyToken;
 }

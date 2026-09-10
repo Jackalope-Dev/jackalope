@@ -173,6 +173,7 @@ export async function accessRoutes(
       const body = z.strictObject({ token: tokenSchema }).parse(await readJson(request));
       const session = await acceptWaitlistToken(env, body.token);
       if (ctx) ctx.waitUntil(deliverAccessMail(env));
+      if (ctx) ctx.waitUntil(syncNewsletter(env));
       return json({ success: true }, 200, { 'set-cookie': waitlistCookie(session) });
     }
     if (request.method === 'POST' && path === '/v1/access/waitlist/preferences') {

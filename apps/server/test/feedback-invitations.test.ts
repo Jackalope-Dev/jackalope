@@ -41,9 +41,9 @@ async function member(newsletter = true) {
   const id = crypto.randomUUID();
   const secret = randomToken();
   await env.DB.prepare(
-    "INSERT INTO access_members(id,email,status,created_at,approved_at,verified_at,source,share_code,newsletter) VALUES(?,?,'approved',?,?,?,'fixture',?,?)",
+    "INSERT INTO access_members(id,email,status,created_at,approved_at,verified_at,source,share_code,newsletter,newsletter_confirmed_at) VALUES(?,?,'approved',?,?,?,'fixture',?,?,?)",
   )
-    .bind(id, `${id}@example.invalid`, start, start, start, randomToken(), Number(newsletter))
+    .bind(id, `${id}@example.invalid`, start, start, start, randomToken(), Number(newsletter), newsletter ? start : null)
     .run();
   await env.DB.prepare(
     'INSERT INTO access_devices(id,hash,member_id,created_at,expires_at) VALUES(?,?,?,?,?)',

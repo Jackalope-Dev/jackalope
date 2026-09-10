@@ -2,6 +2,28 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parsePatchFiles } from '@pierre/diffs';
 import { code } from '@streamdown/code';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Streamdown } from 'streamdown';
+import { ResultImage } from '../src/lib/result-images.ts';
+
+test('untrusted Markdown images never load until explicitly opened', () => {
+  let opened;
+  const onOpenLink = (url) => { opened = url; };
+  const html = renderToStaticMarkup(createElement(Streamdown, {
+    skipHtml: true, mode: 'static',
+    components: {img: (props) => createElement(ResultImage, {...props, onOpenLink})},
+  }, '![diagram](https://example.invalid/pixel?data=synthetic)'));
+  assert.doesNotMatch(html, /<img|<iframe|<link|src=/);
+  assert.match(html, /Open image: diagram/);
+  assert.equal(opened, undefined);
+  const button = ResultImage({src: 'https://example.invalid/diagram', onOpenLink});
+  button.props.onClick();
+  assert.equal(opened, 'https://example.invalid/diagram');
+  for (const src of ['javascript:alert(1)', 'data:image/svg+xml,synthetic', 'file:///etc/passwd']) {
+    assert.equal(ResultImage({src, onOpenLink}).type, 'span');
+  }
+});
 
 test('highlighting preserves middle edits in equal-length code blocks', async () => {
   const first = `// ${'a'.repeat(110)}\nconst value = 1;\n// ${'z'.repeat(110)}`;

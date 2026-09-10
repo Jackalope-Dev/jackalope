@@ -79,14 +79,20 @@ The flags apply only to the launched process. Providers can reject unsupported
 models or constrain effort; the saved receipt records what Jackalope requested,
 not a provider confirmation. Other adapters retain their configured model effort.
 Legacy requests without an effort retain the CLI default. Continuations inherit
-the saved effort unless a caller explicitly supplies another level. Automatic
-model switching or effort escalation is not enabled from this small evaluation.
+the saved effort unless a caller explicitly supplies another level. Quality-based
+automatic model switching and effort escalation are not enabled.
 
 The Codex bridge now waits up to 720 seconds: the saved check can wait 300 seconds
 for a slot, execute for 300 seconds, and complete snapshot/result bookkeeping.
 The queue and command keep their separate cancellation controls. Extending the
 client timeout does not extend the command's execution limit or authorize another
 command. Stored verification remains available through verification_output.
+
+Isolated manual tasks whose launch snapshot has no peers or pending messages skip
+routine coordination polling and completion messages. The exception does not apply
+to current-checkout or assigned queue work. Shared-interface edits, scope expansion
+and new coordination needs still require a refresh; tool-delivered updates remain
+untrusted observations that the worker must assess.
 
 Task history and usage exports record requested effort, launch prompt bytes,
 verification stdout before/after filtering, and bounded unique tool-call counts
@@ -100,7 +106,8 @@ Include every continuation attempt when comparing the cost of completing a task.
 The evaluation runner supports four variants:
 
 - `before`: preserved native executable plus the original frozen prompts.
-- `control`: current native executable and prompts with an explicitly chosen effort.
+- `control`: `--control` executable (defaults to `--after`) and current frontend
+  prompts with an explicitly chosen effort.
 - `after`: current native executable and prompts with an explicitly chosen effort.
 - `direct`: installed Codex/Claude CLI, raw task instructions, same explicit model
   and base permission policy, without Jackalope guidance or its MCP bridge.
@@ -143,7 +150,10 @@ training results only. It requires at least three distinct cases and ten decided
 trials per category/configuration, complete usage, and a 95% Wilson lower success
 bound of 0.7. These are minimum experimental gates, not a production quality SLA.
 Held-out results can reject the selection but never choose a replacement. Duplicate
-receipts and overlapping training/held-out case IDs are rejected. Direct CLI runs
+receipts and overlapping training/held-out case IDs are rejected. CLI version,
+executable hash and profile fingerprint must be known; configurations remain
+separate. The fingerprint identifies the configured profile, not an authenticated
+identity after someone signs in again. Direct CLI runs
 are comparison data and cannot become a Jackalope worker selection.
 
 Human acceptance is the default outcome; without reviews it stays undecided. Pass

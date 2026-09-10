@@ -1,0 +1,7 @@
+/.github/ @Ghosts
+/scripts/release/ @Ghosts
+/scripts/security/ @Ghosts
+/patches/ @Ghosts
+/apps/server/src/access/ @Ghosts
+/apps/desktop/src-tauri/capabilities/ @Ghosts
+/apps/desktop/src-tauri/tauri.conf.json @Ghosts

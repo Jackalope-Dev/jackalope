@@ -556,3 +556,48 @@ async fn http_and_native_mcp_responses_deliver_updates_and_preserve_tool_results
     }
     server.abort();
 }
+
+#[tokio::test]
+async fn isolated_solo_guidance_requires_an_empty_current_project_snapshot() {
+    let fixture = Fixture::new();
+    let mut input = request(None);
+    input.project_id = "empty-project".into();
+    input.isolated = true;
+    {
+        let mut inner = fixture.service.inner.lock().unwrap();
+        assert!(fixture
+            .service
+            .startup(&mut inner, &input, None)
+            .unwrap()
+            .contains("routine project/inbox checks"));
+        input.isolated = false;
+        assert!(!fixture
+            .service
+            .startup(&mut inner, &input, None)
+            .unwrap()
+            .contains("routine project/inbox checks"));
+        input.isolated = true;
+        input.project_id = "p".into();
+        assert!(!fixture
+            .service
+            .startup(&mut inner, &input, None)
+            .unwrap()
+            .contains("routine project/inbox checks"));
+    }
+    fixture.running("writer-run");
+    let message = fixture.message("pending coordination", None).await;
+    input.project_id = "empty-project".into();
+    let mut inner = fixture.service.inner.lock().unwrap();
+    inner
+        .ledger
+        .messages
+        .iter_mut()
+        .find(|m| m.id == message.id)
+        .unwrap()
+        .project_id = input.project_id.clone();
+    assert!(!fixture
+        .service
+        .startup(&mut inner, &input, None)
+        .unwrap()
+        .contains("routine project/inbox checks"));
+}

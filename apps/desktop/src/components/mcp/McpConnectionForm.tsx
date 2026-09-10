@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { mcpEndpointError } from '../../lib/mcp-endpoint';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { useMcpStore } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -58,8 +59,10 @@ export function McpConnectionForm({
       if (agents?.length === 0) throw new Error('Choose at least one agent.');
       if (transport === 'stdio' && !command.trim())
         throw new Error('Enter the executable command.');
-      if (transport !== 'stdio' && !/^https?:\/\//i.test(url.trim()))
-        throw new Error('Enter an HTTP or HTTPS endpoint.');
+      if (transport !== 'stdio') {
+        const endpointError = mcpEndpointError(url.trim());
+        if (endpointError) throw new Error(endpointError);
+      }
       if (
         !legacy &&
         !discovery &&

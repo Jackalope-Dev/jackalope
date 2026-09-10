@@ -1,0 +1,11 @@
+{
+  "rustWarnings": [
+    {"package":"proc-macro-error","version":"1.0.4","advisory":"RUSTSEC-2024-0370","reason":"Transitive GTK derive macro; replacement requires an upstream GTK dependency update."},
+    {"package":"serial","version":"0.4.0","advisory":"RUSTSEC-2017-0008","reason":"Transitive portable-pty dependency; Jackalope uses PTYs, not serial ports."},
+    {"package":"unic-char-property","version":"0.9.0","advisory":"RUSTSEC-2025-0081","reason":"Transitive Tauri URL-pattern Unicode tables; track upstream replacement."},
+    {"package":"unic-char-range","version":"0.9.0","advisory":"RUSTSEC-2025-0075","reason":"Transitive Tauri URL-pattern Unicode tables; track upstream replacement."},
+    {"package":"unic-common","version":"0.9.0","advisory":"RUSTSEC-2025-0080","reason":"Transitive Tauri URL-pattern Unicode tables; track upstream replacement."},
+    {"package":"unic-ucd-ident","version":"0.9.0","advisory":"RUSTSEC-2025-0100","reason":"Transitive Tauri URL-pattern Unicode tables; track upstream replacement."},
+    {"package":"unic-ucd-version","version":"0.9.0","advisory":"RUSTSEC-2025-0098","reason":"Transitive Tauri URL-pattern Unicode tables; track upstream replacement."}
+  ]
+}

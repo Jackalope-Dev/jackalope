@@ -6,8 +6,9 @@ import Mtk from 'gi://Mtk';
 import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
-import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Extension, InjectionManager } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 import { requireValue, sameBounds, validBounds, WindowGrant } from './guard.js';
 
 const IFACE = `<node><interface name="org.jackalope.DesktopControl1">
@@ -53,17 +54,31 @@ function processStart(pid) {
 
 export default class JackalopeControl extends Extension {
   enable() {
+    requireValue(Config.PACKAGE_VERSION.startsWith('46.'), 'This bridge requires GNOME 46.');
     this._instance = GLib.uuid_string_random();
     this._seat = Clutter.get_default_backend().get_default_seat();
     this._keys = new Set();
     this._buttons = new Set();
     this._touches = new Set();
     this._ownDevices = new Set();
+    this._retiredDevices = new Set();
     this._signals = [];
     this._session = null;
     this._resumeTicket = 0;
-    this._busy = false;
     this._enabled = true;
+    this._idleMonitor = global.backend.get_core_idle_monitor();
+    this._injections = new InjectionManager();
+    const observe = (event) => this._input(event);
+    this._injections.overrideMethod(
+      Object.getPrototypeOf(Main.inputMethod),
+      'vfunc_filter_key_event',
+      (original) =>
+        function (event) {
+          observe(event);
+          return original.call(this, event);
+        },
+    );
+    this._watchInput();
     this._signals.push([
       global.stage,
       global.stage.connect('captured-event', (_stage, event) => this._input(event)),
@@ -80,6 +95,16 @@ export default class JackalopeControl extends Extension {
       Main.overview,
       Main.overview.connect('showing', () => this._pause('Overview opened')),
     ]);
+    this._signals.push([
+      this._seat,
+      this._seat.connect('device-removed', (_seat, device) => {
+        if (this._retiredDevices.delete(device)) return;
+        this._cancel('Input device disconnected');
+        this._keys.clear();
+        this._buttons.clear();
+        this._touches.clear();
+      }),
+    ]);
     this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
     this._dbus.export(Gio.DBus.session, '/org/jackalope/DesktopControl');
     this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
@@ -90,6 +115,9 @@ export default class JackalopeControl extends Extension {
 
   disable() {
     this._enabled = false;
+    if (this._inputWatch) this._idleMonitor.remove_watch(this._inputWatch);
+    this._inputWatch = 0;
+    this._injections?.clear();
     this._cancel('GNOME extension disabled');
     this._forget();
     for (const [object, id] of this._signals ?? []) object.disconnect(id);
@@ -185,6 +213,9 @@ export default class JackalopeControl extends Extension {
   }
 
   _input(event) {
+    if (!this._enabled) return Clutter.EVENT_PROPAGATE;
+    // Input-method replays lost their source device; the original passed our filter.
+    if (event.get_flags() & Clutter.EventFlags.FLAG_INPUT_METHOD) return Clutter.EVENT_PROPAGATE;
     if (this._ownDevices.has(event.get_source_device())) return Clutter.EVENT_PROPAGATE;
     const type = event.type();
     if (type === Clutter.EventType.KEY_PRESS) {
@@ -208,6 +239,12 @@ export default class JackalopeControl extends Extension {
         Clutter.EventType.TOUCHPAD_PINCH,
         Clutter.EventType.TOUCHPAD_SWIPE,
         Clutter.EventType.TOUCHPAD_HOLD,
+        Clutter.EventType.PROXIMITY_IN,
+        Clutter.EventType.PROXIMITY_OUT,
+        Clutter.EventType.PAD_BUTTON_PRESS,
+        Clutter.EventType.PAD_BUTTON_RELEASE,
+        Clutter.EventType.PAD_RING,
+        Clutter.EventType.PAD_STRIP,
       ].includes(type)
     ) {
       return Clutter.EVENT_PROPAGATE;
@@ -216,6 +253,23 @@ export default class JackalopeControl extends Extension {
     if (this._session?.status === 'active')
       this._pause('You used the keyboard, pointer or touch input');
     return Clutter.EVENT_PROPAGATE;
+  }
+
+  _watchInput() {
+    this._inputWatch = this._idleMonitor.add_user_active_watch(() => {
+      this._inputWatch = 0;
+      if (!this._enabled) return;
+      // Mutter 46 invokes this synchronously before forwarding client events.
+      const event = Clutter.get_current_event();
+      try {
+        if (event) this._input(event);
+        else this._pause('Input observation unavailable');
+      } catch {
+        this._cancel('Input observation failed');
+      } finally {
+        if (this._enabled) this._watchInput();
+      }
+    });
   }
 
   _verify() {
@@ -227,6 +281,7 @@ export default class JackalopeControl extends Extension {
     }
     if (this._preparing) return;
     try {
+      requireValue(this._inputWatch > 0, 'Input observation unavailable');
       const [window, current] = this._selected(session.window);
       requireValue(
         this._bar?.visible && this._bar.mapped && !Main.sessionMode.isLocked,
@@ -256,6 +311,7 @@ export default class JackalopeControl extends Extension {
     this._removeBar();
     this._pointer = null;
     this._keyboard = null;
+    for (const device of this._ownDevices) this._retiredDevices.add(device);
     this._ownDevices.clear();
   }
 
@@ -270,15 +326,18 @@ export default class JackalopeControl extends Extension {
       Main.layoutManager.removeChrome(this._bar);
       this._bar.destroy();
       this._bar = null;
+      this._toggle = null;
+      this._label = null;
     }
   }
 
   _render() {
     if (!this._bar || !this._session) return;
     const active = this._session.status === 'active';
+    const title = this._session.window.title.slice(0, 36);
     this._label.text = active
-      ? 'Jackalope controls this window · Esc to cancel'
-      : `Paused · ${this._session.reason}`;
+      ? `${title} · Jackalope control · Esc to cancel`
+      : `${title} · Paused · ${this._session.reason}`;
     this._toggle.label = active ? 'Pause' : 'Resume';
   }
 
@@ -489,11 +548,11 @@ export default class JackalopeControl extends Extension {
     const keyboard = this._keyboard;
     try {
       this._check(request);
-      if (modifier) keyboard.notify_keyval(0, modifier, Clutter.KeyState.PRESSED);
-      keyboard.notify_keyval(0, key, Clutter.KeyState.PRESSED);
-      keyboard.notify_keyval(0, key, Clutter.KeyState.RELEASED);
+      if (modifier) keyboard.notify_keyval(GLib.get_monotonic_time(), modifier, Clutter.KeyState.PRESSED);
+      keyboard.notify_keyval(GLib.get_monotonic_time(), key, Clutter.KeyState.PRESSED);
+      keyboard.notify_keyval(GLib.get_monotonic_time(), key, Clutter.KeyState.RELEASED);
     } finally {
-      if (modifier) keyboard.notify_keyval(0, modifier, Clutter.KeyState.RELEASED);
+      if (modifier) keyboard.notify_keyval(GLib.get_monotonic_time(), modifier, Clutter.KeyState.RELEASED);
     }
     await delay(40);
     this._check(request);
@@ -506,7 +565,7 @@ export default class JackalopeControl extends Extension {
       'GNOME Wayland control is unavailable.',
     );
     if (request.action === 'permissions')
-      return { available: true, session: 'gnome-wayland', protocol: 1 };
+      return { available: this._inputWatch > 0, session: 'gnome-wayland', protocol: 1 };
     if (request.action === 'list') {
       const windows = [];
       for (const window of this._windows().reverse()) {
@@ -545,13 +604,13 @@ export default class JackalopeControl extends Extension {
       requireValue(['click', 'scroll'].includes(request.action), 'Unsupported desktop operation.');
       const [x, y] = this._point(request, current, window);
       const pointer = this._pointer;
-      pointer.notify_absolute_motion(0, x, y);
+      pointer.notify_absolute_motion(GLib.get_monotonic_time(), x, y);
       await delay(30);
       this._check(request);
       this._point(request, current, window);
       if (request.action === 'click') {
-        pointer.notify_button(0, 1, Clutter.ButtonState.PRESSED);
-        pointer.notify_button(0, 1, Clutter.ButtonState.RELEASED);
+        pointer.notify_button(GLib.get_monotonic_time(), 1, Clutter.ButtonState.PRESSED);
+        pointer.notify_button(GLib.get_monotonic_time(), 1, Clutter.ButtonState.RELEASED);
       } else {
         requireValue(
           Number.isSafeInteger(request.wheel) &&

@@ -1,7 +1,7 @@
 import { EMAIL_COMPANY, EMAIL_FONT, EMAIL_PALETTE } from '@jackalope/brand/email';
 
 export type AccessMail = { to: string; kind: 'welcome' | 'invite' | 'login'; token: string };
-export type WaitlistMail = { to: string; kind: 'waitlist'; token?: string };
+export type WaitlistMail = { to: string; kind: 'waitlist'; token?: string; newsletter?: boolean };
 export type GrowthMail = {
   to: string;
   kind: 'referral' | 'passes_ready' | 'pass_claimed' | 'pass_expired';
@@ -32,7 +32,7 @@ export function accessEmail(mail: Mail, origin: string) {
       subject: 'You’re on the Jackalope waitlist',
       title: 'Your next hop starts here.',
       intro:
-        'Your place is saved. Confirm your email to see your waitlist number and get your personal referral link.',
+        'Your place is saved. Confirm your email to see your waitlist number and get your personal referral link.' + (mail.kind === 'waitlist' && mail.newsletter ? ' This also confirms your request to receive optional Jackalope product notes. If you did not request them, do not use this link.' : ''),
       action: 'See my place',
       detail:
         'Share with as many people as you like. Each new person who verifies their email adds one day of priority to your signup time. Your number updates as the queue changes.',

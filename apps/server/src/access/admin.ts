@@ -136,7 +136,7 @@ export async function accessAdmin(
   try {
     if (request.method === 'GET' && url.pathname === '/admin/api/access/broadcast') {
       const audience = await env.DB.prepare(
-        "SELECT count(*) AS total FROM access_members WHERE newsletter=1 AND status!='revoked' AND sequenzy_state IS NOT NULL",
+        "SELECT count(*) AS total FROM access_members WHERE newsletter=1 AND newsletter_confirmed_at IS NOT NULL AND status!='revoked' AND sequenzy_state IS NOT NULL",
       ).first<{ total: number }>();
       return json({
         configured: !!(env.SEQUENZY_API_KEY && env.ACCESS_AUDIENCE_LIST && env.ACCESS_EMAIL_FROM),
@@ -159,7 +159,7 @@ export async function accessAdmin(
     if (request.method === 'GET' && url.pathname === '/admin/api/access/member') {
       const id = z.uuid().parse(url.searchParams.get('id'));
       const member = await env.DB.prepare(
-        `SELECT id,email,status,created_at,approved_at,verified_at,source,newsletter,newsletter_synced_at,newsletter_attempts,invite_limit,preferences,campaign,referral_count,waitlist_verified_at,(SELECT count(*) FROM access_members r WHERE r.waitlist_referrer_id=access_members.id AND r.waitlist_verified_at IS NULL AND r.status!='revoked') AS pending_referrals FROM access_members WHERE id=?`,
+        `SELECT id,email,status,created_at,approved_at,verified_at,source,newsletter,newsletter_confirmed_at,newsletter_synced_at,newsletter_attempts,invite_limit,preferences,campaign,referral_count,waitlist_verified_at,(SELECT count(*) FROM access_members r WHERE r.waitlist_referrer_id=access_members.id AND r.waitlist_verified_at IS NULL AND r.status!='revoked') AS pending_referrals FROM access_members WHERE id=?`,
       )
         .bind(id)
         .first<{ email: string }>();

@@ -37,13 +37,13 @@ jobs:
       - run: pnpm --filter @jackalope/server test
       - run: pnpm --filter @jackalope/server build
   deploy:
+    environment: cloud-${{ inputs.environment == 'production' && 'stable' || 'beta' }}
     needs: verify
     if: github.repository == 'Jackalope-Dev/jackalope' && ((github.ref == 'refs/heads/master' && inputs.environment == 'production') || (github.ref == 'refs/heads/beta' && inputs.environment != 'production')) && github.event_name != 'pull_request' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       DEPLOY_ENV: ${{ inputs.environment || 'staging' }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       SERVER_D1_ID: ${{ inputs.environment == 'production' && vars.SERVER_PRODUCTION_D1_ID || vars.SERVER_STAGING_D1_ID }}
       UPDATE_BASE_URL: ${{ inputs.environment == 'production' && 'https://api.jackalope.dev' || 'https://staging-api.jackalope.dev' }}
@@ -78,5 +78,9 @@ jobs:
       - run: node scripts/release/cloudflare.mjs prepare
       - run: pnpm --filter @jackalope/server exec wrangler deploy --env "$DEPLOY_ENV" --config .wrangler/release/wrangler.json --dry-run
       - run: pnpm --filter @jackalope/server exec wrangler d1 migrations apply DB --remote --env "$DEPLOY_ENV" --config .wrangler/release/wrangler.json
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - run: pnpm --filter @jackalope/server exec wrangler deploy --env "$DEPLOY_ENV" --config .wrangler/release/wrangler.json
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - run: node scripts/release/cloudflare.mjs verify

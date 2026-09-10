@@ -43,6 +43,7 @@ function trials(variant, trainPassed, holdoutPassed, tokens) {
       split,
       variant,
       effort: 'quick',
+      profileFingerprint: 'fixture-profile',
       receipt: `${variant}-${split}-${i}`,
       oraclePassed: split === 'train' ? trainPassed : holdoutPassed,
       accepted: null,
@@ -55,6 +56,8 @@ test('routing selects using training only and rejects on holdout without choosin
   const comparison = {
     agent: 'codex',
     model: 'fixture',
+    cliVersion: 'fixture-cli',
+    executableHashes: { after: 'fixture-build', control: 'fixture-build' },
     trials: [...trials('after', true, false, 10), ...trials('control', true, true, 20)],
   };
   const report = routingEvidence([comparison], 'oraclePassed');
@@ -69,10 +72,37 @@ test('routing selects using training only and rejects on holdout without choosin
 });
 
 test('routing rejects overlap and duplicate evidence and will not learn from a single repeated task', () => {
-  const comparison = { agent: 'codex', model: 'fixture', trials: trials('after', true, true, 10) };
+  const comparison = {
+    agent: 'codex',
+    model: 'fixture',
+    cliVersion: 'fixture-cli',
+    executableHashes: { after: 'fixture-build', control: 'fixture-build' },
+    trials: trials('after', true, true, 10),
+  };
   assert.throws(() => routingEvidence([comparison, comparison]), /Duplicate/);
   comparison.trials[12].case = 'train-0';
   assert.throws(() => routingEvidence([comparison]), /overlap/);
   comparison.trials = trials('after', true, true, 10).map((t) => ({ ...t, case: t.split }));
   assert.equal(routingEvidence([comparison], 'oraclePassed').selections[0].selected, null);
+});
+
+test('routing cannot pool different CLI builds or unknown profiles into a recommendation', () => {
+  const rows = trials('after', true, true, 10);
+  const first = {
+    agent: 'codex',
+    model: 'fixture',
+    cliVersion: '1',
+    executableHashes: { after: 'a' },
+    trials: rows.filter((_, i) => i % 12 < 6),
+  };
+  const second = {
+    ...first,
+    executableHashes: { after: 'b' },
+    trials: rows.filter((_, i) => i % 12 >= 6),
+  };
+  const report = routingEvidence([first, second], 'oraclePassed');
+  assert.equal(report.candidates.length, 2);
+  assert.equal(report.selections[0].selected, null);
+  first.trials = rows.map((r) => ({ ...r, profileFingerprint: null }));
+  assert.equal(routingEvidence([first], 'oraclePassed').selections[0].selected, null);
 });

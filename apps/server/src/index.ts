@@ -66,8 +66,6 @@ async function readJson(request: Request): Promise<unknown> {
 async function limit(request: Request, env: Env, feedback: boolean) {
   if (!env.RATE_SECRET || env.RATE_SECRET.length < 32)
     throw new ApiError(503, 'service_not_configured');
-  if (!(await env.GLOBAL_LIMITER.limit({ key: 'ingestion' })).success)
-    throw new ApiError(429, 'rate_limited');
   const address = request.headers.get('cf-connecting-ip');
   if (!address && env.ENVIRONMENT !== 'local') throw new ApiError(403, 'edge_identity_required');
   const key = await crypto.subtle.importKey(
@@ -89,6 +87,14 @@ async function limit(request: Request, env: Env, feedback: boolean) {
     !(await env.IP_LIMITER.limit({ key: peer })).success ||
     (feedback && !(await env.FEEDBACK_LIMITER.limit({ key: peer })).success)
   )
+    throw new ApiError(429, 'rate_limited');
+  const path = new URL(request.url).pathname;
+  const group = path.startsWith('/v1/desktop/')
+    ? path === '/v1/desktop/start' ? 'desktop-link' : 'desktop-session'
+    : path.startsWith('/v1/access/')
+      ? feedback ? 'access-mail' : 'access-session'
+      : 'ingestion';
+  if (!(await env.GLOBAL_LIMITER.limit({ key: group })).success)
     throw new ApiError(429, 'rate_limited');
 }
 async function release(request: Request, env: Env, path: string): Promise<Response> {

@@ -57,6 +57,7 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
     let mut groups = BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>), Group>::new();
     for run in latest
         .values()
+        .filter(|r| ["review", "reviewed", "failed", "stopped"].contains(&r.status.as_str()))
         .filter(|r| r.routing.as_ref().is_none_or(|h| h.handoffs.is_empty()))
     {
         let requirements: Vec<_> = run

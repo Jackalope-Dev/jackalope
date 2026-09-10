@@ -23,6 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
+    environment: cloud-${{ inputs.channel }}
     if: github.repository == 'Jackalope-Dev/jackalope' && github.ref == 'refs/heads/master' && vars.RELEASE_PUBLISH_ENABLED == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
@@ -35,7 +36,6 @@ jobs:
       DEPLOY_ENV: ${{ inputs.channel == 'stable' && 'production' || 'staging' }}
       UPDATE_BASE_URL: ${{ inputs.channel == 'stable' && 'https://api.jackalope.dev' || 'https://staging-api.jackalope.dev' }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -69,7 +69,7 @@ jobs:
           github-token: ${{ github.token }}
       - shell: pwsh
         run: |
-          if (!$env:CLOUDFLARE_API_TOKEN -or $env:CLOUDFLARE_ACCOUNT_ID -notmatch '^[a-f0-9]{32}$') { throw 'Configure the R2 publication token and account ID.' }
+          if ($env:CLOUDFLARE_ACCOUNT_ID -notmatch '^[a-f0-9]{32}$') { throw 'Configure the R2 publication account ID.' }
           $receipt = Get-Content output/release/receipt.json -Raw | ConvertFrom-Json
           if (!$receipt.publicSigned -or $receipt.source -ne $env:EXPECTED_SOURCE -or $receipt.version -ne $env:RELEASE_VERSION -or $receipt.channel -ne $env:RELEASE_CHANNEL) { throw 'Candidate receipt mismatch' }
           foreach ($installer in (Get-ChildItem output/release -File | Where-Object Extension -in '.exe','.msi')) {
@@ -93,6 +93,8 @@ jobs:
             if ($LASTEXITCODE -ne 0 -or $reference.object.type -ne 'commit' -or $reference.object.sha -ne $env:EXPECTED_SOURCE) { throw 'Existing release tag does not match the reviewed candidate source' }
           }
       - run: node scripts/release/publish.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - shell: pwsh
         run: |
           $tag = "$env:RELEASE_CHANNEL-v$env:RELEASE_VERSION"
@@ -103,6 +105,7 @@ jobs:
           gh release edit $tag --draft=false "--prerelease=$prerelease" --notes-file output/release/notes.md
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   website:
+    environment: cloud-stable
     if: inputs.channel == 'stable'
     needs: publish
     runs-on: ubuntu-latest

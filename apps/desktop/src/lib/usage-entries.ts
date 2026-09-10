@@ -15,6 +15,9 @@ export function usageEntries(runs: TaskRun[]) {
       accountBinding: handoff.binding,
       usage: handoff.usage,
       usageObservations: [],
+      effort: undefined,
+      reasoningEffort: undefined,
+      efficiency: undefined,
 
       startedAt: handoff.recordedAt,
       status: 'failed' as const,
@@ -32,6 +35,9 @@ export function usageEntries(runs: TaskRun[]) {
       accountBinding: attempt.binding,
       usage: attempt.usage,
       usageObservations: [],
+      effort: undefined,
+      reasoningEffort: undefined,
+      efficiency: undefined,
 
       startedAt: attempt.recordedAt,
       status: attempt.error ? ('failed' as const) : run.status,

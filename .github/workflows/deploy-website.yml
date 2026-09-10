@@ -52,6 +52,7 @@ jobs:
           retention-days: 7
 
   deploy:
+    environment: cloud-stable
     needs: verify
     if: github.repository == 'Jackalope-Dev/jackalope' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest

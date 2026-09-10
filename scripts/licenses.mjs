@@ -32,7 +32,7 @@ const jsRows = Object.values(npm)
   .flat()
   .map((item) => [item.name, item.versions.join(', '), item.license]);
 const rustRows = cargo.packages
-  .filter((item) => item.source)
+  .filter((item) => item.source || !cargo.workspace_members.includes(item.id))
   .map((item) => [item.name, item.version, item.license]);
 const table = (rows) =>
   `| Package | Version | Declared license |\n| --- | --- | --- |\n${rows
@@ -75,7 +75,7 @@ const packages = [
       })),
     ),
   ...cargo.packages
-    .filter((item) => item.source)
+    .filter((item) => item.source || !cargo.workspace_members.includes(item.id))
     .map((item) => ({
       directory: path.dirname(item.manifest_path),
       name: `${item.name} ${item.version}`,

@@ -17,6 +17,7 @@ export type MemberRow = {
   status: string;
   source: string;
   newsletter: number;
+  newsletter_confirmed_at: number | null;
   created_at: number;
   approved_at: number | null;
   verified_at: number | null;
@@ -148,6 +149,6 @@ export function audienceState(member: MemberRow) {
 }
 
 /** Marketing consent is the only thing that puts someone on the list. */
-export function audienceEligible(member: Pick<MemberRow, 'newsletter' | 'status'>) {
-  return member.newsletter === 1 && member.status !== 'revoked';
+export function audienceEligible(member: Pick<MemberRow, 'newsletter' | 'newsletter_confirmed_at' | 'status'>) {
+  return member.newsletter === 1 && typeof member.newsletter_confirmed_at === 'number' && member.newsletter_confirmed_at > 0 && member.status !== 'revoked';
 }

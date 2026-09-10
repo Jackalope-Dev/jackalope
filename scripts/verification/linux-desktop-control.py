@@ -12,11 +12,11 @@ import tempfile
 import time
 
 
-def fixture(directory):
+def fixture(directory, title='Jackalope X11 fixture'):
     import gi
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GLib
-    window = Gtk.Window(title='Jackalope X11 fixture')
+    window = Gtk.Window(title=title)
     window.set_default_size(600, 420)
     window.move(120, 160)
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)

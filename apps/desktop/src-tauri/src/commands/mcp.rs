@@ -286,6 +286,27 @@ fn write_config(path: &Path, text: &str) -> Result<(), String> {
     fs::rename(&temporary, path).map_err(|e| e.to_string())
 }
 
+fn validate_endpoint(value: &str) -> Result<(), String> {
+    let valid = reqwest::Url::parse(value).ok().is_some_and(|url| {
+        let local = url.host_str().is_some_and(|host| {
+            host == "localhost"
+                || host
+                    .trim_matches(['[', ']'])
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        });
+        url.username().is_empty()
+            && url.password().is_none()
+            && url.fragment().is_none()
+            && (url.scheme() == "https" || (url.scheme() == "http" && local))
+    });
+    if valid {
+        Ok(())
+    } else {
+        Err("Use an HTTPS endpoint. HTTP is only allowed on this computer (localhost or a loopback IP), without URL credentials or fragments.".into())
+    }
+}
+
 fn validate(server: &McpServerConfig) -> Result<(), String> {
     if server.agents.as_ref().is_some_and(|agents| {
         agents.is_empty()
@@ -326,13 +347,7 @@ fn validate(server: &McpServerConfig) -> Result<(), String> {
             );
         }
     } else if ["http", "sse"].contains(&server.transport.as_str()) {
-        if !server
-            .url
-            .as_ref()
-            .is_some_and(|url| url.starts_with("http://") || url.starts_with("https://"))
-        {
-            return Err("Provide an HTTP or HTTPS endpoint.".into());
-        }
+        validate_endpoint(server.url.as_deref().unwrap_or_default())?;
     } else {
         return Err("Unsupported MCP transport.".into());
     }
@@ -625,6 +640,30 @@ pub(super) async fn connect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn endpoint_validation_requires_tls_outside_loopback() {
+        for value in [
+            "https://example.invalid/mcp",
+            "http://localhost:8787/mcp",
+            "http://127.0.0.1:8080",
+            "http://[::1]:8080",
+            "http://127.2.3.4",
+        ] {
+            assert!(validate_endpoint(value).is_ok(), "{value}");
+        }
+        for value in [
+            "http://example.invalid",
+            "http://192.168.1.1",
+            "http://localhost.example.invalid",
+            "http://0.0.0.0",
+            "https://user:secret@example.invalid",
+            "https://example.invalid/#token",
+            "file:///mcp",
+            "not a url",
+        ] {
+            assert!(validate_endpoint(value).is_err(), "{value}");
+        }
+    }
     #[test]
     fn managed_connections_preserve_location_agent_selection_and_legacy_clients() {
         let global = json!({"mcpServers": {

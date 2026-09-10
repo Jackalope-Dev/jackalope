@@ -54,7 +54,13 @@ const tokens = Number(value('--tokens', '250000'));
 const model = value('--model', '');
 const agent = value('--agent', 'codex');
 const binaries = Object.fromEntries(
-  variants.map((v) => [v, value(v === 'before' ? '--before' : '--after', '')]),
+  variants.map((v) => [
+    v,
+    value(
+      v === 'before' ? '--before' : v === 'control' ? '--control' : '--after',
+      v === 'control' ? value('--after', '') : '',
+    ),
+  ]),
 );
 if (
   (suitePath && variants.includes('before')) ||
@@ -277,6 +283,17 @@ if (!args.includes('--execute')) {
             report?.oracle?.success === true,
           behavioralOraclePassed: report?.oracle?.success === true,
           budgetStopped: report?.budgetStopped ?? null,
+          profileFingerprint: run?.accountBinding
+            ? createHash('sha256')
+                .update(
+                  JSON.stringify([
+                    run.accountBinding.adapter,
+                    run.accountBinding.profileId,
+                    run.accountBinding.directory,
+                  ]),
+                )
+                .digest('hex')
+            : null,
           category: fixture.category ?? fixture.id,
           split: fixture.split ?? 'regression',
           effort: efforts[variant],

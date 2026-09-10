@@ -116,3 +116,4 @@ dist-lab/
 # Tauri icon generation also emits unused mobile targets.
 /apps/desktop/src-tauri/icons/android/
 /apps/desktop/src-tauri/icons/ios/
+/patches/glib/Cargo.lock

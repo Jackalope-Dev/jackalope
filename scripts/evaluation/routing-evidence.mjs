@@ -46,6 +46,9 @@ export function routingEvidence(comparisons, outcome = 'accepted') {
         comparison.model,
         trial.effort ?? null,
         trial.variant,
+        comparison.cliVersion ?? null,
+        comparison.executableHashes?.[trial.variant] ?? null,
+        trial.profileFingerprint ?? null,
       ]);
       const group = groups.get(key) ?? {
         category: trial.category,
@@ -53,6 +56,9 @@ export function routingEvidence(comparisons, outcome = 'accepted') {
         model: comparison.model,
         effort: trial.effort ?? null,
         variant: trial.variant,
+        cliVersion: comparison.cliVersion ?? null,
+        executableHash: comparison.executableHashes?.[trial.variant] ?? null,
+        profileFingerprint: trial.profileFingerprint ?? null,
         train: [],
         holdout: [],
       };
@@ -68,6 +74,9 @@ export function routingEvidence(comparisons, outcome = 'accepted') {
       train,
       holdout,
       eligibleFromTraining:
+        !!group.cliVersion &&
+        !!group.executableHash &&
+        !!group.profileFingerprint &&
         train.cases >= 3 &&
         train.decided === train.trials &&
         train.trials >= 10 &&
