@@ -42,6 +42,7 @@ const groups = [
       ['Your access & passes', '/access/'],
       ['Questions', '/#questions'],
       ['Follow on X', 'https://x.com/JackalopeDotDev'],
+      ['Join us on Reddit', 'https://www.reddit.com/r/JackalopeDev/'],
     ],
   },
 ];

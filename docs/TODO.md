@@ -60,7 +60,8 @@ release dates.
   browsers, including keyboard focus and reduced motion.
 - [ ] Verify captions, playback and failure recovery for the product tour.
 - [ ] Keep public guides, comparison sources and discovery output accurate.
-- [ ] Run route, metadata, header and link checks against deployed builds.
+- [ ] Run route, metadata, header and link checks against deployed builds, including
+  the footer's Reddit community link.
 
 ## Platform releases
 

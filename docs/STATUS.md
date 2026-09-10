@@ -19,7 +19,7 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 - Ask Jackalope documentation answers and reviewed local actions.
 - Shared appearance controls, onboarding and optional portable settings sync.
 - An optional account/access, feedback, reporting and update service, plus a
-  product website with public guides and sample-workspace media.
+  product website with public guides, sample-workspace media and a Reddit community link.
 - Windows installer, Microsoft Store and cloud-release preparation tooling.
 
 ## Known limits
