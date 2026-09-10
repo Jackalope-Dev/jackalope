@@ -10,6 +10,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
+import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
@@ -110,6 +111,7 @@ export function RunnerConnections({
             </div>
           }
         />
+        <LocalAiSetup />
         <div className="agent-roster-heading">
           <span>On this computer</span>
           <div className="flex gap-2">

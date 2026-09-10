@@ -7,6 +7,7 @@ Start with the [project overview](../README.md) or browse the
 
 - [Your first task](GETTING-STARTED.md) and [the core workflow](CORE-WORKFLOW.md)
 - [Supported agents](AGENT-SUPPORT.md) and [agent accounts](AGENT-ACCOUNTS.md)
+- [Optional local AI setup and context evaluation](LOCAL-AI.md)
 - [Parallel work and review](PARALLEL-MVP.md) and [execution evaluation](EXECUTION-EVALUATION.md)
 - [Routing, usage and quota handoff](USAGE-AND-ROUTING.md)
 - [Recurring tasks](RECURRING-TEMPLATES.md)

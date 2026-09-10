@@ -94,9 +94,11 @@ export function CaptureTask({
   );
   const modelOptions = config.runnerOptions[currentAgent];
   const defaultModel =
-    modelOptions?.defaultModel ||
-    (modelOptions?.restrictModels ? modelOptions.models[0] : '') ||
-    '';
+    modelCatalog.catalog?.source === 'local'
+      ? (modelCatalog.catalog.models[0]?.id ?? '')
+      : modelOptions?.defaultModel ||
+        (modelOptions?.restrictModels ? modelOptions.models[0] : '') ||
+        '';
   const models = (modelCatalog.catalog?.models ?? [])
     .map((model) => model.id)
     .filter(

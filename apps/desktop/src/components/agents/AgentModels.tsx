@@ -34,6 +34,31 @@ export function AgentModels({
     `${model.id} ${model.name}`.toLowerCase().includes(query.toLowerCase()),
   );
   const visibleModels = query || showAll ? matches : matches.slice(0, 12);
+  if (catalog?.source === 'local') {
+    return (
+      <section className="agent-model-catalog" aria-label="Local account model">
+        <h3 className="text-base font-medium">{models[0]?.name}</h3>
+        <p className="task-muted">{catalog.detail}</p>
+        <p className="task-muted text-xs">
+          This account has its own model. Other OpenCode accounts keep their saved model
+          preferences. Use local setup to check and connect another local model.
+        </p>
+        {restricted && !detectedSelected.length && (
+          <p className="task-error">
+            This model is excluded by your model restriction. Add it to allow tasks.
+          </p>
+        )}
+        {!detectedSelected.length && models[0] && (
+          <Button
+            variant="outline"
+            onClick={() => onChange({ models: [...selected, models[0].id] })}
+          >
+            <Plus size={15} /> Allow this model
+          </Button>
+        )}
+      </section>
+    );
+  }
   return (
     <section className="agent-model-catalog" aria-label="Detected models">
       <div className="flex flex-wrap items-center justify-between gap-3">

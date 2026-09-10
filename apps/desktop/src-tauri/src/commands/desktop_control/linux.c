@@ -769,6 +769,23 @@ static gboolean synthetic(int source) {
       return TRUE;
   return FALSE;
 }
+static gboolean xwayland_server(Display *probe) {
+  int opcode, event, error;
+  if (XQueryExtension(probe, "XWAYLAND", &opcode, &event, &error))
+    return TRUE;
+  if (!XQueryExtension(probe, "XInputExtension", &opcode, &event, &error))
+    return TRUE;
+  int count;
+  XIDeviceInfo *devices = XIQueryDevice(probe, XIAllDevices, &count);
+  if (!devices)
+    return TRUE;
+  gboolean found = FALSE;
+  for (int i = 0; i < count; i++)
+    if (g_ascii_strncasecmp(devices[i].name, "xwayland", 8) == 0)
+      found = TRUE;
+  XIFreeDeviceInfo(devices);
+  return found;
+}
 static void update_devices(void) {
   g_array_set_size(synthetic_devices, 0);
   int count;
@@ -938,7 +955,7 @@ int main(void) {
       int event, error, opcode, major = 2, minor = 0, composite_major,
                                 composite_minor;
       available =
-          !XQueryExtension(probe, "XWAYLAND", &opcode, &event, &error) &&
+          !xwayland_server(probe) &&
           XTestQueryExtension(probe, &event, &error, &composite_major,
                               &composite_minor) &&
           XQueryExtension(probe, "XInputExtension", &opcode, &event, &error) &&
@@ -963,7 +980,7 @@ int main(void) {
   root = DefaultRootWindow(display);
   XSetErrorHandler(x_error);
   int event, error, major, minor;
-  check(!XQueryExtension(display, "XWAYLAND", &major, &event, &error),
+  check(!xwayland_server(display),
         "XWayland cannot monitor physical input across a Wayland desktop. Use "
         "an X11 session.");
   check(XTestQueryExtension(display, &event, &error, &major, &minor),

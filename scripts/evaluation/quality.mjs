@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
@@ -77,12 +77,40 @@ if (!args.includes('--execute')) {
   );
   const cliVersion =
     spawnSync(agent, ['--version'], { encoding: 'utf8', windowsHide: true }).stdout?.trim() ?? null;
-  const trials = [];
+  const comparisonPath = path.join(output, 'comparison.json');
+  let saved = null;
+  try {
+    saved = JSON.parse(await readFile(comparisonPath, 'utf8'));
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  if (saved && !args.includes('--resume'))
+    throw new Error(
+      'This output already contains results. Use --resume or choose another directory.',
+    );
+  if (args.includes('--resume') && !saved) throw new Error('No saved comparison to resume.');
+  if (
+    saved &&
+    (saved.agent !== agent ||
+      saved.baselineRevision !== baseline.revision ||
+      saved.model !== model ||
+      saved.cliVersion !== cliVersion ||
+      saved.seconds !== seconds ||
+      saved.tokens !== tokens ||
+      Object.keys(binaries).some((name) => saved.executableHashes[name] !== executableHashes[name]))
+  )
+    throw new Error('Resume requires the same agent, model, CLI, executable hashes and budgets.');
+  const trials = saved?.trials ?? [];
+  const interruptions = saved?.interruptions ?? [];
   for (const id of selected)
     for (let repetition = 1; repetition <= repeat; repetition++) {
       const fixture = qualityCases.find((c) => c.id === id);
       const order = repetition % 2 ? ['before', 'after'] : ['after', 'before'];
       for (const variant of order) {
+        const completed = trials.some(
+          (trial) =>
+            trial.case === id && trial.variant === variant && trial.repetition === repetition,
+        );
         const prompt =
           variant === 'before'
             ? baseline.prompts[id]
@@ -97,6 +125,18 @@ if (!args.includes('--execute')) {
         if (!prompt) throw new Error(`Missing frozen baseline for ${id}`);
         const spec = { ...fixture, prompt, variant, agent, model, seconds, tokens };
         const specPath = path.join(output, `${id}-${repetition}-${variant}.json`);
+        if (saved) {
+          try {
+            const previous = JSON.parse(await readFile(specPath, 'utf8'));
+            if (JSON.stringify(previous) !== JSON.stringify(spec))
+              throw new Error(
+                `The saved ${id} fixture or prompt changed. Use a new output directory.`,
+              );
+          } catch (error) {
+            if (error.code !== 'ENOENT' || completed) throw error;
+          }
+        }
+        if (completed) continue;
         await writeFile(specPath, `${JSON.stringify(spec, null, 2)}\n`);
         console.log(`Quality: ${id}, ${variant}, repetition ${repetition}`);
         const execution = await new Promise((resolve) => {
@@ -185,9 +225,10 @@ if (!args.includes('--execute')) {
         });
         const summary = qualitySummary(trials, Object.keys(binaries));
         await writeFile(
-          path.join(output, 'comparison.json'),
-          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, seconds, tokens, trials, summary, limitations: 'Small repeated synthetic native trials, not human acceptance or a direct-GUI comparison. CLI reasoning and provider caching follow the installed configuration. Include failures; missing usage remains unknown.' }, null, 2)}\n`,
+          `${comparisonPath}.tmp`,
+          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, seconds, tokens, trials, interruptions, summary, limitations: 'Small repeated synthetic native trials, not human acceptance or a direct-GUI comparison. CLI reasoning and provider caching follow the installed configuration. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
         );
+        await rename(`${comparisonPath}.tmp`, comparisonPath);
         console.log(JSON.stringify(trials.at(-1)));
       }
     }

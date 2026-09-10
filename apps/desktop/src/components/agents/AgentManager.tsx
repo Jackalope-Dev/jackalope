@@ -13,6 +13,7 @@ import { AgentAccounts } from './AgentAccounts';
 import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';
 import { AgentSupport } from './AgentSupport';
+import { LocalAiSetup } from './LocalAiSetup';
 import './agent-manager.css';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
@@ -87,6 +88,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           }}
         />
       )}
+      {selected?.id === 'opencode' && <LocalAiSetup onConnected={refreshModels} />}
       {agents
         .filter((agent) => agent.id === selected?.id)
         .map((agent) => {

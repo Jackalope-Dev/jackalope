@@ -442,7 +442,15 @@ impl TaskRuntime {
         }
         if adapter == "codex" && req.coordination.is_some() {
             let context = req.coordination.as_ref().unwrap();
-            project_mcp.insert("jackalope".into(), serde_json::json!({"url":format!("{}/mcp",context.endpoint),"bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN","tool_timeout_sec":90,"tools":crate::commands::browser::codex_tool_policy()}));
+            let mut tools = crate::commands::browser::codex_tool_policy();
+            if req
+                .verify_command
+                .as_ref()
+                .is_some_and(|command| !command.trim().is_empty())
+            {
+                tools["computer_verify"] = serde_json::json!({"approval_mode":"approve"});
+            }
+            project_mcp.insert("jackalope".into(), serde_json::json!({"url":format!("{}/mcp",context.endpoint),"bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN","tool_timeout_sec":90,"tools":tools}));
         }
         if adapter == "codex" {
             for value in crate::commands::mcp::codex_overrides(&project_mcp)? {
@@ -1028,6 +1036,13 @@ impl TaskRuntime {
                     request.agent_profile_id.as_deref(),
                 )?
             };
+            if request.agent != "auto" && adapter == "opencode" {
+                let requested = request
+                    .model
+                    .as_deref()
+                    .or_else(|| previous.as_ref().and_then(|old| old.model.as_deref()));
+                request.model = policy.model_for_account(&request.agent, requested, &binding)?;
+            }
             if request.agent != "auto"
                 && !self
                     .policy()?

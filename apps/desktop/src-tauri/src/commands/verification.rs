@@ -166,7 +166,19 @@ pub async fn agent_verify(
         let _lease = leases::reserve(&run.workspace)?;
         drop(guard);
         let result = execute(&runtime, &run, &command)?;
-        Ok(output::response(&result))
+        let response = output::response(&result);
+        #[cfg(test)]
+        if let Some(spec) = std::env::var_os("JACKALOPE_QUALITY_SPEC") {
+            use std::io::Write;
+            let path = std::path::PathBuf::from(spec).with_extension("verification.jsonl");
+            let mut capture = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .map_err(|e| e.to_string())?;
+            writeln!(capture, "{}", response).map_err(|e| e.to_string())?;
+        }
+        Ok(response)
     })
     .await
     .map_err(|e| e.to_string())?

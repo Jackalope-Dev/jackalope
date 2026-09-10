@@ -21,6 +21,7 @@ import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
+import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
@@ -446,6 +447,27 @@ export function OnboardingFlow({
           )}
           {step === 'agent' && (
             <>
+              <LocalAiSetup
+                compact
+                onConnected={(profileId) => {
+                  setAgent('opencode');
+                  if (project) {
+                    onboarding.stageProject({
+                      ...project,
+                      preferences: {
+                        ...project.preferences,
+                        agentAccounts: {
+                          ...project.preferences?.agentAccounts,
+                          opencode: profileId,
+                        },
+                      },
+                    });
+                  }
+                  setAllowedAgents((ids) =>
+                    ids === null ? null : [...new Set([...ids, 'opencode'])],
+                  );
+                }}
+              />
               <p className="onboarding-description">
                 Choose a default, then switch other detected agents on or off for this project.
                 Change these choices later in Project settings.

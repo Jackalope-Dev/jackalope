@@ -48,6 +48,30 @@ pub struct ProjectAgentPolicy {
 }
 
 impl AgentPolicy {
+    pub(super) fn model_for_account(
+        &self,
+        agent: &str,
+        requested: Option<&str>,
+        binding: &super::agent_profiles::AccountBinding,
+    ) -> Result<Option<String>, String> {
+        if let Some(model) = super::agent_profiles::local_model(binding)? {
+            let id = format!("{}/{model}", super::local_ai::PROVIDER);
+            if requested.is_some_and(|requested| requested != id) {
+                return Err("This local account uses its verified model. Clear the task model override or choose another account.".into());
+            }
+            self.model(agent, Some(&id))
+        } else {
+            let model = self.model(agent, requested)?;
+            if model
+                .as_ref()
+                .is_some_and(|id| id.starts_with("jackalope-local/"))
+            {
+                return Err("Choose the matching local account to use this model.".into());
+            }
+            Ok(model)
+        }
+    }
+
     pub fn account_allowed(
         &self,
         project: &str,
@@ -176,7 +200,9 @@ impl TaskRuntime {
             ) {
                 return Err("Choose Codex, Claude, Grok, OpenCode or Kimi Code as the default orchestrator in Settings → Agents. Antigravity is available as a worker.".into());
             }
-            policy.model(&policy.default_meta_agent, None)?;
+            if adapter != "opencode" {
+                policy.model(&policy.default_meta_agent, None)?;
+            }
             return Ok(());
         }
         if request.agent == "default" {
@@ -209,7 +235,9 @@ impl TaskRuntime {
                 request.agent_profile_id = Some(account.clone());
             }
         }
-        request.model = policy.model(&request.agent, request.model.as_deref())?;
+        if adapter != "opencode" {
+            request.model = policy.model(&request.agent, request.model.as_deref())?;
+        }
         Ok(())
     }
 }

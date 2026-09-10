@@ -2,12 +2,14 @@ import { applyThemeTokens, DEFAULT_THEME, startThemeClock } from '@jackalope/bra
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AgentAvatar } from './components/agents/AgentAvatar';
+import { LocalAiSetup } from './components/agents/LocalAiSetup';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
 import { ThemeEditor } from './components/theme/ThemeEditor';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Select, SelectItem } from './components/ui/Select';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
+import { localAiFixture } from './design-lab/local-ai-fixture';
 import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
@@ -27,6 +29,10 @@ function DesignLab() {
   return (
     <main className="h-dvh overflow-y-auto p-8 lg:p-16 bg-[var(--color-shell)]">
       <div className="max-w-5xl mx-auto">
+        <p className="mb-3 text-sm">
+          Local setup fixture: browser state only; no installation, download or native tasks.
+        </p>
+        <LocalAiSetup preview={localAiFixture} />
         <WorkspaceHeading
           title="Design library"
           description="The same character, colors, and controls used in the app. Explore the details here."

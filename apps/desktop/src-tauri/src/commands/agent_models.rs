@@ -269,6 +269,13 @@ pub async fn agent_models(
         &adapter,
         agent_profile_id.as_deref(),
     )?;
+    if let Some(model) = agent_profiles::local_model(&binding)? {
+        return Ok(ModelCatalog {
+            models: vec![AgentModel { id: format!("{}/{model}", super::local_ai::PROVIDER), name: format!("Local · {model}"), is_default: true }],
+            source: "local".into(), account: Some(binding.label), checked_at: chrono::Utc::now().to_rfc3339(),
+            detail: "This local account uses the model checked during setup. Ollama must be running; current availability is checked at launch.".into(),
+        });
+    }
     let key = format!("{}:{:?}:{:?}", adapter, executable, binding.directory);
     let mut cache = service.0.lock().await;
     if !refresh.unwrap_or(false) {

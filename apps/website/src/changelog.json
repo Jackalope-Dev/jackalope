@@ -1,5 +1,18 @@
 [
   {
+    "id": "local-agent-setup",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "A guided start with local AI",
+    "description": "An optional path to trying Jackalope without an AI provider subscription, with clear requirements and download choices.",
+    "items": [
+      "Check your computer, set up OpenCode and Ollama, and verify a local file edit and continued session before connecting.",
+      "Keep model downloads optional. Jackalope bundles no model weights.",
+      "Retrieve relevant help locally and reduce repeated routing context while preserving eligible models and task requirements."
+    ],
+    "note": "Real-model quality, paid-token savings and installed setup remain under validation."
+  },
+  {
     "id": "native-window-control-beyond-windows",
     "date": "2026-09-10",
     "status": "In development",
@@ -31,7 +44,8 @@
     "items": [
       "Automatic guidance distinguishes design tokens from security work and avoids adding debugging routines to spelling fixes.",
       "Agents use the assigned workspace and receive tool instructions appropriate to their connection.",
-      "Independent native trials compare correctness and total reported usage against a preserved baseline."
+      "Independent native trials compare correctness and total reported usage against a preserved baseline.",
+      "Codex can run the saved project check during a task, so it can inspect failures before finishing."
     ],
     "note": "In development. Broader provider comparisons and installed-app acceptance remain in progress."
   },

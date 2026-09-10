@@ -368,6 +368,30 @@ pub fn apply_binding(
         ] {
             command.env(name, binding.directory.join(folder));
         }
+        if let Some(model) = local_model(binding)? {
+            let mut configuration = command
+                .get_envs()
+                .find(|(name, _)| *name == "OPENCODE_CONFIG_CONTENT")
+                .and_then(|(_, value)| value)
+                .and_then(|value| value.to_str())
+                .map(serde_json::from_str::<serde_json::Value>)
+                .transpose()
+                .map_err(|_| "Invalid OpenCode process configuration.")?
+                .unwrap_or_else(|| serde_json::json!({}));
+            if !configuration.is_object() {
+                return Err("Invalid OpenCode process configuration.".into());
+            }
+            for (key, value) in super::local_ai::config(&model)
+                .as_object()
+                .ok_or("Invalid local configuration")?
+            {
+                configuration[key] = value.clone();
+            }
+            command.env("OPENCODE_CONFIG_CONTENT", configuration.to_string());
+            command.env("OPENCODE_DISABLE_PROJECT_CONFIG", "true");
+            command.env_remove("OPENCODE_CONFIG");
+            command.env_remove("OPENCODE_CONFIG_DIR");
+        }
     }
     if binding.adapter == "kimi" {
         // Older Python binaries must not fall back to the user's shared login.
@@ -381,6 +405,58 @@ pub fn apply_binding(
         }
     }
     Ok(())
+}
+
+pub(in crate::commands) fn local_model(binding: &AccountBinding) -> Result<Option<String>, String> {
+    if binding.adapter != "opencode" || binding.profile_id.is_none() {
+        return Ok(None);
+    }
+    let path = binding.directory.join("jackalope-local.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let verification: super::local_ai::Verification =
+        serde_json::from_slice(&super::history::read_bounded(&path, 4096)?)
+            .map_err(|_| "Local model settings are unreadable. Run local setup again.")?;
+    Ok(Some(verification.model))
+}
+
+pub(in crate::commands) fn create_local(
+    root: &Path,
+    verification: &super::local_ai::Verification,
+) -> Result<AgentProfile, String> {
+    let _guard = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let mut manifest = load_checked(root)?;
+    let entry = manifest.agents.entry("opencode".into()).or_default();
+    let tag = format!("local:{}", verification.model);
+    let profile = entry
+        .profiles
+        .iter()
+        .find(|p| p.tag.as_deref() == Some(&tag))
+        .cloned()
+        .unwrap_or_else(|| AgentProfile {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: format!("Local · {}", verification.model),
+            group: None,
+            tag: Some(tag),
+        });
+    let directory = dir_for(root, "opencode", &profile.id);
+    fs::create_dir_all(directory.join("config/opencode")).map_err(|e| e.to_string())?;
+    super::history::write_atomic(
+        &directory.join("config/opencode/opencode.json"),
+        &serde_json::to_vec_pretty(&super::local_ai::config(&verification.model))
+            .map_err(|e| e.to_string())?,
+    )?;
+    super::history::write_atomic(
+        &directory.join("jackalope-local.json"),
+        &serde_json::to_vec(verification).map_err(|e| e.to_string())?,
+    )?;
+    if !entry.profiles.iter().any(|p| p.id == profile.id) {
+        entry.profiles.push(profile.clone());
+    }
+    entry.active = Some(profile.id.clone());
+    save(root, &manifest)?;
+    Ok(profile)
 }
 
 pub fn validate_binding(root: &Path, binding: &AccountBinding) -> Result<(), String> {
@@ -725,6 +801,88 @@ fn resolve_profile_dir(root: &Path, agent: &str, explicit_id: Option<&str>) -> O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_profiles_preserve_other_accounts_and_process_permissions() {
+        let root = temp_root();
+        let verification = super::super::local_ai::Verification {
+            model: "qwen3.5:4b".into(),
+            digest: "base".into(),
+            inference_digest: "prepared".into(),
+            elapsed_ms: 50,
+            checked_at: "2026-09-10T00:00:00Z".into(),
+        };
+        let other: Manifest = serde_json::from_str(
+            r#"{"agents":{"opencode":{"profiles":[{"id":"paid","name":"Paid"}],"active":"paid"}}}"#,
+        )
+        .unwrap();
+        save(&root, &other).unwrap();
+        let paid = bind_account(&root, "opencode", None).unwrap();
+        let profile = create_local(&root, &verification).unwrap();
+        assert_eq!(create_local(&root, &verification).unwrap().id, profile.id);
+        assert_eq!(
+            load_checked(&root).unwrap().agents["opencode"]
+                .profiles
+                .len(),
+            2
+        );
+        assert!(local_model(&paid).unwrap().is_none());
+        let binding = bind_account(&root, "opencode", None).unwrap();
+        assert_eq!(binding.profile_id, Some(profile.id));
+        let mut policy = super::super::agent_policy::AgentPolicy::default();
+        policy
+            .runner_options
+            .entry("opencode".into())
+            .or_default()
+            .default_model = "paid/model".into();
+        assert_eq!(
+            policy
+                .model_for_account("opencode", None, &paid)
+                .unwrap()
+                .as_deref(),
+            Some("paid/model")
+        );
+        assert_eq!(
+            policy
+                .model_for_account("opencode", None, &binding)
+                .unwrap()
+                .as_deref(),
+            Some("jackalope-local/qwen3.5:4b")
+        );
+        assert!(policy
+            .model_for_account("opencode", Some("paid/model"), &binding)
+            .is_err());
+        policy
+            .runner_options
+            .get_mut("opencode")
+            .unwrap()
+            .restrict_models = true;
+        assert!(policy
+            .model_for_account("opencode", None, &binding)
+            .is_err());
+        let mut command = std::process::Command::new("opencode");
+        command.env(
+            "OPENCODE_CONFIG_CONTENT",
+            r#"{"permission":{"edit":"deny"},"mcp":{"fixture":{"enabled":false}}}"#,
+        );
+        apply_binding(&mut command, &binding).unwrap();
+        let content = command
+            .get_envs()
+            .find(|(name, _)| *name == "OPENCODE_CONFIG_CONTENT")
+            .unwrap()
+            .1
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let config: serde_json::Value = serde_json::from_str(content).unwrap();
+        assert_eq!(config["permission"]["edit"], "deny");
+        assert_eq!(config["mcp"]["fixture"]["enabled"], false);
+        assert_eq!(config["model"], "jackalope-local/qwen3.5:4b");
+        assert_eq!(config["model"], config["small_model"]);
+        command.env("OPENCODE_CONFIG_CONTENT", "[]");
+        assert!(apply_binding(&mut command, &binding).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn pending_accounts_stay_hidden_after_reload_until_confirmed() {

@@ -35,6 +35,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
         .manage(SignInService::default())
+        .manage(commands::local_ai::LocalAi::default())
         .manage(CapacityService::default())
         .manage(commands::agent_models::ModelCatalogService::default())
         .setup(move |app| {
@@ -141,6 +142,12 @@ pub fn run() {
             commands::release::app_install_update,
             system_get_info,
             commands::desktop_control::platform::desktop_control_request_permissions,
+            commands::local_ai::local_ai_inspect,
+            commands::local_ai::local_ai_install,
+            commands::local_ai::local_ai_pull,
+            commands::local_ai::local_ai_verify,
+            commands::local_ai::local_ai_connect,
+            commands::local_ai::local_ai_cancel,
             pty_spawn,
             pty_write,
             pty_resize,

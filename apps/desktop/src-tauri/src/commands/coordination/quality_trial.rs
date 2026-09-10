@@ -115,10 +115,16 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
     let input = std::fs::read(root.join(format!("profile/history/{id}.input"))).ok();
+    let agent_verification: Vec<Value> =
+        std::fs::read_to_string(spec_path.with_extension("verification.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
     let report = json!({"version":1,"case":spec["id"],"variant":spec["variant"],
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
         "budgetStopped":stopped,"launchError":launch_error,"oracle":oracle,
-        "promptBytes":input.as_ref().map(Vec::len),"run":run,
+        "promptBytes":input.as_ref().map(Vec::len),"run":run,"agentVerification":agent_verification,
         "accepted":null,"humanReviewMinutes":null,
         "limitations":"Disposable native execution, not installed-app acceptance. Budgets use delayed reported usage; all unsuccessful trials remain in comparisons."});
     let receipt = root.join("quality.json");

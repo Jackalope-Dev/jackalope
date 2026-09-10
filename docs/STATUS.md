@@ -6,6 +6,11 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 
 ## Implemented
 
+- Optional [local-agent setup](LOCAL-AI.md) with hardware guidance, explicit downloads,
+  file/session checks and isolated OpenCode/Ollama accounts. Real-model and installed
+  acceptance remain open. Model-free documentation retrieval and lossless routing
+  prompt packing are implemented; MiniLM bundling was evaluated and skipped.
+
 - Local projects, tasks, saved ideas, persistent history and recovery.
 - Durable incremental output saves, concurrent history loading, changed-record UI
   updates and background rich rendering. Local fixtures show improvements;
@@ -25,6 +30,9 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 - More selective automatic guidelines, compact tool guidance and retrievable
   verification output, with independent before/after [quality trials](AGENT-QUALITY.md).
   These checks do not establish broad provider or GUI superiority.
+  The first repeated comparison passed 2/6 versus 6/6 behavioral oracles; raw usage
+  increased while tokens per passing result decreased. See the trial limits and
+  separate verification-permission follow-up in the quality report.
 - Recurring schedules and local monitors that act on committed content changes.
 - MCP connections, task-owned browser sessions and guarded desktop-control grants.
 - Ask Jackalope documentation answers and reviewed local actions, with a focused
@@ -54,6 +62,10 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   and isolated GNOME Keyring round-trip trials passing under WSL. Native Linux
   tests and the desktop executable build pass; installed desktop and macOS
   acceptance remain open.
+- macOS and X11 desktop-control helpers, permission readiness UI and portable
+  keyboard labels are ready for native validation. Linux recorded 277 passing
+  library tests; the final X11 control fixture and XWayland rejection check pass.
+  macOS compilation and device acceptance remain open; Wayland control is unimplemented.
 
 The [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) cover source development and redistribution.
@@ -66,6 +78,12 @@ Account device fixtures cover same-name profiles, metadata, legacy records and s
 revocation at 1280×840, 960×640 and 375px in both themes. Settings-sync browser checks
 cover restore/conflict, in-flight opt-out, deletion and theme rollback. These fixtures
 do not establish installed restoration or deployed metadata acceptance.
+
+Migration check (2026-09-10): local applied `0014_sequenzy_audience.sql` and
+`0015_desktop_metadata.sql`; staging and production applied `0015_desktop_metadata.sql`,
+with all earlier migrations already present. Before/after checks used each configured
+database. All three now record 15 applied migrations, all six device metadata columns
+and no pending migrations. This confirms schema readiness, not application deployment.
 
 ## Known limits
 

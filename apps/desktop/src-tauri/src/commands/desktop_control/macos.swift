@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Foundation
+import ScreenCaptureKit
 
 struct ControlError: Error, CustomStringConvertible {
     let description: String
@@ -148,9 +149,7 @@ func checkPermissions() throws {
 func heldInput() -> Bool {
     let flags = CGEventSource.flagsState(.combinedSessionState)
     if !flags.intersection([.maskShift, .maskControl, .maskAlternate, .maskCommand, .maskSecondaryFn]).isEmpty { return true }
-    for button in 0..<5 {
-        if CGEventSource.buttonState(.combinedSessionState, button: CGMouseButton(rawValue: UInt32(button))!) { return true }
-    }
+    if jackalope_mouse_buttons_down() != 0 { return true }
     for key in 0..<128 {
         if CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(key)) { return true }
     }
@@ -242,6 +241,53 @@ let keyCodes: [String: CGKeyCode] = ["Tab": 48, "Enter": 36, "Escape": 53, "Spac
     "Delete": 117, "ArrowUp": 126, "ArrowDown": 125, "ArrowLeft": 123, "ArrowRight": 124,
     "Home": 115, "End": 119, "PageUp": 116, "PageDown": 121, "a": 0, "s": 1, "z": 6, "y": 16]
 
+@available(macOS 14.0, *)
+func captureModernWindow(_ selected: SelectedWindow, _ rect: CGRect) throws -> CGImage {
+    var result: Result<CGImage, Error>?
+    SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { content, error in
+        DispatchQueue.main.async {
+            guard result == nil else { return }
+            if let error = error { result = .failure(error); return }
+            guard let window = content?.windows.first(where: {
+                $0.windowID == selected.id && $0.owningApplication?.processID == selected.pid
+            }), sameBounds(window.frame, rect) else {
+                result = .failure(ControlError("The selected capture window changed or is unavailable."))
+                return
+            }
+            let configuration = SCStreamConfiguration()
+            configuration.width = Int(rect.width)
+            configuration.height = Int(rect.height)
+            configuration.showsCursor = false
+            configuration.ignoreShadowsSingleWindow = true
+            configuration.capturesAudio = false
+            SCScreenshotManager.captureImage(contentFilter: SCContentFilter(desktopIndependentWindow: window),
+                                            configuration: configuration) { image, error in
+                DispatchQueue.main.async {
+                    guard result == nil else { return }
+                    if let error = error { result = .failure(error) }
+                    else if let image = image { result = .success(image) }
+                    else { result = .failure(ControlError("macOS returned no window capture.")) }
+                }
+            }
+        }
+    }
+    let deadline = Date().addingTimeInterval(8)
+    while result == nil && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    if result == nil { result = .failure(ControlError("Selected-window capture timed out.")) }
+    return try result!.get()
+}
+
+func captureWindow(_ selected: SelectedWindow, _ rect: CGRect) throws -> CGImage {
+    if #available(macOS 14.0, *) { return try captureModernWindow(selected, rect) }
+    guard let image = CGWindowListCreateImage(.null, .optionIncludingWindow, selected.id,
+                                            [.boundsIgnoreFraming, .nominalResolution]) else {
+        throw ControlError("macOS could not capture the selected window.")
+    }
+    return image
+}
+
 func operation(_ request: [String: Any]) throws -> [String: Any] {
     let action = request["action"] as? String ?? ""
     if action == "permissions" { return permissions() }
@@ -295,12 +341,14 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
     if action == "snapshot" { return ["bounds": boundsJSON(rect), "controls": snapshot(root, rect)] }
     if action == "screenshot" {
         try require(rect.width * rect.height <= 20_000_000, "Selected window is too large to capture.")
-        guard let path = request["path"] as? String,
-              let image = CGWindowListCreateImage(.null, .optionIncludingWindow, window.id, [.boundsIgnoreFraming, .nominalResolution]),
-              let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { throw ControlError("macOS could not capture the selected window.") }
+        guard let path = request["path"] as? String else { throw ControlError("Missing capture path.") }
+        let image = try captureWindow(window, rect)
+        guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { throw ControlError("macOS could not capture the selected window.") }
         try require(image.width == Int(rect.width) && image.height == Int(rect.height), "Capture dimensions do not match window coordinates.")
         try require(data.count <= 8 * 1024 * 1024, "Window capture exceeds the 8 MiB limit.")
         try guardState.check()
+        try require(sameBounds(rect, try window.bounds()), "Window moved or resized during capture. Take a new snapshot.")
+        _ = try window.foreground(rect)
         try data.write(to: URL(fileURLWithPath: path), options: [.withoutOverwriting])
         return ["bounds": boundsJSON(rect)]
     }

@@ -12,7 +12,7 @@ release dates.
 - [ ] Check keyboard and screen-reader access, narrow layouts, title-bar controls,
   themes, reduced motion and appearance preview rollback. Include the refreshed
   agent characters in installed-app checks; browser fixtures cover both themes
-  at 1280×840 and 960×640.
+  at 1280Ã—840 and 960Ã—640.
 - [ ] Validate helper actions, notifications and external links in installed builds,
   including Ask context defaults, saved opt-outs and its settings navigation.
 - [ ] Exercise checkpoints, commit attribution, edited merge messages and cleanup
@@ -30,6 +30,13 @@ release dates.
   baselines, representative repositories and multiple providers with independent
   review. Keep failures and missing usage visible; evaluate effort controls and
   learned routing on held-out tasks before enabling them.
+- [ ] Validate [local setup](LOCAL-AI.md) with real models in the packaged app:
+  hardware/memory requirements, current installers, download cancellation/resume,
+  account selection and continued tasks. Check macOS/Linux and enterprise configuration.
+- [ ] Measure documentation round trips, provider tokens and routing quality on matched
+  tasks after context/prompt changes. Keep all eligible models and quality-first selection.
+  MiniLM bundling is deferred; the small authored retrieval evaluation showed equal
+  top-three coverage from model-free BM25.
 
 - [ ] Compare repeated single, serial and staged evaluations with matched provider/model
   budgets and independent human review. Validate feature snapshot recovery, shared
@@ -103,7 +110,8 @@ release dates.
   remains open.
 - [ ] Run macOS helper compilation/guard CI and native desktop-control acceptance
   on macOS and real X11 desktops. Helpers, permission readiness UI and isolated
-  X11 control/interruption fixtures are implemented.
+  X11 control/interruption fixtures are implemented. Check both modern macOS
+  ScreenCaptureKit and older-system capture paths, including held mouse buttons.
 - [ ] Implement guarded Wayland desktop control with compositor support; preserve
   window grants, visible state, physical-input pause and revocation.
 - [ ] Validate macOS/Linux notification clicks, permission denial, tray-host loss

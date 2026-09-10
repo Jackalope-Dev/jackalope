@@ -25,6 +25,8 @@ provider's own GUI.
   the existing capture limit. `verification_output` (HTTP `/v1/computer/output`)
   retrieves the latest saved check by ID in Unicode character ranges. Stored results
   and the review UI retain captured output. Neither operation permits a new command.
+- Codex receives permission to invoke verification only when the task has a saved
+  check. The native guard still rejects missing commands and additional arguments.
 - Permission denials stop the denied action. Independent authorized work may
   continue, with unresolved blockers reported.
 
@@ -54,6 +56,12 @@ revision with only the ignored trial and test-only prompt capture added. Build w
 and use the returned `compiler-artifact.executable`. Rebuild and preserve the after
 binary separately. The driver records both SHA-256 hashes and the CLI version.
 
+After an interruption, confirm the old benchmark process has stopped, preserve any
+unfinished native journal, and pass `--resume` with the same output directory and
+configuration. Completed trials, including failures, are retained. The driver checks
+CLI/binary identity, budgets and pending fixture text before resuming. Record crash
+interruptions separately; missing usage makes total experiment consumption unknown.
+
 Before/after order alternates across repetitions. Keep the account, explicit model,
 reasoning configuration, fixtures and limits matched. Report usage coverage; missing
 usage is unknown. Sum input and output across **all** attempts, including failures,
@@ -63,6 +71,31 @@ The elapsed and reported-token limits are cancellation controls, not hard spendi
 caps. Human acceptance and review time remain unmeasured.
 
 ## Integration decisions and next experiments
+
+The [September 10 comparison receipts](examples/agent-quality-2026-09-10.json)
+contain two repetitions of each case using Codex 0.153.4 and `gpt-6-astra`.
+
+| Measurement | Before | Updated prompts and output |
+| --- | ---: | ---: |
+| Behavioral oracles passed | 2 / 6 | 6 / 6 |
+| Reported tokens across completed trials, including failures | 726,572 | 951,476 |
+| Tokens per passing behavioral result | 363,286 | 158,579 |
+| Launch prompt bytes, by case | 8,441–8,619 | 2,986–4,189 |
+
+The updated runs consumed 31% more raw tokens while producing more correct results;
+tokens per passing result were 56% lower. This is **not** evidence of a general 56%
+quota saving. Two baseline tasks stopped over an unrelated Git ignore-file access
+warning; both baseline scheduler attempts left the implementation broken. The
+updated scheduler implementations passed the independent oracle, but their requested
+in-agent check was denied by Codex's tool approval wiring. The saved-check permission
+repair is a subsequent change and requires its own live tool-acceptance evidence.
+
+One baseline scheduler attempt was interrupted by the host application crash before
+usage was reported. Its private journal is retained separately; the table includes
+all 12 completed trial receipts, and total experiment consumption remains unknown.
+These cases target known defects and are too small for a broad ranking, task-success
+guarantee or comparison with another GUI. Human acceptance is unmeasured. Concurrent
+local builds also make the recorded wall times unsuitable for a speed claim.
 
 RTK v0.48.0 was tried privately using its checksum-verified Windows release. Its
 Apache-2.0 license fits this repository's licensing policy with notices preserved.

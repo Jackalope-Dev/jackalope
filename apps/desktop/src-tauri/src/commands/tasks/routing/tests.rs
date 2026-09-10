@@ -1,6 +1,6 @@
 use super::*;
 
-fn candidate(id: &str, adapter: &str, model: &str, left: Option<f64>) -> Candidate {
+pub(super) fn candidate(id: &str, adapter: &str, model: &str, left: Option<f64>) -> Candidate {
     Candidate {
         id: id.into(),
         agent: adapter.into(),

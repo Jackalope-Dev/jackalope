@@ -20,7 +20,9 @@ pub mod agent_models;
 pub mod agent_policy;
 pub mod agent_profiles;
 pub mod agent_sign_in;
+pub mod local_ai;
 pub mod local_detection;
+mod retrieval;
 
 pub mod history;
 pub mod reset;

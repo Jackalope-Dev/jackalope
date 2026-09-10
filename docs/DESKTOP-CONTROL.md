@@ -122,8 +122,11 @@ the eventual app bundle. No permission bypass or automatic resume is provided.
 
 `macos.swift` is compiled with Xcode command-line tools for the Rust target's
 architecture and macOS 11 minimum. A small `libproc` shim checks process start
-identity for both GUI apps and the helper. Captures use selected-window Core
-Graphics images at nominal resolution; dimensions must match returned coordinates.
+identity for both GUI apps and the helper and checks all held mouse buttons.
+Captures use ScreenCaptureKit
+on macOS 14 and later, with selected-window Core Graphics images on older systems.
+Both paths use logical window dimensions and revalidate identity, bounds, focus
+and the active guard before saving; modern capture has an eight-second deadline.
 Accessibility matches must identify a single window. Input rejects unknown focused
 windows and password controls; Unicode events preserve surrogate pairs and respect
 the platform's event length bound. Both macOS CI architectures compile the helper

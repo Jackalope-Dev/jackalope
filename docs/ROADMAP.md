@@ -10,6 +10,11 @@ aligned with this guide when capabilities or priorities change.
 
 ## Built: the local workspace
 
+Optional local-agent setup includes hardware guidance, download choices and a real
+file/session check before connecting OpenCode to Ollama. Model-free help retrieval
+and compact routing inputs preserve all eligible choices. See [local AI](LOCAL-AI.md)
+for the MiniLM evaluation and limits; real-model and installed acceptance remain open.
+
 Kimi Code joins the native adapters with accounts, models, permissions, structured
 questions, continuation, task tokens, membership capacity, routing and Ask Jackalope.
 Kimi and OpenCode accept direct project MCP connections. Grok model discovery and

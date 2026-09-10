@@ -1,11 +1,94 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { qualityCases } from '../../../scripts/evaluation/quality-cases.mjs';
 import { qualitySummary } from '../../../scripts/evaluation/quality-metrics.mjs';
+import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
+import { resolveTaskGuidelines } from '../src/lib/skills/task-context.ts';
+import { effortPrompt } from '../src/lib/task-effort.ts';
+
+test('resuming completed trials launches no workers and rejects changed configuration', () => {
+  const output = mkdtempSync(path.join(tmpdir(), 'jackalope-quality-resume-'));
+  const executable = path.join(output, 'not-an-agent.exe');
+  writeFileSync(executable, 'A completed comparison must never execute this file.');
+  const hash = createHash('sha256').update(readFileSync(executable)).digest('hex');
+  const baseline = JSON.parse(
+    readFileSync(
+      new URL('../../../scripts/evaluation/baselines/f0b95b3-prompts.json', import.meta.url),
+    ),
+  );
+  const fixture = qualityCases[0];
+  const after = [
+    assemblePrompt({
+      rawPrompt: fixture.prompt,
+      selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
+      executionMode: 'isolated',
+    }).assembledPrompt,
+    effortPrompt(),
+  ].join('\n\n');
+  const comparison = path.join(output, 'comparison.json');
+  const saved = {
+    baselineRevision: baseline.revision,
+    agent: 'codex',
+    model: 'fixture',
+    seconds: 30,
+    tokens: 1000,
+    cliVersion:
+      spawnSync('codex', ['--version'], { encoding: 'utf8', windowsHide: true }).stdout?.trim() ??
+      null,
+    executableHashes: { before: hash, after: hash },
+    trials: ['before', 'after'].map((variant) => ({
+      case: fixture.id,
+      variant,
+      repetition: 1,
+      oraclePassed: false,
+      totalTokens: 20,
+    })),
+  };
+  writeFileSync(comparison, JSON.stringify(saved));
+  for (const variant of ['before', 'after'])
+    writeFileSync(
+      path.join(output, `${fixture.id}-1-${variant}.json`),
+      JSON.stringify({
+        ...fixture,
+        prompt: variant === 'before' ? baseline.prompts[fixture.id] : after,
+        variant,
+        agent: 'codex',
+        model: 'fixture',
+        seconds: 30,
+        tokens: 1000,
+      }),
+    );
+  const run = (model) =>
+    spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL('../../../scripts/evaluation/quality.mjs', import.meta.url)),
+        '--execute',
+        '--resume',
+        `--model=${model}`,
+        '--cases=copy-edit',
+        '--repeat=1',
+        '--seconds=30',
+        '--tokens=1000',
+        `--before=${executable}`,
+        `--after=${executable}`,
+        `--output=${output}`,
+      ],
+      { encoding: 'utf8', windowsHide: true },
+    );
+  const resumed = run('fixture');
+  assert.equal(resumed.status, 0, resumed.stderr);
+  assert.equal(readFileSync(comparison, 'utf8'), JSON.stringify(saved));
+  const changed = run('different-model');
+  assert.notEqual(changed.status, 0);
+  assert.match(changed.stderr, /Resume requires/);
+});
 
 test('quality totals include failed attempts and keep missing usage unknown', () => {
   const rows = [

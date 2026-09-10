@@ -53,7 +53,7 @@ These changes prepare device testing; they do not establish macOS or Linux accep
 The CI jobs must pass on their native runners after these changes are pushed.
 Local Windows checks do not execute Unix branches. CI packages are review artifacts,
 not public downloads or signed release candidates.
-Local Linux validation now includes 246 passing native library tests (14 ignored)
+The earlier command/browser hardening pass included 246 passing Linux native library tests (14 ignored)
 on Ubuntu 24.04 under WSL, three real Chrome browser trials (including cleanup after
 cancellation), and a GNOME Keyring write/read/update/delete round-trip using an
 isolated login collection and private D-Bus session. The Linux desktop executable
@@ -63,7 +63,7 @@ host; this is not a full macOS application build. Actual macOS compilation still
 needs the native CI runners. WSL and browser fixtures do not establish GNOME,
 Wayland, a real X11 desktop, installed-app or release acceptance.
 
-Windows `RUST_TEST_THREADS=2 pnpm verify` passed with 246 native tests (14 ignored),
+That pass's Windows `RUST_TEST_THREADS=2 pnpm verify` passed with 246 native tests (14 ignored),
 136 desktop JavaScript tests, 107 service tests, 45 release tests and both production
 builds. An earlier contended run timed out in the scheduled-task fixture; the full
 rerun passed. Three real browser trials also pass on Windows; profile cleanup has
@@ -135,6 +135,16 @@ focus/movement/device-input pause, Escape and stale/replaced guard rejection.
 It runs in CI on its own Xvfb display and private D-Bus session. macOS CI compiles
 the Swift helper and process-identity shim and runs a noninteractive guard check
 on both architectures; those jobs must run before claiming macOS compilation.
+
+The native-control pass recorded 277 passing Linux library tests (17 ignored).
+After the development environment restarted, the final X11 helper compiled again
+with `-Wall -Wextra -Werror` and its isolated control fixture passed. A separate
+read-only check rejected WSLg XWayland even with environment variables claiming
+an X11 session. Permission UI fixtures passed keyboard activation, denial/retry,
+reduced motion and both themes at 1280×840 and 960×640; they made no native
+permission requests. macOS capture now uses ScreenCaptureKit on macOS 14 and later,
+retaining the older-system capture path. Its compilation and capture acceptance
+still require the native runners and devices.
 
 The remaining native-control implementation is Wayland. Keep Ubuntu/GNOME first,
 but do not enable an XWayland fallback that cannot observe the whole desktop's

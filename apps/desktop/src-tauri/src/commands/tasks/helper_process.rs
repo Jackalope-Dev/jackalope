@@ -16,7 +16,7 @@ pub(in crate::commands) fn run(
     runtime.access.ensure()?;
     let policy = runtime.policy()?;
     let (adapter, executable) = policy.resolve(agent)?;
-    policy.model(agent, model)?;
+    let model = policy.model_for_account(agent, model, binding)?;
     if !policy.account_allowed("", agent, binding) {
         return Err("This account is disabled. Choose an enabled account in Agents.".into());
     }
@@ -27,7 +27,7 @@ pub(in crate::commands) fn run(
     let mut cmd = command(executable);
     let _configuration = routing::process::configure(&mut cmd, &adapter, &prompt_path, prompt)?;
     crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
-    if let Some(model) = model {
+    if let Some(model) = model.as_deref() {
         cmd.args(["--model", model]);
     }
     if adapter == "grok" {

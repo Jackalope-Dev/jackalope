@@ -1,5 +1,11 @@
 # Usage, capacity and proactive work
 
+Routing inputs share repeated account metadata without dropping eligible models,
+task requirements or acceptance criteria. Ask Jackalope prefills bounded official
+documentation excerpts with full-document fallback. These reduce prompt repetition
+and offer fewer documentation round trips; paid-token and quality gains still need
+matched trials. [Local AI and evaluation](LOCAL-AI.md) records the MiniLM decision.
+
 Native attempt accounting and overall/project Usage are implemented; see
 [TASK-JOURNEY.md](./TASK-JOURNEY.md) for coverage and limitations.
 Capacity readers connect Codex, Claude Code, Grok and Antigravity through their

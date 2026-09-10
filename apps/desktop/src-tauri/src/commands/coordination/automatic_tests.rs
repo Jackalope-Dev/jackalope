@@ -119,6 +119,32 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
     );
 }
 
+#[tokio::test]
+async fn agent_verification_cannot_add_or_replace_a_saved_command() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    let input = || super::super::harness::ComputerVerifyInput {
+        command: "node".into(),
+        args: vec!["--test".into(), "unexpected-argument".into()],
+    };
+    let run = || f.service.authorized_run(&headers("reader-run")).unwrap();
+    assert!(
+        super::super::verification::agent_verify(f.runtime.clone(), run(), input())
+            .await
+            .unwrap_err()
+            .contains("No project verification")
+    );
+    f.runtime.update("reader-run", |run| {
+        run.verify_command = Some("node --test".into())
+    });
+    assert!(
+        super::super::verification::agent_verify(f.runtime.clone(), run(), input())
+            .await
+            .unwrap_err()
+            .contains("saved project verification command")
+    );
+}
+
 fn request(previous: Option<&str>) -> RunRequest {
     serde_json::from_value(json!({"id":"next","projectId":"p","projectName":"Fixture","projectPath":"","agent":"codex","isolated":false,"prompt":"Next work","previousRunId":previous})).unwrap()
 }

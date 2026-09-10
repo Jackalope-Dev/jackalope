@@ -21,6 +21,12 @@ export const roadmapStages = [
           'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, and Antigravity adapters are implemented, with provider-specific limits. Kimi supports routing, structured questions, task tokens, and membership quota. Kimi and OpenCode accept direct project tools. Grok models and Antigravity subscription quota are detected through their CLIs. Antigravity remains a worker. Antigravity named profiles use Gemini API keys with separate billing; its subscription login is shared. Named accounts, project preferences, saved ideas, and persistent task history keep work organized. Installed-agent acceptance is still in progress.',
       },
       {
+        title: 'A local way to get started.',
+        summary: 'Optional models, clear download choices, and guided setup.',
+        detail:
+          'Local setup guides you through your computer’s requirements, OpenCode and Ollama installation, and an optional model download. A file edit and session check must pass before connection. Jackalope bundles no model weights. Help retrieves relevant documentation locally, while routing keeps every eligible model in consideration. Real-model quality, token savings, and installed setup still need validation.',
+      },
+      {
         title: 'Room to work in parallel.',
         summary: 'Separate worktrees. Shared context. Review before integration.',
         detail:

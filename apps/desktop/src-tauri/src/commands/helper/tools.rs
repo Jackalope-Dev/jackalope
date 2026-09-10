@@ -86,25 +86,9 @@ impl Helper {
                 if query.len() > 300 {
                     return Err("Use a shorter search query.".into());
                 }
-                let terms: Vec<_> = query.split_whitespace().map(str::to_lowercase).collect();
-                let mut hits: Vec<_> = docs
-                    .iter()
-                    .filter_map(|doc| {
-                        let title = format!("{} {}", doc["title"], doc["slug"]).to_lowercase();
-                        let text = doc["markdown"].as_str().unwrap_or("").to_lowercase();
-                        let score: usize = terms
-                            .iter()
-                            .map(|term| {
-                                usize::from(title.contains(term)) * 5
-                                    + usize::from(text.contains(term))
-                            })
-                            .sum();
-                        (score > 0 || terms.is_empty()).then_some((score, doc))
-                    })
-                    .collect();
-                hits.sort_by_key(|(score, _)| std::cmp::Reverse(*score));
+                let hits = crate::commands::retrieval::search(&query);
                 return Ok(
-                    json!({"source":"Bundled official documentation for this app build", "results":hits.into_iter().take(5).map(|(_,doc)| json!({"slug":doc["slug"],"title":doc["title"],"description":doc["description"],"url":doc["url"]})).collect::<Vec<_>>()}),
+                    json!({"source":"Bundled official documentation for this app build", "results":hits.into_iter().take(5).map(|doc| json!({"slug":doc["slug"],"title":doc["title"],"description":doc["description"],"url":doc["url"]})).collect::<Vec<_>>()}),
                 );
             }
             "read_doc" => {
