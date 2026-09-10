@@ -6,9 +6,17 @@
 - Start isolated concurrent work from current master under .worktrees/<task>.
   Older worktrees are snapshots, not the current baseline.
 - Confirm the baseline with pnpm build. Use targeted checks while working, finish
-  with pnpm verify, and update the short current status/backlog. Do not claim
+  with pnpm verify. Update status/backlog only when capabilities or open scope change. Do not claim
   native or installed-app acceptance from a frontend build.
 - Keep comments for non-obvious behavior and contracts, not narration or task history.
+- Follow docs/DOCUMENTATION.md for every tracked document. Keep only current behavior,
+  engineering guidance and reusable templates. Do not add feature design proposals,
+  decision records, experiment reports, dated test results, work summaries or owner
+  handoffs. Put detailed evidence in the task/PR response or ignored scratch/output.
+  New guides need a distinct contributor purpose and a docs/README.md entry.
+- Before removing unused files, inspect imports, generated paths, package scripts,
+  native registration, packaging and manual test consumers. Preserve compatibility
+  data and required notices. Remove orphaned references and prevent regeneration.
 - Reserve the public changelog for notable features, meaningful improvements and
   larger milestones. Skip routine copy, spacing, icon and internal maintenance
   changes. Use `pnpm changelog:add`; verification checks structure and ordering.

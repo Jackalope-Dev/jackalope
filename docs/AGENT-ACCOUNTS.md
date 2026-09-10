@@ -25,7 +25,8 @@ from the project selector without leaving project settings.
 | Claude Code | `claude auth login` in the embedded terminal | `claude auth status`; identity when reported |
 | Grok | `grok login` in the embedded terminal | ACP `_x.ai/auth/info`; identity when reported |
 | OpenCode | `opencode auth login` in the embedded terminal | Provider identity and credential validity remain unavailable in Jackalope |
-| Antigravity | Existing `agy` sign-in | Separate managed accounts remain unsupported |
+| Kimi Code | `kimi login` in its managed profile | ACP authentication; membership quota when available |
+| Antigravity | Existing subscription sign-in or named Gemini API-key profile | Isolated subscription profiles remain unsupported |
 
 The interfaces follow the [Codex app-server documentation](https://learn.chatgpt.com/docs/app-server),
 [Claude CLI reference](https://code.claude.com/docs/en/cli-reference) and

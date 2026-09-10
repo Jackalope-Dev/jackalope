@@ -75,6 +75,8 @@ Thumbs.db
 .DS_Store
 
 # Temporary & agent scratch
+__pycache__/
+*.py[cod]
 scratch/
 tmp/
 .playwright-cli/

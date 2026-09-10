@@ -118,34 +118,35 @@ permission escalation still requires a supported adapter protocol or continuatio
 ## User notifications
 
 In-app companion notices remain authoritative for pending answers, failed or
-interrupted tasks and review. Windows OS notifications now run from native task
+interrupted tasks and review. Native OS notifications run from native task
 state while the app is in the background, including close-to-tray operation.
 They honor the shared All / Needs attention / Quiet setting and a separate OS
 switch. Existing notices are baselined on startup, event identities prevent repeats,
 and the foreground window suppresses OS delivery. No prompt, project name, path,
 answer or credential appears in a toast. Settings offers a test notification and
-reports delivery errors; Windows can suppress banners independently.
+reports delivery errors; OS notification policy can suppress banners independently.
 
 Clicking a toast brings the running app forward and opens the exact saved attempt.
 Resolved questions open their current task state. Quitting stops native observation;
 cold-start activation from an old toast is not implemented. Windows packaged builds
 use their registered application identity. Unpackaged release builds require the
 installer's registered identifier; debug notices may appear under PowerShell.
-macOS/Linux OS delivery is not implemented and is labeled unavailable. In-app
-notices remain available. Certified installed Store identity, Focus Assist and
+macOS uses UserNotifications from a signed app bundle; Linux uses desktop
+notification actions. Native permission and focus policies still apply. See
+[platform contracts](CROSS-PLATFORM-RELEASES.md#platform-contracts). In-app notices
+remain available. Certified installed Store identity, Focus Assist and
 real notification click acceptance must be tested separately from source tests.
 
-## Open-source evaluation
+## Transport dependencies
 
-- Reuse the existing [official Rust MCP SDK](https://github.com/modelcontextprotocol/rust-sdk)
+- The bridge uses the [official Rust MCP SDK](https://github.com/modelcontextprotocol/rust-sdk)
   3.2.0 (Apache-2.0) and Axum for the shared bridge; no second server framework.
-- Adopt [tauri-winrt-notification](https://github.com/tauri-apps/winrt-notification)
+- Windows uses [tauri-winrt-notification](https://github.com/tauri-apps/winrt-notification)
   0.8.1 (MIT/Apache-2.0) for Windows toast activation callbacks. The standard
   [Tauri notification plugin](https://v2.tauri.app/plugin/notification/) supports
   desktop delivery but documents its Actions API as mobile-only.
 - [Agent Client Protocol](https://agentclientprotocol.com/protocol/v1/initialization)
   drives Kimi lifecycle, capability negotiation, approvals and structured questions.
-  Its [Rust SDK](https://github.com/agentclientprotocol/rust-sdk) remains a possible shared implementation.
   Replacing tested CLI adapters requires provider-specific acceptance; ACP is not
   assumed to be available on every installed agent.
 - [OpenCode's runtime configuration](https://opencode.ai/docs/config/) supports

@@ -1,12 +1,13 @@
 # Documentation guidance
 
-Follow the repository [AGENTS.md](../AGENTS.md). Keep STATUS.md brief and current,
-and TODO.md focused on open work. Separate implemented behavior, measured
-verification and future scope. Preserve unresolved release gates when retiring
-old handoff notes. Use relative links and run pnpm check:docs.
+Follow the repository [AGENTS.md](../AGENTS.md) and [documentation policy](DOCUMENTATION.md).
+Keep STATUS.md limited to capabilities/limits and TODO.md to actionable open work.
+Use present-tense behavior, contracts, setup, recovery and repeatable verification.
+Keep unresolved acceptance requirements when removing old results. Use relative
+links, register each guide in README.md and run pnpm check:docs.
 
-Keep campaign plans, deployment receipts, local session paths and chronological
-test diaries outside public source. STATUS.md summarizes current capabilities
-and known limits; TODO.md retains unresolved contributor and release work.
-Record completed product changes in the public changelog without private
-publication details. Do not restore retired internal records from older branches.
+Do not create feature design documents, decision records, implementation plans,
+experiment summaries, dated test results or agent/maintainer work narratives.
+Keep detailed evidence in the task/PR response or ignored scratch/output. Only
+notable user-visible changes belong in the public changelog. Do not restore
+retired internal records from older branches or force-add ignored receipts.

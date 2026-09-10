@@ -120,6 +120,14 @@ Set `RUST_TEST_THREADS` or pass `-- --test-threads=N` to override this for stres
 
 ## Pull requests and reports
 
+Follow the [documentation policy](docs/DOCUMENTATION.md). Tracked guides describe
+current behavior and repeatable engineering workflows. Keep feature proposals,
+decision records, experiment reports, dated test results and work summaries in
+task/PR discussion or private storage. Update existing guides when their behavior
+changes; new guides need a distinct purpose and a documentation-index entry.
+Use the [behavior template](docs/templates/BEHAVIOR-GUIDE.md) only when useful.
+Detailed local receipts belong in ignored scratch/output, not STATUS or TODO.
+
 Explain the trigger, resulting behavior and verification. Include screenshots
 for UI changes and identify any remaining limitations. Keep generated lockfiles
 in sync using package tools. Add comments for non-obvious invariants rather than

@@ -15,6 +15,7 @@ const cargo = userCargo && existsSync(userCargo) ? userCargo : 'cargo';
 const checks = [
   [process.execPath, ['scripts/knowledge.mjs', '--check']],
   [process.execPath, [pnpm, 'check']],
+  [process.execPath, ['--test', 'scripts/docs-policy.test.mjs']],
   [process.execPath, [pnpm, 'check:docs']],
   [process.execPath, [pnpm, 'check:changelog']],
   [process.execPath, [pnpm, 'test:release']],

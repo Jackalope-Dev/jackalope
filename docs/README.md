@@ -1,39 +1,44 @@
 # Documentation
 
-Start with the [project overview](../README.md) or browse the
-[website guides](https://jackalope.dev/knowledge/).
+Start with the [project overview](../README.md), [contributor setup](../CONTRIBUTING.md)
+or [website guides](https://jackalope.dev/knowledge/). Every guide below describes
+maintained behavior, a repeatable workflow or a reusable template. Follow the
+[documentation policy](DOCUMENTATION.md) when changing this collection.
 
-## Using Jackalope
+## Contributor guidance
 
-- [Your first task](GETTING-STARTED.md) and [the core workflow](CORE-WORKFLOW.md)
-- [Supported agents](AGENT-SUPPORT.md) and [agent accounts](AGENT-ACCOUNTS.md)
-- [Optional local AI setup and context evaluation](LOCAL-AI.md)
-- [Parallel work and review](PARALLEL-WORKFLOWS.md) and [execution evaluation](EXECUTION-EVALUATION.md)
-- [Routing, usage and quota handoff](USAGE-AND-ROUTING.md)
-- [Recurring tasks](RECURRING-TEMPLATES.md)
-- [MCP connections](MCP-DISCOVERY.md), [browser automation](BROWSER-AUTOMATION.md)
-  and [desktop control](DESKTOP-CONTROL.md)
-- [Project knowledge](PROJECT-KNOWLEDGE.md) and [Ask Jackalope](HELPER.md)
-- [Settings sync](SETTINGS-SYNC.md) and [privacy/reporting controls](BETA-MONITORING.md)
+- [Current capabilities](STATUS.md), [contributor priorities](TODO.md) and [roadmap](ROADMAP.md)
+- [Architecture and ownership](ARCHITECTURE.md), [UI guidelines](UI-GUIDELINES.md)
+- [Native testing](SELF-DEVELOPMENT.md) and [verification tools](VERIFICATION.md)
+- [History and recovery](HISTORY-RECOVERY.md), [performance checks](PERFORMANCE.md)
+- [Prompt and output evaluation](AGENT-QUALITY.md), [execution evaluation](EXECUTION-EVALUATION.md)
+- [Dependency contracts](DEPENDENCY-INTEGRATIONS.md), [license inventory](DEPENDENCIES.md)
+- [Licensing and redistribution](LICENSING.md), [security reporting](../SECURITY.md)
+- [Behavior guide template](templates/BEHAVIOR-GUIDE.md)
 
-## Contributing
+## Workspace contracts
 
-- [Development setup and checks](../CONTRIBUTING.md)
-- [Current capabilities and limits](STATUS.md), [open priorities](TODO.md)
-  and [roadmap](ROADMAP.md)
-- [Architecture and code ownership](ARCHITECTURE.md)
-- [Design guide](UI-GUIDELINES.md) and [isolated native testing](SELF-DEVELOPMENT.md)
-- [Dependency integration notes](DEPENDENCY-INTEGRATIONS.md)
-- [License and redistribution](LICENSING.md), [dependency inventory](DEPENDENCIES.md)
-  and [community guidelines](../CODE_OF_CONDUCT.md)
-- [Private security reporting](../SECURITY.md)
+- [Getting started](GETTING-STARTED.md), [core workflow](CORE-WORKFLOW.md), [task outcomes](TASK-OUTCOMES.md)
+- [Parallel workflows](PARALLEL-WORKFLOWS.md), [orchestration](ORCHESTRATION-CAPABILITIES.md)
+- [Agent support](AGENT-SUPPORT.md), [agent accounts](AGENT-ACCOUNTS.md), [Antigravity](ANTIGRAVITY.md)
+- [Local agents and context selection](LOCAL-AI.md), [usage and routing](USAGE-AND-ROUTING.md)
+- [Recurring templates](RECURRING-TEMPLATES.md), [example parallel plan](examples/parallel-plan.json)
+- [Project knowledge](PROJECT-KNOWLEDGE.md), [codebase maps](CODEBASE.md), [Ask Jackalope](HELPER.md)
+- [MCP discovery](MCP-DISCOVERY.md), [browser automation](BROWSER-AUTOMATION.md), [desktop control](DESKTOP-CONTROL.md)
 
-## Hosting and releases
+## Account services and website
 
-- [Source and hosted-service boundaries](DEPLOYMENT-AND-SOURCE.md)
-- [Server setup](../apps/server/README.md) and [website setup](../apps/website/README.md)
-- [Release preparation](RELEASE.md) and [automation](RELEASE-AUTOMATION.md)
-- [Platform acceptance](CROSS-PLATFORM-RELEASES.md)
+- [Native and hosted services](BACKEND.md), [deployment boundaries](DEPLOYMENT-AND-SOURCE.md)
+- [Server setup](../apps/server/README.md), [server operations](SERVER-LAUNCH.md)
+- [Desktop account connection](DESKTOP-ACCOUNT.md), [settings sync](SETTINGS-SYNC.md)
+- [Early access](EARLY-ACCESS.md), [waitlist referrals and passes](WAITLIST-REFERRALS.md)
+- [Monitoring and privacy controls](BETA-MONITORING.md), [feedback invitations](FEEDBACK-INVITATIONS.md)
+- [Website setup](../apps/website/README.md), [signup forms](../apps/website/SEQUENZY.md)
+- [Knowledge content and media](KNOWLEDGE-MEDIA.md), [search and discovery](WEBSITE-SEO.md)
 
-Implementation and automated checks do not imply installed-app acceptance or
-public release availability. Follow the relevant guide's stated limits.
+## Release engineering
+
+- [Windows releases](RELEASE.md), [release automation](RELEASE-AUTOMATION.md)
+- [Platform requirements](CROSS-PLATFORM-RELEASES.md)
+- [Cloud candidates](CRABNEBULA-RELEASE.md), [Microsoft Store](STORE-RELEASE.md)
+- [Blank release record](releases/RELEASE-RECORD-TEMPLATE.md); keep completed records privately

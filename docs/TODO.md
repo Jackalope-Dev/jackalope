@@ -10,9 +10,7 @@ release dates.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
   defaults and explicit overrides, including cancellation and restart.
 - [ ] Check keyboard and screen-reader access, narrow layouts, title-bar controls,
-  themes, reduced motion and appearance preview rollback. Include the refreshed
-  agent characters in installed-app checks; browser fixtures cover both themes
-  at 1280Ã—840 and 960Ã—640.
+  themes, reduced motion and appearance preview rollback. Include agent characters in installed-app checks.
 - [ ] Validate helper actions, notifications and external links in installed builds,
   including Ask context defaults, saved opt-outs and its settings navigation.
 - [ ] Exercise checkpoints, commit attribution, edited merge messages and cleanup
@@ -21,8 +19,7 @@ release dates.
   cache regression when upgrading dependencies.
 - [ ] Complete installed startup, CPU/memory and responsiveness measurements using
   the [performance fixtures](PERFORMANCE.md), including sustained streams, repeated
-  task switching and large wrapped patches. Local runtime/browser checks pass;
-  installed and cross-platform performance acceptance remains open.
+  task switching and large wrapped patches on each supported native platform.
 
 ## Agents and task execution
 
@@ -35,8 +32,6 @@ release dates.
   account selection and continued tasks. Check macOS/Linux and enterprise configuration.
 - [ ] Measure documentation round trips, provider tokens and routing quality on matched
   tasks after context/prompt changes. Keep all eligible models and quality-first selection.
-  MiniLM bundling is deferred; the small authored retrieval evaluation showed equal
-  top-three coverage from model-free BM25.
 
 - [ ] Compare repeated single, serial and staged evaluations with matched provider/model
   budgets and independent human review. Validate feature snapshot recovery, shared
@@ -55,7 +50,7 @@ release dates.
   interruption, indicator failure and permission renewal.
 - [ ] Implement Gemini CLI, Aider and Goose execution protocols.
 - [ ] Validate OpenCode direct MCP, Grok model discovery and Antigravity quota refresh with
-  installed profiles; retain explicit CLI/version boundaries from the capability audit.
+  installed profiles; retain explicit CLI/version boundaries from the capability boundaries.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without
   weakening process ownership, usage accounting or saved-session compatibility.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports
@@ -107,13 +102,10 @@ release dates.
 ## Platform releases
 
 - [ ] Run native CI and accept macOS/Linux credential storage, GUI-launched CLI
-  discovery, process/PTY/browser behavior and trial packaging. WSL native tests,
-  real Chrome cleanup and isolated GNOME Keyring trials pass; desktop acceptance
-  remains open.
+  discovery, process/PTY/browser behavior and trial packaging. Keep WSL/Xvfb fixtures separate from installed desktop acceptance.
 - [ ] Run macOS helper compilation/guard CI and native desktop-control acceptance
-  on macOS and real X11 desktops. Helpers, permission readiness UI and isolated
-  X11 control/interruption fixtures are implemented. Check both modern macOS
-  ScreenCaptureKit and older-system capture paths, including held mouse buttons.
+  on macOS and real X11 desktops. Check ScreenCaptureKit and older-system capture
+  paths, physical interruption, permission readiness and held mouse buttons.
 - [ ] Implement guarded Wayland desktop control with compositor support; preserve
   window grants, visible state, physical-input pause and revocation.
 - [ ] Validate macOS/Linux notification clicks, permission denial, tray-host loss

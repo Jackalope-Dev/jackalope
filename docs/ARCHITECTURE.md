@@ -1,6 +1,6 @@
 # Architecture
 
-Jackalope has three applications and a shared branding package. Desktop execution
+Jackalope has three applications and shared branding/knowledge packages. Desktop execution
 is local; verified account access is required to start new work in every build.
 Saved history and running tasks remain accessible when access expires.
 
@@ -90,7 +90,7 @@ agent-supplied executable. See [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 
 `desktop_control.rs` separately owns explicit per-window grants and a single desktop
 input lease. Both transports share task authorization, cancellation and snapshot
-checks. See [DESKTOP-CONTROL.md](DESKTOP-CONTROL.md) for Windows support and limits.
+checks. See [DESKTOP-CONTROL.md](DESKTOP-CONTROL.md) for platform support and limits.
 
 Native profiles store task journals, queues, schedules, integration receipts and
 preferences. Locks prevent concurrent writers. Interrupted attempts are retained,

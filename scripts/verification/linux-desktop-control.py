@@ -75,7 +75,9 @@ def wait(check, description, timeout=12):
     deadline = time.monotonic() + timeout
     last = None
     while time.monotonic() < deadline:
-        while GLib.MainContext.default().pending():
+        for _ in range(32):
+            if not GLib.MainContext.default().pending():
+                break
             GLib.MainContext.default().iteration(False)
         try:
             result = check()

@@ -86,7 +86,7 @@ fn http_instructions() -> String {
 }
 
 fn instructions(item: &QueueItem) -> String {
-    format!("\nAssigned task: {} ({}). Own only these paths: {}. Other agents may work concurrently. Report a blocker if shared changes outside your scope are needed. Read docs/DESIGN.md and docs/STATUS.md if present. Jackalope owns worktrees, claims and integration; do not create another worktree or claim another task. Check project assignments before work.\n{}", item.title, item.id, item.scopes.join(", "), harness_instructions())
+    format!("\nAssigned task: {} ({}). Own only these paths: {}. Other agents may work concurrently. Report a blocker if shared changes outside your scope are needed. Follow this repository's contributor and agent guidance when present. Jackalope owns worktrees, claims and integration; do not create another worktree or claim another task. Check project assignments before work.\n{}", item.title, item.id, item.scopes.join(", "), harness_instructions())
 }
 
 async fn bridge_help(
