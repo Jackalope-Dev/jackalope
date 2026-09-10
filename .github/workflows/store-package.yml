@@ -47,7 +47,7 @@ jobs:
           $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF_NAME -ne "store-$env:RELEASE_CHANNEL/v$version") { throw 'Release tag must match the app version.' }
           if ($env:RELEASE_MODE -eq 'submission' -and $env:STORE_AUTOMATION_ENABLED -ne 'true') { throw 'Complete Store setup and enable STORE_AUTOMATION_ENABLED first.' }
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24'
           cache: pnpm
