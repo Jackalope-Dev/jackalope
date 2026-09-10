@@ -23,7 +23,7 @@ are disabled for helper requests; the model returns one validated JSON answer or
 application operation per exchange. The same dispatcher serves local MCP.
 This is separate from project task MCP delivery and creates no Git worktree.
 
-Codex, Claude Code, Grok and OpenCode have helper adapters. A question can make
+Codex, Claude Code, Grok, OpenCode and Kimi Code have helper adapters. A question can make
 up to ten model requests, each limited to two minutes and 512 KB of output.
 Stop cancels the loop and terminates its owned process tree. There is no automatic
 agent/account failover. Execution-access and agent/model/account restrictions
@@ -31,7 +31,9 @@ apply. Provider sign-ins and CLI configuration remain owned by installed agents;
 this is not an OS sandbox.
 
 Each turn records its actual agent, model, account label and reported tokens.
-Helper usage stays in helper history rather than project task usage. The prompt
+Helper usage stays in helper history rather than project task usage. Kimi uses a
+private tool-free agent definition; its print output does not include token totals,
+so that helper usage remains unknown. The prompt
 includes up to eight prior replies and recent action IDs/statuses so the agent
 can check completion or Undo receipts. New conversation archives the old record
 locally. On restart, working turns are interrupted and pending/applying actions

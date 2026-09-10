@@ -135,6 +135,7 @@ pub async fn app_install_update(
     }
     {
         let _guard = super::integration::execution_guard()?;
+        super::verification::ensure_all_idle()?;
         runtime.ensure_history_saved()?;
         if state
             .preferences()?

@@ -325,8 +325,8 @@ pub fn helper_send(helper: State<'_, Helper>, prompt: String) -> Result<View, St
         );
     }
     let (adapter, _) = policy.resolve(agent)?;
-    if !["codex", "claude", "grok", "opencode"].contains(&adapter.as_str()) {
-        return Err("The helper supports Codex, Claude Code, Grok and OpenCode. Choose one as the default agent in Agents configuration.".into());
+    if !["codex", "claude", "grok", "opencode", "kimi"].contains(&adapter.as_str()) {
+        return Err("The helper supports Codex, Claude Code, Grok, OpenCode and Kimi Code. Choose one as the default agent in Agents configuration.".into());
     }
     let binding = agent_profiles::bind_account(&helper.runtime.profiles_root(), &adapter, None)?;
     agent_profiles::validate_binding(&helper.runtime.profiles_root(), &binding)?;

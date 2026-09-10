@@ -7,6 +7,7 @@ const agents = [
     url: 'https://learn.chatgpt.com/docs/codex/cli',
     note: 'Your OpenAI coding agent, with project connections and reported usage.',
     connections: 'stdio · HTTP',
+    signIn: 'CLI status check',
   },
   {
     name: 'Claude Code',
@@ -14,12 +15,14 @@ const agents = [
     url: 'https://code.claude.com/docs/en/overview',
     note: 'Use Claude Code with connected tools and answer its questions in Jackalope.',
     connections: 'stdio · HTTP · SSE',
+    signIn: 'CLI status check',
   },
   {
     name: 'Grok',
     mark: '↗',
     url: 'https://docs.x.ai/build/overview',
     note: 'Bring your Grok CLI sessions into the same task and review workflow.',
+    signIn: 'CLI account and model check',
     connections: 'On-demand discovery',
   },
   {
@@ -27,7 +30,16 @@ const agents = [
     mark: '[ ]',
     url: 'https://opencode.ai/docs/',
     note: 'Choose your OpenCode provider and model, including available free or local options.',
-    connections: 'Own CLI configuration only',
+    connections: 'stdio · HTTP · SSE',
+  },
+  {
+    name: 'Kimi Code',
+    mark: 'K',
+    url: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
+    note: 'Use Kimi for tasks and routing, with separate accounts, model choices, and task approvals.',
+    connections: 'stdio · HTTP · SSE',
+    signIn: 'CLI authentication; model access checked on launch',
+    guide: '/agents/kimi-code/',
   },
   {
     name: 'Antigravity',
@@ -63,19 +75,19 @@ export function AgentSupport() {
             <h3>{agent.name}</h3>
             <p>{agent.note}</p>
             <a
-              href={agent.url}
-              target="_blank"
-              rel="noreferrer"
+              href={agent.guide ?? agent.url}
+              target={agent.guide ? undefined : '_blank'}
+              rel={agent.guide ? undefined : 'noreferrer'}
               aria-label={`Set up ${agent.name}`}
             >
-              Get the CLI <ArrowRight size={15} />
+              {agent.guide ? 'Setup guide' : 'Get the CLI'} <ArrowRight size={15} />
             </a>
           </div>
         ))}
       </div>
       <div className="agent-support-common">
-        <Check size={17} /> Tasks & review <span>·</span> Session continuation <span>·</span>{' '}
-        Reported task usage
+        <Check size={17} /> Tasks & review <span>·</span> Session continuation <span>·</span> Usage
+        when reported
       </div>
       <details className="agent-support-details">
         <summary>
@@ -92,11 +104,11 @@ export function AgentSupport() {
               </tr>
             </thead>
             <tbody>
-              {agents.map((agent, index) => (
+              {agents.map((agent) => (
                 <tr key={agent.name}>
                   <th scope="row">{agent.name}</th>
                   <td>{agent.connections}</td>
-                  <td>{index < 2 ? 'CLI status check' : 'Provider checks on launch'}</td>
+                  <td>{agent.signIn ?? 'Provider checks on launch'}</td>
                 </tr>
               ))}
             </tbody>
@@ -104,16 +116,18 @@ export function AgentSupport() {
         </section>
         <p>
           Jackalope uses each agent’s installed CLI and permission rules. Connections configured
-          inside a CLI remain subject to that CLI’s settings; project connections support Codex and
-          Claude Code, with on-demand discovery for Grok and Antigravity. OpenCode uses its own CLI
-          tool configuration. Usage shows what an agent reports, not complete provider billing.
-          Profiles organize sign-ins; they are not a security sandbox.
+          inside a CLI remain subject to that CLI’s settings. Codex, Claude Code, OpenCode, and Kimi
+          Code support direct project connections; all six support on-demand discovery. Kimi reports
+          task token totals and membership quota. Antigravity reports subscription pools through
+          read-only CLI commands. Usage coverage varies by account and CLI version. Profiles
+          organize sign-ins; they are not a security sandbox.
         </p>
         <p>
           Named profiles are available for supported agents. Antigravity profiles use Gemini API
           billing, separate from a Google subscription; multiple subscription logins are not
-          isolated. Antigravity can run tasks but cannot coordinate automatic routing. Gemini CLI,
-          Aider, and Goose have account setup only; task execution is still in development.
+          isolated. Antigravity runs worker tasks; a verified tool-free interface is still needed
+          for automatic routing and Ask Jackalope. Kimi supports both. Gemini CLI, Aider, and Goose
+          have account setup only; task execution is still in development.
         </p>
         <p>
           Model access and subscription requirements depend on your provider. See the{' '}

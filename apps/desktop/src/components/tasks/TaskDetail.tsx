@@ -552,7 +552,7 @@ export function TaskDetail({
               <p className="task-muted mt-3">
                 Reported usage:{' '}
                 {run.usage.reported
-                  ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output · ${run.usage.cacheRead.toLocaleString()} cached input (included)`
+                  ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output${run.accountBinding?.adapter === 'kimi' || run.agent === 'kimi' ? ' · Cache breakdown unavailable' : ` · ${run.usage.cacheRead.toLocaleString()} cached input (included)`}`
                   : 'Unavailable for this attempt'}
               </p>
               {run.mcpUsage && (

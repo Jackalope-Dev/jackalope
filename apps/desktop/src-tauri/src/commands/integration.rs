@@ -1,5 +1,7 @@
+mod dependencies;
 use super::tasks::{TaskRun, TaskRuntime};
 use chrono::Utc;
+pub use dependencies::{prepare_dependencies, validate_dependencies, DependencySnapshot};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -129,6 +131,8 @@ impl Drop for TemporaryIndex {
 }
 
 pub(super) fn snapshot(run: &TaskRun, directory: &Path) -> Result<IntegrationSource, String> {
+    super::verification::ensure_idle(&run.workspace)?;
+    super::verification::ensure_idle(&run.project_path)?;
     let workspace = canonical(&run.workspace)?;
     let head = git(&workspace, &["rev-parse", "HEAD"])?;
     let status = git(
@@ -223,6 +227,8 @@ fn selected_runs(runs: &[TaskRun], ids: &[String]) -> Result<Vec<TaskRun>, Strin
                     .into(),
             );
         }
+        super::verification::ensure_idle(&run.workspace)?;
+        super::verification::ensure_idle(&run.project_path)?;
         let workspace = canonical(&run.workspace)?;
         if workspace == canonical(&run.project_path)? {
             return Err("Integration requires an isolated task worktree.".into());
@@ -321,7 +327,22 @@ fn prepare_with_message(
     message: Option<&str>,
 ) -> Result<IntegrationPlan, String> {
     fs::create_dir_all(directory).map_err(|e| e.to_string())?;
-    let selected = selected_runs(runs, ids)?;
+    let mut selected = selected_runs(runs, ids)?;
+    selected.sort_by_key(|run| run.dependency_snapshot.sources.len());
+    for run in &selected {
+        validate_dependencies(directory, runs, run)?;
+        if run
+            .dependency_snapshot
+            .sources
+            .iter()
+            .any(|source| !ids.contains(&source.run_id))
+        {
+            return Err(
+                "Select every predecessor with this feature for combined review and integration."
+                    .into(),
+            );
+        }
+    }
     let project = canonical(&selected[0].project_path)?;
     let target_branch = selected[0]
         .target_branch
@@ -559,6 +580,9 @@ fn apply(directory: &Path, runs: &[TaskRun], id: &str) -> Result<IntegrationPlan
         return Err("The target checkout is in use by an active or interrupted task.".into());
     }
     let selected = selected_runs(runs, &plan.run_ids)?;
+    for run in &selected {
+        validate_dependencies(directory, runs, run)?;
+    }
     if canonical(&selected[0].project_path)? != project {
         return Err("The project's location changed. Prepare a fresh integration.".into());
     }

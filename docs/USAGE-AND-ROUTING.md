@@ -2,8 +2,8 @@
 
 Native attempt accounting and overall/project Usage are implemented; see
 [TASK-JOURNEY.md](./TASK-JOURNEY.md) for coverage and limitations.
-Standalone capacity readers now connect Codex, Claude Code and Grok through their
-installed CLIs; see [PARALLEL-MVP.md](./PARALLEL-MVP.md). Claude's usage control API
+Capacity readers connect Codex, Claude Code, Grok and Antigravity through their
+installed CLIs, plus managed Kimi Code membership accounts; see [PARALLEL-MVP.md](./PARALLEL-MVP.md). Claude's usage control API
 is experimental. Grok can omit percentages even when it reports an account and
 reset period; missing capacity stays unknown. Default-agent routing, quota-aware preflight, local active-task reservations and
 bounded quota handoff are implemented.
@@ -24,7 +24,7 @@ are untrusted input, not executable routing instructions.
 Enabled/configured models, project allowlists and account selections, available
 executables and required tool delivery constrain options. Unspecified models retain
 the CLI default. No model entitlement is inferred from a model name. Capacity uses
-account-bound Codex/Claude/Grok readers shared with the Usage panel, cached for up
+account-bound Codex/Claude/Grok/Kimi/Antigravity readers shared with the Usage panel, cached for up
 to 60 seconds; custom executables and unsupported providers have unknown capacity.
 Expired/stale windows are not treated as current quota. Estimates leave a 10-point
 reserve in the limiting reported window, plus reservations for other active local
@@ -38,13 +38,22 @@ in that pool). Handoffs retain the owned workspace, original task and progress c
 They cannot increase project permissions or tools. If the default is also exhausted,
 a saved ranking can select the next currently eligible option; without one, work
 stops with an actionable error. Explicit tasks and continuing sessions are pinned.
-Codex, Claude, Grok and OpenCode can coordinate; Antigravity is worker-only.
+Codex, Claude, Grok, OpenCode and Kimi can coordinate; Antigravity is worker-only.
 
 Routing attempts and failed worker legs retain separate provider usage with
 agent/model/account attribution. Decision copies are explanatory and excluded from
 usage totals. Missing reports stay unavailable. New continuations do not duplicate
 prior routing usage. Native fixtures cover failure, stop and recovery contracts;
 installed-agent acceptance remains separate. See [STATUS.md](STATUS.md) for limits.
+
+Kimi worker usage uses before/after totals from the advertised local `/usage` command.
+Resumed session totals are subtracted; context occupancy is separate. Missing cache,
+cost, interrupted-turn totals and helper usage stay unknown. Managed Kimi membership
+windows exclude extra-usage balances and custom providers. Antigravity uses a
+version-gated read-only `/usage` response (no model turn), preserving separate
+Gemini and Claude/GPT pools. Routing uses only the selected model family's windows;
+an unknown/default model has unknown headroom. Gemini API-key profiles have separate billing. Neither
+response establishes a stable account identity for cross-profile pool deduplication.
 
 ## A dedicated Usage destination
 

@@ -11,7 +11,9 @@ contract verified with 1.1.26. The GUI application alone is not sufficient.
    Agents → Check agents. Windows discovery checks PATH and `%LOCALAPPDATA%/agy/bin`;
    other systems also check `~/.local/bin`.
 3. Choose Antigravity for a task, queued work or recurring work. Configuration
-   accepts an absolute CLI executable and an optional model slug from `agy models`.
+   accepts an absolute CLI executable. Model discovery reads the current CLI model
+   through the read-only `/model` command; use `agy` to change it, then refresh.
+   This response does not provide the complete model catalog.
 4. Review the result and changes. Continue reuses the exact conversation and
    workspace; Stop terminates the owned process tree.
 
@@ -57,7 +59,12 @@ prior turns from cumulative result counters to a continuation. Fresh runs can
 fall back to the final usage envelope; missing resumed usage remains unknown.
 The observed CLI reports uncached input and cache reads separately, and includes
 thinking in output tokens. Jackalope adds cache reads to input and does not add
-thinking twice. Subscription quota/capacity reporting is not implemented.
+thinking twice. Subscription quota is read separately from the CLI’s structured
+`-p /usage --output-format json` command. The reader checks the CLI version first
+(minimum 1.1.11), requires a successful zero-turn command receipt, and keeps model
+groups and reset windows distinct. Missing percentages remain unknown. The live
+1.2.0 response was verified without a model request. Gemini API-key profiles use
+separate API billing and do not expose Antigravity subscription allowances.
 
 ## Jackalope tools
 

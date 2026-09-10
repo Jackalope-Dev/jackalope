@@ -34,6 +34,7 @@ const groups = [
       ['Claude Code', '/agents/claude-code/'],
       ['Grok', '/agents/grok/'],
       ['OpenCode', '/agents/opencode/'],
+      ['Kimi Code', '/agents/kimi-code/'],
     ],
   },
   {

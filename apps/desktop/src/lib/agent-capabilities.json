@@ -13,10 +13,23 @@
     "accounts": true,
     "capacity": true
   },
-  "grok": { "bridge": "http", "direct": [], "discovery": true, "accounts": true, "capacity": true },
-  "opencode": {
+  "grok": {
     "bridge": "http",
     "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": true
+  },
+  "kimi": {
+    "bridge": "mcp",
+    "direct": ["stdio", "http", "sse"],
+    "discovery": true,
+    "accounts": true,
+    "capacity": true
+  },
+  "opencode": {
+    "bridge": "mcp",
+    "direct": ["stdio", "http", "sse"],
     "discovery": true,
     "accounts": true,
     "capacity": false
@@ -26,7 +39,7 @@
     "direct": [],
     "discovery": true,
     "accounts": true,
-    "capacity": false
+    "capacity": true
   },
   "gemini": {
     "bridge": "http",

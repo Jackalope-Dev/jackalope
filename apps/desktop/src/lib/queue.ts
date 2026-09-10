@@ -2,6 +2,7 @@ import { syncAgentConfig } from '../stores/agentConfigStore.ts';
 import { nativeTask } from './task-runtime.ts';
 
 export interface QueueItem {
+  stagedDependencies?: boolean;
   feature?: string | null;
   featureId?: string | null;
   contextSelection?: import('./knowledge').ContextSelection;
@@ -18,6 +19,10 @@ export interface QueueItem {
   canceled: boolean;
 }
 export interface QueueMessage {
+  report?: { completed: string[]; remaining: string[]; artifacts: string[] } | null;
+  runId?: string | null;
+  sourceTree?: string | null;
+  resolvedBy?: string | null;
   id: string;
   taskId: string;
   projectId: string;

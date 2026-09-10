@@ -74,6 +74,17 @@ fn routing_unknown_stale_and_model_scoped_quota_remain_distinct() {
     assert_eq!(remaining(&record, Some("opus"), now), None);
     record.status = "reported".into();
     assert_eq!(remaining(&record, Some("opus"), now + 61), None);
+    record.agent = "antigravity".into();
+    record.windows[0].pool_name = "Claude and GPT models".into();
+    let mut gemini = record.windows[0].clone();
+    gemini.pool_name = "Gemini Models".into();
+    gemini.remaining_percent = Some(75.0);
+    record.windows.push(gemini);
+    assert_eq!(remaining(&record, Some("gemini-pro"), now), Some(75.0));
+    assert_eq!(remaining(&record, Some("claude-opus"), now), Some(0.0));
+    assert_eq!(remaining(&record, Some("gpt-model"), now), Some(0.0));
+    assert_eq!(remaining(&record, Some("unknown-model"), now), None);
+    assert_eq!(remaining(&record, None, now), None);
 }
 
 #[test]

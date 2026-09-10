@@ -1,6 +1,7 @@
 mod antigravity;
 mod events;
 pub(super) mod helper_process;
+pub(super) mod kimi;
 mod models;
 mod project_setup;
 mod routing;
@@ -9,6 +10,7 @@ mod runtime;
 mod storage;
 #[cfg(test)]
 mod tests;
+pub(super) mod timing;
 
 use events::*;
 pub use models::*;

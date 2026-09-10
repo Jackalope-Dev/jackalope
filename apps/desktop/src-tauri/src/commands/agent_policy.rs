@@ -170,8 +170,11 @@ impl TaskRuntime {
                 return Err("Automatic routing cannot override a pinned account, model or existing session.".into());
             }
             let (adapter, _) = policy.resolve(&policy.default_meta_agent)?;
-            if !matches!(adapter.as_str(), "codex" | "claude" | "grok" | "opencode") {
-                return Err("Choose Codex, Claude, Grok or OpenCode as the default orchestrator in Settings → Agents. Antigravity is available as a worker.".into());
+            if !matches!(
+                adapter.as_str(),
+                "codex" | "claude" | "grok" | "opencode" | "kimi"
+            ) {
+                return Err("Choose Codex, Claude, Grok, OpenCode or Kimi Code as the default orchestrator in Settings → Agents. Antigravity is available as a worker.".into());
             }
             policy.model(&policy.default_meta_agent, None)?;
             return Ok(());

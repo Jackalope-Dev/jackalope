@@ -14,6 +14,8 @@ export function AgentQuestion({
   onAnswer: (answer: string) => Promise<void>;
 }) {
   const id = useId();
+  const multiple = prompt.inputType === 'multiChoice';
+  const [selected, setSelected] = useState<string[]>([]);
   const options =
     prompt.inputType === 'confirmation'
       ? ['Yes, proceed', 'No, adjust']
@@ -34,15 +36,17 @@ export function AgentQuestion({
   useEffect(() => {
     if (sent !== null) answerRef.current?.focus();
   }, [sent]);
-  const freeform = prompt.inputType === 'text' || options.length === 0 || custom;
+  const freeform = !multiple && (prompt.inputType === 'text' || options.length === 0 || custom);
+  const response = multiple ? JSON.stringify(selected) : answer.trim();
+  const hasResponse = multiple ? selected.length > 0 : !!answer.trim();
   const submit = async () => {
-    if (!active || answered || inFlight.current || !answer.trim()) return;
+    if (!active || answered || inFlight.current || !hasResponse) return;
     inFlight.current = true;
     setSending(true);
     setError('');
     try {
-      await onAnswer(answer.trim());
-      setSent(answer.trim());
+      await onAnswer(response);
+      setSent(response);
     } catch (error) {
       setError(String(error));
     } finally {
@@ -77,7 +81,7 @@ export function AgentQuestion({
       {answered ? (
         <p ref={answerRef} tabIndex={-1} className="agent-question-answer" role="status">
           <Check size={18} aria-hidden="true" />
-          <span>{prompt.answer ?? sent}</span>
+          <span>{displayAnswer(prompt.answer ?? sent, multiple)}</span>
         </p>
       ) : !active ? (
         <p className="task-experience-muted">
@@ -92,18 +96,31 @@ export function AgentQuestion({
         >
           {options.length > 0 && prompt.inputType !== 'text' && (
             <fieldset disabled={sending} className="agent-question-options">
-              <legend className="sr-only">Choose a response</legend>
+              <legend className="sr-only">
+                {multiple ? 'Choose one or more responses' : 'Choose a response'}
+              </legend>
               {options.map((option) => (
                 <label
                   key={option}
                   className="agent-question-option"
-                  data-selected={(!custom && answer === option) || undefined}
+                  data-selected={
+                    (multiple ? selected.includes(option) : !custom && answer === option) ||
+                    undefined
+                  }
                 >
                   <input
-                    type="radio"
+                    type={multiple ? 'checkbox' : 'radio'}
                     name={`${id}-choice`}
-                    checked={!custom && answer === option}
+                    checked={multiple ? selected.includes(option) : !custom && answer === option}
                     onChange={() => {
+                      if (multiple) {
+                        setSelected((current) =>
+                          options.filter((value) =>
+                            value === option ? !current.includes(value) : current.includes(value),
+                          ),
+                        );
+                        return;
+                      }
                       setCustom(false);
                       setAnswer(option);
                     }}
@@ -111,18 +128,20 @@ export function AgentQuestion({
                   <span>{option}</span>
                 </label>
               ))}
-              <label className="agent-question-option" data-selected={custom || undefined}>
-                <input
-                  type="radio"
-                  name={`${id}-choice`}
-                  checked={custom}
-                  onChange={() => {
-                    setCustom(true);
-                    setAnswer('');
-                  }}
-                />
-                <span>Write a different response</span>
-              </label>
+              {!multiple && (
+                <label className="agent-question-option" data-selected={custom || undefined}>
+                  <input
+                    type="radio"
+                    name={`${id}-choice`}
+                    checked={custom}
+                    onChange={() => {
+                      setCustom(true);
+                      setAnswer('');
+                    }}
+                  />
+                  <span>Write a different response</span>
+                </label>
+              )}
             </fieldset>
           )}
           {freeform && (
@@ -145,7 +164,7 @@ export function AgentQuestion({
           )}
           <div className="agent-question-footer">
             <span className="task-experience-muted">Review your answer before sending.</span>
-            <Button type="submit" disabled={sending || !answer.trim()}>
+            <Button type="submit" disabled={sending || !hasResponse}>
               <Send size={16} aria-hidden="true" />
               {sending ? 'Sending…' : 'Send response'}
             </Button>
@@ -154,4 +173,15 @@ export function AgentQuestion({
       )}
     </section>
   );
+}
+
+function displayAnswer(answer: string | null | undefined, multiple: boolean) {
+  if (multiple && answer) {
+    try {
+      const values: unknown = JSON.parse(answer);
+      if (Array.isArray(values) && values.every((value) => typeof value === 'string'))
+        return values.join(', ');
+    } catch {}
+  }
+  return answer;
 }

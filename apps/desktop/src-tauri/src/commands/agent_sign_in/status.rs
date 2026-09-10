@@ -110,6 +110,16 @@ async fn read_rpc(binding: &AccountBinding) -> Result<AccountStatus, String> {
 }
 
 async fn check(binding: AccountBinding) -> Result<AccountStatus, String> {
+    if binding.adapter == "kimi" {
+        let mut client = Client::spawn_bound(&binding, &["acp"])?;
+        let result = timeout(Duration::from_secs(20), async {
+            client.request(super::super::tasks::kimi::initialize()).await?;
+            client.request(json!({"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"methodId":"login"}})).await?;
+            Ok(status("configured", None, "Kimi reports a configured login. Account identity, model access and quota are checked when a task starts."))
+        }).await.unwrap_or_else(|_| Err("Kimi sign-in check timed out.".into()));
+        client.close().await;
+        return result;
+    }
     if binding.profile_id.is_some() && matches!(binding.adapter.as_str(), "gemini" | "goose") {
         let files: &[&str] = if binding.adapter == "gemini" {
             &[

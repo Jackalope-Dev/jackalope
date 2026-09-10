@@ -39,7 +39,7 @@ function DownloadButton({ compact = false }: { compact?: boolean }) {
 const faqs = [
   [
     'What is Jackalope?',
-    'A desktop workspace for Codex, Claude Code, Grok, OpenCode, and Antigravity. Run tasks in parallel, keep their project context together, and review the changes in one place.',
+    'A desktop workspace for Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity. Run tasks in parallel, keep their project context together, and review the changes in one place.',
   ],
   [
     'Why use it instead of more terminal tabs?',

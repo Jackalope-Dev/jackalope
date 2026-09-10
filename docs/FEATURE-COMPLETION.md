@@ -43,11 +43,11 @@ its `jackalope/` branch deleted. "Prune missing worktrees" drops Git registratio
 folder is already gone.
 
 Project MCP configurations are stored under the user's .jackalope/projects directory and
-passed at launch to Codex or Claude. The composer can select a subset of project tools;
+passed at launch to Codex, Claude, OpenCode or Kimi. The composer can select a subset of project tools;
 existing CLI-global tools are unchanged. Continuations retain their selection. Unsupported
-Grok direct project delivery and Codex SSE fail explicitly. Project connections can
-opt into on-demand discovery for Codex, Claude and Grok's HTTP bridge. OpenCode MCP
-remains unsupported; see [MCP-DISCOVERY.md](MCP-DISCOVERY.md). Bearer credentials can use environment
+Grok/Antigravity direct project delivery and Codex SSE fail explicitly. Project connections can
+opt into on-demand discovery through native MCP for Codex, Claude, OpenCode and Kimi,
+or the HTTP bridge for Grok and Antigravity; see [MCP-DISCOVERY.md](MCP-DISCOVERY.md). Bearer credentials can use environment
 variable references. Interactive OAuth is delegated to the installed CLI and its selected
 profile; Jackalope does not implement a second token store. The generic JSON-RPC probe uses
 configured header/environment authentication; CLI-owned OAuth sessions must be checked in

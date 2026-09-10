@@ -122,6 +122,7 @@ fn start_preview(
         return Err("Finish active work and resolve interrupted ownership before starting a managed preview.".into());
     }
     ensure_idle(&run.workspace)?;
+    super::verification::ensure_idle(&run.workspace)?;
     let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|_| {
         "This port is in use. Choose another port; no existing process was stopped.".to_string()
     })?;

@@ -72,6 +72,7 @@ impl Coordinator {
         }
         let id = Uuid::new_v4().to_string();
         ledger.items.push(QueueItem {
+            staged_dependencies: req.staged_dependencies,
             feature: req.feature,
             feature_id: req.feature_id,
             context_selection: req.context_selection,
@@ -112,6 +113,15 @@ impl Coordinator {
             .is_some_and(|f| f.trim().is_empty() || f.len() > 160)
         {
             return Err("Use a feature title up to 160 bytes.".into());
+        }
+        if request.staged_dependencies
+            && (!request.auto_verify
+                || request
+                    .verify_command
+                    .as_ref()
+                    .is_none_or(|s| s.trim().is_empty()))
+        {
+            return Err("Enable automatic project verification and save its command before using staged dependencies.".into());
         }
         let items = ordered_plan(request.items)?;
         let mut inner = self.inner.lock().unwrap();
@@ -155,6 +165,7 @@ impl Coordinator {
                                     .iter()
                                     .map(String::as_str)
                                     .collect::<Vec<_>>()
+                            || old.staged_dependencies != request.staged_dependencies
                             || old.feature != request.feature
                             || old.verify_command != request.verify_command
                             || old.prepare_command != request.prepare_command
@@ -175,6 +186,7 @@ impl Coordinator {
             let id = Self::append(
                 &mut ledger,
                 QueueRequest {
+                    staged_dependencies: request.staged_dependencies,
                     feature: request.feature.clone(),
                     feature_id: request.feature_id.clone(),
                     context_selection: item.context_selection,
@@ -238,6 +250,7 @@ impl Coordinator {
             let instructions = instructions(&item);
             let assigned = item.clone();
             let mut request = RunRequest {
+                dependency_snapshot: Default::default(),
                 monitor_change: None,
                 context_selection: item.context_selection.clone(),
                 context_receipt: Default::default(),
@@ -264,6 +277,27 @@ impl Coordinator {
                 }),
             };
             let result = (|| {
+                if assigned.staged_dependencies && !assigned.dependencies.is_empty() {
+                    let ids = assigned
+                        .dependencies
+                        .iter()
+                        .filter_map(|id| {
+                            inner
+                                .ledger
+                                .items
+                                .iter()
+                                .find(|i| &i.id == id)
+                                .and_then(|i| i.run_id.clone())
+                        })
+                        .collect::<Vec<_>>();
+                    request.dependency_snapshot =
+                        crate::commands::integration::prepare_dependencies(
+                            &self.runtime.integration_directory(),
+                            &runs,
+                            &ids,
+                            &request.id,
+                        )?;
+                }
                 let snapshot = self.startup(&mut inner, &request, Some(&assigned))?;
                 request
                     .coordination
@@ -445,6 +479,7 @@ impl Coordinator {
             return Err("Pause task queues before resetting Jackalope.".into());
         }
         let _integration_guard = crate::commands::integration::execution_guard()?;
+        crate::commands::verification::ensure_all_idle()?;
         self.runtime.request_reset()?;
         self.alive.store(false, Ordering::Relaxed);
         inner.enabled.clear();
@@ -502,6 +537,7 @@ impl Coordinator {
                     .find(|r| r.id == run_id)
                     .ok_or(StatusCode::UNAUTHORIZED)?;
                 QueueItem {
+                    staged_dependencies: false,
                     feature: None,
                     feature_id: None,
                     context_selection: Default::default(),

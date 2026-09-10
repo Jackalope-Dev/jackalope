@@ -25,7 +25,7 @@ pub(in crate::commands) fn run(
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let prompt_path = directory.join(format!("{}.txt", uuid::Uuid::new_v4()));
     let mut cmd = command(executable);
-    routing::process::configure(&mut cmd, &adapter, &prompt_path)?;
+    let _configuration = routing::process::configure(&mut cmd, &adapter, &prompt_path, prompt)?;
     crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;
     if let Some(model) = model {
         cmd.args(["--model", model]);
@@ -53,7 +53,7 @@ pub(in crate::commands) fn run(
     let stdout = child.stdout.take().ok_or("Agent output unavailable")?;
     let stderr = child.stderr.take().ok_or("Agent diagnostics unavailable")?;
     let input = prompt.as_bytes().to_vec();
-    let file_input = adapter == "grok";
+    let file_input = matches!(adapter.as_str(), "grok" | "kimi");
     let writer = std::thread::spawn(move || {
         if file_input {
             Ok(())

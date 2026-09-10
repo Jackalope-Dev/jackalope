@@ -126,7 +126,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                     disabled={
                       !enabled ||
                       !runner?.available ||
-                      !['codex', 'claude', 'grok', 'opencode'].includes(
+                      !['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
                         ('adapter' in agent ? agent.adapter : undefined) ?? agent.id,
                       )
                     }

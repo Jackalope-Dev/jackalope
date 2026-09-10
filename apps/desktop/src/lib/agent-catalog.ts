@@ -52,6 +52,18 @@ export const builtinAgents = [
     loginCommand: 'grok login',
   },
   {
+    id: 'kimi',
+    name: 'Kimi Code',
+    vendor: 'Moonshot AI',
+    description: 'Coding agent with project tools, model selection, and resumable task sessions.',
+    strengths: ['coding', 'reasoning', 'multi-file'],
+    installCommand: 'npm install -g @moonshot-ai/kimi-code',
+    installUrl: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
+    defaultBinary: 'kimi',
+    accountEnvVar: 'KIMI_CODE_HOME',
+    loginCommand: 'kimi login',
+  },
+  {
     id: 'opencode',
     name: 'OpenCode',
     vendor: 'OpenCode AI',

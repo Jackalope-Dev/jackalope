@@ -80,7 +80,21 @@ pub(super) fn ready_items(
     let active_runs: Vec<_> = runs.iter().filter(|r| active(&r.status)).collect();
     let slots = inner.concurrency.saturating_sub(active_runs.len());
     let mut reserved = Vec::new();
-    for item in &inner.ledger.items {
+    let mut pending: Vec<_> = inner.ledger.items.iter().collect();
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for run in &active_runs {
+        *counts.entry(run.project_id.clone()).or_default() += 1;
+    }
+    while !pending.is_empty() {
+        pending.sort_by_key(|item| {
+            (
+                counts.get(&item.project_id).copied().unwrap_or(0),
+                std::cmp::Reverse(downstream(&inner.ledger.items, &item.id).len()),
+                item.created_at.clone(),
+                item.id.clone(),
+            )
+        });
+        let item = pending.remove(0);
         if reserved.len() >= slots {
             break;
         }
@@ -98,7 +112,18 @@ pub(super) fn ready_items(
                 .iter()
                 .find(|i| &i.id == id)
                 .and_then(|i| i.run_id.as_ref())
-                .is_some_and(|id| merged.contains(id))
+                .is_some_and(|id| {
+                    merged.contains(id)
+                        || (item.staged_dependencies
+                            && runs.iter().any(|run| {
+                                &run.id == id
+                                    && ["review", "reviewed"].contains(&run.status.as_str())
+                                    && run
+                                        .verification
+                                        .as_ref()
+                                        .is_some_and(|v| v.result.success && v.tree.is_some())
+                            }))
+                })
         }) {
             continue;
         }
@@ -107,6 +132,8 @@ pub(super) fn ready_items(
                 && other.project_id == item.project_id
                 && other.run_id.as_ref().is_some_and(|id| !merged.contains(id))
                 && !other.canceled
+                && !(item.staged_dependencies
+                    && ancestors(&inner.ledger.items, item).contains(&other.id))
                 && overlaps(&item.scopes, &other.scopes)
         });
         let active_overlap = active_runs.iter().any(|run| {
@@ -125,7 +152,37 @@ pub(super) fn ready_items(
         {
             continue;
         }
+        *counts.entry(item.project_id.clone()).or_default() += 1;
         reserved.push(item);
     }
     reserved.into_iter().cloned().collect()
+}
+
+fn downstream(items: &[QueueItem], id: &str) -> HashSet<String> {
+    let mut found = HashSet::new();
+    let mut pending = vec![id.to_string()];
+    while let Some(id) = pending.pop() {
+        for child in items
+            .iter()
+            .filter(|item| !item.canceled && item.dependencies.contains(&id))
+        {
+            if found.insert(child.id.clone()) {
+                pending.push(child.id.clone());
+            }
+        }
+    }
+    found
+}
+
+fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
+    let mut found = HashSet::new();
+    let mut pending = item.dependencies.clone();
+    while let Some(id) = pending.pop() {
+        if found.insert(id.clone()) {
+            if let Some(parent) = items.iter().find(|i| i.id == id) {
+                pending.extend(parent.dependencies.clone());
+            }
+        }
+    }
+    found
 }

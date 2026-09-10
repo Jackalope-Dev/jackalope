@@ -117,7 +117,7 @@ export function OnboardingFlow({
   const available = (id: string) => {
     const options = config.runnerOptions[id];
     return (
-      ['codex', 'claude', 'grok', 'opencode', 'antigravity'].includes(
+      ['codex', 'claude', 'grok', 'opencode', 'antigravity', 'kimi'].includes(
         config.customAgents.find((custom) => custom.id === id)?.adapter ?? id,
       ) &&
       config.isAgentEnabled(id) &&

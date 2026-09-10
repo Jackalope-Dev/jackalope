@@ -7,7 +7,7 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 ## Implemented
 
 - Local projects, tasks, saved ideas, persistent history and recovery.
-- Codex, Claude Code, Grok Build, OpenCode and Antigravity adapters, with
+- Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity adapters, with
   [provider-specific limits](AGENT-SUPPORT.md).
 - Agent accounts, model selection, reported usage, capacity-aware routing and
   bounded quota handoff. Explicit assignments and continuation identities stay pinned.
@@ -23,7 +23,8 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   distinct working/input poses and reduced-motion support.
 - Required account access in every desktop build, with optional feedback,
   reporting and update services, plus a
-  product website with agent-specific setup, worked workflow guides, sourced
+  product website with agent-specific setup (including Kimi Code), compatibility
+  tables separating execution from usage limits, worked workflow guides, sourced
   comparisons, sample-workspace media and a Reddit community link. The knowledgebase
   has practical steps, related help, searchable guides, captioned short demos and
   contextual screenshots.
@@ -49,6 +50,10 @@ remain open.
 
 ## Known limits
 
+Kimi supports task tokens, membership quota, direct MCP, structured questions, routing
+and Ask Jackalope. OpenCode has direct MCP delivery; Grok has model discovery;
+Antigravity has read-only subscription quota reporting. Authenticated installed-app
+acceptance remains open. See the [capability audit](AGENT-SUPPORT.md#capability-audit).
 Gemini CLI, Aider and Goose do not yet support native task execution. Antigravity
 named accounts use Gemini API-key mode; isolated subscription sign-ins remain
 unsupported. Account or model discovery alone does not establish execution support.

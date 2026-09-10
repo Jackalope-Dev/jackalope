@@ -35,9 +35,9 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Product guide',
     title: 'Parallel coding agents with one review workflow | Jackalope',
     description:
-      'Run Codex, Claude Code, Grok, OpenCode, and Antigravity in parallel Git worktrees while Jackalope keeps project context, progress, and review together.',
+      'Run Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity in parallel worktrees with shared project context and review in Jackalope.',
     headline: 'Run coding agents in parallel. Keep the work coherent.',
-    lede: 'Jackalope is a desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, OpenCode, and Antigravity, following their progress, and reviewing the combined result before integration.',
+    lede: 'Jackalope is a desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity, following their progress, and reviewing the combined result before integration.',
     image: 'tasks',
     signals: [
       'Multiple agents',
@@ -59,7 +59,7 @@ export const marketingPages: MarketingPage[] = [
           'Each parallel task can receive its own Git worktree and branch, preventing two agents from editing the same checkout. Project instructions and relevant updates keep each agent informed about related work.',
         ],
         bullets: [
-          'Choose Codex, Claude Code, Grok, OpenCode, or Antigravity per task.',
+          'Choose Codex, Claude Code, Grok, OpenCode, Kimi Code, or Antigravity per task.',
           'Keep task questions and follow-up attempts attached to the original outcome.',
           'Pause new tasks while active tasks continue.',
           'Inspect each result and the combined patch before changing the target branch.',
@@ -193,17 +193,17 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Agent compatibility',
     title: 'Supported AI coding agents | Jackalope',
     description:
-      'Compare Jackalope support for Codex, Claude Code, Grok, OpenCode, and Antigravity across tasks, project connections, accounts, continuation, and reported usage.',
+      'Compare Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity support for tasks, tools, accounts, and usage in Jackalope.',
     headline: 'Bring the coding agents you already use.',
     lede: 'Jackalope works around installed agent CLIs and their provider accounts. Choose an agent per task while keeping the brief, progress, changes, and review in one project workflow.',
     image: 'agents',
-    signals: ['Codex', 'Claude Code', 'Grok', 'OpenCode', 'Antigravity'],
+    signals: ['Codex', 'Claude Code', 'Grok', 'OpenCode', 'Kimi Code', 'Antigravity'],
     sections: [
       {
         title: 'Choose by the connection your task needs.',
         paragraphs: [
           'Jackalope runs installed coding-agent CLIs. Start with your required provider, account, model, and tools, then check the adapter below. An agent logo or successful account setup does not establish that Jackalope can execute tasks with it.',
-          'All five native adapters implement tasks, continuation, review, and reported task usage. The tool and account differences are important when moving a working CLI setup into a project.',
+          'All six native adapters implement tasks, continuation, and review. Usage reporting varies by CLI and account. Kimi exposes task token totals and membership limits; Antigravity subscription quota requires a CLI with read-only command output. The tool and account differences are important when moving a working CLI setup into a project.',
         ],
       },
       {
@@ -227,17 +227,22 @@ export const marketingPages: MarketingPage[] = [
             [
               'Grok Build',
               'On-demand discovery through the HTTP bridge; no direct injection.',
-              'Named profiles; provider access checked at launch.',
+              'Named profiles; account identity and models read through ACP; access checked at launch.',
             ],
             [
               'OpenCode',
-              'Configure tools in the CLI; project delivery and discovery unsupported.',
+              'Direct stdio, HTTP, and SSE connections, plus on-demand discovery.',
               'Named profiles separate configuration and data; access checked at launch.',
+            ],
+            [
+              'Kimi Code',
+              'Direct stdio, HTTP, and SSE; tool approvals and structured questions.',
+              'Named sign-ins; account model choices; task tokens and membership quota.',
             ],
             [
               'Antigravity',
               'On-demand discovery; worker tasks, not automatic routing coordination.',
-              'Named profiles use Gemini API keys. Subscription login is shared.',
+              'Named profiles use Gemini API keys. Shared subscription login has reported quota windows.',
             ],
           ],
         },
@@ -258,11 +263,13 @@ export const marketingPages: MarketingPage[] = [
             href: '/agents/opencode/',
             label: 'OpenCode setup',
           },
+          { href: '/agents/kimi-code/', label: 'Kimi Code setup and limits' },
         ],
       },
       {
-        title: 'Antigravity and setup-only candidates.',
+        title: 'Worker agents and setup-only candidates.',
         paragraphs: [
+          'Kimi Code uses the kimi CLI for tasks, automatic routing, and Ask Jackalope, with account profiles, model selection, continuation, and in-task permission choices. Authenticated installed-app acceptance remains open.',
           'Antigravity uses the agy CLI for worker tasks. Its named profiles use Gemini API keys with separate API billing; they do not create isolated subscription sign-ins. Use its existing subscription login only with that shared-login limitation in mind.',
           'Gemini CLI, Aider, and Goose offer account setup in the catalog but do not have native task execution adapters. Hermes and other unlisted agents are not supported task runners. Use the roadmap to follow planned support rather than assuming a configured executable can run as another agent.',
         ],
@@ -507,7 +514,7 @@ export const marketingPages: MarketingPage[] = [
         title: 'Connect Grok Build, the coding CLI.',
         paragraphs: [
           'This integration uses the installed Grok Build CLI, rather than a Grok chat in a browser. Follow the official installation and authentication instructions, confirm a small request works in your local project, then choose Grok in Jackalope’s agent configuration.',
-          'Grok validates provider access when a task launches. Finding an executable or saving an account profile does not establish a successful sign-in. If the first task fails immediately, inspect its authentication error before changing the task brief or project code.',
+          'Jackalope reads Grok’s account identity and available models through its CLI. Grok validates model access when a task launches. Finding an executable or saving an account profile does not establish a successful sign-in. If the first task fails immediately, inspect its authentication error before changing the task brief or project code.',
         ],
         links: [
           {
@@ -580,7 +587,7 @@ export const marketingPages: MarketingPage[] = [
     image: 'agents',
     signals: [
       'Installed OpenCode CLI',
-      'Own CLI configuration',
+      'On-demand project tools',
       'Isolated attempts',
       'Combined review',
     ],
@@ -612,9 +619,9 @@ export const marketingPages: MarketingPage[] = [
         ],
       },
       {
-        title: 'Configure tools in OpenCode itself.',
+        title: 'Choose how project tools reach OpenCode.',
         paragraphs: [
-          'Jackalope does not deliver project-selected MCP servers or on-demand discovery connections to OpenCode. Configure required tools in OpenCode’s own settings. Selecting a project connection in Jackalope is not a substitute for that setup.',
+          'OpenCode supports direct stdio, HTTP, and SSE project connections, as well as on-demand discovery. Jackalope adds direct connections to the task process’s configuration while preserving other inline settings. Tools configured in OpenCode’s own settings remain subject to that profile’s configuration.',
           'If a task can read repository files but cannot reach a connected service, verify the tool in the selected OpenCode profile. Keep a local-only first task available so a provider or tool problem does not get confused with a worktree or build problem.',
         ],
         links: [
@@ -649,6 +656,83 @@ export const marketingPages: MarketingPage[] = [
       { href: '/agents/', label: 'Compare supported coding agents' },
       { href: '/git-worktrees-for-ai-agents/', label: 'How task worktrees work' },
       { href: '/features/project-context-for-coding-agents/', label: 'Project context and tools' },
+    ],
+  },
+  {
+    path: '/agents/kimi-code/',
+    kind: 'Agent integration',
+    title: 'Use Kimi Code for project tasks | Jackalope',
+    description:
+      'Set up Kimi Code in Jackalope with separate accounts, model choices, task approvals, and session continuation. Check tool, account, and usage coverage.',
+    headline: 'Bring Kimi Code into your project workflow.',
+    lede: 'Use your installed Kimi Code CLI while Jackalope keeps the task brief, account, progress, changes, and review together. The adapter is implemented; authenticated installed-app acceptance remains in progress.',
+    image: 'agents',
+    signals: ['Kimi Code CLI', 'Separate accounts', 'Task approvals', 'Session continuation'],
+    sections: [
+      {
+        title: 'Install and detect the current CLI.',
+        paragraphs: [
+          'Follow Kimi’s current installation instructions, then open Agents → Configuration. Jackalope looks for the kimi executable. If it is missing, install it with npm install -g @moonshot-ai/kimi-code and restart Jackalope so it receives the updated PATH. Windows also needs Git for Windows.',
+          'Older Python kimi-cli installations use a different data directory. Follow Kimi’s migration guidance before using managed account profiles; finding a kimi executable alone does not confirm version compatibility or provider access.',
+        ],
+        links: [
+          {
+            href: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
+            label: 'Kimi Code installation and migration',
+          },
+          { href: '/knowledge/fixing-cli-path-on-windows/', label: 'Fix missing CLI detection' },
+        ],
+      },
+      {
+        title: 'Choose the account and model.',
+        paragraphs: [
+          'For your existing CLI account, run kimi login. For a separate account, use Add account & sign in in Jackalope, then choose that account in Project → Settings. Named profiles keep Kimi configuration, sign-in data, and sessions in separate directories. They do not restrict access to local files.',
+          'Model choices come from the selected account’s CLI session configuration. Authentication and model discovery do not guarantee that the provider will accept a task or that quota remains. Jackalope checks access when the task starts.',
+        ],
+        links: [
+          {
+            href: '/knowledge/multi-account-and-agents/',
+            label: 'Accounts and credential boundaries',
+          },
+        ],
+      },
+      {
+        title: 'Run a worker task and answer approvals.',
+        paragraphs: [
+          'Assign Kimi Code explicitly to a small task, such as reading project instructions and explaining how to run the tests. Then try a scoped change with an observable check. Kimi streams its response and tool activity into the task, with the CLI’s permission choices, including approval for the session. Structured questions support multiple questions and multiple selections.',
+          'Declining an approval stops the attempt. Unanswered approvals expire after ten minutes; tasks have a thirty-minute limit. Stop ends Jackalope’s owned CLI process tree. Permission scope follows the choices reported by your CLI.',
+          'Kimi supports direct stdio, HTTP, and SSE project connections through ACP, plus on-demand discovery. Direct remote connections require a CLI that advertises the transport. Tools configured inside Kimi remain subject to its own settings and permissions.',
+        ],
+        links: [
+          {
+            href: '/knowledge/connecting-custom-mcp-servers/',
+            label: 'Set up project connections',
+          },
+        ],
+      },
+      {
+        title: 'Continue the same session and review the result.',
+        paragraphs: [
+          'Continue under the original task to retain its account and load the same Kimi session. If the selected model or saved session cannot be loaded, the attempt fails rather than silently switching models or starting a new conversation.',
+          'Review the actual patch and check output before integration. Protocol tests and a CLI handshake cover parts of the adapter; signed-in model execution, account switching, and installed-app behavior still need acceptance checks.',
+        ],
+      },
+      {
+        title: 'Know the current limits.',
+        paragraphs: [
+          'Kimi can run tasks, coordinate automatic agent routing, and power Ask Jackalope. Routing and helper requests use a separate agent definition with tools and subagents disabled.',
+          'Task tokens come from the change in Kimi’s session totals, so continuation excludes earlier turns. Context occupancy is shown separately. Cache breakdown, cost, and helper token usage are unavailable. Membership quota is read for the selected managed Kimi account with a current login; custom-provider billing and extra-usage balances are separate. Missing reports stay unknown.',
+        ],
+        links: [
+          { href: '/knowledge/task-routing-and-quotas/', label: 'Task usage and account capacity' },
+          { href: '/roadmap/', label: 'Implementation and release progress' },
+        ],
+      },
+    ],
+    related: [
+      { href: '/agents/', label: 'Compare supported agents' },
+      { href: '/parallel-coding-agents/', label: 'Run workers in parallel' },
+      { href: '/guides/review-ai-generated-code/', label: 'Review agent-generated code' },
     ],
   },
   {
@@ -848,7 +932,7 @@ export const marketingPages: MarketingPage[] = [
       {
         title: 'Connect tools to the agents that use them.',
         paragraphs: [
-          'Codex and Claude Code support direct project connection delivery. Grok and Antigravity support on-demand discovery. OpenCode uses its own CLI tool configuration. See the agent guide for setup details.',
+          'Codex, Claude Code, OpenCode, and Kimi Code support direct project connection delivery. All six task adapters support on-demand discovery for stdio and HTTP connections. CLI-global tools remain subject to each agent’s own configuration. See the agent guide for setup details.',
         ],
       },
       {

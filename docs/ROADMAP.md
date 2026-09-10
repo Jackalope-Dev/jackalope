@@ -10,6 +10,12 @@ aligned with this guide when capabilities or priorities change.
 
 ## Built: the local workspace
 
+Kimi Code joins the native adapters with accounts, models, permissions, structured
+questions, continuation, task tokens, membership capacity, routing and Ask Jackalope.
+Kimi and OpenCode accept direct project MCP connections. Grok model discovery and
+Antigravity subscription capacity are implemented. Installed-agent acceptance remains
+in progress; provider-specific reporting and permission boundaries still apply.
+
 Projects, agent accounts, tasks, queues, Git worktrees, checks and reviewed
 integration are implemented. The workspace also includes schedules, local change
 monitors, MCP connections, browser sessions, project lessons, codebase maps,

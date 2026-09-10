@@ -125,6 +125,7 @@ fn agent_identity(agent: &str) -> (String, String) {
         "claude" => "Claude",
         "grok" => "Grok",
         "opencode" => "OpenCode",
+        "kimi" => "Kimi Code",
         "antigravity" => "Antigravity",
         _ => "Jackalope agent",
     };

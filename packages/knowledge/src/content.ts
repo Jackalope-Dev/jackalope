@@ -173,7 +173,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I use the helper?',
         paragraphs: [
           'Open the Jackalope companion at the bottom right and choose Ask. Ask a question, request an appearance change, or prepare a task. Activity retains notifications, feedback and task shortcuts.',
-          'The helper uses your default agent, configured model and active account. Codex, Claude Code, Grok and OpenCode have helper adapters; unsupported defaults show a configuration message. Messages and shared context go to that provider and may count toward its usage limits. A question can require several model requests as the helper reads tools and documentation.',
+          'The helper uses your default agent, configured model and active account. Codex, Claude Code, Grok, OpenCode and Kimi Code have helper adapters; unsupported defaults show a configuration message. Messages and shared context go to that provider and may count toward its usage limits. A question can require several model requests as the helper reads tools and documentation.',
           'The helper works without an open project. It uses an app-owned working directory and does not attach repository files. It retains its own local conversation and reported token usage. Stop ends the active response; interrupted requests are never automatically replayed. New conversation archives the previous record locally.',
         ],
       },
@@ -349,7 +349,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How does automatic agent selection work?',
         paragraphs: [
           'Automatic tasks ask your configured default agent to choose among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
-          'Jackalope validates the returned choice and saves its reason. Routing consumes provider usage. Codex, Claude Code, Grok, and OpenCode can coordinate; Antigravity runs as a worker. Explicit assignments remain available.',
+          'Jackalope validates the returned choice and saves its reason. Routing consumes provider usage. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity runs as a worker. Explicit assignments remain available.',
         ],
       },
       {
@@ -407,15 +407,27 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Set up agents and account profiles',
     shortTitle: 'Agents & accounts',
     description:
-      'Set up Codex, Claude Code, Grok, OpenCode, and Antigravity, choose project accounts, and understand credential storage limits.',
+      'Set up Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity, choose project accounts, and understand credential storage limits.',
     readingTime: '3 min read',
     sections: [
       {
         id: 'supported-adapters',
         question: 'Which coding agents can run tasks?',
         paragraphs: [
-          'Codex, Claude Code, Grok Build, OpenCode, and Antigravity have native task adapters. Install the corresponding CLI and configure provider access. Model access, permissions, and billing remain with your provider.',
-          'Antigravity uses agy and is worker-only. Gemini CLI, Aider, and Goose appear in account setup but do not yet have task execution adapters. Discovery of an executable is not proof of valid authentication.',
+          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, and Antigravity have native task adapters. Install the corresponding CLI and configure provider access. Model access, permissions, and billing remain with your provider.',
+          'Kimi Code uses kimi for tasks, routing, and Ask Jackalope. Antigravity uses agy for worker tasks. Gemini CLI, Aider, and Goose appear in account setup but do not yet have task execution adapters. Discovery of an executable is not proof of valid authentication.',
+        ],
+      },
+      {
+        id: 'kimi-code',
+        question: 'What does Kimi Code support?',
+        paragraphs: [
+          'Install the current Kimi Code CLI and select Kimi in Agents → Configuration. Use kimi login for the default account or Add account & sign in for a separate profile. Named profiles use KIMI_CODE_HOME for configuration, sign-in data, and sessions; migrate legacy Python CLI setups before using them.',
+          'Kimi tasks stream text and tool activity, offer the CLI’s tool approval choices and structured questions, and continue the exact saved session with its original account. Declining or leaving an approval unanswered stops the attempt. Selected models come from the account’s CLI session configuration.',
+          'Kimi supports automatic routing and Ask Jackalope with tools disabled for those requests. Worker token usage uses session-total deltas; cache breakdown, cost, and helper tokens remain unknown. Membership quota requires a managed Kimi account with a current login. Detection and authentication checks do not establish signed-in execution or installed-app acceptance.',
+        ],
+        links: [
+          { href: '/agents/kimi-code/', label: 'Kimi Code setup, project tools, and limits' },
         ],
       },
       {
@@ -445,7 +457,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'work-personal-segregation',
         question: 'How do work and personal account profiles differ?',
         paragraphs: [
-          'Named Codex, Claude Code, Grok, and OpenCode profiles use separate supported CLI directories. Choose project defaults in Project → Settings. Continuations retain their bound profile.',
+          'Named Codex, Claude Code, Grok, OpenCode, and Kimi Code profiles use separate supported CLI directories. Choose project defaults in Project → Settings. Continuations retain their bound profile.',
           'Antigravity named profiles require Gemini API keys with separate API billing. Its existing subscription login is shared and can change outside Jackalope. Profiles organize credentials; they do not isolate OS permissions or inherited provider configuration.',
         ],
       },
@@ -490,7 +502,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How are project MCP tools delivered?',
         paragraphs: [
           'Configure connections in MCP → Connections and select the project tools for a task. Codex supports direct stdio and HTTP connections; Claude Code also supports SSE.',
-          'Codex, Claude Code, Grok, and Antigravity support on-demand discovery for supported stdio and HTTP connections. OpenCode project-tool delivery is not implemented; use its own CLI configuration.',
+          'Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity support on-demand discovery for supported stdio and HTTP connections. Direct delivery supports Codex, Claude Code, OpenCode, and Kimi Code; CLI-global tools still use the agent’s own configuration.',
         ],
       },
       {
@@ -709,7 +721,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Fix “CLI not found” on Windows',
     shortTitle: 'Fix CLI discovery',
     description:
-      'Step-by-step instructions for ensuring agent executables (Codex, Claude Code, Grok, OpenCode) are properly discovered by Jackalope on Windows.',
+      'Fix Windows CLI detection for Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity with PATH checks and restart steps.',
     readingTime: '2 min read',
     sections: [
       {

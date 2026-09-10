@@ -23,6 +23,10 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Validate Kimi Code OAuth account switching and real task execution in the installed app,
+  including session approvals, structured questions, direct MCP, usage deltas, quota refresh,
+  routing, helper requests and exact-session resume. Protocol tests and isolated local-provider
+  probes do not establish authenticated execution acceptance.
 - [ ] Complete real account login/switch/resume coverage, including expiry,
   cancellation, saved model defaults and continuation with the bound account.
 - [ ] Verify routing, quota handoff, decomposition, outcome/workflow gates and
@@ -31,8 +35,10 @@ release dates.
 - [ ] Complete packaged desktop-control checks, including multiple monitors,
   interruption, indicator failure and permission renewal.
 - [ ] Implement Gemini CLI, Aider and Goose execution protocols.
-- [ ] Extend provider questions, permissions, cancellation, continuation and
-  scoped MCP delivery; keep unsupported capabilities explicit.
+- [ ] Validate OpenCode direct MCP, Grok model discovery and Antigravity quota refresh with
+  installed profiles; retain explicit CLI/version boundaries from the capability audit.
+- [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without
+  weakening process ownership, usage accounting or saved-session compatibility.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports
   a verified credential-store override.
 - [ ] Extend reconnect/failover with explicit process ownership and recovery.

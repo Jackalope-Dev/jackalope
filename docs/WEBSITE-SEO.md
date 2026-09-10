@@ -17,7 +17,7 @@ knowledge articles use their concise `shortTitle`.
 | --- | --- |
 | Home | Run AI coding agents in parallel in a desktop workspace |
 | Product pages | Parallel coding agents and Git worktrees for AI agents |
-| Agent pages | Run Codex, Claude Code, Grok or OpenCode with project context and review |
+| Agent pages | Run Codex, Claude Code, Grok, OpenCode or Kimi Code with project context and review |
 | Feature pages | Browser automation, project context and recurring coding-agent tasks |
 | Workflow guides | Run Codex and Claude Code together; review AI-generated code |
 | Knowledgebase | Agent setup, troubleshooting, MCP, Git locks, quotas and schedules |

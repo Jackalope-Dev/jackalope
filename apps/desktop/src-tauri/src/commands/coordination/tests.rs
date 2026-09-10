@@ -46,6 +46,7 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
     // a manually-started standalone task did, via a separate, unshared
     // copy of this same text.
     let item = QueueItem {
+        staged_dependencies: false,
         feature: None,
         feature_id: None,
         context_selection: Default::default(),
@@ -141,6 +142,7 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
     assert!(Coordinator::new(dir.join("queue"), runtime.clone()).is_err());
     let id = service
         .add(QueueRequest {
+            staged_dependencies: false,
             feature: None,
             feature_id: None,
             context_selection: Default::default(),
@@ -206,6 +208,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
     let service = Coordinator::new(dir.join("queue"), runtime).unwrap();
     let feature_id = Uuid::new_v4().to_string();
     let request = |items| PlanRequest {
+        staged_dependencies: false,
         feature: Some("Feature".into()),
         feature_id: Some(feature_id.clone()),
         project_id: "project".into(),

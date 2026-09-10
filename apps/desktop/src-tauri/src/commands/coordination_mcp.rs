@@ -48,11 +48,17 @@ enum MessageKind {
     Progress,
     Blocker,
     Handoff,
+    Dependency,
+    Interface,
+    Completion,
+    Waiting,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct MessageInput {
+    report: Option<super::coordination::WorkReport>,
+    resolves: Option<String>,
     kind: MessageKind,
     #[schemars(
         description = "A concise update for the other project agents, at most 4000 UTF-8 bytes"
@@ -279,11 +285,17 @@ impl CoordinationTools {
             MessageKind::Progress => "progress",
             MessageKind::Blocker => "blocker",
             MessageKind::Handoff => "handoff",
+            MessageKind::Dependency => "dependency",
+            MessageKind::Interface => "interface",
+            MessageKind::Completion => "completion",
+            MessageKind::Waiting => "waiting",
         };
         let Json(message) = bridge_message(
             WebState(self.service.clone()),
             headers,
             Json(MessageRequest {
+                report: input.report,
+                resolves: input.resolves,
                 kind: kind.into(),
                 text: input.text,
                 recipient_task_id: input.recipient_task_id,

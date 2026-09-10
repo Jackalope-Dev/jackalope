@@ -34,6 +34,21 @@ pub(super) fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str
         consume_opencode_event(run, &event, kind);
         return;
     }
+    if adapter == "kimi" {
+        if event["role"] == "tool"
+            || event["tool_calls"]
+                .as_array()
+                .is_some_and(|calls| !calls.is_empty())
+        {
+            run.error = Some("Kimi attempted a tool call in a helper that has tools disabled. Update the CLI before retrying.".into());
+        } else if event["role"] == "assistant" {
+            if let Some(text) = event["content"].as_str() {
+                let remaining = 120_000usize.saturating_sub(run.result.chars().count());
+                run.result.extend(text.chars().take(remaining));
+            }
+        }
+        return;
+    }
     let child = event["parent_tool_use_id"].as_str();
     if adapter == "claude" && event["type"] == "assistant" {
         let message = &event["message"];

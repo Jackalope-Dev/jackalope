@@ -14,6 +14,9 @@ use std::{
 
 static CONFIG_LOCK: Mutex<()> = Mutex::new(());
 
+mod delivery;
+pub(super) use delivery::{acp_servers, opencode_config};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpServerConfig {

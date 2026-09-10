@@ -69,11 +69,92 @@ fn parse_models(value: &Value) -> Vec<AgentModel> {
     models
 }
 
+fn parse_acp_models(response: &Value) -> Vec<AgentModel> {
+    let option = response["configOptions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|option| option["id"] == "model" || option["category"] == "model");
+    if let Some(option) = option {
+        let mut values = Vec::new();
+        for entry in option["options"].as_array().into_iter().flatten().take(512) {
+            if let Some(group) = entry["options"].as_array() {
+                values.extend(group.iter().take(512).cloned());
+            } else {
+                values.push(entry.clone());
+            }
+        }
+        let mut models = parse_models(&Value::Array(values));
+        for model in &mut models {
+            model.is_default = option["currentValue"].as_str() == Some(&model.id);
+        }
+        return models;
+    }
+    let values: Vec<_> = response["models"]["availableModels"].as_array().into_iter().flatten().take(512)
+        .map(|model| json!({"id":model["modelId"],"name":model["name"],"isDefault":model["modelId"] == response["models"]["currentModelId"]})).collect();
+    parse_models(&Value::Array(values))
+}
+
+fn parse_antigravity_model(value: &Value) -> Vec<AgentModel> {
+    if value["status"] != "SUCCESS"
+        || value["command"]["name"] != "model"
+        || value["num_turns"] != 0
+    {
+        return vec![];
+    }
+    let model = &value["command"]["data"];
+    parse_models(&json!([{"id":model["id"],"name":model["label"],"isDefault":true}]))
+}
+
 async fn read_catalog(
     adapter: &str,
     executable: &Path,
     binding: &agent_profiles::AccountBinding,
 ) -> Result<Vec<AgentModel>, String> {
+    if adapter == "antigravity" {
+        super::capacity::antigravity::require_commands(binding, executable).await?;
+        let output = super::capacity::antigravity::output(
+            binding,
+            executable,
+            &[
+                "-p",
+                "/model",
+                "--output-format",
+                "json",
+                "--print-timeout",
+                "20s",
+            ],
+        )
+        .await?;
+        let value = serde_json::from_str(&output)
+            .map_err(|_| "Antigravity returned invalid model metadata.")?;
+        return Ok(parse_antigravity_model(&value));
+    }
+    if matches!(adapter, "kimi" | "grok") {
+        let args: &[&str] = if adapter == "kimi" {
+            &["acp"]
+        } else {
+            &["agent", "--no-leader", "stdio"]
+        };
+        let mut client = Client::spawn_executable(binding, executable, args)?;
+        let result = timeout(Duration::from_secs(20), async {
+            client.request(super::tasks::kimi::initialize()).await?;
+            let response = client
+                .request(super::tasks::kimi::session_request(
+                    &std::env::temp_dir().to_string_lossy(),
+                    None,
+                ))
+                .await?;
+            if let Some(session_id) = response["sessionId"].as_str().filter(|_| adapter == "kimi") {
+                let _ = client.request(json!({"jsonrpc":"2.0","id":2,"method":"session/delete","params":{"sessionId":session_id}})).await;
+            }
+            Ok(parse_acp_models(&response))
+        })
+        .await
+        .unwrap_or_else(|_| Err(format!("{adapter} model discovery timed out.")));
+        client.close().await;
+        return result;
+    }
     if adapter == "opencode" {
         let mut command = Command::new(executable);
         command
@@ -180,7 +261,7 @@ pub async fn agent_models(
     let mut policy = runtime.policy()?;
     policy.enabled_agents.clear();
     let (adapter, executable) = policy.resolve(&agent)?;
-    if !["codex", "claude", "opencode"].contains(&adapter.as_str()) {
+    if !["codex", "claude", "grok", "opencode", "kimi", "antigravity"].contains(&adapter.as_str()) {
         return Ok(ModelCatalog {models: vec![], source: adapter, account: None, checked_at: chrono::Utc::now().to_rfc3339(), detail: "This agent does not expose a supported model catalog. Model selection is unavailable; the agent manages its model unless a saved override exists.".into()});
     }
     let binding = agent_profiles::bind_account(
@@ -202,6 +283,8 @@ pub async fn agent_models(
     let models = read_catalog(&adapter, &executable, &binding).await?;
     let detail = if models.is_empty() {
         "The agent returned no models. Check its sign-in and refresh. Model selection is unavailable until models can be detected."
+    } else if adapter == "antigravity" {
+        "Antigravity reports its current CLI model here. The full catalog is not exposed by this command; use agy to change the current model, then refresh."
     } else {
         "Models reported by the current CLI account. Access and quota are checked when a task runs."
     };
@@ -225,6 +308,38 @@ pub async fn agent_models(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn antigravity_current_model_requires_a_zero_turn_command_receipt() {
+        let value = json!({"status":"SUCCESS","num_turns":0,"command":{"name":"model","data":{"id":"reported-model","label":"Current model"}}});
+        assert_eq!(
+            parse_antigravity_model(&value),
+            vec![AgentModel {
+                id: "reported-model".into(),
+                name: "Current model".into(),
+                is_default: true
+            }]
+        );
+        assert!(parse_antigravity_model(
+            &json!({"status":"SUCCESS","num_turns":1,"response":"invented"})
+        )
+        .is_empty());
+    }
+    #[test]
+    fn kimi_catalog_uses_reported_aliases_and_grouped_options() {
+        let models = parse_acp_models(
+            &json!({"configOptions":[{"id":"model","currentValue":"saved-alias","options":[{"group":"Provider","options":[{"value":"saved-alias","name":"Configured model"},{"value":"--invalid"}]}]}]}),
+        );
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].id, "saved-alias");
+        assert!(models[0].is_default);
+        let legacy = parse_acp_models(
+            &json!({"models":{"currentModelId":"alias","availableModels":[{"modelId":"alias","name":"Model"}]}}),
+        );
+        assert_eq!(legacy[0].id, "alias");
+        assert!(legacy[0].is_default);
+        assert!(parse_acp_models(&Value::Null).is_empty());
+    }
+
     #[test]
     fn model_catalog_filters_hidden_invalid_and_duplicate_ids_without_inventing_models() {
         let models = parse_models(

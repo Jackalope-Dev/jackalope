@@ -21,7 +21,7 @@ export function ProjectAccountGroup({
   const load = async (group: 'work' | 'personal') => {
     const entries = await Promise.all(
       agents
-        .filter((a) => ['codex', 'claude', 'grok', 'opencode'].includes(a.id))
+        .filter((a) => ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(a.id))
         .map(async (agent) => ({
           agent: agent.id,
           profiles: (await listAgentProfiles(agent.id)).profiles,

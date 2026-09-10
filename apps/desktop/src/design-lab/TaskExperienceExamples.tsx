@@ -28,10 +28,22 @@ export function TaskExperienceExamples() {
   const prompt: PendingUserPrompt = {
     id: 'example',
     runId: 'design-lab',
-    question: 'How should search handle whitespace?',
+    question:
+      scenario === 'multiple'
+        ? 'Which checks should this task include?'
+        : 'How should search handle whitespace?',
     inputType:
-      scenario === 'confirmation' ? 'confirmation' : scenario === 'text' ? 'text' : 'choice',
-    options: ['Trim surrounding whitespace', 'Keep the exact input'],
+      scenario === 'multiple'
+        ? 'multiChoice'
+        : scenario === 'confirmation'
+          ? 'confirmation'
+          : scenario === 'text'
+            ? 'text'
+            : 'choice',
+    options:
+      scenario === 'multiple'
+        ? ['Keyboard navigation', 'Narrow layout', 'Screen-reader labels']
+        : ['Trim surrounding whitespace', 'Keep the exact input'],
     status: scenario === 'answered' ? 'answered' : 'pending',
     answer: scenario === 'answered' ? 'Trim surrounding whitespace' : undefined,
     createdAt: '2026-09-06T12:00:00Z',
@@ -61,6 +73,7 @@ export function TaskExperienceExamples() {
           }}
         >
           <SelectItem value="choice">Choice</SelectItem>
+          <SelectItem value="multiple">Multiple selections</SelectItem>
           <SelectItem value="text">Free text</SelectItem>
           <SelectItem value="confirmation">Confirmation</SelectItem>
           <SelectItem value="answered">Answered</SelectItem>

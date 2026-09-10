@@ -5,6 +5,7 @@ pub(in crate::commands) const BUILTIN_AGENTS: &[&str] = &[
     "claude",
     "grok",
     "opencode",
+    "kimi",
     "antigravity",
     "gemini",
     "aider",
@@ -24,6 +25,7 @@ pub(super) fn discover_runner(
             "claude" => "Claude Code",
             "grok" => "Grok",
             "opencode" => "OpenCode",
+            "kimi" => "Kimi Code",
             "antigravity" => "Antigravity",
             "gemini" => "Gemini CLI",
             "aider" => "Aider",
@@ -64,8 +66,12 @@ pub(super) fn discover_runner(
                 runner.detail = "Uses agy. Add separate Gemini API-key accounts in Jackalope, or use the existing CLI subscription login. Access is checked when a task starts; multiple subscription logins are not isolated.".into();
                 return runner;
             }
+            if adapter == "kimi" {
+                runner.detail = "Uses Kimi Code CLI through ACP. Sign in with kimi login; credentials and model access are checked when a task starts. Legacy Python kimi-cli accounts must be migrated using Kimi Code CLI.".into();
+                return runner;
+            }
             if adapter == "grok" {
-                runner.detail = "Installed. Grok checks its existing sign-in on launch; this version exposes no separate login-status command.".into();
+                runner.detail = "Installed. Check the selected account in Agents to read Grok's signed-in identity. Model access is checked at task launch.".into();
                 return runner;
             }
             if adapter == "opencode" {

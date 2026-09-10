@@ -25,6 +25,12 @@ pub struct UsageObservation {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]
+    pub dependency_invalidated: bool,
+    #[serde(default)]
+    pub stages: Vec<super::timing::ExecutionStage>,
+    #[serde(default)]
+    pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
+    #[serde(default)]
     pub checkpoint: Option<crate::commands::checkpoint::Checkpoint>,
     #[serde(default)]
     pub checkpoint_error: Option<String>,
@@ -99,6 +105,8 @@ pub struct TaskRun {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRequest {
+    #[serde(skip)]
+    pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(skip)]
     pub monitor_change: Option<crate::commands::monitors::MonitorChange>,
     #[serde(default)]

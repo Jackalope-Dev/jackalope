@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
-import { routeTaskToBestAgent } from '../../lib/agent-routing';
+import { multiAgentPlanningPrompt } from '../../lib/task-decomposition';
 import { type FeatureStep, featurePlanningPrompt, readFeaturePlan } from '../../lib/feature-plan';
 import { queueCommand } from '../../lib/queue';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
@@ -20,14 +20,19 @@ interface Draft {
   runId?: string;
   steps: FeatureStep[];
   added?: boolean;
+  stagedDependencies?: boolean;
 }
 
 export function FeaturePlanner({
   project,
   onClose,
   onAdded,
+  initialGoal = '',
+  multiAgent = false,
 }: {
   project: Project;
+  initialGoal?: string;
+  multiAgent?: boolean;
   onClose: () => void;
   onAdded: () => Promise<void>;
 }) {
@@ -37,7 +42,7 @@ export function FeaturePlanner({
   const available = runners.filter(
     (r) => r.available && config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
-  const storageKey = `jackalope-feature-plan:${project.id}`;
+  const storageKey = `jackalope-feature-plan:${project.id}${multiAgent ? ":multi" : ""}`;
   const [draft, setDraft] = useState<Draft>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
@@ -56,7 +61,7 @@ export function FeaturePlanner({
     }
     return {
       featureId: crypto.randomUUID(),
-      goal: '',
+      goal: initialGoal,
       agent: 'auto',
       steps: [],
     };
@@ -91,15 +96,7 @@ export function FeaturePlanner({
   const change = (index: number, patch: Partial<FeatureStep>) =>
     update({ steps: draft.steps.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
   const autoAssignBestAgents = () => {
-    const updated = draft.steps.map((step) => {
-      const routing = routeTaskToBestAgent({
-        prompt: `${step.title}\n${step.prompt}`,
-        scopes: step.scopes,
-        availableRunners: available,
-      });
-      return { ...step, agent: routing.agentId };
-    });
-    update({ steps: updated });
+    update({ steps: draft.steps.map((step) => ({ ...step, agent: 'auto' })) });
   };
   return (
     <Dialog.Root
@@ -116,8 +113,7 @@ export function FeaturePlanner({
           </Dialog.Close>
           <Dialog.Title className="text-xl">Plan a feature</Dialog.Title>
           <Dialog.Description className="task-muted mt-3">
-            Use one assistant from planning through review. Edit the proposed tasks before adding
-            them; dependencies wait for integrated changes.
+            Plan from the repository and the complete request. Review ownership, outcomes and dependencies before dispatch.
           </Dialog.Description>
           <fieldset
             disabled={busy || submitting || !!planning || draft.added}
@@ -142,7 +138,7 @@ export function FeaturePlanner({
                 onValueChange={(agent) => update({ agent })}
               >
                 <SelectItem value="auto">Let Jackalope choose</SelectItem>
-                {available.map((r) => (
+                      {available.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.name}
                   </SelectItem>
@@ -169,7 +165,7 @@ export function FeaturePlanner({
                             : agentAccountFor(project, draft.agent),
                         targetBranch: project.preferences?.baseBranch || project.gitBranch,
                         isolated: true,
-                        prompt: featurePlanningPrompt(draft.goal),
+                        prompt: multiAgent ? multiAgentPlanningPrompt(draft.goal, available) : featurePlanningPrompt(draft.goal),
                       },
                       { background: true },
                     );
@@ -247,7 +243,7 @@ export function FeaturePlanner({
                 onClick={autoAssignBestAgents}
               >
                 <Sparkles size={14} />
-                Auto-assign best agents
+                Use automatic routing
               </Button>
             </div>
           )}
@@ -275,6 +271,7 @@ export function FeaturePlanner({
                       value={step.agent || draft.agent}
                       onValueChange={(agent) => change(index, { agent })}
                     >
+                      <SelectItem value="auto">Automatic routing</SelectItem>
                       {available.map((r) => (
                         <SelectItem key={r.id} value={r.id}>
                           {r.name}
@@ -306,7 +303,7 @@ export function FeaturePlanner({
                   />
                 </label>
                 <fieldset>
-                  <legend>Starts after these tasks are integrated</legend>
+                  <legend>{draft.stagedDependencies ? "Starts from these verified snapshots" : "Starts after these tasks are integrated"}</legend>
                   {draft.steps
                     .filter((s) => s.key !== step.key)
                     .map((other) => (
@@ -355,6 +352,11 @@ export function FeaturePlanner({
               {error}
             </p>
           )}
+          <label className="flex items-center gap-2 mt-4 min-h-11">
+            <input type="checkbox" checked={draft.stagedDependencies ?? false} disabled={busy || draft.added}
+              onChange={(event) => update({ stagedDependencies: event.target.checked })} />
+            <span>Continue dependencies from verified snapshots before final merge. Requires a saved project check. Changed predecessors require a new plan.</span>
+          </label>
           {!!draft.steps.length && (
             <div className="mt-5 space-y-3">
               <p className="task-muted">
@@ -366,7 +368,10 @@ export function FeaturePlanner({
                 onClick={() =>
                   void act(async () => {
                     if (!draft.added) {
-                      const items = readFeaturePlan(JSON.stringify(draft.steps), draft.agent);
+                      const items = readFeaturePlan(JSON.stringify(draft.steps), draft.agent).map((step) => ({
+                        ...step,
+                        prompt: `${step.prompt}\n\nComplete feature request (shared context; perform only your assigned work):\n${draft.goal}`,
+                      }));
                       localStorage.setItem(storageKey, JSON.stringify(draft));
                       await queueCommand('queue_import', {
                         request: {
@@ -374,6 +379,7 @@ export function FeaturePlanner({
                           projectName: project.name,
                           projectPath: project.path,
                           featureId: draft.featureId,
+                          stagedDependencies: draft.stagedDependencies === true,
                           feature: draft.goal.trim().split('\n')[0].slice(0, 120),
                           targetBranch: project.preferences?.baseBranch || project.gitBranch,
                           agentAccounts: project.preferences?.agentAccounts,

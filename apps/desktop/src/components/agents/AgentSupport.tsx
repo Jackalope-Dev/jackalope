@@ -35,7 +35,10 @@ export function AgentSupport({ adapter }: { adapter: string }) {
           ? 'Available'
           : 'Current CLI account only',
     ],
-    ['Subscription capacity', support.capacity ? 'When reported by the account' : 'Not reported'],
+    [
+      'Subscription capacity',
+      support.capacity ? 'When reported by the account' : 'No connected quota interface',
+    ],
   ];
   return (
     <section aria-label="Agent support" className="mt-4">
@@ -48,6 +51,13 @@ export function AgentSupport({ adapter }: { adapter: string }) {
           </div>
         ))}
       </dl>
+      {adapter === 'kimi' && (
+        <p className="task-muted">
+          Use the current Kimi Code CLI for tasks, routing, and Ask Jackalope. Tool approvals and
+          structured questions appear in the task. Membership quota needs a current managed login.
+          Legacy Python kimi-cli accounts need migration through Kimi Code CLI.
+        </p>
+      )}
       <p className="task-muted">
         Messages arrive at checkpoints. Usage depends on provider reports.
       </p>

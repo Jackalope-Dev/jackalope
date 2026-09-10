@@ -58,16 +58,18 @@ on Ubuntu 24.04 under WSL, three real Chrome browser trials (including cleanup a
 cancellation), and a GNOME Keyring write/read/update/delete round-trip using an
 isolated login collection and private D-Bus session. The Linux desktop executable
 also builds successfully with the normal feature set. The notification module's
-Objective-C API types also checked for macOS arm64 and x64 against a stub Tauri
+Objective-C API types were also checked for macOS arm64 and x64 against a stub Tauri
 host; this is not a full macOS application build. Actual macOS compilation still
 needs the native CI runners. WSL and browser fixtures do not establish GNOME,
 Wayland, X11, installed-app or release acceptance.
 
-Windows `RUST_TEST_THREADS=2 pnpm verify` passed with 245 native tests (14 ignored),
+Windows `RUST_TEST_THREADS=2 pnpm verify` passed with 246 native tests (14 ignored),
 136 desktop JavaScript tests, 107 service tests, 45 release tests and both production
 builds. An earlier contended run timed out in the scheduled-task fixture; the full
-rerun passed. Secret scanning, Rust formatting, documentation links and diff checks
-also passed. Account and notification text rendered in both themes at 1280×840 and
+rerun passed. Three real browser trials also pass on Windows; profile cleanup has
+regression coverage for transient Windows file locks. Secret scanning, Rust formatting,
+documentation links and diff checks also passed. Account and notification text
+rendered in both themes at 1280×840 and
 960×640, with reduced motion and keyboard activation checked using browser fixtures.
 
 ### Native checks on your devices

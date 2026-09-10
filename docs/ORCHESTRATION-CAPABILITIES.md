@@ -16,10 +16,10 @@ Antigravity can execute work but cannot coordinate routing-only requests. See
 
 ## Shared tools and guidance
 
-All five adapters receive the task intent, repository rules, frozen project context,
-verification instructions and a task-scoped authenticated bridge. Codex and Claude
-receive native MCP tools on every bridged task. Grok, OpenCode and Antigravity use
-permitted HTTP calls. The same bridge implements project awareness, messages,
+All six adapters receive the task intent, repository rules, frozen project context,
+verification instructions and a task-scoped authenticated bridge. Codex, Claude,
+OpenCode and Kimi receive native MCP tools on bridged tasks. Grok and Antigravity
+use permitted HTTP calls. The same bridge implements project awareness, messages,
 user questions and saved answers, browser evidence, validation and selected
 on-demand connection discovery. No transport bypasses a denied permission.
 
@@ -100,17 +100,19 @@ explanation before launch. Custom agents inherit their configured adapter.
 The shared agent-capabilities.json drives frontend checks and native direct
 connection validation.
 
-| Capability | Codex | Claude | Grok | OpenCode | Antigravity |
-| --- | --- | --- | --- | --- | --- |
-| Shared harness | MCP | MCP | HTTP | HTTP | HTTP |
-| On-demand stdio / HTTP connections | Yes | Yes | Yes | Yes | Yes |
-| Direct project connections | stdio / HTTP | stdio / HTTP / SSE | No | No | No |
-| Continuation, stop, history | Yes | Yes | Yes | Yes | Yes |
-| Separate managed accounts | Yes | Yes | Yes | Yes | No |
-| Capacity reader | Yes | Yes | When reported | No | No |
+| Capability | Codex | Claude | Grok | OpenCode | Kimi | Antigravity |
+| --- | --- | --- | --- | --- | --- | --- |
+| Shared harness | MCP | MCP | HTTP | MCP | MCP | HTTP |
+| On-demand stdio / HTTP | Yes | Yes | Yes | Yes | Yes | Yes |
+| Direct project connections | stdio / HTTP | stdio / HTTP / SSE | No | stdio / HTTP / SSE | stdio / HTTP / SSE | No |
+| Continuation, stop, history | Yes | Yes | Yes | Yes | Yes | Yes |
+| Separate managed accounts | Yes | Yes | Yes | Yes | Yes | Gemini API keys |
+| Capacity reader | Yes | Yes | When reported | No universal provider quota | Managed membership | Subscription login |
+| Default coordinator / helper | Yes | Yes | Yes | Yes | Yes | No verified tool-free interface |
 
-Unknown capacity stays unknown. Agent-native terminal permission prompts are not
-Jackalope questions. All providers can request input through the shared harness;
+Unknown capacity stays unknown. Kimi ACP approvals and structured questions are
+connected to Jackalope's question UI. Other native terminal prompts need their
+adapter's supported protocol. All providers can request input through the shared harness;
 permission escalation still requires a supported adapter protocol or continuation.
 
 ## User notifications
@@ -142,13 +144,13 @@ real notification click acceptance must be tested separately from source tests.
   [Tauri notification plugin](https://v2.tauri.app/plugin/notification/) supports
   desktop delivery but documents its Actions API as mobile-only.
 - [Agent Client Protocol](https://agentclientprotocol.com/protocol/v1/initialization)
-  and its [Rust SDK](https://github.com/agentclientprotocol/rust-sdk) are candidates
-  for future lifecycle, capability negotiation and interactive permissions.
+  drives Kimi lifecycle, capability negotiation, approvals and structured questions.
+  Its [Rust SDK](https://github.com/agentclientprotocol/rust-sdk) remains a possible shared implementation.
   Replacing tested CLI adapters requires provider-specific acceptance; ACP is not
   assumed to be available on every installed agent.
 - [OpenCode's runtime configuration](https://opencode.ai/docs/config/) supports
-  per-process configuration and native MCP. This is a future upgrade from its
-  shared HTTP harness, requiring config precedence and permission acceptance.
+  per-process configuration and native MCP. Project connections are merged into
+  OPENCODE_CONFIG_CONTENT without replacing unrelated inline settings.
 
 ## Remaining improvements
 

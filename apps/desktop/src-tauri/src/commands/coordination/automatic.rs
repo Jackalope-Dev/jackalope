@@ -237,6 +237,10 @@ impl Coordinator {
                         format!(" Agent-reported checks: {passed} passed, {failed} failed. Last saved project verification: {verification}. No human acceptance is implied.")
                     };
                     ledger.messages.push(CoordinationMessage {
+                        report: None,
+                        run_id: None,
+                        source_tree: None,
+                        resolved_by: None,
                         id: format!("lifecycle:{}:{current}", run.id),
                         task_id: task_id(&ledger.items, &runs, run).into(),
                         project_id: run.project_id.clone(),

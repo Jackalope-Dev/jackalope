@@ -18,7 +18,7 @@ export const roadmapStages = [
         title: 'Your agents. One workspace.',
         summary: 'Projects, accounts, and context that stay with the task.',
         detail:
-          'Codex, Claude Code, Grok Build, OpenCode, and Antigravity adapters are implemented, with provider-specific limits. Antigravity is worker-only; named profiles use Gemini API keys with separate billing, while its subscription login is shared. Named accounts, project preferences, saved ideas, and persistent task history keep work organized. Installed-agent acceptance is still in progress.',
+          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, and Antigravity adapters are implemented, with provider-specific limits. Kimi supports routing, structured questions, task tokens, and membership quota. Kimi and OpenCode accept direct project tools. Grok models and Antigravity subscription quota are detected through their CLIs. Antigravity remains a worker. Antigravity named profiles use Gemini API keys with separate billing; its subscription login is shared. Named accounts, project preferences, saved ideas, and persistent task history keep work organized. Installed-agent acceptance is still in progress.',
       },
       {
         title: 'Room to work in parallel.',

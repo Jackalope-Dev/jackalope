@@ -1,11 +1,23 @@
 use super::*;
 use crate::commands::process_control::{read_bounded, ProcessTree};
 
+pub(in crate::commands::tasks) struct Configuration(Option<PathBuf>);
+
+impl Drop for Configuration {
+    fn drop(&mut self) {
+        if let Some(path) = &self.0 {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
 pub(in crate::commands::tasks) fn configure(
     cmd: &mut Command,
     adapter: &str,
     prompt_path: &Path,
-) -> Result<(), String> {
+    prompt: &str,
+) -> Result<Configuration, String> {
+    let mut configuration = Configuration(None);
     match adapter {
         "codex" => { cmd.args(["exec", "--disable", "shell_tool", "--disable", "apps", "--disable", "plugins", "--disable", "multi_agent", "--json", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "-c", "approval_policy=\"never\"", "-c", "mcp_servers={}", "-c", "web_search=\"disabled\"", "-"]); }
         "claude" => { cmd.args(["--print", "--verbose", "--output-format", "stream-json", "--no-session-persistence", "--tools", "", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}", "--max-turns", "1"]); }
@@ -14,9 +26,60 @@ pub(in crate::commands::tasks) fn configure(
             cmd.args(["run", "--format", "json"]);
             cmd.env("OPENCODE_CONFIG_CONTENT", "{\"permission\":\"deny\",\"agent\":{\"build\":{\"permission\":\"deny\"}}}");
         }
-        _ => return Err("This default agent has no supported routing-only interface. Choose Codex, Claude, Grok or OpenCode as the default orchestrator. Antigravity remains available as a worker.".into()),
+        "kimi" => {
+            let path = prompt_path.with_extension("agent.md");
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)] { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
+            let mut file = options.open(&path).map_err(|_| "Could not create the Kimi helper configuration.")?;
+            configuration.0 = Some(path.clone());
+            file.write_all(format!("---\nname: jackalope-helper\ndescription: Answer the supplied Jackalope request without tools.\ntools: []\nsubagents: []\n---\n{prompt}\n").as_bytes()).map_err(|_| "Could not write the Kimi helper configuration.")?;
+            cmd.args(["--agent-file"]).arg(path).args(["--output-format", "stream-json", "--prompt", "Answer the supplied Jackalope request. Follow its output format."]);
+        }
+        _ => return Err("This default agent has no supported routing-only interface. Choose Codex, Claude, Grok, OpenCode or Kimi Code as the default orchestrator. Antigravity remains available as a worker.".into()),
     }
-    Ok(())
+    Ok(configuration)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn kimi_helper_uses_a_private_tool_free_definition_and_cleans_it_up() {
+        let path =
+            std::env::temp_dir().join(format!("jackalope-helper-{}.txt", uuid::Uuid::new_v4()));
+        let mut command = Command::new("fixture");
+        let context = "Private task context with `commands` and \"quotes\"";
+        let configuration = configure(&mut command, "kimi", &path, context).unwrap();
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert!(!args.join(" ").contains(context));
+        let definition = std::fs::read_to_string(path.with_extension("agent.md")).unwrap();
+        assert!(definition.contains("tools: []\nsubagents: []\n---\n"));
+        assert!(definition.contains(context));
+        let mut run = TaskRun::default();
+        consume_adapter_event(
+            &mut run,
+            r#"{"role":"meta","content":"not an answer"}"#,
+            "kimi",
+        );
+        consume_adapter_event(
+            &mut run,
+            r#"{"role":"assistant","content":"answer"}"#,
+            "kimi",
+        );
+        assert_eq!(run.result, "answer");
+        consume_adapter_event(
+            &mut run,
+            r#"{"role":"assistant","tool_calls":[{"id":"unexpected"}]}"#,
+            "kimi",
+        );
+        assert!(run.error.is_some());
+        drop(configuration);
+        assert!(!path.with_extension("agent.md").exists());
+    }
 }
 
 impl TaskRuntime {
@@ -34,7 +97,7 @@ impl TaskRuntime {
         let prompt_path = directory.join("request.txt");
         let (_, executable) = self.policy()?.resolve(&router.agent)?;
         let mut cmd = command(executable);
-        configure(&mut cmd, &router.adapter, &prompt_path)?;
+        let _configuration = configure(&mut cmd, &router.adapter, &prompt_path, prompt)?;
         agent_profiles::validate_binding(&self.profiles_root(), &router.binding)?;
         agent_profiles::apply_binding(&mut cmd, &router.binding)?;
         if let Some(model) = &router.model {
@@ -79,7 +142,7 @@ impl TaskRuntime {
             activity(run, &format!("{} is choosing an agent, model and account using task context and available quota.", router.agent));
         })?;
         let input = prompt.as_bytes().to_vec();
-        let file_input = router.adapter == "grok";
+        let file_input = matches!(router.adapter.as_str(), "grok" | "kimi");
         let writer = std::thread::spawn(move || {
             let mut stdin = stdin;
             if file_input {

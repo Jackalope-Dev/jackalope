@@ -13,8 +13,10 @@ use tokio::{
     time::timeout,
 };
 
+pub(in crate::commands) mod antigravity;
 pub(crate) mod client;
 mod connected;
+pub(in crate::commands) mod kimi;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +48,8 @@ struct Cache {
     codex: Option<CapacityRecord>,
     claude: Option<CapacityRecord>,
     grok: Option<CapacityRecord>,
+    kimi: Option<CapacityRecord>,
+    antigravity: Option<CapacityRecord>,
 }
 
 #[derive(Default)]
@@ -60,6 +64,8 @@ fn unavailable(agent: &str, status: &str, detail: &str, account: Option<String>)
             "codex" => "Codex account/rateLimits/read",
             "claude" => "Claude CLI get_usage (experimental)",
             "grok" => "Grok CLI x.ai/billing",
+            "kimi" => "Kimi Code membership usages",
+            "antigravity" => "Antigravity CLI /usage",
             _ => "No connected quota adapter",
         }
         .into(),
@@ -225,22 +231,24 @@ pub(in crate::commands) async fn routing_snapshot(
         "codex" => read_codex_bound(binding).await,
         "claude" => connected::read_claude_bound(binding).await,
         "grok" => connected::read_grok_bound(binding).await,
+        "kimi" => kimi::read_bound(binding).await,
+        "antigravity" => antigravity::read_bound(binding).await,
         _ => {
             return unavailable(
                 &binding.adapter,
                 "unsupported",
-                "This provider does not report quota headroom.",
+                "No supported account-quota interface is connected for this provider.",
                 None,
             )
         }
     };
     let record = result
         .map(|record| current_snapshot(record, Utc::now().timestamp()))
-        .unwrap_or_else(|_| {
+        .unwrap_or_else(|message| {
             unavailable(
                 &binding.adapter,
                 "unavailable",
-                "Quota could not be refreshed. Remaining capacity is unknown.",
+                &format!("{message} Remaining capacity is unknown."),
                 None,
             )
         });
@@ -315,10 +323,12 @@ pub async fn capacity_snapshot(
         || (refresh.unwrap_or(false) && age.is_some_and(|age| age >= Duration::from_secs(60)));
     if should_refresh {
         let profiles_root = runtime.profiles_root();
-        let (codex, claude, grok) = tokio::join!(
+        let (codex, claude, grok, kimi, antigravity) = tokio::join!(
             account_snapshot(&profiles_root, "codex"),
             account_snapshot(&profiles_root, "claude"),
-            account_snapshot(&profiles_root, "grok")
+            account_snapshot(&profiles_root, "grok"),
+            account_snapshot(&profiles_root, "kimi"),
+            account_snapshot(&profiles_root, "antigravity")
         );
         cache.codex = Some(match codex {
             Ok(record) => record,
@@ -329,12 +339,20 @@ pub async fn capacity_snapshot(
         });
         cache.claude = Some(connected_refresh("claude", cache.claude.as_ref(), claude));
         cache.grok = Some(connected_refresh("grok", cache.grok.as_ref(), grok));
+        cache.kimi = Some(connected_refresh("kimi", cache.kimi.as_ref(), kimi));
+        cache.antigravity = Some(connected_refresh(
+            "antigravity",
+            cache.antigravity.as_ref(),
+            antigravity,
+        ));
         cache.checked = Some(Instant::now());
     }
     Ok([
         ("codex", &cache.codex),
         ("claude", &cache.claude),
         ("grok", &cache.grok),
+        ("kimi", &cache.kimi),
+        ("antigravity", &cache.antigravity),
     ]
     .into_iter()
     .map(|(agent, record)| {

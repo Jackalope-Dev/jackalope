@@ -82,7 +82,7 @@ export function AgentPreferences({ projectId }: { projectId?: string }) {
             .filter(
               (agent) =>
                 project ||
-                ['codex', 'claude', 'grok', 'opencode'].includes(
+                ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
                   'adapter' in agent ? (agent.adapter ?? agent.id) : agent.id,
                 ),
             )

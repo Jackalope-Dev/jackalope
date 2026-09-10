@@ -419,7 +419,9 @@ mod tests {
     #[test]
     fn terminal_uses_the_same_isolation_as_tasks() {
         let mut binding = binding();
-        for agent in ["codex", "claude", "grok", "opencode", "gemini", "goose"] {
+        for agent in [
+            "codex", "claude", "grok", "opencode", "kimi", "gemini", "goose",
+        ] {
             binding.adapter = agent.into();
             let command = login_command(&binding, std::path::Path::new("test")).unwrap();
             assert_eq!(

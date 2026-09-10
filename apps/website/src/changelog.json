@@ -1,5 +1,17 @@
 [
   {
+    "id": "kimi-code-joins-the-workspace",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Kimi Code joins the workspace",
+    "description": "Use Kimi for tasks and routing, with broader tool and usage coverage across existing agents.",
+    "items": [
+      "Choose Kimi accounts and models, respond to approvals and structured questions, continue sessions, and read task tokens and membership quota.",
+      "Connect project tools directly to Kimi and OpenCode, discover Grok models, and read Antigravity subscription quota."
+    ],
+    "note": "Authenticated installed-app acceptance remains in progress; provider and CLI limits apply."
+  },
+  {
     "id": "account-access-in-every-build",
     "date": "2026-09-10",
     "status": "In development",

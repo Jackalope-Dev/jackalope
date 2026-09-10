@@ -1,9 +1,12 @@
+use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueueItem {
+    #[serde(default)]
+    pub staged_dependencies: bool,
     #[serde(default)]
     pub feature: Option<String>,
     #[serde(default)]
@@ -38,6 +41,8 @@ pub struct QueueItem {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueueRequest {
+    #[serde(default)]
+    pub staged_dependencies: bool,
     #[serde(default)]
     pub feature: Option<String>,
     #[serde(default)]
@@ -81,6 +86,8 @@ pub struct PlanEntry {
 #[serde(rename_all = "camelCase")]
 pub struct PlanRequest {
     #[serde(default)]
+    pub staged_dependencies: bool,
+    #[serde(default)]
     pub feature: Option<String>,
     #[serde(default)]
     pub feature_id: Option<String>,
@@ -103,6 +110,14 @@ pub struct PlanRequest {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoordinationMessage {
+    #[serde(default)]
+    pub report: Option<WorkReport>,
+    #[serde(default)]
+    pub run_id: Option<String>,
+    #[serde(default)]
+    pub source_tree: Option<String>,
+    #[serde(default)]
+    pub resolved_by: Option<String>,
     pub id: String,
     pub task_id: String,
     pub project_id: String,
@@ -133,4 +148,15 @@ pub struct QueueView {
     pub bridge_url: Option<String>,
     pub bridge_error: Option<String>,
     pub merged_run_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, rmcp::schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WorkReport {
+    #[serde(default)]
+    pub completed: Vec<String>,
+    #[serde(default)]
+    pub remaining: Vec<String>,
+    #[serde(default)]
+    pub artifacts: Vec<String>,
 }

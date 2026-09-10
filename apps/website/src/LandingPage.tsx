@@ -63,7 +63,7 @@ const scenes = [
     label: 'Agents & accounts',
     title: 'Choose an agent for each task.',
     description:
-      'Use installed Codex, Claude Code, Grok, OpenCode, and Antigravity CLIs with your existing accounts. Choose the right agent for each task.',
+      'Use installed Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity CLIs with your existing accounts. Choose the right agent for each task.',
     detail: 'Agents & accounts',
     image: 'agents',
   },
@@ -241,7 +241,7 @@ const features = [
     title: 'Give every agent room to work.',
     description: 'Run independent tasks side by side in separate Git worktrees.',
     detail:
-      'Assign Codex, Claude Code, Grok, OpenCode, or Antigravity to each task. Set dependencies when one change needs another, and follow progress without checking a pile of terminals.',
+      'Assign Codex, Claude Code, Grok, OpenCode, Kimi Code, or Antigravity to each task. Set dependencies when one change needs another, and follow progress without checking a pile of terminals.',
     href: '/parallel-coding-agents/',
     link: 'Explore parallel work',
   },
@@ -386,8 +386,9 @@ export function LandingPage({
               </h1>
             </div>
             <p className="hero-description">
-              Run <strong>Codex, Claude Code, Grok, OpenCode, and Antigravity</strong> side by side.
-              One desktop workspace for your projects, parallel tasks, and code review.
+              Run <strong>Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity</strong>{' '}
+              side by side. One desktop workspace for your projects, parallel tasks, and code
+              review.
             </p>
             <div className="hero-conversion">
               <div className="hero-actions">

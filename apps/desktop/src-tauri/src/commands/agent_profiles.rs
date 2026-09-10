@@ -68,6 +68,7 @@ pub fn env_var_for(adapter: &str) -> Option<&'static str> {
         "codex" => Some("CODEX_HOME"),
         "claude" => Some("CLAUDE_CONFIG_DIR"),
         "grok" => Some("GROK_HOME"),
+        "kimi" => Some("KIMI_CODE_HOME"),
         "opencode" => Some("XDG_DATA_HOME"),
         "gemini" => Some("GEMINI_CLI_HOME"),
         "aider" | "antigravity" => Some(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
@@ -79,7 +80,7 @@ pub fn env_var_for(adapter: &str) -> Option<&'static str> {
 pub(super) fn login_args(adapter: &str) -> &'static [&'static str] {
     match adapter {
         "codex" => &["login"],
-        "grok" => &["login"],
+        "grok" | "kimi" => &["login"],
         "opencode" => &["auth", "login"],
         "claude" => &["auth", "login"],
         "goose" => &["configure"],
@@ -258,6 +259,8 @@ fn bind_account_selection(
                     }
                     PathBuf::from(home).join(if adapter == "opencode" {
                         ".local/share".to_string()
+                    } else if adapter == "kimi" {
+                        ".kimi-code".to_string()
                     } else {
                         format!(".{adapter}")
                     })
@@ -365,6 +368,10 @@ pub fn apply_binding(
         ] {
             command.env(name, binding.directory.join(folder));
         }
+    }
+    if binding.adapter == "kimi" {
+        // Older Python binaries must not fall back to the user's shared login.
+        command.env("KIMI_SHARE_DIR", &binding.directory);
     }
     if binding.profile_id.is_some() {
         if let Some(key) = credentials::read(binding)? {
@@ -666,6 +673,15 @@ pub fn credential_env_vars(adapter: &str) -> &'static [&'static str] {
             "CLAUDE_CODE_OAUTH_TOKEN",
         ],
         "grok" => &["XAI_API_KEY", "GROK_API_KEY", "GROK_DEPLOYMENT_KEY"],
+        "kimi" => &[
+            "KIMI_API_KEY",
+            "KIMI_BASE_URL",
+            "KIMI_MODEL_NAME",
+            "KIMI_MODEL_API_KEY",
+            "KIMI_MODEL_BASE_URL",
+            "KIMI_MODEL_PROVIDER_TYPE",
+            "KIMI_CODE_CUSTOM_HEADERS",
+        ],
         "gemini" | "antigravity" => &[
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
@@ -788,6 +804,42 @@ mod tests {
         assert_eq!(env_var_for("grok"), Some("GROK_HOME"));
         assert_eq!(env_var_for("opencode"), Some("XDG_DATA_HOME"));
         assert_eq!(env_var_for("some-custom-agent"), None);
+    }
+
+    #[test]
+    fn kimi_named_profile_binds_its_own_home_and_clears_inherited_model_credentials() {
+        let directory = std::env::temp_dir().join(format!("kimi-binding-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let binding = AccountBinding {
+            adapter: "kimi".into(),
+            profile_id: Some("profile".into()),
+            directory: directory.clone(),
+            label: "Test".into(),
+        };
+        let mut command = std::process::Command::new("kimi");
+        command
+            .env("KIMI_MODEL_NAME", "inherited")
+            .env("KIMI_MODEL_API_KEY", "fixture-only")
+            .env("KIMI_CODE_HOME", "wrong-home");
+        apply_binding(&mut command, &binding).unwrap();
+        let env: std::collections::HashMap<_, _> = command
+            .get_envs()
+            .map(|(name, value)| {
+                (
+                    name.to_string_lossy().into_owned(),
+                    value.map(|value| value.to_string_lossy().into_owned()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            env["KIMI_CODE_HOME"].as_deref(),
+            Some(directory.to_str().unwrap())
+        );
+        assert_eq!(env["KIMI_MODEL_API_KEY"], None);
+        assert_eq!(env["KIMI_SHARE_DIR"], env["KIMI_CODE_HOME"]);
+        assert_eq!(env["KIMI_MODEL_NAME"], None);
+        assert_eq!(login_args("kimi"), &["login"]);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

@@ -18,6 +18,16 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  stages?: {
+    stage: string;
+    startedAt: string;
+    endedAt: string | null;
+    durationMs: number | null;
+  }[];
+  dependencySnapshot?: {
+    base: string;
+    sources: { runId: string; workspace: string; tree: string; head: string }[];
+  };
   checkpoint?: { head: string; message: string } | null;
   checkpointError?: string | null;
   routing?: {
@@ -137,7 +147,7 @@ export interface PendingUserPrompt {
   id: string;
   runId: string;
   question: string;
-  inputType: 'text' | 'choice' | 'confirmation';
+  inputType: 'text' | 'choice' | 'confirmation' | 'multiChoice';
   options: string[];
   defaultValue?: string | null;
   status: 'pending' | 'answered';

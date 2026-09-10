@@ -13,6 +13,7 @@ pub(super) fn visible(message: &CoordinationMessage, item: &QueueItem) -> bool {
 
 #[derive(Default, Deserialize, rmcp::schemars::JsonSchema)]
 pub(in crate::commands) struct InboxQuery {
+    pub wait_ms: Option<u64>,
     pub after: Option<String>,
     pub limit: Option<usize>,
 }
@@ -22,12 +23,25 @@ pub(in crate::commands) async fn bridge_inbox(
     headers: HeaderMap,
     Query(query): Query<InboxQuery>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let item = service.authorized(&headers)?;
-    let inner = service
-        .inner
-        .lock()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(page(&inner.ledger.messages, &item, &query)))
+    let deadline =
+        tokio::time::Instant::now() + Duration::from_millis(query.wait_ms.unwrap_or(0).min(30_000));
+    loop {
+        let item = service.authorized(&headers)?;
+        let result = {
+            let inner = service
+                .inner
+                .lock()
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            page(&inner.ledger.messages, &item, &query)
+        };
+        if result["messages"].as_array().is_some_and(|m| !m.is_empty())
+            || result["cursorExpired"] == true
+            || tokio::time::Instant::now() >= deadline
+        {
+            return Ok(Json(result));
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
 }
 
 fn page(
@@ -43,7 +57,7 @@ fn page(
     let offset = cursor.map_or(0, |index| index + 1);
     let limit = query.limit.unwrap_or(50).clamp(1, 100);
     let page: Vec<_> = messages.iter().skip(offset).take(limit).copied().collect();
-    serde_json::json!({"messages":page,"nextCursor":page.last().map(|m| &m.id),"hasMore":offset + page.len() < messages.len(),"cursorExpired":query.after.is_some() && cursor.is_none(),"taskId":item.id})
+    serde_json::json!({"messages":page,"nextCursor":page.last().map(|m| &m.id).or(query.after.as_ref()),"hasMore":offset + page.len() < messages.len(),"cursorExpired":query.after.is_some() && cursor.is_none(),"taskId":item.id})
 }
 
 #[derive(Deserialize, rmcp::schemars::JsonSchema)]
@@ -89,6 +103,10 @@ mod tests {
     }
     fn message(id: &str, project: &str, recipient: Option<&str>) -> CoordinationMessage {
         CoordinationMessage {
+            report: None,
+            run_id: None,
+            source_tree: None,
+            resolved_by: None,
             id: id.into(),
             task_id: "writer".into(),
             project_id: project.into(),
@@ -111,6 +129,7 @@ mod tests {
             &messages,
             &item(),
             &InboxQuery {
+                wait_ms: None,
                 after: None,
                 limit: Some(1),
             },
@@ -121,6 +140,7 @@ mod tests {
             &messages,
             &item(),
             &InboxQuery {
+                wait_ms: None,
                 after: Some("a".into()),
                 limit: Some(1000),
             },
@@ -133,6 +153,7 @@ mod tests {
                 &messages,
                 &item(),
                 &InboxQuery {
+                    wait_ms: None,
                     after: Some("pruned".into()),
                     limit: None
                 }
@@ -187,6 +208,8 @@ mod tests {
         assert_eq!(project["tasks"].as_array().unwrap().len(), 2);
         assert_eq!(project["tasks"][0]["scopeKnown"], false);
         let request = |recipient: &str| MessageRequest {
+            report: None,
+            resolves: None,
             kind: "handoff".into(),
             text: "Please inspect the result".into(),
             recipient_task_id: Some(recipient.into()),

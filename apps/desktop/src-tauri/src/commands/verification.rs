@@ -5,6 +5,8 @@ use super::{
 use serde::{Deserialize, Serialize};
 use std::{process::Command, time::Duration};
 use tauri::State;
+mod leases;
+pub use leases::{ensure_all_idle, ensure_idle};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,9 +73,13 @@ pub(in crate::commands) fn prepare(
 }
 
 fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verification, String> {
+    let active = ["starting", "running"].contains(&run.status.as_str());
+    runtime.stage(&run.id, Some("verification_wait"));
+    let _slot = leases::check_slot(|| active && !runtime.is_running(&run.id))?;
     let directory = runtime.integration_directory();
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let before = super::integration::workspace_tree(run, &directory)?;
+    runtime.stage(&run.id, Some("verification"));
     let agent_active = ["starting", "running"].contains(&run.status.as_str());
     let result = process_control::run_cancellable(
         shell(command, &run.workspace)?,
@@ -87,12 +93,14 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         tree: (before == after).then_some(after),
         result,
     };
+    let _guard = super::integration::execution_guard()?;
     runtime.update_checked(&run.id, |r| r.verification = Some(verification.clone()))?;
+    runtime.stage(&run.id, None);
     Ok(verification)
 }
 
 pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(), String> {
-    let _guard = super::integration::execution_guard()?;
+    let guard = super::integration::execution_guard()?;
     let runs = runtime.integration_runs()?;
     let run = runs
         .iter()
@@ -119,6 +127,8 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
             return Ok(());
         }
     }
+    let _lease = leases::reserve(&run.workspace)?;
+    drop(guard);
     execute(runtime, run, command)?;
     Ok(())
 }
@@ -141,6 +151,10 @@ pub async fn agent_verify(
         );
     }
     tauri::async_runtime::spawn_blocking(move || {
+        let guard = super::integration::execution_guard()?;
+        if !runtime.is_running(&run.id) { return Err("This attempt is no longer active.".into()); }
+        let _lease = leases::reserve(&run.workspace)?;
+        drop(guard);
         let result = execute(&runtime, &run, &command)?;
         Ok(serde_json::json!({ "exit_code": result.result.exit_code, "stdout": result.result.stdout,
             "stderr": result.result.stderr, "success": result.result.success,
@@ -156,7 +170,7 @@ pub async fn task_verify(
 ) -> Result<Verification, String> {
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let _guard = super::integration::execution_guard()?;
+        let guard = super::integration::execution_guard()?;
         let runs = runtime.integration_runs()?;
         let run = runs.iter().find(|run| run.id == id).ok_or("Task not found")?;
         if runs.iter().any(|other| other.workspace == run.workspace && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())) {
@@ -165,6 +179,8 @@ pub async fn task_verify(
         if run.verify_command.as_ref().filter(|s| !s.trim().is_empty()).is_some_and(|saved| saved != &command) {
             return Err("Run this attempt's saved verification command. Start a new attempt to change its required checks.".into());
         }
+        let _lease = leases::reserve(&run.workspace)?;
+        drop(guard);
         execute(&runtime, run, &command)
     }).await.map_err(|e| e.to_string())?
 }

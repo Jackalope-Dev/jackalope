@@ -82,6 +82,7 @@ export const useAgentConfigStore = create<AgentConfigState>()(
         claude: true,
         grok: true,
         opencode: true,
+        kimi: true,
         antigravity: true,
       },
       allowedModels: {

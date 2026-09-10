@@ -122,6 +122,7 @@ impl TaskRuntime {
         req: &RunRequest,
         previous: Option<TaskRun>,
     ) -> Result<(), String> {
+        self.stage(id, Some("preparation"));
         self.prepare_workspace(id, req, previous.clone())?;
         let mut request = req.clone();
         let mut resume = previous;
@@ -134,8 +135,10 @@ impl TaskRuntime {
                 return Ok(());
             }
             if request.agent == "auto" {
+                self.stage(id, Some("routing"));
                 self.route(&mut request)?;
             }
+            self.stage(id, Some("execution"));
             self.execute_agent(id, &request, resume.take())?;
             let run = self
                 .inner
@@ -165,7 +168,18 @@ impl TaskRuntime {
                 .as_deref()
                 .ok_or("Choose a target branch before running work.")?
         );
-        let base = git(&root, &["rev-parse", &base_ref])?;
+        let base = if req.dependency_snapshot.base.is_empty() {
+            git(&root, &["rev-parse", &base_ref])?
+        } else {
+            git(
+                &root,
+                &[
+                    "rev-parse",
+                    "--verify",
+                    &format!("{}^{{commit}}", req.dependency_snapshot.base),
+                ],
+            )?
+        };
         if previous.is_none()
             && !req.isolated
             && git(&root, &["symbolic-ref", "--quiet", "HEAD"])? != base_ref
@@ -349,6 +363,7 @@ impl TaskRuntime {
             ]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
+                crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["resume", old.session_id.as_deref().unwrap()]);
             }
             cmd.args(["--json", "-"]);
@@ -363,7 +378,13 @@ impl TaskRuntime {
             ]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
+                crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
+            }
+        } else if adapter == "kimi" {
+            cmd.arg("acp");
+            if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
             }
         } else if adapter == "antigravity" {
             antigravity::configure(
@@ -375,6 +396,7 @@ impl TaskRuntime {
             cmd.args(["run", "--format", "json"]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
+                crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["--session", old.session_id.as_deref().unwrap()]);
             }
         } else if adapter == "grok" {
@@ -388,13 +410,16 @@ impl TaskRuntime {
                 .arg(self.directory.join(format!("{id}.prompt")));
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
+                crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
         } else {
-            return Err(format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode or Antigravity to run this task."));
+            return Err(format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code or Antigravity to run this task."));
         }
         if let Some(model) = &selected_model {
-            cmd.args(["--model", model]);
+            if adapter != "kimi" {
+                cmd.args(["--model", model]);
+            }
             self.update_checked(id, |run| run.model = Some(model.clone()))?;
         }
         let (mut project_mcp, discovered_mcp) = crate::commands::mcp::project_delivery(
@@ -476,6 +501,26 @@ impl TaskRuntime {
         if adapter == "antigravity" {
             input = antigravity::input(&input, &workspace);
         }
+        if ["kimi", "opencode"].contains(&adapter.as_str()) {
+            if let Some(context) = &req.coordination {
+                project_mcp.insert(
+                    "jackalope".into(),
+                    serde_json::json!({
+                        "type":"http","url":format!("{}/mcp",context.endpoint),
+                        "bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN"
+                    }),
+                );
+            }
+        }
+        let acp_servers = if adapter == "kimi" {
+            crate::commands::mcp::acp_servers(&project_mcp, &cmd)?
+        } else {
+            Vec::new()
+        };
+        if adapter == "opencode" && !project_mcp.is_empty() {
+            let config = crate::commands::mcp::opencode_config(&project_mcp, &cmd)?;
+            cmd.env("OPENCODE_CONFIG_CONTENT", config);
+        }
         cmd.current_dir(&workspace)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -526,12 +571,12 @@ impl TaskRuntime {
                 );
             }
         })?;
-        let input_result = if adapter == "grok" {
+        let input_result = if adapter == "grok" || adapter == "kimi" {
             Ok(())
         } else {
             stdin.write_all(input.as_bytes())
         };
-        drop(stdin);
+        let mut acp_input = (adapter == "kimi").then_some(stdin);
         if let Err(error) = input_result {
             let _ = self.stop(id);
             return Err(format!("Could not deliver task: {error}"));
@@ -540,7 +585,39 @@ impl TaskRuntime {
         let event_id = id.to_string();
         let output_adapter = adapter.clone();
         let resumed_session = previous.as_ref().and_then(|run| run.session_id.clone());
+        let acp_success = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let reader_success = acp_success.clone();
+        let usage_probe = Arc::new(Mutex::new(None));
+        let reader_probe = usage_probe.clone();
+        let acp_workspace = workspace.clone();
         let reader = std::thread::spawn(move || {
+            if output_adapter == "kimi" {
+                let result = kimi::drive_with_servers(
+                    BufReader::new(stdout),
+                    &mut acp_input.take().unwrap(),
+                    &acp_workspace,
+                    resumed_session.as_deref(),
+                    selected_model.as_deref(),
+                    &input,
+                    &acp_servers,
+                    |update| {
+                        if update["sessionUpdate"] == "jackalope_usage_probe" {
+                            *reader_probe.lock().unwrap() = (update["active"] == true)
+                                .then(|| (std::time::Instant::now(), update["afterTurn"] == true));
+                        } else {
+                            runtime.update(&event_id, |run| kimi::consume(run, update));
+                        }
+                    },
+                    |params| kimi::permission(&runtime, &event_id, params),
+                );
+                match result {
+                    Ok(()) => reader_success.store(true, std::sync::atomic::Ordering::SeqCst),
+                    Err(error) => runtime.update(&event_id, |run| {
+                        run.error.get_or_insert(error);
+                    }),
+                }
+                return;
+            }
             let mut stream = antigravity::Stream::new(resumed_session);
             if let Err(error) = crate::commands::process_control::bounded_lines(
                 BufReader::new(stdout),
@@ -598,9 +675,27 @@ impl TaskRuntime {
             {
                 break exit;
             }
-            if adapter == "antigravity" && !timed_out && started.elapsed() > antigravity::TIMEOUT {
+            if adapter == "kimi" && reader.is_finished() {
+                tree.terminate();
+                let mut child = process.lock().unwrap();
+                let _ = child.kill();
+                break child.wait().map_err(|error| error.to_string())?;
+            }
+            if let Some((began, after_turn)) = *usage_probe.lock().unwrap() {
+                if began.elapsed() > Duration::from_secs(15) {
+                    if !after_turn {
+                        self.update(id, |run| run.error = Some("Kimi's usage command timed out before the task started. Update the CLI and retry.".into()));
+                    }
+                    tree.terminate();
+                    let _ = process.lock().unwrap().kill();
+                }
+            }
+            if (adapter == "antigravity" || adapter == "kimi")
+                && !timed_out
+                && started.elapsed() > antigravity::TIMEOUT
+            {
                 timed_out = true;
-                self.update(id, |run| run.error = Some("Antigravity exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.".into()));
+                self.update(id, |run| run.error = Some(format!("{adapter} exceeded the 30-minute attempt limit. Inspect the saved work and continue the task.")));
                 tree.terminate();
                 let _ = process.lock().unwrap().kill();
             }
@@ -622,6 +717,12 @@ impl TaskRuntime {
         tree.terminate();
         let _ = reader.join();
         let _ = diagnostics.join();
+        // ACP completion is the turn receipt; its persistent server is stopped by the owner.
+        let success = if adapter == "kimi" {
+            acp_success.load(std::sync::atomic::Ordering::SeqCst) && !timed_out
+        } else {
+            exit.success()
+        };
         if adapter == "grok" {
             let _ = std::fs::remove_file(self.directory.join(format!("{id}.prompt")));
         }
@@ -632,7 +733,7 @@ impl TaskRuntime {
             .find(|run| run.id == id)
             .ok_or("Attempt not found")?;
         if req.auto_verify
-            && exit.success()
+            && success
             && run.error.is_none()
             && !run.result.is_empty()
             && self.is_running(id)
@@ -642,7 +743,8 @@ impl TaskRuntime {
                 self.update(id, |r| r.verification_error = Some(error));
             }
         }
-        if exit.success() && run.error.is_none() && !run.result.is_empty() && !quota_stopped {
+        if success && run.error.is_none() && !run.result.is_empty() && !quota_stopped {
+            self.stage(id, Some("checkpoint"));
             let _guard = crate::commands::integration::execution_guard()?;
             let result = {
                 let inner = self.inner.lock().unwrap();
@@ -673,7 +775,7 @@ impl TaskRuntime {
         let canceled = self.inner.lock().unwrap().canceled.remove(id);
         self.update(id, |r| {
             r.finishing = false; r.exit_code = exit.code(); r.ended_at = Some(Utc::now().to_rfc3339());
-            r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if exit.success() && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
+            r.status = if canceled || r.status == "stopping" { "stopped" } else if r.routing.is_some() && r.quota_failure.is_some() { r.ended_at = None; "starting" } else if success && r.error.is_none() && !r.result.is_empty() { "review" } else { "failed" }.into();
             if r.status == "failed" && r.error.is_none() { r.error = Some(format!("Agent exited with {}. Inspect activity for details; no successful result was reported.", exit.code().map_or("no exit code".into(), |c| c.to_string()))); }
         });
         Ok(())
@@ -809,6 +911,7 @@ impl TaskRuntime {
         }
         if !request.isolated && request.previous_run_id.is_none() {
             crate::commands::previews::ensure_idle(&request.project_path)?;
+            crate::commands::verification::ensure_idle(&request.project_path)?;
         }
         let advanced_contract = if request.context_selection.advance_workflow {
             let runs = self.integration_runs()?;
@@ -817,6 +920,7 @@ impl TaskRuntime {
                 .find(|r| Some(&r.id) == request.previous_run_id.as_ref())
                 .ok_or("Choose a previous workflow attempt.")?;
             crate::commands::previews::ensure_idle(&old.workspace)?;
+            crate::commands::verification::ensure_idle(&old.workspace)?;
             let directory = self.integration_directory();
             std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
             let tree = crate::commands::integration::workspace_tree(old, &directory)?;
@@ -829,6 +933,16 @@ impl TaskRuntime {
         }
         self.apply_policy(&mut request)?;
         let previous;
+        if let Some(id) = &request.previous_run_id {
+            let runs = self.integration_runs()?;
+            if let Some(old) = runs.iter().find(|r| &r.id == id) {
+                crate::commands::integration::validate_dependencies(
+                    &self.integration_directory(),
+                    &runs,
+                    old,
+                )?;
+            }
+        }
         let policy = self.policy()?;
         let (adapter, _) = policy.resolve(if request.agent == "auto" {
             &policy.default_meta_agent
@@ -860,6 +974,7 @@ impl TaskRuntime {
                 .transpose()?;
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
+                crate::commands::verification::ensure_idle(&old.workspace)?;
                 if inner
                     .runs
                     .values()
@@ -950,6 +1065,12 @@ impl TaskRuntime {
                 )?
             };
             let run = TaskRun {
+                dependency_invalidated: false,
+                stages: vec![],
+                dependency_snapshot: previous
+                    .as_ref()
+                    .map(|old| old.dependency_snapshot.clone())
+                    .unwrap_or_else(|| request.dependency_snapshot.clone()),
                 checkpoint: None,
                 checkpoint_error: None,
                 routing: (request.agent == "auto").then(super::routing::RoutingHistory::default),
@@ -1031,6 +1152,7 @@ impl TaskRuntime {
                     runtime.fail(&request.id, error);
                 }
             }
+            runtime.stage(&request.id, None);
             runtime.mcp_broker.close(&request.id);
             crate::commands::browser::close(&request.id);
             crate::commands::desktop_control::close(&request.id);

@@ -8,8 +8,8 @@ remains the default for existing connections. A task's selected connection IDs
 carry into continuations; each attempt takes a fresh configuration snapshot.
 
 Jackalope starts selected upstream connections lazily inside the native runtime.
-Codex and Claude receive the authenticated Jackalope MCP endpoint; Grok, OpenCode
-and Antigravity use the
+Codex, Claude, OpenCode and Kimi receive the authenticated Jackalope MCP endpoint;
+Grok and Antigravity use the
 same search/execute operations through the local HTTP harness. Custom agents use
 their configured adapter. Manual, queued and scheduled attempts use the same
 launch path. No model API proxy, additional API key, Node sidecar or embedding

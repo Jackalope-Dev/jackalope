@@ -433,6 +433,13 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                     {new Date(m.createdAt).toLocaleTimeString()}
                   </small>
                   <p>{m.text}</p>
+                  {m.resolvedBy && <span className="task-muted"> · Resolved</span>}
+                  {m.report && <div className="task-muted">
+                    <p>Completed: {m.report.completed.join('; ') || 'None reported'}</p>
+                    <p>Remaining: {m.report.remaining.join('; ') || 'None reported'}</p>
+                    <p>Artifacts: {m.report.artifacts.join(', ') || 'None reported'}</p>
+                    <p>Agent report · Snapshot {m.sourceTree?.slice(0, 12) ?? 'unavailable'}</p>
+                  </div>}
                   <small>
                     {m.recipientTaskId
                       ? `To ${items.find((item) => item.id === m.recipientTaskId)?.title ?? 'task'}`

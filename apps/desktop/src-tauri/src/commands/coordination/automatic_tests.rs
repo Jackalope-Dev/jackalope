@@ -44,6 +44,8 @@ impl Fixture {
             WebState(self.service.clone()),
             headers("writer-run"),
             Json(MessageRequest {
+                report: None,
+                resolves: None,
                 kind: "blocker".into(),
                 text: text.into(),
                 recipient_task_id: recipient.map(str::to_string),
