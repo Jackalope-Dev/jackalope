@@ -246,6 +246,16 @@ async fn real_agent_browser_stop_and_capacity() {
     for id in &ids[..4] {
         browser_navigate(id, &url).await.unwrap();
     }
+    #[cfg(unix)]
+    let mut browser_pids = Vec::new();
+    #[cfg(unix)]
+    for id in &ids[..4] {
+        browser_pids.push(
+            with_session(id, |engine| Ok(engine.browser_pid()))
+                .await
+                .unwrap(),
+        );
+    }
     assert!(browser_navigate(&ids[4], &url)
         .await
         .unwrap_err()
@@ -275,6 +285,41 @@ async fn real_agent_browser_stop_and_capacity() {
         .unwrap();
     browser_navigate(&ids[4], &url).await.unwrap();
     assert!(browser_navigate(&ids[0], &url).await.is_err());
+    #[cfg(unix)]
+    {
+        browser_pids.push(
+            with_session(&ids[4], |engine| Ok(engine.browser_pid()))
+                .await
+                .unwrap(),
+        );
+        for id in &ids {
+            close(id);
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let output = std::process::Command::new("/bin/ps")
+                .args(["-eo", "pgid=,stat="])
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            let remaining = String::from_utf8_lossy(&output.stdout).lines().any(|line| {
+                let mut fields = line.split_whitespace();
+                fields
+                    .next()
+                    .and_then(|group| group.parse::<u32>().ok())
+                    .is_some_and(|group| browser_pids.contains(&group))
+                    && fields.next().is_some_and(|state| !state.starts_with('Z'))
+            });
+            if !remaining {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "Chromium processes survived browser cancellation"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
 }
 
 #[tokio::test]

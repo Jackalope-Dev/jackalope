@@ -1,4 +1,6 @@
 use super::{check_canceled, Slot};
+#[cfg(unix)]
+mod chromium;
 use crate::commands::process_control::ProcessTree;
 use serde_json::{json, Value};
 use std::{
@@ -46,11 +48,14 @@ pub struct Engine {
     child: Child,
     tree: Arc<ProcessTree>,
     canceled: Arc<std::sync::atomic::AtomicBool>,
+    #[cfg(unix)]
+    browser: Option<chromium::BrowserProcess>,
 }
 
 impl Engine {
     pub fn start(slot: Arc<Slot>) -> Result<Self, String> {
         check_canceled(&slot.canceled)?;
+        slot.trees.lock().map_err(|e| e.to_string())?.clear();
         let browser = crate::commands::harness::find_browser_executable()
             .ok_or("Install Chrome, Edge or Chromium, or set JACKALOPE_BROWSER_EXECUTABLE to its executable, then restart Jackalope.")?;
         let directory = create_session_directory()?;
@@ -123,13 +128,18 @@ impl Engine {
             }
         };
         // Publish containment before launch so Stop can interrupt startup or a blocked browser call.
-        *slot.tree.lock().map_err(|e| e.to_string())? = Some(tree.clone());
+        slot.trees
+            .lock()
+            .map_err(|e| e.to_string())?
+            .push(tree.clone());
         let mut engine = Self {
             media: std::sync::Mutex::new(("no-preference".into(), false)),
             directory,
             child,
             tree,
             canceled: slot.canceled.clone(),
+            #[cfg(unix)]
+            browser: None,
         };
         let start = Instant::now();
         loop {
@@ -151,12 +161,25 @@ impl Engine {
             std::thread::sleep(Duration::from_millis(25));
         }
         engine.call(json!({"action":"stream_disable"}))?;
+        #[cfg(windows)]
         engine.call(
             json!({"action":"launch", "headless":true, "executablePath":browser,
             "webmcp":false, "hideScrollbars":false}),
         )?;
+        #[cfg(unix)]
+        {
+            let owned = chromium::BrowserProcess::start(&browser, &engine.directory, &slot)?;
+            let endpoint = owned.endpoint.clone();
+            engine.browser = Some(owned);
+            engine.call(json!({"action":"launch", "cdpUrl":endpoint, "webmcp":false}))?;
+        }
         engine.call(json!({"action":"viewport", "width":1280, "height":800}))?;
         Ok(engine)
+    }
+
+    #[cfg(all(test, unix))]
+    pub(super) fn browser_pid(&self) -> u32 {
+        self.browser.as_ref().unwrap().pid()
     }
 
     #[cfg(windows)]
@@ -197,39 +220,75 @@ impl Engine {
         check_canceled(&self.canceled)?;
         let id = uuid::Uuid::new_v4().to_string();
         request["id"] = json!(id);
-        let mut stream = self.connect()?;
+        let mut stream = self.connect().inspect_err(|_| self.terminate())?;
         let mut payload = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
         payload.push(b'\n');
-        stream.write_all(&payload).map_err(|e| e.to_string())?;
+        stream.write_all(&payload).map_err(|e| {
+            self.terminate();
+            e.to_string()
+        })?;
         let start = Instant::now();
         let mut output = Vec::new();
         let mut buffer = [0u8; 8192];
         loop {
             check_canceled(&self.canceled)?;
             if start.elapsed() > COMMAND_TIMEOUT {
-                self.tree.terminate();
+                self.terminate();
                 return Err("The browser stopped responding and was closed. Continue the task to retry with a fresh browser.".into());
             }
             match stream.read(&mut buffer) {
-                Ok(0) => return Err("The task browser closed unexpectedly. Continue the task to start a fresh browser.".into()),
+                Ok(0) => {
+                    self.terminate();
+                    return Err("The task browser closed unexpectedly. Continue the task to start a fresh browser.".into());
+                }
                 Ok(count) => {
                     output.extend_from_slice(&buffer[..count]);
-                    if output.len() > RESPONSE_LIMIT { return Err("Browser output is too large. Scope the snapshot to a CSS selector.".into()); }
+                    if output.len() > RESPONSE_LIMIT {
+                        return Err(
+                            "Browser output is too large. Scope the snapshot to a CSS selector."
+                                .into(),
+                        );
+                    }
                     if let Some(end) = output.iter().position(|b| *b == b'\n') {
-                        let response: Value = serde_json::from_slice(&output[..end]).map_err(|_| "Invalid browser response")?;
-                        if response["id"].as_str() != Some(&id) { return Err("Mismatched browser response".into()); }
+                        let response: Value = serde_json::from_slice(&output[..end])
+                            .map_err(|_| "Invalid browser response")?;
+                        if response["id"].as_str() != Some(&id) {
+                            return Err("Mismatched browser response".into());
+                        }
                         if response["success"] != true {
-                            let error: String = response["error"].as_str().unwrap_or("Browser action failed").chars().take(2000).collect();
+                            let error: String = response["error"]
+                                .as_str()
+                                .unwrap_or("Browser action failed")
+                                .chars()
+                                .take(2000)
+                                .collect();
                             return Err(error);
                         }
                         let mut data = response["data"].clone();
-                        if let Some(object) = data.as_object_mut() { object.remove("lifecycle"); }
+                        if let Some(object) = data.as_object_mut() {
+                            object.remove("lifecycle");
+                        }
                         return Ok(data);
                     }
                 }
-                Err(error) if matches!(error.kind(), std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock) => {}
-                Err(error) => return Err(format!("Browser connection failed: {error}")),
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+                    ) => {}
+                Err(error) => {
+                    self.terminate();
+                    return Err(format!("Browser connection failed: {error}"));
+                }
             }
+        }
+    }
+
+    fn terminate(&self) {
+        self.tree.terminate();
+        #[cfg(unix)]
+        if let Some(browser) = &self.browser {
+            browser.terminate();
         }
     }
 }
@@ -270,9 +329,11 @@ mod platform_tests {
 
 impl Drop for Engine {
     fn drop(&mut self) {
-        self.tree.terminate();
+        self.terminate();
         let _ = self.child.kill();
         let _ = self.child.wait();
+        #[cfg(unix)]
+        drop(self.browser.take());
         for _ in 0..20 {
             if !self.directory.exists() || std::fs::remove_dir_all(&self.directory).is_ok() {
                 break;

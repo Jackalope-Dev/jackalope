@@ -42,7 +42,7 @@ struct Slot {
     canceled: Arc<AtomicBool>,
     reserved: AtomicBool,
     engine: Mutex<Option<Engine>>,
-    tree: Mutex<Option<Arc<ProcessTree>>>,
+    trees: Mutex<Vec<Arc<ProcessTree>>>,
 }
 
 impl Default for Slot {
@@ -51,7 +51,7 @@ impl Default for Slot {
             canceled: Arc::new(AtomicBool::new(false)),
             reserved: AtomicBool::new(false),
             engine: Mutex::new(None),
-            tree: Mutex::new(None),
+            trees: Mutex::new(Vec::new()),
         }
     }
 }
@@ -73,7 +73,7 @@ pub fn register(run_id: &str) {
 
 fn cancel(slot: &Slot) {
     slot.canceled.store(true, Ordering::SeqCst);
-    if let Some(tree) = slot.tree.lock().unwrap().as_ref() {
+    for tree in slot.trees.lock().unwrap().iter() {
         tree.terminate();
     }
 }

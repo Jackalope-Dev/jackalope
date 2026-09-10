@@ -21,7 +21,8 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 - Shared appearance controls, onboarding and optional portable settings sync.
   Agent characters share the brand's layered silhouettes and theme colors, with
   distinct working/input poses and reduced-motion support.
-- An optional account/access, feedback, reporting and update service, plus a
+- Required account access in every desktop build, with optional feedback,
+  reporting and update services, plus a
   product website with agent-specific setup, worked workflow guides, sourced
   comparisons, sample-workspace media and a Reddit community link. The knowledgebase
   has practical steps, related help, searchable guides, captioned short demos and
@@ -38,15 +39,20 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 The [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) cover source development and redistribution.
 
+Ask panel browser fixtures cover context persistence, keyboard focus, theme-preview
+rollback and light/dark layouts at 1280×840 and 960×640. Installed helper checks
+remain open.
+
 ## Known limits
 
 Gemini CLI, Aider and Goose do not yet support native task execution. Antigravity
 named accounts use Gemini API-key mode; isolated subscription sign-ins remain
 unsupported. Account or model discovery alone does not establish execution support.
 
-Worktrees isolate Git changes, not process privileges. Contributor builds do not
-require the hosted account service. Official beta builds can require approved
-account access; see [monitoring and privacy](BETA-MONITORING.md).
+Worktrees isolate Git changes, not process privileges. Contributor and release
+builds require approved account access for new execution. Previously verified
+accounts retain bounded offline access; saved work remains reviewable after expiry.
+See [account access](DESKTOP-ACCOUNT.md) and [monitoring and privacy](BETA-MONITORING.md).
 
 Installed-agent account switching, routing, helper actions, tools, schedules,
 checkpoint/integration recovery and automatic lessons need their corresponding

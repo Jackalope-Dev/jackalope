@@ -1,5 +1,15 @@
 [
   {
+    "id": "account-access-in-every-build",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Account access in every build.",
+    "description": "Development and release builds now use the same account access checks.",
+    "items": [
+      "Connect an approved account before starting new work, with verified offline access and saved-work recovery preserved."
+    ]
+  },
+  {
     "id": "more-at-home-on-every-desktop",
     "date": "2026-09-10",
     "status": "In development",

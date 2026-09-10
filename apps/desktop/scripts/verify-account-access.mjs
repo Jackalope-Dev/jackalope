@@ -67,7 +67,8 @@ try {
       await page.evaluate((dark) => window.setFixtureTheme(dark), isDark);
       await page.emulateMedia({ reducedMotion: isDark ? 'no-preference' : 'reduce' });
       const connect = page.getByRole('button', { name: 'Connect account', exact: true });
-      await connect.focus();
+      await page.locator('.access-privacy > summary').focus();
+      await page.keyboard.press('Tab');
       assert.equal(await connect.evaluate((element) => document.activeElement === element), true);
       const bounds = await connect.boundingBox();
       assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
