@@ -16,13 +16,22 @@ pub(super) fn check_slot(canceled: impl Fn() -> bool) -> Result<CheckSlot, Strin
         if canceled() || started.elapsed().as_secs() >= 300 {
             return Err("Verification was canceled or timed out waiting for a check slot.".into());
         }
-        if CHECKS.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |count| (count < 2).then_some(count + 1)).is_ok() { return Ok(CheckSlot); }
+        if CHECKS
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |count| {
+                (count < 2).then_some(count + 1)
+            })
+            .is_ok()
+        {
+            return Ok(CheckSlot);
+        }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
 }
 
 impl Drop for CheckSlot {
-    fn drop(&mut self) { CHECKS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst); }
+    fn drop(&mut self) {
+        CHECKS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 pub(super) struct Lease(PathBuf);

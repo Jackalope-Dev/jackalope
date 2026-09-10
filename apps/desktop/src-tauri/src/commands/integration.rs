@@ -945,6 +945,52 @@ mod tests {
     }
 
     #[test]
+    fn feature_snapshots_preserve_target_and_reject_changed_predecessors() {
+        let fixture = Fixture::new();
+        let mut parent = fixture.run(1, "parent.txt", "verified parent\n");
+        let tree = workspace_tree(&parent, &fixture.plans).unwrap();
+        parent.verify_command = Some("fixture check".into());
+        parent.verification = Some(serde_json::from_value(serde_json::json!({"command":"fixture check","checkedAt":"now","tree":tree,"result":{"success":true,"exitCode":0,"stdout":"","stderr":"","durationMs":1,"timedOut":false,"truncated":false}})).unwrap());
+        let dependency = prepare_dependencies(
+            &fixture.plans,
+            &[parent.clone()],
+            &[parent.id.clone()],
+            "fixture",
+        )
+        .unwrap();
+        assert_eq!(
+            git(&fixture.project, &["rev-parse", "HEAD"]).unwrap(),
+            fixture.base
+        );
+        assert_eq!(
+            git(
+                &fixture.project,
+                &["show", &format!("{}:parent.txt", dependency.base)]
+            )
+            .unwrap(),
+            "verified parent"
+        );
+        let mut child = fixture.run(2, "child.txt", "child\n");
+        child.dependency_snapshot = dependency;
+        assert!(
+            validate_dependencies(&fixture.plans, &[parent.clone(), child.clone()], &child).is_ok()
+        );
+        assert!(prepare(
+            &fixture.plans,
+            &[parent.clone(), child.clone()],
+            &[child.id.clone()]
+        )
+        .unwrap_err()
+        .contains("every predecessor"));
+        fs::write(Path::new(&parent.workspace).join("parent.txt"), "changed\n").unwrap();
+        assert!(
+            validate_dependencies(&fixture.plans, &[parent, child.clone()], &child)
+                .unwrap_err()
+                .contains("predecessor changed")
+        );
+    }
+
+    #[test]
     fn checkpoints_and_single_commit_merge_enforce_all_attribution_modes() {
         use crate::commands::project_git::{Attribution, CommitPolicy};
         for attribution in [Attribution::User, Attribution::CoAuthor, Attribution::Agent] {
@@ -1412,4 +1458,17 @@ mod tests {
             .unwrap_err()
             .contains("no longer contains integration"));
     }
+}
+
+#[cfg(test)]
+pub(in crate::commands) fn evaluation_integrate(
+    runtime: &TaskRuntime,
+    ids: &[String],
+) -> Result<(), String> {
+    let _guard = execution_guard()?;
+    let directory = runtime.integration_directory();
+    let runs = runtime.integration_runs()?;
+    let plan = prepare_with_message(&directory, &runs, ids, Some("Complete evaluation step"))?;
+    apply(&directory, &runs, &plan.id)?;
+    Ok(())
 }

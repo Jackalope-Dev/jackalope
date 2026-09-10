@@ -78,8 +78,18 @@ pub(super) fn ready_items(
     merged: &[String],
 ) -> Vec<QueueItem> {
     let active_runs: Vec<_> = runs.iter().filter(|r| active(&r.status)).collect();
-    let slots = inner.concurrency.saturating_sub(active_runs.len());
+    let slots = inner
+        .concurrency
+        .saturating_sub(active_runs.iter().filter(|r| !r.finishing).count());
     let mut reserved = Vec::new();
+    let mut priority = HashMap::<String, usize>::new();
+    for item in inner.ledger.items.iter().rev().filter(|i| !i.canceled) {
+        let depth = priority.get(&item.id).copied().unwrap_or(0) + 1;
+        for parent in &item.dependencies {
+            let value = priority.entry(parent.clone()).or_default();
+            *value = (*value).max(depth);
+        }
+    }
     let mut pending: Vec<_> = inner.ledger.items.iter().collect();
     let mut counts: HashMap<String, usize> = HashMap::new();
     for run in &active_runs {
@@ -89,7 +99,7 @@ pub(super) fn ready_items(
         pending.sort_by_key(|item| {
             (
                 counts.get(&item.project_id).copied().unwrap_or(0),
-                std::cmp::Reverse(downstream(&inner.ledger.items, &item.id).len()),
+                std::cmp::Reverse(priority.get(&item.id).copied().unwrap_or(0)),
                 item.created_at.clone(),
                 item.id.clone(),
             )
@@ -158,22 +168,6 @@ pub(super) fn ready_items(
     reserved.into_iter().cloned().collect()
 }
 
-fn downstream(items: &[QueueItem], id: &str) -> HashSet<String> {
-    let mut found = HashSet::new();
-    let mut pending = vec![id.to_string()];
-    while let Some(id) = pending.pop() {
-        for child in items
-            .iter()
-            .filter(|item| !item.canceled && item.dependencies.contains(&id))
-        {
-            if found.insert(child.id.clone()) {
-                pending.push(child.id.clone());
-            }
-        }
-    }
-    found
-}
-
 fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
     let mut found = HashSet::new();
     let mut pending = item.dependencies.clone();
@@ -185,4 +179,38 @@ fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
         }
     }
     found
+}
+
+#[cfg(test)]
+mod scheduling_tests {
+    use super::*;
+    fn item(id: &str, project: &str, deps: &[&str]) -> QueueItem {
+        serde_json::from_value(serde_json::json!({"id":id,"projectId":project,"projectName":project,"projectPath":"fixture","title":id,"prompt":id,"agent":"codex","scopes":[id],"dependencies":deps,"createdAt":"now","runId":null,"error":null,"canceled":false})).unwrap()
+    }
+    #[test]
+    fn scheduling_prioritizes_the_critical_path_and_fair_projects() {
+        let inner = Inner {
+            ledger: Ledger {
+                items: vec![
+                    item("unrelated", "a", &[]),
+                    item("root", "a", &[]),
+                    item("child", "a", &["root"]),
+                    item("peer", "b", &[]),
+                ],
+                ..Default::default()
+            },
+            enabled: ["a".into(), "b".into()].into(),
+            concurrency: 2,
+            grants: HashMap::new(),
+            url: None,
+            error: None,
+            delivered: HashMap::new(),
+        };
+        let ready = ready_items(&inner, &[], &[]);
+        assert_eq!(
+            ready.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(),
+            ["root", "peer"]
+        );
+        assert!(!ready.iter().any(|i| i.id == "child"));
+    }
 }
