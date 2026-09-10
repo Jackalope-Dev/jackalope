@@ -71,3 +71,4 @@ block2 = "0.6"
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "=3.6.3", features = ["sync-secret-service", "crypto-rust"] }
 notify-rust = { version = "=4.18.0", default-features = false, features = ["z-with-tokio"] }
+zbus = { version = "5", default-features = false, features = ["tokio"] }

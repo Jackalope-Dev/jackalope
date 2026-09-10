@@ -1,8 +1,7 @@
 use super::*;
-use std::{
-    path::PathBuf,
-    process::{Child, Stdio},
-};
+#[cfg(windows)]
+use std::process::Stdio;
+use std::{path::PathBuf, process::Child};
 
 static ACCENT: OnceLock<Mutex<String>> = OnceLock::new();
 

@@ -42,6 +42,29 @@ bookings, native task execution, or installed-app acceptance. Keep that context
 in the captions and walkthroughs. Do not use this footage to illustrate native
 Windows control or helper actions that it does not show.
 
+## Feature-page media
+
+`apps/website/src/feature-media.ts` maps feature, agent and workflow pages to
+their relevant captures and article sections. `FeatureMedia.tsx` reuses the
+browser, composer and accounts clips above without duplicating video files.
+Clips remain click-to-play with captions, written walkthroughs, direct links
+and an error fallback. Screenshot pages use larger, full-size-linked images
+and switch captures with the website's light/dark control.
+
+The September 10, 2026 recurring screenshots are fresh captures of the actual
+`ScheduleManager` frontend with two fictional, paused Atlas schedules. They
+show no execution history. To regenerate both appearances, start the desktop
+Vite preview on port 5193 and run:
+
+```powershell
+node apps/website/scripts/capture-feature-media.mjs
+```
+
+Set `JACKALOPE_CAPTURE_ORIGIN` to use a different preview URL. The script uses
+an isolated Edge browser context and the existing sample IPC fixture; it does
+not access a native profile or start a scheduled task. The capture bounds show
+the heading and schedule list, excluding unrelated workspace notifications.
+
 ## Verification
 
 The website build checks local page links, anchors, linked files, and embedded

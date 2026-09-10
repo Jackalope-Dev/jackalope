@@ -23,9 +23,14 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   comparisons, sample-workspace media and a Reddit community link. The knowledgebase
   has practical steps, related help, searchable guides, captioned short demos and
   contextual screenshots.
+- Feature and workflow pages pair larger interface captures with short captioned
+  clips, written walkthroughs and links into the guide. Recurring-task captures
+  show paused sample schedules; media illustrates the UI, not native execution.
 - Windows installer, Microsoft Store and cloud-release preparation tooling.
 - Cross-platform source hardening for CLI detection, browsers, process/PTY cleanup,
   native credential stores and notifications, with macOS/Linux CI trial jobs.
+- macOS/Linux account and settings-sync availability, task notification activation,
+  Unix process guardians, Linux tray-host detection and macOS Dock reopening.
 
 The [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) cover source development and redistribution.
@@ -45,8 +50,9 @@ checkpoint/integration recovery and automatic lessons need their corresponding
 acceptance checks. Outcome comparisons are required before claiming that lessons
 improve task quality. macOS/Linux secure storage, process lifecycle, packaging,
 signed installation and update acceptance remain open.
-Native desktop control still needs macOS/Linux backends; notification clicks open
-tasks only on Windows. See the [feature-by-feature platform audit](CROSS-PLATFORM-RELEASES.md#source-readiness-audit-2026-09-10).
+Native desktop control still needs macOS/Linux backends. Notification activation,
+tray behavior and Dock reopening need installed desktop acceptance. See the
+[feature-by-feature platform audit](CROSS-PLATFORM-RELEASES.md#source-readiness-audit-2026-09-10).
 
 Remote execution, monetary budgets and team collaboration are future work.
 Automated checks and browser fixtures do not establish installed execution,

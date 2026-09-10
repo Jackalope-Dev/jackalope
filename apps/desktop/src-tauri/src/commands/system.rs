@@ -9,10 +9,24 @@ pub struct SystemInfo {
 }
 
 pub(super) fn device_name() -> String {
-    match std::env::var("COMPUTERNAME") {
-        Ok(name) => name,
-        Err(_) => std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string()),
+    #[cfg(unix)]
+    {
+        let mut name = [0u8; 256];
+        if unsafe { libc::gethostname(name.as_mut_ptr().cast(), name.len()) } == 0 {
+            let length = name
+                .iter()
+                .position(|&byte| byte == 0)
+                .unwrap_or(name.len());
+            if length > 0 {
+                return String::from_utf8_lossy(&name[..length]).into_owned();
+            }
+        }
     }
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .ok()
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "localhost".into())
 }
 
 #[tauri::command]

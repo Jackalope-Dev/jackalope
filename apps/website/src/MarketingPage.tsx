@@ -1,4 +1,6 @@
 import { ArrowRight, Check, Play } from 'lucide-react';
+import { FeatureMedia } from './FeatureMedia';
+import { featureMedia } from './feature-media';
 import type { MarketingPage as MarketingPageContent } from './marketing-content';
 import { WaitlistButton } from './Signup';
 import './comparisons.css';
@@ -6,8 +8,12 @@ import './comparisons.css';
 export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark: boolean }) {
   const comparison = page.comparison;
   const isComparison = page.path.startsWith('/compare/');
+  const hasFeatureMedia = Boolean(featureMedia[page.path]);
   return (
-    <main id="main" className={`acquisition-page${isComparison ? ' comparison-page' : ''}`}>
+    <main
+      id="main"
+      className={`acquisition-page${isComparison ? ' comparison-page' : ''}${hasFeatureMedia ? ' feature-page' : ''}`}
+    >
       <header className="acquisition-hero">
         <div className="page-width acquisition-hero-grid">
           <div className="acquisition-copy">
@@ -39,23 +45,31 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
             )}
             <div className="acquisition-actions">
               <WaitlistButton />
-              <a className="acquisition-text-link" href="/tour/">
-                <Play size={14} fill="currentColor" /> Watch the app
+              <a
+                className="acquisition-text-link"
+                href={hasFeatureMedia ? '#feature-preview' : '/tour/'}
+              >
+                <Play size={14} fill="currentColor" />{' '}
+                {hasFeatureMedia ? 'See it in Jackalope' : 'Watch the app'}
               </a>
             </div>
           </div>
-          <div className="acquisition-proof">
-            <div className="acquisition-proof-label">
-              <span>Jackalope workspace</span>
-              <span>Atlas sample project</span>
+          {hasFeatureMedia ? (
+            <FeatureMedia key={page.path} path={page.path} dark={dark} />
+          ) : (
+            <div className="acquisition-proof">
+              <div className="acquisition-proof-label">
+                <span>Jackalope workspace</span>
+                <span>Atlas sample project</span>
+              </div>
+              <img
+                src={`/media/${page.image}${dark ? '' : '-light'}.png`}
+                width="1440"
+                height="840"
+                alt={`Jackalope ${page.image} interface with fictional Atlas project data`}
+              />
             </div>
-            <img
-              src={`/media/${page.image}${dark ? '' : '-light'}.png`}
-              width="1440"
-              height="840"
-              alt={`Jackalope ${page.image} interface with fictional Atlas project data`}
-            />
-          </div>
+          )}
         </div>
         <section className="page-width acquisition-signals" aria-label="Key capabilities">
           {page.signals.map((signal, index) => (

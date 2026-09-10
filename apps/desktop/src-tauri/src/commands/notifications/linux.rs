@@ -14,7 +14,7 @@ pub async fn show(
             .appname("Jackalope")
             .summary("Jackalope")
             .body(title)
-            .icon("Jackalope")
+            .icon(env!("CARGO_PKG_NAME"))
             .hint(Hint::DesktopEntry("Jackalope".into()))
             .hint(Hint::SuppressSound(true))
             .action("default", "Open Jackalope")

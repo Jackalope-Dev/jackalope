@@ -1,5 +1,18 @@
 [
   {
+    "id": "more-at-home-on-every-desktop",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "More at home on every desktop.",
+    "description": "Task notifications, accounts, and background cleanup now cover more of the macOS and Linux experience.",
+    "items": [
+      "Open the matching task from native macOS and Linux notifications.",
+      "Account connections and settings sync are enabled across platforms.",
+      "Unix task groups gain crash cleanup, with better Linux tray and macOS Dock recovery."
+    ],
+    "note": "Desktop-control backends and installed-platform acceptance are still in progress."
+  },
+  {
     "id": "preparing-for-more-desktops",
     "date": "2026-09-10",
     "status": "In development",

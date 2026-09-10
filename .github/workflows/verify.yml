@@ -65,7 +65,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev libdbus-1-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev libdbus-1-dev patchelf gnome-keyring
       - run: pnpm install --frozen-lockfile
       - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
       - run: rustup override set 1.98.1
@@ -81,9 +81,19 @@ jobs:
       - run: pnpm verify
       - name: Exercise bundled browser
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features real_agent_browser_ -- --ignored --test-threads=1
-      - name: Build unsigned macOS trial bundle
+      - name: Exercise isolated Linux credential storage
+        if: runner.os == 'Linux'
+        run: bash scripts/verification/linux-keyring.sh
+      - name: Build macOS trial bundle
         if: runner.os == 'macOS'
         run: pnpm tauri build --bundles app
+      - name: Ad-hoc sign macOS trial for local permission checks
+        if: runner.os == 'macOS'
+        run: |
+          bundle=apps/desktop/src-tauri/target/release/bundle/macos/Jackalope.app
+          codesign --force --sign - "$bundle/Contents/Resources/resources/agent-browser/agent-browser"
+          codesign --force --deep --sign - "$bundle"
+          codesign --verify --deep --strict "$bundle"
       - name: Build Linux trial package
         if: runner.os == 'Linux'
         run: pnpm tauri build --bundles deb

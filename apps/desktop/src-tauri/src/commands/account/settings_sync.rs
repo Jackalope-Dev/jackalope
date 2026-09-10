@@ -122,7 +122,7 @@ pub async fn app_settings_sync(
     };
     let mut saved = state.read()?;
     if saved.as_ref().is_none_or(|r| r.email.is_none()) {
-        view.available = cfg!(windows) && endpoints(&app).is_ok();
+        view.available = endpoints(&app).is_ok();
         if view.available {
             view.enabled = read_choice(&state)?.enabled;
         }

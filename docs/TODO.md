@@ -60,8 +60,8 @@ release dates.
 - [ ] Check navigation, forms, clipboard recovery and media in Safari and touch
   browsers, including keyboard focus and reduced motion.
 - [ ] Verify captions, playback and failure recovery for the product tour and
-  knowledgebase clips across supported browsers. Keep sample footage aligned
-  with the current interface; see [media guidance](KNOWLEDGE-MEDIA.md).
+  feature-page and knowledgebase clips across supported browsers. Keep sample
+  footage aligned with the current interface; see [media guidance](KNOWLEDGE-MEDIA.md).
 - [ ] Keep public guides, comparison sources and discovery output accurate.
 - [ ] Run route, metadata, header and link checks against deployed builds, including
   the footer's Reddit community link. Recheck live destinations with
@@ -74,7 +74,11 @@ release dates.
   discovery, process/PTY/browser behavior and trial packaging.
 - [ ] Implement guarded macOS desktop control and Linux X11/Wayland backends;
   preserve window grants, visible state, physical-input pause and revocation.
-- [ ] Validate native notifications and add macOS/Linux click-to-task routing.
+- [ ] Validate macOS/Linux notification clicks, permission denial, tray-host loss
+  and macOS Dock reopening in installed builds.
+- [ ] Prioritize Ubuntu/GNOME Wayland acceptance, retaining X11 coverage. Resolve
+  the desktop-control permission and physical-interruption contract for Wayland
+  before exposing native input there.
 - [ ] Validate signed installation, older-to-newer updates, real execution and
   saved-data recovery on each intended platform before enabling its download.
 - [ ] Check approved, pending, revoked and offline-expired accounts in official

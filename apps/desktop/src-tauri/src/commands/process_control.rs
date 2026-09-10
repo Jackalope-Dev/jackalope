@@ -116,7 +116,7 @@ impl ProcessTree {
 #[cfg(unix)]
 pub struct ProcessTree {
     group: i32,
-    terminated: std::sync::atomic::AtomicBool,
+    guardian: std::sync::Mutex<Option<Child>>,
 }
 
 #[cfg(unix)]
@@ -136,20 +136,49 @@ impl ProcessTree {
         {
             return Err("The child does not own an isolated process group.".into());
         }
+        use std::os::unix::process::CommandExt;
+        // This separate process observes EOF even if Jackalope is killed without running Drop.
+        // CLOEXEC on the parent's pipe prevents agent grandchildren from keeping it alive.
+        let guardian = Command::new("/bin/sh")
+            .args([
+                "-c",
+                "IFS= read -r ignored; kill -9 \"-$1\"",
+                "jackalope-process-guardian",
+                &group.to_string(),
+            ])
+            .env_clear()
+            .current_dir("/")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .map_err(|e| format!("Cannot watch the task process group: {e}"))?;
         Ok(Self {
             group,
-            terminated: std::sync::atomic::AtomicBool::new(false),
+            guardian: std::sync::Mutex::new(Some(guardian)),
         })
     }
     pub fn terminate(&self) {
-        if !self
-            .terminated
-            .swap(true, std::sync::atomic::Ordering::SeqCst)
-        {
-            unsafe {
-                libc::kill(-self.group, libc::SIGKILL);
+        let Some(mut guardian) = self.guardian.lock().unwrap().take() else {
+            return;
+        };
+        drop(guardian.stdin.take());
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match guardian.try_wait() {
+                Ok(Some(status)) if status.success() => return,
+                Ok(None) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(5))
+                }
+                _ => break,
             }
         }
+        unsafe {
+            libc::kill(-self.group, libc::SIGKILL);
+        }
+        let _ = guardian.kill();
+        let _ = guardian.wait();
     }
 }
 
@@ -296,5 +325,64 @@ mod tests {
     fn cannot_attach_to_own_process_group() {
         assert!(ProcessTree::attach_pid(unsafe { libc::getpgrp() } as u32).is_err());
         assert!(ProcessTree::attach_pid(0).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn guardian_crash_fixture() {
+        if std::env::var("JACKALOPE_GUARDIAN_FIXTURE").as_deref() != Ok("1") {
+            return;
+        }
+        use std::{io::Write, os::unix::process::CommandExt};
+        let child = Command::new("/bin/sh")
+            .args(["-c", "sleep 30 & wait"])
+            .process_group(0)
+            .spawn()
+            .unwrap();
+        let _tree = ProcessTree::attach(&child).unwrap();
+        println!("guardian-ready");
+        std::io::stdout().flush().unwrap();
+        std::thread::sleep(Duration::from_secs(30));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn abrupt_owner_death_closes_grandchild_pipes() {
+        let mut owner = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "commands::process_control::tests::guardian_crash_fixture",
+                "--nocapture",
+            ])
+            .env("JACKALOPE_GUARDIAN_FIXTURE", "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let stdout = owner.stdout.take().unwrap();
+        let reader = std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stdout).lines() {
+                if line.unwrap() == "guardian-ready" {
+                    sender.send(false).unwrap();
+                }
+            }
+            let _ = sender.send(true);
+        });
+        let ready = receiver.recv_timeout(Duration::from_secs(10));
+        let _ = owner.kill();
+        let _ = owner.wait();
+        assert_eq!(
+            ready,
+            Ok(false),
+            "fixture did not attach its process guardian"
+        );
+        assert_eq!(
+            receiver.recv_timeout(Duration::from_secs(5)),
+            Ok(true),
+            "grandchildren retained the output pipe after their owner was killed"
+        );
+        reader.join().unwrap();
     }
 }

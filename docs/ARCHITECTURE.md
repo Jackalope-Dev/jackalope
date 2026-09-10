@@ -62,7 +62,8 @@ names; changes must preserve both sides and old saved records.
 | integration.rs | Captured source snapshots, review receipts and guarded fast-forward application |
 | git.rs, git_command.rs, worktree_cleanup.rs | Worktree operations and explicit Git environment policies |
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |
-| process_control.rs, pty.rs | Owned process trees and separate tested PTY primitives |
+| process_control.rs, pty.rs | Owned process trees, Unix pipe-based crash guardians and separate tested PTY primitives |
+| notifications.rs, notifications/, window_behavior.rs | Native task notification activation, bounded listeners, tray-host availability and Dock reopening |
 | agent_policy.rs, agent_profiles.rs, capacity/ | Allowlists, profile binding/sign-in and capacity |
 | mcp.rs, mcp_broker.rs, coordination_mcp.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped tools/questions |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |

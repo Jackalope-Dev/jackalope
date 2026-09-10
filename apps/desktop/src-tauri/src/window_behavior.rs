@@ -114,7 +114,7 @@ pub fn desktop_set_close_to_tray(
     behavior.save(enabled)
 }
 
-fn show_main_window(app: &tauri::AppHandle) {
+pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
@@ -129,7 +129,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let mut tray = TrayIconBuilder::with_id("jackalope")
         .tooltip("Jackalope")
         .menu(&menu)
-        .show_menu_on_left_click(false)
+        .show_menu_on_left_click(cfg!(target_os = "linux"))
         .on_menu_event(|app, event| match event.id.as_ref() {
             "tray-open" => show_main_window(app),
             "tray-quit" => app.exit(0),
@@ -151,10 +151,48 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
+    #[cfg(not(target_os = "linux"))]
     app.state::<WindowBehavior>()
         .tray_available
         .store(true, Ordering::Relaxed);
+    #[cfg(target_os = "linux")]
+    watch_tray_host(app.handle().clone());
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn watch_tray_host(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let available = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                let connection = zbus::Connection::session().await?;
+                let watcher = zbus::Proxy::new(
+                    &connection,
+                    "org.kde.StatusNotifierWatcher",
+                    "/StatusNotifierWatcher",
+                    "org.kde.StatusNotifierWatcher",
+                )
+                .await?;
+                watcher
+                    .get_property::<bool>("IsStatusNotifierHostRegistered")
+                    .await
+            })
+            .await
+            .is_ok_and(|result: zbus::Result<bool>| result.unwrap_or(false));
+            let was_available = app
+                .state::<WindowBehavior>()
+                .tray_available
+                .swap(available, Ordering::Relaxed);
+            if was_available && !available {
+                if let Some(window) = app.get_webview_window("main") {
+                    if !window.is_visible().unwrap_or(true) {
+                        show_main_window(&app);
+                    }
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+    });
 }
 
 #[cfg(test)]

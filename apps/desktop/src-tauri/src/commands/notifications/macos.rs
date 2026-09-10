@@ -57,7 +57,7 @@ define_class!(
             let id = response.notification().request().identifier().to_string();
             if let Some(sender) = pending().lock().unwrap().remove(&id) {
                 let clicked = unsafe {
-                    response.actionIdentifier().as_ref() == UNNotificationDefaultActionIdentifier
+                    &*response.actionIdentifier() == UNNotificationDefaultActionIdentifier
                 };
                 let _ = sender.send(clicked);
             }

@@ -23,8 +23,10 @@ large-project performance in installed builds. Complete signing, installation,
 updates and secure storage for each intended platform. Optional account services,
 settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
-hardening are implemented for native testing. macOS/Linux desktop-control backends,
-notification activation and signed release acceptance remain in progress.
+hardening are implemented for native testing, including notification activation,
+account/settings sync, Unix process guardians and tray/Dock recovery. macOS/Linux
+desktop-control backends and signed release acceptance remain in progress, with
+Ubuntu/GNOME Wayland the first Linux acceptance target and X11 compatibility retained.
 
 ## Up next: broader workflows
 

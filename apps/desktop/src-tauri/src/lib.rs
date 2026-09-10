@@ -216,6 +216,10 @@ pub fn run() {
         .build(context)
         .expect("error while building jackalope application")
         .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::RunEvent::Reopen { has_visible_windows: false, .. }) {
+                window_behavior::show_main_window(app);
+            }
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
                 app.state::<commands::helper::Helper>().stop();
                 app.state::<Scheduler>().shutdown();

@@ -55,7 +55,7 @@ export const roadmapStages = [
         title: 'Ready for your everyday machine.',
         summary: 'Installation, updates, and recovery of saved work.',
         detail:
-          'We’re preparing for macOS, Windows, and Linux, with improvements to agent detection, browsers, secure account storage, and process cleanup ready for native testing. Desktop control still needs macOS and Linux support. Signed installation and upgrades need acceptance on each platform; public downloads are not open yet.',
+          'We’re preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Desktop control still needs macOS and Linux support. Signed installation and upgrades need acceptance on each platform; public downloads are not open yet.',
       },
       {
         title: 'The small things that earn trust.',

@@ -296,7 +296,7 @@ impl AccountService {
     }
 
     async fn refresh_locked(&self, app: &AppHandle) -> Result<AccountStatus, String> {
-        if !cfg!(windows) || endpoints(app).is_err() {
+        if endpoints(app).is_err() {
             self.access.revoke();
             return Ok(status("unavailable", None));
         }
