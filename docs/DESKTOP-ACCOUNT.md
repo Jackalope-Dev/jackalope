@@ -1,7 +1,7 @@
 # Desktop account connection
 
 Settings → Jackalope account connects an approved early-access membership to this
-Windows desktop. Store preview and installer beta builds require an approved
+desktop. Store preview and installer beta builds require an approved
 account for new native tasks and terminals, with a bounded 72-hour offline lease.
 Saved work and running tasks remain accessible. Developer builds keep optional
 connection. See [STORE-RELEASE.md](STORE-RELEASE.md) for enforcement and distribution.
@@ -47,8 +47,9 @@ Microsoft Store audience membership.
   user. It contains the pending or connected credential, service binding and account
   metadata. The renderer receives only display status; exports, agent configuration
   and diagnostics do not include this record. There is no plaintext fallback.
-  Other operating systems show the feature as unavailable until secure storage is
-  implemented and accepted there. Reset removes the local record; use website
+  macOS Keychain and Linux Secret Service store credentials behind opaque local
+  references; locked/unavailable stores fail without plaintext fallback. Native
+  acceptance remains required. Reset removes local records and keyring secrets; use website
   revocation to remove the corresponding server credential.
 - Credentials are bound to the embedded API origin. Native requests have bounded
   bodies and timeouts and do not follow redirects. No tokens enter URLs to the API,

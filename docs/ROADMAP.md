@@ -22,6 +22,9 @@ Validate first-run setup, agent sign-in and switching, recovery, accessibility a
 large-project performance in installed builds. Complete signing, installation,
 updates and secure storage for each intended platform. Optional account services,
 settings sync, feedback and delivery need their own acceptance checks.
+Cross-platform discovery, browser, process cleanup, credential storage and notification
+hardening are implemented for native testing. macOS/Linux desktop-control backends,
+notification activation and signed release acceptance remain in progress.
 
 ## Up next: broader workflows
 

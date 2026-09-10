@@ -146,7 +146,9 @@ eligibility and scoped website replies through the existing inbox/outbox. Anonym
 telemetry remains separate. See [feedback invitations](FEEDBACK-INVITATIONS.md).
 Shared brand/tokens exports pure theme calculation for browser and Worker rendering.
 Native commands/account.rs owns optional early-access account connection; its
-credential is encrypted by account_storage.rs with Windows DPAPI. Worker access/devices.ts
+credential is protected by account_storage.rs with Windows DPAPI or a macOS Keychain /
+Linux Secret Service reference. platform.rs initializes the Unix GUI login PATH before
+runtime threads start; children inherit the discovery environment. Worker access/devices.ts
 owns approval, hashed credentials and revocation; the website owns explicit browser
 approval, device management and email invitation entry. The Worker derives bounded
 referral milestones from member/download/device state; the desktop account command

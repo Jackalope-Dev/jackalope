@@ -70,7 +70,11 @@ release dates.
 
 ## Platform releases
 
-- [ ] Complete macOS/Linux secure storage, process/PTY/browser behavior and packaging.
+- [ ] Run native CI and accept macOS/Linux credential storage, GUI-launched CLI
+  discovery, process/PTY/browser behavior and trial packaging.
+- [ ] Implement guarded macOS desktop control and Linux X11/Wayland backends;
+  preserve window grants, visible state, physical-input pause and revocation.
+- [ ] Validate native notifications and add macOS/Linux click-to-task routing.
 - [ ] Validate signed installation, older-to-newer updates, real execution and
   saved-data recovery on each intended platform before enabling its download.
 - [ ] Check approved, pending, revoked and offline-expired accounts in official

@@ -24,6 +24,8 @@ Use Node 24.18 or later within Node 24, pnpm 10.11.0 (pinned in package.json),
 and Rust 1.98.1 with rustfmt. CI tests that Rust toolchain; update its workflow
 and this guide together when raising the baseline. The crate declares Rust 1.98.
 Windows native development also needs the MSVC C++ build tools and WebView2.
+macOS needs Xcode command-line tools; Linux needs Tauri's WebKitGTK/system packages
+and `libdbus-1-dev`. See the [platform prerequisites and device checks](docs/CROSS-PLATFORM-RELEASES.md#native-checks-on-your-devices).
 Git and an installed, signed-in supported agent CLI are needed to run real tasks.
 
 ```powershell

@@ -55,7 +55,7 @@ export const roadmapStages = [
         title: 'Ready for your everyday machine.',
         summary: 'Installation, updates, and recovery of saved work.',
         detail:
-          'Signed installation, upgrades, secure account storage, and process lifecycle need acceptance on each intended platform. We’re preparing for macOS, Windows, and Linux; availability will follow validation. Public downloads are not open yet.',
+          'We’re preparing for macOS, Windows, and Linux, with improvements to agent detection, browsers, secure account storage, and process cleanup ready for native testing. Desktop control still needs macOS and Linux support. Signed installation and upgrades need acceptance on each platform; public downloads are not open yet.',
       },
       {
         title: 'The small things that earn trust.',

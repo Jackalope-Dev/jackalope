@@ -99,7 +99,9 @@ function collectNotices(packages, requireNotice = false) {
         !/^(?:licen[sc]e|copying|notice|unlicense)(?:[.-]|$)/i.test(entry.name)
       )
         continue;
-      const text = readFileSync(path.join(item.directory, entry.name), 'utf8').trim();
+      const text = readFileSync(path.join(item.directory, entry.name), 'utf8')
+        .replace(/[ \t]+$/gm, '')
+        .trim();
       if (!text) continue;
       found = true;
       const owners = notices.get(text) ?? new Set();

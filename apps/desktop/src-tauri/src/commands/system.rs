@@ -22,7 +22,9 @@ pub async fn system_get_info() -> Result<SystemInfo, String> {
         command.arg("--version");
         super::process_control::run(command, std::time::Duration::from_secs(5))
             .is_ok_and(|output| output.success)
-    }).await.map_err(|e| e.to_string())?;
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     Ok(SystemInfo {
         os: std::env::consts::OS.to_string(),

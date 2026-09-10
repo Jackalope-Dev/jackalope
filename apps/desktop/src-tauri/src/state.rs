@@ -14,8 +14,15 @@ pub struct PtySession {
 
 impl PtySession {
     pub fn stop(&mut self) -> std::io::Result<()> {
-        if let Some(tree) = &self.tree { tree.terminate(); }
-        self.child.kill()?;
+        if let Some(tree) = &self.tree {
+            tree.terminate();
+        }
+        if self.child.try_wait()?.is_none() {
+            let killed = self.child.kill();
+            if killed.is_err() && self.child.try_wait()?.is_none() {
+                killed?;
+            }
+        }
         self.child.wait()?;
         Ok(())
     }

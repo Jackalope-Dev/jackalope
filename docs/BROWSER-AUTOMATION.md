@@ -2,7 +2,7 @@
 
 Jackalope bundles [agent-browser 0.37.1](https://github.com/vercel-labs/agent-browser/tree/v0.37.1)
 as its local browser engine. It replaces headless_chrome and launches installed
-Edge or Chrome in a fresh task profile. Users do not need npm, Node, a Vercel
+Edge, Chrome or Chromium in a fresh task profile. Users do not need npm, Node, a Vercel
 account, a browser service subscription or a separate agent-browser installation.
 
 ## Agent capabilities

@@ -130,14 +130,25 @@ impl ProcessTree {
             return Err("Cannot contain the application's own process group.".into());
         }
         let actual = unsafe { libc::getpgid(group) };
-        if actual != group && !(actual == -1 && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)) {
+        if actual != group
+            && !(actual == -1
+                && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH))
+        {
             return Err("The child does not own an isolated process group.".into());
         }
-        Ok(Self { group, terminated: std::sync::atomic::AtomicBool::new(false) })
+        Ok(Self {
+            group,
+            terminated: std::sync::atomic::AtomicBool::new(false),
+        })
     }
     pub fn terminate(&self) {
-        if !self.terminated.swap(true, std::sync::atomic::Ordering::SeqCst) {
-            unsafe { libc::kill(-self.group, libc::SIGKILL); }
+        if !self
+            .terminated
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            unsafe {
+                libc::kill(-self.group, libc::SIGKILL);
+            }
         }
     }
 }

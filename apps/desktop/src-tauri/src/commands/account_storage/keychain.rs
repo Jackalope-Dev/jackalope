@@ -1,7 +1,10 @@
-use std::{path::Path, sync::Mutex};
+use std::path::Path;
+#[cfg(unix)]
+use std::sync::Mutex;
 
 const PREFIX: &str = "jackalope-keyring-v1:";
 const SERVICE: &str = "dev.jackalope.desktop";
+#[cfg(unix)]
 static STORAGE: Mutex<()> = Mutex::new(());
 
 fn unavailable(_: keyring::Error) -> String {
@@ -13,6 +16,7 @@ fn unavailable(_: keyring::Error) -> String {
     }
 }
 
+#[cfg(unix)]
 fn record(path: &Path) -> Result<Option<Vec<u8>>, String> {
     match std::fs::File::open(path) {
         Ok(file) => {
@@ -40,6 +44,7 @@ fn identifier(bytes: &[u8]) -> Result<&str, String> {
     Ok(value)
 }
 
+#[cfg(unix)]
 pub(in crate::commands) fn read(path: &Path) -> Result<Option<Vec<u8>>, String> {
     let _guard = STORAGE
         .lock()
@@ -55,6 +60,7 @@ pub(in crate::commands) fn read(path: &Path) -> Result<Option<Vec<u8>>, String> 
     Ok(Some(secret))
 }
 
+#[cfg(unix)]
 pub(in crate::commands) fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let _guard = STORAGE
         .lock()
@@ -90,6 +96,7 @@ fn save_record(
     Ok(())
 }
 
+#[cfg(unix)]
 pub(in crate::commands) fn remove(path: &Path) -> Result<(), String> {
     let _guard = STORAGE
         .lock()
@@ -145,7 +152,8 @@ mod tests {
     #[test]
     #[ignore = "Requires an unlocked native Keychain or Secret Service in the current desktop session"]
     fn native_keyring_round_trip_update_and_delete() {
-        let directory = std::env::temp_dir().join(format!("jl-keyring-live-{}", uuid::Uuid::new_v4()));
+        let directory =
+            std::env::temp_dir().join(format!("jl-keyring-live-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).unwrap();
         let path = directory.join("account.bin");
         assert!(read(&path).unwrap().is_none());

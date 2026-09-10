@@ -79,7 +79,10 @@ fn remove_entry(path: &Path) -> Result<(), String> {
         }
         std::fs::remove_dir(path)
     } else {
-        if path.file_name().is_some_and(|name| name == "account.bin" || name == "api-key.bin") {
+        if path
+            .file_name()
+            .is_some_and(|name| name == "account.bin" || name == "api-key.bin")
+        {
             return super::account_storage::remove(path);
         }
         std::fs::remove_file(path)

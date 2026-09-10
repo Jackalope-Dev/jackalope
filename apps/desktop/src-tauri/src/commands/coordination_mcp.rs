@@ -26,10 +26,18 @@ struct CoordinationTools {
 }
 
 impl CoordinationTools {
+    fn platform_router() -> ToolRouter<Self> {
+        let mut router = Self::tool_router();
+        if !cfg!(windows) {
+            router.remove_route("desktop_control");
+        }
+        router
+    }
+
     fn new(service: Coordinator) -> Self {
         Self {
             service,
-            tool_router: Self::tool_router(),
+            tool_router: Self::platform_router(),
         }
     }
 }
@@ -622,7 +630,7 @@ mod tests {
 
     #[test]
     fn exposes_project_message_and_harness_tools() {
-        let router = CoordinationTools::tool_router();
+        let router = CoordinationTools::platform_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
         assert!(names.contains(&"inbox"));
@@ -643,7 +651,7 @@ mod tests {
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
         assert!(names.contains(&"computer_verify"));
-        assert!(names.contains(&"desktop_control"));
+        assert_eq!(names.contains(&"desktop_control"), cfg!(windows));
         for name in [
             "ask_user",
             "record_validation_step",

@@ -1,5 +1,17 @@
 [
   {
+    "id": "preparing-for-more-desktops",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Preparing for more desktops.",
+    "description": "Cross-platform foundations are ready for native testing on macOS and Linux.",
+    "items": [
+      "Improved agent and browser detection, terminal cleanup, secure account storage, and notifications.",
+      "Added native CI checks and trial packages for Linux and Intel and Apple Silicon Macs."
+    ],
+    "note": "Desktop control still requires macOS and Linux backends. Signed releases and installed-device acceptance remain in progress."
+  },
+  {
     "id": "project-lessons-grounded-in-your-work",
     "date": "2026-09-09",
     "status": "In development",

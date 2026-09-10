@@ -59,8 +59,11 @@ pub async fn pty_spawn(
     // reading the master side actually reaches EOF once the child exits.
     drop(pair.slave);
 
-    let tree = match child.process_id().ok_or("Terminal process has no identity".into())
-        .and_then(super::process_control::ProcessTree::attach_pid) {
+    let tree = match child
+        .process_id()
+        .ok_or("Terminal process has no identity".into())
+        .and_then(super::process_control::ProcessTree::attach_pid)
+    {
         Ok(tree) => tree,
         Err(error) => {
             let _ = child.kill();
@@ -104,10 +107,16 @@ pub async fn pty_spawn(
     let monitor_id = session_id.clone();
     std::thread::spawn(move || loop {
         let state = monitor_app.state::<AppState>();
-        let Ok(mut sessions) = state.pty_sessions.lock() else { break };
-        let Some(session) = sessions.get_mut(&monitor_id) else { break };
+        let Ok(mut sessions) = state.pty_sessions.lock() else {
+            break;
+        };
+        let Some(session) = sessions.get_mut(&monitor_id) else {
+            break;
+        };
         if session.child.try_wait().ok().flatten().is_some() {
-            if let Some(tree) = &session.tree { tree.terminate(); }
+            if let Some(tree) = &session.tree {
+                tree.terminate();
+            }
             break;
         }
         drop(sessions);
@@ -160,17 +169,22 @@ pub async fn pty_spawn(
         // status. The child handle lives in the shared session map (moved
         // there by `pty_spawn` above), so reach it via the app handle
         // instead of trying to smuggle it into this closure directly.
-        let exit_code =
-            app.state::<AppState>()
-                .pty_sessions
-                .lock()
-                .ok()
-                .and_then(|mut sessions| {
-                    sessions
-                        .get_mut(&event_session_id)
-                        .and_then(|session| session.child.wait().ok())
-                        .map(|status| status.exit_code())
-                });
+        let exit_code = loop {
+            let state = app.state::<AppState>();
+            let Ok(mut sessions) = state.pty_sessions.lock() else {
+                break None;
+            };
+            let Some(session) = sessions.get_mut(&event_session_id) else {
+                break None;
+            };
+            match session.child.try_wait() {
+                Ok(Some(status)) => break Some(status.exit_code()),
+                Err(_) => break None,
+                Ok(None) => (),
+            }
+            drop(sessions);
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        };
         app.state::<AppState>()
             .pty_sessions
             .lock()

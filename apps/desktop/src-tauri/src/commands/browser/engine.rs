@@ -240,13 +240,15 @@ fn create_session_directory() -> Result<PathBuf, String> {
     #[cfg(windows)]
     let root = std::env::temp_dir();
     let directory = root.join(format!("jl-{}", uuid::Uuid::new_v4().simple()));
-    let mut builder = std::fs::DirBuilder::new();
+    let builder = std::fs::DirBuilder::new();
     #[cfg(unix)]
-    {
+    let builder = {
         use std::os::unix::fs::DirBuilderExt;
+        let mut builder = builder;
         // macOS TMPDIR can exceed the Unix socket path limit. Keep the socket short and private.
         builder.mode(0o700);
-    }
+        builder
+    };
     builder.create(&directory).map_err(|e| e.to_string())?;
     Ok(directory)
 }
