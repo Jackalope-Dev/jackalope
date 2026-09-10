@@ -26,6 +26,11 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Extend matched prompt/tool [quality trials](AGENT-QUALITY.md) to direct-CLI
+  baselines, representative repositories and multiple providers with independent
+  review. Keep failures and missing usage visible; evaluate effort controls and
+  learned routing on held-out tasks before enabling them.
+
 - [ ] Compare repeated single, serial and staged evaluations with matched provider/model
   budgets and independent human review. Validate feature snapshot recovery, shared
   verification reservations, structured reports and bounded inbox waits in installed builds.

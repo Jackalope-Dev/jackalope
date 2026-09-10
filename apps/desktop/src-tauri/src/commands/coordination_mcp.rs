@@ -582,7 +582,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Execute the saved project verification command with a five-minute timeout in the task working directory (e.g. 'pnpm' with ['test'] or 'cargo' with ['test']). Returns exit code, stdout, and stderr.",
+        description = "Execute only the saved project verification command with a five-minute timeout in the task directory. Returns exit code, stdout and stderr. Long successful output may omit passing-test lines; use verification_output with check_id to read stored output. Failures remain intact within capture limits.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn computer_verify(
@@ -597,6 +597,25 @@ impl CoordinationTools {
             .map_err(bridge_error)?;
         super::verification::agent_verify(self.service.runtime.clone(), run, input)
             .await
+            .map(CallToolResult::structured)
+            .map_err(|e| ErrorData::invalid_request(e, None))
+    }
+
+    #[tool(
+        description = "Read this attempt's latest stored verification stdout or stderr using check_id from computer_verify. offset and limit count Unicode characters; follow next_offset for more. Does not rerun the command.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn verification_output(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::verification::output::OutputRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        super::verification::output::read(run.verification.as_ref(), input)
             .map(CallToolResult::structured)
             .map_err(|e| ErrorData::invalid_request(e, None))
     }

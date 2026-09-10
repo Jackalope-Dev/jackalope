@@ -22,6 +22,9 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   implemented; measured quality improvements and installed acceptance remain open. See
   [execution evaluation](EXECUTION-EVALUATION.md).
 - Project guidance, editable lessons, codebase maps and task outcome insights.
+- More selective automatic guidelines, compact tool guidance and retrievable
+  verification output, with independent before/after [quality trials](AGENT-QUALITY.md).
+  These checks do not establish broad provider or GUI superiority.
 - Recurring schedules and local monitors that act on committed content changes.
 - MCP connections, task-owned browser sessions and Windows desktop-control grants.
 - Ask Jackalope documentation answers and reviewed local actions, with a focused

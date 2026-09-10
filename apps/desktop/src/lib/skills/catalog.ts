@@ -38,13 +38,13 @@ export const VETTED_SKILLS: SkillDefinition[] = [
     shortLabel: 'Debug & Triage',
     iconName: 'Bug',
     description:
-      'Root-cause analysis requiring a minimal reproduction test before modifying production code.',
+      'Reproduce behavioral defects, identify their cause, and verify the relevant behavior.',
     category: 'debugging',
     triggers: [
       /\b(fix|bug|broken|crash|error|exception|fails?|failing|hang|regression|reproduce|trace|issue)\b/i,
     ],
     guidelines: [
-      'Write a minimal failing reproduction test or script before touching production code.',
+      'Reproduce behavioral defects with a focused failing check when practical. Respect explicit testing constraints; verify copy-only changes through their diff.',
       'Trace the exact call path and inspect state; do not apply superficial patches or guess root causes.',
       'Touch only code directly relevant to the issue. Preserve adjacent logic, comments, and formatting.',
       'Verify that the reproduction test passes and all existing regression tests remain clean.',
@@ -117,7 +117,8 @@ export const VETTED_SKILLS: SkillDefinition[] = [
       'OWASP-aligned inspection preventing secret leaks, injection, and path traversal vulnerabilities.',
     category: 'security',
     triggers: [
-      /\b(security|audit|vulnerabilit(?:y|ies)|cve|sanitize|auth(?:entication|orization)?|jwt|tokens?|secrets?|permissions?|credentials?|passwords?)\b/i,
+      /\b(security|audit|vulnerabilit(?:y|ies)|cve|sanitize|auth(?:entication|orization)?|jwt|secrets?|permissions?|credentials?|passwords?)\b/i,
+      /\b(?:access|refresh|session|bearer|oauth|api)[ -]tokens?\b|\btokens?\s+(?:expir\w*|validat\w*|revoc\w*)\b/i,
     ],
     guidelines: [
       'Never log, persist, or commit API keys, auth tokens, passwords, or sensitive credentials.',
@@ -210,8 +211,28 @@ export const VETTED_SKILLS: SkillDefinition[] = [
  */
 export function detectSkillsFromPrompt(prompt: string): SkillDefinition[] {
   if (!prompt?.trim()) return [];
-  const normalized = prompt.trim();
-  return VETTED_SKILLS.filter((skill) => skill.triggers.some((regex) => regex.test(normalized)));
+  const clauses = prompt
+    .replace(/```[\s\S]*?```/g, '')
+    .split(/[.;\n]|\b(?:but|however)\b|(?=\bwithout\b)/i)
+    .map((clause) => clause.trim())
+    .filter(
+      (clause) =>
+        clause &&
+        !/\b(?:do not|don['’]t|must not|never|avoid|no (?:new |need to )?|skip|without)\b/i.test(
+          clause,
+        ),
+    );
+  return VETTED_SKILLS.filter((skill) =>
+    clauses.some((clause) => {
+      if (
+        skill.id === 'systematic-debugging' &&
+        /\b(?:typos?|spelling|punctuation)\b/i.test(clause) &&
+        !/\b(?:crash|regression|exception|runtime|race|logic)\b/i.test(clause)
+      )
+        return false;
+      return skill.triggers.some((regex) => regex.test(clause));
+    }),
+  );
 }
 
 /**

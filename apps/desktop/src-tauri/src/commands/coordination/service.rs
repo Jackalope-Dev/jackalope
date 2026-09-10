@@ -336,6 +336,8 @@ impl Coordinator {
                     service.inner.lock().unwrap().url =
                         Some(format!("http://{}", listener.local_addr().unwrap()));
                     let router = Router::new()
+                        .route("/v1/help", get(bridge_help))
+                        .route("/v1/computer/output", post(bridge_verification_output))
                         .route("/v1/project", get(bridge_project))
                         .route("/v1/tools/search", post(bridge_tool_search))
                         .route("/v1/tools/execute", post(bridge_tool_execute))

@@ -53,7 +53,7 @@ export function SystemInfoView() {
       <WorkspaceHeading
         title="Devices"
         action={
-          <Button variant="outline" disabled={!desktop || loading} onClick={() => void load()}>
+          <Button variant="outline" disabled={!desktop || loading || requestingPermissions} onClick={() => void load()}>
             <RefreshCw size={16} />
             {loading ? 'Reading…' : 'Refresh device'}
           </Button>
@@ -83,7 +83,7 @@ export function SystemInfoView() {
                     <Button
                       className="mt-3"
                       variant="outline"
-                      disabled={requestingPermissions}
+                      disabled={requestingPermissions || loading}
                       onClick={() => void requestPermissions()}
                     >
                       {requestingPermissions ? 'Checking permissions…' : 'Set up macOS permissions'}

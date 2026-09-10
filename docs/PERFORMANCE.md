@@ -22,6 +22,11 @@ The original read measurement only cloned records; the replacement also construc
 summaries and sorts them. Total assets include lazy chunks, not just startup code.
 Recheck numbers against the current checkout before treating them as a release baseline.
 
+A later rerun during other compilation and native-test work measured 5.56 ms for
+summaries, 3,308 ms for the 400 output saves and 394 ms for reload. This was not a
+paired comparison under equal machine load. Save throughput varies substantially;
+the first-pass result does not establish a consistent gain under CPU or disk contention.
+
 Run the native fixture with:
 
 ```powershell

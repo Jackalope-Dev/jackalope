@@ -61,7 +61,7 @@ export const roadmapStages = [
         title: 'The small things that earn trust.',
         summary: 'Keyboard access, performance, and feedback from early users.',
         detail:
-          'Task updates, history loading, and rich rendering have local performance improvements. Installed startup, memory, accessibility, saved-data recovery, and external beta trials remain release work. Required account access in every build, optional settings sync, and feedback flows also need installed-app and delivery checks before wider use.',
+          'Task updates, history loading, and rich rendering have local performance improvements. Focused task guidance and compact verification results are implemented, with comparisons of correctness and total usage underway. Installed startup, memory, accessibility, saved-data recovery, and external beta trials remain release work. Required account access in every build, optional settings sync, and feedback flows also need installed-app and delivery checks before wider use.',
       },
     ],
   },

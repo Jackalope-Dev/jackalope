@@ -90,3 +90,26 @@ test('saved manual and legacy selections stay explicit, including an empty selec
   assert.equal(draft.prompt, 'Previously saved custom instructions and guidelines');
   assert.deepEqual(draft.skills, []);
 });
+
+test('legacy generated ideas migrate without nesting while edited instructions stay intact', () => {
+  const rawPrompt = 'Fix the runtime crash';
+  const refinedPrompt = assemblePrompt({
+    rawPrompt,
+    selectedSkillIds: ['systematic-debugging'],
+    executionMode: 'isolated',
+    version: 1,
+  }).assembledPrompt;
+  assert.ok(refinedPrompt.includes('Write a minimal failing reproduction'));
+  const task = {
+    rawPrompt,
+    refinedPrompt,
+    clarifications: [
+      { question: 'Task guideline selection', answer: 'Automatic' },
+      { question: 'Active Skill Guidelines', answer: 'Systematic Debugging & Triage' },
+    ],
+  };
+  assert.equal(planningDraft(task).prompt, rawPrompt);
+  assert.equal(planningDraft(task).skills, undefined);
+  const edited = `${refinedPrompt}\nPreserve this additional requirement.`;
+  assert.equal(planningDraft({ ...task, refinedPrompt: edited }).prompt, edited);
+});

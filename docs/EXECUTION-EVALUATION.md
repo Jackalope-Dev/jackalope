@@ -1,5 +1,8 @@
 # Execution quality and evaluation
 
+For matched before/after prompt and native-tool trials, see
+[agent quality and usage evaluation](AGENT-QUALITY.md).
+
 Feature planning inspects the repository before proposing ownership and dependencies.
 The default unspecialized draft keeps one worker and the complete request. Every
 saved feature task retains that full request alongside its assigned instructions.

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{process::Command, time::Duration};
 use tauri::State;
 mod leases;
+pub(super) mod output;
 pub use leases::{ensure_all_idle, ensure_idle};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -159,14 +160,16 @@ pub async fn agent_verify(
     }
     tauri::async_runtime::spawn_blocking(move || {
         let guard = super::integration::execution_guard()?;
-        if !runtime.is_running(&run.id) { return Err("This attempt is no longer active.".into()); }
+        if !runtime.is_running(&run.id) {
+            return Err("This attempt is no longer active.".into());
+        }
         let _lease = leases::reserve(&run.workspace)?;
         drop(guard);
         let result = execute(&runtime, &run, &command)?;
-        Ok(serde_json::json!({ "exit_code": result.result.exit_code, "stdout": result.result.stdout,
-            "stderr": result.result.stderr, "success": result.result.success,
-            "timed_out": result.result.timed_out, "truncated": result.result.truncated }))
-    }).await.map_err(|e| e.to_string())?
+        Ok(output::response(&result))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

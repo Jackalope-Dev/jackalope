@@ -549,9 +549,6 @@ impl TaskRuntime {
         let router = if single { None } else { routers.first() };
         let mut context = req.context_receipt.text();
         context.push_str(&run.contract.text());
-        if let Some(coordination) = &req.coordination {
-            context.push_str(&coordination.instructions);
-        }
         context = context.chars().take(30_000).collect();
         let observations = evidence::evidence(&self.integration_runs()?, req);
         let input = serde_json::json!({"recordedOutcomes":observations,"task":req.prompt,"projectContext":context,"availableOptions":candidates,"previousHandoffs":history.handoffs.iter().map(|handoff| serde_json::json!({"agent":handoff.agent,"model":handoff.model,"reason":handoff.failure.message})).collect::<Vec<_>>()});

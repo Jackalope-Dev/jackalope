@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Owned X11 fixtures. Run through linux-desktop-control.sh, never a user's display."""
 import json
+import ctypes
 import os
 from pathlib import Path
 import signal
@@ -87,9 +88,6 @@ def wait(check, description, timeout=12):
 
 
 def trial(helper):
-    import gi
-    gi.require_version('Atspi', '2.0')
-    from gi.repository import Atspi
     children = []
     with tempfile.TemporaryDirectory(prefix='jackalope-x11-trial-') as temporary:
         directory = Path(temporary)
@@ -123,13 +121,6 @@ def trial(helper):
 
             wait(lambda: state()[0] == 'paused', 'indicator starts paused')
 
-            def visit(item):
-                yield item
-                for index in range(min(item.get_child_count(), 100)):
-                    child = item.get_child_at_index(index)
-                    if child is not None:
-                        yield from visit(child)
-
             def resume():
                 windows = call({'action': 'list'})['windows']
                 bar = next((item for item in windows if item['pid'] == indicator.pid), None)
@@ -140,7 +131,11 @@ def trial(helper):
 
             def activate():
                 wait(resume, 'native Resume button')
-                wait(lambda: state()[0] == 'active', 'native Resume activation')
+                try:
+                    wait(lambda: state()[0] == 'active', 'native Resume activation')
+                except AssertionError:
+                    print('Indicator state:', state(), flush=True)
+                    raise
 
             activate()
             guard = {'file': str(directory / 'state'), 'epoch': int(state()[1])}
@@ -153,7 +148,6 @@ def trial(helper):
             assert 'fixture-password-must-be-redacted' not in json.dumps(snapshot)
             text = 'literal $(echo) {ENTER} café 🦊'
             operation('type', bounds=snapshot['bounds'], text=text)
-            print('Typed fixture text:', repr((directory / 'text').read_text()), flush=True)
             wait(lambda: (directory / 'text').read_text() == text, 'literal Unicode typing')
             snapshot = operation('snapshot')
             assert any(node.get('value') == text for node in snapshot['controls']), snapshot
@@ -173,6 +167,12 @@ def trial(helper):
             png = capture.read_bytes()
             assert png[:8] == b'\x89PNG\r\n\x1a\n'
             assert struct.unpack('>II', png[16:24]) == (result['bounds']['width'], result['bounds']['height'])
+            import gi
+            gi.require_version('GdkPixbuf', '2.0')
+            from gi.repository import GdkPixbuf
+            pixels = GdkPixbuf.Pixbuf.new_from_file(str(capture))
+            colors = pixels.get_pixels()
+            assert len({colors[index:index + 3] for index in range(0, len(colors) - 3, 3)}) > 20, 'Capture is blank'
             call({'action': 'click', 'window': window, 'guard': guard, 'bounds': snapshot['bounds'], 'x': -1, 'y': 0}, error='outside')
             (directory / 'command').write_text('password')
             time.sleep(.2)
@@ -191,10 +191,15 @@ def trial(helper):
             activate()
             guard['epoch'] = int(state()[1])
             call({'action': 'type', 'window': window, 'guard': guard, 'bounds': snapshot['bounds'], 'text': 'must fail'}, error='moved')
-            indicator.terminate()
+            physical_key(0x61)
+            wait(lambda: state()[0] == 'paused' and 'Physical' in state()[5], 'physical-device key pauses access')
+            call({'action': 'focus', 'window': window, 'guard': guard}, error='paused')
+            activate()
+            guard['epoch'] = int(state()[1])
+            physical_key(0xff1b)
             indicator.wait(timeout=5)
             call({'action': 'snapshot', 'window': window, 'guard': guard}, error='ended')
-            print('PASS: X11 inventory, native Resume, snapshots, password rejection, Unicode typing, replacement, click, scroll, PNG, focus/movement pause, epochs and indicator loss')
+            print('PASS: X11 inventory, native Resume, snapshots, password rejection, Unicode typing, replacement, click, scroll, PNG, focus/movement/physical-device pause, Escape, epochs and indicator loss')
         finally:
             for child in reversed(children):
                 if child.poll() is None:
@@ -204,6 +209,50 @@ def trial(helper):
                     except subprocess.TimeoutExpired:
                         os.killpg(child.pid, signal.SIGKILL)
                         child.wait(timeout=5)
+
+
+def physical_key(symbol):
+    class Device(ctypes.Structure):
+        _fields_ = [('id', ctypes.c_int), ('name', ctypes.c_char_p), ('use', ctypes.c_int),
+                    ('attachment', ctypes.c_int), ('enabled', ctypes.c_int), ('classes', ctypes.c_int),
+                    ('data', ctypes.c_void_p)]
+    x11 = ctypes.CDLL('libX11.so.6')
+    xi = ctypes.CDLL('libXi.so.6')
+    xtest = ctypes.CDLL('libXtst.so.6')
+    x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XKeysymToKeycode.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+    x11.XKeysymToKeycode.restype = ctypes.c_ubyte
+    x11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    xi.XIQueryDevice.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
+    xi.XIQueryDevice.restype = ctypes.POINTER(Device)
+    xi.XIFreeDeviceInfo.argtypes = [ctypes.POINTER(Device)]
+    xi.XOpenDevice.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+    xi.XOpenDevice.restype = ctypes.c_void_p
+    xi.XCloseDevice.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    xtest.XTestFakeDeviceKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_int,
+                                             ctypes.c_void_p, ctypes.c_int, ctypes.c_ulong]
+    display = x11.XOpenDisplay(None)
+    assert display
+    device = None
+    try:
+        count = ctypes.c_int()
+        devices = xi.XIQueryDevice(display, 0, ctypes.byref(count))
+        candidates = [devices[index].id for index in range(count.value)
+                      if devices[index].name == b'Xvfb keyboard']
+        xi.XIFreeDeviceInfo(devices)
+        assert len(candidates) == 1, 'This trial must run on its own Xvfb desktop'
+        device = xi.XOpenDevice(display, candidates[0])
+        assert device
+        code = x11.XKeysymToKeycode(display, symbol)
+        assert xtest.XTestFakeDeviceKeyEvent(display, device, code, 1, None, 0, 0)
+        assert xtest.XTestFakeDeviceKeyEvent(display, device, code, 0, None, 0, 0)
+        x11.XSync(display, 0)
+    finally:
+        if device:
+            xi.XCloseDevice(display, device)
+        x11.XCloseDisplay(display)
 
 
 if __name__ == '__main__':

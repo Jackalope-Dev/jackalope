@@ -29,6 +29,10 @@ and installed acceptance are required before claiming throughput or quality gain
 
 ## In progress: dependable everyday use
 
+Focused task guidance and retrievable compact verification output are implemented.
+[Quality trials](AGENT-QUALITY.md) compare the changed behavior against a preserved
+baseline; broader provider comparisons and independent acceptance remain in progress.
+
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)
 show improvements; installed startup, memory and responsiveness acceptance remains open.

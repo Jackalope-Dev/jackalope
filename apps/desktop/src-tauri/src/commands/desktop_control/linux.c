@@ -79,7 +79,8 @@ static void output(JsonObject *result) {
   JsonNode *node = json_node_new(JSON_NODE_OBJECT);
   json_node_take_object(node, result);
   char *json = json_to_string(node, FALSE);
-  check(fwrite(json, 1, strlen(json), stdout) == strlen(json), "Cannot write helper response.");
+  check(fwrite(json, 1, strlen(json), stdout) == strlen(json),
+        "Cannot write helper response.");
   check(fflush(stdout) == 0, "Cannot flush helper response.");
   g_free(json);
   json_node_free(node);
@@ -424,10 +425,10 @@ static void screenshot(Bounds bounds) {
   int event, error;
   check(XCompositeQueryExtension(display, &event, &error),
         "XComposite window capture is unavailable.");
+  XCompositeRedirectWindow(display, selected, CompositeRedirectAutomatic);
+  check(x_ok(), "Cannot prepare selected-window capture.");
   Pixmap pixmap = XCompositeNameWindowPixmap(display, selected);
-  check(
-      x_ok() && pixmap,
-      "A compositing window manager is required for selected-window capture.");
+  check(x_ok() && pixmap, "Selected-window capture is unavailable.");
   XWindowAttributes attrs;
   check(XGetWindowAttributes(display, selected, &attrs) && x_ok() &&
             attrs.visual->class == TrueColor,
@@ -460,6 +461,7 @@ static void screenshot(Bounds bounds) {
     }
   XDestroyImage(image);
   XFreePixmap(display, pixmap);
+  XCompositeUnredirectWindow(display, selected, CompositeRedirectAutomatic);
   char *png = NULL;
   gsize size;
   check(gdk_pixbuf_save_to_buffer(pixels, &png, &size, "png", NULL, NULL) &&
@@ -903,11 +905,24 @@ int main(void) {
       g_strcmp0(g_getenv("XDG_SESSION_TYPE"), "wayland") == 0 ||
       (g_getenv("WAYLAND_DISPLAY") && *g_getenv("WAYLAND_DISPLAY"));
   if (!strcmp(action, "permissions")) {
+    gboolean available = FALSE;
+    Display *probe = wayland ? NULL : XOpenDisplay(NULL);
+    if (probe) {
+      int event, error, opcode, major = 2, minor = 0, composite_major,
+                                composite_minor;
+      available =
+          XTestQueryExtension(probe, &event, &error, &composite_major,
+                              &composite_minor) &&
+          XQueryExtension(probe, "XInputExtension", &opcode, &event, &error) &&
+          XIQueryVersion(probe, &major, &minor) == Success &&
+          XCompositeQueryVersion(probe, &composite_major, &composite_minor) &&
+          (composite_major > 0 || composite_minor >= 2) && atspi_init() == 0;
+      XCloseDisplay(probe);
+    }
     JsonObject *result = json_object_new();
     json_object_set_string_member(result, "session",
                                   wayland ? "wayland" : "x11");
-    json_object_set_boolean_member(result, "available",
-                                   !wayland && g_getenv("DISPLAY") != NULL);
+    json_object_set_boolean_member(result, "available", available);
     output(result);
     return 0;
   }

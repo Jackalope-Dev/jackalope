@@ -5,7 +5,7 @@ import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
-import { assemblePrompt } from '../../lib/skills/context-assembler';
+import { assemblePrompt, PROMPT_VERSION } from '../../lib/skills/context-assembler';
 import { resolveTaskGuidelines } from '../../lib/skills/task-context';
 import { ideaStageLabels } from '../../lib/task-collection';
 import { effortPrompt } from '../../lib/task-effort';
@@ -190,6 +190,7 @@ export function CaptureTask({
       status: current.planningStatus ?? 'backlog',
       rawPrompt: current.prompt.trim(),
       refinedPrompt: assembled.hasSupplementation ? assembled.assembledPrompt : undefined,
+      promptVersion: PROMPT_VERSION,
       assignedAgent: current.agent || undefined,
       effort: current.effort,
       model: current.model,

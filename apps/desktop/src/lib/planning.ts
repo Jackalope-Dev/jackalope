@@ -7,6 +7,7 @@ export function planningDraft(
     TaskTicket,
     | 'rawPrompt'
     | 'refinedPrompt'
+    | 'promptVersion'
     | 'assignedAgent'
     | 'clarifications'
     | 'connectionIds'
@@ -25,16 +26,21 @@ export function planningDraft(
   const skills = VETTED_SKILLS.filter((skill) => selectedNames.includes(skill.name)).map(
     (skill) => skill.id,
   );
-  const generated = assemblePrompt({
+  const assembly = {
     rawPrompt: task.rawPrompt,
     selectedSkillIds: skills,
-    executionMode: isolated ? 'isolated' : 'current',
-  }).assembledPrompt;
+    executionMode: isolated ? ('isolated' as const) : ('current' as const),
+  };
+  const generated = assemblePrompt(assembly).assembledPrompt;
+  const legacy =
+    task.promptVersion === undefined || task.promptVersion === 1
+      ? assemblePrompt({ ...assembly, version: 1 }).assembledPrompt
+      : undefined;
   const automatic = task.clarifications?.some(
     (item) => item.question === 'Task guideline selection' && item.answer === 'Automatic',
   );
   const structured = task.refinedPrompt
-    ? task.refinedPrompt === generated
+    ? task.refinedPrompt === generated || task.refinedPrompt === legacy
     : automatic && task.rawPrompt === generated;
   return {
     effort: task.effort,

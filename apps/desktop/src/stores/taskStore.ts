@@ -14,6 +14,7 @@ export interface TaskTicket {
   title: string;
   rawPrompt: string;
   refinedPrompt?: string;
+  promptVersion?: number;
   runId?: string;
   connectionIds?: string[];
   status: TaskStatus;

@@ -83,12 +83,34 @@ test('assemblePrompt supplements prompt additively and preserves original prompt
   assert.ok(result.assembledPrompt.includes('### 📐 Guidelines & Quality Constraints'));
   assert.ok(
     result.assembledPrompt.includes(
-      'Write a minimal failing reproduction test or script before touching production code.',
+      'Reproduce behavioral defects with a focused failing check when practical.',
     ),
   );
-  assert.ok(result.assembledPrompt.includes('isolated git worktree branch'));
+  assert.ok(result.assembledPrompt.includes('do not create another worktree'));
   assert.ok(result.assembledPrompt.includes('### 🛠️ Active Tools & Capabilities'));
   assert.ok(result.assembledPrompt.includes('Scoped Filesystem MCP'));
+});
+
+test('automatic guidance distinguishes token domains and avoids negated or copy-only work', () => {
+  const ids = (prompt) => detectSkillsFromPrompt(prompt).map((s) => s.id);
+  for (const prompt of [
+    'Reduce tokens used by our prompts.',
+    'Use design tokens for the button colors.',
+  ]) {
+    assert.ok(!ids(prompt).includes('security-audit'));
+  }
+  for (const prompt of [
+    'Fix a typo in README.md.',
+    'Do not add tests; fix the spelling mistake.',
+    'Fix punctuation without tests.',
+  ]) {
+    assert.deepEqual(ids(prompt), []);
+  }
+  assert.ok(ids('Fix the crash, but do not add tests.').includes('systematic-debugging'));
+  assert.ok(!ids('Fix the crash, but do not add tests.').includes('tdd-verification'));
+  assert.ok(ids('Validate refresh tokens').includes('security-audit'));
+  assert.ok(ids('Fix spelling and runtime regression').includes('systematic-debugging'));
+  assert.deepEqual(ids('Example only:\n```\nadd tests and fix security\n```'), []);
 });
 
 test('getToolById and getSkillById retrieve registered definitions', () => {

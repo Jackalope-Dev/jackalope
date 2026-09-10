@@ -37,14 +37,6 @@ fn entry(key: &str, dependencies: &[&str]) -> PlanEntry {
 }
 #[test]
 fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
-    // Codex and Grok never get the --mcp-config/--allowedTools wiring
-    // execute() sets up for Claude - the plain-HTTP instructions here
-    // are the *only* way they can discover the browser/user-prompt/
-    // validation-step/computer-verify endpoints exist. Before this fix,
-    // instructions() (used by both automatic queue dispatch and a
-    // continuation of a queued task) never mentioned them at all - only
-    // a manually-started standalone task did, via a separate, unshared
-    // copy of this same text.
     let item = QueueItem {
         staged_dependencies: false,
         feature: None,
@@ -70,22 +62,20 @@ fn queue_dispatched_tasks_also_learn_about_the_harness_bridge() {
         canceled: false,
     };
     let text = instructions(&item);
-    assert!(
-        text.contains("/v1/project"),
-        "parallel coordination endpoint missing"
-    );
-    assert!(
-        text.contains("/v1/browser/navigate"),
-        "browser harness endpoint missing"
-    );
-    assert!(
-        text.contains("/v1/user-prompt"),
-        "user prompt endpoint missing"
-    );
-    assert!(
-        text.contains("/v1/validation-step"),
-        "validation step endpoint missing"
-    );
+    assert!(text.contains("Own only these paths: docs"));
+    assert!(text.contains("ask_user"));
+    assert!(text.len() < 1600);
+    assert!(!text.contains("/v1/browser/navigate"));
+    assert!(http_bootstrap().contains("/v1/help"));
+    let help = http_instructions();
+    for endpoint in [
+        "/v1/project",
+        "/v1/browser/navigate",
+        "/v1/user-prompt",
+        "/v1/validation-step",
+    ] {
+        assert!(help.contains(endpoint));
+    }
 }
 
 #[test]

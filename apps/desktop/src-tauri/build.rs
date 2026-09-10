@@ -51,6 +51,10 @@ fn main() {
     if target.contains("apple") {
         let source = root.join("src/commands/desktop_control/macos.swift");
         println!("cargo:rerun-if-changed={}", source.display());
+        let header = root.join("src/commands/desktop_control/macos.h");
+        let identity_source = root.join("src/commands/desktop_control/macos-process.c");
+        println!("cargo:rerun-if-changed={}", header.display());
+        println!("cargo:rerun-if-changed={}", identity_source.display());
         let output = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap())
             .join("jackalope-desktop-control");
         let swift_target = if target.starts_with("aarch64") {
@@ -58,6 +62,12 @@ fn main() {
         } else {
             "x86_64-apple-macos11.0"
         };
+        let identity_object = output.with_extension("o");
+        let status = std::process::Command::new("xcrun")
+            .args(["clang", "-target", swift_target, "-O2", "-Wall", "-Wextra", "-Werror", "-c"])
+            .arg(identity_source).arg("-o").arg(&identity_object)
+            .status().expect("macOS desktop control requires Xcode command-line tools");
+        assert!(status.success(), "macOS process identity helper compilation failed");
         let status = std::process::Command::new("xcrun")
             .args([
                 "swiftc",
@@ -68,6 +78,7 @@ fn main() {
                 swift_target,
             ])
             .arg(&source)
+            .arg("-import-objc-header").arg(header).arg(identity_object)
             .arg("-o")
             .arg(&output)
             .status()

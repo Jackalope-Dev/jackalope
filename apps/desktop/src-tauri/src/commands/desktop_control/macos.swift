@@ -52,7 +52,9 @@ func rectFromJSON(_ value: Any?) throws -> CGRect {
 }
 
 func started(_ pid: pid_t) -> String? {
-    NSRunningApplication(processIdentifier: pid)?.launchDate.map { String(Int64($0.timeIntervalSince1970 * 1000)) }
+    var buffer = [CChar](repeating: 0, count: 64)
+    guard jackalope_process_start(pid, &buffer, 64) != 0 else { return nil }
+    return String(cString: buffer)
 }
 
 func visibleWindows() -> [[String: Any]] {
@@ -240,6 +242,28 @@ let keyCodes: [String: CGKeyCode] = ["Tab": 48, "Enter": 36, "Escape": 53, "Spac
 func operation(_ request: [String: Any]) throws -> [String: Any] {
     let action = request["action"] as? String ?? ""
     if action == "permissions" { return permissions() }
+    if action == "self_test" {
+        try require(started(getpid()) != nil && started(-1) == nil, "Process identity self-test failed.")
+        let rect = CGRect(x: -900, y: 100, width: 800, height: 600)
+        try require(sameBounds(rect, try rectFromJSON(boundsJSON(rect))), "Window coordinate self-test failed.")
+        try require(!sameBounds(rect, rect.offsetBy(dx: 1, dy: 0)), "Moved-window check failed.")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("jackalope-guard-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try "42".write(to: directory.appendingPathComponent("tag"), atomically: true, encoding: .utf8)
+        let file = directory.appendingPathComponent("state")
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let identity = "\(getpid())|\(started(getpid())!)"
+        try "active|3|\(now)|\(identity)|".write(to: file, atomically: true, encoding: .utf8)
+        _ = try Guard(["file": file.path, "epoch": UInt64(3)])
+        for state in ["paused|3|\(now)|\(identity)|", "active|4|\(now)|\(identity)|", "active|3|0|\(identity)|", "active|3|\(now)|1|wrong|"] {
+            try state.write(to: file, atomically: true, encoding: .utf8)
+            var rejected = false
+            do { _ = try Guard(["file": file.path, "epoch": UInt64(3)]) } catch { rejected = true }
+            try require(rejected, "Inactive, stale or replaced guard was accepted.")
+        }
+        return ["status": "passed", "checks": "process identity, coordinates, movement, paused/stale/replaced guards"]
+    }
     if action == "request_permissions" {
         _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
         _ = CGRequestScreenCaptureAccess()
@@ -479,7 +503,7 @@ do {
           let request = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         throw ControlError("Invalid desktop helper request.")
     }
-    _ = NSApplication.shared
+    if request["action"] as? String != "self_test" { _ = NSApplication.shared }
     if request["action"] as? String == "indicator" { try Indicator(request).run() }
     else {
         let result = try operation(request)

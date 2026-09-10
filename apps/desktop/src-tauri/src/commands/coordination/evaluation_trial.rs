@@ -2,7 +2,7 @@ use super::*;
 use serde_json::{json, Value};
 use std::{path::Path, time::Instant};
 
-fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
+pub(super) fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
     let output = crate::commands::git_command::command(
         repo,
         args,

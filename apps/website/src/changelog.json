@@ -1,5 +1,18 @@
 [
   {
+    "id": "more-focused-task-guidance-and-verification",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "More focused task guidance and verification",
+    "description": "Task instructions stay closer to your request, and long successful checks return compact results with stored output available when needed.",
+    "items": [
+      "Automatic guidance distinguishes design tokens from security work and avoids adding debugging routines to spelling fixes.",
+      "Agents use the assigned workspace and receive tool instructions appropriate to their connection.",
+      "Independent native trials compare correctness and total reported usage against a preserved baseline."
+    ],
+    "note": "In development. Broader provider comparisons and installed-app acceptance remain in progress."
+  },
+  {
     "id": "smoother-task-history-and-review",
     "date": "2026-09-10",
     "status": "In development",
