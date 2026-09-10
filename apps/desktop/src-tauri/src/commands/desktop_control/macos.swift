@@ -225,7 +225,10 @@ func snapshot(_ root: AXUIElement, _ rect: CGRect) -> [[String: Any]] {
                 if let text = attribute(element, ax) as? String { item[key] = String(text.prefix(200)) }
             }
         }
-        if let bounds = axBounds(element) { item["bounds"] = boundsJSON(bounds.offsetBy(dx: -rect.minX, dy: -rect.minY)) }
+        if let bounds = axBounds(element) {
+            let visible = bounds.intersection(rect)
+            if !visible.isNull && !visible.isEmpty { item["bounds"] = boundsJSON(visible.offsetBy(dx: -rect.minX, dy: -rect.minY)) }
+        }
         result.append(item)
         if !password, let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] {
             for child in children.prefix(160) { visit(child, depth + 1) }
@@ -323,9 +326,16 @@ func operation(_ request: [String: Any]) throws -> [String: Any] {
     case "type":
         guard let text = request["text"] as? String, !text.isEmpty, text.unicodeScalars.count <= 1000,
               !text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw ControlError("Invalid literal text.") }
-        for character in text {
-            _ = try focusedElement(window, try window.bounds())
-            let units = Array(String(character).utf16)
+        var chunks: [[UniChar]] = [[]]
+        for scalar in text.unicodeScalars {
+            let units = Array(String(scalar).utf16)
+            if chunks[chunks.count - 1].count + units.count > 20 { chunks.append([]) }
+            chunks[chunks.count - 1].append(contentsOf: units)
+        }
+        for units in chunks {
+            let current = try window.bounds()
+            try require(sameBounds(rect, current), "Window moved or resized during typing. Inspect before continuing.")
+            _ = try focusedElement(window, current)
             guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
                   let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else { throw ControlError("Cannot create keyboard input.") }
             units.withUnsafeBufferPointer { buffer in

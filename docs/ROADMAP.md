@@ -43,8 +43,9 @@ updates and secure storage for each intended platform. Required account access
 in every build, optional settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
-account/settings sync, Unix process guardians and tray/Dock recovery. macOS/Linux
-desktop-control backends and signed release acceptance remain in progress, with
+account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11
+window-control helpers are implemented for validation; Wayland control and native
+acceptance remain in progress. Signing/distribution are separate follow-ups, with
 Ubuntu/GNOME Wayland the first Linux acceptance target and X11 compatibility retained.
 
 ## Up next: broader workflows

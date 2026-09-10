@@ -125,21 +125,25 @@ pub async fn desktop_control_request_permissions() -> Result<Readiness, String> 
 }
 
 pub(super) fn lease() -> Result<std::fs::File, String> {
+    #[cfg(unix)]
+    let path = PathBuf::from(format!("/tmp/jackalope-desktop-control-{}.lock", unsafe {
+        libc::geteuid()
+    }));
+    #[cfg(not(unix))]
+    let path = std::env::temp_dir().join("jackalope-desktop-control.lock");
+    open_lease(&path)
+}
+
+fn open_lease(path: &std::path::Path) -> Result<std::fs::File, String> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
     #[cfg(unix)]
-    let path = {
+    {
         use std::os::unix::fs::OpenOptionsExt;
         options
             .mode(0o600)
             .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
-        // GUI and terminal launches can have different TMPDIR values on the same desktop.
-        PathBuf::from(format!("/tmp/jackalope-desktop-control-{}.lock", unsafe {
-            libc::geteuid()
-        }))
-    };
-    #[cfg(not(unix))]
-    let path = std::env::temp_dir().join("jackalope-desktop-control.lock");
+    }
     let file = options.open(path).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
@@ -163,5 +167,34 @@ pub(super) fn key(key: &str) -> String {
         key.into()
     } else {
         key.replacen("Primary+", "Control+", 1)
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    #[test]
+    fn desktop_lease_rejects_links_and_shared_permissions() {
+        let directory =
+            std::env::temp_dir().join(format!("jackalope-lease-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("lease");
+        let file = open_lease(&path).unwrap();
+        assert!(open_lease(&path).is_err());
+        let link = directory.join("link");
+        symlink(&path, &link).unwrap();
+        assert!(open_lease(&link).is_err());
+        drop(file);
+        let hard = directory.join("hard");
+        std::fs::hard_link(&path, &hard).unwrap();
+        assert!(open_lease(&hard).is_err());
+        std::fs::remove_file(hard).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(open_lease(&path).is_err());
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        drop(open_lease(&path).unwrap());
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

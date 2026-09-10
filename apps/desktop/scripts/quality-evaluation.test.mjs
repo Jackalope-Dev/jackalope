@@ -5,6 +5,25 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { qualityCases } from '../../../scripts/evaluation/quality-cases.mjs';
+import { qualitySummary } from '../../../scripts/evaluation/quality-metrics.mjs';
+
+test('quality totals include failed attempts and keep missing usage unknown', () => {
+  const rows = [
+    { variant: 'before', oraclePassed: true, totalTokens: 100 },
+    { variant: 'before', oraclePassed: false, totalTokens: 50 },
+    { variant: 'after', oraclePassed: true, totalTokens: null },
+  ];
+  const summary = qualitySummary(rows);
+  assert.equal(summary.before.tokensPerOracleSuccess, 150);
+  assert.equal(summary.after.totalTokens, null);
+  assert.equal(summary.after.usageCoverage, 0);
+  assert.equal(qualitySummary([]).before.totalTokens, null);
+  assert.equal(
+    qualitySummary([{ variant: 'before', oraclePassed: false, totalTokens: 20 }]).before
+      .tokensPerOracleSuccess,
+    null,
+  );
+});
 
 test('quality oracles reject initial defects, accept solutions, and detect unrelated edits', () => {
   for (const fixture of qualityCases) {

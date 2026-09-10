@@ -7,6 +7,7 @@ import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assemb
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { qualityCases } from './quality-cases.mjs';
+import { qualitySummary } from './quality-metrics.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
@@ -182,24 +183,7 @@ if (!args.includes('--execute')) {
           totalTokens: usage ? usage.input + usage.output : null,
           answeredQuestions: run?.prompts?.filter((p) => p.status === 'answered').length ?? 0,
         });
-        const summary = Object.fromEntries(
-          Object.keys(binaries).map((name) => {
-            const rows = trials.filter((t) => t.variant === name);
-            const known = rows.every((t) => t.totalTokens !== null);
-            const total = known ? rows.reduce((n, t) => n + t.totalTokens, 0) : null;
-            const passed = rows.filter((t) => t.oraclePassed).length;
-            return [
-              name,
-              {
-                trials: rows.length,
-                oraclePassed: passed,
-                usageCoverage: rows.filter((t) => t.totalTokens !== null).length,
-                totalTokens: total,
-                tokensPerOracleSuccess: passed && total !== null ? total / passed : null,
-              },
-            ];
-          }),
-        );
+        const summary = qualitySummary(trials, Object.keys(binaries));
         await writeFile(
           path.join(output, 'comparison.json'),
           `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, seconds, tokens, trials, summary, limitations: 'Small repeated synthetic native trials, not human acceptance or a direct-GUI comparison. CLI reasoning and provider caching follow the installed configuration. Include failures; missing usage remains unknown.' }, null, 2)}\n`,

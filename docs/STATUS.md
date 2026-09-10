@@ -26,10 +26,13 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   verification output, with independent before/after [quality trials](AGENT-QUALITY.md).
   These checks do not establish broad provider or GUI superiority.
 - Recurring schedules and local monitors that act on committed content changes.
-- MCP connections, task-owned browser sessions and Windows desktop-control grants.
+- MCP connections, task-owned browser sessions and guarded desktop-control grants.
 - Ask Jackalope documentation answers and reviewed local actions, with a focused
   chat panel and shared context/notification controls in its header settings.
 - Shared appearance controls, onboarding and optional portable settings sync.
+  Account device details distinguish default and isolated profiles and show app
+  versions, account checks and settings checks; deployment and installed acceptance
+  of the additional metadata remain open.
   Agent characters share the brand's layered silhouettes and theme colors, with
   distinct working/input poses and reduced-motion support.
 - Required account access in every desktop build, with optional feedback,
@@ -59,6 +62,11 @@ Ask panel browser fixtures cover context persistence, keyboard focus, theme-prev
 rollback and light/dark layouts at 1280×840 and 960×640. Installed helper checks
 remain open.
 
+Account device fixtures cover same-name profiles, metadata, legacy records and scoped
+revocation at 1280×840, 960×640 and 375px in both themes. Settings-sync browser checks
+cover restore/conflict, in-flight opt-out, deletion and theme rollback. These fixtures
+do not establish installed restoration or deployed metadata acceptance.
+
 ## Known limits
 
 Kimi supports task tokens, membership quota, direct MCP, structured questions, routing
@@ -79,7 +87,9 @@ checkpoint/integration recovery and automatic lessons need their corresponding
 acceptance checks. Outcome comparisons are required before claiming that lessons
 improve task quality. macOS/Linux secure storage, process lifecycle, packaging,
 signed installation and update acceptance remain open.
-Native desktop control still needs macOS/Linux backends. Notification activation,
+Native desktop-control helpers for macOS and Linux X11 are implemented for validation.
+Isolated X11 control trials pass; macOS compilation and device checks remain open.
+Wayland desktop control still needs a compositor-specific implementation. Notification activation,
 tray behavior and Dock reopening need installed desktop acceptance. See the
 [feature-by-feature platform audit](CROSS-PLATFORM-RELEASES.md#source-readiness-audit-2026-09-10).
 

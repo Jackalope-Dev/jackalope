@@ -64,10 +64,25 @@ fn main() {
         };
         let identity_object = output.with_extension("o");
         let status = std::process::Command::new("xcrun")
-            .args(["clang", "-target", swift_target, "-O2", "-Wall", "-Wextra", "-Werror", "-c"])
-            .arg(identity_source).arg("-o").arg(&identity_object)
-            .status().expect("macOS desktop control requires Xcode command-line tools");
-        assert!(status.success(), "macOS process identity helper compilation failed");
+            .args([
+                "clang",
+                "-target",
+                swift_target,
+                "-O2",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-c",
+            ])
+            .arg(identity_source)
+            .arg("-o")
+            .arg(&identity_object)
+            .status()
+            .expect("macOS desktop control requires Xcode command-line tools");
+        assert!(
+            status.success(),
+            "macOS process identity helper compilation failed"
+        );
         let status = std::process::Command::new("xcrun")
             .args([
                 "swiftc",
@@ -78,7 +93,9 @@ fn main() {
                 swift_target,
             ])
             .arg(&source)
-            .arg("-import-objc-header").arg(header).arg(identity_object)
+            .arg("-import-objc-header")
+            .arg(header)
+            .arg(identity_object)
             .arg("-o")
             .arg(&output)
             .status()

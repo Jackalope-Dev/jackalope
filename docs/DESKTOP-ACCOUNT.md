@@ -61,6 +61,22 @@ installed connection, expiry and revocation flows still require acceptance.
 
 ## Deployment and acceptance
 
+Connected desktops represents profile connections, not unique physical computers.
+Isolated tests have independent credentials and local projects, so the same computer
+name can appear more than once. Restarting a profile reuses its saved connection.
+The access page distinguishes connections by a short ID, platform, app version,
+development/release build and default/isolated profile. Account checks run while
+the app is open; their timestamp does not establish human activity or task execution.
+Settings checks record successful server reads/writes, not confirmation that the
+renderer applied a setting. Projects and task history remain local.
+
+Apply `0015_desktop_metadata.sql` before deploying the matching Worker and website.
+Older records show unreported metadata until a compatible desktop checks in. The
+native response advertises `deviceMetadata`; older services remain supported.
+Only bounded version/platform/build/profile categories are sent, never profile
+paths, hardware identifiers, project names or task data. Metadata is visible only
+to the owning account and follows the existing device expiry/deletion lifecycle.
+
 Local verification covers the real Settings component in browser fixtures at
 1280×840 and 960×640, light/dark appearance, keyboard order, settings search and
 focus return. Website fixtures cover signed-out handoff, sign-in in another tab,

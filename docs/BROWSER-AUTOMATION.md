@@ -73,7 +73,7 @@ other adapters retain their existing HTTP delivery and have not been trialed her
   40,000 characters, transport responses to 2 MB and saved screenshots to the
   existing 8 MiB preview limit. Large pages can use a scoped snapshot.
 - These browser tools do not automate native app windows, CAPTCHA or login consent.
-  Separate [Windows desktop control](DESKTOP-CONTROL.md) requires a user-selected
+  Separate [native desktop control](DESKTOP-CONTROL.md) requires a user-selected
   window grant. Browser-based actions may change a site; agents must continue to
   follow the task's authorization.
 

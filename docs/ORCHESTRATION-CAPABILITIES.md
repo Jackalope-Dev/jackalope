@@ -80,7 +80,7 @@ message. Agents must read pending answers; elapsed time is never an answer.
 | Ask a question | ask_user | POST /v1/user-prompt |
 | Retrieve an answer | user_response | GET /v1/user-prompt/poll?id=question |
 | Record checks | record_validation_step | POST /v1/validation-step |
-| Windows window control | desktop_control | POST /v1/desktop/control |
+| Native window control (Windows/macOS/X11; platform readiness required) | desktop_control | POST /v1/desktop/control |
 
 [Native desktop control](DESKTOP-CONTROL.md) requires a fresh human window grant
 for each attempt. It supports accessibility snapshots, screenshots, focus and

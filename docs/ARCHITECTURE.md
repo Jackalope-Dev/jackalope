@@ -68,7 +68,7 @@ names; changes must preserve both sides and old saved records.
 | agent_policy.rs, agent_profiles.rs, capacity/ | Allowlists, profile binding/sign-in and capacity |
 | mcp.rs, mcp_broker.rs, coordination_mcp.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped tools/questions |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
-| desktop_control.rs, desktop_control/ | Attempt-scoped Windows window grants, accessibility, capture and guarded native input |
+| desktop_control.rs, desktop_control/ | Attempt-scoped window grants, platform readiness, accessibility, capture and guarded Windows/macOS/X11 input |
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |

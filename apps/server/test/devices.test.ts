@@ -95,6 +95,67 @@ async function enableSync(secret: string) {
     (await call('/v1/desktop/settings/consent', 'POST', { enabled: true }, secret)).status,
   ).toBe(200);
 }
+it('keeps same-name profiles distinct and reports authenticated metadata and successful settings checks', async () => {
+  const owner = await member();
+  const stranger = await member();
+  const secret = await connectedDevice(owner);
+  const second = await connectedDevice(owner);
+  const metadata = {
+    appVersion: '0.1.0',
+    platform: 'windows',
+    buildKind: 'development',
+    profileKind: 'isolated',
+  };
+  expect((await call('/v1/desktop/metadata', 'POST', metadata)).status).toBe(401);
+  expect((await call('/v1/desktop/metadata', 'POST', metadata, secret, true)).status).toBe(403);
+  for (const invalid of [
+    { ...metadata, profilePath: '/private' },
+    { ...metadata, appVersion: 'x\nsecret' },
+    { ...metadata, platform: 'unknown' },
+  ]) {
+    expect((await call('/v1/desktop/metadata', 'POST', invalid, secret)).status).toBe(400);
+  }
+  for (const token of [secret, second]) {
+    await call('/v1/desktop/name', 'POST', { name: 'Studio PC' }, token);
+  }
+  expect((await call('/v1/desktop/metadata', 'POST', metadata, secret)).status).toBe(200);
+  const status = await (await call('/v1/desktop/me', 'GET', undefined, secret)).json<{
+    id: string;
+  }>();
+  expect(status).toMatchObject({ deviceMetadata: metadata });
+  await enableSync(secret);
+  expect((await call('/v1/desktop/settings', 'GET', undefined, secret)).status).toBe(200);
+  expect((await call('/v1/desktop/settings', 'GET', undefined, second)).status).toBe(403);
+  const devices = await (
+    await call('/v1/access/devices', 'GET', undefined, owner.session, true)
+  ).json<Record<string, unknown>[]>();
+  expect(devices).toHaveLength(2);
+  expect(devices.filter((device) => device.name === 'Studio PC')).toHaveLength(2);
+  expect(devices.find((device) => device.id === status.id)).toMatchObject({
+    ...metadata,
+    lastSeenAt: expect.any(Number),
+    settingsCheckedAt: expect.any(Number),
+    settingsSync: 1,
+  });
+  expect(devices.find((device) => device.id !== status.id)).toMatchObject({
+    appVersion: null,
+    lastSeenAt: null,
+    settingsCheckedAt: null,
+    settingsSync: 0,
+  });
+  expect(
+    await (await call('/v1/access/devices', 'GET', undefined, stranger.session, true)).json(),
+  ).toEqual([]);
+  await call('/v1/desktop/me', 'GET', undefined, secret);
+  await call('/v1/desktop/exchange', 'POST', undefined, secret);
+  expect(await env.DB.prepare('SELECT count(*) AS total FROM access_devices').first('total')).toBe(
+    2,
+  );
+  expect(JSON.stringify(devices)).not.toContain(secret);
+  await call('/v1/access/desktop/revoke', 'POST', { id: status.id }, owner.session, true);
+  expect((await call('/v1/desktop/me', 'GET', undefined, secret)).status).toBe(401);
+  expect((await call('/v1/desktop/me', 'GET', undefined, second)).status).toBe(200);
+});
 it('stores bounded desktop names only for authenticated devices and lists them for their owner', async () => {
   const owner = await member();
   const stranger = await member();

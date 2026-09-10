@@ -7,6 +7,7 @@
 #include <X11/keysym.h>
 #include <atspi/atspi.h>
 #include <gdk/gdkx.h>
+#include <glib-unix.h>
 #include <gtk/gtk.h>
 #include <json-glib/json-glib.h>
 #include <signal.h>
@@ -375,11 +376,19 @@ static void tree(AtspiAccessible *item, JsonArray *nodes, int depth,
   AtspiRect *rect = component ? atspi_component_get_extents(
                                     component, ATSPI_COORD_TYPE_SCREEN, NULL)
                               : NULL;
-  if (rect)
-    json_object_set_object_member(
-        node, "bounds",
-        bounds_json((Bounds){rect->x - bounds.x, rect->y - bounds.y,
-                             rect->width, rect->height}));
+  if (rect && rect->width > 0 && rect->height > 0) {
+    gint64 left = MAX((gint64)rect->x, bounds.x),
+           top = MAX((gint64)rect->y, bounds.y);
+    gint64 right =
+        MIN((gint64)rect->x + rect->width, (gint64)bounds.x + bounds.width);
+    gint64 bottom =
+        MIN((gint64)rect->y + rect->height, (gint64)bounds.y + bounds.height);
+    if (right > left && bottom > top)
+      json_object_set_object_member(
+          node, "bounds",
+          bounds_json((Bounds){left - bounds.x, top - bounds.y, right - left,
+                               bottom - top}));
+  }
   g_free(rect);
   if (component)
     g_object_unref(component);
@@ -771,8 +780,7 @@ static void update_devices(void) {
   XIFreeDeviceInfo(devices);
   check(synthetic_devices->len >= 2, "XTEST input devices are unavailable.");
 }
-static gboolean monitor(gpointer unused) {
-  (void)unused;
+static void input_events(void) {
   while (XPending(display)) {
     XEvent event;
     XNextEvent(display, &event);
@@ -798,6 +806,20 @@ static gboolean monitor(gpointer unused) {
     }
     XFreeEventData(display, &event.xcookie);
   }
+}
+static gboolean input_ready(gint fd, GIOCondition condition, gpointer unused) {
+  (void)fd;
+  (void)unused;
+  if (condition & (G_IO_ERR | G_IO_HUP | G_IO_NVAL)) {
+    cancel_control();
+    return G_SOURCE_REMOVE;
+  }
+  input_events();
+  return G_SOURCE_CONTINUE;
+}
+static gboolean monitor(gpointer unused) {
+  (void)unused;
+  input_events();
   Bounds bounds;
   if (getppid() != parent || !gtk_widget_get_visible(bar)) {
     cancel_control();
@@ -888,7 +910,9 @@ static void indicator(void) {
                   area.y);
   gtk_widget_show_all(bar);
   save_state();
-  g_timeout_add(20, monitor, NULL);
+  g_unix_fd_add(ConnectionNumber(display),
+                G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL, input_ready, NULL);
+  g_timeout_add(100, monitor, NULL);
   gtk_main();
 }
 

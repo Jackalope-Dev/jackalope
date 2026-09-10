@@ -271,6 +271,13 @@ interface Device {
   name?: string | null;
   createdAt: number;
   expiresAt: number;
+  appVersion?: string | null;
+  platform?: 'windows' | 'macos' | 'linux' | null;
+  buildKind?: 'development' | 'release' | null;
+  profileKind?: 'default' | 'isolated' | null;
+  lastSeenAt?: number | null;
+  settingsCheckedAt?: number | null;
+  settingsSync?: number;
 }
 export function ConnectedDesktops() {
   const [devices, setDevices] = useState<Device[] | null>(null);
@@ -328,8 +335,9 @@ export function ConnectedDesktops() {
     <section className="access-card connected-desktops">
       <h2>Connected desktops</h2>
       <p className="connected-desktops-description">
-        Connect from Settings → Jackalope account in the app. Disconnecting removes account access
-        on that desktop; its local projects and agent accounts remain available.
+        Each app profile has its own connection. Development and test profiles can appear with the
+        same computer name. Settings sync carries appearance and notification preferences; projects
+        and task history stay in the local profile.
       </p>
       {devices?.length === 0 && <p>No desktops connected.</p>}
       {devices === null && !error && <p role="status">Reading connected desktops…</p>}
@@ -341,10 +349,71 @@ export function ConnectedDesktops() {
               {device.name || `Desktop ${device.id.slice(0, 8)}`}
             </strong>
             <p>Connected {new Date(device.createdAt).toLocaleString()}</p>
+            <dl className="desktop-device-details">
+              <div>
+                <dt>App</dt>
+                <dd>
+                  {device.appVersion ? `Jackalope ${device.appVersion}` : 'Version not reported'}
+                  {device.buildKind === 'development'
+                    ? ' · Development build'
+                    : device.buildKind === 'release'
+                      ? ' · Release build'
+                      : ''}
+                </dd>
+              </div>
+              <div>
+                <dt>Platform</dt>
+                <dd>
+                  {device.platform
+                    ? { windows: 'Windows', macos: 'macOS', linux: 'Linux' }[device.platform]
+                    : 'Not reported'}
+                </dd>
+              </div>
+              <div>
+                <dt>Profile</dt>
+                <dd>
+                  {device.profileKind === 'isolated'
+                    ? 'Isolated test profile'
+                    : device.profileKind === 'default'
+                      ? 'Default profile'
+                      : 'Not reported'}{' '}
+                  · Connection {device.id.slice(0, 8)}
+                </dd>
+              </div>
+              <div>
+                <dt>Last account check</dt>
+                <dd>
+                  {device.lastSeenAt
+                    ? new Date(device.lastSeenAt).toLocaleString()
+                    : 'Not recorded yet'}
+                </dd>
+              </div>
+              <div>
+                <dt>Settings sync</dt>
+                <dd>
+                  {device.settingsSync === 1
+                    ? 'Enabled'
+                    : device.settingsSync === 0
+                      ? 'Off'
+                      : 'Not reported'}
+                  {device.settingsCheckedAt
+                    ? ` · Last checked ${new Date(device.settingsCheckedAt).toLocaleString()}`
+                    : ' · No check recorded yet'}
+                </dd>
+              </div>
+              <div>
+                <dt>Connection expires</dt>
+                <dd>{new Date(device.expiresAt).toLocaleString()}</dd>
+              </div>
+            </dl>
           </div>
           <div className="desktop-connection-actions">
             {confirm === device.id ? (
               <>
+                <p>
+                  Disconnect this profile’s account access? Local projects and agent accounts are
+                  kept.
+                </p>
                 <button
                   className="button button-primary"
                   type="button"

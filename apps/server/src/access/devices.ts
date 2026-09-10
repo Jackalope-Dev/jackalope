@@ -7,12 +7,16 @@ import { settingsRoute } from './settings';
 const lifetime = 90 * 86400000;
 export async function deviceMember(env: Env, hash: string, now = Date.now()) {
   return env.DB.prepare(
-    "SELECT d.id,d.name AS deviceName,d.expires_at AS expiresAt,m.id AS memberId,m.email FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL",
+    "SELECT d.id,d.name AS deviceName,d.app_version AS appVersion,d.platform,d.build_kind AS buildKind,d.profile_kind AS profileKind,d.expires_at AS expiresAt,m.id AS memberId,m.email FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL",
   )
     .bind(hash, now)
     .first<{
       id: string;
       deviceName: string | null;
+      appVersion: string | null;
+      platform: string | null;
+      buildKind: string | null;
+      profileKind: string | null;
       expiresAt: number;
       memberId: string;
       email: string;
@@ -23,6 +27,12 @@ function publicDevice(member: NonNullable<Awaited<ReturnType<typeof deviceMember
   return {
     id: member.id,
     deviceName: member.deviceName,
+    deviceMetadata: {
+      appVersion: member.appVersion,
+      platform: member.platform,
+      buildKind: member.buildKind,
+      profileKind: member.profileKind,
+    },
     expiresAt: member.expiresAt,
     email: member.email,
   };
@@ -67,6 +77,35 @@ export async function deviceRoutes(
     const token = request.headers.get('authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
     if (!token) throw new AccessError(401, 'device_sign_in_required');
     const hash = await tokenHash(token);
+    if (url.pathname === '/v1/desktop/metadata' && request.method === 'POST') {
+      const member = await deviceMember(env, hash, now);
+      if (!member) throw new AccessError(401, 'device_sign_in_required');
+      const metadata = z
+        .strictObject({
+          appVersion: z
+            .string()
+            .min(1)
+            .max(64)
+            .regex(/^[0-9A-Za-z.+-]+$/),
+          platform: z.enum(['windows', 'macos', 'linux']),
+          buildKind: z.enum(['development', 'release']),
+          profileKind: z.enum(['default', 'isolated']),
+        })
+        .parse(await readJson(request));
+      await env.DB.prepare(
+        'UPDATE access_devices SET app_version=?,platform=?,build_kind=?,profile_kind=? WHERE id=? AND member_id=?',
+      )
+        .bind(
+          metadata.appVersion,
+          metadata.platform,
+          metadata.buildKind,
+          metadata.profileKind,
+          member.id,
+          member.memberId,
+        )
+        .run();
+      return json({ success: true });
+    }
     if (url.pathname === '/v1/desktop/name' && request.method === 'POST') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
@@ -101,15 +140,21 @@ export async function deviceRoutes(
     if (url.pathname === '/v1/desktop/settings') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
-      return json(
-        await settingsRoute(
-          env,
-          member.memberId,
-          member.id,
-          request.method,
-          request.method === 'PUT' ? await readJson(request) : undefined,
-        ),
+      const result = await settingsRoute(
+        env,
+        member.memberId,
+        member.id,
+        request.method,
+        request.method === 'PUT' ? await readJson(request) : undefined,
       );
+      if (request.method === 'GET' || request.method === 'PUT') {
+        await env.DB.prepare(
+          'UPDATE access_devices SET settings_checked_at=? WHERE id=? AND member_id=?',
+        )
+          .bind(now, member.id, member.memberId)
+          .run();
+      }
+      return json(result);
     }
     if (request.method === 'POST' && url.pathname === '/v1/desktop/feedback') {
       const member = await deviceMember(env, hash, now);
@@ -126,6 +171,9 @@ export async function deviceRoutes(
     if (request.method === 'GET' && url.pathname === '/v1/desktop/me') {
       const member = await deviceMember(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
+      await env.DB.prepare('UPDATE access_devices SET last_seen_at=? WHERE id=? AND member_id=?')
+        .bind(now, member.id, member.memberId)
+        .run();
       return json({ ...publicDevice(member), status: 'approved' });
     }
     if (request.method === 'GET' && url.pathname === '/v1/desktop/referrals') {

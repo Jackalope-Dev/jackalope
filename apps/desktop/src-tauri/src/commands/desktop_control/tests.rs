@@ -95,6 +95,21 @@ fn desktop_input_is_bounded_and_rejects_system_keys_and_extra_fields() {
     }
     input.key = Some("Control+a".into());
     assert!(validate(&input).is_ok());
+    for key in ["Primary+a", "Primary+s", "Primary+z", "Primary+y"] {
+        input.key = Some(key.into());
+        assert!(validate(&input).is_ok());
+    }
+    input.key = Some("Primary+v".into());
+    assert!(validate(&input).is_err());
+    assert_eq!(
+        platform::key("Primary+a"),
+        if cfg!(target_os = "macos") {
+            "Primary+a"
+        } else {
+            "Control+a"
+        }
+    );
+    assert_eq!(platform::key("Control+a"), "Control+a");
     let mut input = request("type");
     input.text = Some("literal $() {ENTER} `characters`".into());
     assert!(validate(&input).is_ok());

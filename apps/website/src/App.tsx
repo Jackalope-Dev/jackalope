@@ -68,7 +68,7 @@ const faqs = [
   ],
   [
     'Which tools does Jackalope give agents?',
-    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. A theme-colored glow and status bar show when control is active. Escape or Stop revokes access; mouse or keyboard activity pauses it until you Resume. It operates your live desktop under existing OS permissions; macOS and Linux native window control are not yet supported.',
+    'Browse the MCP directory and choose project connections. Selected stdio and HTTP tools support on-demand discovery; direct connection support varies by agent. Built-in tools cover browser interaction, screenshots, accessibility audits, questions, and local verification. Windows desktop control adds accessibility snapshots, window captures, focus, clicks, typing, and scrolling after you select a window for that attempt. A theme-colored glow and status bar show when control is active. Escape or Stop revokes access; mouse or keyboard activity pauses it until you Resume. It operates your live desktop under existing OS permissions; macOS and Linux X11 window control is in native validation; Wayland remains unsupported.',
     'tools-question',
   ],
   [

@@ -256,6 +256,21 @@ fn failure(code: u16) -> String {
 }
 
 async fn sync_device_name(api: &reqwest::Url, secret: &str, data: &serde_json::Value) {
+    let metadata = device_metadata(
+        cfg!(debug_assertions),
+        std::env::var_os("JACKALOPE_PROFILE_DIR").is_some()
+            || cfg!(debug_assertions) && std::env::var_os("JACKALOPE_TEST_DATA_DIR").is_some(),
+    );
+    if data.get("deviceMetadata").is_some() && data["deviceMetadata"] != metadata {
+        let _ = request(
+            api,
+            "/v1/desktop/metadata",
+            reqwest::Method::POST,
+            Some(secret),
+            Some(metadata),
+        )
+        .await;
+    }
     // Older services omit this field and do not support device names.
     if data.get("deviceName").is_none() {
         return;
@@ -277,6 +292,14 @@ async fn sync_device_name(api: &reqwest::Url, secret: &str, data: &serde_json::V
         Some(serde_json::json!({ "name": name })),
     )
     .await;
+}
+fn device_metadata(development: bool, isolated: bool) -> serde_json::Value {
+    serde_json::json!({
+        "appVersion": env!("CARGO_PKG_VERSION"),
+        "platform": std::env::consts::OS,
+        "buildKind": if development { "development" } else { "release" },
+        "profileKind": if isolated { "isolated" } else { "default" },
+    })
 }
 #[tauri::command]
 pub async fn app_account_status(
@@ -614,6 +637,16 @@ pub async fn app_account_disconnect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn device_metadata_distinguishes_profiles_without_sending_paths() {
+        let default = device_metadata(false, false);
+        assert_eq!(default["buildKind"], "release");
+        assert_eq!(default["profileKind"], "default");
+        let isolated = device_metadata(true, true);
+        assert_eq!(isolated["buildKind"], "development");
+        assert_eq!(isolated["profileKind"], "isolated");
+        assert_eq!(isolated.as_object().unwrap().len(), 4);
+    }
     #[test]
     fn legacy_saved_accounts_need_online_verification_before_beta_execution() {
         let record: SavedAccount = serde_json::from_value(serde_json::json!({

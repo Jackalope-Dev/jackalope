@@ -69,6 +69,56 @@ fn headers(id: &str) -> HeaderMap {
     value
 }
 
+#[tokio::test]
+async fn help_and_verification_output_require_the_current_attempt_credential() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    f.running("writer-run");
+    f.runtime.update("reader-run", |run| {
+        run.verification = Some(
+            serde_json::from_value(json!({
+                "command":"fixture","checkedAt":"check-1","tree":null,
+                "result":{"exitCode":0,"success":true,"timedOut":false,"truncated":false,
+                    "durationMs":1,"stdout":"reader output","stderr":""}
+            }))
+            .unwrap(),
+        );
+    });
+    let state = || WebState(f.service.clone());
+    let input = || {
+        Json(super::super::verification::output::OutputRequest {
+            check_id: "check-1".into(),
+            stream: "stdout".into(),
+            offset: 0,
+            limit: None,
+        })
+    };
+    assert!(bridge_help(state(), headers("reader-run")).await.is_ok());
+    assert!(bridge_help(state(), headers("invalid")).await.is_err());
+    assert_eq!(
+        bridge_verification_output(state(), headers("reader-run"), input())
+            .await
+            .unwrap()
+            .0["text"],
+        "reader output"
+    );
+    assert!(
+        bridge_verification_output(state(), headers("writer-run"), input())
+            .await
+            .is_err()
+    );
+    let mut browser = headers("reader-run");
+    browser.insert("origin", "https://example.invalid".parse().unwrap());
+    assert!(bridge_help(state(), browser).await.is_err());
+    f.runtime
+        .update("reader-run", |run| run.status = "review".into());
+    assert!(
+        bridge_verification_output(state(), headers("reader-run"), input())
+            .await
+            .is_err()
+    );
+}
+
 fn request(previous: Option<&str>) -> RunRequest {
     serde_json::from_value(json!({"id":"next","projectId":"p","projectName":"Fixture","projectPath":"","agent":"codex","isolated":false,"prompt":"Next work","previousRunId":previous})).unwrap()
 }

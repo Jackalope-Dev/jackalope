@@ -516,6 +516,24 @@
   flex-shrink: 0;
   color: var(--color-text-muted);
 }
+.desktop-device-details {
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+.connected-desktops .desktop-device-details > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+.desktop-device-details dt {
+  width: 150px;
+  color: var(--color-text-muted);
+}
+.desktop-device-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 .desktop-connection-result {
   text-align: center;
   padding: 48px 24px;

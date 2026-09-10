@@ -43,11 +43,11 @@ These changes prepare device testing; they do not establish macOS or Linux accep
 | Secure storage | Windows retains DPAPI. macOS uses Keychain; Linux uses persistent Secret Service with encrypted D-Bus transport. Files contain opaque references. Locked/unavailable stores fail without plaintext fallback. Valid legacy Unix API-key files migrate after validation; failed migration retains the original. Disconnect, profile deletion and reset remove referenced secrets. Test restart, locked stores, migration, reset and revocation. Copying a profile does not copy its OS keyring. |
 | Processes and terminals | Commands, authentication probes, MCP, browsers and generic terminals retain owned process groups. A separate Unix guardian watches a close-on-exec pipe and kills the group if Jackalope exits abruptly; normal cleanup reaps the guardian. PTY parent exit also closes descendant pipes. Test stop, timeout, app exit, grandchildren and shell job control. Groups do not contain descendants that deliberately create new sessions, and the short interval before guardian attachment is not protected. Recovery remains conservative on Unix. |
 | Browser automation | Chrome, Edge and Chromium detection includes native installation paths, PATH, and macOS system/user Applications folders. `JACKALOPE_BROWSER_EXECUTABLE` accepts an absolute executable override. Unix sockets use short, private directories. Jackalope launches Unix Chromium in its own guarded process group and connects the bundled helper to that disposable browser over loopback CDP; helper-created Chromium groups previously escaped cleanup. Cancellation tests now inspect browser process groups after Stop. Test all actions and cleanup. Safari/Firefox are unsupported engines; Snap/Flatpak Chromium confinement needs separate validation. Do not disable Chromium's sandbox as a workaround. |
-| Desktop control | **Still Windows-only.** Non-Windows MCP discovery omits this tool; direct calls remain unavailable. macOS needs Accessibility/Screen Recording permission flows, selected-window capture/input, physical-input interruption, visible grant state and revocation. Linux needs separate X11 and Wayland backends, including portal/compositor support. These are missing implementations, not device-test-only gaps. |
+| Desktop control | Windows retains its guarded backend. macOS and Linux X11 now have native helpers, visible Pause/Resume/Cancel controls, process/window identity checks, accessibility snapshots, selected-window capture and guarded input. Devices reports readiness and requests macOS permissions only on an explicit click. Linux X11 fixtures pass under an isolated Xvfb desktop, including physical-device events and Escape. macOS compilation and native acceptance remain open. **Wayland remains an implementation gap** and stays unavailable, including through XWayland. See [native control details](DESKTOP-CONTROL.md). |
 | Notifications, window and tray | Task clicks use native callbacks on all three platforms. Unix response listeners expire after 24 hours, retain at most 64 notices and close on shutdown. macOS uses UserNotifications from a signed app bundle and asks for notification permission. Linux uses desktop notification actions; compositor focus policy still applies. Linux close-to-tray requires a registered StatusNotifier host and a hidden window reappears if that host disappears. macOS Dock reopening restores hidden windows. Test permission denial, DND, clicks, tray loss, window controls, focus and dialogs. |
 | Jackalope account and settings sync | The old Windows-only availability gates are removed. All platforms use the same approved-account, bounded offline lease and explicit sync-choice contracts, backed by their native credential store. Device names come from the Unix hostname API when no shell environment is present. Verify connection, restart, revocation, offline expiry and conflicts against an isolated service. |
 | Files, Git and recovery | Worktree/checkpoint/integration safeguards, locks, atomic replacement, recovery, codebase watching and schedules are shared. Test case-sensitive volumes, symlinks, executable bits, Unicode paths, timezone/DST, restart, sleep/wake and interrupted writes. Scope comparisons remain conservative across case variants. |
-| UI and optional services | WebView UI, MCP HTTP, account service, sync, feedback, lessons and helper actions need installed checks. Check WKWebView/WebKitGTK, clipboard, keyboard, dialogs, links, themes, reduced motion and narrow layouts. Command shortcuts already accept Meta; some labels remain Windows-styled. |
+| UI and optional services | WebView UI, MCP HTTP, account service, sync, feedback, lessons and helper actions need installed checks. Check WKWebView/WebKitGTK, clipboard, keyboard, dialogs, links, themes, reduced motion and narrow layouts. Command shortcuts accept Meta and their labels use Command on Mac and Control on other desktops. |
 | Packages and updates | CI defines Linux x64 and macOS arm64/x64 verification, browser smoke tests and trial packages. macOS 11 is the declared minimum; trial app/helper bundles are ad-hoc signed and archived with executable modes preserved. Developer ID signing/notarization, updater trust, AppImage/RPM, Linux arm64 and clean-machine acceptance remain open. Windows ARM uses the x64 browser helper and needs emulation validation. |
 
 The CI jobs must pass on their native runners after these changes are pushed.
@@ -61,7 +61,7 @@ also builds successfully with the normal feature set. The notification module's
 Objective-C API types were also checked for macOS arm64 and x64 against a stub Tauri
 host; this is not a full macOS application build. Actual macOS compilation still
 needs the native CI runners. WSL and browser fixtures do not establish GNOME,
-Wayland, X11, installed-app or release acceptance.
+Wayland, a real X11 desktop, installed-app or release acceptance.
 
 Windows `RUST_TEST_THREADS=2 pnpm verify` passed with 246 native tests (14 ignored),
 136 desktop JavaScript tests, 107 service tests, 45 release tests and both production
@@ -124,3 +124,20 @@ and restart from the installed trial package launched through Finder or the desk
 menu. Then check permissions and upgrades. Record OS/architecture, display server,
 browser/CLI versions, package and failed step. Terminal launch does not validate
 the GUI login environment.
+
+
+### Native control follow-up
+
+The macOS and Linux X11 helpers, device readiness/permission UI and portable
+shortcut labels are implemented. The X11 fixture now passes native control,
+nonblank window capture, Unicode/replacement input, password rejection,
+focus/movement/device-input pause, Escape and stale/replaced guard rejection.
+It runs in CI on its own Xvfb display and private D-Bus session. macOS CI compiles
+the Swift helper and process-identity shim and runs a noninteractive guard check
+on both architectures; those jobs must run before claiming macOS compilation.
+
+The remaining native-control implementation is Wayland. Keep Ubuntu/GNOME first,
+but do not enable an XWayland fallback that cannot observe the whole desktop's
+physical input. Device acceptance, permission attribution, multi-monitor/DPI,
+nonstandard apps and clean-machine dependency checks remain open. Signing and
+distribution are intentionally outside this source-preparation pass.

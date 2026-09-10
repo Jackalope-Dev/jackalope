@@ -73,6 +73,8 @@ release dates.
 
 - [ ] Validate multi-device settings sync, account changes, offline/conflict
   recovery, deletion and saved opt-outs.
+  Include profile metadata after migration `0015_desktop_metadata.sql`, same-name
+  test profiles, and restart restoration; projects and task history remain local.
 - [ ] Verify signup, referrals, passes, feedback and consent through actual
   delivery and installed clients, including retries, suppression and optional
   email enrollment remaining off until selected.
@@ -99,8 +101,11 @@ release dates.
   discovery, process/PTY/browser behavior and trial packaging. WSL native tests,
   real Chrome cleanup and isolated GNOME Keyring trials pass; desktop acceptance
   remains open.
-- [ ] Implement guarded macOS desktop control and Linux X11/Wayland backends;
-  preserve window grants, visible state, physical-input pause and revocation.
+- [ ] Run macOS helper compilation/guard CI and native desktop-control acceptance
+  on macOS and real X11 desktops. Helpers, permission readiness UI and isolated
+  X11 control/interruption fixtures are implemented.
+- [ ] Implement guarded Wayland desktop control with compositor support; preserve
+  window grants, visible state, physical-input pause and revocation.
 - [ ] Validate macOS/Linux notification clicks, permission denial, tray-host loss
   and macOS Dock reopening in installed builds.
 - [ ] Prioritize Ubuntu/GNOME Wayland acceptance, retaining X11 coverage. Resolve

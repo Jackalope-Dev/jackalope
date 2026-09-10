@@ -1,5 +1,28 @@
 [
   {
+    "id": "native-window-control-beyond-windows",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Native window control beyond Windows",
+    "description": "macOS and Linux X11 window-control backends are implemented for native validation.",
+    "items": [
+      "Keep explicit window grants, visible Pause/Resume/Cancel controls, fresh snapshots, and physical-input interruption.",
+      "Check device readiness, request macOS permissions, and use platform-appropriate shortcut labels.",
+      "Exercise Linux control against isolated native windows in CI."
+    ],
+    "note": "macOS compilation and device acceptance remain open. Wayland window control still requires a compositor-specific implementation; public availability is unchanged."
+  },
+  {
+    "id": "know-which-desktop-is-connected",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Know which desktop is connected.",
+    "description": "Connected desktops now shows app and profile details to help identify separate installations and test profiles.",
+    "items": [
+      "See app version, platform, profile type, connection expiry, and recent account and settings checks."
+    ]
+  },
+  {
     "id": "more-focused-task-guidance-and-verification",
     "date": "2026-09-10",
     "status": "In development",
