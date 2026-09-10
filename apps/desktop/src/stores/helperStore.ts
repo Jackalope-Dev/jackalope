@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { observeRefresh } from '../lib/observe-refresh';
 import { nativeTask, type RunUsage } from '../lib/task-runtime';
 import { isTauriEnvironment } from '../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from './agentConfigStore';
@@ -46,6 +47,28 @@ interface HelperState {
   send: () => Promise<void>;
   refresh: () => Promise<void>;
 }
+let syncedContext = '';
+let syncedAt = 0;
+let syncing: Promise<void> | undefined;
+async function syncHelperContext(force = false): Promise<void> {
+  if (syncing) {
+    await syncing;
+    return syncHelperContext(force);
+  }
+  const context = helperContext();
+  const signature = JSON.stringify(context);
+  if (!force && signature === syncedContext && Date.now() - syncedAt < 8000) return;
+  syncing = nativeTask<void>('helper_sync', {
+    context: signature === syncedContext && !force ? null : context,
+  });
+  try {
+    await syncing;
+    syncedContext = signature;
+    syncedAt = Date.now();
+  } finally {
+    syncing = undefined;
+  }
+}
 export const useHelperStore = create<HelperState>()(
   persist(
     (set, get) => ({
@@ -60,8 +83,10 @@ export const useHelperStore = create<HelperState>()(
       refresh: async () => {
         if (!isTauriEnvironment()) return;
         try {
-          await nativeTask('helper_sync', { context: helperContext() });
-          set({ view: await nativeTask<HelperView>('helper_snapshot'), syncError: null });
+          await syncHelperContext();
+          const view = await nativeTask<HelperView>('helper_snapshot');
+          if (JSON.stringify(view) !== JSON.stringify(get().view) || get().syncError)
+            set({ view, syncError: null });
         } catch (error) {
           set({ syncError: String(error) });
         }
@@ -73,7 +98,7 @@ export const useHelperStore = create<HelperState>()(
         set({ sending: true, error: null });
         try {
           await syncAgentConfig();
-          await nativeTask('helper_sync', { context: helperContext() });
+          await syncHelperContext(true);
           const view = await nativeTask<HelperView>('helper_send', { prompt });
           set({ view, draft: '', error: null });
         } catch (error) {
@@ -148,15 +173,33 @@ export function helperContext() {
 
 export function observeHelper() {
   if (!isTauriEnvironment()) return;
-  let disposed = false;
-  let timer: ReturnType<typeof setTimeout>;
-  const tick = async () => {
-    await useHelperStore.getState().refresh();
-    if (!disposed) timer = setTimeout(tick, 2000);
+  let contextTimer: ReturnType<typeof setTimeout>;
+  const updateContext = () => {
+    clearTimeout(contextTimer);
+    contextTimer = setTimeout(() => {
+      void syncHelperContext().catch((error) =>
+        useHelperStore.setState({ syncError: String(error) }),
+      );
+    }, 100);
   };
-  void tick();
+  const stops = [
+    useHelperStore,
+    useProjectStore,
+    useExecutionStore,
+    useAgentConfigStore,
+    useSettingsStore,
+    useThemeStore,
+  ].map((store) => store.subscribe(updateContext));
+  const stop = observeRefresh({
+    refresh: () => useHelperStore.getState().refresh(),
+    interval: () => {
+      const view = useHelperStore.getState().view;
+      return view.connected || view.turns.some((turn) => turn.status === 'working') ? 2000 : 10_000;
+    },
+  });
   return () => {
-    disposed = true;
-    clearTimeout(timer);
+    stop();
+    clearTimeout(contextTimer);
+    for (const unsubscribe of stops) unsubscribe();
   };
 }

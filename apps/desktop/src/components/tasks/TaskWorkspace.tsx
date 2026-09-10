@@ -2,9 +2,9 @@ import { LoadingState } from '../ui/LoadingState';
 import './core-workflow.css';
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { FolderOpen, MoreHorizontal, Workflow } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
-import { collectWork } from '../../lib/task-collection';
+import { collectWork, type WorkItem } from '../../lib/task-collection';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -30,7 +30,12 @@ export function TaskWorkspace({
   composerFocus?: number;
 }) {
   const { projects, activeProjectId } = useProjectStore();
-  const { runs, runners, selectedId, select, loading, error } = useExecutionStore();
+  const runs = useExecutionStore((state) => state.runs);
+  const runners = useExecutionStore((state) => state.runners);
+  const selectedId = useExecutionStore((state) => state.selectedId);
+  const select = useExecutionStore((state) => state.select);
+  const loading = useExecutionStore((state) => state.loading);
+  const error = useExecutionStore((state) => state.error);
   const ideas = useTaskStore((state) => state.tasks);
   const [projectFilter, setProjectFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
@@ -51,6 +56,14 @@ export function TaskWorkspace({
   });
   const [integratedIds, setIntegratedIds] = useState<string[]>([]);
   const lastOpened = useRef<string | null>(null);
+  const openItem = useCallback(
+    (item: WorkItem) => {
+      lastOpened.current = item.id;
+      if (item.run) select(item.run.id);
+      else if (item.idea) onCapture(item.idea.id);
+    },
+    [select, onCapture],
+  );
   useEffect(() => {
     if (selectedId || !lastOpened.current) return;
     const row = document.getElementById(`work-item-${lastOpened.current}`);
@@ -81,11 +94,15 @@ export function TaskWorkspace({
   const project = projects.find(
     (p) => p.id === (projectFilter === 'all' ? activeProjectId : projectFilter),
   );
-  const items = collectWork(
-    projectFilter === 'all' ? null : projectFilter === 'unassigned' ? '' : projectFilter,
-    ideas,
-    runs,
-    integratedIds,
+  const items = useMemo(
+    () =>
+      collectWork(
+        projectFilter === 'all' ? null : projectFilter === 'unassigned' ? '' : projectFilter,
+        ideas,
+        runs,
+        integratedIds,
+      ),
+    [projectFilter, ideas, runs, integratedIds],
   );
   const needsInput = items.filter((item) => item.stage === 'attention').length;
   const ready = items.filter((item) => item.stage === 'review').length;
@@ -197,11 +214,7 @@ export function TaskWorkspace({
           onViewChange={setView}
           items={items}
           runners={runners}
-          onOpen={(item) => {
-            lastOpened.current = item.id;
-            if (item.run) select(item.run.id);
-            else if (item.idea) onCapture(item.idea.id);
-          }}
+          onOpen={openItem}
         />
       ) : null}
     </section>

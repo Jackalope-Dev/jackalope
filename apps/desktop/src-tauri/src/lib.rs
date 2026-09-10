@@ -39,6 +39,7 @@ pub fn run() {
         .manage(commands::agent_models::ModelCatalogService::default())
         .setup(move |app| {
             commands::browser::set_resource_directory(app.path().resource_dir()?);
+            commands::desktop_control::platform::set_resource_directory(app.path().resource_dir()?);
             let directory = profile
                 .clone()
                 .unwrap_or(app.path().app_data_dir()?)
@@ -49,6 +50,7 @@ pub fn run() {
                 .unwrap_or(directory);
             let resetting = reset_on_startup(&directory)?;
             let runtime = TaskRuntime::new(directory.clone())?;
+            runtime.observe_changes(app.handle().clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
             helper.launch();
             app.manage(helper);
@@ -157,6 +159,7 @@ pub fn run() {
             task_project_directory,
             task_create_project,
             task_runs,
+            task_changes,
             task_history_recovery,
             task_retry_save,
             task_export_recovery,

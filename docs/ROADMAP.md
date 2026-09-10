@@ -29,6 +29,10 @@ and installed acceptance are required before claiming throughput or quality gain
 
 ## In progress: dependable everyday use
 
+Durable incremental history saves, concurrent loading, changed-record UI updates
+and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)
+show improvements; installed startup, memory and responsiveness acceptance remains open.
+
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
 large-project performance in installed builds. Complete signing, installation,
 updates and secure storage for each intended platform. Required account access

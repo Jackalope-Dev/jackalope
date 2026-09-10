@@ -28,7 +28,7 @@ struct CoordinationTools {
 impl CoordinationTools {
     fn platform_router() -> ToolRouter<Self> {
         let mut router = Self::tool_router();
-        if !cfg!(windows) {
+        if !super::desktop_control::platform::supported() {
             router.remove_route("desktop_control");
         }
         router
@@ -663,7 +663,10 @@ mod tests {
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
         assert!(names.contains(&"computer_verify"));
-        assert_eq!(names.contains(&"desktop_control"), cfg!(windows));
+        assert_eq!(
+            names.contains(&"desktop_control"),
+            crate::commands::desktop_control::platform::supported()
+        );
         for name in [
             "ask_user",
             "record_validation_step",

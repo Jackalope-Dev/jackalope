@@ -605,7 +605,8 @@ impl TaskRuntime {
                             *reader_probe.lock().unwrap() = (update["active"] == true)
                                 .then(|| (std::time::Instant::now(), update["afterTurn"] == true));
                         } else {
-                            runtime.update(&event_id, |run| kimi::consume(run, update));
+                            let _ =
+                                runtime.update_output(&event_id, |run| kimi::consume(run, update));
                         }
                     },
                     |params| kimi::permission(&runtime, &event_id, params),
@@ -623,7 +624,7 @@ impl TaskRuntime {
                 BufReader::new(stdout),
                 1_000_000,
                 |line, truncated| {
-                    runtime.update(&event_id, |r| {
+                    let _ = runtime.update_output(&event_id, |r| {
                     if truncated {
                         activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
                         if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }
@@ -633,7 +634,7 @@ impl TaskRuntime {
                 });
                 },
             ) {
-                runtime.update(&event_id, |r| {
+                let _ = runtime.update_output(&event_id, |r| {
                     r.error = Some(format!("Agent output could not be read: {error}"))
                 });
             }
@@ -652,7 +653,7 @@ impl TaskRuntime {
                     if truncated {
                         line.push_str(" [truncated]");
                     }
-                    runtime.update(&event_id, |r| {
+                    let _ = runtime.update_output(&event_id, |r| {
                         if diagnostics_adapter == "antigravity"
                             && antigravity::permission_denied(&line)
                         {

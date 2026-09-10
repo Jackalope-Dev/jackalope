@@ -12,7 +12,7 @@ const cases = value('--case', suite.cases.map((c) => c.id).join(',')).split(',')
 const modes = value('--modes', 'single,serial,staged').split(',');
 const repeats = Number(value('--repeat', '3'));
 const seconds = Number(value('--seconds', '300'));
-const tokens = Number(value('--tokens', '100000'));
+const tokens = Number(value('--tokens', '1000000'));
 if (
   cases.some((id) => !suite.cases.some((c) => c.id === id)) ||
   modes.some((m) => !['single', 'serial', 'staged'].includes(m)) ||
@@ -59,6 +59,7 @@ for (const id of cases)
             '--manifest-path',
             'apps/desktop/src-tauri/Cargo.toml',
             '--lib',
+            '--no-default-features',
             'commands::coordination::evaluation_trial::installed_execution_evaluation',
             '--',
             '--ignored',

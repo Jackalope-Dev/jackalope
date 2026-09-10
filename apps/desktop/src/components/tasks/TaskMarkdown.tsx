@@ -1,11 +1,12 @@
-import { code } from '@streamdown/code';
+import { memo, useEffect, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import { useColorScheme } from '../../hooks/useColorScheme';
+import { createMarkdownHighlighter } from '../../lib/markdown-highlighter';
 import { safeResultLink } from '../../lib/task-workflow';
 import 'streamdown/styles.css';
 import './rich-content.css';
 
-export default function TaskMarkdown({
+export default memo(function TaskMarkdown({
   content,
   active,
   onOpenLink,
@@ -15,13 +16,16 @@ export default function TaskMarkdown({
   onOpenLink: (url: string) => void;
 }) {
   const scheme = useColorScheme();
+  const highlighter = useMemo(createMarkdownHighlighter, []);
+  useEffect(() => highlighter.dispose, [highlighter]);
+  const plugins = useMemo(() => ({ code: highlighter.plugin }), [highlighter]);
   return (
     <div className={`task-markdown ${scheme}`}>
       <Streamdown
         skipHtml
         mode={active ? 'streaming' : 'static'}
         isAnimating={active}
-        plugins={{ code }}
+        plugins={plugins}
         controls={{ code: { copy: true, download: false }, table: false, image: false }}
         components={{
           table: ({ children }) => (
@@ -50,4 +54,4 @@ export default function TaskMarkdown({
       </Streamdown>
     </div>
   );
-}
+});

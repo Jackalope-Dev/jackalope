@@ -255,6 +255,62 @@ mod tests {
             .unwrap();
             assert_eq!(ack.acknowledged_by, ["reader-run-task"]);
         }
+        let mut resolution = request("sender-run-task");
+        resolution.kind = "progress".into();
+        resolution.resolves = Some(message.id.clone());
+        let Json(reply) = bridge_message(
+            WebState(service.clone()),
+            headers("reader-run"),
+            Json(resolution),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            service
+                .view()
+                .unwrap()
+                .messages
+                .iter()
+                .find(|m| m.id == message.id)
+                .unwrap()
+                .resolved_by
+                .as_ref(),
+            Some(&reply.id)
+        );
+        let Json(empty) = bridge_inbox(
+            WebState(service.clone()),
+            headers("reader-run"),
+            Query(InboxQuery {
+                after: Some(reply.id.clone()),
+                limit: None,
+                wait_ms: Some(1),
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(empty["nextCursor"], reply.id);
+        assert!(empty["messages"].as_array().unwrap().is_empty());
+        let waiting = bridge_inbox(
+            WebState(service.clone()),
+            headers("reader-run"),
+            Query(InboxQuery {
+                after: Some(reply.id),
+                limit: None,
+                wait_ms: Some(1000),
+            }),
+        );
+        let sending = async {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            bridge_message(
+                WebState(service.clone()),
+                headers("sender-run"),
+                Json(request("reader-run-task")),
+            )
+            .await
+            .unwrap()
+        };
+        let (received, sent) = tokio::join!(waiting, sending);
+        assert_eq!(received.unwrap().0["messages"][0]["id"], sent.0.id);
         let mut origin = headers("reader-run");
         origin.insert("origin", "https://example.invalid".parse().unwrap());
         assert_eq!(

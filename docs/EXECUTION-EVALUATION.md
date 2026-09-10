@@ -61,10 +61,10 @@ Run `pnpm evaluate:execution` to inspect the evaluation plan without launching a
 To execute installed Codex trials in new disposable repositories/profiles:
 
 ```powershell
-pnpm evaluate:execution -- --execute --case=small-fix,layered-feature --repeat=3 --seconds=300 --tokens=100000
+pnpm evaluate:execution -- --execute '--case=small-fix,layered-feature' --repeat=3 --seconds=300 --tokens=1000000
 ```
 
-Modes are `single`, `serial` and `staged`; select a subset with `--modes=single,staged`.
+Modes are `single`, `serial` and `staged`; select a subset with `'--modes=single,staged'`.
 The driver rotates mode order across repetitions. Each trial retains native journals,
 stage timings, usage, its independent behavioral oracle, limits and failures.
 Comparisons are saved under `scratch/execution-evaluation`. Profiles are retained
@@ -75,7 +75,8 @@ handoff, restart, cancellation, message permissions and stale/conflicting snapsh
 
 Keep the installed provider/model, repository fixture and budgets constant when
 comparing variants. Serial trials integrate immediately and therefore exclude real
-human review delays. Token stopping uses reported usage; it cannot enforce a hard
+human review delays. Token stopping counts reported input and output, including cached input reported
+by the provider. A model may report usage only at turn completion. It cannot enforce a hard
 provider spending limit. Human review minutes, acceptance and escaped defects need
 an independent reviewer and remain unknown in automated receipts. A passing oracle
 is not product acceptance. Repeat trials before claiming a speed or quality gain.

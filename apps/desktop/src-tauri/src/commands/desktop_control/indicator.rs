@@ -1,5 +1,5 @@
 use super::*;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use std::process::Stdio;
 use std::{path::PathBuf, process::Child};
 
@@ -132,9 +132,79 @@ impl Indicator {
         Err("Desktop indicator did not become ready. No input was enabled.".into())
     }
 
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    pub fn start(window: &Window) -> Result<Self, String> {
+        use std::os::unix::fs::DirBuilderExt;
+        let directory =
+            std::env::temp_dir().join(format!("jackalope-window-{}", uuid::Uuid::new_v4()));
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&directory)
+            .map_err(|e| e.to_string())?;
+        let result = Self::start_macos(window, directory.clone());
+        if result.is_err() {
+            let _ = std::fs::remove_dir_all(directory);
+        }
+        result
+    }
+
+    #[cfg(target_os = "macos")]
+    fn start_macos(window: &Window, directory: PathBuf) -> Result<Self, String> {
+        let accent = ACCENT
+            .get_or_init(|| Mutex::new("#6366f1".into()))
+            .lock()
+            .unwrap()
+            .clone();
+        std::fs::write(directory.join("theme"), accent).map_err(|e| e.to_string())?;
+        let errors =
+            std::fs::File::create(directory.join("error.log")).map_err(|e| e.to_string())?;
+        let mut command = super::platform::command(json!({"action":"indicator", "window":window,
+            "file":directory.join("state"),"theme":directory.join("theme")}))?;
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(errors);
+        let mut child = command.spawn().map_err(|e| e.to_string())?;
+        let tree = match super::super::process_control::ProcessTree::attach(&child) {
+            Ok(tree) => tree,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        };
+        let mut result = Self {
+            child,
+            tree,
+            directory,
+        };
+        for _ in 0..100 {
+            if result
+                .child
+                .try_wait()
+                .map_err(|e| e.to_string())?
+                .is_some()
+            {
+                return Err(format!(
+                    "Desktop indicator could not start: {}",
+                    std::fs::read_to_string(result.directory.join("error.log"))
+                        .unwrap_or_default()
+                        .chars()
+                        .take(1200)
+                        .collect::<String>()
+                ));
+            }
+            if result.state().is_ok() {
+                return Ok(result);
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        Err("Desktop indicator did not become ready. No input was enabled.".into())
+    }
+
+    #[cfg(not(any(windows, target_os = "macos")))]
     pub fn start(_: &Window) -> Result<Self, String> {
-        Err("Desktop indicator requires Windows.".into())
+        Err("A guarded native desktop backend is unavailable on this desktop.".into())
     }
 
     pub fn state(&mut self) -> Result<State, String> {

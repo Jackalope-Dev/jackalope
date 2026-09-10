@@ -1,5 +1,6 @@
 import { LifeBuoy, Minus, Settings2, Square, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { shortcutLabel } from '../../lib/platform-shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
@@ -48,7 +49,7 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
       <div className="app-titlebar-controls">
         {onSettings && showThemePicker && <ArcColorPicker variant="titlebar" />}
         {onSettings && (
-          <Tooltip content={`Settings (${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+,)`}>
+          <Tooltip content={`Settings (${shortcutLabel(',')})`}>
             <button
               type="button"
               className="app-titlebar-button"

@@ -45,7 +45,7 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
     let tokens = std::env::var("JACKALOPE_EVAL_TOKENS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(100_000)
+        .unwrap_or(1_000_000)
         .clamp(1000, 1_000_000);
     let root = std::env::temp_dir().join(format!("jackalope-evaluation-{}", Uuid::new_v4()));
     let repo = root.join("repo");
@@ -141,10 +141,49 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
+    let elapsed_ms = started.elapsed().as_millis();
+    service.shutdown();
+    if runtime
+        .integration_runs()?
+        .iter()
+        .any(|run| active(&run.status))
+    {
+        runtime.stop_all();
+        let stopping = Instant::now();
+        while runtime
+            .integration_runs()?
+            .iter()
+            .any(|run| active(&run.status))
+            && stopping.elapsed().as_secs() < 15
+        {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
     let runs = runtime.integration_runs()?;
-    let final_run = runs.iter().max_by_key(|r| &r.started_at);
+    let view = service.view()?;
+    let completed = ids.iter().all(|id| {
+        view.items
+            .iter()
+            .find(|item| &item.id == id)
+            .and_then(|item| item.run_id.as_ref())
+            .is_some_and(|id| {
+                runs.iter().any(|run| {
+                    &run.id == id && ["review", "reviewed"].contains(&run.status.as_str())
+                })
+            })
+    });
+    let final_run = ids
+        .last()
+        .and_then(|id| view.items.iter().find(|item| &item.id == id))
+        .and_then(|item| item.run_id.as_ref())
+        .and_then(|id| runs.iter().find(|run| &run.id == id));
+    let queue: Vec<_> = view
+        .items
+        .iter()
+        .map(|item| json!({"id":item.id,"runId":item.run_id,"error":item.error}))
+        .collect();
     std::fs::write(root.join("oracle.cjs"), case["oracle"].as_str().unwrap())?;
-    let oracle = if let Some(run) = final_run.filter(|r| !active(&r.status)) {
+    let oracle = if let Some(run) = final_run.filter(|_| completed && !budget_stopped) {
         let mut command = std::process::Command::new("node");
         command.arg(root.join("oracle.cjs")).arg(&run.workspace);
         Some(crate::commands::process_control::run_cancellable(
@@ -155,7 +194,7 @@ async fn evaluate() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
-    let report = json!({"version":1,"case":case_id,"mode":mode,"elapsedMs":started.elapsed().as_millis(),"secondsBudget":seconds,"observedTokenBudget":tokens,"budgetStopped":budget_stopped,"oracle":oracle,"accepted":null,"humanReviewMinutes":null,"escapedDefects":null,"runs":runs,"limitations":"The automated oracle is not human acceptance. Token stopping uses reported usage and cannot enforce provider spending. Serial mode uses immediate fixture integration, excluding real human review delays. Repeat each mode with the same provider/model and budgets before drawing conclusions."});
+    let report = json!({"version":1,"case":case_id,"mode":mode,"elapsedMs":elapsed_ms,"secondsBudget":seconds,"observedTokenBudget":tokens,"budgetStopped":budget_stopped,"completed":completed,"queue":queue,"oracle":oracle,"accepted":null,"humanReviewMinutes":null,"escapedDefects":null,"runs":runs,"limitations":"The automated oracle is not human acceptance. Token stopping uses reported usage and cannot enforce provider spending. Serial mode uses immediate fixture integration, excluding real human review delays. Repeat each mode with the same provider/model and budgets before drawing conclusions."});
     std::fs::write(
         root.join("evaluation.json"),
         serde_json::to_vec_pretty(&report)?,

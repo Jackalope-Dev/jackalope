@@ -1,6 +1,9 @@
+import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ContextSelection } from '../lib/knowledge';
+import { observeRefresh } from '../lib/observe-refresh';
+import { mergeTaskChanges, type TaskChanges } from '../lib/task-changes';
 import type { TaskEffort } from '../lib/task-effort';
 import {
   isActive,
@@ -46,6 +49,8 @@ interface ExecutionState {
   refresh: () => Promise<void>;
   start: (request: Omit<RunRequest, 'id'>, options?: { background?: boolean }) => Promise<string>;
 }
+let revision: number | undefined;
+let previousDetailId: string | null = null;
 let refreshing: Promise<void> | undefined;
 let discovering: Promise<void> | undefined;
 export const useExecutionStore = create<ExecutionState>()(
@@ -97,12 +102,21 @@ export const useExecutionStore = create<ExecutionState>()(
         const detailId = get().selectedId;
         refreshing = Promise.resolve().then(async () => {
           try {
-            const runs = isTauriEnvironment()
-              ? await nativeTask<TaskRun[]>('task_runs', { detailId })
-              : [];
+            let runs = get().runs;
+            if (isTauriEnvironment()) {
+              const changes = await nativeTask<TaskChanges>('task_changes', {
+                since: revision ?? null,
+                detailId,
+                previousDetailId,
+              });
+              runs = mergeTaskChanges(runs, changes);
+              revision = changes.revision;
+              previousDetailId = detailId;
+            }
             const working = runs.some(isActive);
             const wasWorking = get().runs.some(isActive);
-            set({ runs, loading: false, error: null, historyError: null });
+            if (runs !== get().runs || get().loading || get().error || get().historyError)
+              set({ runs, loading: false, error: null, historyError: null });
             if (working !== wasWorking)
               useMascotStore.getState().setMood(working ? 'working' : 'idle');
           } catch (error) {
@@ -138,17 +152,25 @@ export const useExecutionStore = create<ExecutionState>()(
 );
 
 export function observeExecution() {
-  let disposed = false;
-  let timer: ReturnType<typeof setTimeout>;
-  const poll = async () => {
-    await useExecutionStore.getState().refresh();
-    if (!disposed)
-      timer = setTimeout(poll, useExecutionStore.getState().runs.some(isActive) ? 1000 : 8000);
-  };
-  void poll();
+  let eventsAvailable = false;
   if (isTauriEnvironment()) void useExecutionStore.getState().discover();
-  return () => {
-    disposed = true;
-    clearTimeout(timer);
-  };
+  return observeRefresh({
+    refresh: () => useExecutionStore.getState().refresh(),
+    interval: () =>
+      !eventsAvailable
+        ? useExecutionStore.getState().runs.some(isActive)
+          ? 1000
+          : 8000
+        : document.hidden
+          ? 60_000
+          : 15_000,
+    subscribe: isTauriEnvironment()
+      ? async (changed) => {
+          const stop = await listen('task-state-changed', changed);
+          eventsAvailable = true;
+          changed();
+          return stop;
+        }
+      : undefined,
+  });
 }

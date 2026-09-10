@@ -61,7 +61,7 @@ export const roadmapStages = [
         title: 'The small things that earn trust.',
         summary: 'Keyboard access, performance, and feedback from early users.',
         detail:
-          'Release work includes accessibility, large-project responsiveness, saved-data recovery, and external beta trials. Required account access in every build, optional settings sync, and feedback flows also need installed-app and delivery checks before wider use.',
+          'Task updates, history loading, and rich rendering have local performance improvements. Installed startup, memory, accessibility, saved-data recovery, and external beta trials remain release work. Required account access in every build, optional settings sync, and feedback flows also need installed-app and delivery checks before wider use.',
       },
     ],
   },

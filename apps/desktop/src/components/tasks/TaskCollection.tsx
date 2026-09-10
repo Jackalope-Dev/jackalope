@@ -1,5 +1,5 @@
 import { Check, ChevronRight, Columns3, Lightbulb, List, ListTodo, Search } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode, useMemo } from 'react';
 
 import { ideaStageLabels, type WorkItem, workStages } from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
@@ -39,78 +39,28 @@ export function TaskCollection({
   const setFilter = (filter: string) => onViewChange({ ...view, filter });
   const setLayout = (layout: 'list' | 'board') => onViewChange({ ...view, layout });
   const setQuery = (query: string) => onViewChange({ ...view, query });
-  const filtered = items.filter(
-    (item) =>
-      (filter === 'all' || item.stage === filter) &&
-      `${item.title} ${item.idea?.rawPrompt ?? ''} ${item.run?.prompt ?? ''}`
-        .toLowerCase()
-        .includes(query.trim().toLowerCase()),
+  const filtered = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          (filter === 'all' || item.stage === filter) &&
+          `${item.title} ${item.idea?.rawPrompt ?? ''} ${item.run?.prompt ?? ''}`
+            .toLowerCase()
+            .includes(query.trim().toLowerCase()),
+      ),
+    [items, filter, query],
   );
-  const card = (item: WorkItem) => {
-    const agent = item.run?.agent ?? item.idea?.assignedAgent;
-    const date = new Date(item.date);
-    return (
-      <button
-        id={`work-item-${item.id}`}
-        key={item.id}
-        type="button"
-        className="work-item"
-        onClick={() => onOpen(item)}
-      >
-        <span className="work-item-content">
-          <span className="work-item-title">{item.title}</span>
-          <span className="work-item-meta">
-            <span>
-              {item.run?.projectName ??
-                projects.find((p) => p.id === item.idea?.projectId)?.name ??
-                'No project yet'}{' '}
-              ·{' '}
-            </span>
-            {agent && agent !== 'Unassigned' && (
-              <span>{runners.find((r) => r.id === agent)?.name ?? agent} · </span>
-            )}
-            {Number.isNaN(date.getTime()) ? (
-              'Date unavailable'
-            ) : (
-              <time dateTime={item.date} title={date.toLocaleString()}>
-                {date.toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </time>
-            )}
-          </span>
-        </span>
-        {item.run ? (
-          <span className="work-item-status">
-            {item.stage === 'finished' && item.run.status !== 'reviewed' ? (
-              <span className="task-status">
-                <Check size={16} />
-                Integrated
-              </span>
-            ) : layout === 'board' ||
-              (item.stage === 'attention' &&
-                ['failed', 'stopped', 'interrupted'].includes(item.run.status)) ? (
-              <RunStatus status={item.run.status} />
-            ) : null}
-            <span className="work-item-action">
-              {item.stage === 'finished' ? 'Open result' : taskNextAction(item.run)}
-              <ChevronRight size={14} aria-hidden="true" />
-            </span>
-            {item.run.persistenceError && <span className="work-item-meta">Not saved</span>}
-          </span>
-        ) : (
-          <span className="work-idea-status">
-            {item.idea?.status === 'done' ? <Check size={15} /> : <Lightbulb size={15} />}
-            {item.idea?.runId
-              ? 'History unavailable'
-              : ideaStageLabels[item.idea?.status ?? 'backlog']}
-          </span>
-        )}
-      </button>
-    );
-  };
+  const card = (item: WorkItem) => (
+    <WorkCard
+      key={item.id}
+      item={item}
+      runners={runners}
+      projects={projects}
+      onOpen={onOpen}
+      layout={layout}
+    />
+  );
+
   return (
     <div className="task-collection">
       {items.length > 0 && (
@@ -240,3 +190,99 @@ export function TaskCollection({
     </div>
   );
 }
+
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'short',
+  timeStyle: 'medium',
+});
+const WorkCard = memo(
+  function WorkCard({
+    item,
+    runners,
+    projects,
+    onOpen,
+    layout,
+  }: {
+    item: WorkItem;
+    runners: Runner[];
+    projects: ReturnType<typeof useProjectStore.getState>['projects'];
+    onOpen: (item: WorkItem) => void;
+    layout: TaskCollectionView['layout'];
+  }) {
+    const agent = item.run?.agent ?? item.idea?.assignedAgent;
+    const date = new Date(item.date);
+    return (
+      <button
+        id={`work-item-${item.id}`}
+        key={item.id}
+        type="button"
+        className="work-item"
+        onClick={() => onOpen(item)}
+      >
+        <span className="work-item-content">
+          <span className="work-item-title">{item.title}</span>
+          <span className="work-item-meta">
+            <span>
+              {item.run?.projectName ??
+                projects.find((p) => p.id === item.idea?.projectId)?.name ??
+                'No project yet'}{' '}
+              ·{' '}
+            </span>
+            {agent && agent !== 'Unassigned' && (
+              <span>{runners.find((r) => r.id === agent)?.name ?? agent} · </span>
+            )}
+            {Number.isNaN(date.getTime()) ? (
+              'Date unavailable'
+            ) : (
+              <time dateTime={item.date} title={dateTimeFormatter.format(date)}>
+                {dateFormatter.format(date)}
+              </time>
+            )}
+          </span>
+        </span>
+        {item.run ? (
+          <span className="work-item-status">
+            {item.stage === 'finished' && item.run.status !== 'reviewed' ? (
+              <span className="task-status">
+                <Check size={16} />
+                Integrated
+              </span>
+            ) : layout === 'board' ||
+              (item.stage === 'attention' &&
+                ['failed', 'stopped', 'interrupted'].includes(item.run.status)) ? (
+              <RunStatus status={item.run.status} />
+            ) : null}
+            <span className="work-item-action">
+              {item.stage === 'finished' ? 'Open result' : taskNextAction(item.run)}
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
+            {item.run.persistenceError && <span className="work-item-meta">Not saved</span>}
+          </span>
+        ) : (
+          <span className="work-idea-status">
+            {item.idea?.status === 'done' ? <Check size={15} /> : <Lightbulb size={15} />}
+            {item.idea?.runId
+              ? 'History unavailable'
+              : ideaStageLabels[item.idea?.status ?? 'backlog']}
+          </span>
+        )}
+      </button>
+    );
+  },
+  (before, after) =>
+    before.onOpen === after.onOpen &&
+    before.layout === after.layout &&
+    before.runners === after.runners &&
+    before.projects === after.projects &&
+    before.item.id === after.item.id &&
+    before.item.title === after.item.title &&
+    before.item.stage === after.item.stage &&
+    before.item.date === after.item.date &&
+    before.item.run === after.item.run &&
+    before.item.idea === after.item.idea,
+);

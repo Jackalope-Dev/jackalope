@@ -2,6 +2,7 @@ import { PRESET_THEMES } from '@jackalope/brand/theme';
 import * as Dialog from '@radix-ui/react-dialog';
 import { LifeBuoy, Plus, Search, Settings2 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { shortcutLabel } from '../../lib/platform-shortcuts';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useThemeStore } from '../../stores/themeStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
@@ -110,7 +111,7 @@ export function CommandPalette({
               >
                 <Plus size={16} />
                 <span>New task</span>
-                <kbd>Ctrl Shift N</kbd>
+                <kbd>{shortcutLabel('Shift+N')}</kbd>
               </button>
             )}
             {showSettings && (

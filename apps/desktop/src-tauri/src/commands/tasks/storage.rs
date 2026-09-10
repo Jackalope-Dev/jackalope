@@ -25,6 +25,8 @@ impl TaskRuntime {
             .open(directory.join("runtime.lock"))
             .map_err(|e| e.to_string())?;
         owner.try_lock().map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
+        let owner = Arc::new(owner);
+        let writer = journal::Writer::new(directory.clone())?;
         let runtime = Self {
             access: Arc::new(super::super::execution_access::ExecutionAccess::new()),
             knowledge: super::super::knowledge::KnowledgeStore::new(
@@ -33,17 +35,48 @@ impl TaskRuntime {
             mcp_broker: super::super::mcp_broker::Broker::default(),
             inner: Arc::new(Mutex::new(Inner::default())),
             directory,
-            _owner: Arc::new(owner),
+            writer,
+            _owner: owner,
         };
         let paths: Vec<_> = std::fs::read_dir(&runtime.directory)
             .map_err(|e| e.to_string())?
             .map(|entry| entry.map(|entry| entry.path()).map_err(|e| e.to_string()))
             .collect::<Result<_, _>>()?;
+        let history: Vec<_> = paths
+            .iter()
+            .filter(|path| {
+                path.extension().is_some_and(|ext| ext == "json")
+                    && path.file_name().is_none_or(|name| name != "schedules.json")
+            })
+            .collect();
+        let mut loaded: HashMap<_, _> = std::thread::scope(|scope| {
+            let workers: Vec<_> = history
+                .chunks(history.len().div_ceil(4).max(1))
+                .map(|chunk| {
+                    scope.spawn(move || {
+                        chunk
+                            .iter()
+                            .map(|path| ((*path).clone(), load_record(path)))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+            workers
+                .into_iter()
+                .flat_map(|worker| worker.join().expect("history reader panicked"))
+                .collect()
+        });
         for path in paths {
             if path
                 .file_name()
                 .is_some_and(|name| name == "schedules.json")
             {
+                continue;
+            }
+            if path.extension().is_some_and(|ext| ext == "journal")
+                && !path.with_extension("json").exists()
+            {
+                runtime.record_recovery(HistoryRecoveryEntry { path: path.to_string_lossy().into_owned(), reason: "A task journal has no snapshot. The original remains available for recovery.".into(), quarantined: false });
                 continue;
             }
             if path.extension().is_some_and(|ext| ext == "tmp") {
@@ -63,8 +96,28 @@ impl TaskRuntime {
                 continue;
             }
             if path.extension().is_some_and(|ext| ext == "json") {
-                let bytes = match crate::commands::history::read_bounded(&path, 8_000_000) {
-                    Ok(bytes) => bytes,
+                let parsed = match loaded
+                    .remove(&path)
+                    .expect("history loader omitted a record")
+                {
+                    Ok((parsed, warning)) => {
+                        if let Some(warning) = warning {
+                            runtime.record_recovery(HistoryRecoveryEntry {
+                                path: path
+                                    .with_extension("journal")
+                                    .to_string_lossy()
+                                    .into_owned(),
+                                reason: warning.clone(),
+                                quarantined: false,
+                            });
+                            parsed.map(|mut run| {
+                                run.persistence_error = Some(warning);
+                                run
+                            })
+                        } else {
+                            parsed
+                        }
+                    }
                     Err(reason) => {
                         runtime.record_recovery(HistoryRecoveryEntry {
                             path: path.to_string_lossy().into_owned(),
@@ -74,16 +127,6 @@ impl TaskRuntime {
                         continue;
                     }
                 };
-                let parsed = serde_json::from_slice::<TaskRun>(&bytes).map_err(|e| e.to_string())
-                    .and_then(|run| {
-                        if !valid_id(&run.id) {
-                            Err("invalid task identifier".to_string())
-                        } else if path.file_stem().and_then(|stem| stem.to_str()) != Some(run.id.as_str()) {
-                            Err("Task identifier does not match its history filename; the other task was not overwritten.".into())
-                        } else if run.details_omitted {
-                            Err("This file contains a task summary rather than a complete history record.".into())
-                        } else { Ok(run) }
-                    });
                 match parsed {
                     Err(reason) => {
                         runtime
@@ -94,7 +137,6 @@ impl TaskRuntime {
                             .push(quarantine(&path, reason));
                     }
                     Ok(mut run) => {
-                        run.persistence_error = None;
                         if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
                             run.status = if cfg!(windows) && run.process_contained {
                                 "stopped"
@@ -108,6 +150,8 @@ impl TaskRuntime {
                                 run.persistence_error = Some(format!(
                                     "The recovered state could not be saved: {error}"
                                 ));
+                            } else {
+                                run.persistence_error = None;
                             }
                         }
                         runtime
@@ -185,7 +229,7 @@ impl TaskRuntime {
         files
             .into_iter()
             .filter_map(|(path, _)| {
-                let bytes = crate::commands::history::read_bounded(&path, 8_000_000).ok()?;
+                let bytes = journal::read(&path).ok()?;
                 let run = serde_json::from_slice::<TaskRun>(&bytes).ok()?;
                 (path.file_stem().and_then(|stem| stem.to_str()) == Some(run.id.as_str()))
                     .then_some(run)
@@ -231,7 +275,9 @@ impl TaskRuntime {
         }
         run.persistence_error = None;
         std::fs::rename(&archived, &live).map_err(|e| e.to_string())?;
-        self.inner.lock().unwrap().runs.insert(run.id.clone(), run);
+        let mut inner = self.inner.lock().unwrap();
+        self.writer.changed(&run.id);
+        inner.runs.insert(run.id.clone(), run);
         Ok(())
     }
 
@@ -275,24 +321,60 @@ impl TaskRuntime {
         self.save(&run)?;
         let id = run.id.clone();
         let _ = std::fs::remove_file(self.archive_directory().join(format!("{id}.json")));
-        self.inner.lock().unwrap().runs.insert(id.clone(), run);
+        let mut inner = self.inner.lock().unwrap();
+        self.writer.changed(&id);
+        inner.runs.insert(id.clone(), run);
         Ok(id)
     }
 
     pub(super) fn save(&self, run: &TaskRun) -> Result<(), String> {
-        if !valid_id(&run.id) || run.details_omitted {
-            return Err("Only a complete task record with a valid identifier can be saved.".into());
+        journal::Writer::wait(self.writer.submit(run.clone(), true)?)
+    }
+
+    pub(super) fn update_output(
+        &self,
+        id: &str,
+        update: impl FnOnce(&mut TaskRun),
+    ) -> Result<(), String> {
+        let receive = {
+            let mut inner = self.inner.lock().unwrap();
+            let run = inner.runs.get_mut(id).ok_or("Attempt not found")?;
+            update(run);
+            Self::bound_output(run);
+            self.writer.submit(run.clone(), false)?
+        };
+        let result = journal::Writer::wait(receive);
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(run) = inner.runs.get_mut(id) {
+            run.persistence_error = self.writer.error(id);
+            self.writer.changed(id);
         }
-        let mut saved = run.clone();
-        saved.persistence_error = None;
-        let bytes = serde_json::to_vec(&saved).map_err(|e| e.to_string())?;
-        if bytes.len() > 8_000_000 {
-            return Err("This task exceeds the history size limit. Save a recovery copy before closing Jackalope.".into());
+        result
+    }
+
+    fn bound_output(run: &mut TaskRun) {
+        if run.result.len() > 128_000 {
+            let mut end = 128_000;
+            while !run.result.is_char_boundary(end) {
+                end -= 1;
+            }
+            run.result.truncate(end);
+            run.result
+                .push_str("\n[Result truncated; inspect the agent session for complete output.]");
         }
-        crate::commands::history::write_atomic(
-            &self.directory.join(format!("{}.json", run.id)),
-            &bytes,
-        )
+        if run.validation_steps.len() > 200 {
+            run.validation_steps
+                .drain(..run.validation_steps.len() - 200);
+        }
+        if run.screenshots.len() > 100 {
+            run.screenshots.drain(..run.screenshots.len() - 100);
+        }
+        if run.activity.len() > 150 {
+            run.activity.drain(..run.activity.len() - 150);
+        }
+        if run.diagnostics.len() > 150 {
+            run.diagnostics.drain(..run.diagnostics.len() - 150);
+        }
     }
 
     pub(in crate::commands) fn update(&self, id: &str, update: impl FnOnce(&mut TaskRun)) {
@@ -307,29 +389,7 @@ impl TaskRuntime {
         let mut inner = self.inner.lock().unwrap();
         if let Some(run) = inner.runs.get_mut(id) {
             update(run);
-            if run.result.len() > 128_000 {
-                let mut end = 128_000;
-                while !run.result.is_char_boundary(end) {
-                    end -= 1;
-                }
-                run.result.truncate(end);
-                run.result.push_str(
-                    "\n[Result truncated; inspect the agent session for complete output.]",
-                );
-            }
-            if run.validation_steps.len() > 200 {
-                run.validation_steps
-                    .drain(..run.validation_steps.len() - 200);
-            }
-            if run.screenshots.len() > 100 {
-                run.screenshots.drain(..run.screenshots.len() - 100);
-            }
-            if run.activity.len() > 150 {
-                run.activity.drain(..run.activity.len() - 150);
-            }
-            if run.diagnostics.len() > 150 {
-                run.diagnostics.drain(..run.diagnostics.len() - 150);
-            }
+            Self::bound_output(run);
             if let Err(error) = self.save(run) {
                 let error = format!("History could not be saved: {error}");
                 run.persistence_error = Some(error.clone());
@@ -343,13 +403,12 @@ impl TaskRuntime {
     }
 
     pub(in crate::commands) fn ensure_history_saved(&self) -> Result<(), String> {
-        if self
-            .inner
-            .lock()
-            .map_err(|e| e.to_string())?
+        let inner = self.inner.lock().map_err(|e| e.to_string())?;
+        self.writer.flush()?;
+        if inner
             .runs
             .values()
-            .any(|run| run.persistence_error.is_some())
+            .any(|run| run.persistence_error.is_some() || self.writer.error(&run.id).is_some())
         {
             return Err("Task history has unsaved changes. Open the affected task and retry saving before starting more work or installing an update.".into());
         }
@@ -382,4 +441,18 @@ impl TaskRuntime {
     pub(in crate::commands) fn record_recovery(&self, entry: HistoryRecoveryEntry) {
         self.inner.lock().unwrap().recovery.push(entry);
     }
+}
+
+fn load_record(path: &Path) -> Result<(Result<TaskRun, String>, Option<String>), String> {
+    let (bytes, warning) = journal::recover(path)?;
+    Ok((serde_json::from_slice::<TaskRun>(&bytes).map_err(|e| e.to_string())
+                    .and_then(|run| {
+                        if !valid_id(&run.id) {
+                            Err("invalid task identifier".to_string())
+                        } else if path.file_stem().and_then(|stem| stem.to_str()) != Some(run.id.as_str()) {
+                            Err("Task identifier does not match its history filename; the other task was not overwritten.".into())
+                        } else if run.details_omitted {
+                            Err("This file contains a task summary rather than a complete history record.".into())
+                        } else { Ok(run) }
+                    }), warning))
 }

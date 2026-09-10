@@ -48,5 +48,41 @@ fn main() {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(staged, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
+    if target.contains("apple") {
+        let source = root.join("src/commands/desktop_control/macos.swift");
+        println!("cargo:rerun-if-changed={}", source.display());
+        let output = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap())
+            .join("jackalope-desktop-control");
+        let swift_target = if target.starts_with("aarch64") {
+            "arm64-apple-macos11.0"
+        } else {
+            "x86_64-apple-macos11.0"
+        };
+        let status = std::process::Command::new("xcrun")
+            .args([
+                "swiftc",
+                "-swift-version",
+                "5",
+                "-O",
+                "-target",
+                swift_target,
+            ])
+            .arg(&source)
+            .arg("-o")
+            .arg(&output)
+            .status()
+            .expect("Building macOS desktop control requires Xcode command-line tools");
+        assert!(status.success(), "macOS desktop helper compilation failed");
+        let destination = root.join("resources/desktop-control/jackalope-desktop-control");
+        let bytes = std::fs::read(&output).unwrap();
+        if std::fs::read(&destination).ok().as_deref() != Some(bytes.as_slice()) {
+            std::fs::write(&destination, bytes).unwrap();
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(destination, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
     tauri_build::build()
 }

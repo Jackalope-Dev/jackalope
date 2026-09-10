@@ -19,7 +19,10 @@ release dates.
   recovery with staged changes, locked folders and active tasks.
 - [ ] Verify rich results and diffs in installed WebViews. Preserve the Streamdown
   cache regression when upgrading dependencies.
-- [ ] Measure native startup, memory, large histories, diffs and responsiveness.
+- [ ] Complete installed startup, CPU/memory and responsiveness measurements using
+  the [performance fixtures](PERFORMANCE.md), including sustained streams, repeated
+  task switching and large wrapped patches. Local runtime/browser checks pass;
+  installed and cross-platform performance acceptance remains open.
 
 ## Agents and task execution
 

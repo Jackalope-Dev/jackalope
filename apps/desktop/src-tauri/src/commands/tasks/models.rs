@@ -177,3 +177,72 @@ pub struct Runner {
     pub account: String,
     pub detail: String,
 }
+
+impl TaskRun {
+    pub(super) fn summary(&self) -> Self {
+        let mut context_receipt = self.context_receipt.clone();
+        for entry in &mut context_receipt.entries {
+            entry.content.clear();
+            if let Some(source) = &mut entry.automatic {
+                source.evidence.clear();
+            }
+        }
+        let verification = self.verification.as_ref().map(|check| {
+            let mut check = check.clone();
+            check.result.stdout.clear();
+            check.result.stderr.clear();
+            check
+        });
+        Self {
+            dependency_invalidated: self.dependency_invalidated,
+            stages: self.stages.clone(),
+            dependency_snapshot: self.dependency_snapshot.clone(),
+            checkpoint: self.checkpoint.clone(),
+            checkpoint_error: self.checkpoint_error.clone(),
+            routing: self.routing.clone(),
+            quota_failure: self.quota_failure.clone(),
+            contract: self.contract.clone(),
+            monitor_change: self.monitor_change.clone(),
+            context_receipt: context_receipt,
+            id: self.id.clone(),
+            task_id: self.task_id.clone(),
+            project_id: self.project_id.clone(),
+            project_name: self.project_name.clone(),
+            project_path: self.project_path.clone(),
+            workspace: self.workspace.clone(),
+            branch: self.branch.clone(),
+            base_head: self.base_head.clone(),
+            agent: self.agent.clone(),
+            account: self.account.clone(),
+            connection_ids: self.connection_ids.clone(),
+            account_binding: self.account_binding.clone(),
+            target_branch: self.target_branch.clone(),
+            process_contained: self.process_contained.clone(),
+            verify_command: self.verify_command.clone(),
+            prepare_command: self.prepare_command.clone(),
+            auto_verify: self.auto_verify.clone(),
+            verification: verification,
+            finishing: self.finishing.clone(),
+            verification_error: self.verification_error.clone(),
+            model: self.model.clone(),
+            prompt: self.prompt.chars().take(500).collect(),
+            status: self.status.clone(),
+            started_at: self.started_at.clone(),
+            ended_at: self.ended_at.clone(),
+            session_id: self.session_id.clone(),
+            result: Default::default(),
+            details_omitted: true,
+            activity: Default::default(),
+            diagnostics: Default::default(),
+            error: self.error.clone(),
+            persistence_error: self.persistence_error.clone(),
+            exit_code: self.exit_code.clone(),
+            usage: self.usage.clone(),
+            mcp_usage: self.mcp_usage.clone(),
+            usage_observations: self.usage_observations.clone(),
+            prompts: self.prompts.clone(),
+            validation_steps: self.validation_steps.clone(),
+            screenshots: self.screenshots.clone(),
+        }
+    }
+}

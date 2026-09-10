@@ -12,11 +12,16 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
+  worker: { format: 'es' },
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: {
-      '@': path.resolve(import.meta.dirname, './src'),
-    },
+    alias: [
+      {
+        find: /^shiki$/,
+        replacement: path.resolve(import.meta.dirname, './src/lib/highlighter-bundle.ts'),
+      },
+      { find: '@', replacement: path.resolve(import.meta.dirname, './src') },
+    ],
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   // 1. prevent vite from obscuring rust errors

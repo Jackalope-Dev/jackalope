@@ -1,12 +1,18 @@
 mod antigravity;
 mod events;
 pub(super) mod helper_process;
+mod journal;
+#[cfg(test)]
+mod journal_tests;
 pub(super) mod kimi;
 mod models;
+#[cfg(test)]
+mod performance;
 mod project_setup;
 mod routing;
 mod runners;
 mod runtime;
+mod snapshots;
 mod storage;
 #[cfg(test)]
 mod tests;
@@ -18,6 +24,7 @@ pub use project_setup::*;
 use runners::discover_runner;
 pub(super) use runners::executable;
 pub(super) use runners::BUILTIN_AGENTS;
+pub use snapshots::task_changes;
 
 use super::history::{quarantine, HistoryRecovery, HistoryRecoveryEntry};
 use chrono::Utc;
@@ -49,6 +56,8 @@ pub struct TaskRuntime {
     pub(in crate::commands) mcp_broker: super::mcp_broker::Broker,
     inner: Arc<Mutex<Inner>>,
     directory: PathBuf,
+    // Drop joins the writer before releasing the profile lock below.
+    writer: journal::Writer,
     _owner: Arc<std::fs::File>,
 }
 
@@ -379,28 +388,7 @@ pub async fn task_import_recovery(
 
 #[tauri::command]
 pub fn task_runs(state: State<'_, TaskRuntime>, detail_id: Option<String>) -> Vec<TaskRun> {
-    let mut runs: Vec<_> = state.inner.lock().unwrap().runs.values().cloned().collect();
-    runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
-    for run in &mut runs {
-        if detail_id.as_deref() != Some(run.id.as_str()) {
-            run.details_omitted = true;
-            run.prompt = run.prompt.chars().take(500).collect();
-            run.result.clear();
-            run.activity.clear();
-            run.diagnostics.clear();
-            for entry in &mut run.context_receipt.entries {
-                entry.content.clear();
-                if let Some(source) = &mut entry.automatic {
-                    source.evidence.clear();
-                }
-            }
-            if let Some(check) = &mut run.verification {
-                check.result.stdout.clear();
-                check.result.stderr.clear();
-            }
-        }
-    }
-    runs
+    state.snapshot(detail_id.as_deref())
 }
 
 #[tauri::command]

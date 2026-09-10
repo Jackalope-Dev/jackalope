@@ -109,3 +109,4 @@ dist-lab/
 
 /apps/desktop/.settings-sync-fixture.html
 /apps/desktop/.settings-sync-fixture.tsx
+/apps/desktop/src-tauri/resources/desktop-control/jackalope-desktop-control

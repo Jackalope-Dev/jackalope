@@ -45,7 +45,7 @@ pub(in crate::commands) fn prepare(
     command: &str,
     workspace: &str,
 ) -> Result<process_control::CommandResult, String> {
-    let _guard = super::integration::execution_guard()?;
+    let guard = super::integration::execution_guard()?;
     let runs = runtime.integration_runs()?;
     if runs.iter().any(|other| {
         other.id != id
@@ -58,6 +58,9 @@ pub(in crate::commands) fn prepare(
         run.activity
             .push("Preparing the workspace with the saved project command.".into())
     })?;
+    let _lease = leases::reserve(workspace)?;
+    drop(guard);
+    let _slot = leases::check_slot(|| !runtime.is_running(id))?;
     let result = process_control::run_cancellable(
         shell(command, workspace)?,
         Duration::from_secs(300),
@@ -74,29 +77,33 @@ pub(in crate::commands) fn prepare(
 
 fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verification, String> {
     let active = ["starting", "running"].contains(&run.status.as_str());
-    runtime.stage(&run.id, Some("verification_wait"));
-    let _slot = leases::check_slot(|| active && !runtime.is_running(&run.id))?;
-    let directory = runtime.integration_directory();
-    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    let before = super::integration::workspace_tree(run, &directory)?;
-    runtime.stage(&run.id, Some("verification"));
-    let agent_active = ["starting", "running"].contains(&run.status.as_str());
-    let result = process_control::run_cancellable(
-        shell(command, &run.workspace)?,
-        Duration::from_secs(300),
-        || agent_active && !runtime.is_running(&run.id),
-    )?;
-    let after = super::integration::workspace_tree(run, &directory)?;
-    let verification = Verification {
-        command: command.to_string(),
-        checked_at: chrono::Utc::now().to_rfc3339(),
-        tree: (before == after).then_some(after),
-        result,
-    };
-    let _guard = super::integration::execution_guard()?;
-    runtime.update_checked(&run.id, |r| r.verification = Some(verification.clone()))?;
-    runtime.stage(&run.id, None);
-    Ok(verification)
+    let result = (|| {
+        runtime.stage(&run.id, Some("verification_wait"));
+        let _slot = leases::check_slot(|| active && !runtime.is_running(&run.id))?;
+        let directory = runtime.integration_directory();
+        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let before = super::integration::workspace_tree(run, &directory)?;
+        runtime.stage(&run.id, Some("verification"));
+        let agent_active = ["starting", "running"].contains(&run.status.as_str());
+        let result = process_control::run_cancellable(
+            shell(command, &run.workspace)?,
+            Duration::from_secs(300),
+            || agent_active && !runtime.is_running(&run.id),
+        )?;
+        let after = super::integration::workspace_tree(run, &directory)?;
+        let verification = Verification {
+            command: command.to_string(),
+            checked_at: chrono::Utc::now().to_rfc3339(),
+            tree: (before == after).then_some(after),
+            result,
+        };
+        let _guard = super::integration::execution_guard()?;
+        runtime.update_checked(&run.id, |r| r.verification = Some(verification.clone()))?;
+        Ok(verification)
+    })();
+    let resume = active && !run.finishing && runtime.is_running(&run.id);
+    runtime.stage(&run.id, resume.then_some("execution"));
+    result
 }
 
 pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(), String> {

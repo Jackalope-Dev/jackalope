@@ -297,7 +297,11 @@ pub fn helper_snapshot(helper: State<'_, Helper>) -> View {
 }
 
 #[tauri::command]
-pub fn helper_sync(helper: State<'_, Helper>, mut context: Value) -> Result<(), String> {
+pub fn helper_sync(helper: State<'_, Helper>, context: Option<Value>) -> Result<(), String> {
+    let Some(mut context) = context else {
+        helper.inner.lock().unwrap().context_at = Some(Instant::now());
+        return Ok(());
+    };
     if !context.is_object() || context.to_string().len() > 48_000 {
         return Err("Helper context is too large.".into());
     }

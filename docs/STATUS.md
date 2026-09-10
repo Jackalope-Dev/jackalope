@@ -7,6 +7,9 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 ## Implemented
 
 - Local projects, tasks, saved ideas, persistent history and recovery.
+- Durable incremental output saves, concurrent history loading, changed-record UI
+  updates and background rich rendering. Local fixtures show improvements;
+  [installed performance acceptance](PERFORMANCE.md) remains open.
 - Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity adapters, with
   [provider-specific limits](AGENT-SUPPORT.md).
 - Agent accounts, model selection, reported usage, capacity-aware routing and

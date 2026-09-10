@@ -29,7 +29,7 @@
     }
   },
   "bundle": {
-    "resources": ["resources/agent-browser/"],
+    "resources": ["resources/agent-browser/", "resources/desktop-control/"],
     "active": true,
     "targets": "all",
     "macOS": {

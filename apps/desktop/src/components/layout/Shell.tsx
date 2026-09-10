@@ -2,6 +2,7 @@ import * as Menu from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { captureDraftForProject } from '../../lib/capture-draft';
+import { shortcutLabel } from '../../lib/platform-shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
@@ -209,7 +210,7 @@ export function Shell({
     window.addEventListener('jackalope:open-settings', handle);
     return () => window.removeEventListener('jackalope:open-settings', handle);
   }, []);
-  const shortcut = navigator.platform.includes('Mac') ? '⌘ K' : 'Ctrl K';
+  const shortcut = shortcutLabel('K');
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -296,7 +297,7 @@ export function Shell({
         </div>
         <div className="flex items-center gap-3">
           {(activeTab !== 'kanban' || selectedTaskId) && (
-            <Tooltip content="New task (Ctrl+Shift+N)">
+            <Tooltip content={`New task (${shortcutLabel('Shift+N')})`}>
               <button
                 type="button"
                 className="command-trigger"
@@ -322,7 +323,7 @@ export function Shell({
           </Tooltip>
           {!isTauriEnvironment() && showThemePicker && <ArcColorPicker />}
           {!isTauriEnvironment() && (
-            <Tooltip content="Settings (Ctrl+,)">
+            <Tooltip content={`Settings (${shortcutLabel(',')})`}>
               <button
                 type="button"
                 onClick={() => navigate('preferences')}

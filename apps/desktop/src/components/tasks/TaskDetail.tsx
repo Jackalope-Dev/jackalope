@@ -154,7 +154,7 @@ export function TaskDetail({
       setActing(false);
     }
   };
-  const openLink = async (href: string) => {
+  const openLink = useCallback(async (href: string) => {
     try {
       if (isTauriEnvironment()) {
         const { open } = await import('@tauri-apps/plugin-shell');
@@ -163,7 +163,7 @@ export function TaskDetail({
     } catch (cause) {
       setError(String(cause));
     }
-  };
+  }, []);
   const copyResult = async () => {
     try {
       await navigator.clipboard.writeText(run.result);
@@ -422,11 +422,7 @@ export function TaskDetail({
                     </p>
                   }
                 >
-                  <TaskMarkdown
-                    content={run.result}
-                    active={active}
-                    onOpenLink={(url) => void openLink(url)}
-                  />
+                  <TaskMarkdown content={run.result} active={active} onOpenLink={openLink} />
                 </Suspense>
               </div>
             ) : (

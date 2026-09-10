@@ -1,5 +1,16 @@
 [
   {
+    "id": "smoother-task-history-and-review",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Smoother task history and review",
+    "description": "Task updates and large histories do less work in the desktop interface.",
+    "items": [
+      "Task output uses durable incremental saves, and the interface receives changed task records.",
+      "History loads concurrently, while large patches and code highlighting run in background workers."
+    ]
+  },
+  {
     "id": "better-coordination-from-request-to-review",
     "date": "2026-09-10",
     "status": "In development",

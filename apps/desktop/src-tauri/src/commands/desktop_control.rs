@@ -4,6 +4,7 @@ use super::{
 };
 use rmcp::schemars;
 pub mod indicator;
+pub mod platform;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -19,7 +20,7 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct DesktopRequest {
     #[schemars(
-        description = "request_access, snapshot, screenshot, focus, click, type, press, scroll, or release. Windows only. request_access asks the user to select one window. Escape/Stop/release revokes access. Physical input pauses control; only the human can Resume."
+        description = "request_access, snapshot, screenshot, focus, click, type, press, scroll, or release. On supported desktop platforms, request_access asks the user to select one window. Escape/Stop/release revokes access. Physical input pauses control; only the human can Resume."
     )]
     pub action: String,
     #[schemars(
@@ -36,7 +37,7 @@ pub struct DesktopRequest {
     )]
     pub text: Option<String>,
     #[schemars(
-        description = "Tab, Shift+Tab, Enter, Escape, Space, Backspace, Delete, ArrowUp/Down/Left/Right, Home, End, PageUp, PageDown, Control+a/s/z/y."
+        description = "Tab, Shift+Tab, Enter, Escape, Space, Backspace, Delete, ArrowUp/Down/Left/Right, Home, End, PageUp, PageDown, Primary+a/s/z/y (Command on macOS, Control elsewhere), or literal Control+a/s/z/y."
     )]
     pub key: Option<String>,
     #[schemars(description = "Scroll wheel notches, -10 to 10. Positive scrolls up.")]
@@ -124,15 +125,7 @@ fn session(runtime: &TaskRuntime, id: &str, create: bool) -> Result<Arc<Session>
                 .into(),
         );
     }
-    let lock = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(std::env::temp_dir().join("jackalope-desktop-control.lock"))
-        .map_err(|e| e.to_string())?;
-    lock.try_lock()
-        .map_err(|_| "Another Jackalope instance owns desktop control. Release it there first.")?;
+    let lock = platform::lease()?;
     let session = Arc::new(Session {
         canceled: AtomicBool::new(false),
         access: Mutex::new(Access::default()),
@@ -229,6 +222,10 @@ fn validate(request: &DesktopRequest) -> Result<(), String> {
             "Control+s",
             "Control+z",
             "Control+y",
+            "Primary+a",
+            "Primary+s",
+            "Primary+z",
+            "Primary+y",
         ]
         .contains(&request.key.as_deref().unwrap_or(""))
     {
@@ -270,9 +267,12 @@ fn native_command(script: &str, payload: Value) -> Result<std::process::Command,
     Ok(command)
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn native(payload: Value, canceled: &AtomicBool) -> Result<Value, String> {
+    #[cfg(windows)]
     let command = native_command(include_str!("desktop_control/windows.ps1"), payload)?;
+    #[cfg(target_os = "macos")]
+    let command = platform::command(payload)?;
     if canceled.load(Ordering::SeqCst) {
         return Err("Desktop access was revoked.".into());
     }
@@ -298,9 +298,9 @@ fn native(payload: Value, canceled: &AtomicBool) -> Result<Value, String> {
         .map_err(|_| "Desktop helper returned invalid output.".into())
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn native(_: Value, _: &AtomicBool) -> Result<Value, String> {
-    Err("Native desktop control is available on Windows only.".into())
+    Err("Guarded native desktop control is unavailable on this desktop. Task browser automation is available separately.".into())
 }
 
 pub async fn execute(
@@ -313,8 +313,8 @@ pub async fn execute(
         close(&run.id);
         return Ok(json!({"status":"released"}));
     }
-    if !cfg!(windows) {
-        return Err("Native desktop control is available on Windows only.".into());
+    if !platform::supported() {
+        return Err("Guarded native desktop control is unavailable on this desktop. Task browser automation is available separately.".into());
     }
     let owned = session(&runtime, &run.id, request.action == "request_access")?;
     let id = run.id.clone();
@@ -361,7 +361,7 @@ pub async fn execute(
             Some(snapshot.bounds)
         } else { access.snapshot = None; None };
         current(&runtime, &run.id)?;
-        let mut payload = json!({"action":request.action,"window":window,"bounds":bounds,"x":request.x,"y":request.y,"text":request.text,"key":request.key,"wheel":request.wheel});
+        let mut payload = json!({"action":request.action,"window":window,"bounds":bounds,"x":request.x,"y":request.y,"text":request.text,"key":request.key.as_deref().map(platform::key),"wheel":request.wheel});
         payload["guard"] = access.indicator.as_ref().unwrap().guard(state.epoch);
         let artifact_id = uuid::Uuid::new_v4().to_string();
         let temporary = std::env::temp_dir().join(format!("jackalope-desktop-{artifact_id}.png"));

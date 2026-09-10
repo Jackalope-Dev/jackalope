@@ -154,7 +154,9 @@ pub(super) async fn bridge_message(
         Some(
             tauri::async_runtime::spawn_blocking(move || {
                 let _guard = crate::commands::integration::execution_guard()?;
-                crate::commands::integration::workspace_tree(&run, &runtime.integration_directory())
+                let directory = runtime.integration_directory();
+                std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+                crate::commands::integration::workspace_tree(&run, &directory)
             })
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?

@@ -104,6 +104,8 @@
   font-size: var(--text-sm);
 }
 .work-item {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 88px;
   display: flex;
   align-items: center;
   justify-content: space-between;
