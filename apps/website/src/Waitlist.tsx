@@ -28,7 +28,15 @@ export function WaitlistPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [copied, setCopied] = useState<'share' | 'link' | ''>('');
   const pending = useRef(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  /** Copy confirmation belongs on the button that was pressed, not the page notice. */
+  function markCopied(which: 'share' | 'link') {
+    setCopied(which);
+    window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopied(''), 2000);
+  }
   const refreshPlace = useCallback(() => {
     void accessRequest<Place>('waitlist/me')
       .then(setPlace)
@@ -60,6 +68,7 @@ export function WaitlistPage() {
     else setLoading(false);
     return () => {
       controller.abort();
+      window.clearTimeout(copiedTimer.current);
       window.removeEventListener('hashchange', readLink);
     };
   }, []);
@@ -113,7 +122,7 @@ export function WaitlistPage() {
     } else
       await act(async () => {
         await navigator.clipboard.writeText(`${shareMessage}\n\n${place.shareUrl}`);
-        setNotice('Message and referral link copied.');
+        markCopied('share');
       });
   }
   return (
@@ -202,7 +211,6 @@ export function WaitlistPage() {
               <div className="queue-ticket-number">
                 <span>Your place in line</span>
                 <strong>#{place.position?.toLocaleString() ?? '-'}</strong>
-                <span>Every good introduction brings you closer.</span>
               </div>
               <div className="queue-ticket-progress">
                 <dl>
@@ -248,11 +256,6 @@ export function WaitlistPage() {
                   ? 'Keep sharing the waitlist with as many people as you like. Your referral total keeps growing.'
                   : 'Invite as many people to the waitlist as you like. Every new signup that verifies their email through your link earns you one day of priority.'}
               </p>
-              <p className="access-fine">
-                We rank signup time minus earned priority, with earlier signups breaking ties. Your
-                number can move both ways as others refer or leave the queue. Priority improves your
-                place; it doesn’t promise an access date.
-              </p>
             </div>
             <div>
               <label htmlFor="waitlist-share">
@@ -271,8 +274,8 @@ export function WaitlistPage() {
                   type="button"
                   disabled={busy}
                 >
-                  <Share2 size={18} />
-                  Share the waitlist
+                  {copied === 'share' ? <Check size={18} /> : <Share2 size={18} />}
+                  {copied === 'share' ? 'Copied' : 'Share the waitlist'}
                 </button>
                 <button
                   className="button button-secondary"
@@ -280,13 +283,13 @@ export function WaitlistPage() {
                   onClick={() =>
                     void act(async () => {
                       await navigator.clipboard.writeText(place.shareUrl);
-                      setNotice('Referral link copied.');
+                      markCopied('link');
                     })
                   }
                   type="button"
                 >
-                  <Copy size={18} />
-                  Copy link
+                  {copied === 'link' ? <Check size={18} /> : <Copy size={18} />}
+                  {copied === 'link' ? 'Copied' : 'Copy link'}
                 </button>
               </div>
             </div>

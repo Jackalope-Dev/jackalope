@@ -89,7 +89,7 @@ const pendingProject = {
   },
 };
 
-test('project selection and cancellation leave saved projects and active selection untouched', () => {
+test('returning to the project step keeps setup active and saved projects untouched', () => {
   projects.setState({ projects: [existingProject], activeProjectId: existingProject.id });
   store.getState().begin();
   store.getState().stageProject(pendingProject, 'A task that is not ready yet');
@@ -97,10 +97,9 @@ test('project selection and cancellation leave saved projects and active selecti
   assert.deepEqual(projects.getState().projects, [existingProject]);
   assert.equal(projects.getState().activeProjectId, existingProject.id);
   store.getState().go('project');
-  store.getState().cancel();
-  assert.equal(store.getState().status, 'skipped');
-  assert.equal(store.getState().pendingProject, null);
-  assert.equal(store.getState().firstTask, null);
+  assert.equal(store.getState().status, 'active');
+  assert.deepEqual(store.getState().pendingProject, pendingProject);
+  assert.equal(store.getState().firstTask, 'A task that is not ready yet');
   assert.deepEqual(projects.getState().projects, [existingProject]);
   assert.equal(projects.getState().activeProjectId, existingProject.id);
 });

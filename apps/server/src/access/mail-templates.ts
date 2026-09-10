@@ -156,8 +156,20 @@ ${expiry ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.7;color:${c.f
 
 const c = EMAIL_PALETTE;
 
-const button = (action: string, link: string, arrow = false) =>
-  `<a href="${escapeHtml(link)}" style="display:inline-block;padding:15px 28px;border-radius:8px;background:${c.accent};color:${c.onAccent};font-size:16px;font-weight:600;line-height:1;text-decoration:none">${escapeHtml(action)}${arrow ? ' &rarr;' : ''}</a>`;
+/**
+ * The one action, drawn as a filled block.
+ *
+ * The fill and the padding sit on the `<td>` rather than on the `<a>`: Outlook
+ * ignores padding and background on an inline-block anchor, which leaves the
+ * action looking like plain underlined text. Colours are hex for the same
+ * reason - Gmail drops `hsl()` values outright. See EMAIL_PALETTE.
+ */
+export const button = (
+  action: string,
+  link: string,
+  { arrow = false, align = 'left' }: { arrow?: boolean; align?: 'left' | 'center' } = {},
+) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${align}" style="border-collapse:separate${align === 'center' ? ';margin:0 auto' : ''}"><tr><td align="center" bgcolor="${c.accent}" style="padding:15px 28px;border-radius:8px;background:${c.accent}"><a href="${escapeHtml(link)}" style="display:block;color:${c.onAccent};font-family:${EMAIL_FONT};font-size:16px;font-weight:600;line-height:1;text-decoration:none">${escapeHtml(action)}${arrow ? ' &rarr;' : ''}</a></td></tr></table>`;
 
 /**
  * The one action in a message.
@@ -168,10 +180,10 @@ const button = (action: string, link: string, arrow = false) =>
  */
 function callout(stamp: string, action: string, link: string) {
   if (!stamp)
-    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:34px 0"><tr><td align="center">${button(action, link)}</td></tr></table>`;
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:34px 0"><tr><td align="center">${button(action, link, { align: 'center' })}</td></tr></table>`;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0;border-collapse:separate;border:1px solid ${c.borderSubtle};border-left:3px solid ${c.accent};border-radius:12px;background:${c.panel}"><tr><td style="padding:24px">
 <p style="margin:0 0 18px;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${c.faint}">${escapeHtml(stamp)}</p>
-${button(action, link, true)}
+${button(action, link, { arrow: true })}
 </td></tr></table>`;
 }
 

@@ -6,7 +6,10 @@ independent download. The existing installer release path remains separate.
 
 ## Build and review
 
-Install the Windows SDK (MakeAppx), Node/pnpm and the repository Rust toolchain.
+Install the Windows SDK (MakeAppx and MakePRI), Node/pnpm and the repository Rust toolchain.
+Packaging renders scaled and unplated light/dark taskbar icons from the shared
+icon source and indexes them in `resources.pri`, so Windows can select the artwork
+without adding a system-colored backplate.
 Run from the repository root:
 
 ~~~powershell

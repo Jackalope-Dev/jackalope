@@ -1,7 +1,7 @@
 import { EMAIL_PALETTE } from '@jackalope/brand/email';
 import { z } from 'zod';
 import { MANAGED_TAGS } from './audience';
-import { emailShell, escapeHtml } from './mail-templates';
+import { button, emailShell, escapeHtml } from './mail-templates';
 import { providerJson } from './provider';
 
 const c = EMAIL_PALETTE;
@@ -141,7 +141,7 @@ ${chosen.map(entryHtml).join('')}${extras}
 ${draft.outro ? paragraphs(draft.outro) : ''}
 ${
   action
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 0"><tr><td><a href="${escapeHtml(action.url)}" style="display:inline-block;padding:14px 22px;border-radius:8px;background:${c.accent};color:${c.onAccent};font-size:16px;font-weight:600;line-height:1;text-decoration:none">${escapeHtml(action.label)} &rarr;</a></td></tr></table>`
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 0"><tr><td>${button(action.label, action.url, { arrow: true })}</td></tr></table>`
     : ''
 }
 <p style="margin:30px 0 0;font-size:15px;line-height:1.8;color:${c.muted}">Thanks for making room for Jackalope,<br><strong style="color:${c.ink}">Jackalope</strong></p>`;

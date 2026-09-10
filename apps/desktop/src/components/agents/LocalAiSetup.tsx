@@ -566,8 +566,10 @@ export function LocalAiSteps({
                 <ArrowLeft size={16} />
                 Back
               </>
+            ) : projectSetup ? (
+              'Back to agents'
             ) : (
-              'Cancel setup'
+              'Close'
             )}
           </Button>
         )}

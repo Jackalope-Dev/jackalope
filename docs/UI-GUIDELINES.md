@@ -58,9 +58,10 @@ small windows. Respect reduced motion, including preference changes while open.
 ## Setup, settings and accounts
 
 Keep setup provisional until workspace entry. Preserve project choice, task
-drafts and explicit preferences across Back, retry and reload. Cancel must not
-add a project or change its active selection. Give slow or failed checks a
-clear retry or background-continuation path.
+drafts and explicit preferences across Back, retry and reload. Project onboarding
+has no cancel exit; users reach the final step before entering the workspace.
+The first task remains optional on that final step. Give slow or failed checks a
+clear retry path.
 
 App appearance/privacy and account access precede the project setup steps.
 Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.

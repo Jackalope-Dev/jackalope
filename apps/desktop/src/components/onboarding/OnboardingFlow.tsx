@@ -437,15 +437,6 @@ export function OnboardingFlow({
                 )}
                 <div className="onboarding-actions">
                   <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => onboarding.cancel()}
-                  >
-                    <ArrowLeft size={16} />
-                    Cancel setup
-                  </Button>
-                  <Button
                     type="submit"
                     disabled={
                       !desktop ||

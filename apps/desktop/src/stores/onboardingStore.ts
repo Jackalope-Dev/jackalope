@@ -18,7 +18,6 @@ interface OnboardingState {
   setFirstTask: (prompt: string) => void;
   go: (step: OnboardingStep) => void;
   finish: () => void;
-  cancel: () => void;
 }
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -57,14 +56,6 @@ export const useOnboardingStore = create<OnboardingState>()(
       go: (step) => set({ step }),
       finish: () =>
         set({ status: 'complete', pendingProject: null, firstTask: null, projectId: null }),
-      cancel: () =>
-        set({
-          status: 'skipped',
-          step: 'project',
-          pendingProject: null,
-          firstTask: null,
-          projectId: null,
-        }),
     }),
     {
       name: 'jackalope-onboarding-v1',

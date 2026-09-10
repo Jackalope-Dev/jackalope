@@ -62,9 +62,7 @@ try {
     $configuration = if ($Mode -eq 'rehearsal') { 'debug' } else { 'release' }
     Copy-Item -LiteralPath (Join-Path $target "$configuration/jackalope-desktop.exe") -Destination $stage
     Copy-Item -LiteralPath (Join-Path $repoRoot 'apps/desktop/src-tauri/resources') -Destination (Join-Path $stage 'resources') -Recurse
-    foreach ($icon in @('StoreLogo.png', 'Square44x44Logo.png', 'Square150x150Logo.png')) {
-        Copy-Item -LiteralPath (Join-Path $repoRoot "apps/desktop/src-tauri/icons/$icon") -Destination (Join-Path $stage 'Assets')
-    }
+    & (Join-Path $PSScriptRoot 'store-resources.ps1') -Stage $stage -SdkBin (Join-Path $sdk.FullName 'x64')
     if ($WebViewRuntimePath) { Copy-Item -LiteralPath $WebViewRuntimePath -Destination (Join-Path $stage 'WebView2') -Recurse }
     $package = Join-Path $output "Jackalope_${version}_x64.msix"
     Run-Checked { & (Join-Path $sdk.FullName 'x64/makeappx.exe') pack /d $stage /p $package /o }

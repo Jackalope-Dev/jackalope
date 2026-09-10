@@ -91,10 +91,6 @@ export function WaitlistQuestions({
   return (
     <section className="access-card waitlist-questions" aria-labelledby={`${id}-title`}>
       <h2 id={`${id}-title`}>Help us decide what to build next.</h2>
-      <p>
-        Three optional questions. Windows is furthest along, so if you are on macOS or Linux, saying
-        so is the most useful thing you can do right now.
-      </p>
       {!open ? (
         <div className="preference-actions">
           <button type="button" className="button button-secondary" onClick={() => setOpen(true)}>

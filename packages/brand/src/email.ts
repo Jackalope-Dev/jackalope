@@ -1,4 +1,4 @@
-import { DEFAULT_THEME, themeTokens } from './tokens.ts';
+import { DEFAULT_THEME, hslToHex, themeTokens } from './tokens.ts';
 
 /**
  * The one palette every Jackalope email uses.
@@ -10,6 +10,17 @@ import { DEFAULT_THEME, themeTokens } from './tokens.ts';
  * product. Keep this in step with the Sequenzy email design system.
  */
 const action = themeTokens({ ...DEFAULT_THEME, isDark: false, appearance: 'manual' });
+
+/**
+ * Mail clients are not browsers. Gmail's CSS sanitiser drops any declaration
+ * whose value it does not recognise, and `hsl()` is one of them - a button
+ * styled `background:hsl(24 95% 53%)` arrives as a bare underlined link. The
+ * token pipeline speaks hsl, so anything it hands an email is flattened to hex.
+ */
+const hex = (value: string) => {
+  const parts = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/.exec(value);
+  return parts ? hslToHex(Number(parts[1]), Number(parts[2]), Number(parts[3])) : value;
+};
 
 export const EMAIL_PALETTE = {
   /** Page behind the message. */
@@ -28,8 +39,8 @@ export const EMAIL_PALETTE = {
   /** Kickers, stamps, timestamps. Dark enough to clear 4.5:1 on both surfaces. */
   faint: '#756a5f',
   /** The product's action colour, contrast-corrected against white. */
-  accent: action['--color-action'],
-  onAccent: action['--color-on-action'],
+  accent: hex(action['--color-action']),
+  onAccent: hex(action['--color-on-action']),
   /** Accent tuned for text on warm paper rather than for a filled button. */
   accentInk: '#4338ca',
 } as const;
