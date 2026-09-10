@@ -90,7 +90,11 @@ export function SystemInfoView() {
                       disabled={requestingPermissions || loading}
                       onClick={() => void requestPermissions()}
                     >
-                      {requestingPermissions ? 'Checking permissions…' : 'Set up macOS permissions'}
+                      {requestingPermissions
+                        ? 'Setting up…'
+                        : host.os === 'linux'
+                          ? 'Install GNOME window control'
+                          : 'Set up macOS permissions'}
                     </Button>
                   )}
               </div>

@@ -1,4 +1,5 @@
 import { ArrowRight, Mail } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import type { BlogSection } from './blog-types';
 import { posts, tour, updates } from './content';
 import { EditorialArt } from './EditorialArt';
@@ -20,6 +21,64 @@ const dateLabel = (date: string) =>
 const sectionId = (section: BlogSection, index: number) => section.id || `section-${index + 1}`;
 
 export function JournalTeaser({ all = false }: { all?: boolean }) {
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!all || !grid) return;
+    const cards = Array.from(grid.children) as HTMLElement[];
+    let frame = 0;
+    const layout = () => {
+      const styles = getComputedStyle(grid);
+      const columns = Number(styles.getPropertyValue('--note-columns'));
+      const gap = Number.parseFloat(styles.columnGap);
+      const columnWidth = (grid.clientWidth - gap * (columns - 1)) / columns;
+      const spans = cards.map((card) =>
+        Number(getComputedStyle(card).getPropertyValue('--note-span')),
+      );
+      for (const [index, card] of cards.entries()) {
+        card.style.width = `${columnWidth * spans[index] + gap * (spans[index] - 1)}px`;
+      }
+      const heights = Array<number>(columns).fill(0);
+      let previousTop = 0;
+      for (const [index, card] of cards.entries()) {
+        const span = spans[index];
+        let column = 0;
+        let top = Infinity;
+        for (let start = 0; start <= columns - span; start++) {
+          // Keep visual reading order aligned with the links' keyboard order.
+          const candidate = Math.max(previousTop, ...heights.slice(start, start + span));
+          if (candidate < top) {
+            top = candidate;
+            column = start;
+          }
+        }
+        card.style.left = `${column * (columnWidth + gap)}px`;
+        card.style.top = `${top}px`;
+        for (let lane = column; lane < column + span; lane++) {
+          heights[lane] = top + card.offsetHeight + gap;
+        }
+        previousTop = top;
+      }
+      grid.style.height = `${Math.max(...heights) - gap}px`;
+      grid.dataset.masonry = '';
+    };
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(layout);
+    });
+    observer.observe(grid);
+    for (const card of cards) observer.observe(card);
+    layout();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      delete grid.dataset.masonry;
+      grid.style.removeProperty('height');
+      for (const card of cards) card.removeAttribute('style');
+    };
+  }, [all]);
+
   return (
     <section
       className={`journal-teaser page-width${all ? ' journal-index' : ''}`}
@@ -35,7 +94,7 @@ export function JournalTeaser({ all = false }: { all?: boolean }) {
           </a>
         )}
       </div>
-      <div className="notes-grid">
+      <div className="notes-grid" ref={gridRef}>
         {(all ? posts : posts.slice(0, 2)).map((post) => (
           <a
             className="note-preview"
@@ -303,7 +362,6 @@ export function JournalPage({ path }: { path: string }) {
     return (
       <main id="main" className="journal-page field-notes-page page-width">
         <header className="journal-heading">
-          <p className="eyebrow">The Jackalope journal</p>
           <h1>Field notes.</h1>
           <p>
             Inside the work. Behind the decisions. Practical guides and a closer look at what we’re

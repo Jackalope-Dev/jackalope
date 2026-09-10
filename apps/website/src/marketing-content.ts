@@ -13,6 +13,11 @@ export type MarketingPage = {
   comparison?: {
     name: string;
     reviewed: string;
+    overview: {
+      jackalope: string;
+      competitor: string;
+      shared: string[];
+    };
     rows: Array<{ topic: string; jackalope: string; competitor: string }>;
     sources: Array<{ href: string; label: string }>;
     faqs: Array<{ question: string; answer: string }>;

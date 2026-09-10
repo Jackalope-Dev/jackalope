@@ -37,6 +37,13 @@ export function documentationIssues(documents) {
     )
       issues.push(`${file}: keep the behavior or repeatable procedure, not a work record.`);
     if (
+      isGuide &&
+      /(?:\b(?:verification|validation|migration check|test results)\s*\(\d{4}-\d{2}-\d{2}\)|\bOn (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2},? \d{4},[^.]*\bpassed\b)/i.test(
+        prose,
+      )
+    )
+      issues.push(`${file}: keep dated verification receipts outside tracked guides.`);
+    if (
       /(?:[A-Z]:[\\/]Users[\\/](?!<)[^\s/\\]+|\/Users\/(?!<)[^\s/]+|jackalope-private(?:-backups)?[\\/])/i.test(
         prose,
       )

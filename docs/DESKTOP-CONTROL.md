@@ -4,7 +4,7 @@ Windows, macOS and Linux X11 tasks expose `desktop_control` through native MCP a
 `POST /v1/desktop/control`. This operates a user-selected live application window.
 It is separate from the isolated [task browser](BROWSER-AUTOMATION.md).
 macOS and Linux X11 backends are implemented for native validation; macOS compilation
-and device acceptance remain open. Wayland and headless Linux sessions return an
+and device acceptance remain open. Unsupported Wayland and headless Linux sessions return an
 explicit unavailable response and omit the MCP tool. An XWayland connection is not
 accepted as permission to control a Wayland desktop.
 
@@ -159,9 +159,9 @@ branch; real keyboards, mice, desktop environments and scaling still require
 hardware checks. The fixture does not establish a real agent's grant flow or
 installed acceptance.
 
-Wayland remains a code gap, not merely an unrun device test. Generic RemoteDesktop
-and ScreenCast portals do not supply this tool's passive physical-input guard.
-GNOME accessibility monitoring is version-specific and still needs a complete
-window identity, capture, input and interruption implementation. Ubuntu/GNOME is
-the first target; keep the tool unavailable until those requirements can be met.
-Signing and distribution are separate follow-up work.
+Wayland control requires compositor-specific window identity, capture, input and
+physical-interruption support. Generic RemoteDesktop and ScreenCast portals alone
+do not supply the passive physical-input guard. Native readiness must verify a
+compatible helper before exposing the tool; an XWayland connection is insufficient.
+Ubuntu/GNOME is the first acceptance target. Signing, installed grants and real
+device interruption require separate release checks.

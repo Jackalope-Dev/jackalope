@@ -1,7 +1,13 @@
 .editorial-art {
   --art-color: var(--color-accent-ink);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
   height: 238px;
+  min-height: 260px;
+  padding: 22px 24px 24px;
   overflow: hidden;
   color: var(--color-text-primary);
   background: color-mix(in srgb, var(--art-color) 13%, var(--color-surface));
@@ -27,21 +33,19 @@
   mask-image: linear-gradient(135deg, black, transparent 80%);
 }
 .art-caption {
-  position: absolute;
-  top: 22px;
-  left: 24px;
+  align-self: stretch;
   font-size: 10px;
   font-weight: 650;
+  line-height: 1.6;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 .art-drawing {
-  position: absolute;
-  width: min(88%, 360px);
+  position: relative;
+  flex-shrink: 0;
+  width: min(100%, 360px);
   height: 180px;
-  left: 50%;
-  top: 55%;
-  transform: translate(-50%, -50%);
+  margin-block: auto;
 }
 .art-map,
 .art-branches {

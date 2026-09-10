@@ -8,11 +8,22 @@ pub fn set_resource_directory(path: PathBuf) {
 }
 
 pub fn supported() -> bool {
+    #[cfg(target_os = "linux")]
+    if wayland_session() {
+        return super::native(json!({"action":"permissions"}), &AtomicBool::new(false))
+            .is_ok_and(|value| value["available"] == true && value["protocol"] == 1);
+    }
     cfg!(any(windows, target_os = "macos"))
         || (cfg!(target_os = "linux")
             && std::env::var_os("DISPLAY").is_some_and(|value| !value.is_empty())
             && std::env::var("XDG_SESSION_TYPE").as_deref() != Ok("wayland")
             && std::env::var_os("WAYLAND_DISPLAY").is_none_or(|value| value.is_empty()))
+}
+
+fn wayland_session() -> bool {
+    cfg!(target_os = "linux")
+        && (std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("wayland")
+            || std::env::var_os("WAYLAND_DISPLAY").is_some_and(|value| !value.is_empty()))
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -55,7 +66,10 @@ pub(super) fn command(payload: Value) -> Result<std::process::Command, String> {
     }
     command.env("JACKALOPE_DESKTOP_REQUEST", payload.to_string());
     #[cfg(target_os = "linux")]
-    command.env("GDK_BACKEND", "x11");
+    command.env(
+        "GDK_BACKEND",
+        if wayland_session() { "wayland" } else { "x11" },
+    );
     Ok(command)
 }
 
@@ -67,7 +81,7 @@ pub struct Readiness {
 }
 
 pub fn readiness() -> Readiness {
-    if !supported() {
+    if !wayland_session() && !supported() {
         return Readiness { available: false, can_request_permissions: false,
             message: "Native window control is unavailable in this desktop session. On Linux, use an X11 session with accessibility and compositing support. Task browser automation is available separately.".into() };
     }
@@ -88,13 +102,23 @@ pub fn readiness() -> Readiness {
         });
         Readiness {
             available,
-            can_request_permissions: cfg!(target_os = "macos") && result.is_ok(),
+            can_request_permissions: (cfg!(target_os = "macos") && result.is_ok())
+                || (cfg!(target_os = "linux")
+                    && result
+                        .as_ref()
+                        .is_ok_and(|value| value["canInstall"] == true)),
             message: if available {
                 "Native window control is available. Each task asks you to choose a window; click Resume in the native bar to begin.".into()
-            } else if let Err(error) = result {
-                error
+            } else if let Err(error) = &result {
+                error.clone()
             } else if cfg!(target_os = "macos") {
                 "Allow Accessibility, Screen Recording and Input Monitoring for Jackalope in System Settings, then restart the app and refresh this device.".into()
+            } else if let Some(message) = result
+                .as_ref()
+                .ok()
+                .and_then(|value| value["message"].as_str())
+            {
+                message.into()
             } else {
                 "This desktop is missing the display, input or accessibility services needed for native window control.".into()
             },
@@ -120,8 +144,89 @@ pub async fn desktop_control_request_permissions() -> Result<Readiness, String> 
     })
     .await
     .map_err(|e| e.to_string())?;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    return tauri::async_runtime::spawn_blocking(|| {
+        if !wayland_session() || !readiness().can_request_permissions {
+            return Err("GNOME 46 Wayland is required for this extension setup.".into());
+        }
+        install_gnome_extension()?;
+        let mut command = std::process::Command::new("gnome-extensions");
+        command.args(["enable", "desktop-control@jackalope.dev"]);
+        let _ = super::super::process_control::run_cancellable(command, Duration::from_secs(5), || false);
+        let current = readiness();
+        if current.available {
+            Ok(current)
+        } else {
+            Ok(Readiness { available: false, can_request_permissions: false,
+                message: "GNOME extension installed. Sign out and back in, enable Jackalope Window Control in Extensions, then refresh this device. Each task still needs your window choice and Resume.".into() })
+        }
+    }).await.map_err(|e| e.to_string())?;
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     Err("This platform does not use macOS desktop permissions.".into())
+}
+
+#[cfg(target_os = "linux")]
+fn install_gnome_extension() -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let data = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+        .filter(|path| path.is_absolute())
+        .ok_or("The user data directory is unavailable.")?;
+    let directory = data.join("gnome-shell/extensions/desktop-control@jackalope.dev");
+    if std::fs::symlink_metadata(&directory)
+        .is_ok_and(|metadata| !metadata.is_dir() || metadata.file_type().is_symlink())
+    {
+        return Err("The GNOME extension directory must be a regular directory.".into());
+    }
+    std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    for (name, contents) in [
+        (
+            "metadata.json",
+            include_str!(
+                "../../../resources/gnome-extension/desktop-control@jackalope.dev/metadata.json"
+            ),
+        ),
+        (
+            "guard.js",
+            include_str!(
+                "../../../resources/gnome-extension/desktop-control@jackalope.dev/guard.js"
+            ),
+        ),
+        (
+            "extension.js",
+            include_str!(
+                "../../../resources/gnome-extension/desktop-control@jackalope.dev/extension.js"
+            ),
+        ),
+    ] {
+        let target = directory.join(name);
+        if std::fs::symlink_metadata(&target)
+            .is_ok_and(|metadata| !metadata.is_file() || metadata.file_type().is_symlink())
+        {
+            return Err(format!(
+                "GNOME extension file {name} is not a regular file."
+            ));
+        }
+        let temporary = directory.join(format!(".jackalope-{}", uuid::Uuid::new_v4()));
+        let result = (|| -> std::io::Result<()> {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&temporary)?;
+            file.write_all(contents.as_bytes())?;
+            file.sync_all()?;
+            std::fs::rename(&temporary, target)
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
+        result.map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 pub(super) fn lease() -> Result<std::fs::File, String> {

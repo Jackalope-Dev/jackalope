@@ -114,6 +114,11 @@ fn main() {
     }
     if target.contains("linux") {
         let source = root.join("src/commands/desktop_control/linux.c");
+        println!(
+            "cargo:rerun-if-changed={}",
+            root.join("src/commands/desktop_control/linux-wayland.h")
+                .display()
+        );
         println!("cargo:rerun-if-changed={}", source.display());
         let mut compiler = cc::Build::new().get_compiler().to_command();
         compiler.args(["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"]);

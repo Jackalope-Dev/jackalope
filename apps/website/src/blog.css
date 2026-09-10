@@ -3,9 +3,14 @@
   padding-block: 12px 64px;
 }
 .journal-index .notes-grid {
+  --note-columns: 3;
+  position: relative;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+}
+.journal-index .notes-grid[data-masonry] {
   display: block;
-  columns: 3;
-  column-gap: 24px;
 }
 .journal-teaser .note-preview {
   display: block;
@@ -18,8 +23,11 @@
     border-color 180ms ease;
 }
 .journal-index .note-preview {
-  break-inside: avoid;
-  margin-bottom: 24px;
+  --note-span: 1;
+  grid-column: span var(--note-span);
+}
+.journal-index .note-preview:nth-child(5n + 1) {
+  --note-span: 2;
 }
 .journal-teaser .note-preview:hover {
   border-color: var(--color-accent-ink);
@@ -28,6 +36,9 @@
 .journal-teaser .note-preview:focus-visible {
   outline: 3px solid var(--color-accent-ink);
   outline-offset: 5px;
+}
+.journal-index .notes-grid[data-masonry] > .note-preview {
+  position: absolute;
 }
 .note-copy {
   padding: 24px;
@@ -51,6 +62,10 @@
   line-height: 1.25;
   letter-spacing: -0.8px;
 }
+.journal-index .note-preview:nth-child(5n + 1) .note-copy h3 {
+  max-width: 22ch;
+  font-size: clamp(28px, 3vw, 38px);
+}
 .note-copy > p {
   margin: 0;
   font-size: 13px;
@@ -73,22 +88,23 @@
 }
 .journal-index .editorial-parallel,
 .journal-index .editorial-map {
-  height: 272px;
+  height: 320px;
 }
 .journal-index .editorial-quality,
 .journal-index .editorial-browser {
-  height: 222px;
+  height: 290px;
 }
 .journal-index .editorial-performance,
 .journal-index .editorial-review {
-  height: 196px;
+  height: 260px;
 }
 .journal-index .editorial-studio {
-  height: 300px;
+  height: 340px;
 }
 .field-notes-page .journal-heading {
   max-width: 800px;
-  margin-bottom: 56px;
+  margin: 0 auto 64px;
+  text-align: center;
 }
 .field-notes-page .journal-heading h1 {
   font-size: clamp(60px, 9vw, 112px);
@@ -96,16 +112,25 @@
 }
 .field-notes-page .journal-heading > p:last-child {
   max-width: 510px;
+  margin-inline: auto;
   line-height: 1.8;
 }
 @media (max-width: 1000px) {
   .journal-index .notes-grid {
-    columns: 2;
+    --note-columns: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .journal-index .note-preview:nth-child(5n + 1) {
+    --note-span: 1;
+  }
+  .journal-index .note-preview:nth-child(5n + 1) .note-copy h3 {
+    font-size: 28px;
   }
 }
 @media (max-width: 640px) {
   .journal-index .notes-grid {
-    columns: 1;
+    --note-columns: 1;
+    grid-template-columns: minmax(0, 1fr);
   }
   .note-copy {
     padding: 22px;

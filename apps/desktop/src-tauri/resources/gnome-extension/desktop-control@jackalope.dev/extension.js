@@ -3,6 +3,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Mtk from 'gi://Mtk';
+import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -221,6 +222,7 @@ export default class JackalopeControl extends Extension {
       this._cancel('Indicator connection expired');
       return;
     }
+    if (this._preparing) return;
     try {
       const [window, current] = this._selected(session.window);
       requireValue(
@@ -315,6 +317,7 @@ export default class JackalopeControl extends Extension {
       now(),
     );
     this._session = session;
+    this._preparing = true;
     this._ownerWatch = Gio.bus_watch_name_on_connection(
       Gio.DBus.session,
       sender,
@@ -353,7 +356,8 @@ export default class JackalopeControl extends Extension {
         style:
           'background-color: #111111; color: #ffffff; padding: 10px; spacing: 12px; border-radius: 0 0 10px 10px;',
       });
-      this._label = new St.Label({ text: '', y_align: Clutter.ActorAlign.CENTER });
+      this._label = new St.Label({ text: '', x_expand: true, y_align: Clutter.ActorAlign.CENTER });
+      this._label.clutter_text.ellipsize = Pango.EllipsizeMode.END;
       this._toggle = new St.Button({
         label: 'Resume',
         reactive: true,
@@ -382,10 +386,14 @@ export default class JackalopeControl extends Extension {
       this._bar.set_position(monitor.x + Math.max(0, (monitor.width - 720) / 2), monitor.y);
       this._bar.set_width(Math.min(720, monitor.width));
       this._render();
+      this._preparing = false;
       return { ...session.state(), token: session.token };
     } catch (error) {
-      this._cancel(error.message);
-      this._forget();
+      if (this._session === session) {
+        this._cancel(error.message);
+        this._forget();
+        this._preparing = false;
+      }
       throw error;
     }
   }
@@ -522,8 +530,9 @@ export default class JackalopeControl extends Extension {
         );
       return this._session.state();
     }
-    requireValue(!this._busy, 'Another desktop operation is still running.');
-    this._busy = true;
+    const session = this._session;
+    requireValue(!session.busy, 'Another desktop operation is still running.');
+    session.busy = true;
     try {
       const [window, current] = this._check(request);
       if (request.action === 'check') return current;
@@ -561,7 +570,7 @@ export default class JackalopeControl extends Extension {
       this._check(request);
       return { status: 'sent' };
     } finally {
-      this._busy = false;
+      session.busy = false;
     }
   }
 

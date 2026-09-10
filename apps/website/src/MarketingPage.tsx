@@ -1,4 +1,10 @@
-import { ArrowRight, Check, Play } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Play } from 'lucide-react';
+import {
+  ComparisonDirectory,
+  ComparisonGuide,
+  ComparisonVisual,
+  ComparisonWorkflows,
+} from './ComparisonVisual';
 import { FeatureMedia } from './FeatureMedia';
 import { featureMedia } from './feature-media';
 import type { MarketingPage as MarketingPageContent } from './marketing-content';
@@ -8,6 +14,7 @@ import './comparisons.css';
 export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark: boolean }) {
   const comparison = page.comparison;
   const isComparison = page.path.startsWith('/compare/');
+  const isDirectory = page.path === '/compare/';
   const hasFeatureMedia = Boolean(featureMedia[page.path]);
   return (
     <main
@@ -54,7 +61,11 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
               </a>
             </div>
           </div>
-          {hasFeatureMedia ? (
+          {comparison ? (
+            <ComparisonVisual comparison={comparison} />
+          ) : isDirectory ? (
+            <ComparisonGuide />
+          ) : hasFeatureMedia ? (
             <FeatureMedia key={page.path} path={page.path} dark={dark} />
           ) : (
             <div className="acquisition-proof">
@@ -71,52 +82,31 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
             </div>
           )}
         </div>
-        <section className="page-width acquisition-signals" aria-label="Key capabilities">
-          {page.signals.map((signal, index) => (
-            <span key={signal}>
-              <small>0{index + 1}</small>
-              {signal}
-            </span>
-          ))}
-        </section>
+        {!isComparison && (
+          <section className="page-width acquisition-signals" aria-label="Key capabilities">
+            {page.signals.map((signal, index) => (
+              <span key={signal}>
+                <small>0{index + 1}</small>
+                {signal}
+              </span>
+            ))}
+          </section>
+        )}
       </header>
 
       <div className="page-width acquisition-body">
         <article>
+          {isDirectory && <ComparisonDirectory />}
           {comparison && (
             <section id="at-a-glance" className="comparison-overview">
               <div>
-                <h2>The workflow at a glance</h2>
+                <span className="comparison-eyebrow">Side by side</span>
+                <h2>What changes in your workflow?</h2>
                 <p>
-                  An editorial comparison by Jackalope, based on the official sources linked below.
-                  These are documented capabilities, not hands-on performance rankings.
+                  A comparison by Jackalope, based on the linked official sources. Shared features
+                  can work differently; this is a workflow guide, not a performance ranking.
                 </p>
-                <section
-                  className="comparison-table-scroll"
-                  aria-label={`Jackalope and ${comparison.name} workflow comparison`}
-                  // biome-ignore lint/a11y/noNoninteractiveTabindex: Wide tables need keyboard scrolling.
-                  tabIndex={0}
-                >
-                  <table>
-                    <caption>Jackalope and {comparison.name}: key workflow differences</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Workflow</th>
-                        <th scope="col">Jackalope</th>
-                        <th scope="col">{comparison.name}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {comparison.rows.map((row) => (
-                        <tr key={row.topic}>
-                          <th scope="row">{row.topic}</th>
-                          <td>{row.jackalope}</td>
-                          <td>{row.competitor}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
+                <ComparisonWorkflows comparison={comparison} />
                 <p className="comparison-sources">
                   Sources:{' '}
                   {comparison.sources.map((source, index) => (
@@ -131,82 +121,58 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
               </div>
             </section>
           )}
-          {page.sections.map((section, index) => (
-            <section key={section.title} id={`section-${index + 1}`}>
-              <div className="acquisition-section-index">0{index + 1}</div>
+          {isComparison ? (
+            <section className="comparison-overview comparison-deep-dive" id="details">
               <div>
-                <h2>{section.title}</h2>
-                {section.paragraphs.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-                {section.table && (
-                  <section
-                    className="comparison-table-scroll"
-                    aria-label={section.title}
-                    // biome-ignore lint/a11y/noNoninteractiveTabindex: Wide tables need keyboard scrolling.
-                    tabIndex={0}
+                <span className="comparison-eyebrow">A closer look</span>
+                <h2>{isDirectory ? 'How to choose' : 'Go deeper where it matters.'}</h2>
+                {page.sections.map((section, index) => (
+                  <details
+                    className="comparison-detail"
+                    key={section.title}
+                    id={`section-${index + 1}`}
                   >
-                    <table>
-                      <caption>{section.title}</caption>
-                      <thead>
-                        <tr>
-                          {section.table.columns.map((column) => (
-                            <th scope="col" key={column}>
-                              {column}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {section.table.rows.map(([heading, ...cells]) => (
-                          <tr key={heading}>
-                            <th scope="row">{heading}</th>
-                            {cells.map((cell) => (
-                              <td key={cell}>{cell}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </section>
-                )}
-                {section.bullets && (
-                  <ul>
-                    {section.bullets.map((bullet) => (
-                      <li key={bullet}>
-                        <Check size={15} />
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {section.links && (
-                  <p className="comparison-sources">
-                    {section.links.map((link, linkIndex) => (
-                      <span key={link.href}>
-                        {linkIndex > 0 && ' · '}
-                        <a href={link.href}>{link.label}</a>
-                      </span>
-                    ))}
-                  </p>
-                )}
+                    <summary>
+                      <h3>{section.title}</h3>
+                      <ChevronDown size={18} aria-hidden="true" />
+                    </summary>
+                    <div>
+                      <SectionContent section={section} />
+                    </div>
+                  </details>
+                ))}
               </div>
             </section>
-          ))}
-          {comparison && (
-            <>
-              <section id="questions" className="comparison-overview">
+          ) : (
+            page.sections.map((section, index) => (
+              <section key={section.title} id={`section-${index + 1}`}>
+                <div className="acquisition-section-index">0{index + 1}</div>
                 <div>
-                  <h2>Common questions</h2>
-                  {comparison.faqs.map((faq) => (
-                    <div className="comparison-faq" key={faq.question}>
-                      <h3>{faq.question}</h3>
-                      <p>{faq.answer}</p>
-                    </div>
-                  ))}
+                  <h2>{section.title}</h2>
+                  <SectionContent section={section} />
                 </div>
               </section>
-              <section className="comparison-overview">
+            ))
+          )}
+          {comparison && (
+            <>
+              {comparison.faqs.length > 0 && (
+                <section id="questions" className="comparison-overview">
+                  <div>
+                    <h2>Common questions</h2>
+                    {comparison.faqs.map((faq) => (
+                      <details className="comparison-detail" key={faq.question}>
+                        <summary>
+                          <h3>{faq.question}</h3>
+                          <ChevronDown size={18} aria-hidden="true" />
+                        </summary>
+                        <p>{faq.answer}</p>
+                      </details>
+                    ))}
+                  </div>
+                </section>
+              )}
+              <section className="comparison-overview comparison-next">
                 <div>
                   <h2>See how Jackalope fits your work</h2>
                   <p>
@@ -227,7 +193,7 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
           )}
         </article>
         <aside className="acquisition-related" aria-labelledby="related-title">
-          <p id="related-title">{isComparison ? 'Compare workspaces' : 'Keep exploring'}</p>
+          <h2 id="related-title">{isComparison ? 'Compare workspaces' : 'Keep exploring'}</h2>
           {page.related.map((link) => (
             <a href={link.href} key={link.href}>
               {link.label} <ArrowRight size={15} />
@@ -239,5 +205,66 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
         </aside>
       </div>
     </main>
+  );
+}
+
+function SectionContent({ section }: { section: MarketingPageContent['sections'][number] }) {
+  return (
+    <>
+      {section.paragraphs.map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
+      {section.table && (
+        <section
+          className="comparison-table-scroll"
+          aria-label={section.title}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Wide tables need keyboard scrolling.
+          tabIndex={0}
+        >
+          <table>
+            <caption>{section.title}</caption>
+            <thead>
+              <tr>
+                {section.table.columns.map((column) => (
+                  <th scope="col" key={column}>
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {section.table.rows.map(([heading, ...cells]) => (
+                <tr key={heading}>
+                  <th scope="row">{heading}</th>
+                  {cells.map((cell) => (
+                    <td key={cell}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+      {section.bullets && (
+        <ul>
+          {section.bullets.map((bullet) => (
+            <li key={bullet}>
+              <Check size={15} />
+              <span>{bullet}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {section.links && (
+        <p className="comparison-sources">
+          {section.links.map((link, linkIndex) => (
+            <span key={link.href}>
+              {linkIndex > 0 && ' · '}
+              <a href={link.href}>{link.label}</a>
+            </span>
+          ))}
+        </p>
+      )}
+    </>
   );
 }

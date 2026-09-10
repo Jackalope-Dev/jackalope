@@ -330,7 +330,7 @@
   grid-column: span 2;
 }
 .feature-card > .editorial-art {
-  height: 224px;
+  height: auto;
   flex-shrink: 0;
 }
 .feature-card-copy {
@@ -405,10 +405,6 @@
     grid-column: span 6;
     display: grid;
     grid-template-columns: 1fr 1fr;
-  }
-  .feature-card:last-child > .editorial-art {
-    height: 100%;
-    min-height: 240px;
   }
 }
 @media (max-width: 640px) {

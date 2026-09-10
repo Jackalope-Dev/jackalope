@@ -152,6 +152,21 @@ static int wayland_main(const char *action) {
       json_object_set_string_member(result, "message",
           "Enable the Jackalope Window Control extension in GNOME 46, then refresh. Other Wayland compositors are not supported.");
       g_clear_error(&error);
+      if (wayland_bus) {
+        GVariant *version = g_dbus_connection_call_sync(wayland_bus, "org.gnome.Shell", "/org/gnome/Shell",
+            "org.freedesktop.DBus.Properties", "Get", g_variant_new("(ss)", "org.gnome.Shell", "ShellVersion"),
+            G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, 2000, NULL, NULL);
+        if (version) {
+          GVariant *wrapped, *text;
+          g_variant_get(version, "(@v)", &wrapped);
+          text = g_variant_get_variant(wrapped);
+          json_object_set_boolean_member(result, "canInstall", g_variant_is_of_type(text, G_VARIANT_TYPE_STRING) &&
+              g_str_has_prefix(g_variant_get_string(text, NULL), "46."));
+          g_variant_unref(text);
+          g_variant_unref(wrapped);
+          g_variant_unref(version);
+        }
+      }
     }
     output(result);
     return 0;

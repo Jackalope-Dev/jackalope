@@ -45,6 +45,8 @@ test('indexing an internal record does not permit its path or dated narrative', 
   for (const source of [
     '# Feature\n## Local validation — September 10, 2026',
     '# Feature\n## Integration decisions and next experiments',
+    '# Feature\nPlatform-preparation verification (2026-09-10): the full suite passed.',
+    '# Feature\nOn September 10, 2026, `pnpm verify` passed with native tests running\nserially.',
     '# Feature\nSee C:\\Users\\example\\Desktop\\results.',
   ])
     assert.ok(documentationIssues(docs('docs/FEATURE.md', source)).length > 0);

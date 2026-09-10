@@ -10,9 +10,51 @@ type Comparison = {
 } & NonNullable<MarketingPage['comparison']>;
 
 const reviewed = '2026-09-09';
+export const terminalComparison: NonNullable<MarketingPage['comparison']> = {
+  name: 'Terminal tabs',
+  reviewed: '2026-09-10',
+  overview: {
+    jackalope: 'Tasks, context, and review together across sessions.',
+    competitor: 'A direct coding session with your own editor and Git tools.',
+    shared: ['Your existing agents', 'Local projects', 'Git worktrees'],
+  },
+  rows: [
+    {
+      topic: 'Task context',
+      jackalope: 'The brief, project, account, and follow-ups stay with the task.',
+      competitor: 'You keep track of the brief and context across sessions.',
+    },
+    {
+      topic: 'Parallel work',
+      jackalope: 'Worktrees and plans with explicit task dependencies.',
+      competitor: 'Create worktrees with Git and coordinate sessions yourself.',
+    },
+    {
+      topic: 'Questions and history',
+      jackalope: 'Questions, attempts, and results are grouped by task.',
+      competitor: 'Return to individual sessions and your own notes.',
+    },
+    {
+      topic: 'Review',
+      jackalope: 'Prepare related results as a combined patch before integration.',
+      competitor: 'Run checks and inspect changes with your existing tools.',
+    },
+  ],
+  sources: [
+    { label: 'Git worktree documentation', href: 'https://git-scm.com/docs/git-worktree' },
+    { label: 'Jackalope worktrees', href: '/knowledge/git-worktrees/' },
+  ],
+  faqs: [],
+};
+
 const comparisons: Comparison[] = [
   {
     slug: 'superset',
+    overview: {
+      jackalope: 'Local tasks, dependencies, and one combined review.',
+      competitor: 'Parallel agents across local and remote hosts.',
+      shared: ['Agent choice', 'Git worktrees', 'Scheduled work'],
+    },
     name: 'Superset',
     reviewed,
     description:
@@ -113,6 +155,11 @@ const comparisons: Comparison[] = [
   },
   {
     slug: 'orca',
+    overview: {
+      jackalope: 'Task history and evidence through to combined review.',
+      competitor: 'Terminals, browser feedback, and diffs in one workspace.',
+      shared: ['Git worktrees', 'Browser tools', 'Code review'],
+    },
     name: 'Orca',
     reviewed,
     description:
@@ -210,6 +257,11 @@ const comparisons: Comparison[] = [
   },
   {
     slug: 'conductor',
+    overview: {
+      jackalope: 'Coordinate dependent agent tasks on your machine.',
+      competitor: 'Local and cloud workspaces with shared participation.',
+      shared: ['Agent choice', 'Isolated workspaces', 'Diff review'],
+    },
     name: 'Conductor',
     reviewed,
     description:
@@ -319,6 +371,11 @@ const comparisons: Comparison[] = [
   },
   {
     slug: 'emdash',
+    overview: {
+      jackalope: 'Task dependencies and evidence in a combined review.',
+      competitor: 'Parallel development with reusable tools and remote hosts.',
+      shared: ['Git worktrees', 'MCP tools', 'Review workflow'],
+    },
     name: 'Emdash',
     reviewed,
     description:
@@ -419,6 +476,11 @@ const comparisons: Comparison[] = [
   },
   {
     slug: 'braid',
+    overview: {
+      jackalope: 'Keep task context and dependent changes together.',
+      competitor: 'Project setup, agent sessions, and the pull request lifecycle.',
+      shared: ['Local agents', 'Git worktrees', 'Code review'],
+    },
     name: 'Braid',
     reviewed,
     description:
@@ -517,6 +579,11 @@ const comparisons: Comparison[] = [
   },
   {
     slug: 'worktree',
+    overview: {
+      jackalope: 'Supervise local agent tasks and review combined changes.',
+      competitor: 'Bring teammates into shared AI conversations.',
+      shared: ['Local execution', 'Project context', 'MCP tools'],
+    },
     name: 'Worktree',
     reviewed,
     description:
@@ -623,6 +690,11 @@ const comparisons: Comparison[] = [
   },
   {
     slug: 'codius',
+    overview: {
+      jackalope: 'Local task continuity from the brief to the final patch.',
+      competitor: 'Reach agents on your own hosts from desktop, web, or phone.',
+      shared: ['Agent choice', 'Git worktrees', 'Scheduled work'],
+    },
     name: 'Codius',
     reviewed,
     description:
@@ -715,6 +787,11 @@ const comparisons: Comparison[] = [
   },
   {
     slug: 'hermes',
+    overview: {
+      jackalope: 'A workspace around your supported coding agents.',
+      competitor: 'An agent with persistent memory and messaging.',
+      shared: ['Persistent context', 'Tool use', 'Automation'],
+    },
     name: 'Hermes Agent',
     reviewed,
     description:

@@ -1,4 +1,4 @@
-import { comparisonLinks } from './comparison-content.ts';
+import { comparisonLinks, terminalComparison } from './comparison-content.ts';
 import type { MarketingPage } from './marketing-content.ts';
 import { roadmapHeadline, roadmapLede, roadmapStages } from './roadmap-content.ts';
 
@@ -189,6 +189,7 @@ export const growthPages: MarketingPage[] = [
     description:
       'When do terminal sessions work well, and when does a coding-agent workspace help? Compare task context, Git worktrees, questions, and review.',
     headline: 'Keep your terminal. Give the work a home.',
+    comparison: terminalComparison,
     lede: 'Terminal tabs are a good way to start a coding agent. A workspace becomes useful when you are juggling projects, questions, branches, and several changes that need one review.',
     image: 'tasks',
     signals: ['Your existing agents', 'Visible questions', 'Task history', 'Combined patches'],

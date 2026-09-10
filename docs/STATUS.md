@@ -48,8 +48,9 @@ Antigravity named accounts use Gemini API keys; isolated subscription accounts a
 unsupported. Discovery and fixture responses do not establish real account execution.
 
 Desktop control supports Windows and has macOS/X11 helpers for native validation.
-Wayland control is unavailable, including through XWayland. Worktrees separate Git
-changes; agent processes and configured tools still run with local OS privileges.
+Wayland control requires a supported compositor integration and native readiness;
+XWayland alone is insufficient. Worktrees separate Git changes; agent processes and
+configured tools still run with local OS privileges.
 
 Installed provider, accessibility, recovery, performance, signed installation and
 update acceptance remain platform-specific requirements. Real-model quality and
