@@ -66,6 +66,9 @@ export function UsageDashboard({
         account,
         accountBinding,
         usageObservations,
+        effort,
+        reasoningEffort,
+        efficiency,
         model,
         startedAt,
         status,
@@ -87,6 +90,9 @@ export function UsageDashboard({
             }
           : undefined,
         usageObservations,
+        effort,
+        reasoningEffort,
+        efficiency,
         model,
         startedAt,
         status,
@@ -98,7 +104,15 @@ export function UsageDashboard({
         [
           JSON.stringify(
             {
-              schema: 2,
+              schema: 3,
+              breakdown: {
+                routing: filtered.filter((r) => r.purpose === 'Routing').map((r) => r.usage),
+                execution: filtered.filter((r) => r.purpose === 'Worker').map((r) => r.usage),
+                quotaRetries: filtered
+                  .filter((r) => r.purpose === 'Worker · quota handoff')
+                  .map((r) => r.usage),
+                verificationTokens: null,
+              },
               coverage: 'Jackalope attempts only; missing usage is unavailable',
               attempts: data,
             },

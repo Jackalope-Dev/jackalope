@@ -21,11 +21,12 @@ pub(super) fn consume_event(run: &mut TaskRun, line: &str) {
     consume_adapter_event(run, line, &adapter);
 }
 
-pub(super) fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str) {
+pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, adapter: &str) {
     let Ok(event) = serde_json::from_str::<Value>(line) else {
         activity(run, line);
         return;
     };
+    run.efficiency.observe(&event, adapter);
     let kind = event["type"].as_str().unwrap_or("");
     if let Some(failure) = super::routing::quota_failure(&event) {
         run.quota_failure = Some(failure);

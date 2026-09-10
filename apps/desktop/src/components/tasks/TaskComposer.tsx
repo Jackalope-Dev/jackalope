@@ -214,7 +214,8 @@ export function TaskComposer({
                   className="composer-effort-description"
                   aria-live="polite"
                 >
-                  {effort.description}
+                  {effort.description} Codex and Claude also receive a matching model effort
+                  request; other agents keep their configured model effort.
                 </p>
               </section>
               <fieldset className="composer-config" aria-label="Task configuration">

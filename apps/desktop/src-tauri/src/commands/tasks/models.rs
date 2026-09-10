@@ -25,6 +25,12 @@ pub struct UsageObservation {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]
+    pub effort: Option<super::effort::TaskEffort>,
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
+    #[serde(default)]
+    pub efficiency: super::efficiency::Efficiency,
+    #[serde(default)]
     pub dependency_invalidated: bool,
     #[serde(default)]
     pub stages: Vec<super::timing::ExecutionStage>,
@@ -105,6 +111,8 @@ pub struct TaskRun {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRequest {
+    #[serde(default)]
+    pub effort: Option<super::effort::TaskEffort>,
     #[serde(skip)]
     pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(skip)]
@@ -194,6 +202,9 @@ impl TaskRun {
             check
         });
         Self {
+            effort: self.effort,
+            reasoning_effort: self.reasoning_effort.clone(),
+            efficiency: self.efficiency.clone(),
             dependency_invalidated: self.dependency_invalidated,
             stages: self.stages.clone(),
             dependency_snapshot: self.dependency_snapshot.clone(),

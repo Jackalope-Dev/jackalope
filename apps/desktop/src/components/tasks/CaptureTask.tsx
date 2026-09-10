@@ -260,6 +260,7 @@ export function CaptureTask({
         prepareCommand: project.preferences?.prepareCommand,
         autoVerify: project.preferences?.autoVerify === true,
         prompt: finalPrompt,
+        effort: current.effort ?? 'balanced',
         isolated: current.isolated,
         connectionIds: current.connectionIds,
         contextSelection: current.contextSelection,

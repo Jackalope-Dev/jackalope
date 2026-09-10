@@ -562,6 +562,13 @@ export function TaskDetail({
                   <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
                 ))}
               <p className="task-muted mt-3">
+                {run.effort && (
+                  <>
+                    Task approach: {run.effort} · Model effort:{' '}
+                    {run.reasoningEffort ? `${run.reasoningEffort} requested` : 'Agent default'}
+                    <br />
+                  </>
+                )}
                 Reported usage:{' '}
                 {run.usage.reported
                   ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output${run.accountBinding?.adapter === 'kimi' || run.agent === 'kimi' ? ' · Cache breakdown unavailable' : ` · ${run.usage.cacheRead.toLocaleString()} cached input (included)`}`

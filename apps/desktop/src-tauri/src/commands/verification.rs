@@ -9,6 +9,10 @@ mod leases;
 pub(super) mod output;
 pub use leases::{ensure_all_idle, ensure_idle};
 
+pub(super) const CHECK_TIMEOUT_SECS: u64 = 300;
+pub(super) const QUEUE_TIMEOUT_SECS: u64 = 300;
+pub(super) const BRIDGE_TIMEOUT_SECS: u64 = CHECK_TIMEOUT_SECS + QUEUE_TIMEOUT_SECS + 120;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Verification {
@@ -64,7 +68,7 @@ pub(in crate::commands) fn prepare(
     let _slot = leases::check_slot(|| !runtime.is_running(id))?;
     let result = process_control::run_cancellable(
         shell(command, workspace)?,
-        Duration::from_secs(300),
+        Duration::from_secs(CHECK_TIMEOUT_SECS),
         || !runtime.is_running(id),
     )?;
     runtime.update_checked(id, |run| {
@@ -88,7 +92,7 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         let agent_active = ["starting", "running"].contains(&run.status.as_str());
         let result = process_control::run_cancellable(
             shell(command, &run.workspace)?,
-            Duration::from_secs(300),
+            Duration::from_secs(CHECK_TIMEOUT_SECS),
             || agent_active && !runtime.is_running(&run.id),
         )?;
         let after = super::integration::workspace_tree(run, &directory)?;
@@ -167,6 +171,13 @@ pub async fn agent_verify(
         drop(guard);
         let result = execute(&runtime, &run, &command)?;
         let response = output::response(&result);
+        runtime.update_checked(&run.id, |current| {
+            current.efficiency.verification(
+                &result.result.stdout,
+                &response,
+                result.result.success,
+            );
+        })?;
         #[cfg(test)]
         if let Some(spec) = std::env::var_os("JACKALOPE_QUALITY_SPEC") {
             use std::io::Write;

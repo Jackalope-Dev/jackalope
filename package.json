@@ -20,6 +20,7 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "evaluate:execution": "node scripts/evaluation/run.mjs",
     "evaluate:quality": "node scripts/evaluation/quality.mjs",
+    "evaluate:routing": "node scripts/evaluation/routing.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:links:website": "node apps/website/scripts/audit-links.mjs",
     "check:changelog": "node scripts/changelog.mjs check",

@@ -17,6 +17,8 @@ mod evaluation_trial;
 #[cfg(test)]
 mod native_mcp_trial;
 #[cfg(test)]
+mod quality_direct;
+#[cfg(test)]
 mod quality_trial;
 mod service;
 mod storage;

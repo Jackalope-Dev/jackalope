@@ -98,7 +98,7 @@ export const roadmapStages = [
         title: 'A clearer picture of your limits.',
         summary: 'Richer usage coverage, measured budgets, and routing guidance.',
         detail:
-          'Build on current capacity-aware routing with broader provider reporting and monetary budgets. Reported, estimated, stale, and unavailable usage should remain distinct. Recovery and failover will need clear ownership so unfinished work is never silently replayed.',
+          'Build on current capacity-aware routing, Codex/Claude effort requests, and usage attribution with broader provider reporting and monetary budgets. Direct-CLI comparisons and offline routing evaluations are implemented; representative independent review remains open. Reported, estimated, stale, and unavailable usage should remain distinct. Recovery and failover will need clear ownership so unfinished work is never silently replayed.',
       },
     ],
   },

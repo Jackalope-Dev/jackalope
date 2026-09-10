@@ -250,6 +250,7 @@ impl Coordinator {
             let instructions = instructions(&item);
             let assigned = item.clone();
             let mut request = RunRequest {
+                effort: None,
                 dependency_snapshot: Default::default(),
                 monitor_change: None,
                 context_selection: item.context_selection.clone(),

@@ -23,10 +23,11 @@ release dates.
 
 ## Agents and task execution
 
-- [ ] Extend matched prompt/tool [quality trials](AGENT-QUALITY.md) to direct-CLI
-  baselines, representative repositories and multiple providers with independent
-  review. Keep failures and missing usage visible; evaluate effort controls and
-  learned routing on held-out tasks before enabling them.
+- [ ] Run the implemented direct-CLI and effort [quality trials](AGENT-QUALITY.md)
+  on representative repository-derived suites across providers with independent
+  review. Preserve failures and missing usage. Meet separate training/held-out
+  gates before enabling automatic effort escalation or learned routing. Validate
+  effort overrides and long verification cancellation in installed applications.
 - [ ] Validate [local setup](LOCAL-AI.md) with real models in the packaged app:
   hardware/memory requirements, current installers, download cancellation/resume,
   account selection and continued tasks. Check macOS/Linux and enterprise configuration.

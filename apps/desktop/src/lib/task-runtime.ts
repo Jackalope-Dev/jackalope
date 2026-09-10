@@ -18,6 +18,18 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  effort?: import('./task-effort').TaskEffort | null;
+  reasoningEffort?: string | null;
+  efficiency?: {
+    toolCalls?: Record<string, number>;
+    toolObservationsTruncated?: boolean;
+    launchPromptBytes: number;
+    launches: number;
+    verificationCalls: number;
+    verificationFailures: number;
+    verificationStdoutBytes: number;
+    verificationDeliveredBytes: number;
+  };
   dependencyInvalidated?: boolean;
   stages?: {
     stage: string;
@@ -174,6 +186,7 @@ export interface ScreenshotArtifact {
   timestamp: string;
 }
 export interface RunRequest {
+  effort?: import('./task-effort').TaskEffort;
   contextSelection?: import('./knowledge').ContextSelection;
   connectionIds?: string[];
   model?: string;

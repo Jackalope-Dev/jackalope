@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
+import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
 import { qualityCases } from './quality-cases.mjs';
 import { qualitySummary } from './quality-metrics.mjs';
 
@@ -13,15 +14,58 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
 const value = (name, fallback) =>
   args.find((a) => a.startsWith(`${name}=`))?.slice(name.length + 1) ?? fallback;
-const selected = value('--cases', qualityCases.map((c) => c.id).join(',')).split(',');
+const suitePath = value('--suite', null);
+const cases = suitePath
+  ? JSON.parse(await readFile(path.resolve(suitePath), 'utf8')).cases
+  : qualityCases;
+if (
+  !Array.isArray(cases) ||
+  !cases.length ||
+  cases.length > 100 ||
+  new Set(cases.map((c) => c.id)).size !== cases.length ||
+  cases.some(
+    (c) =>
+      !/^[a-z0-9-]+$/.test(c.id) ||
+      !c.prompt ||
+      typeof c.oracle !== 'string' ||
+      !c.files ||
+      Object.entries(c.files).some(
+        ([name, content]) =>
+          /(^[A-Za-z]:|^[/\\]|(^|[/\\])\.\.?([/\\]|$)|(^|[/\\])\.git([/\\]|$))/.test(name) ||
+          typeof content !== 'string',
+      ),
+  )
+)
+  throw new Error(
+    'Invalid evaluation suite: provide unique IDs, prompts, oracles and relative fixture files.',
+  );
+const selected = value(
+  '--cases',
+  suitePath ? cases.map((c) => c.id).join(',') : 'copy-edit,design-tokens,scheduler-fix',
+).split(',');
+const variants = value('--variants', 'before,after').split(',');
+const requestedEffort = value('--effort', null);
+const efforts = Object.fromEntries(
+  variants.map((v) => [v, value(`--${v}-effort`, requestedEffort)]),
+);
 const repeat = Number(value('--repeat', '3'));
 const seconds = Number(value('--seconds', '180'));
 const tokens = Number(value('--tokens', '250000'));
 const model = value('--model', '');
 const agent = value('--agent', 'codex');
-const binaries = { before: value('--before', ''), after: value('--after', '') };
+const binaries = Object.fromEntries(
+  variants.map((v) => [v, value(v === 'before' ? '--before' : '--after', '')]),
+);
 if (
-  selected.some((id) => !qualityCases.some((c) => c.id === id)) ||
+  (suitePath && variants.includes('before')) ||
+  variants.length < 1 ||
+  variants.length > 4 ||
+  new Set(variants).size !== variants.length ||
+  variants.some((v) => !['before', 'control', 'after', 'direct'].includes(v)) ||
+  Object.values(efforts).some(
+    (e) => e !== null && !['quick', 'balanced', 'thorough'].includes(e),
+  ) ||
+  selected.some((id) => !cases.some((c) => c.id === id)) ||
   !Number.isInteger(repeat) ||
   repeat < 1 ||
   repeat > 10 ||
@@ -41,12 +85,13 @@ if (!args.includes('--execute')) {
         cases: selected,
         variants: Object.keys(binaries),
         repeat,
+        efforts,
         seconds,
         tokens,
         agent,
         model: model || 'Required for execution',
         instructions:
-          'Pass --execute --model=<model> --before=<saved native test executable> --after=<current native test executable>. Trials use installed accounts; reported token limits are not hard spending caps.',
+          'Pass --execute --model=<model> --after=<native test executable> --variants=direct,after --effort=balanced for a matched direct-CLI comparison. Legacy before requires --before=<baseline executable>. Trials use installed accounts; reported token limits are not hard spending caps.',
       },
       null,
       2,
@@ -97,6 +142,9 @@ if (!args.includes('--execute')) {
       saved.cliVersion !== cliVersion ||
       saved.seconds !== seconds ||
       saved.tokens !== tokens ||
+      JSON.stringify(saved.efforts ?? Object.fromEntries(variants.map((v) => [v, null]))) !==
+        JSON.stringify(efforts) ||
+      Object.keys(saved.executableHashes).join() !== variants.join() ||
       Object.keys(binaries).some((name) => saved.executableHashes[name] !== executableHashes[name]))
   )
     throw new Error('Resume requires the same agent, model, CLI, executable hashes and budgets.');
@@ -104,8 +152,8 @@ if (!args.includes('--execute')) {
   const interruptions = saved?.interruptions ?? [];
   for (const id of selected)
     for (let repetition = 1; repetition <= repeat; repetition++) {
-      const fixture = qualityCases.find((c) => c.id === id);
-      const order = repetition % 2 ? ['before', 'after'] : ['after', 'before'];
+      const fixture = cases.find((c) => c.id === id);
+      const order = repetition % 2 ? variants : [...variants].reverse();
       for (const variant of order) {
         const completed = trials.some(
           (trial) =>
@@ -114,16 +162,31 @@ if (!args.includes('--execute')) {
         const prompt =
           variant === 'before'
             ? baseline.prompts[id]
-            : [
-                assemblePrompt({
-                  rawPrompt: fixture.prompt,
-                  selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
-                  executionMode: 'isolated',
-                }).assembledPrompt,
-                effortPrompt(),
-              ].join('\n\n');
+            : variant === 'direct'
+              ? (fixture.directPrompt ??
+                fixture.prompt.replace(
+                  'through Jackalope computer_verify',
+                  'using your permitted shell',
+                ))
+              : [
+                  assemblePrompt({
+                    rawPrompt: fixture.prompt,
+                    selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
+                    executionMode: 'isolated',
+                  }).assembledPrompt,
+                  effortPrompt(efforts[variant] ?? undefined),
+                ].join('\n\n');
         if (!prompt) throw new Error(`Missing frozen baseline for ${id}`);
-        const spec = { ...fixture, prompt, variant, agent, model, seconds, tokens };
+        const spec = {
+          ...fixture,
+          prompt,
+          variant,
+          agent,
+          model,
+          seconds,
+          tokens,
+          ...(efforts[variant] ? { effort: efforts[variant] } : {}),
+        };
         const specPath = path.join(output, `${id}-${repetition}-${variant}.json`);
         if (saved) {
           try {
@@ -212,6 +275,16 @@ if (!args.includes('--execute')) {
             !report?.budgetStopped &&
             run?.status === 'review' &&
             report?.oracle?.success === true,
+          behavioralOraclePassed: report?.oracle?.success === true,
+          budgetStopped: report?.budgetStopped ?? null,
+          category: fixture.category ?? fixture.id,
+          split: fixture.split ?? 'regression',
+          effort: efforts[variant],
+          reasoningEffort: run?.reasoningEffort ?? null,
+          efficiency: run?.efficiency ?? null,
+          stages: run?.stages ?? [],
+          usageBreakdown: run ? runUsageBreakdown([run]) : null,
+          accepted: null,
           status: run?.status ?? null,
           launchError: report?.launchError ?? null,
           elapsedMs: report?.elapsedMs ?? null,
@@ -226,7 +299,7 @@ if (!args.includes('--execute')) {
         const summary = qualitySummary(trials, Object.keys(binaries));
         await writeFile(
           `${comparisonPath}.tmp`,
-          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, seconds, tokens, trials, interruptions, summary, limitations: 'Small repeated synthetic native trials, not human acceptance or a direct-GUI comparison. CLI reasoning and provider caching follow the installed configuration. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
+          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, efforts, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
         );
         await rename(`${comparisonPath}.tmp`, comparisonPath);
         console.log(JSON.stringify(trials.at(-1)));

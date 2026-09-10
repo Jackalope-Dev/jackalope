@@ -1,3 +1,5 @@
+import { heldoutCases } from './quality-heldout.mjs';
+
 const prelude = `const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -90,6 +92,8 @@ assert.deepEqual(readyTasks([{id:'x',dependsOn:['x']}],[]),[]);
 `,
   },
 ];
+
+qualityCases.push(...heldoutCases);
 
 for (const fixture of qualityCases) {
   const protectedFiles = Object.fromEntries(

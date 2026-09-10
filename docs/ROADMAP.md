@@ -32,6 +32,10 @@ critical-path admission, structured reports, workspace verification reservations
 execution timing are implemented. Repeated [execution evaluations](EXECUTION-EVALUATION.md)
 and installed acceptance are required before claiming throughput or quality gains.
 
+Process-scoped model effort requests for Codex/Claude, usage attribution and direct-CLI
+quality comparisons are implemented. Broader independent evaluation and automatic
+effort escalation remain open; see [agent quality](AGENT-QUALITY.md).
+
 ## In progress: dependable everyday use
 
 Focused task guidance and retrievable compact verification output are implemented.

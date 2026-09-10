@@ -1,4 +1,6 @@
 mod antigravity;
+mod efficiency;
+pub(super) mod effort;
 mod events;
 pub(super) mod helper_process;
 mod journal;
@@ -18,6 +20,7 @@ mod storage;
 mod tests;
 pub(super) mod timing;
 
+pub(super) use events::consume_adapter_event;
 use events::*;
 pub use models::*;
 pub use project_setup::*;

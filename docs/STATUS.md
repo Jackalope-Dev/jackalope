@@ -19,6 +19,10 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   exports and [archive management](HISTORY-RECOVERY.md).
 - Project guidance, editable lessons, codebase maps and task outcome insights.
 - MCP connections, task-owned Chromium sessions and scoped desktop-window grants.
+- Codex/Claude effort requests, verification timeout alignment, usage attribution
+  and direct-CLI quality comparisons with separate routing evaluation gates. See
+  [agent quality](AGENT-QUALITY.md); automatic escalation and learned routing
+  remain dependent on broader independent acceptance.
 - Ask Jackalope documentation answers and reviewed local actions, backed by bounded
   model-free documentation retrieval. Optional [OpenCode/Ollama setup](LOCAL-AI.md)
   checks file edits and session continuation before connecting a local account.

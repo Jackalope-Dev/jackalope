@@ -138,6 +138,19 @@ test('quality oracles reject initial defects, accept solutions, and detect unrel
         path.join(repo, 'scheduler.mjs'),
         'export function readyTasks(tasks, completed) { const done = new Set(completed); return tasks.filter(t=>!done.has(t.id)&&t.dependsOn.every(d=>done.has(d))).toSorted((a,b)=>(b.priority??0)-(a.priority??0)).map(t=>t.id); }',
       );
+    const solutions = {
+      'query-values': 'export const solve=(query,key)=>new URLSearchParams(query).getAll(key);',
+      'stable-dedup':
+        'export const solve=items=>{const seen=new Set();return items.filter(item=>{if(seen.has(item.id))return false;seen.add(item.id);return true;});};',
+      'retry-delay':
+        'export const solve=(attempt,base,cap)=>{if(![attempt,base,cap].every(v=>typeof v === "number" && Number.isFinite(v)&&v>=0)||!Number.isInteger(attempt))throw new RangeError();return base===0?0:Math.min(cap,base*2**attempt);};',
+      'csv-cell': `export const solve=value=>{const s=String(value);return /[,"\\r\\n]/.test(s)?'"'+s.replaceAll('"','""')+'"':s;};`,
+      'group-records':
+        'export const solve=records=>{const result=new Map();for(const r of records){if(!result.has(r.group))result.set(r.group,[]);result.get(r.group).push(r);}return result;};',
+      'page-window':
+        'export const solve=(items,page,size)=>{if(!Number.isSafeInteger(page)||!Number.isSafeInteger(size)||page<=0||size<=0)throw new RangeError();return items.slice((page-1)*size,page*size);};',
+    };
+    if (solutions[fixture.id]) writeFileSync(path.join(repo, 'index.mjs'), solutions[fixture.id]);
     const good = run();
     assert.equal(good.status, 0, `${fixture.id}: ${good.stderr}`);
     writeFileSync(path.join(repo, 'unrequested.txt'), 'Extra work');

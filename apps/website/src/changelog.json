@@ -1,5 +1,16 @@
 [
   {
+    "id": "match-agent-effort-to-the-task",
+    "date": "2026-09-10",
+    "status": "In development",
+    "title": "Match agent effort to the task",
+    "description": "Task effort now requests matching reasoning levels from Codex and Claude, with clearer usage records and more reliable long checks.",
+    "items": [
+      "Quick, Balanced and Thorough apply to the launched agent without changing global settings.",
+      "Saved verification has time to finish, and usage exports retain effort and verification output measurements."
+    ]
+  },
+  {
     "id": "local-agent-setup",
     "date": "2026-09-10",
     "status": "In development",

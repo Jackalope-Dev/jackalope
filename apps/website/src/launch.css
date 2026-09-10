@@ -971,18 +971,16 @@
     flex-direction: row;
     gap: 4px;
     margin-bottom: 26px;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
+    flex-wrap: wrap;
   }
   .product-tabs button {
     grid-template-columns: 1fr;
     gap: 5px;
-    min-width: 104px;
+    min-width: 88px;
     padding: 10px;
-    flex: 1;
+    flex: 1 1 88px;
     font-size: 11px;
     line-height: 1.7;
-    scroll-snap-align: start;
   }
   .product-tabs :where(button) > svg {
     display: none;

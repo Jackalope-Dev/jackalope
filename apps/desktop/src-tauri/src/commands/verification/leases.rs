@@ -13,7 +13,7 @@ pub(super) fn check_slot(canceled: impl Fn() -> bool) -> Result<CheckSlot, Strin
     use std::sync::atomic::Ordering;
     let started = std::time::Instant::now();
     loop {
-        if canceled() || started.elapsed().as_secs() >= 300 {
+        if canceled() || started.elapsed().as_secs() >= super::QUEUE_TIMEOUT_SECS {
             return Err("Verification was canceled or timed out waiting for a check slot.".into());
         }
         if CHECKS
@@ -81,6 +81,16 @@ impl Drop for Lease {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn canceled_queue_wait_does_not_claim_capacity() {
+        assert!(check_slot(|| true).is_err());
+        let slot = check_slot(|| false).unwrap();
+        drop(slot);
+        assert!(
+            super::super::BRIDGE_TIMEOUT_SECS
+                > super::super::CHECK_TIMEOUT_SECS + super::super::QUEUE_TIMEOUT_SECS
+        );
+    }
     #[test]
     fn reservations_exclude_only_the_owned_workspace_and_release_on_drop() {
         let root = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());

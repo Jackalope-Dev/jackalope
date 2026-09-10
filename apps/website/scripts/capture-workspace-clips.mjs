@@ -73,7 +73,10 @@ try {
           }
         })();
         const chapter = (text) => chapters.push({ frame, text });
-        const hold = () => page.waitForTimeout(2200);
+        const hold = async () => {
+          const until = frame + fps * 2;
+          while (frame < until) await page.waitForTimeout(50);
+        };
         try {
           await hold();
           if (scene === 'tasks') {
@@ -160,7 +163,9 @@ try {
             '-c:v',
             'libx264',
             '-preset',
-            'slow',
+            'medium',
+            '-threads',
+            '2',
             '-crf',
             '24',
             '-pix_fmt',

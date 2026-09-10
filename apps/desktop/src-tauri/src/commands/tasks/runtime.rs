@@ -416,6 +416,8 @@ impl TaskRuntime {
         } else {
             return Err(format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code or Antigravity to run this task."));
         }
+        let reasoning_effort = super::effort::configure(&mut cmd, &adapter, req.effort);
+        self.update_checked(id, |run| run.reasoning_effort = reasoning_effort)?;
         if let Some(model) = &selected_model {
             if adapter != "kimi" {
                 cmd.args(["--model", model]);
@@ -450,7 +452,7 @@ impl TaskRuntime {
             {
                 tools["computer_verify"] = serde_json::json!({"approval_mode":"approve"});
             }
-            project_mcp.insert("jackalope".into(), serde_json::json!({"url":format!("{}/mcp",context.endpoint),"bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN","tool_timeout_sec":90,"tools":tools}));
+            project_mcp.insert("jackalope".into(), serde_json::json!({"url":format!("{}/mcp",context.endpoint),"bearer_token_env_var":"JACKALOPE_BRIDGE_TOKEN","tool_timeout_sec":crate::commands::verification::BRIDGE_TIMEOUT_SECS,"tools":tools}));
         }
         if adapter == "codex" {
             for value in crate::commands::mcp::codex_overrides(&project_mcp)? {
@@ -531,6 +533,12 @@ impl TaskRuntime {
             let config = crate::commands::mcp::opencode_config(&project_mcp, &cmd)?;
             cmd.env("OPENCODE_CONFIG_CONTENT", config);
         }
+        self.update_checked(id, |run| {
+            run.efficiency.launches += 1;
+            run.efficiency.launch_prompt_bytes += input.len() as u64;
+        })?;
+        #[cfg(test)]
+        cmd.env_remove("JACKALOPE_QUALITY_SPEC");
         #[cfg(test)]
         if std::env::var_os("JACKALOPE_QUALITY_SPEC").is_some() {
             std::fs::write(self.directory.join(format!("{id}.input")), &input)
@@ -1059,6 +1067,7 @@ impl TaskRuntime {
             });
             request.account_binding = Some(binding.clone());
             if let Some(old) = &previous {
+                request.effort = request.effort.or(old.effort);
                 request.verify_command = old.verify_command.clone();
                 request.prepare_command = old.prepare_command.clone();
                 request.auto_verify = old.auto_verify;
@@ -1088,6 +1097,9 @@ impl TaskRuntime {
                 )?
             };
             let run = TaskRun {
+                effort: request.effort,
+                reasoning_effort: None,
+                efficiency: Default::default(),
                 dependency_invalidated: false,
                 stages: vec![],
                 dependency_snapshot: previous
