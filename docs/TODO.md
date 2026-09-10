@@ -10,8 +10,11 @@ release dates.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
   defaults and explicit overrides, including cancellation and restart.
 - [ ] Check keyboard and screen-reader access, narrow layouts, title-bar controls,
-  themes, reduced motion and appearance preview rollback.
-- [ ] Validate helper actions, notifications and external links in installed builds.
+  themes, reduced motion and appearance preview rollback. Include the refreshed
+  agent characters in installed-app checks; browser fixtures cover both themes
+  at 1280×840 and 960×640.
+- [ ] Validate helper actions, notifications and external links in installed builds,
+  including Ask context defaults, saved opt-outs and its settings navigation.
 - [ ] Exercise checkpoints, commit attribution, edited merge messages and cleanup
   recovery with staged changes, locked folders and active tasks.
 - [ ] Verify rich results and diffs in installed WebViews. Preserve the Streamdown
@@ -45,7 +48,10 @@ release dates.
   while preserving existing adapters and encrypted saved data.
 - [ ] Add guarded GitHub issue, pull-request and CI integration.
 
-## Optional services
+## Account access and optional services
+
+- [ ] Validate required account access in development and release builds, including
+  reconnect, revocation, offline expiry and saved-work recovery.
 
 - [ ] Validate multi-device settings sync, account changes, offline/conflict
   recovery, deletion and saved opt-outs.
@@ -53,7 +59,8 @@ release dates.
   delivery and installed clients, including retries, suppression and optional
   email enrollment remaining off until selected.
 - [ ] Complete reporting, retention/deletion and installed-channel acceptance.
-- [ ] Keep independent setup reproducible without Jackalope's private accounts.
+- [ ] Keep builds and automated fixtures reproducible without private credentials;
+  document approved account setup for native execution.
 
 ## Website
 

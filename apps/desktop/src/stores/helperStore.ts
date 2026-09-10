@@ -53,7 +53,7 @@ export const useHelperStore = create<HelperState>()(
       draft: '',
       screen: 'tasks',
       sharePreferences: true,
-      shareProjects: false,
+      shareProjects: true,
       error: null,
       syncError: null,
       sending: false,

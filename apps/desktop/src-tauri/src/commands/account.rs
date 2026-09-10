@@ -622,7 +622,7 @@ mod tests {
             "email": "member@example.invalid"
         }))
         .unwrap();
-        let access = ExecutionAccess::new(true);
+        let access = ExecutionAccess::new();
         access.update(record.verified_at, record.expires_at);
         assert!(!access.status().allowed);
         assert!(!record.settings_sync);

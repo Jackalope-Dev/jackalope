@@ -184,7 +184,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Start with a small request whose result you can see. This example uses appearance context and leaves the final choice with you.',
         ],
         steps: [
-          'Open Ask and review Context & connections. Include appearance if you want advice about your current palette.',
+          'Open the settings button beside Close to review Ask context. Appearance and project context are on by default; saved choices are preserved.',
           'Ask: “Preview a calm dark theme with a blue accent and low atmosphere.”',
           'Read the proposed values and open the preview. Try reading a task and its controls before choosing Keep theme, or cancel to restore your saved choice.',
         ],
@@ -204,7 +204,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What can the helper read?',
         paragraphs: [
           'Official knowledgebase guides are bundled with the app, so documentation tools work offline. The selected agent still needs its usual provider connection. Answers should cite the source guide; bundled documentation describes that app build and may differ from newer website content.',
-          'App version, current screen and agent availability are shared. Context & connections lets you include appearance and supported preferences, or project names and selected-project task statuses. Files, paths, task prompts, results, logs and credentials are excluded from this context.',
+          'App version, current screen and agent availability are shared. Helper settings lets you change sharing for appearance and supported preferences, or project names and selected-project task statuses. Both are on by default; saved choices are preserved. Files, paths, task prompts, results, logs and credentials are excluded from this context.',
           'Each question includes up to eight prior replies from the current helper conversation. Turning off context sharing stops new reads; earlier information can remain in conversation history. Start a new conversation to leave that history out.',
         ],
       },
@@ -227,7 +227,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'connect-agent',
         question: 'How do I connect another agent through MCP?',
         paragraphs: [
-          'In Ask → Context & connections, choose Connect an external agent, then Copy MCP connection. The copied JSON contains a Streamable HTTP URL on 127.0.0.1 and a bearer credential. Configure it in a compatible local MCP client; clients have different configuration formats.',
+          'In Helper settings → External agent connection, choose Connect an external agent, then Copy MCP connection. The copied JSON contains a Streamable HTTP URL on 127.0.0.1 and a bearer credential. Configure it in a compatible local MCP client; clients have different configuration formats.',
           'The copied mcpServers entry can be used with Claude Code HTTP MCP configuration. For Codex, use the URL as the server url and supply the bearer credential through an environment variable named by bearer_token_env_var. Keep the credential out of repository files and shared messages.',
           'Access expires after one hour, when you disconnect, or when Jackalope closes. Enabling a new connection replaces the old credential. A remote cloud agent cannot reach this loopback endpoint directly. There is no public remote management endpoint.',
           'Connected agents can read only the context selected in the helper and can propose actions for review there. The app must be running; fresh app context requires an open workspace. Requests from browser origins are rejected. This is not a security boundary against another process running as the same OS user.',

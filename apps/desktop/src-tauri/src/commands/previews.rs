@@ -256,7 +256,7 @@ mod tests {
             serde_json::to_vec(&record).unwrap(),
         )
         .unwrap();
-        let runtime = TaskRuntime::new(history).unwrap();
+        let runtime = TaskRuntime::with_test_access(history).unwrap();
         let occupied = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = occupied.local_addr().unwrap().port();
         let command = if cfg!(windows) {

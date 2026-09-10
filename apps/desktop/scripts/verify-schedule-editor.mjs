@@ -9,8 +9,6 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await mkdir('output/playwright', { recursive: true });
   await page.goto(process.env.JACKALOPE_TEST_URL ?? 'http://localhost:5173');
-  await page.getByRole('button', { name: 'Continue in development build', exact: true }).click();
-  await page.waitForTimeout(1500);
   await page.evaluate(async () => {
     const module = (name) =>
       import(
@@ -34,6 +32,10 @@ try {
       transformCallback: () => 0,
       invoke: async (command, args) => {
         window.scheduleFixture.calls.push(command);
+        if (command === 'app_execution_access')
+          return { required: true, allowed: false, validUntil: null };
+        if (command === 'helper_snapshot')
+          return { turns: [], actions: [], connected: false, error: null };
         if (command === 'schedule_list' && window.scheduleFixture.loading)
           return new Promise((resolve) => window.scheduleFixture.resolvers.push(resolve));
         if (command === 'schedule_list')
@@ -58,6 +60,7 @@ try {
     };
     useOnboardingStore.getState().finish();
   });
+  await page.getByRole('button', { name: 'Open saved work', exact: true }).click();
   await page.getByRole('button', { name: 'Recurring', exact: true }).click();
   const loading = page.locator('.workspace-loading').filter({ hasText: 'Loading schedules…' });
   await loading.waitFor();

@@ -8,7 +8,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     if !repo.is_absolute() || !profile.is_absolute() || profile.exists() {
         return Err("Use an absolute disposable repository and a new absolute profile.".into());
     }
-    let runtime = TaskRuntime::new(profile.join("history"))?;
+    let runtime = TaskRuntime::with_test_access(profile.join("history"))?;
     let service = Coordinator::new(profile.join("coordination"), runtime.clone())?;
     service.launch();
     let result = exercise(&service, &runtime, &repo).await;

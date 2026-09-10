@@ -42,7 +42,7 @@ async fn installed_agents_verify_browser_flow() {
         .await
         .unwrap();
     });
-    let runtime = TaskRuntime::new(profile.join("history")).unwrap();
+    let runtime = TaskRuntime::with_test_access(profile.join("history")).unwrap();
     let coordinator = Coordinator::new(profile.join("coordination"), runtime.clone()).unwrap();
     coordinator.launch();
     for _ in 0..100 {

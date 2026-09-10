@@ -17,73 +17,31 @@
   gap: 20px;
 }
 .agent-roster-row {
-  --agent-color: var(--color-accent-ink);
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
   padding: 24px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-surface-sunken) 40%, transparent);
-}
-.agent-roster-row[data-provider="codex"] {
-  --agent-color: var(--color-agent-codex);
-}
-.agent-roster-row[data-provider="claude"] {
-  --agent-color: var(--color-agent-claude);
-}
-.agent-roster-row[data-provider="grok"] {
-  --agent-color: var(--color-agent-grok);
+  border-radius: 24px;
+  background: var(--color-surface);
 }
 .agent-avatar {
   display: grid;
   place-items: center;
   width: 72px;
   height: 72px;
-  color: var(--agent-color);
+  border-radius: 20px;
   background: radial-gradient(
-    ellipse at center,
-    color-mix(in srgb, var(--agent-color) 12%, transparent),
-    transparent 72%
+    ellipse at 40% 30%,
+    var(--color-accent-subtle),
+    var(--color-surface-sunken)
   );
 }
 .agent-avatar svg {
   width: 64px;
   height: 64px;
   overflow: visible;
-}
-.agent-account-avatars {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 72px;
-  height: 72px;
-}
-.agent-account-avatars[data-multiple] .agent-avatar {
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
-  background: none;
-}
-.agent-account-avatars[data-multiple] .agent-avatar + .agent-avatar {
-  flex-basis: 32px;
-  width: 32px;
-  height: 32px;
-  margin-top: 24px;
-  margin-left: -8px;
-}
-.agent-account-avatars[data-multiple] .agent-avatar svg {
-  width: 100%;
-  height: 100%;
-}
-.agent-account-avatars[data-multiple] .agent-avatar:nth-child(3) {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 24px;
-  height: 24px;
-  margin: 0;
 }
 .agent-account-summary {
   display: grid;
@@ -109,11 +67,6 @@
   outline-offset: 3px;
   border-radius: 4px;
 }
-.agent-roster-row:hover .agent-avatar-face,
-.agent-roster-row:focus-within .agent-avatar-face {
-  animation: agent-blink 0.65s ease-out;
-  transform-origin: 40px 36px;
-}
 .agent-roster-name {
   flex-wrap: wrap;
   margin-bottom: 8px;
@@ -129,7 +82,7 @@
   color: var(--color-text-secondary);
 }
 .agent-default {
-  color: var(--agent-color);
+  color: var(--color-accent-ink);
 }
 .agent-presence {
   font-size: var(--text-sm);
@@ -162,33 +115,13 @@
   align-items: center;
   vertical-align: middle;
 }
-@keyframes agent-blink {
-  0%,
-  40%,
-  100% {
-    transform: scaleY(1);
-  }
-  20% {
-    transform: scaleY(0.15);
-  }
-}
 @media (max-width: 700px) {
   .agent-roster-row {
     grid-template-columns: 72px minmax(0, 1fr);
     gap: 12px 20px;
   }
-  .agent-avatar {
-    width: 72px;
-    height: 80px;
-  }
   .agent-roster-action {
     grid-column: 2;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .agent-roster-row:hover .agent-avatar-face,
-  .agent-roster-row:focus-within .agent-avatar-face {
-    animation: none;
   }
 }
 
@@ -206,6 +139,7 @@
   grid-column: 1 / -1;
   align-self: end;
   padding-top: 8px;
+  border-top: 1px solid var(--color-border-subtle);
 }
 .agent-roster-action > button {
   flex: 1;

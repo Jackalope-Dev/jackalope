@@ -116,7 +116,7 @@ fn local_monitor_persists_baseline_and_notice_without_launching_an_agent() {
     assert_eq!(restored.before, "absent");
     assert_ne!(restored.after, "absent");
     drop(scheduler);
-    let runtime = super::super::tasks::TaskRuntime::new(directory.clone()).unwrap();
+    let runtime = super::super::tasks::TaskRuntime::with_test_access(directory.clone()).unwrap();
     assert!(directory.join("schedules.json").exists());
     assert!(!directory.join("schedules.json.corrupt").exists());
     let coordinator = Coordinator::new(directory.join("coordination"), runtime).unwrap();

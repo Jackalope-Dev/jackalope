@@ -34,9 +34,9 @@ inbox acceptance.
   Accepted invitations remain counted, including after access revocation.
   Owners see their invitees' emails and acceptance status; recipients see that
   disclosure before accepting through a shared link.
-- The gate covers the member hub and private prerelease downloads. Desktop
-  developer builds and standalone local CLI use do not require a Jackalope cloud
-  sign-in. Official beta builds additionally enforce approved native access; see
+- The gate covers the member hub and private prerelease downloads. Every desktop
+  build requires approved account access for new native work. Standalone agent
+  CLI use remains independent of Jackalope sign-in; see
   [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) and [STORE-RELEASE.md](STORE-RELEASE.md).
 
 ## Configuration

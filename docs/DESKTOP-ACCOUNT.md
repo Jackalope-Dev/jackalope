@@ -1,12 +1,15 @@
 # Desktop account connection
 
 Settings → Jackalope account connects an approved early-access membership to this
-desktop. Store preview and installer beta builds require an approved
+desktop. All builds, including local development builds, require an approved
 account for new native tasks and terminals, with a bounded 72-hour offline lease.
-Saved work and running tasks remain accessible. Developer builds keep optional
-connection. See [STORE-RELEASE.md](STORE-RELEASE.md) for enforcement and distribution.
+Saved work and running tasks remain accessible. There is no development bypass.
+See [STORE-RELEASE.md](STORE-RELEASE.md) for enforcement and distribution.
 Account connection does not sync projects, enable remote execution or change
 Microsoft Store audience membership.
+Connection and optional settings sync are enabled on Windows, macOS and Linux;
+macOS/Linux no longer report unavailable solely because of the platform. Their
+installed connection, expiry and revocation flows still require acceptance.
 
 ## User flow
 

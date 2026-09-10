@@ -24,7 +24,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         "args":["-e",r#"require('readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);const send=result=>console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result}));if(q.method==='initialize')send({protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'trial',version:'1'}});if(q.method==='tools/list')send({tools:[{name:'jackalope_echo',annotations:{readOnlyHint:true,destructiveHint:false},description:'Echo the supplied value for local verification',inputSchema:{type:'object',properties:{value:{type:'string'}},required:['value']}},...Array.from({length:100},(_,i)=>({name:'unrelated_'+i,description:'Unrelated fixture operation',inputSchema:{type:'object'}}))]});if(q.method==='tools/call')send({content:[{type:'text',text:'Verified through Jackalope: '+q.params.arguments.value}],structuredContent:{value:q.params.arguments.value}});});"#]
     }))?;
     mcp_save_server(server).await?;
-    let runtime = TaskRuntime::new(profile.join("history"))?;
+    let runtime = TaskRuntime::with_test_access(profile.join("history"))?;
     let coordinator = Coordinator::new(profile.join("coordination"), runtime.clone())?;
     coordinator.launch();
     for _ in 0..100 {

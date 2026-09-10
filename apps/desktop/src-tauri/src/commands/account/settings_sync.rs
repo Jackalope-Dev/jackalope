@@ -311,7 +311,7 @@ mod tests {
         std::fs::create_dir(&directory).unwrap();
         let state = AccountService::new(
             directory.join("account.bin"),
-            Arc::new(ExecutionAccess::new(true)),
+            Arc::new(ExecutionAccess::new()),
         );
         let fresh = read_choice(&state).unwrap();
         assert!(fresh.enabled);
@@ -319,7 +319,7 @@ mod tests {
         save_choice(&state, false).unwrap();
         let restarted = AccountService::new(
             directory.join("account.bin"),
-            Arc::new(ExecutionAccess::new(true)),
+            Arc::new(ExecutionAccess::new()),
         );
         let saved = read_choice(&restarted).unwrap();
         assert!(!saved.enabled);

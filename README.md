@@ -15,6 +15,7 @@ sign-ins, run tasks in parallel Git worktrees, and review changes before merging
 today. Signed installers and platform acceptance remain in progress; see
 [current status](docs/STATUS.md) and [release requirements](docs/CROSS-PLATFORM-RELEASES.md).
 Joining the [waitlist](https://jackalope.dev/#newsletter) is optional for contributors.
+Running native tasks requires an approved Jackalope account, including in source builds.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="apps/website/public/media/tasks.png" />
@@ -70,7 +71,7 @@ covers the toolchain, focused tests, secret checks and pull-request workflow.
 | --- | --- |
 | [apps/desktop](apps/desktop) | React interface and Tauri/Rust task runtime |
 | [apps/website](apps/website) | Product website, guides and sample media |
-| [apps/server](apps/server) | Optional account, access, feedback and update service |
+| [apps/server](apps/server) | Account access, optional feedback and update services |
 | [packages](packages) | Shared branding, knowledge and packages |
 | [docs](docs/README.md) | User workflows, architecture and contributor reference |
 | [scripts](scripts) | Verification, dependency notices and release tooling |

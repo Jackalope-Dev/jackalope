@@ -164,7 +164,7 @@ mod tests {
             let record = serde_json::json!({"id":id,"taskId":format!("{id}-task"),"projectId":project,"projectName":"Fixture","projectPath":"","workspace":"","branch":"","baseHead":"","agent":"codex","account":"fixture","model":null,"prompt":"Fixture manual task","status":"review","startedAt":"2026-09-08T00:00:00Z","endedAt":null,"sessionId":null,"result":"","activity":[],"error":null,"persistenceError":null,"exitCode":null,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"reported":false,"estimatedCostUsd":null}});
             std::fs::write(history.join(format!("{id}.json")), record.to_string()).unwrap();
         }
-        let runtime = TaskRuntime::new(history).unwrap();
+        let runtime = TaskRuntime::with_test_access(history).unwrap();
         let service = Coordinator::new(directory.join("coordination"), runtime.clone()).unwrap();
         for id in ["sender-run", "reader-run", "foreign-run"] {
             runtime.update(id, |run| run.status = "running".into());

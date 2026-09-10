@@ -11,7 +11,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useUpdateStore } from '../../stores/updateStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
-import { type AccountStatus, JackalopeAccount } from '../settings/JackalopeAccount';
+import { JackalopeAccount } from '../settings/JackalopeAccount';
 import { PrivacySettings } from '../settings/PrivacySettings';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Button } from '../ui/button';
@@ -32,7 +32,6 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
   const loadRelease = useUpdateStore((state) => state.load);
   const reducedMotion = useReducedMotion();
   const [access, setAccess] = useState<AccessStatus | null>(null);
-  const [account, setAccount] = useState<AccountStatus | null>(null);
   const [error, setError] = useState('');
   const [reviewing, setReviewing] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -51,7 +50,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
       try {
         const value = isTauriEnvironment()
           ? await nativeTask<AccessStatus>('app_execution_access')
-          : { required: false, allowed: true, validUntil: null };
+          : { required: true, allowed: false, validUntil: null };
         if (!canceled) setAccess(value);
       } catch {
         if (!canceled) {
@@ -69,10 +68,6 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     if (!access?.allowed || (entered.current && !connecting) || verified) return;
-    if (!access.required && account?.state !== 'connected') {
-      if (!needsSetup && !connecting) setAdmitted(true);
-      return;
-    }
     let canceled = false;
     void useCommunityStore
       .getState()
@@ -91,7 +86,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
     return () => {
       canceled = true;
     };
-  }, [access, account?.state, connecting, needsSetup, verified]);
+  }, [access, connecting, verified]);
   useEffect(() => {
     if (!verified) return;
     if (!access?.allowed) {
@@ -201,7 +196,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                   Checking access…
                 </p>
               ) : (
-                <JackalopeAccount presentation="welcome" onStatus={setAccount} />
+                <JackalopeAccount presentation="welcome" />
               )}
               {error && (
                 <p className="access-error" role="alert">
@@ -210,23 +205,6 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
               )}
             </div>
             <footer className="access-footer">
-              {access && !access.required && (
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    await useCommunityStore.getState().applyDefaults();
-                    const privacy = useCommunityStore.getState();
-                    if (privacy.error) {
-                      setError(privacy.error);
-                      return;
-                    }
-                    setAdmitted(true);
-                  }}
-                >
-                  Continue in development build
-                  <ArrowRight size={16} />
-                </Button>
-              )}
               {hasProjects && (
                 <Button
                   variant="ghost"

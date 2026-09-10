@@ -153,7 +153,7 @@ fn desktop_release_cancels_inflight_work_before_releasing_its_lease() {
 async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access() {
     let directory =
         std::env::temp_dir().join(format!("jackalope-desktop-auth-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(directory.join("runs")).unwrap();
+    let runtime = TaskRuntime::with_test_access(directory.join("runs")).unwrap();
     assert!(session(&runtime, "missing", true).is_err());
     let service =
         super::super::coordination::Coordinator::new(directory.join("queue"), runtime.clone())

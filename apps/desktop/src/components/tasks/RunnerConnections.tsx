@@ -223,23 +223,11 @@ export function RunnerConnections({
               });
               return (
                 <article key={runner.id} className="agent-roster-row" data-provider={provider}>
-                  <div
-                    className="agent-account-avatars"
-                    data-multiple={profiles.length > 1 || undefined}
-                    aria-hidden="true"
-                  >
-                    {Array.from(
-                      { length: Math.max(1, Math.min(profiles.length, 3)) },
-                      (_, index) => (
-                        <AgentAvatar
-                          key={profiles[index]?.id ?? runner.id}
-                          provider={provider}
-                          working={index === 0 && working && !waitingRun}
-                          waiting={index === 0 && !!waitingRun}
-                        />
-                      ),
-                    )}
-                  </div>
+                  <AgentAvatar
+                    provider={provider}
+                    working={working && !waitingRun}
+                    waiting={!!waitingRun}
+                  />
                   <div className="agent-roster-identity">
                     <div className="agent-roster-name">
                       <h2>{custom?.name ?? runner.name}</h2>

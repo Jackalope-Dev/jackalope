@@ -21,7 +21,7 @@ impl Fixture {
             let value = json!({"id":id,"taskId":format!("{id}-task"),"projectId":project,"projectName":"Fixture","projectPath":"","workspace":"","branch":"","baseHead":"","agent":"codex","account":"fixture","model":null,"prompt":format!("{id} work"),"status":"review","startedAt":"2026-09-08T00:00:00Z","endedAt":null,"sessionId":null,"result":"","activity":[],"error":null,"persistenceError":null,"exitCode":null,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"reported":false,"estimatedCostUsd":null}});
             std::fs::write(history.join(format!("{id}.json")), value.to_string()).unwrap();
         }
-        let runtime = TaskRuntime::new(history).unwrap();
+        let runtime = TaskRuntime::with_test_access(history).unwrap();
         let service = Coordinator::new(root.join("coordination"), runtime.clone()).unwrap();
         Self {
             root,
@@ -278,7 +278,7 @@ fn quick_failure_emits_start_and_failure_and_restart_emits_recovery_once() {
     fixture.running("reader-run");
     let root = fixture.root.clone();
     drop(fixture);
-    let runtime = TaskRuntime::new(root.join("history")).unwrap();
+    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let service = Coordinator::new(root.join("coordination"), runtime).unwrap();
     service.reconcile().unwrap();
     let messages = service.view().unwrap().messages;

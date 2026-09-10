@@ -16,8 +16,11 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
 - Project guidance, editable lessons, codebase maps and task outcome insights.
 - Recurring schedules and local monitors that act on committed content changes.
 - MCP connections, task-owned browser sessions and Windows desktop-control grants.
-- Ask Jackalope documentation answers and reviewed local actions.
+- Ask Jackalope documentation answers and reviewed local actions, with a focused
+  chat panel and shared context/notification controls in its header settings.
 - Shared appearance controls, onboarding and optional portable settings sync.
+  Agent characters share the brand's layered silhouettes and theme colors, with
+  distinct working/input poses and reduced-motion support.
 - An optional account/access, feedback, reporting and update service, plus a
   product website with agent-specific setup, worked workflow guides, sourced
   comparisons, sample-workspace media and a Reddit community link. The knowledgebase

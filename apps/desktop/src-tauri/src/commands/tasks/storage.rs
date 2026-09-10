@@ -7,6 +7,14 @@ use super::*;
 const RETAINED_REVIEWED: usize = 200;
 
 impl TaskRuntime {
+    #[cfg(test)]
+    pub(crate) fn with_test_access(directory: PathBuf) -> Result<Self, String> {
+        let runtime = Self::new(directory)?;
+        let now = Utc::now().timestamp_millis();
+        runtime.access.update(now, now + 60 * 60 * 1000);
+        Ok(runtime)
+    }
+
     pub fn new(directory: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let owner = std::fs::OpenOptions::new()
@@ -18,9 +26,7 @@ impl TaskRuntime {
             .map_err(|e| e.to_string())?;
         owner.try_lock().map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
         let runtime = Self {
-            access: Arc::new(super::super::execution_access::ExecutionAccess::new(cfg!(
-                feature = "beta-access"
-            ))),
+            access: Arc::new(super::super::execution_access::ExecutionAccess::new()),
             knowledge: super::super::knowledge::KnowledgeStore::new(
                 directory.join("knowledge/entries.json"),
             ),

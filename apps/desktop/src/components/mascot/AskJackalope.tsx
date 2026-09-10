@@ -1,4 +1,4 @@
-import { BookOpen, Send, Square } from 'lucide-react';
+import { Send, Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -21,15 +21,10 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
   const helper = useHelperStore();
   const agent = useAgentConfigStore((state) => state.defaultMetaAgent);
   const [localError, setLocalError] = useState('');
-  const [connection, setConnection] = useState<{ url: string; token: string }>();
-  const [copied, setCopied] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const working = helper.sending || helper.view.turns.some((turn) => turn.status === 'working');
   const native = isTauriEnvironment();
-  useEffect(() => {
-    if (!helper.view.connected) setConnection(undefined);
-  }, [helper.view.connected]);
   const count = helper.view.turns.length;
   useEffect(() => {
     if (count) scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
@@ -46,142 +41,8 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
   return (
     <section className="helper-chat" aria-label="Ask Jackalope">
       <div className="helper-body" ref={scroll}>
-        <div className="helper-intro">
-          <p>Ask about Jackalope, personalize your workspace, or prepare your next task.</p>
-          <small>
-            {agent ? `Uses ${agent} and its active account.` : 'Choose a default agent in Agents.'}{' '}
-            Messages and shared context go to that provider and may count toward its usage limits.
-          </small>
-        </div>
-        <details className="helper-context">
-          <summary>Context & connections</summary>
-          <p>
-            App version, current page and agent availability are shared. Project files, paths, task
-            messages and credentials are excluded.
-          </p>
-          <label>
-            <input
-              type="checkbox"
-              checked={helper.sharePreferences}
-              onChange={(event) => {
-                useHelperStore.setState({ sharePreferences: event.target.checked });
-                void helper.refresh();
-              }}
-            />{' '}
-            Appearance and supported preferences
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={helper.shareProjects}
-              onChange={(event) => {
-                useHelperStore.setState({ shareProjects: event.target.checked });
-                void helper.refresh();
-              }}
-            />{' '}
-            Project names and selected project task statuses
-          </label>
-          <p>
-            Each question includes up to eight previous replies. Earlier shared information can
-            remain in the conversation; start a new conversation to omit it.
-          </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={!native}
-            onClick={() =>
-              void action(async () => {
-                if (helper.view.connected) {
-                  await nativeTask('helper_connection', { enabled: false });
-                  setConnection(undefined);
-                } else setConnection(await nativeTask('helper_connection', { enabled: true }));
-                setCopied(false);
-              })
-            }
-          >
-            {helper.view.connected ? 'Disconnect external agent' : 'Connect an external agent'}
-          </Button>
-          {helper.view.connected && (
-            <p>
-              Local MCP access expires after one hour or when Jackalope closes. Connected agents can
-              read the context selected above and propose actions for review here.
-            </p>
-          )}
-          {helper.view.connected && !connection && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                void action(async () => {
-                  setConnection(await nativeTask('helper_connection', { enabled: true }));
-                  setCopied(false);
-                })
-              }
-            >
-              Replace connection to copy again
-            </Button>
-          )}
-          {connection && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                void action(async () => {
-                  await navigator.clipboard.writeText(
-                    JSON.stringify(
-                      {
-                        mcpServers: {
-                          jackalope: {
-                            type: 'http',
-                            url: connection.url,
-                            headers: { Authorization: `Bearer ${connection.token}` },
-                          },
-                        },
-                      },
-                      null,
-                      2,
-                    ),
-                  );
-                  setCopied(true);
-                })
-              }
-            >
-              {copied ? 'Connection copied' : 'Copy MCP connection'}
-            </Button>
-          )}
-          <button
-            type="button"
-            className="helper-text-button"
-            onClick={() =>
-              void openLink('https://jackalope.dev/knowledge/ask-jackalope/').catch((error) =>
-                setLocalError(String(error)),
-              )
-            }
-          >
-            Connection instructions
-          </button>
-        </details>
         <div className="helper-transcript">
-          {!count && (
-            <div className="helper-suggestions">
-              {[
-                'How do isolated worktrees work?',
-                'Make Jackalope dark with a purple accent.',
-                'What can you help me do?',
-              ].map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => {
-                    useHelperStore.setState({ draft: prompt });
-                    input.current?.focus();
-                  }}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          )}
+          {!count && <p className="helper-empty">How can I help?</p>}
           {helper.view.turns.map((turn) => (
             <article className="helper-turn" key={turn.id}>
               <p className="helper-user">{turn.prompt}</p>
@@ -266,17 +127,17 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
           }}
         />
         <div className="helper-buttons">
-          <button
-            className="helper-text-button"
-            type="button"
-            onClick={() =>
-              void openLink('https://jackalope.dev/knowledge/').catch((error) =>
-                setLocalError(String(error)),
-              )
-            }
-          >
-            <BookOpen size={14} /> Browse help
-          </button>
+          {!!count && (
+            <button
+              type="button"
+              className="helper-text-button"
+              disabled={working}
+              title="Archive this conversation locally and start a new one"
+              onClick={() => void action(() => nativeTask('helper_new_conversation'))}
+            >
+              New conversation
+            </button>
+          )}
           {working ? (
             <Button
               type="button"
@@ -296,16 +157,10 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
             </Button>
           )}
         </div>
-        {!!count && (
-          <button
-            type="button"
-            className="helper-text-button"
-            disabled={working}
-            onClick={() => void action(() => nativeTask('helper_new_conversation'))}
-          >
-            New conversation · archive this one locally
-          </button>
-        )}
+        <small className="helper-disclaimer">
+          {agent ? `Uses your default agent, ${agent}.` : 'Choose a default agent in Agents.'}{' '}
+          Messages and shared context go to its provider. Usage limits apply.
+        </small>
       </form>
     </section>
   );

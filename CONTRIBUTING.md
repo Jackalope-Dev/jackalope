@@ -17,6 +17,8 @@ Documentation fixes, reproducible bug reports, accessibility work and tests are
 welcome alongside features. Maintainers review contributions before merging;
 discuss larger changes before investing in an implementation. No hosted Jackalope
 account, signing key or deployment credential is needed for source contributions.
+Running native tasks requires an approved Jackalope account in every build,
+including local development builds. Automated tests use isolated access fixtures.
 
 ## Development
 

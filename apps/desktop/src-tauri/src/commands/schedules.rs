@@ -597,7 +597,8 @@ mod tests {
     pub(super) fn fixture(missed: &str) -> (PathBuf, Scheduler) {
         let directory =
             std::env::temp_dir().join(format!("jackalope-schedule-{}", uuid::Uuid::new_v4()));
-        let runtime = super::super::tasks::TaskRuntime::new(directory.clone()).unwrap();
+        let runtime =
+            super::super::tasks::TaskRuntime::with_test_access(directory.clone()).unwrap();
         let coordinator = Coordinator::new(directory.join("coordination"), runtime).unwrap();
         let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator);
         let definition: ScheduleDefinition = serde_json::from_value(serde_json::json!({
@@ -628,7 +629,7 @@ mod tests {
     fn execution_access_denial_skips_the_occurrence_without_creating_a_run() {
         let (directory, mut scheduler) = fixture("once");
         scheduler.coordinator.runtime.access =
-            Arc::new(super::super::execution_access::ExecutionAccess::new(true));
+            Arc::new(super::super::execution_access::ExecutionAccess::new());
         let now = Utc::now();
         scheduler.ledger.lock().unwrap().schedules[0].next_at = now;
         scheduler.tick(now).unwrap();

@@ -38,14 +38,16 @@ locally. On restart, working turns are interrupted and pending/applying actions
 expire. Corrupt history is preserved and blocks writes until repaired.
 
 App version, screen and agent availability are shared. Appearance/preferences
-can be disabled. Project names and selected-project task statuses are opt-in.
+and project names and selected-project task statuses are enabled by default.
+Use the settings button beside Close to change sharing, notifications and companion
+animations. Existing saved sharing choices are preserved.
 Task prompts/results, files, paths and credentials are excluded. Context older
 than 15 seconds is rejected. Disabling sharing prevents new reads; previous
 conversation text remains until the user starts a new conversation.
 
 ## Local MCP
 
-Ask → Context & connections → Connect an external agent creates a random
+Helper settings → External agent connection → Connect an external agent creates a random
 in-memory credential. Copy MCP connection returns the ephemeral loopback URL and
 HTTP bearer configuration. A new connection replaces the old credential;
 disconnect, restart or the one-hour expiry revokes it. Credentials never enter

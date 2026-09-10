@@ -20,8 +20,8 @@ implementation does not establish release acceptance.
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
 large-project performance in installed builds. Complete signing, installation,
-updates and secure storage for each intended platform. Optional account services,
-settings sync, feedback and delivery need their own acceptance checks.
+updates and secure storage for each intended platform. Required account access
+in every build, optional settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS/Linux

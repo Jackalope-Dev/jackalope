@@ -167,11 +167,7 @@ pub fn launch(app: tauri::AppHandle) {
             let preferences = service.preferences.lock().unwrap().clone();
             for notice in &current {
                 if seen.insert(notice.key.clone()) && permitted(&preferences, notice, focused) {
-                    if let Err(error) = show(&app, notice.title, Some(notice.run_id.clone())).await
-                    {
-                        *service.error.lock().unwrap() = Some(error);
-                        let _ = app.emit("jackalope-notification-status", ());
-                    }
+                    let _ = show(&app, notice.title, Some(notice.run_id.clone())).await;
                 }
             }
             // Resolved questions cannot become pending again; retired attempts never replay.
@@ -253,21 +249,20 @@ fn activate(app: &tauri::AppHandle, run_id: Option<String>) {
 
 async fn show(app: &tauri::AppHandle, title: &str, run_id: Option<String>) -> Result<(), String> {
     #[cfg(windows)]
-    {
+    let result = {
         let app = app.clone();
         let title = title.to_owned();
         tauri::async_runtime::spawn_blocking(move || show_windows(&app, &title, run_id))
             .await
             .map_err(|e| e.to_string())?
-    }
+    };
     #[cfg(target_os = "linux")]
-    {
-        linux::show(app, title, run_id).await
-    }
+    let result = linux::show(app, title, run_id).await;
     #[cfg(target_os = "macos")]
-    {
-        macos::show(app, title, run_id).await
-    }
+    let result = macos::show(app, title, run_id).await;
+    *app.state::<Notifications>().error.lock().unwrap() = result.as_ref().err().cloned();
+    let _ = app.emit("jackalope-notification-status", ());
+    result
 }
 
 #[tauri::command]

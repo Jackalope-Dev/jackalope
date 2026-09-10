@@ -3,7 +3,7 @@ use super::*;
 fn helper() -> Helper {
     let directory =
         std::env::temp_dir().join(format!("jackalope-helper-test-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(directory.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
     Helper::new(directory, runtime)
 }
 

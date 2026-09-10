@@ -179,7 +179,7 @@ fn main() {
     )
     .unwrap();
     let history = root.join("history");
-    let runtime = TaskRuntime::new(history.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let mut policy = AgentPolicy::default();
     policy.automatic_quota_handoff = Some(enabled);
     for id in BUILTIN_AGENTS {
@@ -248,7 +248,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(10));
     }
     drop(runtime);
-    let restored = TaskRuntime::new(history).unwrap();
+    let restored = TaskRuntime::with_test_access(history).unwrap();
     let run = restored.inner.lock().unwrap().runs[&id].clone();
     assert_eq!(run.workspace, settled.workspace);
     assert_eq!(run.routing.unwrap().handoffs.len(), 1);
@@ -344,7 +344,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
         ],
     )
     .unwrap();
-    let runtime = TaskRuntime::new(root.join("history")).unwrap();
+    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "codex".into();
     for id in BUILTIN_AGENTS {

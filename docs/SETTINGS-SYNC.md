@@ -3,8 +3,8 @@
 Launch checks account access outside the numbered setup flow. App appearance and
 privacy controls live on this screen. Approval shows a brief animated checkmark
 (with a reduced-motion alternative), then enters the workspace or project setup.
-Official beta builds require a native verified access lease; development builds
-can continue without a hosted account. Native execution checks remain authoritative
+Every desktop build requires a native verified account access lease, including
+local development builds. Native execution checks remain authoritative
 including after revocation and offline expiry. Saved work remains reviewable.
 
 Project setup has four steps: Project, Agents, Appearance and First task. Adding another project

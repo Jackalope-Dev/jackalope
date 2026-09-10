@@ -249,7 +249,7 @@ fn installed_agent_lifecycle_trial() {
     )
     .unwrap();
     let history = root.join("history");
-    let runtime = TaskRuntime::new(history.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let model = std::env::var("JACKALOPE_AGENT_MODEL").ok();
     let request = RunRequest {
         id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
@@ -427,7 +427,7 @@ fn installed_agent_lifecycle_trial() {
     assert_eq!(settled(&runtime, &stop.id).status, "stopped");
     std::thread::sleep(Duration::from_millis(300));
     drop(runtime);
-    let restored = TaskRuntime::new(history).unwrap();
+    let restored = TaskRuntime::with_test_access(history).unwrap();
     assert_eq!(
         restored.inner.lock().unwrap().runs[&second.id].result,
         second.result
@@ -438,7 +438,7 @@ fn installed_agent_lifecycle_trial() {
 #[test]
 fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
     let folder = std::env::temp_dir().join(format!("jackalope-answer-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let run = sample("codex");
     runtime
         .inner
@@ -548,7 +548,7 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     .unwrap();
     let executable = folder.join("fixture.cmd");
     std::fs::write(&executable, "@echo off\r\nset /p TASK_INPUT=\r\necho %*>args.txt\r\necho {\"type\":\"thread.started\",\"thread_id\":\"fixture-session\"}\r\necho {\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Fixture complete\"}}\r\n").unwrap();
-    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "custom-fixture".into();
     policy.custom_agents.push(CustomAgent {
@@ -637,7 +637,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
         std::process::id(),
         Utc::now().timestamp_nanos_opt().unwrap()
     ));
-    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
     consume_event(
         &mut run,
@@ -649,7 +649,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
     );
     runtime.save(&run).unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::new(folder.clone()).unwrap();
+    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let inner = loaded.inner.lock().unwrap();
     let restored = &inner.runs[&run.id];
     assert_eq!(restored.status, "interrupted");
@@ -673,7 +673,7 @@ fn journal_identifiers_cannot_escape_the_storage_directory() {
 fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     let folder = std::env::temp_dir().join(format!("jackalope-retry-{}", uuid::Uuid::new_v4()));
     let directory = folder.join("history");
-    let runtime = TaskRuntime::new(directory.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
     let mut run = sample("codex");
     run.status = "review".into();
     run.result = "last saved output".into();
@@ -711,7 +711,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     runtime.update_checked(&run.id, |_| {}).unwrap();
     runtime.ensure_history_saved().unwrap();
     drop(runtime);
-    let restarted = TaskRuntime::new(directory).unwrap();
+    let restarted = TaskRuntime::with_test_access(directory).unwrap();
     let saved = restarted.integration_runs().unwrap().pop().unwrap();
     assert_eq!(saved.result, "latest unsaved output");
     assert!(saved.persistence_error.is_none());
@@ -725,7 +725,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
 fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_written() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-startup-save-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.process_contained = true;
     runtime.save(&run).unwrap();
@@ -735,7 +735,7 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
     let mut readonly = original.clone();
     readonly.set_readonly(true);
     std::fs::set_permissions(&path, readonly).unwrap();
-    let runtime = TaskRuntime::new(folder.clone())
+    let runtime = TaskRuntime::with_test_access(folder.clone())
         .expect("a failed checkpoint must not prevent reading other history");
     let recovered = runtime.integration_runs().unwrap().pop().unwrap();
     assert_eq!(recovered.status, "stopped");
@@ -759,7 +759,7 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
 fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-history-id-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut good = sample("codex");
     good.status = "review".into();
     good.result = "keep this result".into();
@@ -771,7 +771,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
     let unfinished = folder.join(format!("{}.tmp", good.id));
     std::fs::write(&unfinished, b"partial JSON").unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::new(folder.clone()).unwrap();
+    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
     assert_eq!(loaded.integration_runs().unwrap().len(), 1);
     assert_eq!(
         loaded.integration_runs().unwrap()[0].result,
@@ -788,7 +788,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
 fn oversized_or_summary_records_do_not_overwrite_complete_history() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-history-limit-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
     runtime.save(&run).unwrap();
     let path = folder.join(format!("{}.json", run.id));
@@ -827,7 +827,7 @@ fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
     )
     .unwrap();
 
-    let runtime = TaskRuntime::new(folder.clone())
+    let runtime = TaskRuntime::with_test_access(folder.clone())
         .expect("a corrupted or invalid history entry must not prevent app startup");
     let inner = runtime.inner.lock().unwrap();
     assert_eq!(inner.runs.len(), 1, "only the valid entry should load");
@@ -846,7 +846,7 @@ fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
     assert!(folder.join("bad-id-file.json.corrupt").exists());
     assert!(!folder.join("bad-id-file.json").exists());
 
-    let restarted = TaskRuntime::new(folder.clone()).unwrap();
+    let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let inner = restarted.inner.lock().unwrap();
     assert_eq!(inner.runs.len(), 1);
     assert_eq!(
@@ -910,7 +910,7 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
         ],
     )
     .unwrap();
-    let runtime = TaskRuntime::new(root.join("profile")).unwrap();
+    let runtime = TaskRuntime::with_test_access(root.join("profile")).unwrap();
     let mut run = sample("codex");
     run.project_path = path.into();
     run.workspace = path.into();
@@ -1005,7 +1005,7 @@ fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
 #[test]
 fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let folder = std::env::temp_dir().join(format!("jackalope-retention-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     for status in ["review", "failed", "interrupted"] {
         let mut run = sample("codex");
         run.id = format!("keep-{status}");
@@ -1022,7 +1022,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     }
     drop(runtime);
 
-    let restarted = TaskRuntime::new(folder.clone()).unwrap();
+    let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let loaded = restarted.integration_runs().unwrap();
     assert_eq!(
         loaded.iter().filter(|r| r.status == "reviewed").count(),
@@ -1064,7 +1064,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
 #[test]
 fn recovery_exports_import_once_and_never_shadow_a_present_task() {
     let folder = std::env::temp_dir().join(format!("jackalope-import-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::new(folder.clone()).unwrap();
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.id = "imported-attempt-01".into();
     run.status = "review".into();

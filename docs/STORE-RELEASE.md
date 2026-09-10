@@ -140,9 +140,8 @@ The current referral system also grants invitations to approved members; account
 approval does not impose an exact operator-only cohort size.
 
 A hidden link can be forwarded and permits installation. Jackalope membership
-controls new execution inside official beta builds. No raw installer download is
-needed for this path. Later, enable Store discoverability and deliberately decide
-whether to remove the beta-access build feature.
+controls new execution in every build. No raw installer download is
+needed for this path. Store discoverability does not change the account requirement.
 
 Private-to-public audience is a one-way change for that product. Removing a tester
 from the Store private audience does not revoke an installed app. Membership and
@@ -150,9 +149,10 @@ device revocation are handled by Jackalope's service.
 
 ## Native beta gate
 
-The `store` Cargo feature includes `beta-access`. Official EXE/MSI beta builds
-also enable `beta-access`; ordinary local developer builds remain independent.
-Changing a renderer preference or update channel cannot disable the compiled gate.
+Every native build requires verified account access, including local development
+and Store builds. The `beta-access` feature remains compatible with existing build
+scripts but no longer controls enforcement. Changing build features, a renderer
+preference or update channel cannot disable the gate.
 
 The native runtime starts denied until it checks the encrypted account record.
 Only a successful server verification supplies an authorization timestamp. The

@@ -15,7 +15,7 @@ export function NotificationSettings() {
     setResult('');
     try {
       await nativeTask('notification_test');
-      setResult('Sent to Windows. If it did not appear, check Windows notification settings.');
+      setResult('Sent to your desktop. If it did not appear, check system notification settings.');
     } catch (error) {
       setResult(String(error));
     } finally {
@@ -44,7 +44,7 @@ export function NotificationSettings() {
       <div className="space-y-3 px-5 py-4">
         <p className="task-muted">
           {!status?.supported
-            ? 'Available in the Windows desktop app.'
+            ? 'Available in the desktop app.'
             : 'Notifications stop when Jackalope quits.'}
         </p>
         {status?.supported && (

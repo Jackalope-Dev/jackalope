@@ -15,19 +15,13 @@
 .helper-chat button {
   min-height: 44px;
 }
-.helper-intro {
-  padding: 14px 20px 8px;
-}
-.helper-intro p {
-  margin-bottom: 6px;
-}
 .helper-chat small,
 .helper-context {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 .helper-context {
-  margin: 0 20px;
+  margin: 0;
   flex-shrink: 0;
 }
 .helper-context summary {
@@ -37,15 +31,6 @@
 }
 .helper-context p {
   margin-bottom: 8px;
-}
-.helper-context label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-}
-.helper-context input {
-  accent-color: var(--color-accent);
 }
 .helper-transcript {
   padding: 12px 20px;
@@ -79,20 +64,10 @@
 .helper-turn details ul {
   padding-left: 16px;
 }
-.helper-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.helper-suggestions button {
-  text-align: left;
-  min-height: 44px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  color: var(--color-accent-ink);
-}
-.helper-suggestions button:hover {
-  background: var(--color-surface-hover);
+.helper-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--color-text-secondary);
 }
 .helper-composer {
   padding: 12px 20px 16px;
@@ -112,7 +87,7 @@
 }
 .helper-buttons {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
   margin-top: 8px;
@@ -153,8 +128,12 @@
 }
 .helper-tabs {
   display: flex;
-  padding: 6px 20px;
+  margin: 12px 20px 4px;
+  padding: 4px;
   gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
   flex-shrink: 0;
 }
 .helper-tabs button {
@@ -162,14 +141,69 @@
   min-height: 44px;
   border-radius: 10px;
   font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-.helper-tabs button[aria-pressed="true"] {
-  background: var(--color-surface-hover);
-  box-shadow: var(--shadow-selection);
+  font-weight: 600;
   color: var(--color-text-primary);
 }
-.helper-chat :is(button, textarea, input, summary):focus-visible {
+.helper-tabs button:hover {
+  background: var(--color-surface-hover);
+}
+.companion-panel .helper-tabs button[aria-pressed="true"] {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-selection);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.companion-panel :is(button, textarea, input, summary):focus-visible {
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
+}
+.helper-disclaimer {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.helper-buttons > .helper-text-button {
+  margin-right: auto;
+}
+.companion-header-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+.companion-header-actions .quiet-icon {
+  min-width: 44px;
+  min-height: 44px;
+}
+.helper-settings {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 16px 20px;
+  font-size: var(--text-sm);
+}
+.helper-settings > section + section,
+.helper-settings > details {
+  margin-top: 20px;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 16px;
+}
+.helper-settings h3 {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.helper-settings p {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.helper-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+}
+.helper-settings .themed-select {
+  width: 100%;
 }

@@ -1,6 +1,7 @@
 import { applyThemeTokens, DEFAULT_THEME, startThemeClock } from '@jackalope/brand/theme';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { AgentAvatar } from './components/agents/AgentAvatar';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
 import { ThemeEditor } from './components/theme/ThemeEditor';
 import { Button } from './components/ui/button';
@@ -11,6 +12,7 @@ import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
 import './index.css';
 import './components/ui/experience.css';
+import './components/agents/agents-workspace.css';
 
 function DesignLab() {
   useEffect(startThemeClock, []);
@@ -18,6 +20,7 @@ function DesignLab() {
   const [replay, setReplay] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [period, setPeriod] = useState('30');
+  const [agentState, setAgentState] = useState('idle');
   const { mood, setMood } = useMascotStore();
   useEffect(() => applyThemeTokens(theme), [theme]);
 
@@ -153,6 +156,33 @@ function DesignLab() {
                 <SelectItem value="unavailable">No connection available</SelectItem>
               </Select>
             </label>
+          </div>
+        </section>
+        <section className="rounded-3xl bg-[var(--color-bg)] p-8 mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-base font-medium">Agent characters</h2>
+              <p className="task-muted mt-2">Example poses only. No agents are running.</p>
+            </div>
+            <Select aria-label="Agent pose" value={agentState} onValueChange={setAgentState}>
+              <SelectItem value="idle">Idle</SelectItem>
+              <SelectItem value="working">Working</SelectItem>
+              <SelectItem value="waiting">Needs input</SelectItem>
+            </Select>
+          </div>
+          <div className="flex flex-wrap gap-8">
+            {['codex', 'claude', 'grok', 'opencode', 'antigravity', 'custom'].map((provider) => (
+              <figure key={provider} className="grid justify-items-center gap-3">
+                <AgentAvatar
+                  provider={provider}
+                  working={agentState === 'working'}
+                  waiting={agentState === 'waiting'}
+                />
+                <figcaption className="text-xs text-[var(--color-text-secondary)]">
+                  {provider}
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </section>
         <TaskExperienceExamples />

@@ -10,7 +10,6 @@ struct Lease {
 }
 
 pub struct ExecutionAccess {
-    required: bool,
     lease: Mutex<Lease>,
 }
 
@@ -23,9 +22,8 @@ pub struct AccessStatus {
 }
 
 impl ExecutionAccess {
-    pub fn new(required: bool) -> Self {
+    pub fn new() -> Self {
         Self {
-            required,
             lease: Mutex::new(Lease::default()),
         }
     }
@@ -52,8 +50,8 @@ impl ExecutionAccess {
             (lease.checked_at > 0 && now >= lease.checked_at && now < until).then_some(until)
         });
         AccessStatus {
-            required: self.required,
-            allowed: !self.required || until.is_some(),
+            required: true,
+            allowed: until.is_some(),
             valid_until: until,
         }
     }
@@ -82,7 +80,7 @@ mod tests {
 
     #[test]
     fn access_requires_verification_and_expires_without_sliding_on_reads() {
-        let access = ExecutionAccess::new(true);
+        let access = ExecutionAccess::new();
         assert!(!access.at(1000).allowed);
         access.update(1000, i64::MAX);
         assert!(access.at(1001).allowed);
@@ -93,21 +91,16 @@ mod tests {
         assert!(!access.at(2000).allowed);
         access.revoke();
         assert!(!access.at(1001).allowed);
-        assert!(ExecutionAccess::new(false).at(1001).allowed);
     }
 
     #[test]
-    fn beta_access_denies_native_launches_without_creating_attempts_and_keeps_history_readable() {
+    fn all_builds_deny_unverified_native_launches_and_keep_history_readable() {
         use crate::commands::tasks::{RunRequest, TaskRuntime};
-        use std::sync::Arc;
         let folder =
             std::env::temp_dir().join(format!("jackalope-access-{}", uuid::Uuid::new_v4()));
-        let mut runtime = TaskRuntime::new(folder.clone()).unwrap();
-        assert_eq!(
-            runtime.access.status().required,
-            cfg!(feature = "beta-access")
-        );
-        runtime.access = Arc::new(ExecutionAccess::new(true));
+        let runtime = TaskRuntime::new(folder.clone()).unwrap();
+        assert!(runtime.access.status().required);
+        assert!(!runtime.access.status().allowed);
         let request: RunRequest = serde_json::from_value(serde_json::json!({
             "id": "denied-attempt", "projectId": "project", "projectName": "Project",
             "projectPath": folder.join("must-not-create"), "agent": "codex",
@@ -140,6 +133,10 @@ mod tests {
             .contains("approved Jackalope"));
         assert!(runtime.integration_runs().unwrap().is_empty());
         drop(runtime);
+        let restarted = TaskRuntime::new(folder.clone()).unwrap();
+        assert!(restarted.access.status().required);
+        assert!(!restarted.access.status().allowed);
+        drop(restarted);
         std::fs::remove_dir_all(folder).unwrap();
     }
 }

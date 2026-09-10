@@ -1,7 +1,8 @@
 # Architecture
 
 Jackalope has three applications and a shared branding package. Desktop execution
-is local; the optional Cloudflare service is not required for projects, history or review.
+is local; verified account access is required to start new work in every build.
+Saved history and running tasks remain accessible when access expires.
 
 ## Repository ownership
 
@@ -10,7 +11,7 @@ is local; the optional Cloudflare service is not required for projects, history 
 | `apps/desktop/src` | React views, local UI state and clients for native commands |
 | `apps/desktop/src-tauri` | Execution, persistence, process ownership, Git safeguards and native packaging |
 | `apps/website` | Marketing, browser account flows, static discovery output and website verification |
-| `apps/server` | Optional hosted ingestion, account/access services and database migrations |
+| `apps/server` | Account/access services, optional ingestion and database migrations |
 | `packages/brand` | Shared theme, tokens, typography and character geometry |
 | `packages/knowledge` | Shared public guides, Markdown serialization and generated native help catalog |
 | `scripts/release` | Cross-application build, signing, release receipts and publication orchestration |
@@ -146,7 +147,7 @@ access/feedback.ts owns authenticated campaign state, shared cooldowns, opt-in e
 eligibility and scoped website replies through the existing inbox/outbox. Anonymous
 telemetry remains separate. See [feedback invitations](FEEDBACK-INVITATIONS.md).
 Shared brand/tokens exports pure theme calculation for browser and Worker rendering.
-Native commands/account.rs owns optional early-access account connection; its
+Native commands/account.rs owns required early-access account connection; its
 credential is protected by account_storage.rs with Windows DPAPI or a macOS Keychain /
 Linux Secret Service reference. platform.rs initializes the Unix GUI login PATH before
 runtime threads start; children inherit the discovery environment. Worker access/devices.ts
