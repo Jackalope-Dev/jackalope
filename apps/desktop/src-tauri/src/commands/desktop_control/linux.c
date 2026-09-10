@@ -21,6 +21,8 @@ typedef struct {
 } Bounds;
 static gboolean wayland_backend;
 static JsonObject *wayland_info;
+static gboolean wayland_coordinates;
+static gint64 wayland_origin_x, wayland_origin_y;
 static void wayland_input_check(Bounds expected);
 static int wayland_main(const char *action);
 static Display *display;
@@ -314,7 +316,7 @@ static AtspiAccessible *accessible_window(Bounds bounds) {
             atspi_accessible_get_component_iface(window);
         AtspiRect *rect = component
                               ? atspi_component_get_extents(
-                                    component, ATSPI_COORD_TYPE_SCREEN, NULL)
+                                    component, wayland_backend ? ATSPI_COORD_TYPE_WINDOW : ATSPI_COORD_TYPE_SCREEN, NULL)
                               : NULL;
         Bounds accessible =
             rect ? (Bounds){rect->x, rect->y, rect->width, rect->height}
@@ -327,6 +329,13 @@ static AtspiAccessible *accessible_window(Bounds bounds) {
         if (matches) {
           check(match == NULL, "Accessible window identity is ambiguous.");
           match = g_object_ref(window);
+          if (wayland_backend && rect) {
+            JsonObject *buffer = object(wayland_info, "buffer");
+            gboolean surface = rect->width == number(buffer, "width") && rect->height == number(buffer, "height");
+            wayland_coordinates = surface || (rect->width == bounds.width && rect->height == bounds.height);
+            wayland_origin_x = rect->x + (surface ? bounds.x - number(buffer, "x") : 0);
+            wayland_origin_y = rect->y + (surface ? bounds.y - number(buffer, "y") : 0);
+          }
         }
         g_free(rect);
         if (component)
@@ -392,13 +401,14 @@ static void tree(AtspiAccessible *item, JsonArray *nodes, int depth,
   AtspiRect *rect = component ? atspi_component_get_extents(
                                     component, wayland_backend ? ATSPI_COORD_TYPE_WINDOW : ATSPI_COORD_TYPE_SCREEN, NULL)
                               : NULL;
-  if (rect && rect->width > 0 && rect->height > 0) {
-    gint64 left = MAX((gint64)rect->x, bounds.x),
-           top = MAX((gint64)rect->y, bounds.y);
+  if (rect && rect->width > 0 && rect->height > 0 && (!wayland_backend || wayland_coordinates)) {
+    gint64 origin_x = (gint64)rect->x - (wayland_backend ? wayland_origin_x : 0);
+    gint64 origin_y = (gint64)rect->y - (wayland_backend ? wayland_origin_y : 0);
+    gint64 left = MAX(origin_x, bounds.x), top = MAX(origin_y, bounds.y);
     gint64 right =
-        MIN((gint64)rect->x + rect->width, (gint64)bounds.x + bounds.width);
+        MIN(origin_x + rect->width, (gint64)bounds.x + bounds.width);
     gint64 bottom =
-        MIN((gint64)rect->y + rect->height, (gint64)bounds.y + bounds.height);
+        MIN(origin_y + rect->height, (gint64)bounds.y + bounds.height);
     if (right > left && bottom > top)
       json_object_set_object_member(
           node, "bounds",

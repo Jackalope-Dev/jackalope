@@ -108,6 +108,8 @@ export default class JackalopeControl extends Extension {
     const pid = window.get_pid();
     const rect = window.get_frame_rect();
     const bounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    const surface = window.get_buffer_rect();
+    const buffer = { x: surface.x, y: surface.y, width: surface.width, height: surface.height };
     requireValue(validBounds(bounds), 'Window bounds are unavailable or too large.');
     const app =
       window.get_wm_class() || window.get_gtk_application_id() || window.get_sandboxed_app_id();
@@ -122,6 +124,7 @@ export default class JackalopeControl extends Extension {
       class: app,
       title: window.get_title() || app,
       bounds,
+      buffer,
     };
   }
 
@@ -547,8 +550,8 @@ export default class JackalopeControl extends Extension {
       this._check(request);
       this._point(request, current, window);
       if (request.action === 'click') {
-        pointer.notify_button(0, 272, Clutter.ButtonState.PRESSED);
-        pointer.notify_button(0, 272, Clutter.ButtonState.RELEASED);
+        pointer.notify_button(0, 1, Clutter.ButtonState.PRESSED);
+        pointer.notify_button(0, 1, Clutter.ButtonState.RELEASED);
       } else {
         requireValue(
           Number.isSafeInteger(request.wheel) &&

@@ -360,10 +360,10 @@
   color: var(--color-text-secondary);
   font-size: 11px;
 }
-.comparison-next {
+.acquisition-body article > .comparison-next {
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg));
   border-radius: 20px;
-  padding-inline: 28px;
+  padding: 32px;
 }
 @media (max-width: 1100px) {
   .comparison-page .acquisition-body {
@@ -399,8 +399,8 @@
     border-right: 0;
     border-bottom: 1px solid var(--color-border);
   }
-  .comparison-next {
-    padding-inline: 20px;
+  .acquisition-body article > .comparison-next {
+    padding: 24px 20px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
