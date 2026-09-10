@@ -193,7 +193,22 @@
 }
 .onboarding-runner-list {
   display: grid;
+  gap: 16px;
+}
+.onboarding-agent-account {
+  display: grid;
   gap: 8px;
+  margin: 12px 0 0;
+  padding: 0 14px;
+  min-width: 0;
+}
+.onboarding-agent-account p {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.onboarding-local-agent {
+  margin: 24px 0;
 }
 .onboarding-agent-choice {
   display: flex;
@@ -206,6 +221,7 @@
   display: flex;
   align-items: center;
   text-align: left;
+  color: var(--color-text-primary);
   gap: 14px;
   border: 1px solid var(--color-border);
   border-radius: 12px;

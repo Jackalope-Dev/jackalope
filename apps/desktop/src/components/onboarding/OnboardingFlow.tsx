@@ -15,6 +15,7 @@ import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { createProject, openProject } from '../../lib/project-setup';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
@@ -28,6 +29,7 @@ import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ProjectGitSettings } from '../projects/ProjectGitSettings';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
+import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { ProjectThemeStep } from './ProjectThemeStep';
 import './onboarding.css';
 
@@ -67,6 +69,7 @@ export function OnboardingFlow({
   const [themePreview, setThemePreview] = useState<ThemePalette>();
   const execution = useExecutionStore();
   const config = useAgentConfigStore();
+  const accounts = useAgentAccountsStore((state) => state.agents);
   const [path, setPath] = useState(project?.path ?? '');
   const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
   const [projectName, setProjectName] = useState('');
@@ -115,6 +118,7 @@ export function OnboardingFlow({
     };
   }, [previewProjectId, preview]);
   const runner = execution.runners.find((item) => item.id === agent);
+  const runnerAdapter = config.customAgents.find((custom) => custom.id === agent)?.adapter ?? agent;
   const available = (id: string) => {
     const options = config.runnerOptions[id];
     return (
@@ -126,6 +130,25 @@ export function OnboardingFlow({
     );
   };
   const projectEnabled = (id: string) => allowedAgents === null || allowedAgents.includes(id);
+  const detectedAgents = execution.runners.filter((item) => item.available && available(item.id));
+  const installableAgents = builtinAgents.filter(
+    (item) =>
+      available(item.id) &&
+      !execution.runners.some((runner) => runner.id === item.id && runner.available),
+  );
+  const invalidAccounts = detectedAgents.some((item) => {
+    if (!projectEnabled(item.id)) return false;
+    const adapter = config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
+    const entry = accounts[adapter];
+    if (!entry?.view) return false;
+    const enabled = accountProfiles(entry.view, entry.statuses).filter(
+      (account) =>
+        !config.disabledAccounts[adapter]?.includes(account.id) &&
+        !project?.preferences?.disabledAccounts?.[adapter]?.includes(account.id),
+    );
+    const selected = project?.preferences?.agentAccounts?.[adapter];
+    return !enabled.length || (!!selected && !enabled.some((account) => account.id === selected));
+  });
   const toggleAgent = (id: string, enabled: boolean) => {
     const current =
       allowedAgents ??
@@ -447,90 +470,71 @@ export function OnboardingFlow({
           )}
           {step === 'agent' && (
             <>
-              <LocalAiSetup
-                compact
-                onConnected={(profileId) => {
-                  setAgent('opencode');
-                  if (project) {
-                    onboarding.stageProject({
-                      ...project,
-                      preferences: {
-                        ...project.preferences,
-                        agentAccounts: {
-                          ...project.preferences?.agentAccounts,
-                          opencode: profileId,
-                        },
-                      },
-                    });
-                  }
-                  setAllowedAgents((ids) =>
-                    ids === null ? null : [...new Set([...ids, 'opencode'])],
-                  );
-                }}
-              />
               <p className="onboarding-description">
                 Choose a default, then switch other detected agents on or off for this project.
                 Change these choices later in Project settings.
               </p>
               <fieldset className="onboarding-runner-list" aria-label="Choose your project agent">
-                {execution.runners.map((item) => {
-                  const workerOnly = ![
-                    'codex',
-                    'claude',
-                    'grok',
-                    'opencode',
-                    'antigravity',
-                  ].includes(
-                    config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id,
-                  );
-                  const enabled = available(item.id) && !workerOnly;
+                {detectedAgents.map((item) => {
+                  const adapter =
+                    config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
                   const meta = getAgentMetadata(item.id);
                   return (
-                    <div className="onboarding-agent-choice" key={item.id}>
-                      <button
-                        type="button"
-                        aria-pressed={agent === item.id}
-                        disabled={!item.available || !enabled || !projectEnabled(item.id) || busy}
-                        onClick={() => setAgent(item.id)}
-                        className="onboarding-runner"
-                      >
-                        <span className="onboarding-radio">
-                          {agent === item.id && <Check size={14} />}
-                        </span>
-                        <div className="onboarding-runner-info">
-                          <div className="onboarding-runner-header">
-                            <strong>{item.name}</strong>
-                            {agent === item.id && projectEnabled(item.id) && (
-                              <span className="onboarding-vendor">Default</span>
-                            )}
-                            {meta?.vendor && (
-                              <span className="onboarding-vendor">{meta.vendor}</span>
-                            )}
+                    <div className="onboarding-agent-card" key={item.id}>
+                      <div className="onboarding-agent-choice">
+                        <button
+                          type="button"
+                          aria-pressed={agent === item.id}
+                          disabled={!projectEnabled(item.id) || busy}
+                          onClick={() => setAgent(item.id)}
+                          className="onboarding-runner"
+                        >
+                          <span className="onboarding-radio">
+                            {agent === item.id && <Check size={14} />}
+                          </span>
+                          <div className="onboarding-runner-info">
+                            <div className="onboarding-runner-header">
+                              <strong>{item.name}</strong>
+                              {agent === item.id && projectEnabled(item.id) && (
+                                <span className="onboarding-vendor">Default</span>
+                              )}
+                              {meta?.vendor && (
+                                <span className="onboarding-vendor">{meta.vendor}</span>
+                              )}
+                            </div>
+                            <small>{item.detail || 'Installed'}</small>
                           </div>
-                          <small>
-                            {workerOnly
-                              ? 'Execution is not supported by this agent yet'
-                              : !enabled
-                                ? 'Disabled in agent or model settings'
-                                : !item.available
-                                  ? 'Not installed or not found'
-                                  : item.signedIn
-                                    ? 'Installed · sign-in detected'
-                                    : 'Installed · sign-in not confirmed'}
-                          </small>
-                          <small>{item.detail}</small>
-                        </div>
-                      </button>
-                      <Switch
-                        label={`Use ${item.name} in this project`}
-                        checked={item.available && enabled && projectEnabled(item.id)}
-                        disabled={!item.available || !enabled || busy}
-                        onCheckedChange={(checked) => toggleAgent(item.id, checked)}
-                      />
+                        </button>
+                        <Switch
+                          label={`Use ${item.name} in this project`}
+                          checked={projectEnabled(item.id)}
+                          disabled={busy}
+                          onCheckedChange={(checked) => toggleAgent(item.id, checked)}
+                        />
+                      </div>
+                      {projectEnabled(item.id) && (
+                        <OnboardingAgentAccount
+                          agentId={adapter}
+                          agentName={item.name}
+                          value={project?.preferences?.agentAccounts?.[adapter]}
+                          blocked={project?.preferences?.disabledAccounts?.[adapter]}
+                          disabled={busy}
+                          onChange={(id) => {
+                            if (!project) return;
+                            const agentAccounts = { ...project.preferences?.agentAccounts };
+                            if (id) agentAccounts[adapter] = id;
+                            else delete agentAccounts[adapter];
+                            onboarding.stageProject({
+                              ...project,
+                              preferences: { ...project.preferences, agentAccounts },
+                            });
+                          }}
+                        />
+                      )}
                     </div>
                   );
                 })}
-                {!execution.runners.length && (
+                {!detectedAgents.length && (
                   <p className="task-muted" role="status">
                     {execution.discovering
                       ? 'Looking for installed agents…'
@@ -538,6 +542,29 @@ export function OnboardingFlow({
                   </p>
                 )}
               </fieldset>
+              <div className="onboarding-local-agent">
+                <LocalAiSetup
+                  compact
+                  onConnected={(profileId) => {
+                    setAgent('opencode');
+                    if (project) {
+                      onboarding.stageProject({
+                        ...project,
+                        preferences: {
+                          ...project.preferences,
+                          agentAccounts: {
+                            ...project.preferences?.agentAccounts,
+                            opencode: profileId,
+                          },
+                        },
+                      });
+                    }
+                    setAllowedAgents((ids) =>
+                      ids === null ? null : [...new Set([...ids, 'opencode'])],
+                    );
+                  }}
+                />
+              </div>
               {!execution.runners.some(
                 (item) => item.available && available(item.id) && projectEnabled(item.id),
               ) && (
@@ -555,6 +582,7 @@ export function OnboardingFlow({
                   key={project.path}
                   projectPath={project.path}
                   onDraftChange={setCommitPolicy}
+                  disabled={busy}
                 />
               )}
               <p className="onboarding-note">
@@ -563,7 +591,7 @@ export function OnboardingFlow({
                 <strong>Project settings</strong>.
               </p>
 
-              {runner && !runner.signedIn && runner.available && (
+              {runner && !runner.signedIn && runner.available && !accounts[runnerAdapter]?.view && (
                 <div className="onboarding-signin-tip">
                   <p className="onboarding-note">
                     Sign in through {runner.name} before starting a task.
@@ -592,64 +620,54 @@ export function OnboardingFlow({
                 </div>
               )}
 
-              {builtinAgents.filter(
-                (b) => !execution.runners.some((r) => r.id === b.id && r.available),
-              ).length > 0 && (
+              {installableAgents.length > 0 && (
                 <details className="onboarding-install-catalog">
                   <summary>
-                    Install other supported agents (
-                    {
-                      builtinAgents.filter(
-                        (b) => !execution.runners.some((r) => r.id === b.id && r.available),
-                      ).length
-                    }{' '}
-                    available)
+                    Install other supported agents ({installableAgents.length} available)
                   </summary>
                   <div className="onboarding-catalog-grid">
-                    {builtinAgents
-                      .filter((b) => !execution.runners.some((r) => r.id === b.id && r.available))
-                      .map((b) => (
-                        <div key={b.id} className="onboarding-catalog-card">
-                          <div className="onboarding-catalog-head">
-                            <div>
-                              <strong>{b.name}</strong>
-                              <span className="onboarding-vendor">{b.vendor}</span>
-                            </div>
-                            <a
-                              href={b.installUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="onboarding-catalog-link"
-                              title={`Open ${b.name} docs`}
-                            >
-                              <ExternalLink size={14} />
-                            </a>
+                    {installableAgents.map((b) => (
+                      <div key={b.id} className="onboarding-catalog-card">
+                        <div className="onboarding-catalog-head">
+                          <div>
+                            <strong>{b.name}</strong>
+                            <span className="onboarding-vendor">{b.vendor}</span>
                           </div>
-                          <p className="onboarding-catalog-desc">{b.description}</p>
-                          {b.installCommand &&
-                            (() => {
-                              const instCmd = b.installCommand;
-                              return (
-                                <div className="onboarding-command-box">
-                                  <code>{instCmd}</code>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => copyToClipboard(instCmd)}
-                                  >
-                                    {copiedCommand === instCmd ? (
-                                      <Check size={13} />
-                                    ) : (
-                                      <Copy size={13} />
-                                    )}
-                                    {copiedCommand === instCmd ? 'Copied' : 'Copy'}
-                                  </Button>
-                                </div>
-                              );
-                            })()}
+                          <a
+                            href={b.installUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="onboarding-catalog-link"
+                            title={`Open ${b.name} docs`}
+                          >
+                            <ExternalLink size={14} />
+                          </a>
                         </div>
-                      ))}
+                        <p className="onboarding-catalog-desc">{b.description}</p>
+                        {b.installCommand &&
+                          (() => {
+                            const instCmd = b.installCommand;
+                            return (
+                              <div className="onboarding-command-box">
+                                <code>{instCmd}</code>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(instCmd)}
+                                >
+                                  {copiedCommand === instCmd ? (
+                                    <Check size={13} />
+                                  ) : (
+                                    <Copy size={13} />
+                                  )}
+                                  {copiedCommand === instCmd ? 'Copied' : 'Copy'}
+                                </Button>
+                              </div>
+                            );
+                          })()}
+                      </div>
+                    ))}
                   </div>
                 </details>
               )}
@@ -663,14 +681,16 @@ export function OnboardingFlow({
                   disabled={
                     busy ||
                     execution.discovering ||
+                    !commitPolicy ||
+                    invalidAccounts ||
                     !runner?.available ||
                     !available(agent) ||
                     !projectEnabled(agent)
                   }
                   onClick={() =>
                     void attempt(async () => {
-                      if (!project) return;
-                      if (commitPolicy) await projectGitPolicy(project.path, commitPolicy);
+                      if (!project || !commitPolicy) return;
+                      await projectGitPolicy(project.path, commitPolicy);
                       setThemePreview(undefined);
                       onboarding.stageProject(
                         {

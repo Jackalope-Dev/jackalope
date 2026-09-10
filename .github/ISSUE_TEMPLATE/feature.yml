@@ -1,5 +1,6 @@
 name: Feature request
 description: Describe a workflow that Jackalope could improve
+labels: [enhancement, needs triage]
 body:
   - type: textarea
     id: problem

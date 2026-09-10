@@ -29,9 +29,11 @@ const choices = [
 export function ProjectGitSettings({
   projectPath,
   onDraftChange,
+  disabled = false,
 }: {
   projectPath: string;
   onDraftChange?: (policy: CommitPolicy | undefined) => void;
+  disabled?: boolean;
 }) {
   const id = useId();
   const [policy, setPolicy] = useState<CommitPolicy>();
@@ -62,8 +64,8 @@ export function ProjectGitSettings({
     };
   }, [projectPath, retry]);
   useEffect(() => {
-    onDraftChange?.(JSON.stringify(policy) !== JSON.stringify(saved) ? policy : undefined);
-  }, [policy, saved, onDraftChange]);
+    onDraftChange?.(policy);
+  }, [policy, onDraftChange]);
   const save = async () => {
     if (!policy || busy) return;
     setBusy(true);
@@ -91,8 +93,8 @@ export function ProjectGitSettings({
       </p>
       {policy ? (
         <>
-          <fieldset disabled={busy} className="grid gap-2">
-            <legend className="task-label mb-2">Who gets credit?</legend>
+          <fieldset disabled={busy || disabled} className="grid gap-2">
+            <legend className="sr-only">Commit attribution</legend>
             {choices.map(({ value, title, description, icon: Icon }) => (
               <label
                 key={value}
@@ -155,20 +157,23 @@ export function ProjectGitSettings({
               />
             </div>
           </fieldset>
-          <Button
-            className="mt-4"
-            variant="outline"
-            disabled={
-              busy ||
-              !dirty ||
-              (policy.attribution !== 'agent' &&
-                (!policy.name.trim() || !policy.email.includes('@')))
-            }
-            onClick={() => void save()}
-          >
-            <Check size={16} />
-            {busy ? 'Saving…' : 'Save commit settings'}
-          </Button>
+          {!onDraftChange && (
+            <Button
+              className="mt-4"
+              variant="outline"
+              disabled={
+                busy ||
+                disabled ||
+                !dirty ||
+                (policy.attribution !== 'agent' &&
+                  (!policy.name.trim() || !policy.email.includes('@')))
+              }
+              onClick={() => void save()}
+            >
+              <Check size={16} />
+              {busy ? 'Saving…' : 'Save commit settings'}
+            </Button>
+          )}
           {dirty && (
             <p className="task-muted text-sm mt-2">
               {onDraftChange

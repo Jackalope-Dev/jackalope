@@ -82,6 +82,8 @@ One-time setup:
 For each release, update the app's version and release notes, review/commit the
 change, and push a tag matching `store-beta/vX.Y.Z` or `store-stable/vX.Y.Z`.
 The tag must match `tauri.conf.json`. Manual dispatch also supports either channel.
+Keep release tags fixed to their reviewed source. Source corrections require a
+new version and tag; do not move or delete `store-beta/v*` or `store-stable/v*` tags.
 The workflow runs verification, builds a real-identity MSIX with fixed WebView2,
 checks artifact hashes, uploads it, and submits it with publication after
 certification. Beta targets the configured flight; stable targets the base product

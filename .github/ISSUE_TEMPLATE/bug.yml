@@ -1,20 +1,22 @@
 name: Bug report
 description: Report a reproducible problem
+labels: [bug, needs triage]
 body:
   - type: markdown
     attributes:
-      value: For vulnerabilities, email security@jackalope.dev instead. Remove tokens, private prompts and personal paths from anything you attach.
+      value: Report vulnerabilities privately at https://github.com/Jackalope-Dev/jackalope/security/advisories/new or email security@jackalope.dev. Remove tokens, private prompts and personal paths from anything you attach.
   - type: input
     id: version
     attributes:
-      label: Jackalope version or commit
+      label: Jackalope version, commit or affected URL
+      description: For website issues, include the page URL.
     validations:
       required: true
   - type: input
     id: environment
     attributes:
-      label: OS and agent CLI/version
-      description: Include whether this is the native app or browser preview.
+      label: Environment
+      description: Include your OS, native app or browser, and relevant agent CLI/version or build tools.
     validations:
       required: true
   - type: textarea

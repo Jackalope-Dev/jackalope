@@ -1,6 +1,7 @@
 # Security reporting
 
-Email **security@jackalope.dev** to report a suspected vulnerability privately.
+Use [GitHub's private vulnerability reporting](https://github.com/Jackalope-Dev/jackalope/security/advisories/new)
+or email **security@jackalope.dev** to report a suspected vulnerability privately.
 Please do not put vulnerability details, credentials or private data in a public
 issue or pull request before the maintainers have reviewed the report.
 

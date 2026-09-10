@@ -407,39 +407,42 @@ export function ConnectedDesktops() {
               </div>
             </dl>
           </div>
-          <div className="desktop-connection-actions">
-            {confirm === device.id ? (
-              <>
-                <p>
-                  Disconnect this profile’s account access? Local projects and agent accounts are
-                  kept.
-                </p>
+          <div className="desktop-device-actions">
+            <div className="desktop-connection-actions">
+              <button
+                className={`button button-compact ${confirm === device.id ? 'button-primary' : 'button-quiet desktop-disconnect'}`}
+                type="button"
+                disabled={!!busy}
+                aria-describedby={confirm === device.id ? `disconnect-${device.id}` : undefined}
+                onClick={() =>
+                  confirm === device.id ? void revoke(device.id) : setConfirm(device.id)
+                }
+              >
+                {busy === device.id
+                  ? 'Disconnecting…'
+                  : confirm === device.id
+                    ? 'Confirm disconnect'
+                    : 'Disconnect'}
+              </button>
+              {confirm === device.id && (
                 <button
-                  className="button button-primary"
+                  className="button button-compact button-quiet"
                   type="button"
                   disabled={!!busy}
-                  onClick={() => void revoke(device.id)}
-                >
-                  {busy ? 'Disconnecting…' : 'Confirm disconnect'}
-                </button>
-                <button
-                  className="text-link"
-                  type="button"
-                  disabled={!!busy}
-                  onClick={() => setConfirm('')}
+                  onClick={(event) => {
+                    setConfirm('');
+                    event.currentTarget.parentElement?.querySelector('button')?.focus();
+                  }}
                 >
                   Cancel
                 </button>
-              </>
-            ) : (
-              <button
-                className="text-link"
-                type="button"
-                disabled={!!busy}
-                onClick={() => setConfirm(device.id)}
-              >
-                Disconnect
-              </button>
+              )}
+            </div>
+            {confirm === device.id && (
+              <p id={`disconnect-${device.id}`}>
+                Disconnect this profile’s account access? Local projects and agent accounts are
+                kept.
+              </p>
             )}
           </div>
         </div>

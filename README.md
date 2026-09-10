@@ -4,6 +4,10 @@
 
 # Jackalope
 
+[![Verify platforms](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml)
+[![Security checks](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml)
+[![Support Jackalope on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Jackalope-FF6433?logo=kofi&logoColor=white)](https://ko-fi.com/jackalope_digital)
+
 A desktop workspace for coding agents. Bring your installed agents and existing
 sign-ins, run tasks in parallel Git worktrees, and review changes before merging.
 
@@ -54,9 +58,9 @@ For interface development, run `pnpm dev` for the desktop browser preview or
 `pnpm dev:website` for the website. Run them in separate terminals on ports 5173
 and 5180. The desktop browser preview cannot execute native tasks.
 
-Contributor builds do not require a Jackalope cloud account, deployment secrets,
-or a reporting endpoint. Official early-access builds can require approved
-membership. See [privacy and reporting](docs/BETA-MONITORING.md).
+Building the source and running automated tests do not require a Jackalope cloud
+account, deployment secrets or a reporting endpoint. Running native tasks requires
+an approved Jackalope account in every build. See [privacy and reporting](docs/BETA-MONITORING.md).
 
 Run `pnpm verify` before submitting changes. [CONTRIBUTING.md](CONTRIBUTING.md)
 covers the toolchain, focused tests, secret checks and pull-request workflow.
@@ -79,9 +83,11 @@ before enabling signups or publishing a build.
 
 ## Get involved
 
-[Report a bug or request a feature](https://github.com/Jackalope-Dev/jackalope/issues/new/choose),
-join the [community](https://www.reddit.com/r/JackalopeDev/), or send a focused pull
-request. Please follow our [community guidelines](CODE_OF_CONDUCT.md).
+[Report a bug, request a feature or flag a documentation issue](https://github.com/Jackalope-Dev/jackalope/issues/new/choose),
+ask a question in [GitHub Discussions](https://github.com/Jackalope-Dev/jackalope/discussions),
+or send a focused pull request. You can also join the
+[Reddit community](https://www.reddit.com/r/JackalopeDev/).
+Please follow our [community guidelines](CODE_OF_CONDUCT.md).
 For private support, email [contact@jackalope.dev](mailto:contact@jackalope.dev).
 Report vulnerabilities privately to [security@jackalope.dev](mailto:security@jackalope.dev);
 see [SECURITY.md](SECURITY.md).

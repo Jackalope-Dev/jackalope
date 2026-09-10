@@ -4,8 +4,8 @@ contact_links:
     url: https://jackalope.dev/knowledge/
     about: Find setup, workflow and troubleshooting guides.
   - name: Private security report
-    url: https://github.com/Jackalope-Dev/jackalope/blob/master/SECURITY.md
+    url: https://github.com/Jackalope-Dev/jackalope/security/advisories/new
     about: Report vulnerabilities privately, without posting sensitive details in an issue.
   - name: Community questions
-    url: https://www.reddit.com/r/JackalopeDev/
-    about: Discuss workflows and ask the community for help.
+    url: https://github.com/Jackalope-Dev/jackalope/discussions/categories/q-a
+    about: Ask setup, workflow and development questions in GitHub Discussions.

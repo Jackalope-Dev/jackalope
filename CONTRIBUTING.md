@@ -143,9 +143,11 @@ coordinator → execution guard → runtime lock order.
 Native release acceptance is platform-specific across Windows, macOS and Linux.
 A passing frontend build alone does not establish native platform support. See [TODO.md](docs/TODO.md) for current priorities.
 
-Use the issue forms for bugs and feature requests. Review support reports before
-sharing them; omit credentials, private prompts and personal paths. Report
-vulnerabilities privately using [SECURITY.md](SECURITY.md).
+Use the [issue forms](https://github.com/Jackalope-Dev/jackalope/issues/new/choose)
+for bugs, feature requests and documentation problems. Ask setup, workflow and
+development questions in [GitHub Discussions](https://github.com/Jackalope-Dev/jackalope/discussions/categories/q-a).
+Review support reports before sharing them; omit credentials, private prompts and
+personal paths. Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
 
 ## Contribution license
 
