@@ -15,6 +15,15 @@ pub(super) struct BrowserProcess {
 
 impl BrowserProcess {
     pub fn start(executable: &Path, directory: &Path, slot: &Slot) -> Result<Self, String> {
+        Self::start_with_timeout(executable, directory, slot, super::COMMAND_TIMEOUT)
+    }
+
+    fn start_with_timeout(
+        executable: &Path,
+        directory: &Path,
+        slot: &Slot,
+        timeout: Duration,
+    ) -> Result<Self, String> {
         let profile = directory.join("chromium");
         std::fs::create_dir(&profile).map_err(|e| e.to_string())?;
         let mut command = Command::new(executable);
@@ -94,7 +103,7 @@ impl BrowserProcess {
                     return Ok(owned);
                 }
             }
-            if started.elapsed() > Duration::from_secs(15) {
+            if started.elapsed() >= timeout {
                 return Err(
                     "Chromium did not become ready. Check its installation and retry.".into(),
                 );
@@ -143,6 +152,78 @@ impl Drop for BrowserProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct StartupFixture(std::path::PathBuf);
+
+    impl StartupFixture {
+        fn new(script: &str) -> Self {
+            use std::os::unix::fs::PermissionsExt;
+
+            let directory =
+                std::env::temp_dir().join(format!("jl-chromium-startup-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir(&directory).unwrap();
+            let executable = directory.join("browser");
+            std::fs::write(&executable, format!("#!/bin/sh\n{script}\n")).unwrap();
+            std::fs::set_permissions(executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+            Self(directory)
+        }
+
+        fn executable(&self) -> std::path::PathBuf {
+            self.0.join("browser")
+        }
+    }
+
+    impl Drop for StartupFixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn startup_allows_cold_launch_beyond_fifteen_seconds() {
+        let fixture = StartupFixture::new(
+            "sleep 16\nprintf '4321\\n/devtools/browser/cold-start\\n' > chromium/DevToolsActivePort\nexec sleep 60",
+        );
+        let browser =
+            BrowserProcess::start(&fixture.executable(), &fixture.0, &Slot::default()).unwrap();
+        assert_eq!(
+            browser.endpoint,
+            "ws://127.0.0.1:4321/devtools/browser/cold-start"
+        );
+    }
+
+    #[test]
+    fn startup_timeout_remains_bounded() {
+        let fixture = StartupFixture::new("exec sleep 60");
+        let started = Instant::now();
+        let result = BrowserProcess::start_with_timeout(
+            &fixture.executable(),
+            &fixture.0,
+            &Slot::default(),
+            Duration::from_millis(100),
+        );
+        assert!(result.err().unwrap().contains("did not become ready"));
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn startup_can_be_canceled_before_ready() {
+        let fixture = StartupFixture::new("touch started\nexec sleep 60");
+        let slot = Arc::new(Slot::default());
+        std::thread::scope(|scope| {
+            let startup =
+                scope.spawn(|| BrowserProcess::start(&fixture.executable(), &fixture.0, &slot));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !fixture.0.join("started").exists() {
+                assert!(Instant::now() < deadline, "Browser fixture did not start");
+                std::thread::sleep(Duration::from_millis(25));
+            }
+            let canceled = Instant::now();
+            super::super::super::cancel(&slot);
+            assert!(startup.join().unwrap().err().unwrap().contains("stopped"));
+            assert!(canceled.elapsed() < Duration::from_secs(5));
+        });
+    }
 
     #[test]
     fn endpoint_requires_a_local_port_and_browser_path() {

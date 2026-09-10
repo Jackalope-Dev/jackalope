@@ -158,10 +158,12 @@
   outline: 2px solid var(--color-accent-ink);
   outline-offset: 2px;
 }
-.helper-disclaimer {
+.helper-chat .helper-disclaimer {
   display: block;
   margin-top: 10px;
+  font-size: calc(var(--text-xs) - 1px);
   line-height: 1.5;
+  text-align: center;
 }
 .helper-buttons > .helper-text-button {
   margin-right: auto;
@@ -206,4 +208,22 @@
 }
 .helper-settings .themed-select {
   width: 100%;
+}
+.helper-connection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+.helper-connection p {
+  margin: 0;
+}
+.helper-connection button {
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+}
+.helper-connection .helper-text-button {
+  justify-content: center;
+  text-align: center;
 }

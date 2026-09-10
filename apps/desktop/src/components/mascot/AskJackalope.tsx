@@ -1,4 +1,4 @@
-import { Send, Square } from 'lucide-react';
+import { Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -153,7 +153,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
               size="sm"
               disabled={!native || !helper.draft.trim() || !!helper.view.error}
             >
-              <Send size={14} /> Send
+              Send
             </Button>
           )}
         </div>

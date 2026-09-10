@@ -6,7 +6,6 @@ import {
   CircleCheck,
   CircleHelp,
   Info,
-  MessageSquare,
   Search,
   Settings2,
   X,
@@ -24,7 +23,6 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { AskJackalope } from './AskJackalope';
 import { CompanionSettings } from './CompanionSettings';
 import { openCompanionTask } from './CompanionSources';
@@ -56,7 +54,6 @@ export function Companion({
         (action) => action.status === 'proposed' && Date.now() - action.createdAt < 600_000,
       ).length,
   );
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const interactedOutside = useRef(false);
   const pendingAction = useRef<(() => void) | null>(null);
   const [hint, setHint] = useState<Pick<CompanionNotice, 'id' | 'title' | 'kind'> | null>(null);
@@ -223,15 +220,6 @@ export function Companion({
                 <AskJackalope onNavigate={() => setOpen(false)} />
               ) : (
                 <>
-                  <button
-                    type="button"
-                    className="companion-feedback"
-                    onClick={() => activate(() => setFeedbackOpen(true))}
-                  >
-                    <MessageSquare size={18} aria-hidden="true" />
-                    <span>Send feedback</span>
-                    <ArrowUpRight size={16} aria-hidden="true" />
-                  </button>
                   <div className="companion-content">
                     <div className="companion-section-heading">
                       <h3>Notifications</h3>
@@ -348,7 +336,6 @@ export function Companion({
           )}
         </Popover.Content>
       </Popover.Portal>
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </Popover.Root>
   );
 }

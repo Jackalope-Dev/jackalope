@@ -56,11 +56,6 @@ export function CompanionSettings() {
             }}
           />
         </label>
-        <p>
-          App version, current page and agent availability are always shared. Files, paths, task
-          messages and credentials are excluded.
-        </p>
-        <p>Start a new conversation to leave previously shared context behind.</p>
       </section>
       <section>
         <h3>Notifications</h3>
@@ -75,7 +70,6 @@ export function CompanionSettings() {
           <SelectItem value="failures-only">Needs attention only</SelectItem>
           <SelectItem value="none">Quiet</SelectItem>
         </Select>
-        <p>All notices remain in Activity.</p>
         <label className="helper-setting" htmlFor="helper-os-notifications">
           OS task notifications
           <Switch
@@ -98,81 +92,83 @@ export function CompanionSettings() {
       </section>
       <details className="helper-context">
         <summary>External agent connection</summary>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={!native}
-          onClick={() =>
-            void action(async () => {
-              if (helper.view.connected) {
-                await nativeTask('helper_connection', { enabled: false });
-                setConnection(undefined);
-              } else setConnection(await nativeTask('helper_connection', { enabled: true }));
-              setCopied(false);
-            })
-          }
-        >
-          {helper.view.connected ? 'Disconnect external agent' : 'Connect an external agent'}
-        </Button>
-        {helper.view.connected && (
-          <p>
-            Local MCP access expires after one hour or when Jackalope closes. Connected agents can
-            read the context selected above and propose actions for review here.
-          </p>
-        )}
-        {helper.view.connected && !connection && (
+        <div className="helper-connection">
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
+            disabled={!native}
             onClick={() =>
               void action(async () => {
-                setConnection(await nativeTask('helper_connection', { enabled: true }));
+                if (helper.view.connected) {
+                  await nativeTask('helper_connection', { enabled: false });
+                  setConnection(undefined);
+                } else setConnection(await nativeTask('helper_connection', { enabled: true }));
                 setCopied(false);
               })
             }
           >
-            Replace connection to copy again
+            {helper.view.connected ? 'Disconnect external agent' : 'Connect an external agent'}
           </Button>
-        )}
-        {connection && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              void action(async () => {
-                await navigator.clipboard.writeText(
-                  JSON.stringify(
-                    {
-                      mcpServers: {
-                        jackalope: {
-                          type: 'http',
-                          url: connection.url,
-                          headers: { Authorization: `Bearer ${connection.token}` },
+          {helper.view.connected && (
+            <p>
+              Local MCP access expires after one hour or when Jackalope closes. Connected agents can
+              read the context selected above and propose actions for review here.
+            </p>
+          )}
+          {helper.view.connected && !connection && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                void action(async () => {
+                  setConnection(await nativeTask('helper_connection', { enabled: true }));
+                  setCopied(false);
+                })
+              }
+            >
+              Replace connection to copy again
+            </Button>
+          )}
+          {connection && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                void action(async () => {
+                  await navigator.clipboard.writeText(
+                    JSON.stringify(
+                      {
+                        mcpServers: {
+                          jackalope: {
+                            type: 'http',
+                            url: connection.url,
+                            headers: { Authorization: `Bearer ${connection.token}` },
+                          },
                         },
                       },
-                    },
-                    null,
-                    2,
-                  ),
-                );
-                setCopied(true);
-              })
+                      null,
+                      2,
+                    ),
+                  );
+                  setCopied(true);
+                })
+              }
+            >
+              {copied ? 'Connection copied' : 'Copy MCP connection'}
+            </Button>
+          )}
+          <button
+            type="button"
+            className="helper-text-button"
+            onClick={() =>
+              void openExternalUrl('https://jackalope.dev/knowledge/ask-jackalope/').catch(
+                (error) => setLocalError(String(error)),
+              )
             }
           >
-            {copied ? 'Connection copied' : 'Copy MCP connection'}
-          </Button>
-        )}
-        <button
-          type="button"
-          className="helper-text-button"
-          onClick={() =>
-            void openExternalUrl('https://jackalope.dev/knowledge/ask-jackalope/').catch((error) =>
-              setLocalError(String(error)),
-            )
-          }
-        >
-          Connection instructions
-        </button>
+            Connection instructions
+          </button>
+        </div>
       </details>
       {(localError || helper.syncError) && (
         <p role="alert" className="helper-error">

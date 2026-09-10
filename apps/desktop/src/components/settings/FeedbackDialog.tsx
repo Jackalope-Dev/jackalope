@@ -1,15 +1,16 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { returnToCompanion } from '../mascot/useCompanionNotices';
 import { FeedbackForm } from './FeedbackForm';
 import './settings.css';
 
 export function FeedbackDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus: (event: Event) => void;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -17,7 +18,7 @@ export function FeedbackDialog({
         <Dialog.Overlay className="task-dialog-overlay" />
         <Dialog.Content
           className="task-dialog appearance-panel"
-          onCloseAutoFocus={returnToCompanion}
+          onCloseAutoFocus={onCloseAutoFocus}
           onPointerDownOutside={(event) => event.preventDefault()}
         >
           <Dialog.Close className="task-close" aria-label="Close feedback">

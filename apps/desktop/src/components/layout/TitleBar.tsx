@@ -1,8 +1,9 @@
-import { LifeBuoy, Minus, Settings2, Square, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { LifeBuoy, Megaphone, Minus, Settings2, Square, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { shortcutLabel } from '../../lib/platform-shortcuts';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { FeedbackDialog } from '../settings/FeedbackDialog';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -15,6 +16,8 @@ import { Tooltip } from '../ui/Tooltip';
  */
 export function TitleBar({ onSettings }: { onSettings?: () => void }) {
   const [isMaximized, setIsMaximized] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const feedbackButton = useRef<HTMLButtonElement>(null);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
 
   useEffect(() => {
@@ -62,6 +65,19 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
             </button>
           </Tooltip>
         )}
+        <Tooltip content="Send feedback">
+          <button
+            ref={feedbackButton}
+            type="button"
+            className="app-titlebar-button"
+            aria-label="Send feedback"
+            onMouseDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onClick={() => setFeedbackOpen(true)}
+          >
+            <Megaphone size={16} aria-hidden="true" />
+          </button>
+        </Tooltip>
         <Tooltip content="Help Center">
           <button
             type="button"
@@ -102,6 +118,14 @@ export function TitleBar({ onSettings }: { onSettings?: () => void }) {
           <X size={14} />
         </button>
       </div>
+      <FeedbackDialog
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          feedbackButton.current?.focus();
+        }}
+      />
     </div>
   );
 }
