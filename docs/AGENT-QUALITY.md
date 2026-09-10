@@ -88,7 +88,13 @@ quota saving. Two baseline tasks stopped over an unrelated Git ignore-file acces
 warning; both baseline scheduler attempts left the implementation broken. The
 updated scheduler implementations passed the independent oracle, but their requested
 in-agent check was denied by Codex's tool approval wiring. The saved-check permission
-repair is a subsequent change and requires its own live tool-acceptance evidence.
+repair was tested separately in two fresh native runs. Both invoked the check,
+received the expected failure, corrected the implementation, and passed all 81 saved
+tests plus the independent behavioral oracle. Successful stdout shrank from
+3,334/3,336 bytes to 208 bytes; failing stdout remained 4,416/4,413 bytes unchanged.
+The second follow-up was stopped at the observed token limit after reporting 277,420
+tokens, so only one of these two runs counts as completed within budget. These
+follow-ups are recorded separately and are not folded into the original comparison.
 
 One baseline scheduler attempt was interrupted by the host application crash before
 usage was reported. Its private journal is retained separately; the table includes
@@ -96,6 +102,11 @@ all 12 completed trial receipts, and total experiment consumption remains unknow
 These cases target known defects and are too small for a broad ranking, task-success
 guarantee or comparison with another GUI. Human acceptance is unmeasured. Concurrent
 local builds also make the recorded wall times unsuitable for a speed claim.
+
+Final master validation passed `pnpm verify`: 288 native tests (17 opt-in tests
+ignored), 145 desktop tests, 108 service tests, 45 release tests and both application
+builds. The secret scan and local documentation-link checks also passed. This does
+not establish packaged or installed-app acceptance.
 
 RTK v0.48.0 was tried privately using its checksum-verified Windows release. Its
 Apache-2.0 license fits this repository's licensing policy with notices preserved.

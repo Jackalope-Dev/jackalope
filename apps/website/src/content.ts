@@ -4,6 +4,7 @@ import updates from './changelog.json' with { type: 'json' };
 import { growthPost } from './growth-content.ts';
 import { knowledgeGuides } from './knowledge-content.ts';
 import { marketingPages } from './marketing-content.ts';
+import { recentPosts } from './recent-posts.ts';
 
 export const siteOrigin = 'https://jackalope.dev';
 export const company = { name: 'Jackalope Digital LLC', url: 'https://jackalope.digital' };
@@ -22,10 +23,12 @@ export const tour = {
 };
 
 export const posts: BlogPost[] = [
+  ...recentPosts,
   ...practicalPosts,
   growthPost,
   {
     slug: 'work-and-personal-accounts',
+    cover: { kind: 'accounts', tone: 'rose', label: 'A place for both' },
     title: 'Work and personal accounts, with room for both.',
     seoTitle: 'Separate work and personal coding-agent accounts',
     category: 'Working with agents',
@@ -74,6 +77,7 @@ export const posts: BlogPost[] = [
   },
   {
     slug: 'room-for-the-work',
+    cover: { kind: 'studio', tone: 'indigo', label: 'Room to think' },
     title: 'A little more room for the work.',
     seoTitle: 'Why we are building a coding-agent workspace',
     category: 'From the studio',
@@ -114,6 +118,7 @@ export const posts: BlogPost[] = [
   },
   {
     slug: 'from-brief-to-review',
+    cover: { kind: 'review', tone: 'mint', label: 'From idea to review' },
     title: 'From a clear brief to a considered review.',
     seoTitle: 'Coding-agent workflow: From brief to code review',
     category: 'Working with agents',

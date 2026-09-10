@@ -50,6 +50,12 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   comparisons, sample-workspace media and a Reddit community link. The knowledgebase
   has practical steps, related help, searchable guides, captioned short demos and
   contextual screenshots.
+- Homepage features use illustrated cards with expandable details. Field notes use
+  a responsive illustrated masonry index, with new articles on parallel handoffs,
+  focused guidance and task-history performance. Chromium checks cover 1280×840,
+  960×640 and 375px layouts, both themes, reduced motion, keyboard details/links
+  and article navigation. Card text contrast passes in both themes; Safari and
+  touch-device checks remain open.
 - Feature and workflow pages pair larger interface captures with short captioned
   clips, written walkthroughs and links into the guide. Recurring-task captures
   show paused sample schedules; media illustrates the UI, not native execution.
@@ -66,6 +72,11 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   keyboard labels are ready for native validation. Linux recorded 277 passing
   library tests; the final X11 control fixture and XWayland rejection check pass.
   macOS compilation and device acceptance remain open; Wayland control is unimplemented.
+
+Platform-preparation verification (2026-09-10): the resumed Windows `pnpm verify`
+passed with 287 native tests (17 ignored), 145 desktop tests, 108 service tests,
+45 release tests and both production builds. Native macOS CI and device acceptance
+remain required; the [platform audit](CROSS-PLATFORM-RELEASES.md) records Linux evidence.
 
 The [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) cover source development and redistribution.

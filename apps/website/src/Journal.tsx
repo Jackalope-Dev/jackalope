@@ -1,6 +1,7 @@
 import { ArrowRight, Mail } from 'lucide-react';
 import type { BlogSection } from './blog-types';
 import { posts, tour, updates } from './content';
+import { EditorialArt } from './EditorialArt';
 import { PublishedReleases } from './PublishedReleases';
 import './blog.css';
 
@@ -35,25 +36,28 @@ export function JournalTeaser({ all = false }: { all?: boolean }) {
         )}
       </div>
       <div className="notes-grid">
-        {(all ? posts : posts.slice(0, 2)).map((post, index) => (
-          <a className="note-preview" href={`/blog/${post.slug}/`} key={post.slug}>
-            <div className={`note-art note-art-${index}`} aria-hidden="true">
-              <span className="note-orbit" />
-              <span className="note-seed" />
-              <span className="note-art-label">
-                {index === 0 ? 'Room to think.' : 'Idea → explore → review.'}
-              </span>
-              <span className="note-index">0{index + 1}</span>
+        {(all ? posts : posts.slice(0, 2)).map((post) => (
+          <a
+            className="note-preview"
+            href={`/blog/${post.slug}/`}
+            key={post.slug}
+            aria-labelledby={`note-${post.slug}`}
+          >
+            <EditorialArt
+              {...(post.cover ?? { kind: 'studio', tone: 'indigo', label: 'From the studio' })}
+            />
+            <div className="note-copy">
+              <div className="note-meta">
+                {post.category}
+                <span>{post.readingTime}</span>
+              </div>
+              <h3 id={`note-${post.slug}`}>{post.title}</h3>
+              <p>{post.description}</p>
+              <div className="note-footer">
+                <time dateTime={post.date}>{dateLabel(post.date)}</time>
+                <ArrowRight size={18} aria-hidden="true" />
+              </div>
             </div>
-            <div className="note-meta">
-              {post.category}
-              <span>{post.readingTime}</span>
-            </div>
-            <h3>{post.title}</h3>
-            <p>{post.description}</p>
-            <span className="text-link">
-              Read the note <ArrowRight size={16} />
-            </span>
           </a>
         ))}
       </div>
@@ -297,10 +301,14 @@ export function JournalPage({ path }: { path: string }) {
     );
   if (path === '/blog/')
     return (
-      <main id="main" className="journal-page page-width">
+      <main id="main" className="journal-page field-notes-page page-width">
         <header className="journal-heading">
+          <p className="eyebrow">The Jackalope journal</p>
           <h1>Field notes.</h1>
-          <p>Ideas, practical guides, and product updates.</p>
+          <p>
+            Inside the work. Behind the decisions. Practical guides and a closer look at what we’re
+            building.
+          </p>
         </header>
         <JournalTeaser all />
       </main>

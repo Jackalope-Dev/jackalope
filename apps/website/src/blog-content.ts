@@ -3,6 +3,7 @@ import type { BlogPost } from './blog-types.ts';
 export const practicalPosts: BlogPost[] = [
   {
     slug: 'git-worktrees-for-ai-coding-agents',
+    cover: { kind: 'parallel', tone: 'indigo', label: 'Separate spaces. Shared purpose.' },
     title: 'Git worktrees for AI coding agents: from setup to cleanup',
     seoTitle: 'Git worktree tutorial for coding agents',
     category: 'Practical guides',
@@ -122,6 +123,7 @@ export const practicalPosts: BlogPost[] = [
   },
   {
     slug: 'claude-code-and-codex-together',
+    cover: { kind: 'agents', tone: 'honey', label: 'Two agents. One shared brief.' },
     title: 'Using Claude Code and Codex together: a practical workflow',
     seoTitle: 'Using Claude Code and Codex together',
     category: 'Working with agents',
@@ -242,6 +244,7 @@ export const practicalPosts: BlogPost[] = [
   },
   {
     slug: 'review-ai-generated-code-checklist',
+    cover: { kind: 'review', tone: 'mint', label: 'Look closer' },
     title: 'How to review AI-generated code: a checklist with examples',
     seoTitle: 'AI code review checklist with examples',
     category: 'Practical guides',
@@ -366,6 +369,7 @@ export const practicalPosts: BlogPost[] = [
   },
   {
     slug: 'mcp-for-coding-agents',
+    cover: { kind: 'browser', tone: 'rose', label: 'Connect with intention' },
     title: 'MCP for coding agents: tools, permissions, and project context',
     seoTitle: 'MCP for coding agents: tools and permissions',
     category: 'Practical guides',
@@ -497,6 +501,7 @@ export const practicalPosts: BlogPost[] = [
   },
   {
     slug: 'choose-ai-coding-agent-workspace',
+    cover: { kind: 'map', tone: 'honey', label: 'Find your way of working' },
     title: 'How to choose an AI coding-agent workspace',
     seoTitle: 'How to choose an AI coding-agent workspace',
     category: 'Choosing your tools',

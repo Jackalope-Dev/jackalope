@@ -91,6 +91,8 @@ release dates.
 
 ## Website
 
+- [ ] Check the illustrated feature cards and field-notes masonry in Safari and
+  touch browsers, including reading order, keyboard links and expanded details.
 - [ ] Check navigation, forms, clipboard recovery and media in Safari and touch
   browsers, including keyboard focus and reduced motion.
 - [ ] Verify captions, playback and failure recovery for the product tour and

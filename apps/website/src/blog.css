@@ -2,18 +2,119 @@
   width: 100%;
   padding-block: 12px 64px;
 }
-
 .journal-index .notes-grid {
-  gap: 0 48px;
+  display: block;
+  columns: 3;
+  column-gap: 24px;
 }
-
+.journal-teaser .note-preview {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
 .journal-index .note-preview {
-  padding-block: 32px;
-  border-top: 1px solid var(--color-border);
+  break-inside: avoid;
+  margin-bottom: 24px;
 }
-
-.journal-index .note-art {
-  display: none;
+.journal-teaser .note-preview:hover {
+  border-color: var(--color-accent-ink);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--color-accent-ink) 9%, transparent);
+}
+.journal-teaser .note-preview:focus-visible {
+  outline: 3px solid var(--color-accent-ink);
+  outline-offset: 5px;
+}
+.note-copy {
+  padding: 24px;
+}
+.note-copy .note-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin: 0 0 16px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.note-copy .note-meta > span {
+  flex-shrink: 0;
+}
+.note-copy h3 {
+  margin: 0 0 14px;
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.8px;
+}
+.note-copy > p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+.note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+.note-footer svg {
+  color: var(--color-accent-ink);
+}
+.journal-index .editorial-parallel,
+.journal-index .editorial-map {
+  height: 272px;
+}
+.journal-index .editorial-quality,
+.journal-index .editorial-browser {
+  height: 222px;
+}
+.journal-index .editorial-performance,
+.journal-index .editorial-review {
+  height: 196px;
+}
+.journal-index .editorial-studio {
+  height: 300px;
+}
+.field-notes-page .journal-heading {
+  max-width: 800px;
+  margin-bottom: 56px;
+}
+.field-notes-page .journal-heading h1 {
+  font-size: clamp(60px, 9vw, 112px);
+  letter-spacing: -0.07em;
+}
+.field-notes-page .journal-heading > p:last-child {
+  max-width: 510px;
+  line-height: 1.8;
+}
+@media (max-width: 1000px) {
+  .journal-index .notes-grid {
+    columns: 2;
+  }
+}
+@media (max-width: 640px) {
+  .journal-index .notes-grid {
+    columns: 1;
+  }
+  .note-copy {
+    padding: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .journal-teaser .note-preview {
+    transition: none;
+  }
 }
 
 .blog-body h2[id] {
@@ -155,10 +256,6 @@
 }
 
 @media (max-width: 640px) {
-  .journal-index .notes-grid {
-    grid-template-columns: 1fr;
-  }
-
   .blog-code pre {
     padding: 16px;
   }

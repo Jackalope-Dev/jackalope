@@ -146,6 +146,11 @@ permission requests. macOS capture now uses ScreenCaptureKit on macOS 14 and lat
 retaining the older-system capture path. Its compilation and capture acceptance
 still require the native runners and devices.
 
+The resumed Windows `pnpm verify` completed successfully with 287 native tests
+(17 ignored), 145 desktop JavaScript tests, 108 service tests, 45 release tests
+and both production builds. The isolated Cargo target avoided contention with
+other native builds. These checks do not compile or execute the macOS helper.
+
 The remaining native-control implementation is Wayland. Keep Ubuntu/GNOME first,
 but do not enable an XWayland fallback that cannot observe the whole desktop's
 physical input. Device acceptance, permission attribution, multi-monitor/DPI,

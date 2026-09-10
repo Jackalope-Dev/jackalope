@@ -5,24 +5,22 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
-  BookOpen,
-  CalendarClock,
   Check,
   GitBranch,
   GitMerge,
   Moon,
   Play,
-  Plug,
   Plus,
   ScanSearch,
   Sun,
-  Users,
 } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
+import type { EditorialCover } from './blog-types';
 import { ConnectedWorkspace } from './ConnectedWorkspace';
 import { tour } from './content';
+import { EditorialArt } from './EditorialArt';
 
 function HeroMark() {
   const root = useRef<HTMLDivElement>(null);
@@ -228,7 +226,11 @@ function UseCaseVisual({ item }: { item: (typeof examples)[number] }) {
 
 const features = [
   {
-    icon: ScanSearch,
+    cover: {
+      kind: 'map',
+      tone: 'indigo',
+      label: 'Follow the connections',
+    } satisfies EditorialCover,
     title: 'See how the code connects.',
     description: 'Explore your project and trace the reach of a change.',
     detail:
@@ -237,7 +239,7 @@ const features = [
     link: 'Explore the codebase map',
   },
   {
-    icon: GitBranch,
+    cover: { kind: 'parallel', tone: 'mint', label: 'Space to explore' } satisfies EditorialCover,
     title: 'Give every agent room to work.',
     description: 'Run independent tasks side by side in separate Git worktrees.',
     detail:
@@ -246,7 +248,11 @@ const features = [
     link: 'Explore parallel work',
   },
   {
-    icon: BookOpen,
+    cover: {
+      kind: 'context',
+      tone: 'honey',
+      label: 'Context that carries forward',
+    } satisfies EditorialCover,
     title: 'Brief once. Build on it.',
     description: 'Carry project instructions and lessons into the next task.',
     detail:
@@ -255,7 +261,11 @@ const features = [
     link: 'Explore project context',
   },
   {
-    icon: GitMerge,
+    cover: {
+      kind: 'review',
+      tone: 'indigo',
+      label: 'The decision stays yours',
+    } satisfies EditorialCover,
     title: 'Your project. Your final say.',
     description: 'Review the changes and checks together before you merge.',
     detail:
@@ -264,7 +274,7 @@ const features = [
     link: 'Explore code review',
   },
   {
-    icon: Users,
+    cover: { kind: 'accounts', tone: 'rose', label: 'Separate accounts' } satisfies EditorialCover,
     title: 'Work and personal, sorted.',
     description: 'Use the right agent account for every project.',
     detail:
@@ -273,7 +283,7 @@ const features = [
     link: 'Explore accounts and usage',
   },
   {
-    icon: Plug,
+    cover: { kind: 'browser', tone: 'mint', label: 'Tools for the task' } satisfies EditorialCover,
     title: 'Computer use & agent browser.',
     description: 'Let agents browse the web and use a Windows app you approve.',
     detail:
@@ -282,7 +292,11 @@ const features = [
     link: 'Explore browser and computer use',
   },
   {
-    icon: CalendarClock,
+    cover: {
+      kind: 'schedule',
+      tone: 'honey',
+      label: 'Make room for what is next',
+    } satisfies EditorialCover,
     title: 'Put repeat work on repeat.',
     description: 'Schedule checks and chores, with a result for every run.',
     detail:
@@ -449,24 +463,23 @@ export function LandingPage({
             </h2>
           </div>
           <div className="feature-grid">
-            {features.map(({ icon: Icon, ...feature }) => (
-              <details className="feature-item" key={feature.title}>
-                <summary>
-                  <Icon className="feature-icon" size={28} aria-hidden="true" />
-                  <span>
-                    <span className="feature-title">{feature.title}</span>
-                    <span className="feature-description">{feature.description}</span>
-                  </span>
-                  <Plus className="feature-toggle" size={22} aria-hidden="true" />
-                </summary>
-                <div className="feature-detail">
-                  <p>{feature.detail}</p>
-                  <a href={feature.href}>
-                    {feature.link}
-                    <ArrowUpRight size={16} aria-hidden="true" />
+            {features.map((feature) => (
+              <article className="feature-card" key={feature.title}>
+                <EditorialArt {...feature.cover} />
+                <div className="feature-card-copy">
+                  <h3>{feature.title}</h3>
+                  <p>{feature.description}</p>
+                  <details className="feature-card-details">
+                    <summary aria-label={`How it works: ${feature.title}`}>
+                      How it works <Plus size={16} aria-hidden="true" />
+                    </summary>
+                    <p>{feature.detail}</p>
+                  </details>
+                  <a className="feature-card-link" href={feature.href}>
+                    {feature.link} <ArrowUpRight size={17} aria-hidden="true" />
                   </a>
                 </div>
-              </details>
+              </article>
             ))}
           </div>
           <div className="feature-next">

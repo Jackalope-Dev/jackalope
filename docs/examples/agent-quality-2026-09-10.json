@@ -321,5 +321,83 @@
     "Two repetitions on three known regression fixtures, one provider and one account; no direct-GUI baseline.",
     "Reported tokens include cached input; do not interpret as dollar cost or subscription quota savings.",
     "Concurrent local builds affected wall time; no speed claim."
-  ]
+  ],
+  "savedVerificationFollowup": {
+    "nativeBinarySha256": "3db057efb8e36beda02140c3d24475dd1aca0be62b7476c0629b804863f8d4c5",
+    "model": "gpt-6-astra",
+    "cliVersion": "codex-cli 0.153.4",
+    "trials": [
+      {
+        "repetition": 1,
+        "verificationToolAccepted": true,
+        "result": "Updated only `scheduler.mjs` to enforce all dependencies, exclude completed IDs, and sort by descending priority with zero defaults and stable ties. Inputs remain unchanged; empty inputs work.\n\nJackalope `node --test`: 81 passed. Focused edge-case checks and `git diff --check` passed. Nothing unresolved; changes are uncommitted.\n\nCommit message: Fix task readiness filtering and priority ordering",
+        "elapsedMs": 94222,
+        "input": 195543,
+        "output": 1442,
+        "verificationResponses": [
+          {
+            "success": false,
+            "omittedPassingLines": 0,
+            "storedStdoutBytes": 4416,
+            "returnedStdoutBytes": 4416,
+            "truncated": false
+          },
+          {
+            "success": true,
+            "omittedPassingLines": 81,
+            "storedStdoutBytes": 3334,
+            "returnedStdoutBytes": 208,
+            "truncated": false
+          }
+        ],
+        "completedWithinBudget": true,
+        "behavioralOraclePassed": true,
+        "budgetStopped": false,
+        "status": "review",
+        "observedTokenBudget": 250000
+      },
+      {
+        "repetition": 2,
+        "verificationToolAccepted": true,
+        "result": "Changed only `scheduler.mjs`: all dependencies must be completed, completed tasks are excluded, and descending priority sorting preserves ties with missing priority treated as 0. Export, empty-input handling, and input immutability are preserved.\n\nVerified through Jackalope `computer_verify`: `node --test` passed 81/81 tests. Six focused checks and `git diff --check` also passed. Nothing unresolved; changes remain uncommitted.\n\nCommit message: Fix ready task filtering and priority ordering",
+        "elapsedMs": 96173,
+        "input": 275851,
+        "output": 1569,
+        "verificationResponses": [
+          {
+            "success": false,
+            "omittedPassingLines": 0,
+            "storedStdoutBytes": 4413,
+            "returnedStdoutBytes": 4413,
+            "truncated": false
+          },
+          {
+            "success": true,
+            "omittedPassingLines": 81,
+            "storedStdoutBytes": 3336,
+            "returnedStdoutBytes": 208,
+            "truncated": false
+          }
+        ],
+        "completedWithinBudget": false,
+        "behavioralOraclePassed": true,
+        "budgetStopped": true,
+        "status": "stopped",
+        "observedTokenBudget": 250000
+      }
+    ],
+    "limitation": "Separate post-benchmark tool acceptance checks, not included in the original before/after totals."
+  },
+  "validation": {
+    "command": "pnpm verify",
+    "nativeTestsPassed": 288,
+    "nativeTestsIgnored": 17,
+    "desktopTestsPassed": 145,
+    "serviceTestsPassed": 108,
+    "releaseTestsPassed": 45,
+    "desktopAndWebsiteBuilds": "passed",
+    "secretScan": "passed",
+    "documentationLinks": "passed",
+    "installedAppAcceptance": false
+  }
 }

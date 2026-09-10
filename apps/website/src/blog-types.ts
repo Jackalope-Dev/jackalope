@@ -1,5 +1,22 @@
 export type BlogLink = { label: string; href: string };
 
+export type EditorialCover = {
+  kind:
+    | 'map'
+    | 'parallel'
+    | 'context'
+    | 'quality'
+    | 'review'
+    | 'performance'
+    | 'accounts'
+    | 'agents'
+    | 'browser'
+    | 'schedule'
+    | 'studio';
+  tone: 'indigo' | 'mint' | 'honey' | 'rose';
+  label: string;
+};
+
 export type BlogSection = {
   id?: string;
   title: string;
@@ -18,6 +35,7 @@ export type BlogPost = {
   date: string;
   readingTime: string;
   description: string;
+  cover?: EditorialCover;
   sections: BlogSection[];
   related?: BlogLink[];
 };

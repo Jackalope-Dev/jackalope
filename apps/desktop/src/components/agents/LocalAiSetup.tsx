@@ -635,7 +635,7 @@ function ModelChoice({
         {fit === 'fits'
           ? 'Meets memory guide'
           : fit === 'limited'
-            ? 'Memory may limit speed'
+            ? 'May exceed memory'
             : 'Check memory'}
       </span>
     </label>
