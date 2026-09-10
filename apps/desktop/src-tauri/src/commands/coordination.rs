@@ -73,7 +73,7 @@ pub struct Coordinator {
     directory: PathBuf,
     pub(super) runtime: TaskRuntime,
     alive: Arc<AtomicBool>,
-    _lock: Arc<std::fs::File>,
+    _lock: Arc<super::file_lock::FileLock>,
     storage_error: Option<String>,
     scope_checked: Arc<Mutex<Option<std::time::Instant>>>,
 }

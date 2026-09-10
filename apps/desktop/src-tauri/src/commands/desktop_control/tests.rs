@@ -142,7 +142,7 @@ fn desktop_release_cancels_inflight_work_before_releasing_its_lease() {
         .write(true)
         .open(&path)
         .unwrap();
-    file.try_lock().unwrap();
+    let file = super::super::file_lock::FileLock::try_new(file).unwrap();
     let owned = Arc::new(Session {
         canceled: AtomicBool::new(false),
         access: Mutex::new(Access::default()),

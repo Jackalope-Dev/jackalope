@@ -35,7 +35,7 @@ pub fn reset_on_startup(directory: &Path) -> Result<bool, String> {
         .write(true)
         .open(directory.join("runtime.lock"))
         .map_err(|e| e.to_string())?;
-    lock.try_lock()
+    let _lock = super::file_lock::FileLock::try_new(lock)
         .map_err(|_| "Close the other Jackalope instance before resetting.".to_string())?;
     let coordinator_lock = if directory.join("coordination/owner.lock").exists() {
         let owner = std::fs::OpenOptions::new()
@@ -43,8 +43,7 @@ pub fn reset_on_startup(directory: &Path) -> Result<bool, String> {
             .write(true)
             .open(directory.join("coordination/owner.lock"))
             .map_err(|e| e.to_string())?;
-        owner
-            .try_lock()
+        let owner = super::file_lock::FileLock::try_new(owner)
             .map_err(|_| "The task coordinator is still running.".to_string())?;
         Some(owner)
     } else {
@@ -146,7 +145,7 @@ mod tests {
         std::fs::write(directory.join("coordination/queue.json"), "queue").unwrap();
         std::fs::write(directory.join("coordination/owner.lock"), "").unwrap();
         let owner = std::fs::File::create(directory.join("runtime.lock")).unwrap();
-        owner.try_lock().unwrap();
+        let owner = super::super::file_lock::FileLock::try_new(owner).unwrap();
         assert!(reset_on_startup(&directory).is_err());
         assert!(directory.join("history.json").exists());
         drop(owner);

@@ -61,7 +61,7 @@ pub struct TaskRuntime {
     directory: PathBuf,
     // Drop joins the writer before releasing the profile lock below.
     writer: journal::Writer,
-    _owner: Arc<std::fs::File>,
+    _owner: Arc<super::file_lock::FileLock>,
 }
 
 fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {

@@ -234,7 +234,7 @@ fn write_gnome_extension(directory: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
-pub(super) fn lease() -> Result<std::fs::File, String> {
+pub(super) fn lease() -> Result<super::super::file_lock::FileLock, String> {
     #[cfg(unix)]
     let path = PathBuf::from(format!("/tmp/jackalope-desktop-control-{}.lock", unsafe {
         libc::geteuid()
@@ -244,7 +244,7 @@ pub(super) fn lease() -> Result<std::fs::File, String> {
     open_lease(&path)
 }
 
-fn open_lease(path: &std::path::Path) -> Result<std::fs::File, String> {
+fn open_lease(path: &std::path::Path) -> Result<super::super::file_lock::FileLock, String> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
     #[cfg(unix)]
@@ -267,9 +267,9 @@ fn open_lease(path: &std::path::Path) -> Result<std::fs::File, String> {
             return Err("Desktop lease must be a private regular file owned by this user.".into());
         }
     }
-    file.try_lock()
-        .map_err(|_| "Another Jackalope instance owns desktop control. Release it there first.")?;
-    Ok(file)
+    super::super::file_lock::FileLock::try_new(file).map_err(|_| {
+        "Another Jackalope instance owns desktop control. Release it there first.".into()
+    })
 }
 
 pub(super) fn key(key: &str) -> String {

@@ -10,7 +10,7 @@ impl Coordinator {
             .write(true)
             .open(directory.join("owner.lock"))
             .map_err(|e| e.to_string())?;
-        lock.try_lock().map_err(|_| "Another Jackalope instance owns this task queue. Close it before opening this workspace.".to_string())?;
+        let lock = super::super::file_lock::FileLock::try_new(lock).map_err(|_| "Another Jackalope instance owns this task queue. Close it before opening this workspace.".to_string())?;
         let path = directory.join("queue.json");
         let loaded = match path.try_exists() {
             Ok(false) => Ok(Ledger::default()),

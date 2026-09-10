@@ -32,6 +32,11 @@
     "resources": ["resources/agent-browser/", "resources/desktop-control/"],
     "active": true,
     "targets": "all",
+    "linux": {
+      "deb": {
+        "depends": ["at-spi2-core", "libjson-glib-1.0-0"]
+      }
+    },
     "macOS": {
       "minimumSystemVersion": "11.0"
     },

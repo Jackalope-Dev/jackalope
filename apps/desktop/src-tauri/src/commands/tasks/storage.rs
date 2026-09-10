@@ -24,7 +24,7 @@ impl TaskRuntime {
             .write(true)
             .open(directory.join("runtime.lock"))
             .map_err(|e| e.to_string())?;
-        owner.try_lock().map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
+        let owner = super::super::file_lock::FileLock::try_new(owner).map_err(|_| "Another Jackalope instance owns this task history. Close it before starting another instance.".to_string())?;
         let owner = Arc::new(owner);
         let writer = journal::Writer::new(directory.clone())?;
         let runtime = Self {

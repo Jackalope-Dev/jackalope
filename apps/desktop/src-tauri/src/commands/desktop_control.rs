@@ -72,7 +72,7 @@ struct Access {
 struct Session {
     canceled: AtomicBool,
     access: Mutex<Access>,
-    _lease: std::fs::File,
+    _lease: super::file_lock::FileLock,
 }
 
 static SESSIONS: OnceLock<Mutex<HashMap<String, Arc<Session>>>> = OnceLock::new();
