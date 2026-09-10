@@ -1,0 +1,76 @@
+name: Deploy website
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/website/**'
+      - 'apps/desktop/src-tauri/icons/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/deploy-website.yml'
+      - 'scripts/release/website.mjs'
+  pull_request:
+    paths:
+      - 'apps/website/**'
+      - 'apps/desktop/src-tauri/icons/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/deploy-website.yml'
+      - 'scripts/release/website.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:website
+      - run: pnpm --filter @jackalope/server exec wrangler deploy --config ../website/wrangler.jsonc --dry-run
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: website
+          path: apps/website/dist
+          retention-days: 7
+
+  deploy:
+    environment: cloud-stable
+    needs: verify
+    if: github.repository == 'Jackalope-Dev/jackalope' && github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/release/website.mjs
+        env:
+          RELEASE_SERVICE_BOOTSTRAP: ${{ vars.RELEASE_SERVICE_BOOTSTRAP }}
+      - run: pnpm build:website
+      - run: pnpm --filter @jackalope/server exec wrangler deploy --config ../website/wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - run: node apps/website/scripts/verify-deployment.mjs https://jackalope.dev

@@ -1,0 +1,66 @@
+import { agentCapabilities } from '../../lib/agent-capabilities';
+
+export function AgentSupport({ adapter }: { adapter: string }) {
+  const support = agentCapabilities(adapter);
+  if (!support)
+    return <p className="task-muted">Choose a supported adapter to see its capabilities.</p>;
+  if (['gemini', 'aider', 'goose'].includes(adapter))
+    return (
+      <p className="task-muted mt-4">
+        Separate account setup is available. Running tasks with this agent is still in development.
+      </p>
+    );
+  const rows = [
+    ['Project context, task awareness & messages', 'Available'],
+    [
+      'User questions & validation',
+      support.bridge === 'mcp' ? 'Built-in tools' : 'Through permitted shell/network tools',
+    ],
+    [
+      'Browser evidence & interaction',
+      adapter === 'codex'
+        ? 'Read tools; actions may require permission'
+        : 'Subject to CLI permissions',
+    ],
+    [
+      'Selected project connections',
+      support.direct.length ? 'Direct and on-demand tools' : 'On-demand tools',
+    ],
+    ['Continuation, stop & saved history', 'Available'],
+    [
+      'Separate accounts',
+      adapter === 'antigravity'
+        ? 'Gemini API keys; current CLI subscription login'
+        : support.accounts
+          ? 'Available'
+          : 'Current CLI account only',
+    ],
+    [
+      'Subscription capacity',
+      support.capacity ? 'When reported by the account' : 'No connected quota interface',
+    ],
+  ];
+  return (
+    <section aria-label="Agent support" className="mt-4">
+      <h3 className="text-base font-medium">Supported in Jackalope</h3>
+      <dl className="agent-support-list">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {adapter === 'kimi' && (
+        <p className="task-muted">
+          Use the current Kimi Code CLI for tasks, routing, and Ask Jackalope. Tool approvals and
+          structured questions appear in the task. Membership quota needs a current managed login.
+          Legacy Python kimi-cli accounts need migration through Kimi Code CLI.
+        </p>
+      )}
+      <p className="task-muted">
+        Messages arrive at checkpoints. Usage depends on provider reports.
+      </p>
+    </section>
+  );
+}

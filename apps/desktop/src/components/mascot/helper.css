@@ -1,0 +1,209 @@
+.helper-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: var(--text-sm);
+}
+.helper-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+}
+.helper-chat button {
+  min-height: 44px;
+}
+.helper-chat small,
+.helper-context {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.helper-context {
+  margin: 0;
+  flex-shrink: 0;
+}
+.helper-context summary {
+  cursor: pointer;
+  padding: 10px 0;
+  min-height: 44px;
+}
+.helper-context p {
+  margin-bottom: 8px;
+}
+.helper-transcript {
+  padding: 12px 20px;
+}
+.helper-turn {
+  padding-bottom: 18px;
+  overflow-wrap: anywhere;
+}
+.helper-user {
+  background: var(--color-surface-hover);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+.helper-turn > small {
+  display: block;
+  margin: 6px 0;
+}
+.helper-turn details {
+  margin: 8px 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.helper-turn details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.helper-turn details ul {
+  padding-left: 16px;
+}
+.helper-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+.helper-composer {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+.helper-composer textarea {
+  width: 100%;
+  resize: vertical;
+  max-height: 120px;
+  min-height: 60px;
+  padding: 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.helper-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.helper-text-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+  text-align: left;
+}
+.helper-text-button:disabled {
+  opacity: 0.5;
+}
+.helper-action {
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.helper-action-values {
+  margin: 6px 0;
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.helper-action > small {
+  display: block;
+}
+.helper-error {
+  color: var(--color-danger);
+  padding: 8px 20px;
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.helper-action .helper-error {
+  padding: 8px 0;
+}
+.helper-tabs {
+  display: flex;
+  margin: 12px 20px 4px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+.helper-tabs button {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.helper-tabs button:hover {
+  background: var(--color-surface-hover);
+}
+.companion-panel .helper-tabs button[aria-pressed="true"] {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-selection);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.companion-panel :is(button, textarea, input, summary):focus-visible {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.helper-disclaimer {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.helper-buttons > .helper-text-button {
+  margin-right: auto;
+}
+.companion-header-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+.companion-header-actions .quiet-icon {
+  min-width: 44px;
+  min-height: 44px;
+}
+.helper-settings {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 16px 20px;
+  font-size: var(--text-sm);
+}
+.helper-settings > section + section,
+.helper-settings > details {
+  margin-top: 20px;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 16px;
+}
+.helper-settings h3 {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.helper-settings p {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.helper-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+}
+.helper-settings .themed-select {
+  width: 100%;
+}

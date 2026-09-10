@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible problem
+body:
+  - type: markdown
+    attributes:
+      value: For vulnerabilities, email security@jackalope.dev instead. Remove tokens, private prompts and personal paths from anything you attach.
+  - type: input
+    id: version
+    attributes:
+      label: Jackalope version or commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and agent CLI/version
+      description: Include whether this is the native app or browser preview.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Reviewed diagnostics or screenshots
+      description: Optional. Review the support report locally before sharing it.

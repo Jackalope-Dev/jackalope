@@ -1,0 +1,26 @@
+{
+  "name": "@jackalope/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "types": "wrangler types --strict-vars=false",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "db:local": "wrangler d1 migrations apply DB --local"
+  },
+  "dependencies": {
+    "@jackalope/brand": "workspace:*",
+    "jose": "^6.2.12",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.7",
+    "@types/node": "^24.13.4",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.0",
+    "wrangler": "4.131.0"
+  }
+}

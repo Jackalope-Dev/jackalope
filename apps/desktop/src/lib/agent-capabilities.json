@@ -1,0 +1,65 @@
+{
+  "codex": {
+    "bridge": "mcp",
+    "direct": ["stdio", "http"],
+    "discovery": true,
+    "accounts": true,
+    "capacity": true
+  },
+  "claude": {
+    "bridge": "mcp",
+    "direct": ["stdio", "http", "sse"],
+    "discovery": true,
+    "accounts": true,
+    "capacity": true
+  },
+  "grok": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": true
+  },
+  "kimi": {
+    "bridge": "mcp",
+    "direct": ["stdio", "http", "sse"],
+    "discovery": true,
+    "accounts": true,
+    "capacity": true
+  },
+  "opencode": {
+    "bridge": "mcp",
+    "direct": ["stdio", "http", "sse"],
+    "discovery": true,
+    "accounts": true,
+    "capacity": false
+  },
+  "antigravity": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": true
+  },
+  "gemini": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": false
+  },
+  "aider": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": false
+  },
+  "goose": {
+    "bridge": "http",
+    "direct": [],
+    "discovery": true,
+    "accounts": true,
+    "capacity": false
+  }
+}

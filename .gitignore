@@ -1,0 +1,119 @@
+# Node & Package Managers
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust & Tauri
+target/
+src-tauri/target/
+**/gen/schemas/
+apps/desktop/src-tauri/resources/agent-browser/agent-browser*
+*.pdb
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.npmrc
+.netrc
+.pypirc
+.cargo/credentials
+.cargo/credentials.toml
+
+# Local service state and diagnostics
+.wrangler/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backups/
+exports/
+secrets/
+.private/
+docs/internal/
+/publication/
+/docs/releases/*
+!/docs/releases/RELEASE-RECORD-TEMPLATE.md
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.bak
+*.dump
+*.log
+*.har
+*.trace
+*.dmp
+
+# IDE & Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Generated
+Thumbs.db
+.DS_Store
+
+# Temporary & agent scratch
+__pycache__/
+*.py[cod]
+scratch/
+tmp/
+.playwright-cli/
+/output/
+
+# Linked git worktrees (agent task isolation, see AGENTS.md) — each is its
+# own working tree on its own branch, never nested content of this one
+.worktrees/
+
+# Signing material and private deployment configuration
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+*.der
+*.jks
+*.keystore
+*.kdbx
+*.mobileprovision
+*.ovpn
+*.p7b
+*.p7c
+*.p7s
+!*.pub
+# Public/test certificates may be explicitly allowlisted beside their fixture.
+wrangler.deploy.jsonc
+dist-lab/
+
+/marketing-assets/
+
+/apps/desktop/.settings-sync-fixture.html
+/apps/desktop/.settings-sync-fixture.tsx
+/apps/desktop/src-tauri/resources/desktop-control/jackalope-desktop-control
+
+# Tauri icon generation also emits unused mobile targets.
+/apps/desktop/src-tauri/icons/android/
+/apps/desktop/src-tauri/icons/ios/
+/patches/glib/Cargo.lock

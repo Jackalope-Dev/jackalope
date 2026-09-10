@@ -1,0 +1,217 @@
+import { VETTED_SKILLS } from '../../lib/skills/catalog';
+import { useProjectStore } from '../../stores/projectStore';
+import { openProjectSettings } from '../layout/navigation';
+import { Setting } from '../settings/Setting';
+import { Button } from '../ui/button';
+import { Switch } from '../ui/Switch';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { ProjectGitSettings } from './ProjectGitSettings';
+import { RemoveProjectAction } from './RemoveProjectAction';
+import '../settings/settings.css';
+export function ProjectPreferences({
+  embedded = false,
+  projectId,
+}: {
+  embedded?: boolean;
+  projectId?: string;
+}) {
+  const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
+  const project = projects.find((p) => p.id === (projectId ?? activeProjectId));
+  return (
+    <section className={embedded ? 'project-preferences' : 'workspace-page project-preferences'}>
+      {!embedded && (
+        <WorkspaceHeading
+          title="Project settings"
+          description={project ? `${project.name} · ${project.path}` : undefined}
+        />
+      )}
+      {!project ? (
+        <p className="settings-section-subtitle mt-4">
+          Open a repository to configure project preferences.
+        </p>
+      ) : (
+        <>
+          <div className="project-workspace-fields">
+            <div className="project-preference-field">
+              <label htmlFor="project-name">Project name</label>
+              <input
+                id="project-name"
+                className="settings-input"
+                value={project.name}
+                onChange={(e) => updateProject(project.id, { name: e.target.value })}
+              />
+            </div>
+          </div>
+          {!embedded && (
+            <section className="project-preferences-section project-settings-links">
+              <Setting
+                title="Appearance"
+                description={
+                  project.preferences?.theme
+                    ? `Project theme: ${project.preferences.theme.name}`
+                    : 'Using the app theme.'
+                }
+              >
+                <Button
+                  variant="outline"
+                  onClick={() => openProjectSettings(project.id, 'Appearance')}
+                >
+                  Edit appearance
+                </Button>
+              </Setting>
+              <Setting
+                title="Agents and accounts"
+                description="Choose project defaults and available accounts."
+              >
+                <Button variant="outline" onClick={() => openProjectSettings(project.id, 'Agents')}>
+                  Configure agents
+                </Button>
+              </Setting>
+            </section>
+          )}
+          <section className="project-preferences-section">
+            <h2>Task instructions</h2>
+            <div className="project-workspace-fields">
+              <div className="project-preference-field">
+                <label htmlFor="project-instructions">Project instructions</label>
+                <p id="project-instructions-help" className="settings-row-description">
+                  Appended to prompts launched from the task composer.
+                </p>
+                <textarea
+                  id="project-instructions"
+                  aria-describedby="project-instructions-help"
+                  className="settings-textarea"
+                  rows={5}
+                  value={project.preferences?.customInstructions ?? ''}
+                  onChange={(e) =>
+                    updateProjectPreferences(project.id, {
+                      customInstructions: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </section>
+          <section className="project-preferences-section project-task-context">
+            <h2>Task context</h2>
+            <Setting
+              title="Choose guidelines automatically"
+              description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Customize task → Context."
+            >
+              <Switch
+                label="Choose guidelines automatically"
+                checked={project.preferences?.automaticTaskContext !== false}
+                onCheckedChange={(automaticTaskContext) =>
+                  updateProjectPreferences(project.id, { automaticTaskContext })
+                }
+              />
+            </Setting>
+            <details>
+              <summary className="min-h-11 cursor-pointer py-3">Always include guidelines</summary>
+              {VETTED_SKILLS.map((skill) => (
+                <Setting key={skill.id} title={skill.shortLabel} description={skill.description}>
+                  <Switch
+                    label={`Always include ${skill.shortLabel}`}
+                    checked={project.preferences?.taskGuidelines?.includes(skill.id) ?? false}
+                    onCheckedChange={(include) =>
+                      updateProjectPreferences(project.id, {
+                        taskGuidelines: include
+                          ? [...(project.preferences?.taskGuidelines ?? []), skill.id]
+                          : project.preferences?.taskGuidelines?.filter((id) => id !== skill.id),
+                      })
+                    }
+                  />
+                </Setting>
+              ))}
+            </details>
+          </section>
+          <ProjectGitSettings key={project.path} projectPath={project.path} />
+          <section className="project-preferences-section">
+            <h2>Workspace</h2>
+            <div className="project-workspace-fields">
+              <div className="project-preference-field">
+                <label htmlFor="project-base-branch">Target branch</label>
+                <p id="project-base-branch-help" className="settings-row-description">
+                  Starting branch for new tasks and their review.
+                </p>
+                <input
+                  id="project-base-branch"
+                  aria-describedby="project-base-branch-help"
+                  className="settings-input w-full"
+                  value={project.preferences?.baseBranch ?? ''}
+                  placeholder={project.gitBranch}
+                  onChange={(e) =>
+                    updateProjectPreferences(project.id, { baseBranch: e.target.value })
+                  }
+                />
+              </div>
+              <div className="project-preference-field">
+                <label htmlFor="preparation-command">Workspace preparation</label>
+                <p id="preparation-command-help" className="settings-row-description">
+                  Runs before new tasks, with your OS permissions. Five-minute limit; skipped for
+                  continuations.
+                </p>
+                <input
+                  id="preparation-command"
+                  aria-describedby="preparation-command-help"
+                  className="settings-input w-full"
+                  value={project.preferences?.prepareCommand ?? ''}
+                  placeholder="pnpm install --frozen-lockfile"
+                  onChange={(event) =>
+                    updateProjectPreferences(project.id, { prepareCommand: event.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </section>
+          <section className="project-preferences-section">
+            <h2>Verification</h2>
+            <div className="project-workspace-fields">
+              <div className="project-preference-field">
+                <label htmlFor="verification-command">Verification command</label>
+                <p id="verification-command-help" className="settings-row-description">
+                  Runs with your OS permissions. Five-minute limit.
+                </p>
+                <input
+                  id="verification-command"
+                  aria-describedby="verification-command-help"
+                  className="settings-input w-full"
+                  value={project.preferences?.verifyCommand ?? ''}
+                  placeholder="pnpm build"
+                  onChange={(e) =>
+                    updateProjectPreferences(project.id, {
+                      verifyCommand: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <Setting
+              title="Check results automatically"
+              description="Run this command after new tasks and scheduled runs finish successfully."
+            >
+              <Switch
+                label="Check results automatically"
+                checked={project.preferences?.autoVerify === true}
+                onCheckedChange={(autoVerify) =>
+                  updateProjectPreferences(project.id, { autoVerify })
+                }
+              />
+            </Setting>
+          </section>
+          <section className="project-preferences-section">
+            <Setting
+              title="Remove project"
+              description="Remove this project from Jackalope. Your files and task history stay intact."
+            >
+              <RemoveProjectAction
+                project={project}
+                trigger={<Button variant="outline">Remove from Jackalope…</Button>}
+              />
+            </Setting>
+          </section>
+        </>
+      )}
+    </section>
+  );
+}

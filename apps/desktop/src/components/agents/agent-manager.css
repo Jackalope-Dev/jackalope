@@ -1,0 +1,343 @@
+.agents-page-content {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.agent-manager {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.agent-manager > .workspace-heading {
+  padding-bottom: 0;
+}
+
+.agent-config-row {
+  min-width: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.agent-config-heading,
+.agent-config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-config-heading {
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 8px;
+}
+
+.agent-config-identity {
+  flex: 1 1 240px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-config-fields,
+.agent-manual-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.agent-config-fields {
+  padding-block: 12px 4px;
+}
+
+.agent-manager .task-label,
+.agent-account-edit .task-label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  align-content: start;
+}
+
+.agent-manager .task-input,
+.agent-account-edit .task-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.agent-manager textarea {
+  resize: vertical;
+  min-height: 104px;
+}
+
+.agent-account-edit-form {
+  display: grid;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.agent-account-edit .task-input {
+  min-height: 44px;
+  color: var(--color-text-primary);
+}
+
+.agent-account-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.agent-manual-form > button {
+  justify-self: start;
+}
+
+.agent-model-restriction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.agent-accounts {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.agent-accounts-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.agent-accounts-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.agent-account-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 44px;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.agent-account-select:hover {
+  background: var(--color-surface-hover, rgba(127, 127, 127, 0.08));
+}
+
+.agent-account-select[aria-pressed="true"] {
+  color: var(--color-accent-ink);
+}
+
+.agent-accounts-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.agent-chooser {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.agent-support-list {
+  margin: 16px 0;
+}
+.agent-support-list > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.agent-support-list dd {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.agent-account-identity {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.agent-account-add {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-elevated);
+}
+.agent-account-add-heading {
+  flex-basis: 100%;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.agent-account-add-heading h4 {
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.agent-account-group {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+}
+.agent-account-group label {
+  position: relative;
+  cursor: pointer;
+}
+.agent-account-group input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.agent-account-group span {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.agent-detected-models button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.agent-account-group input:checked + span {
+  border-color: var(--color-border-focus);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.agent-account-group input:focus-visible + span {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.agent-account-group:disabled {
+  opacity: 0.6;
+}
+.agent-account-group:disabled label {
+  cursor: default;
+}
+.agent-account-identity .agent-account-group {
+  margin-top: 12px;
+}
+.agent-account-add > input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.agent-sign-in-dialog {
+  width: min(800px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+.agent-sign-in-terminal {
+  height: clamp(160px, 35dvh, 320px);
+  padding: 12px;
+  margin-top: 16px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.agent-sign-in-terminal:focus-within {
+  outline: 2px solid var(--color-accent-ink);
+  outline-offset: 2px;
+}
+.agent-account-status {
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+}
+
+.workspace-page.agent-settings-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 64px;
+}
+
+.agent-install-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-block: 16px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.agent-install-guide p {
+  flex: 1 1 200px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.agent-install-compact > button {
+  width: 100%;
+}
+
+.agent-model-catalog {
+  display: grid;
+  gap: 14px;
+  padding-block: 12px;
+}
+.agent-detected-models {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 10px;
+}
+.agent-detected-models button {
+  height: auto;
+  min-height: 56px;
+  justify-content: start;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  white-space: normal;
+}
+.agent-detected-models strong {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  display: block;
+}
+.agent-detected-models small {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  display: block;
+  margin-top: 4px;
+}

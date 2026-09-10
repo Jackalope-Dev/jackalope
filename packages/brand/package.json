@@ -1,0 +1,27 @@
+{
+  "name": "@jackalope/brand",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    "./theme": "./src/theme.ts",
+    "./character": "./src/character.ts",
+    "./agent-character": "./src/AgentCharacter.tsx",
+    "./echo": "./src/EchoMark.tsx",
+    "./email": "./src/email.ts",
+    "./passes": "./src/PassTickets.tsx",
+    "./fonts.css": "./src/fonts.css",
+    "./tokens": "./src/tokens.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.4"
+  },
+  "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0"
+  }
+}

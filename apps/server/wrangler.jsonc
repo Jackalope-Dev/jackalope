@@ -1,0 +1,259 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jackalope-service-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "limits": {
+    "cpu_ms": 1000
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    }
+  },
+  "vars": {
+    "ENVIRONMENT": "local",
+    "INGESTION_ENABLED": "false",
+    "TELEMETRY_DAYS": "30",
+    "FEEDBACK_DAYS": "90",
+    "ADMIN_EMAIL": "",
+    "ACCESS_ISSUER": "",
+    "ACCESS_AUD": "",
+    "FEEDBACK_EMAIL_ENABLED": "false",
+    "FEEDBACK_EMAIL_FROM": "",
+    "FEEDBACK_EMAIL_TO": "contact@jackalope.dev",
+    "EARLY_ACCESS_ENABLED": "false",
+    "ACCESS_WEB_ORIGIN": "https://jackalope.dev",
+    "ACCESS_EMAIL_FROM": "",
+    "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
+    "ACCESS_INSTALLER_KEY": "",
+    "ACCESS_STORE_URL": "",
+    "ACCESS_AUDIENCE_LIST": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jackalope-service-local",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RELEASES",
+      "bucket_name": "jackalope-releases-local"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "IP_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    },
+    {
+      "name": "FEEDBACK_LIMITER",
+      "namespace_id": "1002",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    },
+    {
+      "name": "GLOBAL_LIMITER",
+      "namespace_id": "1003",
+      "simple": {
+        "limit": 600,
+        "period": 60
+      }
+    }
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "env": {
+    "staging": {
+      "name": "jackalope-service-staging",
+      "services": [{ "binding": "ACCESS_WEBSITE", "service": "jackalope-website" }],
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "INGESTION_ENABLED": "false",
+        "TELEMETRY_DAYS": "30",
+        "FEEDBACK_DAYS": "90",
+        "ADMIN_EMAIL": "",
+        "ACCESS_ISSUER": "",
+        "ACCESS_AUD": "",
+        "FEEDBACK_EMAIL_ENABLED": "false",
+        "FEEDBACK_EMAIL_FROM": "",
+        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev",
+        "EARLY_ACCESS_ENABLED": "false",
+        "ACCESS_WEB_ORIGIN": "https://jackalope.dev",
+        "ACCESS_EMAIL_FROM": "",
+        "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
+        "ACCESS_INSTALLER_KEY": "",
+        "ACCESS_STORE_URL": "",
+        "ACCESS_AUDIENCE_LIST": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "jackalope-service-staging",
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "RELEASES",
+          "bucket_name": "jackalope-releases-staging"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "IP_LIMITER",
+          "namespace_id": "2001",
+          "simple": {
+            "limit": 60,
+            "period": 60
+          }
+        },
+        {
+          "name": "FEEDBACK_LIMITER",
+          "namespace_id": "2002",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
+        },
+        {
+          "name": "GLOBAL_LIMITER",
+          "namespace_id": "2003",
+          "simple": {
+            "limit": 600,
+            "period": 60
+          }
+        }
+      ],
+      "triggers": {
+        "crons": ["*/5 * * * *"]
+      },
+      "secrets": {
+        "required": ["RATE_SECRET", "ACCESS_SECRET", "SEQUENZY_API_KEY"]
+      },
+      "routes": [
+        {
+          "pattern": "staging-api.jackalope.dev",
+          "custom_domain": true
+        }
+      ],
+      "send_email": [
+        {
+          "name": "FEEDBACK_EMAIL",
+          "allowed_destination_addresses": ["contact@jackalope.dev"]
+        }
+      ]
+    },
+    "production": {
+      "name": "jackalope-service-production",
+      "services": [{ "binding": "ACCESS_WEBSITE", "service": "jackalope-website" }],
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "ENVIRONMENT": "production",
+        "INGESTION_ENABLED": "false",
+        "TELEMETRY_DAYS": "30",
+        "FEEDBACK_DAYS": "90",
+        "ADMIN_EMAIL": "",
+        "ACCESS_ISSUER": "",
+        "ACCESS_AUD": "",
+        "FEEDBACK_EMAIL_ENABLED": "false",
+        "FEEDBACK_EMAIL_FROM": "",
+        "FEEDBACK_EMAIL_TO": "contact@jackalope.dev",
+        "EARLY_ACCESS_ENABLED": "false",
+        "ACCESS_WEB_ORIGIN": "https://jackalope.dev",
+        "ACCESS_EMAIL_FROM": "",
+        "ACCESS_EMAIL_REPLY_TO": "contact@jackalope.dev",
+        "ACCESS_INSTALLER_KEY": "",
+        "ACCESS_STORE_URL": "",
+        "ACCESS_AUDIENCE_LIST": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "jackalope-service-production",
+          "database_id": "00000000-0000-0000-0000-000000000003",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "RELEASES",
+          "bucket_name": "jackalope-releases-production"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "IP_LIMITER",
+          "namespace_id": "3001",
+          "simple": {
+            "limit": 60,
+            "period": 60
+          }
+        },
+        {
+          "name": "FEEDBACK_LIMITER",
+          "namespace_id": "3002",
+          "simple": {
+            "limit": 5,
+            "period": 60
+          }
+        },
+        {
+          "name": "GLOBAL_LIMITER",
+          "namespace_id": "3003",
+          "simple": {
+            "limit": 600,
+            "period": 60
+          }
+        }
+      ],
+      "triggers": {
+        "crons": ["*/5 * * * *"]
+      },
+      "secrets": {
+        "required": ["RATE_SECRET", "ACCESS_SECRET", "SEQUENZY_API_KEY"]
+      },
+      "routes": [
+        {
+          "pattern": "api.jackalope.dev",
+          "custom_domain": true
+        }
+      ],
+      "send_email": [
+        {
+          "name": "FEEDBACK_EMAIL",
+          "allowed_destination_addresses": ["contact@jackalope.dev"]
+        }
+      ]
+    }
+  },
+  "secrets": {
+    "required": ["RATE_SECRET", "ACCESS_SECRET", "SEQUENZY_API_KEY"]
+  },
+  "send_email": [
+    {
+      "name": "FEEDBACK_EMAIL",
+      "allowed_destination_addresses": ["contact@jackalope.dev"]
+    }
+  ]
+}

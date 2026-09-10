@@ -1,0 +1,377 @@
+use super::{check_canceled, Slot};
+#[cfg(unix)]
+mod chromium;
+use crate::commands::process_control::ProcessTree;
+use serde_json::{json, Value};
+use std::{
+    io::{Read, Write},
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    sync::{Arc, OnceLock},
+    time::{Duration, Instant},
+};
+
+static RESOURCES: OnceLock<PathBuf> = OnceLock::new();
+const RESPONSE_LIMIT: usize = 2_000_000;
+pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
+
+pub fn set_resource_directory(path: PathBuf) {
+    let _ = RESOURCES.set(path);
+}
+
+fn executable() -> Result<PathBuf, String> {
+    let name = if cfg!(windows) {
+        "agent-browser.exe"
+    } else {
+        "agent-browser"
+    };
+    let relative = PathBuf::from("resources/agent-browser").join(name);
+    if let Some(root) = RESOURCES.get() {
+        let path = root.join(&relative);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+    #[cfg(debug_assertions)]
+    {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+    Err("The bundled browser tool is missing. Reinstall Jackalope.".into())
+}
+
+pub struct Engine {
+    pub directory: PathBuf,
+    pub media: std::sync::Mutex<(String, bool)>,
+    child: Child,
+    tree: Arc<ProcessTree>,
+    canceled: Arc<std::sync::atomic::AtomicBool>,
+    #[cfg(unix)]
+    browser: Option<chromium::BrowserProcess>,
+}
+
+impl Engine {
+    pub fn start(slot: Arc<Slot>) -> Result<Self, String> {
+        check_canceled(&slot.canceled)?;
+        slot.trees.lock().map_err(|e| e.to_string())?.clear();
+        let browser = crate::commands::harness::find_browser_executable()
+            .ok_or("Install Chrome, Edge or Chromium, or set JACKALOPE_BROWSER_EXECUTABLE to its executable, then restart Jackalope.")?;
+        let directory = create_session_directory()?;
+        let result = Self::spawn(slot, directory.clone(), browser);
+        if result.is_err() {
+            remove_session_directory(&directory);
+        }
+        result
+    }
+
+    fn spawn(slot: Arc<Slot>, directory: PathBuf, browser: PathBuf) -> Result<Self, String> {
+        let mut command = Command::new(executable()?);
+        command
+            .env_clear()
+            .current_dir(&directory)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        for key in [
+            "SystemRoot",
+            "WINDIR",
+            "PATH",
+            "PATHEXT",
+            "COMSPEC",
+            "ProgramFiles",
+            "ProgramFiles(x86)",
+            "LOCALAPPDATA",
+            "APPDATA",
+            "USERPROFILE",
+            "DISPLAY",
+            "WAYLAND_DISPLAY",
+            "XDG_RUNTIME_DIR",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "XAUTHORITY",
+            "LANG",
+        ] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
+        command
+            .env("HOME", &directory)
+            .env("TMP", &directory)
+            .env("TEMP", &directory)
+            .env("TMPDIR", &directory)
+            .env("AGENT_BROWSER_DAEMON", "1")
+            .env("AGENT_BROWSER_SESSION", "task")
+            .env("AGENT_BROWSER_SOCKET_DIR", &directory)
+            .env("AGENT_BROWSER_DEFAULT_TIMEOUT", "15000")
+            .env("AGENT_BROWSER_IDLE_TIMEOUT_MS", "0");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        let mut child = command
+            .spawn()
+            .map_err(|e| format!("Could not start browser tool: {e}"))?;
+        let tree = match ProcessTree::attach(&child) {
+            Ok(tree) => Arc::new(tree),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        };
+        // Publish containment before launch so Stop can interrupt startup or a blocked browser call.
+        slot.trees
+            .lock()
+            .map_err(|e| e.to_string())?
+            .push(tree.clone());
+        let mut engine = Self {
+            media: std::sync::Mutex::new(("no-preference".into(), false)),
+            directory,
+            child,
+            tree,
+            canceled: slot.canceled.clone(),
+            #[cfg(unix)]
+            browser: None,
+        };
+        let start = Instant::now();
+        loop {
+            check_canceled(&engine.canceled)?;
+            if engine
+                .child
+                .try_wait()
+                .map_err(|e| e.to_string())?
+                .is_some()
+            {
+                return Err("The browser tool exited during startup.".into());
+            }
+            if engine.connect().is_ok() {
+                break;
+            }
+            if start.elapsed() > Duration::from_secs(10) {
+                return Err("The browser tool did not become ready.".into());
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        engine.call(json!({"action":"stream_disable"}))?;
+        #[cfg(windows)]
+        engine.call(
+            json!({"action":"launch", "headless":true, "executablePath":browser,
+            "webmcp":false, "hideScrollbars":false}),
+        )?;
+        #[cfg(unix)]
+        {
+            let owned = chromium::BrowserProcess::start(&browser, &engine.directory, &slot)?;
+            let endpoint = owned.endpoint.clone();
+            engine.browser = Some(owned);
+            engine.call(json!({"action":"launch", "cdpUrl":endpoint, "webmcp":false}))?;
+        }
+        engine.call(json!({"action":"viewport", "width":1280, "height":800}))?;
+        Ok(engine)
+    }
+
+    #[cfg(all(test, unix))]
+    pub(super) fn browser_pid(&self) -> u32 {
+        self.browser.as_ref().unwrap().pid()
+    }
+
+    #[cfg(windows)]
+    fn connect(&self) -> Result<std::net::TcpStream, String> {
+        let port: u16 = std::fs::read_to_string(self.directory.join("task.port"))
+            .map_err(|e| e.to_string())?
+            .trim()
+            .parse()
+            .map_err(|_| "Invalid browser port")?;
+        let stream = std::net::TcpStream::connect_timeout(
+            &([127, 0, 0, 1], port).into(),
+            Duration::from_millis(200),
+        )
+        .map_err(|e| e.to_string())?;
+        stream
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .map_err(|e| e.to_string())?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .map_err(|e| e.to_string())?;
+        Ok(stream)
+    }
+
+    #[cfg(unix)]
+    fn connect(&self) -> Result<std::os::unix::net::UnixStream, String> {
+        let stream = std::os::unix::net::UnixStream::connect(self.directory.join("task.sock"))
+            .map_err(|e| e.to_string())?;
+        stream
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .map_err(|e| e.to_string())?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .map_err(|e| e.to_string())?;
+        Ok(stream)
+    }
+
+    pub fn call(&self, mut request: Value) -> Result<Value, String> {
+        check_canceled(&self.canceled)?;
+        let id = uuid::Uuid::new_v4().to_string();
+        request["id"] = json!(id);
+        let mut stream = self.connect().inspect_err(|_| self.terminate())?;
+        let mut payload = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
+        payload.push(b'\n');
+        stream.write_all(&payload).map_err(|e| {
+            self.terminate();
+            e.to_string()
+        })?;
+        let start = Instant::now();
+        let mut output = Vec::new();
+        let mut buffer = [0u8; 8192];
+        loop {
+            check_canceled(&self.canceled)?;
+            if start.elapsed() > COMMAND_TIMEOUT {
+                self.terminate();
+                return Err("The browser stopped responding and was closed. Continue the task to retry with a fresh browser.".into());
+            }
+            match stream.read(&mut buffer) {
+                Ok(0) => {
+                    self.terminate();
+                    return Err("The task browser closed unexpectedly. Continue the task to start a fresh browser.".into());
+                }
+                Ok(count) => {
+                    output.extend_from_slice(&buffer[..count]);
+                    if output.len() > RESPONSE_LIMIT {
+                        return Err(
+                            "Browser output is too large. Scope the snapshot to a CSS selector."
+                                .into(),
+                        );
+                    }
+                    if let Some(end) = output.iter().position(|b| *b == b'\n') {
+                        let response: Value = serde_json::from_slice(&output[..end])
+                            .map_err(|_| "Invalid browser response")?;
+                        if response["id"].as_str() != Some(&id) {
+                            return Err("Mismatched browser response".into());
+                        }
+                        if response["success"] != true {
+                            let error: String = response["error"]
+                                .as_str()
+                                .unwrap_or("Browser action failed")
+                                .chars()
+                                .take(2000)
+                                .collect();
+                            return Err(error);
+                        }
+                        let mut data = response["data"].clone();
+                        if let Some(object) = data.as_object_mut() {
+                            object.remove("lifecycle");
+                        }
+                        return Ok(data);
+                    }
+                }
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+                    ) => {}
+                Err(error) => {
+                    self.terminate();
+                    return Err(format!("Browser connection failed: {error}"));
+                }
+            }
+        }
+    }
+
+    fn terminate(&self) {
+        self.tree.terminate();
+        #[cfg(unix)]
+        if let Some(browser) = &self.browser {
+            browser.terminate();
+        }
+    }
+}
+
+fn create_session_directory() -> Result<PathBuf, String> {
+    #[cfg(unix)]
+    let root = PathBuf::from("/tmp");
+    #[cfg(windows)]
+    let root = std::env::temp_dir();
+    let directory = root.join(format!("jl-{}", uuid::Uuid::new_v4().simple()));
+    let builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    let builder = {
+        use std::os::unix::fs::DirBuilderExt;
+        let mut builder = builder;
+        // macOS TMPDIR can exceed the Unix socket path limit. Keep the socket short and private.
+        builder.mode(0o700);
+        builder
+    };
+    builder.create(&directory).map_err(|e| e.to_string())?;
+    Ok(directory)
+}
+
+#[cfg(all(test, unix))]
+mod platform_tests {
+    #[test]
+    fn session_directory_is_private_and_socket_path_fits_macos() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = super::create_session_directory().unwrap();
+        assert!(directory.join("task.sock").as_os_str().len() < 104);
+        assert_eq!(
+            directory.metadata().unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        std::fs::remove_dir(directory).unwrap();
+    }
+}
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        self.terminate();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        #[cfg(unix)]
+        drop(self.browser.take());
+        remove_session_directory(&self.directory);
+    }
+}
+
+fn remove_session_directory(directory: &std::path::Path) {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        if !directory.exists() || std::fs::remove_dir_all(directory).is_ok() {
+            return;
+        }
+        if Instant::now() >= deadline {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(all(test, windows))]
+mod cleanup_tests {
+    #[test]
+    fn profile_cleanup_retries_transient_windows_file_locks() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let directory = super::create_session_directory().unwrap();
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .share_mode(0)
+            .open(directory.join("locked-cache"))
+            .unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(1250));
+            drop(file);
+        });
+        super::remove_session_directory(&directory);
+        release.join().unwrap();
+        assert!(
+            !directory.exists(),
+            "Temporary browser profile was left behind"
+        );
+    }
+}

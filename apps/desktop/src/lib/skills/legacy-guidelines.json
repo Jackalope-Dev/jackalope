@@ -1,0 +1,56 @@
+{
+  "systematic-debugging": [
+    "Write a minimal failing reproduction test or script before touching production code.",
+    "Trace the exact call path and inspect state; do not apply superficial patches or guess root causes.",
+    "Touch only code directly relevant to the issue. Preserve adjacent logic, comments, and formatting.",
+    "Verify that the reproduction test passes and all existing regression tests remain clean."
+  ],
+  "feature-scaffolding": [
+    "Follow existing project architectural conventions, directory layouts, and naming patterns.",
+    "For UI components, use semantic HTML, accessible WAI-ARIA roles/states, and theme CSS variables.",
+    "Ensure strict type safety across all boundaries; avoid loose any types or unchecked runtime assumptions.",
+    "Validate that the project builds and typechecks cleanly with exit code 0."
+  ],
+  "clean-refactoring": [
+    "Preserve identical public API contracts, return types, and observable side effects.",
+    "Perform small, incremental transformations that can be individually verified.",
+    "Remove confirmed dead imports, unused variables, and orphaned styles cleanly.",
+    "Avoid running full-file reformatters that pollute git diffs with unrelated changes."
+  ],
+  "tdd-verification": [
+    "Ensure every test is hermetic, order-independent, and does not leak global state or open handles.",
+    "Cover boundary conditions: empty inputs, maximum limits, malformed payloads, and network failures.",
+    "Assert on observable behavior and contracts rather than internal implementation details.",
+    "Keep assertions specific and descriptive so failure messages point directly to the cause."
+  ],
+  "security-audit": [
+    "Never log, persist, or commit API keys, auth tokens, passwords, or sensitive credentials.",
+    "Validate and sanitize all external inputs, file paths, URLs, and IPC payloads against traversal or injection.",
+    "Enforce least-privilege containment for spawned child processes and file access.",
+    "Check third-party dependencies for known vulnerabilities and unpinned dynamic imports."
+  ],
+  "performance-tuning": [
+    "Establish a measurable baseline before making changes; verify improvement with concrete benchmarks.",
+    "Avoid O(N²) iterations, redundant deep clones, and unbuffered streaming over IPC or network.",
+    "Ensure all event listeners, timers, observer handles, and child processes are explicitly cleaned up.",
+    "Keep bundle size and memory footprint minimal; avoid pulling large dependencies for simple helpers."
+  ],
+  "git-coordination": [
+    "Use the assigned workspace and respect the chosen execution mode. Preserve existing changes and other active worktrees.",
+    "Commit, push, or integrate only when the user has authorized it and project instructions permit it.",
+    "When commits are authorized, follow the project conventions and configured author identity.",
+    "Ensure the combined workspace builds and passes all checks before requesting integration."
+  ],
+  "ui-validation": [
+    "Find the project preview command and relevant route, then use available browser tools to inspect the affected UI.",
+    "Check keyboard focus, error states, narrow layouts, supported themes and reduced motion where relevant.",
+    "Capture screenshot evidence and report what was checked, including unavailable environments or tools.",
+    "Use project design conventions for routine choices; ask only when a missing decision blocks the work."
+  ],
+  "onboarding-flow": [
+    "Navigate step-by-step through the onboarding registration or welcome flow.",
+    "Use an isolated test profile and existing test fixtures. Ask for missing access only when required; never use live credentials in prompts or logs.",
+    "Verify form error validation on invalid inputs and successful transition to the next step.",
+    "Check back, cancel, retry, reload and completion behavior while preserving unfinished input. Record verified steps and screenshot evidence with available tools."
+  ]
+}

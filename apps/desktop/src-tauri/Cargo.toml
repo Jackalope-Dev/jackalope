@@ -1,0 +1,79 @@
+[package]
+name = "jackalope-desktop"
+version = "0.1.0"
+description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
+authors = ["Jackalope Contributors"]
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.98"
+
+[lib]
+name = "jackalope_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+cc = "1"
+pkg-config = "0.3"
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+portable-pty = "0.9"
+axum = "0.8"
+uuid = { version = "1", features = ["v4"] }
+rmcp = { version = "=3.2.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server", "client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest"] }
+
+toml_edit = { version = "0.25", features = ["serde"] }
+toml = "1"
+reqwest = { version = "0.13", default-features = false }
+ignore = "0.4"
+tree-sitter = "0.27"
+tree-sitter-typescript = "0.23"
+tree-sitter-javascript = "0.25"
+tree-sitter-rust = "0.24"
+petgraph = "0.8"
+cron = "0.17"
+chrono-tz = "0.10"
+dunce = "1"
+oxc_resolver = "11"
+notify-debouncer-mini = "=0.7.0"
+gix = { version = "=0.87.1", default-features = false, features = ["sha1", "sha256"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+beta-access = []
+store = ["beta-access"]
+
+[dev-dependencies]
+keyring = "=3.6.3"
+
+[patch.crates-io]
+glib = { path = "../../../patches/glib" }
+
+[target.'cfg(windows)'.dependencies]
+tauri-winrt-notification = "0.8.1"
+windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "=3.6.3", features = ["apple-native"] }
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-user-notifications = "0.3"
+block2 = "0.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "=3.6.3", features = ["sync-secret-service", "crypto-rust"] }
+notify-rust = { version = "=4.18.0", default-features = false, features = ["z-with-tokio"] }
+zbus = { version = "5", default-features = false, features = ["tokio"] }

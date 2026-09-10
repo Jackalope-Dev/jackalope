@@ -1,0 +1,80 @@
+name: Desktop release
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Rehearsal uses temporary keys; candidate requires configured signing
+        type: choice
+        options: [rehearsal, candidate]
+        default: rehearsal
+        required: true
+      channel:
+        type: choice
+        options: [beta, stable]
+        default: beta
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: desktop-release-${{ inputs.channel || 'beta' }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: (github.event_name == 'workflow_dispatch' || vars.RELEASE_DISTRIBUTION != 'store') && ((github.ref == 'refs/heads/master' && inputs.channel == 'stable') || (github.ref == 'refs/heads/beta' && (github.event_name == 'push' || inputs.channel == 'beta')))
+    runs-on: windows-latest
+    environment: cloud-${{ inputs.channel || 'beta' }}
+    timeout-minutes: 60
+    env:
+      RELEASE_MODE: ${{ inputs.mode == 'candidate' && 'publish' || 'rehearsal' }}
+      RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
+      UPDATE_BASE_URL: ${{ inputs.channel == 'stable' && 'https://api.jackalope.dev' || 'https://staging-api.jackalope.dev' }}
+      STABLE_UPDATE_ENDPOINT: https://api.jackalope.dev/updates/stable/latest.json
+      BETA_UPDATE_ENDPOINT: https://staging-api.jackalope.dev/updates/beta/latest.json
+      COMMUNITY_SERVICE_URL: ${{ inputs.mode == 'candidate' && vars.COMMUNITY_SERVICE_URL || '' }}
+      RELEASE_SIGNING_READY: ${{ vars.RELEASE_SIGNING_READY }}
+      TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+      WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+      - run: rustup override set 1.98.1
+      - run: node --test scripts/release/*.test.mjs
+      - id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          node scripts/release/catalog.mjs check $version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - shell: pwsh
+        run: ./scripts/release/build.ps1 -Mode $env:RELEASE_MODE -Channel $env:RELEASE_CHANNEL
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.mode == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.mode == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          WINDOWS_CERTIFICATE_BASE64: ${{ inputs.mode == 'candidate' && secrets.WINDOWS_CERTIFICATE_BASE64 || '' }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ inputs.mode == 'candidate' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desktop-${{ inputs.channel || 'beta' }}-${{ steps.version.outputs.version }}
+          path: |
+            output/release/*.exe
+            output/release/*.msi
+            output/release/*.sig
+            output/release/checksums.json
+            output/release/receipt.json
+            output/release/latest.json
+            output/release/notes.md
+          if-no-files-found: error
+          retention-days: 14

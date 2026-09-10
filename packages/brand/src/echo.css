@@ -1,0 +1,66 @@
+.brand-echo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.brand-echo-line {
+  stroke: currentColor;
+  stroke-width: 0.3;
+  transform: translate(calc(var(--echo) * 3px), calc(var(--echo) * 0.7px));
+  animation: brand-echo-fold 4.8s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation-play-state: paused;
+}
+.brand-echo[data-animated="true"] .brand-echo-line {
+  animation-play-state: running;
+}
+@keyframes brand-echo-fold {
+  0%,
+  100% {
+    transform: translate(calc(var(--echo) * 3px), calc(var(--echo) * 0.7px));
+  }
+  45%,
+  55% {
+    transform: translate(calc(var(--echo) * 0.4px), calc(var(--echo) * -0.12px));
+  }
+}
+.brand-echo-wordmark {
+  display: grid;
+  width: max-content;
+  isolation: isolate;
+  cursor: default;
+}
+.brand-echo-wordmark > span {
+  grid-area: 1 / 1;
+  pointer-events: none;
+}
+.brand-echo-wordmark-face {
+  z-index: 1;
+}
+.brand-echo-wordmark-line {
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 1px currentColor;
+  opacity: 0;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .brand-echo-wordmark:hover .brand-echo-wordmark-line {
+    animation: brand-echo-wordmark-fold 1.4s cubic-bezier(0.45, 0, 0.25, 1);
+  }
+}
+@keyframes brand-echo-wordmark-fold {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  35%,
+  55% {
+    opacity: 0.55;
+    transform: translate(calc(var(--echo) * 0.035em), calc(var(--echo) * 0.008em));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-echo-line {
+    animation: none;
+  }
+}
