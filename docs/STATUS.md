@@ -35,6 +35,10 @@ installed-app or release acceptance. See [release requirements](RELEASE.md),
   native credential stores and notifications, with macOS/Linux CI trial jobs.
 - macOS/Linux account and settings-sync availability, task notification activation,
   Unix process guardians, Linux tray-host detection and macOS Dock reopening.
+- Direct ownership of Unix Chromium processes, with Linux browser cancellation
+  and isolated GNOME Keyring round-trip trials passing under WSL. Native Linux
+  tests and the desktop executable build pass; installed desktop and macOS
+  acceptance remain open.
 
 The [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) cover source development and redistribution.

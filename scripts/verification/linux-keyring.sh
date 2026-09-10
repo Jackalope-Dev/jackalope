@@ -24,5 +24,8 @@ mkdir -m 700 "$XDG_RUNTIME_DIR"
 dbus-run-session -- bash -euc '
   printf "%s" "jackalope-disposable-keyring-fixture" |
     gnome-keyring-daemon --unlock --components=secrets --control-directory="$XDG_RUNTIME_DIR/keyring"
+  gnome-keyring-daemon --start --components=secrets --control-directory="$XDG_RUNTIME_DIR/keyring"
+  locked=$(gdbus call --session --timeout 10 --dest org.freedesktop.secrets --object-path /org/freedesktop/secrets/collection/login --method org.freedesktop.DBus.Properties.Get org.freedesktop.Secret.Collection Locked)
+  test "$locked" = "(<false>,)"
   timeout --kill-after=3s 90s "$JACKALOPE_KEYRING_TEST_BINARY" --exact commands::account_storage::keychain::tests::native_keyring_round_trip_update_and_delete --ignored --test-threads=1
 '

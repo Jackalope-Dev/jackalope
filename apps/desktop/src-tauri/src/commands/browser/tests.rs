@@ -195,7 +195,11 @@ async fn real_agent_browser_workflow() {
         .directory
         .clone();
     close(&id);
-    assert!(!dir.exists());
+    assert!(
+        !dir.exists(),
+        "Temporary browser profile remains: {}",
+        dir.display()
+    );
     browser_snapshot(&other, serde_json::from_value(json!({})).unwrap())
         .await
         .unwrap();

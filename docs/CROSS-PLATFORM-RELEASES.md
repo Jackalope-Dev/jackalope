@@ -53,13 +53,22 @@ These changes prepare device testing; they do not establish macOS or Linux accep
 The CI jobs must pass on their native runners after these changes are pushed.
 Local Windows checks do not execute Unix branches. CI packages are review artifacts,
 not public downloads or signed release candidates.
-The Linux x64 helper started and answered a Unix-socket RPC under WSL in this audit;
-that smoke check did not launch Chromium or the native Linux app.
-Windows `RUST_TEST_THREADS=2 pnpm verify` passed: 45 release tests, 107 service tests,
-136 desktop JavaScript tests and 243 native tests (14 ignored), plus both production
-builds. Three separately selected real-browser tests passed. Secret scanning,
-documentation links and `git diff --check` passed. macOS/Linux native compilation,
-secure-store integration and installed-device acceptance are not established here.
+Local Linux validation now includes 246 passing native library tests (14 ignored)
+on Ubuntu 24.04 under WSL, three real Chrome browser trials (including cleanup after
+cancellation), and a GNOME Keyring write/read/update/delete round-trip using an
+isolated login collection and private D-Bus session. The Linux desktop executable
+also builds successfully with the normal feature set. The notification module's
+Objective-C API types also checked for macOS arm64 and x64 against a stub Tauri
+host; this is not a full macOS application build. Actual macOS compilation still
+needs the native CI runners. WSL and browser fixtures do not establish GNOME,
+Wayland, X11, installed-app or release acceptance.
+
+Windows `RUST_TEST_THREADS=2 pnpm verify` passed with 245 native tests (14 ignored),
+136 desktop JavaScript tests, 107 service tests, 45 release tests and both production
+builds. An earlier contended run timed out in the scheduled-task fixture; the full
+rerun passed. Secret scanning, Rust formatting, documentation links and diff checks
+also passed. Account and notification text rendered in both themes at 1280×840 and
+960×640, with reduced motion and keyboard activation checked using browser fixtures.
 
 ### Native checks on your devices
 
@@ -87,8 +96,10 @@ Browser tests launch disposable sessions. The keyring check writes and deletes a
 fixture secret in the active user's native store. Use an isolated OS login/profile;
 mock storage tests do not establish native-store acceptance.
 On Linux, `bash scripts/verification/linux-keyring.sh` exercises the same storage
-test using a disposable HOME, private D-Bus session and GNOME Keyring. It needs
-`gnome-keyring`, `dbus-run-session` and the normal development tools, and never
+test using a disposable HOME, private D-Bus session and GNOME Keyring. It starts
+the Secret Service component and checks that the fixture login collection is
+unlocked before testing. It needs `gnome-keyring`, `dbus-run-session`, `gdbus` and
+the normal development tools, and never
 uses the everyday login keyring. CI runs this check after the native suite.
 
 macOS notification trials need the `.app` bundle with a valid signature; an

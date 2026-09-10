@@ -61,7 +61,7 @@ impl Engine {
         let directory = create_session_directory()?;
         let result = Self::spawn(slot, directory.clone(), browser);
         if result.is_err() {
-            let _ = std::fs::remove_dir_all(directory);
+            remove_session_directory(&directory);
         }
         result
     }
@@ -334,11 +334,44 @@ impl Drop for Engine {
         let _ = self.child.wait();
         #[cfg(unix)]
         drop(self.browser.take());
-        for _ in 0..20 {
-            if !self.directory.exists() || std::fs::remove_dir_all(&self.directory).is_ok() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
+        remove_session_directory(&self.directory);
+    }
+}
+
+fn remove_session_directory(directory: &std::path::Path) {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        if !directory.exists() || std::fs::remove_dir_all(directory).is_ok() {
+            return;
         }
+        if Instant::now() >= deadline {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[cfg(all(test, windows))]
+mod cleanup_tests {
+    #[test]
+    fn profile_cleanup_retries_transient_windows_file_locks() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let directory = super::create_session_directory().unwrap();
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .share_mode(0)
+            .open(directory.join("locked-cache"))
+            .unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(1250));
+            drop(file);
+        });
+        super::remove_session_directory(&directory);
+        release.join().unwrap();
+        assert!(
+            !directory.exists(),
+            "Temporary browser profile was left behind"
+        );
     }
 }

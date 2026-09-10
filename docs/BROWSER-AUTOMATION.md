@@ -51,8 +51,12 @@ other adapters retain their existing HTTP delivery and have not been trialed her
 - Each attempt registers its own browser permission. The browser starts lazily;
   four tasks may reserve browsers at once, with up to 16 explicitly opened tabs each.
 - Jackalope starts the daemon directly inside its existing owned process tree,
-  before launching Chromium. Stop can interrupt startup or an in-flight command.
+  before launching Chromium. On Unix, Jackalope also launches Chromium directly
+  in a separate guarded process group and connects the daemon to its temporary
+  loopback CDP endpoint. This keeps browser descendants owned even when the
+  helper exits unexpectedly. Stop can interrupt startup or an in-flight command.
   Completion, continuation replacement and app shutdown close the session.
+  Temporary profile removal retries transient filesystem locks for up to three seconds.
   A closed attempt cannot recreate a browser. A dead session requires task continuation.
 - Calls serialize per task; unrelated sessions can proceed independently. Browser
   action waits are bounded at 15 seconds and transport calls at 30 seconds.
@@ -83,8 +87,9 @@ builds. Do not replace the bundled binary with a user-configured executable.
 
 The package provides Windows x64, macOS x64/arm64 and Linux x64/arm64 (glibc/musl)
 binaries. Windows arm64 currently selects the x64 binary for OS emulation.
-Only Windows x64 with installed Edge was exercised in this evaluation. Platform
-browser discovery, signing and installed/update acceptance remain release gates.
+Native browser trials cover Windows x64 with installed Edge and Linux x64 under
+WSL with installed Chrome. macOS browser behavior, confined Linux browser packages,
+signing and installed/update acceptance remain release gates.
 
 The direct daemon protocol is upstream implementation detail. For upgrades,
 review protocol and launch changes, update the dependency/version assertion and

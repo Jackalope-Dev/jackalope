@@ -78,7 +78,9 @@ release dates.
 ## Platform releases
 
 - [ ] Run native CI and accept macOS/Linux credential storage, GUI-launched CLI
-  discovery, process/PTY/browser behavior and trial packaging.
+  discovery, process/PTY/browser behavior and trial packaging. WSL native tests,
+  real Chrome cleanup and isolated GNOME Keyring trials pass; desktop acceptance
+  remains open.
 - [ ] Implement guarded macOS desktop control and Linux X11/Wayland backends;
   preserve window grants, visible state, physical-input pause and revocation.
 - [ ] Validate macOS/Linux notification clicks, permission denial, tray-host loss
@@ -88,8 +90,8 @@ release dates.
   before exposing native input there.
 - [ ] Validate signed installation, older-to-newer updates, real execution and
   saved-data recovery on each intended platform before enabling its download.
-- [ ] Check approved, pending, revoked and offline-expired accounts in official
-  builds while preserving contributor-build independence.
+- [ ] Check approved, pending, revoked and offline-expired accounts in development
+  and release builds while preserving access to saved work.
 - [ ] Verify downloaded artifacts, publication recovery and the selected channel;
   follow [release acceptance](RELEASE.md) and [platform requirements](CROSS-PLATFORM-RELEASES.md).
 

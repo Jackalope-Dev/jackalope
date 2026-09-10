@@ -106,7 +106,7 @@ export function JackalopeAccount({
       )}
       {!account && !error && <p role="status">Reading account connection…</p>}
       {account?.state === 'unavailable' && (
-        <p>Open a supported Windows desktop build to connect your Jackalope account.</p>
+        <p>Open the desktop app to connect your Jackalope account.</p>
       )}
       {connected && (
         <div className="space-y-2">

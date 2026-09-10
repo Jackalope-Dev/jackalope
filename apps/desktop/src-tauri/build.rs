@@ -38,15 +38,15 @@ fn main() {
         "cargo:rerun-if-changed={}",
         package.join("package.json").display()
     );
-    std::fs::copy(&source, destination.join(format!("agent-browser{suffix}"))).unwrap();
+    let staged = destination.join(format!("agent-browser{suffix}"));
+    let bytes = std::fs::read(&source).unwrap();
+    if std::fs::read(&staged).ok().as_deref() != Some(bytes.as_slice()) {
+        std::fs::write(&staged, bytes).unwrap();
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(
-            destination.join(format!("agent-browser{suffix}")),
-            std::fs::Permissions::from_mode(0o755),
-        )
-        .unwrap();
+        std::fs::set_permissions(staged, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
     tauri_build::build()
 }
