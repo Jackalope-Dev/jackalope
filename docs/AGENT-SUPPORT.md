@@ -86,14 +86,8 @@ Inherited model credential overrides are cleared for named accounts.
 Protocol tests cover permission decisions, malformed output, interrupted turns,
 model selection and exact-session resume. A disposable native process fixture
 covers approvals, process shutdown, continuation, stop and history recovery.
-An isolated Kimi Code CLI 0.42.0 handshake confirmed ACP version 1 and a clean
-unauthenticated-session rejection. Local-provider probes confirmed tool-free helper
-execution and ACP usage ordering with one model request and exact fixture token totals.
-These checks do not establish authenticated
-model execution or installed-app acceptance.
-A real 0.42.0 CLI request against an isolated local fixture provider confirmed
-that the helper request contains no tool declarations and produces the expected
-structured output. This is protocol evidence, not paid-provider acceptance.
+Provider authentication and installed-app acceptance require separate real-account
+trials; a local fixture provider does not establish either.
 
 ## Accounts and boundaries
 
@@ -106,13 +100,12 @@ two-account acceptance remains required before claiming provider login coverage.
 Codex uses `CODEX_HOME`, Claude uses `CLAUDE_CONFIG_DIR`, and Grok uses `GROK_HOME`.
 OpenCode uses `XDG_DATA_HOME` for credentials and session data. Named OpenCode
 profiles additionally redirect XDG config, cache and state directories; the
-default profile preserves the user's existing CLI configuration. OpenCode's
-actual `debug paths` command confirmed these locations with an empty profile.
+default profile preserves the user's existing CLI configuration. Use OpenCode’s `debug paths` command to inspect the selected profile.
 The temporary-directory path remains controlled by OpenCode and the OS.
 
 Gemini account setup uses `GEMINI_CLI_HOME` as the parent of `.gemini` and
 `GEMINI_FORCE_FILE_STORAGE=true` to isolate credentials from the shared keychain.
-The installed Gemini CLI source confirms both overrides. Goose uses `GOOSE_PATH_ROOT`
+Goose uses `GOOSE_PATH_ROOT`
 and `GOOSE_DISABLE_KEYRING=1` for per-profile configuration and secrets; see its
 [path implementation](https://github.com/aaif-goose/goose/blob/main/crates/goose/src/config/paths.rs)
 and [configuration implementation](https://github.com/aaif-goose/goose/blob/main/crates/goose/src/config/base.rs).
@@ -121,7 +114,7 @@ provider API keys in the account dialog. Antigravity profiles use the documented
 [Gemini API-key mode](https://antigravity.google/docs/cli/install/), with separate
 API billing. Its existing subscription login remains available but does not
 support multiple isolated identities. Managed keys use DPAPI on Windows and
-owner-only files on Unix. No migration changes existing account identities.
+native Keychain/Secret Service storage on Unix. Existing account identities remain stable.
 
 The desktop never marks Grok or OpenCode authenticated merely because an
 executable or saved credential exists. Profiles are account organization,
@@ -138,17 +131,17 @@ The common coordination bridge is available to agents through task instructions;
 Codex, Claude, OpenCode and Kimi additionally receive direct bridge MCP tools. Do not claim that every
 agent has passed real browser, question or third-party OAuth tool trials.
 
-## Capability audit
+## Capability boundaries
 
-The September 2026 audit prioritizes existing adapters. A missing integration is
-not described as a provider lacking the underlying capability.
+This table describes Jackalope’s adapter interfaces. Missing integration does not
+imply that the provider lacks the underlying capability.
 
 | Area | Finding and current behavior |
 | --- | --- |
 | Kimi tools, questions, usage and helpers | Implemented through ACP, local session totals, the membership API and explicit tool-free agent definitions. Cache/cost and helper token totals are absent from these output interfaces; unknown values are preserved. |
 | OpenCode project tools | Implemented with per-process `OPENCODE_CONFIG_CONTENT`, merging unrelated inline settings and resolving connection credentials only for the task process. stdio and remote HTTP/SSE are supported. |
-| Grok account and models | Account checks already used `_x.ai/auth/info`; misleading discovery copy is corrected. Model discovery now reads the actual ACP session model catalog. A live 1.0.13 metadata request verified the shape without a model turn. |
-| Antigravity quota and model | Implemented with version-gated read-only `/usage` and `/model` commands. Live 1.2.0 responses verified subscription groups and the current model. `/model` reports one selected model, not a full catalog; the tested binary rejected `models --output-format json`. |
+| Grok account and models | Account checks use `_x.ai/auth/info`; model discovery reads the ACP session model catalog without a model turn. |
+| Antigravity quota and model | Implemented with version-gated read-only `/usage` and `/model` commands. `/usage` returns subscription groups; `/model` reports one selected model, not a full catalog. |
 | OpenCode account quota | OpenCode routes to independent providers, API keys and local models. Its task usage events do not supply a universal remaining-account allowance. No arbitrary provider balance is assigned to an OpenCode profile. |
 | Grok / Antigravity direct MCP | The retained headless interfaces lack a verified per-process MCP override. Project tools work through on-demand discovery. Grok ACP advertises MCP; moving execution to it needs usage, permission and resume parity with the existing adapter, rather than silently changing an established session protocol. |
 | Antigravity coordinator, native prompts and subscription profiles | Headless stdin accepts user messages, not permission replies; no verified tool-free invocation or isolated subscription-keychain override is connected. Worker tools and questions use the shared harness; named profiles use separate Gemini API keys. Plan mode alone is not a no-tools guarantee. |
@@ -165,7 +158,7 @@ Sources: [Kimi ACP](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/ki
 
 ## Other candidates
 
-Gemini CLI, Aider and Goose now appear in the catalog and support managed account
+Gemini CLI, Aider and Goose appear in the catalog and support managed account
 setup. They still lack native task protocol adapters and lifecycle acceptance.
 Their task launch explicitly fails with an explanation instead of falling through
 to Grok's flags. Account setup must not be presented as task execution acceptance.

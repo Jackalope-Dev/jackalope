@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -18,6 +19,10 @@
 typedef struct {
   int x, y, width, height;
 } Bounds;
+static gboolean wayland_backend;
+static JsonObject *wayland_info;
+static void wayland_input_check(Bounds expected);
+static int wayland_main(const char *action);
 static Display *display;
 static Window root, selected;
 static long selected_pid;
@@ -269,6 +274,10 @@ static gboolean held_input(void) {
                   Button2Mask | Button3Mask | Button4Mask | Button5Mask)) != 0;
 }
 static void input_check(Bounds expected) {
+  if (wayland_backend) {
+    wayland_input_check(expected);
+    return;
+  }
   Bounds current;
   guard_check();
   check(identity(&current) && same_bounds(expected, current),
@@ -279,9 +288,11 @@ static void input_check(Bounds expected) {
 
 static AtspiAccessible *accessible_window(Bounds bounds) {
   Bounds frame_bounds = bounds;
-  Window frame = window_frame(selected);
-  check(frame && window_bounds(frame, &frame_bounds),
-        "Cannot identify selected window frame.");
+  if (!wayland_backend) {
+    Window frame = window_frame(selected);
+    check(frame && window_bounds(frame, &frame_bounds),
+          "Cannot identify selected window frame.");
+  }
   check(atspi_init() == 0, "Accessibility service is unavailable.");
   atspi_set_timeout(400, 400);
   AtspiAccessible *desktop = atspi_get_desktop(0), *match = NULL;
@@ -308,8 +319,12 @@ static AtspiAccessible *accessible_window(Bounds bounds) {
         Bounds accessible =
             rect ? (Bounds){rect->x, rect->y, rect->width, rect->height}
                  : (Bounds){0};
-        if (rect && (same_bounds(bounds, accessible) ||
-                     same_bounds(frame_bounds, accessible))) {
+        char *title = wayland_backend ? atspi_accessible_get_name(window, NULL) : NULL;
+        gboolean matches = wayland_backend
+            ? title && !strcmp(title, string(wayland_info, "title"))
+            : rect && (same_bounds(bounds, accessible) || same_bounds(frame_bounds, accessible));
+        g_free(title);
+        if (matches) {
           check(match == NULL, "Accessible window identity is ambiguous.");
           match = g_object_ref(window);
         }
@@ -332,6 +347,7 @@ static void tree(AtspiAccessible *item, JsonArray *nodes, int depth,
   if (depth > 12 || json_array_get_length(nodes) >= 160 ||
       g_get_monotonic_time() > deadline)
     return;
+  if (wayland_backend) { bounds.x = 0; bounds.y = 0; }
   atspi_accessible_set_cache_mask(item, ATSPI_CACHE_NONE);
   atspi_accessible_clear_cache(item);
   gboolean password =
@@ -374,7 +390,7 @@ static void tree(AtspiAccessible *item, JsonArray *nodes, int depth,
     g_object_unref(states);
   AtspiComponent *component = atspi_accessible_get_component_iface(item);
   AtspiRect *rect = component ? atspi_component_get_extents(
-                                    component, ATSPI_COORD_TYPE_SCREEN, NULL)
+                                    component, wayland_backend ? ATSPI_COORD_TYPE_WINDOW : ATSPI_COORD_TYPE_SCREEN, NULL)
                               : NULL;
   if (rect && rect->width > 0 && rect->height > 0) {
     gint64 left = MAX((gint64)rect->x, bounds.x),
@@ -558,6 +574,51 @@ static void list_windows(void) {
   output(result);
 }
 
+static void type_literal(Bounds bounds) {
+      const char *text = string(request, "text");
+      check(g_utf8_validate(text, -1, NULL) && g_utf8_strlen(text, -1) > 0 &&
+                g_utf8_strlen(text, -1) <= 1000,
+            "Invalid literal text.");
+      for (const char *p = text; *p; p = g_utf8_next_char(p))
+        check(!g_unichar_iscntrl(g_utf8_get_char(p)),
+              "Control characters are not allowed.");
+      AtspiAccessible *focused = focused_control(bounds);
+      AtspiEditableText *editable =
+          atspi_accessible_get_editable_text_iface(focused);
+      AtspiText *view = atspi_accessible_get_text_iface(focused);
+      check(editable && view, "The focused app does not expose editable text. "
+                              "Literal typing is unavailable.");
+      int offset = atspi_text_get_caret_offset(view, NULL);
+      check(offset >= 0, "Cannot identify text caret.");
+      int selections = atspi_text_get_n_selections(view, NULL);
+      check(selections <= 1, "Multiple text selections are not supported.");
+      if (selections == 1) {
+        AtspiRange *range = atspi_text_get_selection(view, 0, NULL);
+        check(range && range->start_offset >= 0 &&
+                  range->end_offset >= range->start_offset,
+              "Cannot identify selected text.");
+        offset = range->start_offset;
+        input_check(bounds);
+        check(atspi_editable_text_delete_text(editable, range->start_offset,
+                                              range->end_offset, NULL),
+              "The app refused to replace selected text. Inspect before "
+              "retrying.");
+        g_free(range);
+      }
+      input_check(bounds);
+      check(atspi_editable_text_insert_text(editable, offset, text,
+                                            strlen(text), NULL),
+            "The app refused literal text insertion. Inspect before retrying.");
+      input_check(bounds);
+      check(atspi_text_set_caret_offset(view, offset + g_utf8_strlen(text, -1),
+                                        NULL),
+            "Text was inserted but the caret could not be updated. Inspect "
+            "before further input.");
+      g_object_unref(editable);
+      g_object_unref(view);
+      g_object_unref(focused);
+}
+
 static void operate(const char *action) {
   guard_check();
   Bounds bounds;
@@ -609,48 +670,7 @@ static void operate(const char *action) {
         XSync(display, False);
       }
     } else if (!strcmp(action, "type")) {
-      const char *text = string(request, "text");
-      check(g_utf8_validate(text, -1, NULL) && g_utf8_strlen(text, -1) > 0 &&
-                g_utf8_strlen(text, -1) <= 1000,
-            "Invalid literal text.");
-      for (const char *p = text; *p; p = g_utf8_next_char(p))
-        check(!g_unichar_iscntrl(g_utf8_get_char(p)),
-              "Control characters are not allowed.");
-      AtspiAccessible *focused = focused_control(bounds);
-      AtspiEditableText *editable =
-          atspi_accessible_get_editable_text_iface(focused);
-      AtspiText *view = atspi_accessible_get_text_iface(focused);
-      check(editable && view, "The focused app does not expose editable text. "
-                              "Literal typing is unavailable.");
-      int offset = atspi_text_get_caret_offset(view, NULL);
-      check(offset >= 0, "Cannot identify text caret.");
-      int selections = atspi_text_get_n_selections(view, NULL);
-      check(selections <= 1, "Multiple text selections are not supported.");
-      if (selections == 1) {
-        AtspiRange *range = atspi_text_get_selection(view, 0, NULL);
-        check(range && range->start_offset >= 0 &&
-                  range->end_offset >= range->start_offset,
-              "Cannot identify selected text.");
-        offset = range->start_offset;
-        input_check(bounds);
-        check(atspi_editable_text_delete_text(editable, range->start_offset,
-                                              range->end_offset, NULL),
-              "The app refused to replace selected text. Inspect before "
-              "retrying.");
-        g_free(range);
-      }
-      input_check(bounds);
-      check(atspi_editable_text_insert_text(editable, offset, text,
-                                            strlen(text), NULL),
-            "The app refused literal text insertion. Inspect before retrying.");
-      input_check(bounds);
-      check(atspi_text_set_caret_offset(view, offset + g_utf8_strlen(text, -1),
-                                        NULL),
-            "Text was inserted but the caret could not be updated. Inspect "
-            "before further input.");
-      g_object_unref(editable);
-      g_object_unref(view);
-      g_object_unref(focused);
+      type_literal(bounds);
     } else if (!strcmp(action, "press")) {
       AtspiAccessible *focused = focused_control(bounds);
       g_object_unref(focused);
@@ -936,6 +956,8 @@ static void indicator(void) {
   gtk_main();
 }
 
+#include "linux-wayland.h"
+
 int main(void) {
   const char *raw = g_getenv("JACKALOPE_DESKTOP_REQUEST");
   check(raw && strlen(raw) <= 128000, "Invalid desktop helper request.");
@@ -948,6 +970,10 @@ int main(void) {
   gboolean wayland =
       g_strcmp0(g_getenv("XDG_SESSION_TYPE"), "wayland") == 0 ||
       (g_getenv("WAYLAND_DISPLAY") && *g_getenv("WAYLAND_DISPLAY"));
+  if (wayland) {
+    wayland_backend = TRUE;
+    return wayland_main(action);
+  }
   if (!strcmp(action, "permissions")) {
     gboolean available = FALSE;
     Display *probe = wayland ? NULL : XOpenDisplay(NULL);

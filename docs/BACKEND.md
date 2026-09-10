@@ -1,8 +1,8 @@
 # Native and hosted services
 
 Desktop tasks, history, coordination, schedules, browser sessions and repository
-inspection run in the Rust/Tauri host. Local work does not require a Jackalope
-account or managed service. CLIs contact their providers, configured MCP tools
+inspection run in the Rust/Tauri host. New execution requires approved Jackalope account access in every build; saved
+work remains readable when access expires. CLIs contact their providers, configured MCP tools
 may be remote, the optional marketplace uses AllMCPs, and configured releases
 check an HTTPS update feed. Local-first does not mean network-free.
 
@@ -52,9 +52,8 @@ codebases and agent conversations:
 
 Feedback is not telemetry and must never be bundled into it:
 
-- A visible "Submit feedback" control (in-app, likely reachable from a
-  persistent but unobtrusive location — command palette and/or a settings/help
-  entry point). Nothing is sent until the user actively triggers it.
+- Settings provides feedback review and an explicit Send action. Nothing is sent
+  until the user triggers it.
 - The submission can reasonably include more context than telemetry does
   (the user is choosing to share it), but still needs a clear "what gets
   sent" disclosure at the point of submission — don't silently attach a full

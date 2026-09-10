@@ -24,7 +24,7 @@ Tasks defaults to all projects and orders needs-input/recovery work before resul
 ready for review, active work, saved ideas and finished work. Integration state
 comes from native verified receipts. Project filters and the board remain available.
 Parallel planning remains inside Tasks with the existing ownership and dependency
-contracts; it has not been replaced with autonomous task decomposition.
+contracts; plans stay editable before dispatch.
 
 Result detail leads with the agent's output and latest recorded screenshot when
 available. Changes load without an Inspect action, including while their section
@@ -45,7 +45,7 @@ Preparation failure retains workspace/history and its recorded command output.
 Automatic verification is explicitly enabled in Project defaults. Its saved command
 and authorization travel with the task, queue item or schedule and survive account
 or preference changes. After a successful agent result the task remains active
-while native verification holds the execution guard. Navigating away does not
+while native verification reserves its workspace and uses separate check capacity. Navigating away does not
 cancel it; Stop does. Matching successful checks are reused only for the same file
 snapshot. Missing commands, command failures and unstable file snapshots remain
 visible. Historical records default to automatic verification off and no preparation.
@@ -69,7 +69,7 @@ alone does not override an explicit scope. The active attempt retains its tools.
 Task detail reaches the existing integration preview directly with the task selected.
 The explicit merge action retains source/target snapshots, check requirements,
 conflict handling and receipt recovery. Mark reviewed still only records a review.
-No push or automatic workspace cleanup is added. Integrated work continues through a
+Merging does not push. Source cleanup follows the explicit integration choice. Integrated work continues through a
 new task based on the updated target, with the earlier result attached.
 
 Make recurring opens the existing schedule editor with the task's original intent,

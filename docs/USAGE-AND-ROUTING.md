@@ -4,12 +4,12 @@ Routing inputs share repeated account metadata without dropping eligible models,
 task requirements or acceptance criteria. Ask Jackalope prefills bounded official
 documentation excerpts with full-document fallback. These reduce prompt repetition
 and offer fewer documentation round trips; paid-token and quality gains still need
-matched trials. [Local AI and evaluation](LOCAL-AI.md) records the MiniLM decision.
+matched trials. [Local AI](LOCAL-AI.md) describes model-free retrieval and prompt packing.
 
 Native attempt accounting and overall/project Usage are implemented; see
-[TASK-JOURNEY.md](./TASK-JOURNEY.md) for coverage and limitations.
+[CORE-WORKFLOW.md](./CORE-WORKFLOW.md) for coverage and limitations.
 Capacity readers connect Codex, Claude Code, Grok and Antigravity through their
-installed CLIs, plus managed Kimi Code membership accounts; see [PARALLEL-MVP.md](./PARALLEL-MVP.md). Claude's usage control API
+installed CLIs, plus managed Kimi Code membership accounts; see [PARALLEL-WORKFLOWS.md](./PARALLEL-WORKFLOWS.md). Claude's usage control API
 is experimental. Grok can omit percentages even when it reports an account and
 reset period; missing capacity stays unknown. Default-agent routing, quota-aware preflight, local active-task reservations and
 bounded quota handoff are implemented.

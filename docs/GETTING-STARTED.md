@@ -41,7 +41,8 @@ in the worktree before preparing another integration. Source worktrees are kept.
   from any page, or open the task, then **Retry saving** after restoring space or
   access. **Save recovery copy…** writes a private task snapshot to another
   location; it does not contain source files or clear the original save error.
-  Recovery copies currently support inspection/manual recovery, not automatic import.
+  Settings → Data & reset can import recovery copies and restore archived runs;
+  existing runs are never overwritten. See [history and recovery](HISTORY-RECOVERY.md).
 - **Queue cannot be read:** inspect its preserved location in the history notice.
   New work stays blocked to protect assignments. Back up and repair the queue
   with Jackalope closed, then restart. Existing task results remain readable.

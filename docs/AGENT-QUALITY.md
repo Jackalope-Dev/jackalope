@@ -5,7 +5,7 @@ result with fewer retries and reasonable total usage. Prompt size alone is not a
 quality score, and passing synthetic tasks does not establish superiority over a
 provider's own GUI.
 
-## Implemented changes
+## Prompt and output contracts
 
 - Automatic guidelines distinguish design tokens from authentication tokens, skip
   negated requests and fenced examples, and avoid a debugging workflow for spelling
@@ -49,9 +49,9 @@ pnpm evaluate:quality -- --execute --agent=codex --model=gpt-6-astra --before=C:
 
 The executable arguments are native Rust test binaries containing
 `commands::coordination::quality_trial::installed_quality_trial`. Preserve the
-baseline binary **before** changing product behavior. The frozen frontend baseline
-comes from `f0b95b3857a9dc862f062d8451654310fd46167b`; the native baseline is that
-revision with only the ignored trial and test-only prompt capture added. Build with
+baseline binary **before** changing product behavior. The frozen prompt fixture under `scripts/evaluation/baselines/` is active input
+to the comparison driver and its resume regression tests, not a result receipt.
+Pair it with the matching native baseline executable. Build with
 `cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --no-run --message-format=json`
 and use the returned `compiler-artifact.executable`. Rebuild and preserve the after
 binary separately. The driver records both SHA-256 hashes and the CLI version.
@@ -70,68 +70,3 @@ added to input again. These tokens are not a subscription-quota or dollar estima
 The elapsed and reported-token limits are cancellation controls, not hard spending
 caps. Human acceptance and review time remain unmeasured.
 
-## Integration decisions and next experiments
-
-The [September 10 comparison receipts](examples/agent-quality-2026-09-10.json)
-contain two repetitions of each case using Codex 0.153.4 and `gpt-6-astra`.
-
-| Measurement | Before | Updated prompts and output |
-| --- | ---: | ---: |
-| Behavioral oracles passed | 2 / 6 | 6 / 6 |
-| Reported tokens across completed trials, including failures | 726,572 | 951,476 |
-| Tokens per passing behavioral result | 363,286 | 158,579 |
-| Launch prompt bytes, by case | 8,441–8,619 | 2,986–4,189 |
-
-The updated runs consumed 31% more raw tokens while producing more correct results;
-tokens per passing result were 56% lower. This is **not** evidence of a general 56%
-quota saving. Two baseline tasks stopped over an unrelated Git ignore-file access
-warning; both baseline scheduler attempts left the implementation broken. The
-updated scheduler implementations passed the independent oracle, but their requested
-in-agent check was denied by Codex's tool approval wiring. The saved-check permission
-repair was tested separately in two fresh native runs. Both invoked the check,
-received the expected failure, corrected the implementation, and passed all 81 saved
-tests plus the independent behavioral oracle. Successful stdout shrank from
-3,334/3,336 bytes to 208 bytes; failing stdout remained 4,416/4,413 bytes unchanged.
-The second follow-up was stopped at the observed token limit after reporting 277,420
-tokens, so only one of these two runs counts as completed within budget. These
-follow-ups are recorded separately and are not folded into the original comparison.
-
-One baseline scheduler attempt was interrupted by the host application crash before
-usage was reported. Its private journal is retained separately; the table includes
-all 12 completed trial receipts, and total experiment consumption remains unknown.
-These cases target known defects and are too small for a broad ranking, task-success
-guarantee or comparison with another GUI. Human acceptance is unmeasured. Concurrent
-local builds also make the recorded wall times unsuitable for a speed claim.
-
-Final master validation passed `pnpm verify`: 288 native tests (17 opt-in tests
-ignored), 145 desktop tests, 108 service tests, 45 release tests and both application
-builds. The secret scan and local documentation-link checks also passed. This does
-not establish packaged or installed-app acceptance.
-
-RTK v0.48.0 was tried privately using its checksum-verified Windows release. Its
-Apache-2.0 license fits this repository's licensing policy with notices preserved.
-Automatic `pipe` detection did not compress the supplied Rust/Node fixtures;
-explicit `cargo-test` compressed the successful Rust fixture substantially but
-removed its warning. That does not establish a safe universal output filter.
-The current integration uses a small conservative native filter, adds no runtime
-dependency, and does not install shell hooks. Broader command-specific filters need
-real log corpora and diagnostic-retention tests first.
-
-Promptfoo (MIT), GEPA (MIT), RouteLLM (Apache-2.0), and Inspect AI (MIT) remain
-evaluation candidates. They are not bundled. Prompt optimization and learned
-routing need a representative training set, held-out tasks and total-cost scoring;
-the three regression cases are too small and specifically target known defects.
-Existing tree-sitter analysis and on-demand MCP discovery should be extended before
-adding a duplicate analysis framework.
-
-Next, compare against direct installed CLIs under equivalent permissions, then
-collect independent review outcomes on representative repositories and repeat
-across supported providers. Evaluate model effort controls per adapter/model before
-mapping Quick/Balanced/Thorough to provider flags. Those settings currently specify
-the task approach; no new reasoning-level or learned-routing claim is made.
-
-Research basis: [OpenAI prompting guidance](https://developers.openai.com/api/docs/guides/latest-model),
-[prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching),
-[Anthropic agent evaluations](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents),
-[Google's agent-system scaling research](https://research.google/blog/towards-a-science-of-scaling-agent-systems-when-and-why-agent-systems-work/),
-and [RTK source and release](https://github.com/rtk-ai/rtk/tree/v0.48.0).

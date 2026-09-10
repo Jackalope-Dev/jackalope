@@ -20,7 +20,7 @@ light/dark sample workspace image. Clips have native controls, captions, a
 written walkthrough and a direct video link; they do not autoplay or preload
 video data.
 
-The September 9, 2026 clips are silent excerpts from the existing
+The clips are silent excerpts from the existing
 `apps/website/public/media/launch-v4-720p.mp4` sample-data tour:
 
 | Clip | Source interval | Poster frame | Guide |
@@ -51,7 +51,7 @@ Clips remain click-to-play with captions, written walkthroughs, direct links
 and an error fallback. Screenshot pages use larger, full-size-linked images
 and switch captures with the website's light/dark control.
 
-The September 10, 2026 recurring screenshots are fresh captures of the actual
+The recurring screenshots are captures of the actual
 `ScheduleManager` frontend with two fictional, paused Atlas schedules. They
 show no execution history. To regenerate both appearances, start the desktop
 Vite preview on port 5193 and run:

@@ -13,7 +13,7 @@ aligned with this guide when capabilities or priorities change.
 Optional local-agent setup includes hardware guidance, download choices and a real
 file/session check before connecting OpenCode to Ollama. Model-free help retrieval
 and compact routing inputs preserve all eligible choices. See [local AI](LOCAL-AI.md)
-for the MiniLM evaluation and limits; real-model and installed acceptance remain open.
+for setup and context-selection behavior; real-model and installed acceptance remain open.
 
 Kimi Code joins the native adapters with accounts, models, permissions, structured
 questions, continuation, task tokens, membership capacity, routing and Ask Jackalope.
@@ -40,7 +40,7 @@ baseline; broader provider comparisons and independent acceptance remain in prog
 
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)
-show improvements; installed startup, memory and responsiveness acceptance remains open.
+exercise these contracts; installed startup, memory and responsiveness acceptance remains open.
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
 large-project performance in installed builds. Complete signing, installation,

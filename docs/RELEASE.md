@@ -7,11 +7,9 @@ failure recovery. Read [STATUS.md](STATUS.md), [TODO.md](TODO.md), and
 
 ## 1. Scope, authority, and present state
 
-The initial supported target is **Windows x64**, using locally installed,
-signed-in Codex and Claude Code CLIs. Grok is implemented but needs the same
-release trial before being advertised as supported. macOS/Linux and remote pairing remain outside the validated Windows release target.
-Local recurring execution and codebase mapping are implemented; see FEATURE-COMPLETION.md
-for their verification and limits.
+This guide covers Windows x64 NSIS and MSI distribution. Use
+[CROSS-PLATFORM-RELEASES.md](CROSS-PLATFORM-RELEASES.md) for other targets and
+[AGENT-SUPPORT.md](AGENT-SUPPORT.md) for provider-specific acceptance.
 
 Prepare reviewable artifacts before publication. Protect signing and publication
 credentials separately from pull-request verification.
@@ -22,7 +20,7 @@ credentials separately from pull-request verification.
 | Update client | Trusted key/HTTPS source from build config; automatic checks; manual installation; progress and recovery | Configure real key/feed; exercise installed old-to-new upgrades |
 | Release scripts | Local signing/configuration, Authenticode checks, checksums, EXE/MSI manifest generation | Run with real credentials and validate downloaded bytes |
 | CI | `.github/workflows/verify.yml`: frontend/native tests and unsigned NSIS artifact | Successful CI run, separate protected signing/publication setup |
-| Hosted services | Workers/D1 telemetry/feedback and private R2 update hosting implemented locally | Deployment acceptance via SERVER-LAUNCH.md; desktop telemetry/feedback integration remains separate |
+| Hosted services | Workers/D1 telemetry/feedback and private R2 update hosting implemented locally | Deployment acceptance via SERVER-LAUNCH.md; telemetry/feedback activation requires installed acceptance |
 
 Inspect the candidate revision, local diff and remote before releasing. An old
 installer is not proof of current source behavior; never publish an artifact

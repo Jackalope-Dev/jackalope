@@ -44,7 +44,7 @@ For a separate static lab build, use `pnpm --filter @jackalope/desktop build:lab
 Ordinary desktop builds exclude that entry point.
 
 The [architecture guide](docs/ARCHITECTURE.md) maps the code. Follow
-[DESIGN.md](docs/DESIGN.md) for UI changes and [SELF-DEVELOPMENT.md](docs/SELF-DEVELOPMENT.md)
+[UI-GUIDELINES.md](docs/UI-GUIDELINES.md) for UI changes and [SELF-DEVELOPMENT.md](docs/SELF-DEVELOPMENT.md)
 when testing the native app without disturbing an existing profile. Server
 development is independent and requires no Cloudflare login; see its
 [README](apps/server/README.md).
@@ -126,9 +126,8 @@ in sync using package tools. Add comments for non-obvious invariants rather than
 narrating the code. Preserve saved-data compatibility, process ownership and the
 coordinator → execution guard → runtime lock order.
 
-The project currently targets Windows for native release acceptance. Other
-platform fixes are welcome, but a passing frontend build alone does not establish
-native platform support. See [TODO.md](docs/TODO.md) for current priorities.
+Native release acceptance is platform-specific across Windows, macOS and Linux.
+A passing frontend build alone does not establish native platform support. See [TODO.md](docs/TODO.md) for current priorities.
 
 Use the issue forms for bugs and feature requests. Review support reports before
 sharing them; omit credentials, private prompts and personal paths. Report

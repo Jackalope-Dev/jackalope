@@ -27,10 +27,9 @@ Named Jackalope accounts use Google's documented Gemini API-key mode instead.
 Each profile has a separate HOME/USERPROFILE and `.gemini/antigravity-cli/settings.json`
 with `modelProvider: "gemini"`. Jackalope requires an account-specific GEMINI_API_KEY
 and rejects a changed provider setting or missing key before launch. Keys are
-protected with Windows DPAPI, or stored in owner-only files on Unix. Gemini API
+protected with Windows DPAPI, macOS Keychain or Linux Secret Service. Gemini API
 billing is separate from a Google subscription. Real two-account API-key execution
-and continuation acceptance remain pending; the earlier CLI-login trial does not
-establish acceptance of this new mode.
+and continuation require separate acceptance.
 
 ## Execution and permissions
 
@@ -62,8 +61,7 @@ thinking in output tokens. Jackalope adds cache reads to input and does not add
 thinking twice. Subscription quota is read separately from the CLI’s structured
 `-p /usage --output-format json` command. The reader checks the CLI version first
 (minimum 1.1.11), requires a successful zero-turn command receipt, and keeps model
-groups and reset windows distinct. Missing percentages remain unknown. The live
-1.2.0 response was verified without a model request. Gemini API-key profiles use
+groups and reset windows distinct. Missing percentages remain unknown. Gemini API-key profiles use
 separate API billing and do not expose Antigravity subscription allowances.
 
 ## Jackalope tools
@@ -77,7 +75,7 @@ workspace MCP configuration or place task credentials into source files.
 
 HTTP calls remain subject to the CLI's shell/network policy. Discovery never
 authorizes side effects. An unavailable transport is reported, not bypassed.
-See [the orchestration audit](ORCHESTRATION-CAPABILITIES.md) for shared coverage.
+See [orchestration capabilities](ORCHESTRATION-CAPABILITIES.md) for shared coverage.
 
 ## Verification
 

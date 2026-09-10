@@ -1,7 +1,7 @@
 # Native browser automation
 
 Jackalope bundles [agent-browser 0.37.1](https://github.com/vercel-labs/agent-browser/tree/v0.37.1)
-as its local browser engine. It replaces headless_chrome and launches installed
+as its local browser engine. It launches installed
 Edge, Chrome or Chromium in a fresh task profile. Users do not need npm, Node, a Vercel
 account, a browser service subscription or a separate agent-browser installation.
 
@@ -43,8 +43,7 @@ Codex receives explicit approval for these seven Jackalope tools through its
 [per-tool MCP configuration](https://learn.chatgpt.com/docs/extend/mcp).
 This applies only to the task's Jackalope server. Claude's existing launch allowlist
 includes the same tools. No global CLI settings are written and unrelated project
-MCP approvals are unchanged. Both installed adapters completed native trials;
-other adapters retain their existing HTTP delivery and have not been trialed here.
+MCP approvals are unchanged. Other adapters use their configured transport; validate each provider separately.
 
 ## Ownership and limits
 
@@ -87,9 +86,8 @@ builds. Do not replace the bundled binary with a user-configured executable.
 
 The package provides Windows x64, macOS x64/arm64 and Linux x64/arm64 (glibc/musl)
 binaries. Windows arm64 currently selects the x64 binary for OS emulation.
-Native browser trials cover Windows x64 with installed Edge and Linux x64 under
-WSL with installed Chrome. macOS browser behavior, confined Linux browser packages,
-signing and installed/update acceptance remain release gates.
+Native browser behavior, confined Linux browser packages, signing and installed
+updates require separate platform acceptance.
 
 The direct daemon protocol is upstream implementation detail. For upgrades,
 review protocol and launch changes, update the dependency/version assertion and

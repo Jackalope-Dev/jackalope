@@ -1,31 +1,9 @@
 # Desktop performance
 
-Use these measurements to compare local implementation changes. They are not
-installed-app startup, memory, battery-use or agent-quality claims.
+This guide describes persistence and rendering contracts and repeatable checks.
+Keep benchmark results and machine-specific receipts outside tracked source.
 
-## Local measurements
-
-On Windows, the initial debug-build fixture used 1,000 saved tasks with 100 KB
-results and four simultaneous streams producing 100 updates each. The baseline
-was master at `fc23acf`, before the performance pass. Both versions used durable
-writes; the new path does not acknowledge output before flushing it to disk.
-
-| Operation | Before | After first pass |
-| --- | ---: | ---: |
-| Copy task history / construct list summaries, average of 30 reads | 44.81 ms | 2.95 ms |
-| Save 400 output updates across four streams | 3,082 ms | 1,372 ms |
-| Reload 1,000 saved tasks | 589 ms | 179 ms |
-| Desktop frontend assets, uncompressed | 14.06 MB | 12.99 MB |
-
-These are single local runs, with filesystem caching and other processes present.
-The original read measurement only cloned records; the replacement also constructs
-summaries and sorts them. Total assets include lazy chunks, not just startup code.
-Recheck numbers against the current checkout before treating them as a release baseline.
-
-A later rerun during other compilation and native-test work measured 5.56 ms for
-summaries, 3,308 ms for the 400 output saves and 394 ms for reload. This was not a
-paired comparison under equal machine load. Save throughput varies substantially;
-the first-pass result does not establish a consistent gain under CPU or disk contention.
+## Repeatable checks
 
 Run the native fixture with:
 

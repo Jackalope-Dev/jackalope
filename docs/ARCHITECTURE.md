@@ -78,7 +78,7 @@ Lock order is **coordinator state → execution guard → runtime state**.
 TaskRuntime::start_locked requires a caller-held execution guard. Successful
 agent exit is not an integrated dependency. Integration rechecks source/target
 identity, saved checks and local files before changing a checkout. See
-[PARALLEL-MVP.md](PARALLEL-MVP.md) for the full contract.
+[PARALLEL-WORKFLOWS.md](PARALLEL-WORKFLOWS.md) for the full contract.
 
 ## Persistence and trust
 

@@ -1,7 +1,7 @@
 # Agent guidance
 
 - Do not commit code. Leave changes for the maintainer to review and commit.
-- Read docs/STATUS.md, docs/TODO.md and docs/DESIGN.md before changes. Check git
+- Read docs/STATUS.md, docs/TODO.md and docs/UI-GUIDELINES.md before changes. Check git
   status and worktree list; preserve existing work.
 - Start isolated concurrent work from current master under .worktrees/<task>.
   Older worktrees are snapshots, not the current baseline.
@@ -31,5 +31,5 @@
   server configuration and isolated native test profiles. Do not stop another
   user's working app to run a test.
 
-Read docs/PARALLEL-MVP.md for integration rules and docs/SELF-DEVELOPMENT.md for
+Read docs/PARALLEL-WORKFLOWS.md for integration rules and docs/SELF-DEVELOPMENT.md for
 native testing. Repository skills point to these shared guides.

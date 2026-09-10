@@ -8,10 +8,10 @@ description: Develop and verify Jackalope's Tauri/React desktop, website and sha
 Read [AGENTS.md](../../../AGENTS.md), current [status](../../../docs/STATUS.md)
 and [backlog](../../../docs/TODO.md). Use [CONTRIBUTING.md](../../../CONTRIBUTING.md)
 for checks, [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) for ownership and
-[DESIGN.md](../../../docs/DESIGN.md) before changing a screen.
+[UI-GUIDELINES.md](../../../docs/UI-GUIDELINES.md) before changing a screen.
 
 For dispatch, schedules, coordination, capacity or Git integration, read
-[PARALLEL-MVP.md](../../../docs/PARALLEL-MVP.md). Native ownership and saved
+[PARALLEL-WORKFLOWS.md](../../../docs/PARALLEL-WORKFLOWS.md). Native ownership and saved
 receipts establish execution; UI transitions and successful exits do not prove
 integration. Keep coordinator → execution guard → runtime lock order.
 

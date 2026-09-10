@@ -1,4 +1,4 @@
-# Design guide
+# UI guidelines
 
 Use this guide for Jackalope interface changes, [ARCHITECTURE.md](ARCHITECTURE.md)
 for code ownership and the [roadmap](ROADMAP.md) for future direction.
@@ -18,7 +18,7 @@ credentials or execution support must stay visibly unavailable.
 Use real progress, errors and recorded outcomes. Worktrees isolate changes,
 not process privileges. Tool connections and browser previews do not prove
 task execution. Preserve the contracts in [CORE-WORKFLOW.md](CORE-WORKFLOW.md)
-and [TASK-JOURNEY.md](TASK-JOURNEY.md).
+and [task outcomes](TASK-OUTCOMES.md).
 
 ## Navigation and copy
 
