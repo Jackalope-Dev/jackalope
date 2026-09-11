@@ -1,7 +1,6 @@
 import { Button } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import {
-  api,
   audienceLabel,
   displayName,
   message,
@@ -46,44 +45,42 @@ export function Dashboard() {
             : 'Dashboard unavailable. Refresh to try again.'}
       </p>
       {data && (
-        <>
-          <div className="metric-grid" aria-label="Account overview">
-            {(
+        <div className="metric-grid">
+          {(
+            [
               [
-                [
-                  'Waiting for access',
-                  data.people.waiting,
-                  'Review waitlist',
-                  '/admin/access#people',
-                ],
-                [
-                  'Approved accounts',
-                  data.people.approved,
-                  'Manage people',
-                  '/admin/access?status=approved#people',
-                ],
-                [
-                  'Desktop connected',
-                  data.people.connected,
-                  'View connections',
-                  '/admin/access?status=approved&stage=connected#people',
-                ],
-                [
-                  'New feedback',
-                  data.feedback.find((row) => row.status === 'new')?.count || 0,
-                  'Open inbox',
-                  '/admin#feedback',
-                ],
-              ] as const
-            ).map(([label, count, action, href]) => (
-              <div className="metric" key={label}>
-                <span>{label}</span>
-                <strong>{count.toLocaleString()}</strong>
-                <a href={href}>{action} →</a>
-              </div>
-            ))}
-          </div>
-        </>
+                'Waiting for access',
+                data.people.waiting,
+                'Review waitlist',
+                '/admin/access#people',
+              ],
+              [
+                'Approved accounts',
+                data.people.approved,
+                'Manage people',
+                '/admin/access?status=approved#people',
+              ],
+              [
+                'Desktop connected',
+                data.people.connected,
+                'View connections',
+                '/admin/access?status=approved&stage=connected#people',
+              ],
+              [
+                'New feedback',
+                data.feedback.find((row) => row.status === 'new')?.count || 0,
+                'Open inbox',
+                '/admin#feedback',
+              ],
+            ] as const
+          ).map(([label, count, action, href]) => (
+            <div className="metric" key={label}>
+              <span>{label}</span>
+              <strong>{count.toLocaleString()}</strong>
+              <a href={href}>{action} →</a>
+            </div>
+          ))}
+        </div>
       )}
       <div className="two-col">
         <section className="panel">

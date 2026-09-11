@@ -110,7 +110,7 @@ export function People({ search }: { search: string }) {
           Waitlist referrals are unlimited. Each verified signup earns one day of priority. Instant
           Access Passes are a separate allowance after acceptance.
         </p>
-        <div className="tabs" role="group" aria-label="Filter people">
+        <fieldset className="tabs" aria-label="Filter people">
           {Object.entries(groupNames).map(([value, label]) => (
             <Button
               key={value}
@@ -121,7 +121,7 @@ export function People({ search }: { search: string }) {
               {label} ({countMap[value] ?? '…'})
             </Button>
           ))}
-        </div>
+        </fieldset>
         <form
           className="filters"
           onSubmit={(event) => {

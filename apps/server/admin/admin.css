@@ -1,3 +1,17 @@
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.form-control,
+.themed-select,
+.ui-button {
+  font-family: inherit;
+}
+details li {
+  margin: 8px 0;
+}
 * {
   box-sizing: border-box;
 }
@@ -73,6 +87,7 @@ small {
   color: var(--muted);
 }
 [hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: Hidden views must stay hidden regardless of layout rules. */
   display: none !important;
 }
 [role="alert"]:not(:empty) {
@@ -207,7 +222,7 @@ nav[aria-label="Email previews"] {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 8px;
 }
-nav[aria-label="Email previews"] a {
+[aria-label="Email previews"] a {
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -367,7 +382,7 @@ tbody tr:last-child td {
 .quick-link small {
   display: block;
 }
-.quick-link:hover strong {
+.quick-link:where(:hover) strong {
   color: var(--accent);
 }
 .service-list {
@@ -468,9 +483,7 @@ summary {
   padding: 10px 0;
   color: var(--accent);
 }
-details li {
-  margin: 8px 0;
-}
+
 .readiness-heading {
   display: flex;
   justify-content: space-between;
@@ -529,31 +542,6 @@ details li {
   padding: 18px 0;
   border-top: 1px solid var(--line);
 }
-dialog {
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 28px;
-  width: 660px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100dvh - 48px);
-  overflow: auto;
-  box-shadow: var(--shadow-pop);
-}
-dialog::backdrop {
-  background: rgb(0 0 0 / 0.55);
-}
-dialog header {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 16px;
-}
-dialog h2,
-dialog p {
-  overflow-wrap: anywhere;
-}
 .facts {
   display: grid;
   grid-template-columns: 150px 1fr;
@@ -582,9 +570,6 @@ dialog p {
 }
 .confirmation span {
   flex: 1;
-}
-dialog .footer {
-  margin-top: 24px;
 }
 .compose {
   display: grid;
@@ -796,16 +781,15 @@ dialog .footer {
   .person .actions {
     gap: 8px;
   }
-  dialog {
-    padding: 20px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    scroll-behavior: auto !important;
+    scroll-behavior: auto;
+    /* biome-ignore lint/complexity/noImportantStyles: Reduced motion overrides component animations. */
     animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Reduced motion overrides component transitions. */
     transition: none !important;
   }
 }
@@ -820,14 +804,7 @@ dialog .footer {
 .filters .themed-select {
   width: 100%;
 }
-.form-field {
-  min-width: 0;
-}
-.form-control,
-.themed-select,
-.ui-button {
-  font-family: inherit;
-}
+
 .tabs .ui-button[aria-pressed="true"] {
   background: var(--color-accent-subtle);
   color: var(--accent);

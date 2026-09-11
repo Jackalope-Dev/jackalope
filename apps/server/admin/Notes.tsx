@@ -160,7 +160,7 @@ export function Notes() {
           )}
           <h3 id="entries-heading">Include these changes</h3>
           <p>Straight from the published changelog. Nothing is included until you tick it.</p>
-          <div className="entries" role="group" aria-labelledby="entries-heading">
+          <fieldset className="entries" aria-labelledby="entries-heading">
             {request.data?.entries.map((entry) => (
               <label className="entry" key={entry.id}>
                 <input
@@ -189,7 +189,7 @@ export function Notes() {
             {request.data && !request.data.entries.length && (
               <p className="empty">No published changes yet.</p>
             )}
-          </div>
+          </fieldset>
           {request.data &&
             note.entries.some((id) => !request.data?.entries.some((entry) => entry.id === id)) && (
               <Button

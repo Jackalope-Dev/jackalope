@@ -103,7 +103,8 @@ export function Table({
   label: string;
 }) {
   return (
-    <div className="table" tabIndex={0} role="region" aria-label={label}>
+    // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll overflowing tables.
+    <section className="table" tabIndex={0} aria-label={label}>
       {rows.length ? (
         <table>
           <thead>
@@ -130,6 +131,6 @@ export function Table({
       ) : (
         <p className="empty">No events in this selection.</p>
       )}
-    </div>
+    </section>
   );
 }

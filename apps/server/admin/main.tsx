@@ -36,12 +36,14 @@ function locationView() {
 }
 function App() {
   const [route, setRoute] = useState(locationView);
+  const [peopleSearch, setPeopleSearch] = useState(location.search);
   const [visited, setVisited] = useState(() => new Set([locationView().view]));
   const main = useRef<HTMLElement>(null);
   useEffect(() => {
     const navigate = () => {
       const next = locationView();
       setRoute(next);
+      if (next.view === 'people') setPeopleSearch(next.search);
       setVisited((previous) => new Set([...previous, next.view]));
       main.current?.focus({ preventScroll: true });
       window.scrollTo(0, 0);
@@ -58,7 +60,7 @@ function App() {
   }, [route.view]);
   const views = {
     overview: <Dashboard />,
-    people: <People search={route.search} />,
+    people: <People search={peopleSearch} />,
     activity: <Usage />,
     feedback: <Feedback />,
     insights: <Audience />,
@@ -67,7 +69,14 @@ function App() {
   };
   useEffect(() => {
     const intercept = (event: MouseEvent) => {
-      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
         return;
       const target = event.target instanceof Element ? event.target.closest('a') : null;
       if (!target || target.target || target.hasAttribute('download')) return;
@@ -87,14 +96,7 @@ function App() {
   }, []);
   return (
     <div>
-      <a
-        className="skip-link"
-        href="#main"
-        onClick={(event) => {
-          event.preventDefault();
-          main.current?.focus();
-        }}
-      >
+      <a className="skip-link" href="#main">
         Skip to content
       </a>
       <aside className="sidebar">
