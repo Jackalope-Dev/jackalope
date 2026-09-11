@@ -22,6 +22,22 @@ const hex = (value: string) => {
   return parts ? hslToHex(Number(parts[1]), Number(parts[2]), Number(parts[3])) : value;
 };
 
+const mixHex = (foreground: string, background: string, weight: number) =>
+  `#${[1, 3, 5]
+    .map((index) =>
+      Math.round(
+        parseInt(foreground.slice(index, index + 2), 16) * weight +
+          parseInt(background.slice(index, index + 2), 16) * (1 - weight),
+      )
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+const accent = hex(action['--color-action']);
+// Flatten the in-app pass gradient to hex so the solid email fallback matches it.
+const ticketStart = mixHex(accent, '#101124', 0.85);
+const ticketEnd = mixHex(accent, '#101124', 0.48);
+
 export const EMAIL_PALETTE = {
   /** Page behind the message. */
   bg: '#f4f0eb',
@@ -39,10 +55,14 @@ export const EMAIL_PALETTE = {
   /** Kickers, stamps, timestamps. Dark enough to clear 4.5:1 on both surfaces. */
   faint: '#756a5f',
   /** The product's action colour, contrast-corrected against white. */
-  accent: hex(action['--color-action']),
+  accent,
   onAccent: hex(action['--color-on-action']),
   /** Accent tuned for text on warm paper rather than for a filled button. */
   accentInk: '#4338ca',
+  ticketStart,
+  ticketEnd,
+  ticketRule: mixHex('#ffffff', ticketEnd, 0.45),
+  onTicket: '#ffffff',
 } as const;
 
 /** Body stack. Mail clients ignore webfonts often enough to lead with the fallback. */

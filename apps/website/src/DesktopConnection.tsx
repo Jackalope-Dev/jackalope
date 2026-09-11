@@ -1,5 +1,5 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { Button, Checkbox } from '@jackalope/ui';
+import { Button, Checkbox, Panel } from '@jackalope/ui';
 import { Check, Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
@@ -160,7 +160,7 @@ export function DesktopConnection({
   }
   if (done)
     return (
-      <section className="access-card desktop-connection-result" aria-live="polite">
+      <Panel variant="plain" className="access-card desktop-connection-result" aria-live="polite">
         {approved && (
           <div className="desktop-connection-celebration" aria-hidden="true">
             <EchoMark animated={false} />
@@ -180,11 +180,11 @@ export function DesktopConnection({
             You can close this tab. Jackalope will continue automatically.
           </p>
         )}
-      </section>
+      </Panel>
     );
   if (!verification) return null;
   return (
-    <section className="access-card access-entry" aria-label="Connect desktop">
+    <Panel variant="plain" className="access-card access-entry" aria-label="Connect desktop">
       <h2>Connect your desktop</h2>
       {!signedIn ? (
         <div>
@@ -265,7 +265,7 @@ export function DesktopConnection({
           )}
         </p>
       )}
-    </section>
+    </Panel>
   );
 }
 
@@ -335,7 +335,7 @@ export function ConnectedDesktops() {
     }
   }
   return (
-    <section className="access-card connected-desktops">
+    <Panel variant="plain" className="access-card connected-desktops">
       <h2>Connected desktops</h2>
       <p className="connected-desktops-description">
         Each app profile has its own connection. Development and test profiles can appear with the
@@ -421,12 +421,10 @@ export function ConnectedDesktops() {
                 onClick={() =>
                   confirm === device.id ? void revoke(device.id) : setConfirm(device.id)
                 }
+                loading={busy === device.id}
+                loadingLabel={'Disconnecting…'}
               >
-                {busy === device.id
-                  ? 'Disconnecting…'
-                  : confirm === device.id
-                    ? 'Confirm disconnect'
-                    : 'Disconnect'}
+                {confirm === device.id ? 'Confirm disconnect' : 'Disconnect'}
               </Button>
               {confirm === device.id && (
                 <Button
@@ -466,6 +464,6 @@ export function ConnectedDesktops() {
           </Button>
         </p>
       )}
-    </section>
+    </Panel>
   );
 }

@@ -1,4 +1,13 @@
-import { Button, DefinitionList, EmptyState, SectionHeader, Stat } from '@jackalope/ui';
+import {
+  Button,
+  DefinitionList,
+  Disclosure,
+  DisclosureSummary,
+  EmptyState,
+  Panel,
+  SectionHeader,
+  Stat,
+} from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import {
   audienceLabel,
@@ -85,7 +94,7 @@ export function Dashboard() {
         </div>
       )}
       <div className="two-col">
-        <section className="panel">
+        <Panel className="panel">
           <SectionHeader
             className="section-heading"
             title="Next steps"
@@ -118,8 +127,8 @@ export function Dashboard() {
           ) : (
             <p>{summary.loading ? 'Loading follow-ups…' : 'Follow-ups could not be loaded.'}</p>
           )}
-        </section>
-        <section className="panel">
+        </Panel>
+        <Panel className="panel">
           <SectionHeader
             className="section-heading"
             title="Service snapshot"
@@ -150,9 +159,9 @@ export function Dashboard() {
           <p className="privacy">
             Configuration checks do not confirm delivery or a successful installation.
           </p>
-        </section>
+        </Panel>
       </div>
-      <section className="panel">
+      <Panel className="panel">
         <h2>Stay close to your users</h2>
         <p>Turn requests and feedback into the next useful improvement.</p>
         <div className="two-col">
@@ -167,7 +176,7 @@ export function Dashboard() {
             href="/admin/access#notes"
           />
         </div>
-      </section>
+      </Panel>
     </>
   );
 }
@@ -229,7 +238,7 @@ export function Usage() {
       >
         See reported activity and errors across releases.
       </Heading>
-      <section className="panel">
+      <Panel className="panel">
         <div className="filters">
           <SelectField
             label="Window"
@@ -266,16 +275,16 @@ export function Usage() {
               : 'Activity unavailable for this selection. Refresh to try again.'}
         </p>
         {data && (
-          <details>
-            <summary>About these numbers</summary>
+          <Disclosure>
+            <DisclosureSummary>About these numbers</DisclosureSummary>
             <p>
               {data.coverage} Retention: {data.retentionDays} days. Ingestion{' '}
               {data.ingestionEnabled ? 'on' : 'off'} · Feedback email{' '}
               {data.emailEnabled ? 'on' : 'off'}.
             </p>
-          </details>
+          </Disclosure>
         )}
-      </section>
+      </Panel>
       {data && (
         <>
           <div className="metric-grid">
@@ -296,7 +305,7 @@ export function Usage() {
               />
             ))}
           </div>
-          <section className="panel">
+          <Panel className="panel">
             <h2>Daily app opens</h2>
             <p>Reported events by UTC receipt date. Includes today’s partial total.</p>
             {!peak && <p className="notice">No app-open events reported in this selection.</p>}
@@ -331,16 +340,16 @@ export function Usage() {
               <span>Peak {peak} opens / day</span>
               <span>{dates.at(-1)}</span>
             </div>
-            <details>
-              <summary>Daily counts</summary>
+            <Disclosure>
+              <DisclosureSummary>Daily counts</DisclosureSummary>
               <Table
                 label="Daily app opens"
                 headers={['UTC date', 'Opens']}
                 rows={dates.map((day) => [day, totals.get(day) || 0])}
               />
-            </details>
-          </section>
-          <section className="panel">
+            </Disclosure>
+          </Panel>
+          <Panel className="panel">
             <h2>Release activity</h2>
             <p>App opens are events, not unique people.</p>
             <Table
@@ -348,15 +357,15 @@ export function Usage() {
               headers={['Version', 'Channel', 'OS', 'Opens', 'Tasks started', 'Errors']}
               rows={[...releases.values()].sort((a, b) => Number(b[3]) - Number(a[3]))}
             />
-          </section>
-          <section className="panel">
+          </Panel>
+          <Panel className="panel">
             <h2>Feature use and errors</h2>
             <Table
               label="Feature use and errors"
               headers={['Event / category', 'Count']}
               rows={[...events.entries()].sort((a, b) => b[1] - a[1])}
             />
-          </section>
+          </Panel>
         </>
       )}
     </>
@@ -423,7 +432,7 @@ export function Feedback() {
       >
         A shared inbox for reports, ideas and replies from your users.
       </Heading>
-      <section className="panel">
+      <Panel className="panel">
         <div className="section-heading">
           <SelectField
             label="Status"
@@ -490,7 +499,7 @@ export function Feedback() {
             Load older reports
           </Button>
         )}
-      </section>
+      </Panel>
       <p className="privacy">
         Written feedback is voluntarily shared content and may contain personal information. Reports
         are retained for a limited time.

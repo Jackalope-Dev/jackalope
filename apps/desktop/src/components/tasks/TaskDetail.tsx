@@ -1,4 +1,4 @@
-import { Checkbox, Tabs, Textarea } from '@jackalope/ui';
+import { Badge, Checkbox, Disclosure, DisclosureSummary, Tabs, Textarea } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
@@ -220,12 +220,14 @@ export function TaskDetail({
         </div>
         <div role="status">
           {run.finishing ? (
-            <span className="task-status">Checking result</span>
+            <Badge appearance="plain" className="task-status">
+              Checking result
+            </Badge>
           ) : integrated ? (
-            <span className="task-status">
+            <Badge appearance="plain" className="task-status">
               <Check size={16} />
               Integrated
-            </span>
+            </Badge>
           ) : (
             <RunStatus status={run.status} />
           )}
@@ -247,14 +249,16 @@ export function TaskDetail({
         </InlineNotice>
       )}
       {!!run.dependencySnapshot?.sources.length && (
-        <details className="task-notice">
-          <summary>Verified feature inputs ({run.dependencySnapshot.sources.length})</summary>
+        <Disclosure className="task-notice">
+          <DisclosureSummary>
+            Verified feature inputs ({run.dependencySnapshot.sources.length})
+          </DisclosureSummary>
           {run.dependencySnapshot.sources.map((source) => (
             <p key={source.runId}>
               {source.runId} · {source.tree.slice(0, 12)}
             </p>
           ))}
-        </details>
+        </Disclosure>
       )}
       {!!run.contract?.requirements.length && (
         <Button variant="ghost" onClick={() => setTab('outcomes')}>
@@ -571,11 +575,11 @@ export function TaskDetail({
                   : 'Unavailable for this attempt'}
               </p>
               {run.mcpUsage && (
-                <details className="my-3">
-                  <summary>
+                <Disclosure className="my-3">
+                  <DisclosureSummary>
                     Tool discovery · {run.mcpUsage.calls}{' '}
                     {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
-                  </summary>
+                  </DisclosureSummary>
                   <p className="task-muted mt-2">
                     Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools} ·
                     Failed calls: {run.mcpUsage.failures}
@@ -586,13 +590,13 @@ export function TaskDetail({
                     {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB. These are schema bytes, not
                     billed tokens or measured savings.
                   </p>
-                </details>
+                </Disclosure>
               )}
               {!!run.diagnostics.length && (
-                <details>
-                  <summary>Agent diagnostics</summary>
+                <Disclosure>
+                  <DisclosureSummary>Agent diagnostics</DisclosureSummary>
                   <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
-                </details>
+                </Disclosure>
               )}
             </section>
             {isLatest && (

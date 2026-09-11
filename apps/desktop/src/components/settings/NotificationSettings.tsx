@@ -46,8 +46,14 @@ export function NotificationSettings() {
             : 'Notifications stop when Jackalope quits.'}
         </p>
         {status?.supported && (
-          <Button variant="outline" disabled={busy} onClick={() => void test()}>
-            {busy ? 'Sending…' : 'Send test notification'}
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => void test()}
+            loading={busy}
+            loadingLabel={'Sending…'}
+          >
+            {'Send test notification'}
           </Button>
         )}
         {(error || status?.error) && (

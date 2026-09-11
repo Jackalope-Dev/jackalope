@@ -112,8 +112,13 @@ export function FeedbackForm({
             <pre className="task-output">{JSON.stringify(preview.diagnostics, null, 2)}</pre>
           )}
           <div className="flex flex-wrap gap-3">
-            <Button disabled={busy || !settings?.configured} onClick={() => void act(send)}>
-              {busy ? 'Sending…' : 'Send to Jackalope'}
+            <Button
+              disabled={busy || !settings?.configured}
+              onClick={() => void act(send)}
+              loading={busy}
+              loadingLabel={'Sending…'}
+            >
+              {'Send to Jackalope'}
             </Button>
             <Button
               variant="outline"

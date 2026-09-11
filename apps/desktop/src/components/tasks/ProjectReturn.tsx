@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
 import { nextAction, returnToProject } from '../../lib/project-return';
@@ -40,10 +41,10 @@ export function ProjectReturn({
   }, [project.path]);
   if (!unfinished.length && !entries.length) return null;
   return (
-    <details className="project-return my-5">
-      <summary className="min-h-11 py-3 font-medium">
+    <Disclosure className="project-return my-5">
+      <DisclosureSummary className="min-h-11 py-3 font-medium">
         Pick up in {project.name} · {unfinished.length} unfinished
-      </summary>
+      </DisclosureSummary>
       <div className="space-y-3">
         {unfinished.slice(0, 3).map((run) => (
           <div key={run.id} className="flex flex-wrap justify-between gap-3 items-center">
@@ -62,8 +63,8 @@ export function ProjectReturn({
           </p>
         )}
         {!!entries.filter((e) => e.enabled && e.kind === 'memory').length && (
-          <details>
-            <summary className="min-h-11 py-3">Project decisions</summary>
+          <Disclosure>
+            <DisclosureSummary className="min-h-11 py-3">Project decisions</DisclosureSummary>
             {entries
               .filter((e) => e.enabled && e.kind === 'memory')
               .slice(0, 5)
@@ -90,18 +91,18 @@ export function ProjectReturn({
             <Button variant="ghost" onClick={() => navigateWorkspace('project-settings')}>
               Review saved knowledge
             </Button>
-          </details>
+          </Disclosure>
         )}
         {snapshot?.recentChanges && (
-          <details>
-            <summary className="min-h-11 py-3">Recent local commits</summary>
+          <Disclosure>
+            <DisclosureSummary className="min-h-11 py-3">Recent local commits</DisclosureSummary>
             <pre className="task-input whitespace-pre-wrap break-words">
               {snapshot.recentChanges}
             </pre>
             <p className="task-muted">
               Local snapshot when this view opened. No remote fetch was made.
             </p>
-          </details>
+          </Disclosure>
         )}
         {(error || knowledgeError) && (
           <p role="status" className="task-muted">
@@ -109,6 +110,6 @@ export function ProjectReturn({
           </p>
         )}
       </div>
-    </details>
+    </Disclosure>
   );
 }

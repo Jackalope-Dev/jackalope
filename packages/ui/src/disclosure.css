@@ -1,0 +1,38 @@
+@import "./foundation.css";
+@layer components {
+  .ui-disclosure {
+    min-width: 0;
+  }
+  .ui-disclosure-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 8px 0;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 500;
+    text-align: left;
+  }
+  .ui-disclosure-summary::-webkit-details-marker {
+    display: none;
+  }
+  .ui-disclosure-summary:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+  .ui-disclosure-indicator {
+    margin-left: auto;
+    color: var(--color-text-muted);
+    transition: transform 160ms;
+  }
+  .ui-disclosure[open] > .ui-disclosure-summary > .ui-disclosure-indicator {
+    transform: rotate(180deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-disclosure-indicator {
+      transition: none;
+    }
+  }
+}

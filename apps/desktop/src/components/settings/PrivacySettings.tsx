@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useCommunityStore } from '../../stores/communityStore';
@@ -57,10 +58,10 @@ export function PrivacySettings() {
         Optional daily counts to improve Jackalope. No prompts, code or account IDs. Kept for 30
         days.
       </p>
-      <details className="space-y-2">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
+      <Disclosure className="space-y-2">
+        <DisclosureSummary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
           What gets shared
-        </summary>
+        </DisclosureSummary>
         <p className="settings-row-description">
           Counts of app opens, task outcomes and feature use, plus known error categories if
           enabled. Grouped by app version, release channel and operating system.
@@ -70,7 +71,7 @@ export function PrivacySettings() {
           stack traces. Network providers receive your IP address to deliver requests; Jackalope
           does not save it in reports. Written feedback is separate.
         </p>
-      </details>
+      </Disclosure>
       <p className="settings-row-description">
         <a
           href="https://jackalope.dev/privacy/"

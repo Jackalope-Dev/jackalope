@@ -807,9 +807,6 @@ h1 span {
   color: var(--color-text-muted);
   transition: transform var(--motion-fast);
 }
-.faq-list :where(details[open]) svg {
-  transform: rotate(45deg);
-}
 .faq-list :where(details) > p {
   color: var(--color-text-secondary);
   font-size: 12px;

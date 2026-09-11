@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUpRight, Play } from 'lucide-react';
+import { Disclosure, DisclosureSummary, ExternalLinkIcon } from '@jackalope/ui';
+import { ArrowDown, Play } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { featureMedia } from './feature-media';
 import { knowledgeClips } from './knowledge-media';
@@ -87,14 +88,14 @@ export function FeatureMedia({ path, dark }: { path: string; dark: boolean }) {
               </p>
             )}
             {clip && (
-              <details>
-                <summary>Read the walkthrough</summary>
+              <Disclosure>
+                <DisclosureSummary>Read the walkthrough</DisclosureSummary>
                 <p>{clip.transcript}</p>
-              </details>
+              </Disclosure>
             )}
             <a className="feature-preview-source" href={source}>
               {clip ? 'Open video' : 'Open full-size screenshot'}{' '}
-              <ArrowUpRight size={14} aria-hidden="true" />
+              <ExternalLinkIcon size={16} aria-hidden="true" />
             </a>
           </figcaption>
         </figure>

@@ -1,3 +1,4 @@
+import { RefreshIcon } from '@jackalope/ui';
 import {
   ArrowRight,
   BookOpen,
@@ -5,7 +6,6 @@ import {
   FileText,
   FolderOpen,
   ListTodo,
-  RefreshCw,
   Terminal,
   TestTube2,
 } from 'lucide-react';
@@ -48,7 +48,7 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
             disabled={busy || !isTauriEnvironment()}
             onClick={() => void refresh()}
           >
-            <RefreshCw size={16} />
+            <RefreshIcon size={16} />
             {busy ? 'Reading…' : 'Refresh context'}
           </Button>
         }

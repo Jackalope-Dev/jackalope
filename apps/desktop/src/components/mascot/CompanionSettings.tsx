@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
@@ -91,8 +92,8 @@ export function CompanionSettings() {
           />
         </label>
       </section>
-      <details className="helper-context">
-        <summary>External agent connection</summary>
+      <Disclosure className="helper-context">
+        <DisclosureSummary>External agent connection</DisclosureSummary>
         <div className="helper-connection">
           <Button
             variant="secondary"
@@ -170,7 +171,7 @@ export function CompanionSettings() {
             Connection instructions
           </button>
         </div>
-      </details>
+      </Disclosure>
       {(localError || helper.syncError) && (
         <InlineNotice tone="error">{localError || helper.syncError}</InlineNotice>
       )}

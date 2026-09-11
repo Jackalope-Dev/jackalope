@@ -270,14 +270,18 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
               Preview
             </Button>
           ) : (
-            <Button size="sm" disabled={busy} onClick={() => void apply()}>
-              {busy
-                ? 'Applying…'
-                : preview
-                  ? 'Keep theme'
-                  : action.operation === 'prepare_task'
-                    ? 'Open draft'
-                    : 'Apply'}
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => void apply()}
+              loading={busy}
+              loadingLabel={'Applying…'}
+            >
+              {preview
+                ? 'Keep theme'
+                : action.operation === 'prepare_task'
+                  ? 'Open draft'
+                  : 'Apply'}
             </Button>
           )}
           <Button

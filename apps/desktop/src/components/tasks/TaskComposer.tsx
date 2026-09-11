@@ -1,4 +1,4 @@
-import { Textarea } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import {
   ArrowRight,
   BookOpen,
@@ -180,8 +180,8 @@ export function TaskComposer({
               }
             }}
           />
-          <details className="composer-customization">
-            <summary>Customize task</summary>
+          <Disclosure className="composer-customization">
+            <DisclosureSummary>Customize task</DisclosureSummary>
             <div className="composer-configuration">
               <section
                 className="composer-effort"
@@ -447,16 +447,16 @@ export function TaskComposer({
                 {(id === 'agent' || id === 'tools') && setup}
               </section>
             ))}
-            <details className="composer-outcomes">
-              <summary>
+            <Disclosure className="composer-outcomes">
+              <DisclosureSummary>
                 Requirements
                 {current.contextSelection?.outcomes?.length
                   ? ` · ${current.contextSelection.outcomes.length}`
                   : ' · optional'}
-              </summary>
+              </DisclosureSummary>
               {outcomes}
-            </details>
-          </details>
+            </Disclosure>
+          </Disclosure>
         </fieldset>
       </form>
       <div className="task-composer-footer">
@@ -485,8 +485,10 @@ export function TaskComposer({
               type="submit"
               form="task-composer"
               disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
+              loading={submitting}
+              loadingLabel={'Starting…'}
             >
-              {submitting ? 'Starting…' : 'Start task'}
+              {'Start task'}
               <ArrowRight size={15} />
             </Button>
           )}

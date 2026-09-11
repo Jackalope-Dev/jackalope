@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { taskTitle } from '../../lib/task-title';
@@ -523,16 +524,16 @@ export function UsageDashboard({
             </div>
           )}
           {!historyError && !loading && filtered.some((r) => r.usageObservations?.length) && (
-            <details className="my-6">
-              <summary>Message and subagent observations</summary>
+            <Disclosure className="my-6">
+              <DisclosureSummary>Message and subagent observations</DisclosureSummary>
               <p className="task-muted">Partial observations; not added to the totals above.</p>
               {filtered
                 .filter((r) => r.usageObservations?.length)
                 .map((r) => (
-                  <details key={r.usageKey} className="mt-4">
-                    <summary>
+                  <Disclosure key={r.usageKey} className="mt-4">
+                    <DisclosureSummary>
                       {taskTitle(r.prompt)} · {r.usageObservations?.length} messages
-                    </summary>
+                    </DisclosureSummary>
                     {r.usageObservations?.map((o) => (
                       <p className="task-muted py-1" key={o.messageId}>
                         {o.parentToolUseId ? `Child ${o.parentToolUseId}` : 'Main agent'} ·{' '}
@@ -540,16 +541,16 @@ export function UsageDashboard({
                         {o.output.toLocaleString()} output
                       </p>
                     ))}
-                  </details>
+                  </Disclosure>
                 ))}
-            </details>
+            </Disclosure>
           )}
         </>
       )}
       {view === 'tokens' && (
         <>
-          <details className="usage-measurement supporting-details">
-            <summary>What these numbers include</summary>
+          <Disclosure className="usage-measurement supporting-details">
+            <DisclosureSummary>What these numbers include</DisclosureSummary>
             <p>
               Only loaded Jackalope task history is included. Archived, deleted or unreadable
               history and work in other apps are excluded. Totals include routing failures,
@@ -566,7 +567,7 @@ export function UsageDashboard({
               Opening this dashboard does not send a model prompt. Connected capacity is an
               account-wide read and may include other apps; it is not added to task usage.
             </p>
-          </details>
+          </Disclosure>
           {project === 'all' && agent === 'all' && account === 'all' && (
             <section className="usage-app-activity" aria-label="Other app activity">
               <WorkspaceSectionHeading title="Other app activity" />
@@ -591,8 +592,8 @@ export function UsageDashboard({
                 Refresh helper history
               </Button>
               {helper.turns.length > 0 && !helperError && !helper.error && (
-                <details>
-                  <summary>Inspect helper usage by turn</summary>
+                <Disclosure>
+                  <DisclosureSummary>Inspect helper usage by turn</DisclosureSummary>
                   <div className="usage-table-scroll">
                     <table className="usage-table">
                       <caption className="sr-only">
@@ -625,7 +626,7 @@ export function UsageDashboard({
                       </tbody>
                     </table>
                   </div>
-                </details>
+                </Disclosure>
               )}
             </section>
           )}

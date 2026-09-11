@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
 import { knowledgeClips, knowledgeScreenshots } from './knowledge-media';
 import { setInitialVideoVolume } from './video-volume';
@@ -39,10 +40,10 @@ export function KnowledgeMedia({
         <figcaption>
           <p>{clip.description} Recorded with sample data.</p>
           {failed && <p role="status">The video could not load. Read the walkthrough below.</p>}
-          <details>
-            <summary>Read the walkthrough</summary>
+          <Disclosure>
+            <DisclosureSummary>Read the walkthrough</DisclosureSummary>
             <p>{clip.transcript}</p>
-          </details>
+          </Disclosure>
           <a href={`${base}.mp4`}>Open video</a>
         </figcaption>
       </figure>

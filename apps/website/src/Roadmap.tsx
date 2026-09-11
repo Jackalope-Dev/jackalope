@@ -1,11 +1,10 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { Tabs } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Tabs } from '@jackalope/ui';
 import {
   ArrowDown,
   ArrowRight,
   Bot,
   Check,
-  ChevronDown,
   Compass,
   Gauge,
   GitBranch,
@@ -97,8 +96,8 @@ export function RoadmapPage() {
                   {stage.items.map((item, itemIndex) => {
                     const ItemIcon = itemIcons[stageIndex]?.[itemIndex] ?? Wrench;
                     return (
-                      <details className="roadmap-item" key={item.title}>
-                        <summary>
+                      <Disclosure className="roadmap-item" key={item.title}>
+                        <DisclosureSummary>
                           <span className="roadmap-item-icon">
                             <ItemIcon size={24} strokeWidth={1.6} />
                           </span>
@@ -106,10 +105,9 @@ export function RoadmapPage() {
                             <strong>{item.title}</strong>
                             <span>{item.summary}</span>
                           </span>
-                          <ChevronDown size={19} />
-                        </summary>
+                        </DisclosureSummary>
                         <p>{item.detail}</p>
-                      </details>
+                      </Disclosure>
                     );
                   })}
                 </div>

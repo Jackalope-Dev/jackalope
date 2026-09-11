@@ -1,4 +1,5 @@
-import { Archive, RefreshCw, Upload } from 'lucide-react';
+import { RefreshIcon } from '@jackalope/ui';
+import { Archive, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ArchivedRun, nativeTask, statusLabel } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -89,12 +90,14 @@ export function ArchivedHistory() {
             variant="outline"
             disabled={!desktop || importing}
             onClick={() => void importRecovery()}
+            loading={importing}
+            loadingLabel={'Importing…'}
           >
             <Upload size={16} />
-            {importing ? 'Importing…' : 'Import a recovery file…'}
+            {'Import a recovery file…'}
           </Button>
           <Button variant="ghost" disabled={!desktop || loading} onClick={() => void load()}>
-            <RefreshCw size={16} />
+            <RefreshIcon size={16} />
             {loading ? 'Reading…' : 'Refresh'}
           </Button>
         </div>
@@ -132,8 +135,14 @@ export function ArchivedHistory() {
                     {new Date(run.endedAt ?? run.startedAt).toLocaleDateString()}
                   </p>
                 </div>
-                <Button variant="outline" disabled={!!busyId} onClick={() => void restore(run)}>
-                  {busyId === run.id ? 'Restoring…' : 'Restore'}
+                <Button
+                  variant="outline"
+                  disabled={!!busyId}
+                  onClick={() => void restore(run)}
+                  loading={busyId === run.id}
+                  loadingLabel={'Restoring…'}
+                >
+                  {'Restore'}
                 </Button>
               </li>
             ))}

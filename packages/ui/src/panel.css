@@ -1,0 +1,44 @@
+@import "./foundation.css";
+@layer components {
+  .ui-panel {
+    min-width: 0;
+    padding: 24px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 14px;
+    background: var(--color-surface-elevated);
+  }
+  .ui-panel[data-variant="plain"] {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .ui-panel-header,
+  .ui-panel-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    min-width: 0;
+  }
+  .ui-panel-header {
+    margin-bottom: 20px;
+  }
+  .ui-panel-header :where(h2, h3, p) {
+    margin: 0;
+  }
+  .ui-panel-header p {
+    margin-top: 6px;
+    color: var(--color-text-secondary);
+  }
+  .ui-panel-body {
+    min-width: 0;
+  }
+  .ui-panel-footer {
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+}

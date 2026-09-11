@@ -1,4 +1,4 @@
-import { IconButton } from '@jackalope/ui';
+import { IconButton, RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   ArrowLeft,
@@ -13,7 +13,6 @@ import {
   Loader2,
   MemoryStick,
   Monitor,
-  RefreshCw,
   ShieldCheck,
   Sparkles,
   X,
@@ -335,7 +334,7 @@ export function LocalAiSteps({
                 })
               }
             >
-              <RefreshCw size={16} />
+              <RefreshIcon size={16} />
               Check again
             </Button>
             {status('inspect')}
@@ -481,7 +480,7 @@ export function LocalAiSteps({
                 })
               }
             >
-              <RefreshCw size={16} />
+              <RefreshIcon size={16} />
               Check again
             </Button>
             {status('inspect')}

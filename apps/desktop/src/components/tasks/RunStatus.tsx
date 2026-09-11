@@ -1,3 +1,4 @@
+import { Badge, type BadgeProps } from '@jackalope/ui';
 import { Check, CircleAlert, CircleCheck, Clock3, LoaderCircle, Square } from 'lucide-react';
 import { statusLabel, type TaskRun } from '../../lib/task-runtime';
 
@@ -13,11 +14,21 @@ const icons = {
 };
 
 export function RunStatus({ status }: { status: TaskRun['status'] }) {
-  const Icon = icons[status];
+  const variant: BadgeProps['variant'] =
+    status === 'review' || status === 'reviewed'
+      ? 'success'
+      : status === 'failed' || status === 'interrupted'
+        ? 'danger'
+        : 'default';
   return (
-    <span className="task-status" data-state={status}>
-      <Icon size={16} aria-hidden="true" />
+    <Badge
+      appearance="plain"
+      className="task-status"
+      data-state={status}
+      variant={variant}
+      icon={icons[status]}
+    >
       {statusLabel[status]}
-    </span>
+    </Badge>
   );
 }

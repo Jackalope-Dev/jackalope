@@ -1,9 +1,9 @@
+import { LoadingIcon } from '@jackalope/ui';
 import {
   AlertTriangle,
   Bot,
   FileCheck2,
   Loader2,
-  RefreshCw,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -83,7 +83,7 @@ export function CrossModelReviewPanel({
             disabled={loading}
             className="h-7 text-xs flex items-center gap-1.5"
           >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            <LoadingIcon size={16} className={loading ? 'animate-spin' : ''} />
             Re-audit
           </Button>
         )}

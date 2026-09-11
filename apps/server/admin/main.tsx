@@ -1,13 +1,10 @@
 import '@jackalope/brand/fonts.css';
 import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character';
-import { Button, ErrorState } from '@jackalope/ui';
+import { Button, ErrorState, ExternalLinkIcon, FeedbackIcon, MailIcon } from '@jackalope/ui';
 import {
   Activity,
-  ArrowUpRight,
   ChartNoAxesColumn,
   LayoutDashboard,
-  Mail,
-  MessageSquare,
   Users,
   Wrench,
 } from 'lucide-react';
@@ -22,9 +19,9 @@ const navigation = [
   ['overview', '/admin', 'Overview', LayoutDashboard],
   ['people', '/admin/access#people', 'People', Users],
   ['activity', '/admin#activity', 'Usage & releases', Activity],
-  ['feedback', '/admin#feedback', 'Feedback', MessageSquare],
+  ['feedback', '/admin#feedback', 'Feedback', FeedbackIcon],
   ['insights', '/admin/access#insights', 'Audience insights', ChartNoAxesColumn],
-  ['notes', '/admin/access#notes', 'Product notes', Mail],
+  ['notes', '/admin/access#notes', 'Product notes', MailIcon],
   ['setup', '/admin/access#setup', 'Service setup', Wrench],
 ] as const;
 function locationView() {
@@ -113,7 +110,7 @@ function App() {
         <nav className="admin-nav" aria-label="Admin navigation">
           {navigation.map(([id, href, title, Icon]) => (
             <a key={id} href={href} aria-current={route.view === id ? 'page' : undefined}>
-              <Icon size={19} aria-hidden="true" />
+              <Icon size={20} aria-hidden="true" />
               {title}
             </a>
           ))}
@@ -121,7 +118,7 @@ function App() {
         <div className="sidebar-footer">
           <small>Private workspace</small>
           <a href="https://jackalope.dev" target="_blank" rel="noreferrer">
-            Open website <ArrowUpRight size={18} aria-hidden="true" />
+            Open website <ExternalLinkIcon size={20} aria-hidden="true" />
           </a>
         </div>
       </aside>

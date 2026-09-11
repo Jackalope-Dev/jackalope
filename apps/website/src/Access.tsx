@@ -1,5 +1,5 @@
-import { Button, CopyButton, Input, LoadingState, Textarea } from '@jackalope/ui';
-import { ArrowDownToLine, ArrowRight, Check, Copy, LogOut, Mail, Share2 } from 'lucide-react';
+import { Button, CopyButton, Input, LoadingState, MailIcon, Panel, Textarea } from '@jackalope/ui';
+import { ArrowDownToLine, ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
@@ -216,13 +216,13 @@ export function AccessPage() {
       {loading ? <LoadingState label="Loading your account…" compact /> : null}
       <DesktopConnection email={member?.email ?? null} refreshMembership={refreshMembership} />
       {loading ? null : !accessOrigin ? (
-        <section className="access-card access-entry">
+        <Panel variant="plain" className="access-card access-entry">
           <h2>Join the waitlist</h2>
           <p>Sign-in is not available yet. Join the waitlist to hear when early access opens.</p>
           <a className="button button-primary" href="/#newsletter">
             Join the waitlist <ArrowRight size={17} />
           </a>
-        </section>
+        </Panel>
       ) : member ? (
         <>
           <div className="access-identity">
@@ -249,7 +249,7 @@ export function AccessPage() {
             <a href="#invitations">Instant Access Passes</a>
             <a href="#desktops">Connected desktops</a>
           </nav>
-          <section id="setup" className="access-card access-download">
+          <Panel variant="plain" id="setup" className="access-card access-download">
             <div>
               <h2>Make room for your first task.</h2>
               {member.download ? (
@@ -301,8 +301,9 @@ export function AccessPage() {
                 </div>
               </li>
             </ol>
-          </section>
-          <section
+          </Panel>
+          <Panel
+            variant="plain"
             id="invitations"
             className="access-card access-invitations"
             aria-labelledby="invite-heading"
@@ -345,7 +346,7 @@ export function AccessPage() {
             <div className="access-invite-options">
               <div>
                 <h3>
-                  <Mail size={18} /> Send a pass by email
+                  <MailIcon size={20} /> Send a pass by email
                 </h3>
                 <p>Reserve a place for seven days. If it isn’t accepted, you can use it again.</p>
                 <form onSubmit={sendInvites}>
@@ -505,13 +506,13 @@ export function AccessPage() {
                 </ul>
               </div>
             )}
-          </section>
+          </Panel>
           <div id="desktops">
             <ConnectedDesktops />
           </div>
         </>
       ) : (
-        <section className="access-card access-entry">
+        <Panel variant="plain" className="access-card access-entry">
           <p>
             Still waiting? <a href="/waitlist/">Check your place & referrals</a>.
           </p>
@@ -530,8 +531,10 @@ export function AccessPage() {
                   disabled={busy}
                   type="button"
                   onClick={accept}
+                  loading={busy}
+                  loadingLabel={'Opening…'}
                 >
-                  {busy ? 'Opening…' : 'Continue to Jackalope'} <ArrowRight size={18} />
+                  {'Continue to Jackalope'} <ArrowRight size={18} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -620,8 +623,10 @@ export function AccessPage() {
                   className="button button-primary button-download"
                   type="submit"
                   disabled={busy}
+                  loading={busy}
+                  loadingLabel={'Sending…'}
                 >
-                  {busy ? 'Sending…' : 'Send sign-in link'} <ArrowRight size={17} />
+                  {'Send sign-in link'} <ArrowRight size={17} />
                 </Button>
               </form>
               {invite && (
@@ -641,7 +646,7 @@ export function AccessPage() {
               </a>
             </>
           )}
-        </section>
+        </Panel>
       )}
     </main>
   );

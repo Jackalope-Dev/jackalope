@@ -1,5 +1,5 @@
-import { Input } from '@jackalope/ui';
-import { Check, Plus, RefreshCw } from 'lucide-react';
+import { Input, RefreshIcon } from '@jackalope/ui';
+import { Check, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -70,7 +70,7 @@ export function AgentModels({
           onClick={() => void refresh(true)}
           disabled={loading || !isTauriEnvironment()}
         >
-          <RefreshCw size={15} />
+          <RefreshIcon size={16} />
           Refresh models
         </Button>
       </div>

@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
 import { nativeTask, type TaskRun, type Verification } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -39,8 +40,14 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
           {selected && <code className="block text-xs mt-2 break-all">{selected}</code>}
         </div>
         {selected && (
-          <Button variant="outline" disabled={busy} onClick={() => void verify()}>
-            {busy ? 'Checking…' : 'Run checks'}
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => void verify()}
+            loading={busy}
+            loadingLabel={'Checking…'}
+          >
+            {'Run checks'}
           </Button>
         )}
       </div>
@@ -75,8 +82,8 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
             {(check.result.durationMs / 1000).toFixed(1)} seconds. File changes require another
             check.
           </p>
-          <details>
-            <summary className="task-summary">Read verification output</summary>
+          <Disclosure>
+            <DisclosureSummary className="task-summary">Read verification output</DisclosureSummary>
             {check.result.truncated && (
               <p className="task-muted">Output was shortened to keep this view responsive.</p>
             )}
@@ -85,7 +92,7 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
               {'\n'}
               {check.result.stderr}
             </pre>
-          </details>
+          </Disclosure>
         </div>
       ) : (
         <p className="task-muted text-xs">No project checks recorded for this attempt.</p>

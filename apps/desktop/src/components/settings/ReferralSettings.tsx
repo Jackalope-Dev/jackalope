@@ -1,6 +1,6 @@
 import { PassTickets } from '@jackalope/brand/passes';
-import { CopyButton, Input } from '@jackalope/ui';
-import { ArrowUpRight, Check, Mail, RefreshCw } from 'lucide-react';
+import { CopyButton, ExternalLinkIcon, Input, MailIcon, RefreshIcon } from '@jackalope/ui';
+import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -134,7 +134,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
             disabled={!referrals.remaining}
             onClick={() => void share('email')}
           >
-            <Mail size={16} /> Email
+            <MailIcon size={16} /> Email
           </Button>
           <Button variant="outline" disabled={!referrals.remaining} onClick={() => void share('x')}>
             X
@@ -164,7 +164,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
           <div className="referral-progress-heading">
             <h3>Your people</h3>
             <button type="button" onClick={() => void load()} aria-label="Refresh passes">
-              <RefreshCw size={15} /> Refresh
+              <RefreshIcon size={16} /> Refresh
             </button>
           </div>
           <ul>
@@ -199,7 +199,7 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
         </div>
       )}
       <Button variant="outline" onClick={() => void openManagement()}>
-        Manage email passes <ArrowUpRight size={16} />
+        Manage email passes <ExternalLinkIcon size={16} />
       </Button>
       {error && (
         <p role="alert" className="settings-row-description">

@@ -1,4 +1,5 @@
-import { BookOpen, Lightbulb, Search, Workflow } from 'lucide-react';
+import { SearchField } from '@jackalope/ui';
+import { BookOpen, Lightbulb, Workflow } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { type KnowledgeEntry, openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
 import { nativeTask } from '../../lib/task-runtime';
@@ -8,7 +9,7 @@ import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
+
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
@@ -238,18 +239,20 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             }
           }}
         >
-          <div className="context-history-field">
-            <Search size={16} aria-hidden="true" />
-            <Input
-              aria-label="Search this project's task history"
-              value={query}
-              maxLength={200}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search instructions and results…"
-            />
-          </div>
-          <Button disabled={!desktop || searching || query.trim().length < 2}>
-            {searching ? 'Searching…' : 'Search'}
+          <SearchField
+            aria-label="Search this project's task history"
+            value={query}
+            maxLength={200}
+            placeholder="Search instructions and results…"
+            onValueChange={(value) => setQuery(value)}
+            containerClassName="context-history-field"
+          />
+          <Button
+            disabled={!desktop || searching || query.trim().length < 2}
+            loading={searching}
+            loadingLabel={'Searching…'}
+          >
+            {'Search'}
           </Button>
         </form>
 

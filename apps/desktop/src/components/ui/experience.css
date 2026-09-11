@@ -170,20 +170,6 @@
   align-items: center;
   gap: 6px;
 }
-.task-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-xs);
-}
-.task-status[data-state="review"],
-.task-status[data-state="reviewed"] {
-  color: var(--color-success);
-}
-.task-status[data-state="failed"],
-.task-status[data-state="interrupted"] {
-  color: var(--color-danger);
-}
 .task-list-header {
   flex-wrap: wrap;
 }

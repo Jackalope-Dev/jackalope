@@ -1,4 +1,4 @@
-import { CopyButton } from '@jackalope/ui';
+import { CopyButton, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { FileDiff } from 'lucide-react';
 import { useState } from 'react';
 import { DiffPreview } from './DiffPreview';
@@ -7,11 +7,11 @@ import './task-experience.css';
 export function PatchPreview({ patch }: { patch: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <details className="task-patch" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="task-experience-summary">
+    <Disclosure className="task-patch" onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <DisclosureSummary className="task-experience-summary">
         <FileDiff size={18} aria-hidden="true" />
         Read patch<span className="task-experience-meta">File changes</span>
-      </summary>
+      </DisclosureSummary>
       <div className="task-patch-toolbar">
         <span>+ Added · − Removed</span>
         <CopyButton
@@ -21,6 +21,6 @@ export function PatchPreview({ patch }: { patch: string }) {
         />
       </div>
       {open && <DiffPreview patch={patch} />}
-    </details>
+    </Disclosure>
   );
 }

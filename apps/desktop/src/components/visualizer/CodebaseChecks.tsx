@@ -1,13 +1,5 @@
-import { Input } from '@jackalope/ui';
-import {
-  ArrowRight,
-  CheckCheck,
-  FileCode2,
-  FileQuestion,
-  Info,
-  RefreshCw,
-  Search,
-} from 'lucide-react';
+import { RefreshIcon, SearchField, SearchIcon } from '@jackalope/ui';
+import { ArrowRight, CheckCheck, FileCode2, FileQuestion, Info, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import type { CodebaseReference, CodebaseSnapshot } from '../../lib/codebase';
 import { Button } from '../ui/button';
@@ -75,19 +67,16 @@ export function CodebaseChecks({
         ))}
       </div>
       <div className="codebase-check-filter">
-        <label>
-          <Search size={17} />
-          <Input
-            className="task-input"
-            aria-label="Search checks"
-            placeholder="Find a file or reference…"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setLimit(12);
-            }}
-          />
-        </label>
+        <SearchField
+          className="task-input"
+          aria-label="Search checks"
+          placeholder="Find a file or reference…"
+          value={query}
+          onValueChange={(value) => {
+            setQuery(value);
+            setLimit(12);
+          }}
+        />
         {filter !== 'all' && (
           <Button
             variant="ghost"
@@ -119,7 +108,7 @@ export function CodebaseChecks({
                 {visibleCycles.slice(0, limit).map((cycle) => (
                   <article className="codebase-finding" key={cycle.join('|')}>
                     <header>
-                      <RefreshCw size={18} />
+                      <RefreshIcon size={20} />
                       <h3>{cycle.length} connected files</h3>
                     </header>
                     <p>
@@ -197,7 +186,7 @@ export function CodebaseChecks({
             (show('notes') ? notes.length : 0) ===
             0 && (
             <div className="codebase-check-empty">
-              <Search size={28} />
+              <SearchIcon size={24} />
               <h3>No matching findings</h3>
               <p>Try another search or show all check types.</p>
             </div>

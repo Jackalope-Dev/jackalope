@@ -236,10 +236,6 @@ nav[aria-label="Email previews"] {
 }
 .panel,
 .readiness {
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--color-surface-elevated);
   margin: 0 0 24px;
 }
 .panel h2 .icon {
@@ -725,7 +721,6 @@ summary {
   }
   .panel,
   .readiness {
-    padding: 18px;
   }
   .insight-grid,
   .checks {

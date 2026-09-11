@@ -1,4 +1,5 @@
-import { ArrowRight, Mail } from 'lucide-react';
+import { MailIcon } from '@jackalope/ui';
+import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { BlogSection } from './blog-types';
 import { posts, updates } from './content';
@@ -268,7 +269,7 @@ export function JournalPage({ path }: { path: string }) {
         </header>
         {publishedVersion && <PublishedReleases />}
         <div className="release-status">
-          <Mail size={18} aria-hidden="true" />
+          <MailIcon size={20} aria-hidden="true" />
           <p>
             <strong>Get the next update.</strong> Join our newsletter for launch news and occasional
             product notes. <a href="#newsletter">Sign up for updates</a>.

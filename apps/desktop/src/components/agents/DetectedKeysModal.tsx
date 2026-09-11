@@ -1,4 +1,4 @@
-import { Checkbox } from '@jackalope/ui';
+import { Checkbox, LoadingIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Check,
@@ -6,7 +6,6 @@ import {
   Cpu,
   KeyRound,
   Loader2,
-  RefreshCw,
   Server,
   ShieldCheck,
   Sparkles,
@@ -175,7 +174,7 @@ export function DetectedKeysModal({
                   disabled={loading}
                   className="h-7 text-xs flex items-center gap-1.5"
                 >
-                  <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                  <LoadingIcon size={16} className={loading ? 'animate-spin' : ''} />
                   Re-scan
                 </Button>
               </div>

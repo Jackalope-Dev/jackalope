@@ -1,5 +1,6 @@
+import { RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Circle, KeyRound, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Circle, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   type AgentProfile,
@@ -132,8 +133,13 @@ function EditAccount({
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || !name.trim()}>
-              {busy ? 'Saving…' : 'Save account'}
+            <Button
+              type="submit"
+              disabled={busy || !name.trim()}
+              loading={busy}
+              loadingLabel={'Saving…'}
+            >
+              {'Save account'}
             </Button>
           </DialogFooter>
         </form>
@@ -268,13 +274,9 @@ export function AgentAccounts({
           aria-label={`New ${agentName} account name`}
           maxLength={80}
         />
-        <Button type="submit" disabled={locked}>
+        <Button type="submit" disabled={locked} loading={busy === 'add'} loadingLabel={'Adding…'}>
           <Plus size={16} />
-          {busy === 'add'
-            ? 'Adding…'
-            : keyAccount
-              ? 'Add account & connect'
-              : 'Add account & sign in'}
+          {keyAccount ? 'Add account & connect' : 'Add account & sign in'}
         </Button>
       </form>
       <Button
@@ -376,7 +378,7 @@ export function AgentAccounts({
                   title="Check sign-in"
                   onClick={() => void action(`check-${profile.id}`, () => check(profile))}
                 >
-                  <RefreshCw size={16} />
+                  <RefreshIcon size={16} />
                 </Button>
                 <Button
                   variant="ghost"

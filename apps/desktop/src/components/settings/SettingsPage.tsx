@@ -1,5 +1,5 @@
-import { Input } from '@jackalope/ui';
-import { Search } from 'lucide-react';
+import { Input, SearchField } from '@jackalope/ui';
+
 import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -149,16 +149,13 @@ export function SettingsPage({
         title="Settings"
         titleRef={heading}
         action={
-          <label className="settings-search">
-            <Search size={16} />
-            <Input
-              aria-label="Search settings"
-              type="search"
-              placeholder="Search settings…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
+          <SearchField
+            aria-label="Search settings"
+            placeholder="Search settings…"
+            value={query}
+            onValueChange={(value) => setQuery(value)}
+            containerClassName="settings-search"
+          />
         }
       />
       <p className="sr-only">

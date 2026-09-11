@@ -120,14 +120,6 @@
   cursor: pointer;
   padding: 8px 0;
 }
-.task-experience-summary::after {
-  content: "+";
-  margin-left: 4px;
-  color: var(--color-text-muted);
-}
-details[open] > .task-experience-summary::after {
-  content: "−";
-}
 .task-activity {
   margin-top: 20px;
   border-top: 1px solid var(--color-border-subtle);
@@ -136,22 +128,6 @@ details[open] > .task-experience-summary::after {
   display: grid;
   gap: 12px;
   padding-top: 8px;
-}
-.task-activity-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 12px;
-  border-radius: 10px;
-  background: var(--color-surface-sunken);
-  color: var(--color-text-muted);
-}
-.task-activity-search input {
-  min-height: 44px;
-  min-width: 0;
-  flex: 1;
-  background: transparent;
-  color: var(--color-text-primary);
 }
 .task-activity-list {
   list-style: none;
@@ -178,9 +154,6 @@ details[open] > .task-experience-summary::after {
   flex-shrink: 0;
   color: var(--color-text-muted);
   transition: transform 150ms ease;
-}
-details[open] > .task-activity-entry > svg {
-  transform: rotate(90deg);
 }
 .task-activity-number {
   min-width: 24px;

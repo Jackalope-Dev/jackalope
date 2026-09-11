@@ -1,6 +1,6 @@
 import { EchoMark, EchoWordmark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
-import { Tabs } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Tabs } from '@jackalope/ui';
 import {
   ArrowDown,
   ArrowRight,
@@ -490,12 +490,12 @@ export function LandingPage({
                 <div className="feature-card-copy">
                   <h3>{feature.title}</h3>
                   <p>{feature.description}</p>
-                  <details className="feature-card-details">
-                    <summary aria-label={`How it works: ${feature.title}`}>
-                      How it works <Plus size={16} aria-hidden="true" />
-                    </summary>
+                  <Disclosure className="feature-card-details">
+                    <DisclosureSummary aria-label={`How it works: ${feature.title}`}>
+                      How it works
+                    </DisclosureSummary>
                     <p>{feature.detail}</p>
-                  </details>
+                  </Disclosure>
                   <a className="feature-card-link" href={feature.href}>
                     {feature.link} <ArrowUpRight size={17} aria-hidden="true" />
                   </a>
@@ -623,13 +623,10 @@ export function LandingPage({
           {faqColumns.map((column) => (
             <div className="faq-list" key={column[0]?.[0]}>
               {column.map(([question, answer, id]) => (
-                <details key={question} id={id}>
-                  <summary>
-                    {question}
-                    <Plus size={18} aria-hidden="true" />
-                  </summary>
+                <Disclosure key={question} id={id}>
+                  <DisclosureSummary>{question}</DisclosureSummary>
                   <p>{answer}</p>
-                </details>
+                </Disclosure>
               ))}
             </div>
           ))}
@@ -644,13 +641,10 @@ export function LandingPage({
             Explore the roadmap <ArrowUpRight size={16} />
           </a>
         </p>
-        <details>
-          <summary>
-            Agent support & compatibility
-            <Plus size={20} />
-          </summary>
+        <Disclosure>
+          <DisclosureSummary>Agent support & compatibility</DisclosureSummary>
           <AgentSupport />
-        </details>
+        </Disclosure>
       </div>
 
       <section className="landing-finale" id="download" aria-labelledby="download-title">

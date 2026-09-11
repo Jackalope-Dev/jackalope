@@ -1,4 +1,4 @@
-import { Input } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
@@ -393,8 +393,8 @@ export function CaptureTask({
         }}
       />
       {idea && (
-        <details className="mt-4">
-          <summary>Idea details</summary>
+        <Disclosure className="mt-4">
+          <DisclosureSummary>Idea details</DisclosureSummary>
           <label className="task-label mt-4" htmlFor="capture-title">
             Title
           </label>
@@ -434,7 +434,7 @@ export function CaptureTask({
               </Button>
             }
           />
-        </details>
+        </Disclosure>
       )}
       {toolsOpen && (
         <Suspense fallback={null}>
@@ -455,8 +455,10 @@ export function CaptureTask({
             variant="ghost"
             disabled={!desktop || discovering}
             onClick={() => void discover()}
+            loading={discovering}
+            loadingLabel={'Checking…'}
           >
-            {discovering ? 'Checking…' : 'Refresh agents'}
+            {'Refresh agents'}
           </Button>
         </div>
       )}

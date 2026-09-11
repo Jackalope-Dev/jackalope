@@ -53,50 +53,7 @@
   color: var(--color-text-secondary);
 }
 .knowledge-search-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   margin-top: 28px;
-  padding: 0 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface-elevated);
-  color: var(--color-text-muted);
-}
-.knowledge-search-bar:focus-within {
-  border-color: var(--color-accent-ink);
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
-}
-.knowledge-search-bar input {
-  flex: 1;
-  width: 100%;
-  min-width: 0;
-  padding: 18px 0;
-  font: inherit;
-  font-size: 15px;
-  color: var(--color-text-primary);
-  border: 0;
-  background: transparent;
-}
-.knowledge-search-bar input:focus-visible {
-  outline: none;
-}
-.knowledge-search-bar input::placeholder {
-  color: var(--color-text-muted);
-}
-.knowledge-search-bar svg {
-  flex-shrink: 0;
-}
-.knowledge-search-bar button {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 40px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
 }
 .knowledge-helper-card {
   background: var(--color-surface-sunken);

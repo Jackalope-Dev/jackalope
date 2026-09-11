@@ -144,8 +144,10 @@ export function FeedbackPage() {
                   className="button button-primary"
                   disabled={busy}
                   onClick={() => void act('submit')}
+                  loading={busy}
+                  loadingLabel={'Sending…'}
                 >
-                  {busy ? 'Sending…' : 'Send to Jackalope'}
+                  {'Send to Jackalope'}
                 </Button>
                 <Button
                   variant="secondary"

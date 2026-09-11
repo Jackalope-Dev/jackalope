@@ -1,5 +1,5 @@
-import { DropdownMenu as Menu } from '@jackalope/ui';
-import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
+import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
+import { Check, ChevronDown, GitBranch, Plus, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { captureDraftForProject } from '../../lib/capture-draft';
 import { shortcutLabel } from '../../lib/platform-shortcuts';
@@ -318,7 +318,7 @@ export function Shell({
               className="command-trigger command-jump"
               aria-label="Search commands"
             >
-              <Search className="size-3.5" />
+              <SearchIcon className="" />
               <span className="hidden sm:inline">Jump to…</span>
               <kbd>{shortcut}</kbd>
             </button>

@@ -170,9 +170,11 @@ export function ProjectGitSettings({
                   (!policy.name.trim() || !policy.email.includes('@')))
               }
               onClick={() => void save()}
+              loading={busy}
+              loadingLabel={'Saving…'}
             >
               <Check size={16} />
-              {busy ? 'Saving…' : 'Save commit settings'}
+              {'Save commit settings'}
             </Button>
           )}
           {dirty && (

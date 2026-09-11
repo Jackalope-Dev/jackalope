@@ -1,4 +1,4 @@
-import { Checkbox, Textarea } from '@jackalope/ui';
+import { Checkbox, Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type ContextReceipt, type ContextSelection, useKnowledge } from '../../lib/knowledge';
 import { nativeTask } from '../../lib/task-runtime';
@@ -128,12 +128,12 @@ export function TaskKnowledge({
         )}
         {receipt?.entries.map((entry) => (
           <div key={entry.id} className="py-2">
-            <details>
-              <summary className="min-h-11 py-3">
+            <Disclosure>
+              <DisclosureSummary className="min-h-11 py-3">
                 {entry.title} · {entry.kind === 'memory' ? 'Matched lesson' : 'Selected workflow'}
-              </summary>
+              </DisclosureSummary>
               <p className="whitespace-pre-wrap break-words">{entry.content}</p>
-            </details>
+            </Disclosure>
             {entry.kind === 'memory' && (
               <Button
                 type="button"

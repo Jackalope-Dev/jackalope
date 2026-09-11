@@ -1,4 +1,5 @@
-import { RefreshCw } from 'lucide-react';
+import { RefreshIcon } from '@jackalope/ui';
+
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
@@ -58,9 +59,11 @@ export function CapacityPanel() {
             variant="outline"
             onClick={refresh}
             disabled={loading || now < nextRefresh || !isTauriEnvironment()}
+            loading={loading}
+            loadingLabel={'Checking…'}
           >
-            <RefreshCw size={14} />
-            {loading ? 'Checking…' : 'Refresh capacity'}
+            <RefreshIcon size={16} />
+            {'Refresh capacity'}
           </Button>
         }
       />

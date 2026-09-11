@@ -1,4 +1,4 @@
-import { Checkbox } from '@jackalope/ui';
+import { Checkbox, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { ArrowRight, Check, GitMerge, GitPullRequest } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { IntegrationPlan, QueueItem } from '../../lib/queue';
@@ -174,10 +174,14 @@ export function MergeReview({
               }}
             />
           </label>
-          <Button className="mt-5" disabled={busy || !chosen.length} onClick={() => void prepare()}>
-            {busy
-              ? 'Preparing…'
-              : `Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
+          <Button
+            className="mt-5"
+            disabled={busy || !chosen.length}
+            onClick={() => void prepare()}
+            loading={busy}
+            loadingLabel={'Preparing…'}
+          >
+            {`Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
             <GitMerge size={15} />
           </Button>
         </>
@@ -315,8 +319,10 @@ export function MergeReview({
           p.projectPath.replaceAll('\\', '/').toLowerCase() ===
           project.path.replaceAll('\\', '/').toLowerCase(),
       ).length > 0 && (
-        <details className="mt-7">
-          <summary className="task-summary">Previous integration reviews</summary>
+        <Disclosure className="mt-7">
+          <DisclosureSummary className="task-summary">
+            Previous integration reviews
+          </DisclosureSummary>
           {plans
             .filter(
               (p) =>
@@ -337,7 +343,7 @@ export function MergeReview({
                 <span>{p.status === 'applied' ? 'Merged' : p.status}</span>
               </button>
             ))}
-        </details>
+        </Disclosure>
       )}
     </div>
   );

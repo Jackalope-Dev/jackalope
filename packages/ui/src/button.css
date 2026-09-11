@@ -83,6 +83,26 @@
     height: 44px;
     padding: 0;
   }
+  .ui-button-labels {
+    display: inline-grid;
+    min-width: 0;
+    gap: inherit;
+  }
+  .ui-button-content,
+  .ui-button-pending {
+    display: inline-flex;
+    grid-area: 1 / 1;
+    justify-content: center;
+    align-items: center;
+    gap: inherit;
+  }
+  .ui-button[data-loading="false"] .ui-button-pending,
+  .ui-button[data-loading="true"] .ui-button-content {
+    visibility: hidden;
+  }
+  .ui-button[data-loading="false"] .ui-icon-loading {
+    animation: none;
+  }
   @media (prefers-reduced-motion: reduce) {
     .ui-button {
       transition: none;

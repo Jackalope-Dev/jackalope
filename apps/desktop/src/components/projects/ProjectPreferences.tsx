@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings } from '../layout/navigation';
@@ -107,8 +108,10 @@ export function ProjectPreferences({
                 }
               />
             </Setting>
-            <details>
-              <summary className="min-h-11 cursor-pointer py-3">Always include guidelines</summary>
+            <Disclosure>
+              <DisclosureSummary className="min-h-11 cursor-pointer py-3">
+                Always include guidelines
+              </DisclosureSummary>
               {VETTED_SKILLS.map((skill) => (
                 <Setting key={skill.id} title={skill.shortLabel} description={skill.description}>
                   <Switch
@@ -124,7 +127,7 @@ export function ProjectPreferences({
                   />
                 </Setting>
               ))}
-            </details>
+            </Disclosure>
           </section>
           <ProjectGitSettings key={project.path} projectPath={project.path} />
           <section className="project-preferences-section">

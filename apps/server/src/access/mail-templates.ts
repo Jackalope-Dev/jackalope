@@ -26,7 +26,7 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'Share a thought',
       detail:
         'A sentence or two is plenty. Good experiences, rough edges, and ideas are all welcome. Your feedback goes directly to the people building Jackalope.',
-      stamp: 'EARLY ACCESS / YOUR EXPERIENCE',
+      stamp: 'Early access / Your experience',
     },
     waitlist: {
       subject: 'You’re on the Jackalope waitlist',
@@ -51,7 +51,7 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'Open my Jackalope space',
       detail:
         'Each pass lets one person skip the waitlist after email verification. Available downloads and setup steps live in your space.',
-      stamp: 'YOU’RE IN / BRING FIVE',
+      stamp: 'You’re in / Bring five',
     },
     invite: {
       subject: 'An Instant Access Pass to Jackalope',
@@ -61,7 +61,7 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'Claim my pass',
       detail:
         'No second approval needed. Once you’re in, you get five passes of your own. Downloads appear when a reviewed build is available.',
-      stamp: 'INSTANT ACCESS PASS / ADMIT ONE',
+      stamp: 'Instant access pass / Admit one',
     },
     login: {
       subject: 'Your Jackalope sign-in link',
@@ -69,7 +69,7 @@ export function accessEmail(mail: Mail, origin: string) {
       intro: 'Your downloads, setup steps, and Instant Access Passes are one click away.',
       action: 'Open my Jackalope space',
       detail: 'This private, single-use sign-in link expires in 30 minutes.',
-      stamp: 'YOUR SPACE / YOUR AGENTS',
+      stamp: 'Your space / Your agents',
     },
     referral: {
       subject: 'Your Jackalope referrals are adding up',
@@ -78,7 +78,7 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'See my progress',
       detail:
         'Each verified referral earns one day of waitlist priority. Check your page for your current number. Referral sharing is unlimited and never spends an Instant Access Pass.',
-      stamp: 'WAITLIST / A HOP FORWARD',
+      stamp: 'Waitlist / A hop forward',
     },
     passes_ready: {
       subject: 'You’re in. Your Jackalope passes are ready',
@@ -87,7 +87,7 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'See my passes',
       detail:
         'Each pass brings one person straight into early access after email verification. Your space also shows setup steps and downloads as reviewed builds become available.',
-      stamp: 'INSTANT ACCESS / PASS IT ON',
+      stamp: 'Instant access / Pass it on',
     },
     pass_claimed: {
       subject: 'Someone claimed your Jackalope pass',
@@ -96,7 +96,7 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'See my passes',
       detail:
         'Your pass page shows who has joined, who has requested a download, and who has connected the desktop. Claimed passes count toward your allowance.',
-      stamp: 'INSTANT ACCESS / CLAIMED',
+      stamp: 'Instant access / Claimed',
     },
     pass_expired: {
       subject: 'A Jackalope pass is yours to share again',
@@ -106,7 +106,7 @@ export function accessEmail(mail: Mail, origin: string) {
       action: 'See my passes',
       detail:
         'Email reservations last seven days. You can send a new pass to the same person or share it with someone else. Your page always shows the current allowance.',
-      stamp: 'INSTANT ACCESS / AVAILABLE AGAIN',
+      stamp: 'Instant access / Available again',
     },
   }[mail.kind];
   const link =
@@ -174,17 +174,18 @@ export const button = (
 /**
  * The one action in a message.
  *
- * With a stamp it sits in a labelled panel that names what the link is for.
+ * With a stamp it sits in a ticket with a perforated action stub, like in-app passes.
  * Without one - where the surrounding copy already says it plainly - the button
  * stands on its own, centred, with nothing around it.
  */
 function callout(stamp: string, action: string, link: string) {
   if (!stamp)
     return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:34px 0"><tr><td align="center">${button(action, link, { align: 'center' })}</td></tr></table>`;
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0;border-collapse:separate;border:1px solid ${c.borderSubtle};border-radius:12px;background:${c.panel}"><tr><td style="padding:24px">
-<p style="margin:0 0 18px;font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${c.faint}">${escapeHtml(stamp)}</p>
-${button(action, link, { arrow: true })}
-</td></tr></table>`;
+  const [title, detail] = stamp.split(' / ');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${c.ticketStart}" style="margin:30px 0;border-collapse:separate;border-spacing:0;border:1px solid ${c.ticketStart};border-radius:18px;background-color:${c.ticketStart};background-image:linear-gradient(145deg,${c.ticketStart},${c.ticketEnd})"><tr><td style="padding:24px 26px 28px">
+<p style="margin:0 0 24px;font-size:11px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:${c.onTicket}">Jackalope &nbsp;/&nbsp; ${escapeHtml(detail ?? '')}</p>
+<p style="margin:0;font-size:30px;line-height:1.12;font-weight:700;letter-spacing:-.8px;color:${c.onTicket}">${escapeHtml(title)}</p>
+</td></tr><tr><td bgcolor="${c.ticketEnd}" style="padding:0;mso-padding-alt:18px 26px;border-top:1px dashed ${c.ticketRule};border-radius:0 0 17px 17px;background-color:${c.ticketEnd}"><a class="ticket-action" href="${escapeHtml(link)}" style="display:block;position:relative;padding:18px 26px;color:${c.onTicket};font-family:${EMAIL_FONT};font-size:16px;font-weight:600;line-height:1.5;text-decoration:none">${escapeHtml(action)} &nbsp;&rarr;</a></td></tr></table>`;
 }
 
 /**
@@ -206,7 +207,7 @@ export function emailShell({
   footer: string;
 }) {
   const address = EMAIL_COMPANY.postalAddress;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"><title>${escapeHtml(subject)}</title><style>:root{color-scheme:light only}@media(max-width:480px){.lead-title{font-size:34px!important;letter-spacing:-1px!important}.letter{padding:28px 22px!important}}</style></head><body style="margin:0;padding:0;background:${c.bg};color:${c.ink};font-family:${EMAIL_FONT};-webkit-font-smoothing:antialiased">
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only"><title>${escapeHtml(subject)}</title><style>:root{color-scheme:light only}.ticket-action::before,.ticket-action::after{content:"";position:absolute;top:-8px;width:14px;height:14px;border-radius:50%;background:${c.surface};pointer-events:none}.ticket-action::before{left:-8px}.ticket-action::after{right:-8px}.ticket-action:focus-visible{outline:2px solid ${c.onTicket};outline-offset:-6px}@media(max-width:480px){.lead-title{font-size:34px!important;letter-spacing:-1px!important}.letter{padding:28px 22px!important}}</style></head><body style="margin:0;padding:0;background:${c.bg};color:${c.ink};font-family:${EMAIL_FONT};-webkit-font-smoothing:antialiased">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${escapeHtml(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${c.bg}"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:separate;background:${c.surface};border:1px solid ${c.border};border-radius:16px">

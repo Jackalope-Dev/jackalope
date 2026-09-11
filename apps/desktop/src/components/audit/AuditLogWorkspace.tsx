@@ -1,4 +1,4 @@
-import { Input } from '@jackalope/ui';
+import { SearchField } from '@jackalope/ui';
 import {
   AlertTriangle,
   Bot,
@@ -8,7 +8,6 @@ import {
   Cpu,
   History,
   Info,
-  Search,
   ShieldAlert,
   Sparkles,
   Trash2,
@@ -232,20 +231,14 @@ export function AuditLogWorkspace() {
           </div>
 
           {/* Search Query Input */}
-          <div className="relative min-w-[220px]">
-            <Search
-              size={13}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
-            />
-            <Input
-              type="text"
-              placeholder="Search audit events..."
-              aria-label="Search audit events"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-11 w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
-          </div>
+          <SearchField
+            placeholder="Search audit events..."
+            aria-label="Search audit events"
+            value={searchQuery}
+            className="h-11 w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+            onValueChange={(value) => setSearchQuery(value)}
+            containerClassName="relative min-w-[220px]"
+          />
         </div>
       </div>
 

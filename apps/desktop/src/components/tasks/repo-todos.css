@@ -73,19 +73,9 @@
   padding: 12px 0;
 }
 .repo-todo-search {
-  position: relative;
   flex: 1;
   max-width: 260px;
   min-width: 180px;
-}
-.repo-todo-search > svg {
-  position: absolute;
-  left: 12px;
-  top: 14px;
-  color: var(--color-text-muted);
-}
-.repo-todo-search input {
-  padding-left: 36px;
 }
 .repo-todos input:not([type="checkbox"]) {
   min-height: 44px;

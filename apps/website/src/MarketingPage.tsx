@@ -1,4 +1,5 @@
-import { ArrowRight, Check, ChevronDown, Play } from 'lucide-react';
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { ArrowRight, Check, Play } from 'lucide-react';
 import {
   ComparisonDirectory,
   ComparisonGuide,
@@ -127,19 +128,18 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
                 <span className="comparison-eyebrow">A closer look</span>
                 <h2>{isDirectory ? 'How to choose' : 'Go deeper where it matters.'}</h2>
                 {page.sections.map((section, index) => (
-                  <details
+                  <Disclosure
                     className="comparison-detail"
                     key={section.title}
                     id={`section-${index + 1}`}
                   >
-                    <summary>
+                    <DisclosureSummary>
                       <h3>{section.title}</h3>
-                      <ChevronDown size={18} aria-hidden="true" />
-                    </summary>
+                    </DisclosureSummary>
                     <div>
                       <SectionContent section={section} />
                     </div>
-                  </details>
+                  </Disclosure>
                 ))}
               </div>
             </section>
@@ -161,13 +161,12 @@ export function MarketingPage({ page, dark }: { page: MarketingPageContent; dark
                   <div>
                     <h2>Common questions</h2>
                     {comparison.faqs.map((faq) => (
-                      <details className="comparison-detail" key={faq.question}>
-                        <summary>
+                      <Disclosure className="comparison-detail" key={faq.question}>
+                        <DisclosureSummary>
                           <h3>{faq.question}</h3>
-                          <ChevronDown size={18} aria-hidden="true" />
-                        </summary>
+                        </DisclosureSummary>
                         <p>{faq.answer}</p>
-                      </details>
+                      </Disclosure>
                     ))}
                   </div>
                 </section>

@@ -1,4 +1,5 @@
-import { Monitor, RefreshCw } from 'lucide-react';
+import { RefreshIcon } from '@jackalope/ui';
+import { Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getSystemInfo,
@@ -60,7 +61,7 @@ export function SystemInfoView() {
             disabled={!desktop || loading || requestingPermissions}
             onClick={() => void load()}
           >
-            <RefreshCw size={16} />
+            <RefreshIcon size={16} />
             {loading ? 'Reading…' : 'Refresh device'}
           </Button>
         }

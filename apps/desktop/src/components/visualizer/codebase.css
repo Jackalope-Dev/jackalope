@@ -37,15 +37,7 @@
 }
 .codebase-search {
   flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 180px;
-  color: var(--color-text-muted);
-}
-.codebase-search input {
-  min-height: 44px;
-  background: var(--color-surface);
 }
 .codebase-breadcrumb {
   display: flex;
@@ -389,17 +381,6 @@
   color: var(--color-text-muted);
   white-space: nowrap;
 }
-.codebase-search {
-  position: relative;
-}
-.codebase-search > svg {
-  position: absolute;
-  left: 12px;
-  pointer-events: none;
-}
-.codebase-search input {
-  padding-left: 38px;
-}
 
 .codebase-checks-visual {
   display: grid;
@@ -450,20 +431,9 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-.codebase-check-filter label {
-  position: relative;
+.codebase-check-filter > .ui-search-field {
   flex: 1;
   min-width: 180px;
-}
-.codebase-check-filter svg {
-  position: absolute;
-  top: 14px;
-  left: 12px;
-  color: var(--color-text-muted);
-}
-.codebase-check-filter input {
-  padding-left: 38px;
-  width: 100%;
 }
 .codebase-finding-section > h2 {
   font-size: var(--text-lg);

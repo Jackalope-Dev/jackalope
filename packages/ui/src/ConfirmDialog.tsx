@@ -98,9 +98,11 @@ export function ConfirmDialog({
             type="button"
             variant={variant}
             disabled={busy || disabled}
+            loading={busy}
+            loadingLabel={busyLabel}
             onClick={() => void confirm()}
           >
-            {busy ? busyLabel : label}
+            {label}
           </Button>
         </DialogFooter>
       </DialogContent>

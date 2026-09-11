@@ -1,5 +1,5 @@
-import { Input } from '@jackalope/ui';
-import { Check, ChevronRight, Columns3, Lightbulb, List, ListTodo, Search } from 'lucide-react';
+import { Badge, Disclosure, DisclosureSummary, SearchField } from '@jackalope/ui';
+import { Check, ChevronRight, Columns3, Lightbulb, List, ListTodo } from 'lucide-react';
 import { memo, type ReactNode, useMemo } from 'react';
 
 import { ideaStageLabels, type WorkItem, workStages } from '../../lib/task-collection';
@@ -86,15 +86,13 @@ export function TaskCollection({
       )}
       <div className="work-toolbar">
         {scope}
-        <label className="work-search">
-          <Search size={16} aria-hidden="true" />
-          <Input
-            aria-label="Search tasks"
-            placeholder="Find a task…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+        <SearchField
+          aria-label="Search tasks"
+          placeholder="Find a task…"
+          value={query}
+          onValueChange={(value) => setQuery(value)}
+          containerClassName="work-search"
+        />
         <Select aria-label="Filter tasks by status" value={filter} onValueChange={setFilter}>
           <SelectItem value="all">All statuses</SelectItem>
           {workStages.map((stage) => (
@@ -154,10 +152,10 @@ export function TaskCollection({
               </>
             );
             return stage.id === 'finished' && filter === 'all' && !query.trim() ? (
-              <details key={stage.id} className="work-group work-finished">
-                <summary>{heading}</summary>
+              <Disclosure key={stage.id} className="work-group work-finished">
+                <DisclosureSummary>{heading}</DisclosureSummary>
                 {stageItems.map(card)}
-              </details>
+              </Disclosure>
             ) : (
               <section key={stage.id} className="work-group" aria-label={stage.label}>
                 <h2>{heading}</h2>
@@ -249,10 +247,10 @@ const WorkCard = memo(
         {item.run ? (
           <span className="work-item-status">
             {item.stage === 'finished' && item.run.status !== 'reviewed' ? (
-              <span className="task-status">
+              <Badge appearance="plain" className="task-status">
                 <Check size={16} />
                 Integrated
-              </span>
+              </Badge>
             ) : layout === 'board' ||
               (item.stage === 'attention' &&
                 ['failed', 'stopped', 'interrupted'].includes(item.run.status)) ? (
@@ -265,12 +263,12 @@ const WorkCard = memo(
             {item.run.persistenceError && <span className="work-item-meta">Not saved</span>}
           </span>
         ) : (
-          <span className="work-idea-status">
+          <Badge appearance="plain" className="work-idea-status">
             {item.idea?.status === 'done' ? <Check size={15} /> : <Lightbulb size={15} />}
             {item.idea?.runId
               ? 'History unavailable'
               : ideaStageLabels[item.idea?.status ?? 'backlog']}
-          </span>
+          </Badge>
         )}
       </button>
     );

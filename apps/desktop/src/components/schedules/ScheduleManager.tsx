@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -292,10 +293,10 @@ export function ScheduleManager(props: {
                   </p>
                 </div>
               )}
-              <details className="mt-3">
-                <summary className="min-h-11 py-3">
+              <Disclosure className="mt-3">
+                <DisclosureSummary className="min-h-11 py-3">
                   Instructions and run history ({history.length})
-                </summary>
+                </DisclosureSummary>
                 <p className="whitespace-pre-wrap my-3">{d.request.prompt}</p>
                 {[...history].reverse().map((event) => {
                   const run = runs.find((r) => r.id === event.runId);
@@ -349,7 +350,7 @@ export function ScheduleManager(props: {
                   );
                 })}
                 {!history.length && <p className="task-muted">No occurrences yet.</p>}
-              </details>
+              </Disclosure>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" disabled={busy} onClick={() => open(d)}>
@@ -388,8 +389,8 @@ export function ScheduleManager(props: {
       )}
       <ScheduleTemplateLibrary onChoose={chooseTemplate} disabled={!desktop || busy} />
       {legacy.length > 0 && (
-        <details className="mt-6">
-          <summary>Recover saved schedule plans ({legacy.length})</summary>
+        <Disclosure className="mt-6">
+          <DisclosureSummary>Recover saved schedule plans ({legacy.length})</DisclosureSummary>
           <p className="task-muted my-3">
             Review and save these plans as schedules. They start paused.
           </p>
@@ -420,7 +421,7 @@ export function ScheduleManager(props: {
               </article>
             ))}
           </div>
-        </details>
+        </Disclosure>
       )}
       <Dialog.Root
         open={!!changePreview}
@@ -745,8 +746,10 @@ export function ScheduleManager(props: {
                       (!monitorOnly &&
                         (!agent || (agent !== 'auto' && !isAgentAllowedForProject(project, agent))))
                     }
+                    loading={busy}
+                    loadingLabel={'Saving…'}
                   >
-                    {busy ? 'Saving…' : 'Save schedule'}
+                    {'Save schedule'}
                   </Button>
                 </div>
                 <p className="task-muted text-xs">

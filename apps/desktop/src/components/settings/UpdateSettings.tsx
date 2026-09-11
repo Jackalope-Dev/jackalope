@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect, useId } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -75,8 +76,14 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
               onCheckedChange={update.setAutoCheck}
             />
           </div>
-          <Button variant="outline" disabled={busy} onClick={() => void update.check()}>
-            {update.checking ? 'Checking…' : 'Check for updates'}
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => void update.check()}
+            loading={update.checking}
+            loadingLabel={'Checking…'}
+          >
+            {'Check for updates'}
           </Button>
           {update.lastChecked !== null &&
             !update.checking &&
@@ -90,10 +97,10 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
         <div className="space-y-3">
           <p>Version {release.availableVersion} is available.</p>
           {release.notes && (
-            <details>
-              <summary className="task-summary">Release notes</summary>
+            <Disclosure>
+              <DisclosureSummary className="task-summary">Release notes</DisclosureSummary>
               <ReleaseNotes notes={release.notes} />
-            </details>
+            </Disclosure>
           )}
           {blocked && (
             <p className="text-sm" role="status">

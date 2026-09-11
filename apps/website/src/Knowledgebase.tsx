@@ -1,6 +1,6 @@
 import { guideMarkdown } from '@jackalope/knowledge';
-import { Button, IconButton, Input } from '@jackalope/ui';
-import { ArrowLeft, ArrowRight, Check, Copy, Info, Play, Search, X } from 'lucide-react';
+import { Button, Disclosure, DisclosureSummary, SearchField } from '@jackalope/ui';
+import { ArrowLeft, ArrowRight, Check, Copy, Info, Play } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { siteOrigin } from './content';
 import { KnowledgeMedia } from './KnowledgeMedia';
@@ -188,8 +188,8 @@ export function KnowledgebasePage({
             <a href="/knowledge/" className="knowledge-back-link">
               <ArrowLeft size={14} /> All guides
             </a>
-            <details className="knowledge-toc" open>
-              <summary>On this page</summary>
+            <Disclosure className="knowledge-toc" open>
+              <DisclosureSummary>On this page</DisclosureSummary>
               <nav aria-label="On this page">
                 {activeGuide.sections.map((section) => (
                   <a
@@ -201,7 +201,7 @@ export function KnowledgebasePage({
                   </a>
                 ))}
               </nav>
-            </details>
+            </Disclosure>
           </aside>
           <article className="knowledge-guide-content" aria-label={activeGuide.shortTitle}>
             {activeGuide.sections.map((section) => (
@@ -304,21 +304,14 @@ export function KnowledgebasePage({
               Get your first task moving, find your way around, or work through a snag. Start here.
             </p>
             <search className="knowledge-search-bar">
-              <Search size={20} aria-hidden="true" />
-              <Input
+              <SearchField
                 ref={searchRef}
-                type="search"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search guides, tools, or an error…"
                 aria-label="Search knowledgebase"
                 aria-controls="knowledge-results"
+                onValueChange={(value) => setQuery(value)}
               />
-              {query && (
-                <IconButton type="button" onClick={clearSearch} label="Clear search">
-                  <X size={18} />
-                </IconButton>
-              )}
             </search>
           </div>
           <aside className="knowledge-helper-card" aria-labelledby="helper-card-title">

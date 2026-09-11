@@ -161,14 +161,6 @@ select option {
 .task-list-row:hover {
   background: var(--color-surface-hover);
 }
-.task-status {
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  white-space: nowrap;
-  padding: 5px 9px;
-  border-radius: 6px;
-  background: var(--color-surface-hover);
-}
 .task-back {
   display: flex;
   align-items: center;

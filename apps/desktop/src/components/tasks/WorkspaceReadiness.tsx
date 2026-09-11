@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { type Project, useProjectStore } from '../../stores/projectStore';
@@ -29,8 +30,8 @@ export function WorkspaceReadiness({
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   return (
-    <details className="my-4">
-      <summary className="min-h-11 py-3">Workspace readiness</summary>
+    <Disclosure className="my-4">
+      <DisclosureSummary className="min-h-11 py-3">Workspace readiness</DisclosureSummary>
       <div className="space-y-3">
         <p className="task-muted">
           Inspect setup, local changes and configuration names. Suggested commands remain editable
@@ -119,10 +120,12 @@ export function WorkspaceReadiness({
               </div>
             )}
             {!!result.changes && (
-              <details>
-                <summary className="min-h-11 py-3">Local changes to preserve</summary>
+              <Disclosure>
+                <DisclosureSummary className="min-h-11 py-3">
+                  Local changes to preserve
+                </DisclosureSummary>
                 <pre className="task-input whitespace-pre-wrap break-words">{result.changes}</pre>
-              </details>
+              </Disclosure>
             )}
             {result.notes.map((note) => (
               <p key={note} className="task-muted">
@@ -134,6 +137,6 @@ export function WorkspaceReadiness({
         {saved && <p role="status">{saved}</p>}
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
       </div>
-    </details>
+    </Disclosure>
   );
 }

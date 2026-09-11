@@ -1,3 +1,4 @@
+import { ArrowRight, Check } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { characterPaths } from './character';
 import { PRESET_THEMES, themeTokens } from './tokens';
@@ -61,21 +62,8 @@ export function PassTickets({
                 </strong>
                 <span className="brand-pass-ticket-stub">
                   <span>{state === 'Available' ? label : state}</span>
-                  {state === 'Available' && (
-                    <svg
-                      width="17"
-                      height="17"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d={copied ? 'm5 12 4 4L19 6' : 'M5 12h14m-7-7 7 7-7 7'} />
-                    </svg>
-                  )}
+                  {state === 'Available' &&
+                    (copied ? <Check size={16} aria-hidden="true" /> : <ArrowRight size={16} aria-hidden="true" />)}
                 </span>
               </button>
             </li>

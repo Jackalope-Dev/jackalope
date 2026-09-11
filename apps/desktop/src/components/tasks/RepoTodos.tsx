@@ -1,17 +1,14 @@
-import { Checkbox, IconButton, Textarea } from '@jackalope/ui';
-import * as Dialog from '@radix-ui/react-dialog';
 import {
-  Check,
-  Circle,
-  FileText,
-  ListTodo,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  Search,
-  X,
-} from 'lucide-react';
+  Checkbox,
+  Disclosure,
+  DisclosureSummary,
+  IconButton,
+  RefreshIcon,
+  SearchField,
+  Textarea,
+} from '@jackalope/ui';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Check, Circle, FileText, ListTodo, Pencil, Play, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -264,7 +261,7 @@ export function RepoTodos({
                   );
                 })}
                 <Button variant="ghost" disabled={saving} onClick={() => void load()}>
-                  <RefreshCw size={15} />
+                  <RefreshIcon size={16} />
                   Refresh files
                 </Button>
                 <p className="repo-todo-hint">
@@ -357,15 +354,13 @@ export function RepoTodos({
                               { id: 'all', label: 'All' },
                             ]}
                           />
-                          <div className="repo-todo-search">
-                            <Search size={16} aria-hidden="true" />
-                            <Input
-                              aria-label="Search TODOs"
-                              placeholder="Find a TODO…"
-                              value={query}
-                              onChange={(event) => setQuery(event.target.value)}
-                            />
-                          </div>
+                          <SearchField
+                            aria-label="Search TODOs"
+                            placeholder="Find a TODO…"
+                            value={query}
+                            onValueChange={(value) => setQuery(value)}
+                            containerClassName="repo-todo-search"
+                          />
                         </WorkspaceToolbar>
                         {groups.map((sectionLine) => {
                           const group = visible.filter((item) => item.sectionLine === sectionLine);
@@ -501,12 +496,12 @@ export function RepoTodos({
                           </Button>
                         </form>
                         {items.length === 0 && content.trim() && (
-                          <details className="repo-todo-notes">
-                            <summary>Read existing document</summary>
+                          <Disclosure className="repo-todo-notes">
+                            <DisclosureSummary>Read existing document</DisclosureSummary>
                             <div className="repo-todo-markdown">
                               <ReactMarkdown>{content}</ReactMarkdown>
                             </div>
-                          </details>
+                          </Disclosure>
                         )}
                       </>
                     )}

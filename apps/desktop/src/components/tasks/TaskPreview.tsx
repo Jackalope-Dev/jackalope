@@ -1,4 +1,4 @@
-import { Input } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
@@ -47,10 +47,10 @@ export function TaskPreview({ run }: { run: TaskRun }) {
     }
   };
   return (
-    <details className="my-4">
-      <summary className="min-h-11 py-3">
+    <Disclosure className="my-4">
+      <DisclosureSummary className="min-h-11 py-3">
         Try the result in a local preview{preview?.running ? ' · Process running' : ''}
-      </summary>
+      </DisclosureSummary>
       <div className="space-y-3">
         <p className="task-muted">
           Start a preview in this task's workspace. Keep the server bound to localhost and use{' '}
@@ -150,6 +150,6 @@ export function TaskPreview({ run }: { run: TaskRun }) {
         </p>
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
       </div>
-    </details>
+    </Disclosure>
   );
 }

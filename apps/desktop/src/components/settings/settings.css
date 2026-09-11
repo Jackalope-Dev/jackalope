@@ -257,23 +257,7 @@
 }
 
 .settings-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   min-width: 0;
-  padding: 0 12px;
-  border-radius: 10px;
-  background: var(--color-surface-sunken);
-}
-.settings-search input {
-  width: 100%;
-  min-width: 0;
-  background: transparent;
-  outline: none;
-}
-.settings-search:focus-within {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
 }
 .settings-section + .settings-section {
   margin-top: var(--workspace-section-gap, 32px);

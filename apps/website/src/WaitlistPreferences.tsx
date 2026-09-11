@@ -1,4 +1,4 @@
-import { Button, Checkbox } from '@jackalope/ui';
+import { Button, Checkbox, Panel } from '@jackalope/ui';
 import { ArrowRight, Check, Copy } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
@@ -90,7 +90,11 @@ export function WaitlistQuestions({
   const chosen = (name: string) => (answers?.[name as keyof Preferences] ?? []) as string[];
 
   return (
-    <section className="access-card waitlist-questions" aria-labelledby={`${id}-title`}>
+    <Panel
+      variant="plain"
+      className="access-card waitlist-questions"
+      aria-labelledby={`${id}-title`}
+    >
       <h2 id={`${id}-title`}>Help us decide what to build next.</h2>
       {!open ? (
         <div className="preference-actions">
@@ -128,8 +132,10 @@ export function WaitlistQuestions({
               type="submit"
               className="button button-primary"
               disabled={state === 'saving'}
+              loading={state === 'saving'}
+              loadingLabel={'Saving…'}
             >
-              {state === 'saving' ? 'Saving…' : 'Save my answers'} <Check size={16} />
+              {'Save my answers'} <Check size={16} />
             </Button>
             {answers && (
               <Button
@@ -146,7 +152,7 @@ export function WaitlistQuestions({
         </form>
       )}
       <p role="status">{message}</p>
-    </section>
+    </Panel>
   );
 }
 
@@ -240,8 +246,10 @@ export function WaitlistPreferences({ token }: { token: string }) {
               type="submit"
               className="button button-primary"
               disabled={state === 'saving'}
+              loading={state === 'saving'}
+              loadingLabel={'Saving…'}
             >
-              {state === 'saving' ? 'Saving…' : 'Save preferences'} <Check size={16} />
+              {'Save preferences'} <Check size={16} />
             </Button>
             <Button
               variant="ghost"

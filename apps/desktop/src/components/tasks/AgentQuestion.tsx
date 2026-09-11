@@ -162,9 +162,14 @@ export function AgentQuestion({
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <div className="agent-question-footer">
             <span className="task-experience-muted">Review your answer before sending.</span>
-            <Button type="submit" disabled={sending || !hasResponse}>
+            <Button
+              type="submit"
+              disabled={sending || !hasResponse}
+              loading={sending}
+              loadingLabel={'Sending…'}
+            >
               <Send size={16} aria-hidden="true" />
-              {sending ? 'Sending…' : 'Send response'}
+              {'Send response'}
             </Button>
           </div>
         </form>

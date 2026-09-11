@@ -141,8 +141,13 @@ export function AgentKeySignIn({
               <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy || !key.trim()}>
-                {busy ? 'Saving…' : 'Connect account'}
+              <Button
+                type="submit"
+                disabled={busy || !key.trim()}
+                loading={busy}
+                loadingLabel={'Saving…'}
+              >
+                {'Connect account'}
               </Button>
             </div>
           </form>

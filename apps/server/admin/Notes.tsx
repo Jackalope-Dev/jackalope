@@ -1,4 +1,4 @@
-import { Button, Checkbox, FormField, Input, Textarea } from '@jackalope/ui';
+import { Button, Checkbox, FormField, Input, Panel, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { type Broadcast, message, post, useResource } from './api';
 import { ErrorNotice, Heading, Refresh, SelectField } from './components';
@@ -139,7 +139,7 @@ export function Notes() {
       >
         Turn published changes into a thoughtful update for your audience.
       </Heading>
-      <section className="panel">
+      <Panel className="panel">
         <h2>Compose an update</h2>
         <p role="status">
           {request.loading
@@ -329,6 +329,8 @@ export function Notes() {
           </Button>
           <Button
             disabled={busy || request.loading || !request.data?.configured}
+            loading={busy}
+            loadingLabel="Creating draft…"
             onClick={() => void createDraft()}
           >
             Create draft in Sequenzy
@@ -337,7 +339,7 @@ export function Notes() {
         <p className="privacy">
           Creating a draft never sends email. Review and send it in Sequenzy.
         </p>
-      </section>
+      </Panel>
     </>
   );
 }

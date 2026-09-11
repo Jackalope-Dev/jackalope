@@ -392,8 +392,8 @@ export function McpConnectionForm({
         <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Saving…' : editing ? 'Save changes' : 'Add connection'}
+        <Button type="submit" disabled={busy} loading={busy} loadingLabel={'Saving…'}>
+          {editing ? 'Save changes' : 'Add connection'}
         </Button>
       </DialogFooter>
     </form>

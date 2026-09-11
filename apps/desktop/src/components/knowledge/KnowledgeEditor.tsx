@@ -164,8 +164,13 @@ export function KnowledgeEditor({
               Available for future tasks
             </label>
             {error && <InlineNotice tone="error">{error}</InlineNotice>}
-            <Button type="submit" disabled={busy || bytes > limit}>
-              {busy ? 'Saving…' : memory ? 'Save lesson' : 'Save workflow'}
+            <Button
+              type="submit"
+              disabled={busy || bytes > limit}
+              loading={busy}
+              loadingLabel={'Saving…'}
+            >
+              {memory ? 'Save lesson' : 'Save workflow'}
             </Button>
           </form>
         </Dialog.Content>

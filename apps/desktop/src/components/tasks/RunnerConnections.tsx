@@ -1,5 +1,6 @@
+import { RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, CircleAlert, Plus, RefreshCw, Settings2 } from 'lucide-react';
+import { ArrowRight, CircleAlert, Plus, Settings2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -131,17 +132,21 @@ export function RunnerConnections({
                 }
               }}
               title="Reads each signed-in agent's account identity and remaining capacity."
+              loading={capacity.loading}
+              loadingLabel={'Checking…'}
             >
-              <RefreshCw size={15} />
-              {capacity.loading ? 'Checking…' : 'Check accounts'}
+              <RefreshIcon size={16} />
+              {'Check accounts'}
             </Button>
             <Button
               variant="ghost"
               disabled={!desktop || checking || discovering}
               onClick={() => void checkAgents()}
+              loading={checking || discovering}
+              loadingLabel={'Checking…'}
             >
-              <RefreshCw size={15} />
-              {checking || discovering ? 'Checking…' : 'Check agents'}
+              <RefreshIcon size={16} />
+              {'Check agents'}
             </Button>
           </div>
         </div>

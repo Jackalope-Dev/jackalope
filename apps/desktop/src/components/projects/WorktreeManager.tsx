@@ -1,4 +1,4 @@
-import { IconButton } from '@jackalope/ui';
+import { IconButton, RefreshIcon } from '@jackalope/ui';
 import {
   Archive,
   Check,
@@ -8,7 +8,6 @@ import {
   GitMerge,
   Lock,
   Plus,
-  RefreshCw,
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -206,7 +205,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 disabled={refreshing || pending || !desktop}
                 onClick={() => void loadWorktreesForActiveProject(targetBranch)}
               >
-                <RefreshCw size={18} />
+                <RefreshIcon size={20} />
               </IconButton>
               <Button
                 aria-expanded={creating}
@@ -315,9 +314,14 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     className="font-mono"
                   />
                 </label>
-                <Button type="submit" disabled={pending || !slug.trim() || !branchName.trim()}>
+                <Button
+                  type="submit"
+                  disabled={pending || !slug.trim() || !branchName.trim()}
+                  loading={busy}
+                  loadingLabel={'Creating…'}
+                >
                   <GitBranch size={18} />
-                  {busy ? 'Creating…' : 'Create worktree'}
+                  {'Create worktree'}
                 </Button>
               </div>
             </form>
@@ -382,9 +386,11 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                       disabled={refreshing || pending || !desktop}
                       aria-label={`Remove worktree ${wt.branch || wt.path}`}
                       onClick={() => void cleanup(wt)}
+                      loading={removing === wt.path}
+                      loadingLabel={'Removing…'}
                     >
                       <Trash2 size={18} aria-hidden="true" />
-                      {removing === wt.path ? 'Removing…' : 'Remove worktree & branch'}
+                      {'Remove worktree & branch'}
                     </Button>
                   )}
                 {wt.cleanup?.recoverable && (
@@ -399,9 +405,11 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         variant="outline"
                         disabled={refreshing || pending || !desktop}
                         aria-label={`Archive and remove ${wt.branch || wt.path}`}
+                        loading={removing === wt.path}
+                        loadingLabel={'Archiving…'}
                       >
                         <Archive size={18} aria-hidden="true" />
-                        {removing === wt.path ? 'Archiving…' : 'Archive & remove'}
+                        {'Archive & remove'}
                       </Button>
                     }
                   />

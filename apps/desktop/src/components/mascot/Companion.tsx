@@ -1,15 +1,5 @@
-import { Popover } from '@jackalope/ui';
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  Check,
-  CircleCheck,
-  CircleHelp,
-  Info,
-  Search,
-  Settings2,
-  X,
-} from 'lucide-react';
+import { ExternalLinkIcon, Popover, SearchIcon } from '@jackalope/ui';
+import { ArrowLeft, Check, CircleCheck, CircleHelp, Info, Settings2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { isActive, statusLabel } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
@@ -265,7 +255,7 @@ export function Companion({
                                       }}
                                     >
                                       {notice.actionLabel ?? 'View details'}
-                                      <ArrowUpRight size={14} />
+                                      <ExternalLinkIcon size={16} />
                                     </button>
                                   )}
                                   {isUnread && (
@@ -314,7 +304,7 @@ export function Companion({
                                       : statusLabel[run.status]}
                                   </small>
                                 </span>
-                                <ArrowUpRight size={16} />
+                                <ExternalLinkIcon size={16} />
                               </button>
                             </li>
                           ))}
@@ -324,7 +314,7 @@ export function Companion({
                   </div>
                   <div className="companion-shortcuts">
                     <button type="button" onClick={() => activate(onSearch)}>
-                      <Search size={16} /> Find anything
+                      <SearchIcon size={16} /> Find anything
                     </button>
                     <button type="button" onClick={() => activate(onSettings)}>
                       <Settings2 size={16} /> Preferences

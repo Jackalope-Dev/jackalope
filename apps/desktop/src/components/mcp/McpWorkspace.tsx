@@ -1,3 +1,4 @@
+import { Badge, LoadingIcon, RefreshIcon, SearchField } from '@jackalope/ui';
 import {
   Activity,
   Check,
@@ -6,7 +7,6 @@ import {
   Globe,
   Pencil,
   Plus,
-  RefreshCw,
   Search,
   Server,
   Trash2,
@@ -23,7 +23,7 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
+
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
@@ -212,7 +212,7 @@ export function McpWorkspace({
                   }}
                   disabled={loadingServers || loadingMarketplace}
                 >
-                  <RefreshCw size={16} />
+                  <RefreshIcon size={16} />
                   Refresh
                 </Button>
                 <Button
@@ -304,19 +304,14 @@ export function McpWorkspace({
                   ]}
                 />
 
-                <div className="relative min-w-56">
-                  <Search
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
-                  />
-                  <Input
-                    aria-label="Filter connections"
-                    className="with-search-icon"
-                    placeholder="Filter connections or checked tools…"
-                    value={configuredSearch}
-                    onChange={(e) => setConfiguredSearch(e.target.value)}
-                  />
-                </div>
+                <SearchField
+                  aria-label="Filter connections"
+                  className="with-search-icon"
+                  placeholder="Filter connections or checked tools…"
+                  value={configuredSearch}
+                  onValueChange={(value) => setConfiguredSearch(value)}
+                  containerClassName="relative min-w-56"
+                />
               </WorkspaceToolbar>
 
               {/* Servers Grid */}
@@ -405,15 +400,21 @@ export function McpWorkspace({
                                       Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
                                     </Button>
                                   ))}
-                              <span className={`mcp-pill scope-${server.scope}`}>
+                              <Badge
+                                variant={
+                                  ['global', 'claude', 'codex'].includes(server.scope)
+                                    ? 'accent'
+                                    : 'default'
+                                }
+                              >
                                 {server.scope.startsWith('project:')
                                   ? 'This project'
                                   : server.scope === 'global'
                                     ? 'Global'
                                     : server.scope}
-                              </span>
-                              <span className="mcp-pill">{server.transport}</span>
-                              {server.discovery && <span className="mcp-pill">On demand</span>}
+                              </Badge>
+                              <Badge>{server.transport}</Badge>
+                              {server.discovery && <Badge>On demand</Badge>}
                             </div>
                           </div>
 
@@ -588,27 +589,13 @@ export function McpWorkspace({
                 <>
                   {/* Search input */}
                   <div className="mcp-search-bar relative">
-                    <Search
-                      size={16}
-                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
-                    />
-                    <Input
+                    <SearchField
                       className="mcp-search-input"
                       aria-label="Search MCP marketplace"
                       placeholder="Search MCP servers…"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onValueChange={(value) => setSearchQuery(value)}
                     />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        aria-label="Clear marketplace search"
-                        className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
                   </div>
 
                   {/* Category Pills */}
@@ -634,9 +621,9 @@ export function McpWorkspace({
 
                   {loadingMarketplace ? (
                     <div className="p-16 text-center text-[var(--color-text-muted)]">
-                      <RefreshCw
+                      <LoadingIcon
                         size={24}
-                        className="animate-spin mx-auto mb-3 text-[var(--color-accent-ink)]"
+                        className="mx-auto mb-3 text-[var(--color-accent-ink)]"
                       />
                       Searching allmcps.com registry…
                     </div>

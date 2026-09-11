@@ -1,14 +1,6 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { Tabs } from '@jackalope/ui';
-import {
-  ArrowDown,
-  ArrowRight,
-  ArrowUpRight,
-  BookOpen,
-  GitBranch,
-  Map as MapIcon,
-  Play,
-} from 'lucide-react';
+import { Disclosure, DisclosureSummary, ExternalLinkIcon, Tabs } from '@jackalope/ui';
+import { ArrowDown, ArrowRight, BookOpen, GitBranch, Map as MapIcon, Play } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { tour } from './content';
 import { Signup, WaitlistButton } from './Signup';
@@ -180,13 +172,13 @@ function TourFilm() {
           Recorded with fictional Atlas project data. Browser interactions are scripted; no native
           agent task is launched.
         </p>
-        <details>
-          <summary>Read the film transcript</summary>
+        <Disclosure>
+          <DisclosureSummary>Read the film transcript</DisclosureSummary>
           <p>{tour.transcript}</p>
           <a href={tour.video}>
-            Open video directly <ArrowUpRight size={14} />
+            Open video directly <ExternalLinkIcon size={16} />
           </a>
-        </details>
+        </Disclosure>
       </div>
     </section>
   );
@@ -292,7 +284,7 @@ export function TourPage({ dark, available }: { dark: boolean; available: boolea
                 <p className="tour-takeaway">{scene.takeaway}</p>
                 <a className="tour-text-link" href={scene.href}>
                   {scene.link}
-                  <ArrowUpRight size={16} />
+                  <ExternalLinkIcon size={16} />
                 </a>
               </div>
               <WorkspaceClip key={`${scene.id}-${dark}`} scene={scene} dark={dark} />
@@ -313,32 +305,32 @@ export function TourPage({ dark, available }: { dark: boolean; available: boolea
             More connected.
           </h2>
           <a className="tour-text-link" href="/#questions">
-            More questions, answered <ArrowUpRight size={16} />
+            More questions, answered <ExternalLinkIcon size={16} />
           </a>
         </div>
         <div className="tour-answers">
-          <details open>
-            <summary>What do I bring?</summary>
+          <Disclosure open>
+            <DisclosureSummary>What do I bring?</DisclosureSummary>
             <p>
               A local Git project and a supported coding agent with its provider account. Jackalope
               brings the workspace; model access and any subscription costs stay with your provider.
             </p>
-          </details>
-          <details>
-            <summary>Where does my work live?</summary>
+          </Disclosure>
+          <Disclosure>
+            <DisclosureSummary>Where does my work live?</DisclosureSummary>
             <p>
               Repositories and task workspaces stay on your computer. Agents may send code and
               context to their providers according to your account settings. Separate worktrees keep
               Git changes apart; they do not sandbox agent processes.
             </p>
-          </details>
-          <details>
-            <summary>What happens after I join the waitlist?</summary>
+          </Disclosure>
+          <Disclosure>
+            <DisclosureSummary>What happens after I join the waitlist?</DisclosureSummary>
             <p>
               Verify your email to confirm your place. We’ll email you when access is ready. Joining
               is free, and a waitlist place does not yet grant desktop access.
             </p>
-          </details>
+          </Disclosure>
         </div>
       </section>
 
@@ -352,7 +344,7 @@ export function TourPage({ dark, available }: { dark: boolean; available: boolea
             <a href={resource.href} key={resource.href}>
               <div>
                 <Icon size={24} aria-hidden="true" />
-                <ArrowUpRight size={20} aria-hidden="true" />
+                <ExternalLinkIcon size={20} aria-hidden="true" />
               </div>
               <span className="tour-eyebrow">{resource.label}</span>
               <h3>{resource.title}</h3>

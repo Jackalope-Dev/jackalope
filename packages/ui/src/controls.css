@@ -100,6 +100,13 @@
     background: color-mix(in srgb, var(--badge-tone) 12%, transparent);
     border-color: color-mix(in srgb, var(--badge-tone) 30%, transparent);
   }
+  .ui-badge[data-appearance="plain"] {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-weight: 500;
+  }
   @media (prefers-reduced-motion: reduce) {
     .ui-switch-track,
     .ui-switch-thumb {

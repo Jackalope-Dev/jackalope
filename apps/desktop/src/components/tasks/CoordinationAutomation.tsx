@@ -1,4 +1,4 @@
-import { Checkbox } from '@jackalope/ui';
+import { Checkbox, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -38,8 +38,8 @@ export function CoordinationAutomation({
       className="queue-coordination coordination-decisions"
       aria-label="Automatic coordination"
     >
-      <details>
-        <summary className="task-summary">Automatic coordination</summary>
+      <Disclosure>
+        <DisclosureSummary className="task-summary">Automatic coordination</DisclosureSummary>
         <p>
           When the queue is running, Jackalope can use your default agent to reconcile completed
           work in a separate worktree. This uses your connected agent account and allowance.
@@ -69,7 +69,7 @@ export function CoordinationAutomation({
           results stay in Review & merge. Pausing the queue stops new automatic actions; running
           agents continue.
         </p>
-      </details>
+      </Disclosure>
       {jobs
         .slice(-10)
         .reverse()

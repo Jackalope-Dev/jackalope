@@ -1,4 +1,4 @@
-import { Textarea } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -289,12 +289,14 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
               Each task names an agent, file or folder scopes, and any tasks it depends on. Keep the
               instructions concrete enough to review the result.
             </p>
-            <details className="mt-4 text-sm">
-              <summary className="task-link cursor-pointer">Show the export format</summary>
+            <Disclosure className="mt-4 text-sm">
+              <DisclosureSummary className="task-link cursor-pointer">
+                Show the export format
+              </DisclosureSummary>
               <pre className="task-muted text-xs mt-3 overflow-x-auto whitespace-pre-wrap break-words">
                 {example}
               </pre>
-            </details>
+            </Disclosure>
           </>
         ) : (
           <>
@@ -327,10 +329,12 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
                       ? `After: ${item.dependsOn.map((key) => preview.find((task) => task.key === key)?.title ?? key).join(', ')}`
                       : 'No dependencies'}
                   </p>
-                  <details className="mt-2 text-xs">
-                    <summary className="task-link cursor-pointer">Read instructions</summary>
+                  <Disclosure className="mt-2 text-xs">
+                    <DisclosureSummary className="task-link cursor-pointer">
+                      Read instructions
+                    </DisclosureSummary>
                     <p className="task-muted mt-2 whitespace-pre-wrap break-words">{item.prompt}</p>
-                  </details>
+                  </Disclosure>
                 </li>
               ))}
             </ol>
@@ -367,14 +371,13 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
           <Button variant="ghost" disabled={busy} onClick={onClose}>
             {added ? 'Close' : 'Cancel'}
           </Button>
-          <Button disabled={busy || !text.trim()} onClick={preview ? () => void add() : review}>
-            {busy
-              ? 'Adding…'
-              : added
-                ? 'Refresh queue'
-                : preview
-                  ? `Add ${preview.length} tasks`
-                  : 'Review plan'}
+          <Button
+            disabled={busy || !text.trim()}
+            onClick={preview ? () => void add() : review}
+            loading={busy}
+            loadingLabel={'Adding…'}
+          >
+            {added ? 'Refresh queue' : preview ? `Add ${preview.length} tasks` : 'Review plan'}
             <ArrowRight size={14} />
           </Button>
         </div>

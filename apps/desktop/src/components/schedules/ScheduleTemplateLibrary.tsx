@@ -1,4 +1,5 @@
-import { Search } from 'lucide-react';
+import { SearchField } from '@jackalope/ui';
+
 import { useState } from 'react';
 import {
   filterScheduleTemplates,
@@ -6,7 +7,7 @@ import {
   scheduleTemplates,
 } from '../../lib/schedule-templates';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
+
 import { Select, SelectItem } from '../ui/Select';
 import './schedule-templates.css';
 
@@ -37,16 +38,14 @@ export function ScheduleTemplateLibrary({
         <span className="task-muted">{scheduleTemplates.length} templates</span>
       </div>
       <div className="template-library-filters">
-        <label className="template-search" htmlFor="schedule-template-search">
-          <Search size={18} aria-hidden="true" />
-          <Input
-            id="schedule-template-search"
-            aria-label="Search recurring templates"
-            placeholder="Search templates"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+        <SearchField
+          id="schedule-template-search"
+          aria-label="Search recurring templates"
+          placeholder="Search templates"
+          value={query}
+          onValueChange={(value) => setQuery(value)}
+          containerClassName="template-search"
+        />
         <Select aria-label="Template category" value={category} onValueChange={setCategory}>
           {['All', 'Security', 'Product quality', 'Engineering', 'Project health'].map((value) => (
             <SelectItem key={value} value={value}>

@@ -1,5 +1,5 @@
-import { Input } from '@jackalope/ui';
-import { ArrowLeft, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
+import { Input, Panel, PanelBody, PanelHeader, RefreshIcon } from '@jackalope/ui';
+import { ArrowLeft, Plus, Star, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -61,9 +61,11 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
               variant="outline"
               onClick={() => void save()}
               disabled={!desktop || busy || discovering}
+              loading={busy || discovering}
+              loadingLabel={'Checking…'}
             >
-              <RefreshCw size={15} />
-              {busy || discovering ? 'Checking…' : 'Save & check agents'}
+              <RefreshIcon size={16} />
+              {'Save & check agents'}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setAdding(!adding)}>
               <Plus size={15} />
@@ -102,8 +104,8 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           };
           const enabled = config.isAgentEnabled(agent.id);
           return (
-            <section key={agent.id} className="agent-config-row">
-              <div className="agent-config-heading">
+            <Panel variant="plain" key={agent.id} className="agent-config-row">
+              <PanelHeader className="agent-config-heading">
                 <div className="agent-config-identity">
                   <h3 className="font-medium">
                     {agent.name}
@@ -160,27 +162,27 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                     </Button>
                   )}
                 </div>
-              </div>
+              </PanelHeader>
               {agent.id === 'antigravity' && !runner?.available && (
                 <AgentInstallGuide desktopInstalled={runner?.desktopInstalled} />
               )}
               <section aria-label="Agent accounts">
                 <h3 className="text-base font-medium mt-6">Accounts</h3>
-                <div className="agent-config-fields">
+                <PanelBody className="agent-config-fields">
                   <AgentAccounts
                     key={agent.id}
                     agentId={('adapter' in agent ? agent.adapter : undefined) || agent.id}
                     agentName={agent.name}
                     onChanged={refreshModels}
                   />
-                </div>
+                </PanelBody>
               </section>
               <AgentSupport
                 adapter={('adapter' in agent ? agent.adapter : undefined) ?? agent.id}
               />
               <section aria-label="Models and executable">
                 <h3 className="text-base font-medium mt-4">Models & executable</h3>
-                <div className="agent-config-fields">
+                <PanelBody className="agent-config-fields">
                   <label className="task-label">
                     Executable override
                     <Input
@@ -199,9 +201,9 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                     restricted={options.restrictModels}
                     onChange={update}
                   />
-                </div>
+                </PanelBody>
               </section>
-            </section>
+            </Panel>
           );
         })}
       {!config.defaultMetaAgent && (

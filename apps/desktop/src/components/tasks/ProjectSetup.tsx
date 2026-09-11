@@ -125,8 +125,13 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
             This build does not send usage telemetry or crash reports.
           </p>
           <DialogFooter>
-            <Button type="submit" disabled={!desktop || !path.trim() || busy}>
-              {busy ? 'Checking repository…' : 'Continue setup'}
+            <Button
+              type="submit"
+              disabled={!desktop || !path.trim() || busy}
+              loading={busy}
+              loadingLabel={'Checking repository…'}
+            >
+              {'Continue setup'}
               <ArrowRight size={15} />
             </Button>
           </DialogFooter>

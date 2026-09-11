@@ -1,4 +1,5 @@
-import { ArrowUpRight } from 'lucide-react';
+import { ExternalLinkIcon } from '@jackalope/ui';
+
 import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -139,9 +140,14 @@ export function JackalopeAccount({
       )}
       <div className={welcome ? 'access-account-actions' : 'flex flex-wrap gap-3'}>
         {(account?.state === 'disconnected' || account?.state === 'expired') && (
-          <Button disabled={busy} onClick={() => void act('app_account_connect')}>
-            {busy ? 'Connecting…' : 'Connect account'}
-            {welcome && !busy && <ArrowUpRight size={18} aria-hidden="true" />}
+          <Button
+            disabled={busy}
+            onClick={() => void act('app_account_connect')}
+            loading={busy}
+            loadingLabel={'Connecting…'}
+          >
+            {'Connect account'}
+            {welcome && !busy && <ExternalLinkIcon size={20} aria-hidden="true" />}
           </Button>
         )}
         {(account?.state === 'pending' || account?.state === 'waiting') && (
@@ -172,8 +178,10 @@ export function JackalopeAccount({
               variant="outline"
               disabled={busy}
               onClick={() => void act('app_account_disconnect')}
+              loading={busy}
+              loadingLabel={'Disconnecting…'}
             >
-              {busy ? 'Disconnecting…' : 'Disconnect this desktop'}
+              {'Disconnect this desktop'}
             </Button>
           </>
         )}

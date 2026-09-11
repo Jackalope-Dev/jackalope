@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { ArrowRight, Check, Code2 } from 'lucide-react';
 
 const agents = [
@@ -89,10 +90,10 @@ export function AgentSupport() {
         <Check size={17} /> Tasks & review <span>·</span> Session continuation <span>·</span> Usage
         when reported
       </div>
-      <details className="agent-support-details">
-        <summary>
+      <Disclosure className="agent-support-details">
+        <DisclosureSummary>
           <Code2 size={17} /> Which features work with which agents?
-        </summary>
+        </DisclosureSummary>
         {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users can scroll the comparison on narrow screens. */}
         <section className="agent-support-table" aria-label="Agent connection support" tabIndex={0}>
           <table>
@@ -133,7 +134,7 @@ export function AgentSupport() {
           Model access and subscription requirements depend on your provider. See the{' '}
           <a href="/roadmap/">roadmap</a> for upcoming agent support.
         </p>
-      </details>
+      </Disclosure>
     </section>
   );
 }

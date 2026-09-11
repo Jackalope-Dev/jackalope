@@ -1,5 +1,6 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { ArrowRight, ChevronDown, FolderOpen, ShieldCheck } from 'lucide-react';
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
@@ -167,8 +168,8 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
               <h1 id="access-heading">Welcome to Jackalope.</h1>
               <p>Connect your account to check early access.</p>
             </header>
-            <details className="access-privacy">
-              <summary>
+            <Disclosure className="access-privacy">
+              <DisclosureSummary>
                 <ShieldCheck size={20} />
                 <span>
                   <strong>App preferences & privacy</strong>
@@ -176,8 +177,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                     Settings sync is on for new connections. Review or turn it off here.
                   </small>
                 </span>
-                <ChevronDown size={18} />
-              </summary>
+              </DisclosureSummary>
               <div className="access-privacy-controls">
                 <PrivacySettings />
                 <div className="flex items-center justify-between gap-4">
@@ -189,7 +189,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                   />
                 </div>
               </div>
-            </details>
+            </Disclosure>
             <div className="access-connection">
               {!access && !error ? (
                 <p className="access-checking" role="status">

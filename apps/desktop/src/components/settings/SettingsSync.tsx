@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useEffect } from 'react';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
 import { Button } from '../ui/button';
@@ -23,16 +24,16 @@ export function SettingsSync() {
         Keep appearance, companion and notification preferences across desktops. Credentials,
         projects and task history stay local.
       </p>
-      <details className="space-y-2">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
+      <Disclosure className="space-y-2">
+        <DisclosureSummary className="min-h-11 cursor-pointer py-3 text-sm rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
           How sync works
-        </summary>
+        </DisclosureSummary>
         <p className="settings-row-description">
           The first sync restores saved preferences. Paths stay local. Sync is optional on each
           desktop; turning it off keeps local settings and the saved copy. Account access checks
           continue.
         </p>
-      </details>
+      </Disclosure>
       {!sync.owner && (
         <p role="status">
           {sync.enabled

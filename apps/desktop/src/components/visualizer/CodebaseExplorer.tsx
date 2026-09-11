@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary, RefreshIcon, SearchField } from '@jackalope/ui';
 import {
   Background,
   Controls,
@@ -6,7 +7,7 @@ import {
   ReactFlow,
   type ReactFlowInstance,
 } from '@xyflow/react';
-import { ArrowLeft, Download, FileCode2, Folder, Network, RefreshCw, Search } from 'lucide-react';
+import { ArrowLeft, Download, FileCode2, Folder, Network } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type CodebaseReference,
@@ -21,7 +22,7 @@ import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
-import { Input } from '../ui/input';
+
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -278,7 +279,7 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
               </Button>
             )}
             <Button onClick={() => void scan()} disabled={busy || !isTauriEnvironment()}>
-              <RefreshCw size={16} />
+              <RefreshIcon size={16} />
               {busy
                 ? 'Analyzing…'
                 : stale
@@ -343,20 +344,18 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
             </fieldset>
             {mode === 'map' && (
               <>
-                <div className="codebase-search">
-                  <Search size={17} aria-hidden="true" />
-                  <Input
-                    aria-label="Find a file"
-                    placeholder="Find a file or directory…"
-                    value={query}
-                    onChange={(event) => {
-                      setQuery(event.target.value);
-                      setSelected(null);
-                      setMode('map');
-                      setPage(1);
-                    }}
-                  />
-                </div>
+                <SearchField
+                  aria-label="Find a file"
+                  placeholder="Find a file or directory…"
+                  value={query}
+                  onValueChange={(value) => {
+                    setQuery(value);
+                    setSelected(null);
+                    setMode('map');
+                    setPage(1);
+                  }}
+                  containerClassName="codebase-search"
+                />
                 <Select
                   aria-label="File language"
                   value={language}
@@ -532,8 +531,8 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
               )}
             </>
           )}
-          <details className="codebase-coverage">
-            <summary>What this map covers</summary>
+          <Disclosure className="codebase-coverage">
+            <DisclosureSummary>What this map covers</DisclosureSummary>
             <p>
               {snapshot.files.filter((file) => file.analyzed).length} files syntax-analyzed.
               JavaScript / TypeScript: static imports, re-exports, literal import() and require().
@@ -559,7 +558,7 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
               references, 20 seconds. Read in {(snapshot.durationMs / 1000).toFixed(2)} seconds.
               Recent snapshots are cached briefly for return visits.
             </p>
-          </details>
+          </Disclosure>
         </>
       )}
     </div>

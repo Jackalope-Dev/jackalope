@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { useMemo, useState } from 'react';
 import { computeAgentAnalytics } from '../../lib/agent-analytics';
 import { generateAgentInsights, type WorkflowInsight } from '../../lib/agent-insights';
@@ -171,10 +172,10 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
           >
             <h3 className="font-medium">{insight.title}</h3>
             <p className="task-muted">{insight.description}</p>
-            <details>
-              <summary className="cursor-pointer min-h-11 py-3">
+            <Disclosure>
+              <DisclosureSummary className="cursor-pointer min-h-11 py-3">
                 Inspect {insight.runs.length} source task(s)
-              </summary>
+              </DisclosureSummary>
               <ul>
                 {insight.runs.map((run) => (
                   <li key={run.id}>
@@ -188,7 +189,7 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
                   </li>
                 ))}
               </ul>
-            </details>
+            </Disclosure>
           </article>
         ))}
       </section>
@@ -242,10 +243,10 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
                     {entry.automatic?.managed ? 'Automatically maintained' : 'Edited by you'}
                   </p>
                   <p className="whitespace-pre-wrap break-words">{entry.content}</p>
-                  <details>
-                    <summary className="cursor-pointer min-h-11 py-3">
+                  <Disclosure>
+                    <DisclosureSummary className="cursor-pointer min-h-11 py-3">
                       Source evidence and matching
-                    </summary>
+                    </DisclosureSummary>
                     <p className="task-muted">Matches: {entry.keywords.join(', ')}</p>
                     {entry.automatic?.evidence.map((evidence) => (
                       <p className="task-muted break-words" key={evidence}>
@@ -260,7 +261,7 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
                         Open source task
                       </Button>
                     )}
-                  </details>
+                  </Disclosure>
                 </article>
               );
             })}

@@ -1,7 +1,7 @@
 import { PassTickets } from '@jackalope/brand/passes';
-import { Button, CopyButton, IconButton, Input } from '@jackalope/ui';
+import { Button, CopyButton, IconButton, Input, MailIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, Check, Mail, X } from 'lucide-react';
+import { ArrowRight, Check, X } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
@@ -114,7 +114,7 @@ export function AccessPasses({
           </div>
           <form onSubmit={send}>
             <label htmlFor="pass-dialog-email">
-              <Mail size={17} /> Or send by email
+              <MailIcon size={16} /> Or send by email
             </label>
             <p>Reserve a place for seven days.</p>
             <Input
@@ -132,8 +132,10 @@ export function AccessPasses({
               className="button button-secondary"
               type="submit"
               disabled={busy || !available}
+              loading={busy}
+              loadingLabel={'Sending…'}
             >
-              {busy ? 'Sending…' : 'Send a pass'}
+              {'Send a pass'}
               <ArrowRight size={17} />
             </Button>
           </form>

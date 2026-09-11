@@ -1,14 +1,16 @@
 import {
   Button,
   EmptyState,
+  ExternalLinkIcon,
   FormField,
   InlineNotice,
   PageHeader,
+  RefreshIcon,
   Select,
   SelectItem,
   Table as UiTable,
 } from '@jackalope/ui';
-import { ArrowUpRight, RotateCw } from 'lucide-react';
+
 import type { ReactNode } from 'react';
 
 const nonce = document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content;
@@ -73,8 +75,8 @@ export function Refresh({
   children?: ReactNode;
 }) {
   return (
-    <Button variant="secondary" disabled={loading} onClick={onClick}>
-      <RotateCw size={16} style={{ flexShrink: 0 }} aria-hidden="true" />
+    <Button variant="secondary" loading={loading} loadingLabel="Refreshing…" onClick={onClick}>
+      <RefreshIcon size={16} style={{ flexShrink: 0 }} aria-hidden="true" />
       {children}
     </Button>
   );
@@ -97,7 +99,7 @@ export function QuickLink({
         <strong>{title}</strong>
         <small>{description}</small>
       </div>
-      <ArrowUpRight size={18} aria-hidden="true" />
+      <ExternalLinkIcon size={20} aria-hidden="true" />
     </a>
   );
 }

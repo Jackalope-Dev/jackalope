@@ -1,5 +1,5 @@
-import { Input, Tabs } from '@jackalope/ui';
-import { ArrowLeft, ExternalLink, Search } from 'lucide-react';
+import { Disclosure, DisclosureSummary, SearchField, Tabs } from '@jackalope/ui';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -254,15 +254,13 @@ export function McpServerPage({
             </p>
             {tools.length > 0 ? (
               <>
-                <label className="mcp-tool-search">
-                  <Search size={16} aria-hidden="true" />
-                  <Input
-                    aria-label="Search listed tools"
-                    placeholder="Find a tool…"
-                    value={toolQuery}
-                    onChange={(event) => setToolQuery(event.target.value)}
-                  />
-                </label>
+                <SearchField
+                  aria-label="Search listed tools"
+                  placeholder="Find a tool…"
+                  value={toolQuery}
+                  onValueChange={(value) => setToolQuery(value)}
+                  containerClassName="mcp-tool-search"
+                />
                 <ul className="mcp-detail-tool-list">
                   {filteredTools.map((tool) => (
                     <li key={tool.name}>
@@ -271,10 +269,10 @@ export function McpServerPage({
                       </h3>
                       <p>{tool.description || 'No description supplied.'}</p>
                       {tool.inputSchema && (
-                        <details>
-                          <summary>Input schema</summary>
+                        <Disclosure>
+                          <DisclosureSummary>Input schema</DisclosureSummary>
                           <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
-                        </details>
+                        </Disclosure>
                       )}
                     </li>
                   ))}

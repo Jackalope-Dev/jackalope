@@ -1,3 +1,4 @@
+import { Badge, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -365,7 +366,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                     <div className="queue-item-body">
                       <div className="queue-item-title">
                         <h3>{item.title}</h3>
-                        <span className="task-status">
+                        <Badge appearance="plain" className="task-status">
                           {phase === 'merged'
                             ? 'Integrated'
                             : item.error
@@ -373,17 +374,17 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                               : run
                                 ? statusLabel[run.status]
                                 : 'Queued'}
-                        </span>
+                        </Badge>
                       </div>
                       <p className="task-muted text-xs">
                         {item.agent} · {item.scopes.join(', ')}
                       </p>
                       {phase === 'queued' && <p className="queue-wait">{reason(item)}</p>}
                       {item.error && <InlineNotice tone="error">{item.error}</InlineNotice>}
-                      <details className="mt-2">
-                        <summary className="task-summary">Task brief</summary>
+                      <Disclosure className="mt-2">
+                        <DisclosureSummary className="task-summary">Task brief</DisclosureSummary>
                         <p className="queue-brief">{item.prompt}</p>
-                      </details>
+                      </Disclosure>
                       <div className="queue-item-actions">
                         {run ? (
                           <button

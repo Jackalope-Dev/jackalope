@@ -1,5 +1,5 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
-import { Input, Textarea } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Input, RefreshIcon, Textarea } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,7 +8,6 @@ import {
   ExternalLink,
   FolderOpen,
   FolderPlus,
-  RefreshCw,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
@@ -281,7 +280,7 @@ export function OnboardingFlow({
                 disabled={busy || execution.discovering || !desktop}
                 onClick={() => void refresh()}
               >
-                <RefreshCw size={15} />
+                <RefreshIcon size={16} />
                 {execution.discovering ? 'Scanning agents…' : 'Re-scan agents'}
               </Button>
             )}
@@ -615,10 +614,10 @@ export function OnboardingFlow({
               )}
 
               {installableAgents.length > 0 && (
-                <details className="onboarding-install-catalog">
-                  <summary>
+                <Disclosure className="onboarding-install-catalog">
+                  <DisclosureSummary>
                     Install other supported agents ({installableAgents.length} available)
-                  </summary>
+                  </DisclosureSummary>
                   <div className="onboarding-catalog-grid">
                     {installableAgents.map((b) => (
                       <div key={b.id} className="onboarding-catalog-card">
@@ -663,7 +662,7 @@ export function OnboardingFlow({
                       </div>
                     ))}
                   </div>
-                </details>
+                </Disclosure>
               )}
 
               <div className="onboarding-actions">

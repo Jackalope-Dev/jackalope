@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import type { TaskRun } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
@@ -37,10 +38,10 @@ export function CoordinationDecisions({
                 These files also changed in another task. Reconcile the edits before merging.
               </InlineNotice>
             )}
-            <details>
-              <summary className="task-summary">
+            <Disclosure>
+              <DisclosureSummary className="task-summary">
                 Review files outside the assignment or shared with another task
-              </summary>
+              </DisclosureSummary>
               <ul className="coordination-paths">
                 {[...new Set([...audit.outside, ...audit.overlaps])].map((path) => (
                   <li key={path}>
@@ -74,7 +75,7 @@ export function CoordinationDecisions({
                 </>
               )}
               {accepted && <p className="task-muted">Extra files accepted for this version.</p>}
-            </details>
+            </Disclosure>
           </article>
         );
       })}
@@ -118,8 +119,10 @@ export function CoordinationDecisions({
             )}
             {agreement.kind === 'ownership' &&
               !['released', 'canceled'].includes(agreement.status) && (
-                <details>
-                  <summary className="task-summary">Release this responsibility</summary>
+                <Disclosure>
+                  <DisclosureSummary className="task-summary">
+                    Release this responsibility
+                  </DisclosureSummary>
                   <p>
                     The owner must be stopped. Changes in the claimed paths must be preserved
                     through integration or removed from this worktree first.
@@ -136,12 +139,14 @@ export function CoordinationDecisions({
                   >
                     Release ownership
                   </Button>
-                </details>
+                </Disclosure>
               )}
             {agreement.kind === 'interface' &&
               ['pending', 'rejected'].includes(agreement.status) && (
-                <details>
-                  <summary className="task-summary">Resolve this decision</summary>
+                <Disclosure>
+                  <DisclosureSummary className="task-summary">
+                    Resolve this decision
+                  </DisclosureSummary>
                   <p>
                     Continue the affected tasks to reach agreement. If this interface is no longer
                     needed, cancel its gate to allow dependent work and review.
@@ -158,7 +163,7 @@ export function CoordinationDecisions({
                   >
                     Cancel interface gate
                   </Button>
-                </details>
+                </Disclosure>
               )}
           </article>
         ))}

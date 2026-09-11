@@ -1,3 +1,4 @@
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { Check, FileText, Layers } from 'lucide-react';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { Setting } from '../settings/Setting';
@@ -75,42 +76,42 @@ export function TaskContextPanel({
                     <span className="task-context-suggestion">Suggested</span>
                   )}
                 </button>
-                <details>
-                  <summary aria-label={`Read ${skill.shortLabel} guidelines`}>
+                <Disclosure>
+                  <DisclosureSummary aria-label={`Read ${skill.shortLabel} guidelines`}>
                     Read guidelines
-                  </summary>
+                  </DisclosureSummary>
                   <p>{skill.description}</p>
                   <ul>
                     {skill.guidelines.map((rule) => (
                       <li key={rule}>{rule}</li>
                     ))}
                   </ul>
-                </details>
+                </Disclosure>
               </div>
             );
           })}
         </div>
         {instructions && (
-          <details className="task-context-instructions">
-            <summary>
+          <Disclosure className="task-context-instructions">
+            <DisclosureSummary>
               <FileText size={16} aria-hidden="true" />
               Project instructions<span className="task-experience-meta">Included</span>
-            </summary>
+            </DisclosureSummary>
 
             <CodeSurface label="Project instructions">{instructions}</CodeSurface>
-          </details>
+          </Disclosure>
         )}
-        <details className="task-context-instructions">
-          <summary>
+        <Disclosure className="task-context-instructions">
+          <DisclosureSummary>
             <FileText size={16} aria-hidden="true" />
             Full task prompt
-          </summary>
+          </DisclosureSummary>
           {prompt ? (
             <CodeSurface label="Full task prompt">{prompt}</CodeSurface>
           ) : (
             <p className="task-experience-muted">Describe your task to preview the prompt.</p>
           )}
-        </details>
+        </Disclosure>
       </div>
     </Container>
   );

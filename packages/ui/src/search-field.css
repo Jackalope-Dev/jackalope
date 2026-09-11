@@ -1,0 +1,34 @@
+@import "./foundation.css";
+@layer components {
+  .ui-search-field {
+    position: relative;
+    min-width: 0;
+    width: 100%;
+  }
+  .ui-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .ui-search-field .ui-search-input {
+    width: 100%;
+    padding-left: 40px;
+    padding-right: 48px;
+  }
+  .ui-search-input::-webkit-search-cancel-button {
+    appearance: none;
+  }
+  .ui-search-clear {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-secondary);
+  }
+  .ui-search-clear:active {
+    transform: translateY(-50%);
+  }
+}

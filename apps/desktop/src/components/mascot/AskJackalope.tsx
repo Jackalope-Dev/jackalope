@@ -1,4 +1,4 @@
-import { Textarea } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import { Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
@@ -53,10 +53,10 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
                 {turn.model ? ` · ${turn.model}` : ''}
               </small>
               {!!turn.steps.length && (
-                <details>
-                  <summary>
+                <Disclosure>
+                  <DisclosureSummary>
                     {turn.steps.length} tool {turn.steps.length === 1 ? 'call' : 'calls'}
-                  </summary>
+                  </DisclosureSummary>
                   <ul>
                     {[...new Set(turn.steps)].map((step) => (
                       <li key={step}>
@@ -65,7 +65,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
                       </li>
                     ))}
                   </ul>
-                </details>
+                </Disclosure>
               )}
               {turn.answer && (
                 <Suspense fallback={<p>{turn.answer}</p>}>

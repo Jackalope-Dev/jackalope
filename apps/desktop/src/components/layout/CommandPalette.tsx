@@ -1,7 +1,7 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
-import { Input } from '@jackalope/ui';
+import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LifeBuoy, Plus, Search, Settings2 } from 'lucide-react';
+import { LifeBuoy, Plus, Settings2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { shortcutLabel } from '../../lib/platform-shortcuts';
 import { openExternalUrl } from '../../lib/tauri-bridge';
@@ -87,13 +87,12 @@ export function CommandPalette({
             Search, then use arrow keys and Enter to choose. Escape closes this dialog.
           </Dialog.Description>
           <div className="command-search">
-            <Search className="size-4 text-[var(--color-text-muted)]" />
-            <Input
+            <SearchField
               aria-label="Search commands"
               placeholder="Where do you want to go?"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
               className="w-full bg-transparent text-sm py-1 outline-none"
+              onValueChange={(value) => setQuery(value)}
             />
             <Dialog.Close className="quiet-icon text-xs" aria-label="Close commands">
               Esc

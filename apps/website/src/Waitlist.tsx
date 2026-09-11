@@ -1,5 +1,5 @@
-import { Button, Input } from '@jackalope/ui';
-import { ArrowRight, Check, Copy, LogOut, Mail, RefreshCw, Share2 } from 'lucide-react';
+import { Button, Input, MailIcon, Panel, RefreshIcon } from '@jackalope/ui';
+import { ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
@@ -161,7 +161,7 @@ export function WaitlistPage() {
       {loading ? (
         <p role="status">Finding your place…</p>
       ) : token ? (
-        <section className="access-card access-entry">
+        <Panel variant="plain" className="access-card access-entry">
           <h2>Make your place yours.</h2>
           <p>Confirm your email to see your number and start earning referral priority.</p>
           <div className="access-entry-actions">
@@ -185,7 +185,7 @@ export function WaitlistPage() {
               Request a different link
             </Button>
           </div>
-        </section>
+        </Panel>
       ) : place ? (
         <>
           <div className="access-identity">
@@ -208,7 +208,7 @@ export function WaitlistPage() {
             </Button>
           </div>
           {place.status === 'approved' ? (
-            <section className="waitlist-approved access-card">
+            <Panel variant="plain" className="waitlist-approved access-card">
               <Check size={32} />
               <h2>You’re in. Bring five people.</h2>
               <p>
@@ -219,7 +219,7 @@ export function WaitlistPage() {
                 Open my passes
                 <ArrowRight size={18} />
               </a>
-            </section>
+            </Panel>
           ) : (
             <section className="queue-ticket" aria-label="Your waitlist position">
               <div className="queue-ticket-number">
@@ -253,13 +253,13 @@ export function WaitlistPage() {
                     })
                   }
                 >
-                  <RefreshCw size={16} />
+                  <RefreshIcon size={16} />
                   Refresh my place
                 </Button>
               </div>
             </section>
           )}
-          <section className="access-card waitlist-sharing">
+          <Panel variant="plain" className="access-card waitlist-sharing">
             <div>
               <h2>
                 {place.status === 'approved'
@@ -305,7 +305,7 @@ export function WaitlistPage() {
                 </Button>
               </div>
             </div>
-          </section>
+          </Panel>
           <WaitlistQuestions
             answers={place.preferences}
             onSaved={(preferences) => setPlace({ ...place, preferences })}
@@ -326,7 +326,7 @@ export function WaitlistPage() {
           </aside>
         </>
       ) : (
-        <section className="access-card access-entry">
+        <Panel variant="plain" className="access-card access-entry">
           <h2>{sent ? 'Check your inbox.' : 'Find your place.'}</h2>
           <p>
             {sent
@@ -354,9 +354,11 @@ export function WaitlistPage() {
                 className="button button-primary"
                 type="submit"
                 disabled={busy}
+                loading={busy}
+                loadingLabel={'Sending…'}
               >
-                {busy ? 'Sending…' : sent ? 'Send a fresh link' : 'Email my private link'}
-                <Mail size={18} />
+                {sent ? 'Send a fresh link' : 'Email my private link'}
+                <MailIcon size={20} />
               </Button>
             </form>
           ) : (
@@ -366,7 +368,7 @@ export function WaitlistPage() {
             New here? <a href="/#newsletter">Join the waitlist</a>. Already accepted?{' '}
             <a href="/access/">Open your member space</a>.
           </p>
-        </section>
+        </Panel>
       )}
     </main>
   );

@@ -395,9 +395,6 @@
 .feature-card-details summary::-webkit-details-marker {
   display: none;
 }
-.feature-card-details[open] summary svg {
-  transform: rotate(45deg);
-}
 .landing-story .feature-card-details p {
   margin: 0 0 16px;
   font-size: 13px;

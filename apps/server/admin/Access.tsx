@@ -8,10 +8,13 @@ import {
   DialogCloseButton,
   DialogContent,
   DialogHeader,
+  Disclosure,
+  DisclosureSummary,
   EmptyState,
   FormField,
-  Input,
   LoadingState,
+  Panel,
+  SearchField,
   SegmentedControl,
   useDialogFocus,
 } from '@jackalope/ui';
@@ -111,7 +114,7 @@ export function People({ search }: { search: string }) {
       >
         Review requests and help people take their next step.
       </Heading>
-      <section className="panel">
+      <Panel className="panel">
         <h2>Manage access</h2>
         <p>
           Waitlist referrals are unlimited. Each verified signup earns one day of priority. Instant
@@ -145,13 +148,12 @@ export function People({ search }: { search: string }) {
             ]}
           />
           <FormField label="Find an email">
-            <Input
+            <SearchField
               ref={searchRef}
-              type="search"
               maxLength={254}
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
               placeholder="Search in the selected group"
+              onValueChange={(value) => setQuery(value)}
             />
           </FormField>
           <SelectField
@@ -284,7 +286,7 @@ export function People({ search }: { search: string }) {
             Load more people
           </Button>
         )}
-      </section>
+      </Panel>
       {detail && <Details person={detail} onClose={() => setDetail(null)} />}
       {action && (
         <ConfirmAction
@@ -533,8 +535,14 @@ function EmailEntry({ mail }: { mail: Mail }) {
       <ErrorNotice>{error}</ErrorNotice>
       {mail.can_check ? (
         <div className="actions">
-          <Button variant="secondary" disabled={busy} onClick={() => void check()}>
-            {busy ? 'Checking…' : 'Check delivery'}
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void check()}
+            loading={busy}
+            loadingLabel={'Checking…'}
+          >
+            {'Check delivery'}
           </Button>
         </div>
       ) : (
@@ -561,7 +569,7 @@ export function Audience() {
       >
         Understand who is waiting and what they want to build.
       </Heading>
-      <section className="panel">
+      <Panel className="panel">
         <h2>What future users need</h2>
         <ErrorNotice>{request.error}</ErrorNotice>
         <p role="status">
@@ -608,7 +616,7 @@ export function Audience() {
           Optional answers, multiple choices per person. These describe respondents, not all
           visitors. Missing answers are not zero demand.
         </p>
-      </section>
+      </Panel>
     </>
   );
 }
@@ -629,7 +637,7 @@ export function Setup() {
       >
         Check access, email and distribution before your next invitation.
       </Heading>
-      <section className="panel">
+      <Panel className="panel">
         <h2>Before you invite</h2>
         <ErrorNotice>{request.error}</ErrorNotice>
         <p role="status">
@@ -684,8 +692,8 @@ export function Setup() {
             ))}
           </ul>
         )}
-        <details>
-          <summary>First-user onboarding checklist</summary>
+        <Disclosure>
+          <DisclosureSummary>First-user onboarding checklist</DisclosureSummary>
           <ol>
             <li>
               Configure the certified Microsoft Store listing link, or upload a reviewed,
@@ -709,13 +717,13 @@ export function Setup() {
             Setup checks show configuration and file availability. They do not verify the publisher
             signature, installation, inbox placement or a completed user task.
           </p>
-        </details>
-      </section>
-      <section className="panel">
+        </Disclosure>
+      </Panel>
+      <Panel className="panel">
         <h2>Email templates</h2>
         <p>Preview the messages people receive during onboarding.</p>
-        <details>
-          <summary>Browse email previews</summary>
+        <Disclosure>
+          <DisclosureSummary>Browse email previews</DisclosureSummary>
           <nav aria-label="Email previews">
             {[
               ['waitlist', 'Waitlist verification'],
@@ -738,8 +746,8 @@ export function Setup() {
             ))}
           </nav>
           <p>Previews use sample data and cannot sign anyone in.</p>
-        </details>
-      </section>
+        </Disclosure>
+      </Panel>
     </>
   );
 }
