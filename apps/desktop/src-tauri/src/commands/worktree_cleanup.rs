@@ -216,22 +216,35 @@ fn ignored_location(root: &Path, name: &str) -> Option<PathBuf> {
     Some(root.join(relative))
 }
 
-/// Dependency and build trees a package manager or compiler rewrites wholesale.
-/// The scan below does not descend into them: their contents are restored from a
-/// manifest, and third-party fixtures there otherwise trip every name check.
+/// Dependency and build trees a package manager or compiler restores from a
+/// manifest. The scan below does not descend into them: third-party fixtures
+/// there trip every name check, and walking them is slow. A name missing here
+/// only costs an unnecessary block and a slower scan, never a lost file, so this
+/// list stays limited to trees a lockfile or build command rebuilds in full.
 fn regenerable_tree(name: &str) -> bool {
     matches!(
         name,
-        "node_modules" | ".pnpm-store" | ".yarn" | "vendor" | "target"
+        // JavaScript
+        "node_modules" | ".pnpm-store" | ".yarn" | "bower_components" | ".turbo"
+        // Rust, Maven, Go, PHP, Ruby
+        | "target" | "vendor" | ".bundle" | ".gradle" | ".m2"
+        // Python
+        | ".venv" | "venv" | "site-packages" | "__pycache__" | ".tox"
+        | ".mypy_cache" | ".pytest_cache" | ".ruff_cache"
+        // Elixir, Dart, Swift, Haskell
+        | "_build" | "deps" | ".dart_tool" | "Pods" | "DerivedData" | ".build"
+        | ".stack-work" | "dist-newstyle"
     )
 }
 
 /// Names that carry secrets or local data rather than regenerable output. Ignored
-/// content matching these is never deleted; the worktree is kept until it moves out.
+/// content matching these is never deleted; the worktree is kept until it moves
+/// out. This is the only guard between an ignored file and removal, so a name
+/// missing here costs a file that cannot be recovered: prefer a false block.
 fn sensitive_name(filename: &str) -> bool {
     let filename = filename.to_ascii_lowercase();
-    // Committed templates such as .env.example carry placeholders, not secrets.
-    if [".example", ".sample", ".template"]
+    // Checked-in templates such as .env.example carry placeholders, not secrets.
+    if [".example", ".sample", ".template", ".dist"]
         .iter()
         .any(|suffix| filename.ends_with(suffix))
     {
@@ -239,26 +252,45 @@ fn sensitive_name(filename: &str) -> bool {
     }
     matches!(
         filename.as_str(),
+        // A nested repository holds history nothing here can restore.
         ".git"
-            | ".env"
-            | ".envrc"
-            | ".npmrc"
-            | ".netrc"
-            | ".pypirc"
-            | ".dev.vars"
-            | "credentials"
-            | "credentials.toml"
+        // Environment and package-manager credentials
+        | ".env" | ".envrc" | ".npmrc" | ".netrc" | ".pypirc" | ".dev.vars"
+        | ".s3cfg" | ".boto" | ".pgpass" | ".my.cnf" | ".dockercfg" | ".htpasswd"
+        | "credentials" | "credentials.toml" | "credentials.json" | "secrets.json"
+        // Private keys by convention rather than extension
+        | "id_rsa" | "id_dsa" | "id_ecdsa" | "id_ed25519"
     ) || filename.starts_with(".env.")
         || filename.starts_with(".dev.vars.")
+        || filename.starts_with("secrets.")
         || [
+            // Keys, certificates and keystores
             ".key",
             ".pem",
+            ".p8",
             ".p12",
             ".pfx",
+            ".ppk",
+            ".jks",
             ".keystore",
+            ".asc",
+            ".gpg",
+            // Infrastructure state, which embeds provider credentials
+            ".tfstate",
+            ".tfvars",
+            // Local databases
             ".db",
+            ".db3",
             ".sqlite",
             ".sqlite3",
+            ".sqlitedb",
+            ".mdb",
+            ".accdb",
+            ".duckdb",
+            ".realm",
+            ".rdb",
+            // Anything trailing .env, such as local.env or prod.env
+            ".env",
         ]
         .iter()
         .any(|suffix| filename.ends_with(suffix))
@@ -1317,6 +1349,12 @@ mod tests {
             "dist/.env.local",
             "dist/state.sqlite",
             "ignored/keys/id.pem",
+            "ignored/keys/id_ed25519",
+            "ignored/infra/terraform.tfstate",
+            "ignored/infra/prod.tfvars",
+            "dist/prod.env",
+            "dist/analytics.duckdb",
+            "dist/secrets.json",
         ] {
             let f = Fixture::new("main");
             fs::write(f.worktree.join(".gitignore"), ".env\nignored/\ndist/\n").unwrap();
@@ -1368,12 +1406,15 @@ mod tests {
         // A placeholder template, and a third-party fixture inside a dependency
         // tree, are both regenerable and must not keep the worktree.
         fs::write(f.worktree.join("ignored/.env.example"), "TOKEN=").unwrap();
-        fs::create_dir_all(f.worktree.join("ignored/node_modules/pkg")).unwrap();
-        fs::write(
-            f.worktree.join("ignored/node_modules/pkg/test.pem"),
-            "fixture",
-        )
-        .unwrap();
+        for tree in [
+            "node_modules/pkg",
+            ".venv/lib/site-packages/pkg",
+            "Pods/lib",
+        ] {
+            let dir = f.worktree.join("ignored").join(tree);
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join("test.pem"), "fixture").unwrap();
+        }
         fs::create_dir(f.worktree.join("out")).unwrap();
         fs::write(f.worktree.join("out/bundle.js"), "generated").unwrap();
         fs::write(f.worktree.join("install.log"), "generated").unwrap();
