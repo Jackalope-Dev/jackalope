@@ -1,13 +1,3 @@
-.mcp-workspace {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  overflow-y: auto;
-  padding: 1.5rem 1.75rem 3rem;
-  max-width: 76rem;
-  margin: 0 auto;
-}
-
 .mcp-tabs {
   display: flex;
   align-items: center;
@@ -635,21 +625,6 @@
   }
 }
 
-.mcp-server-hero {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 24px;
-  padding: 28px 0;
-}
-.mcp-server-hero h1 {
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.mcp-server-hero h1:focus {
-  outline: none;
-}
 .mcp-server-icon {
   display: grid;
   place-items: center;
@@ -664,13 +639,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-.mcp-server-identity {
-  flex: 1;
-  min-width: 0;
-}
-.mcp-server-identity .mcp-market-labels {
-  margin-top: 12px;
 }
 .mcp-server-actions {
   display: flex;

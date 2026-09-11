@@ -25,6 +25,8 @@ import { ArcColorPicker } from '../theme/ArcColorPicker';
 import { LoadingState } from '../ui/LoadingState';
 import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { Tooltip } from '../ui/Tooltip';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import { InvitationsButton } from './InvitationsButton';
 import {
@@ -403,7 +405,14 @@ export function Shell({
           key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
           onBack={activeTab === 'kanban' ? undefined : () => setActiveTab('kanban')}
         >
-          <Suspense fallback={<LoadingState label={`Opening ${view.label}…`} />}>
+          <Suspense
+            fallback={
+              <WorkspacePage>
+                <WorkspaceHeading title={activeTab === 'topology' ? 'Codebase' : view.label} />
+                <LoadingState compact label={`Opening ${view.label}…`} />
+              </WorkspacePage>
+            }
+          >
             {activeTab === 'kanban' && (
               <TaskWorkspace
                 composerVisible={!capture}
@@ -454,9 +463,9 @@ export function Shell({
               />
             )}
             {activeTab === 'agent-settings' && (
-              <section className="workspace-page agent-settings-page w-full">
+              <WorkspacePage className="agent-settings-page">
                 <AgentManager key={configuredAgent} initialAgentId={configuredAgent} />
-              </section>
+              </WorkspacePage>
             )}
             {activeTab === 'project-settings' && <ProjectPreferences key={activeProjectId} />}
             {activeTab === 'project-knowledge' && <ProjectContext key={activeProjectId} />}

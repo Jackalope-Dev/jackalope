@@ -23,6 +23,8 @@ import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ScheduleTemplateLibrary } from './ScheduleTemplateLibrary';
 import { ScheduleTiming } from './ScheduleTiming';
 
@@ -238,7 +240,7 @@ export function ScheduleManager(props: {
       (s) => !activeProjectId || s.definition.request.projectId === activeProjectId,
     ) ?? [];
   return (
-    <section className="task-page">
+    <WorkspacePage className="">
       <WorkspaceHeading
         title="Recurring tasks"
         description="Runs while Jackalope is open, including in the tray."
@@ -254,7 +256,7 @@ export function ScheduleManager(props: {
         }
       />
       {!desktop && <p className="task-notice">Open the desktop app to schedule execution.</p>}
-      {visible.length > 0 && <h2 className="text-base font-medium mt-5">Your schedules</h2>}
+      {visible.length > 0 && <WorkspaceSectionHeading title="Your schedules" />}
       {(error || ledger?.error) && (
         <p role="alert" className="task-error">
           {error || ledger?.error}
@@ -779,6 +781,6 @@ export function ScheduleManager(props: {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </section>
+    </WorkspacePage>
   );
 }

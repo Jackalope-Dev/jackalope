@@ -45,15 +45,15 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
     }
   };
   return (
-    <div className="agent-manager">
-      <Button variant="ghost" className="self-start" onClick={() => navigateWorkspace('agents')}>
-        <ArrowLeft size={16} />
-        Back to agents
-      </Button>
+    <div className="agent-manager workspace-stack">
       <WorkspaceHeading
         title={`Configure ${selected?.name ?? 'agent'}`}
         action={
           <div className="flex flex-wrap gap-3">
+            <Button variant="ghost" onClick={() => navigateWorkspace('agents')}>
+              <ArrowLeft size={16} />
+              Back to agents
+            </Button>
             <Button
               type="button"
               variant="outline"

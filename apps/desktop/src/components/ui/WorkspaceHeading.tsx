@@ -1,25 +1,29 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
+import './workspace-layout.css';
 
 export function WorkspaceHeading({
   title,
   description,
   action,
+  titleRef,
+  icon,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  titleRef?: Ref<HTMLHeadingElement>;
+  icon?: ReactNode;
 }) {
   return (
-    <header className="workspace-heading flex flex-wrap items-end justify-between gap-5 pb-6">
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-semibold tracking-[-0.045em] leading-tight text-[var(--color-text-primary)]">
-          {title}
-        </h1>
-        {description && (
-          <p className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-            {description}
-          </p>
-        )}
+    <header className="workspace-heading">
+      <div className="workspace-heading-identity">
+        {icon}
+        <div>
+          <h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined}>
+            {title}
+          </h1>
+          {description && <p>{description}</p>}
+        </div>
       </div>
       {action}
     </header>

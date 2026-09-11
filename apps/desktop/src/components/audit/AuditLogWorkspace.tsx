@@ -116,8 +116,7 @@ export function AuditLogWorkspace() {
   };
 
   return (
-    <div className="task-page activity-log">
-      {/* Workspace Header */}
+    <div className="activity-log">
       <div className="pb-5 border-b border-[var(--color-border)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -125,7 +124,7 @@ export function AuditLogWorkspace() {
               <span className="p-1.5 rounded-lg bg-[var(--color-accent-subtle)] text-[var(--color-accent-ink)]">
                 <History size={18} />
               </span>
-              <h1 className="task-title">Activity log</h1>
+              <h3 className="text-base font-semibold">Activity log</h3>
             </div>
           </div>
 

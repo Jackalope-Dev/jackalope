@@ -37,6 +37,20 @@ export function WaitlistPage() {
     window.clearTimeout(copiedTimer.current);
     copiedTimer.current = window.setTimeout(() => setCopied(''), 2000);
   }
+  /**
+   * Clipboard writes are instant and never touch the network, so they stay out
+   * of `act`: flipping `busy` disables the button mid-press, which moves focus
+   * off it - and the button is now where the confirmation lives.
+   */
+  async function copyText(value: string, which: 'share' | 'link') {
+    try {
+      await navigator.clipboard.writeText(value);
+      setError('');
+      markCopied(which);
+    } catch {
+      setError('Copying didn’t work. Select your link above and copy it.');
+    }
+  }
   const refreshPlace = useCallback(() => {
     void accessRequest<Place>('waitlist/me')
       .then(setPlace)
@@ -119,11 +133,7 @@ export function WaitlistPage() {
         if (!(e instanceof DOMException && e.name === 'AbortError'))
           setError('Sharing didn’t open. Copy your link below.');
       }
-    } else
-      await act(async () => {
-        await navigator.clipboard.writeText(`${shareMessage}\n\n${place.shareUrl}`);
-        markCopied('share');
-      });
+    } else await copyText(`${shareMessage}\n\n${place.shareUrl}`, 'share');
   }
   return (
     <main id="main" className="access-page page-width waitlist-page">
@@ -280,12 +290,7 @@ export function WaitlistPage() {
                 <button
                   className="button button-secondary"
                   disabled={busy}
-                  onClick={() =>
-                    void act(async () => {
-                      await navigator.clipboard.writeText(place.shareUrl);
-                      markCopied('link');
-                    })
-                  }
+                  onClick={() => void copyText(place.shareUrl, 'link')}
                   type="button"
                 >
                   {copied === 'link' ? <Check size={18} /> : <Copy size={18} />}

@@ -1,0 +1,107 @@
+.workspace-page-layout {
+  --workspace-page-padding: 32px;
+  --workspace-heading-gap: 24px;
+  --workspace-section-gap: 32px;
+  --workspace-section-heading-gap: 16px;
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  max-width: 1320px;
+  margin-inline: auto;
+  padding: var(--workspace-page-padding) var(--workspace-gutter, 32px) 48px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+}
+.workspace-canvas > .workspace-page-layout {
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: max(var(--workspace-gutter, 32px), calc((100% - 1320px) / 2));
+}
+.workspace-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: var(--workspace-heading-gap, 24px);
+}
+.workspace-heading > div:first-child,
+.workspace-section-header > div:first-child {
+  min-width: 0;
+  max-width: 65ch;
+}
+.workspace-heading-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.workspace-heading-identity > div {
+  min-width: 0;
+}
+.workspace-heading h1 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.25;
+}
+.workspace-heading h1:focus {
+  outline: none;
+}
+.workspace-heading p,
+.workspace-section-header p {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.workspace-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--workspace-heading-gap, 24px);
+  min-width: 0;
+}
+.workspace-stack > .workspace-heading {
+  margin-bottom: 0;
+}
+.workspace-section.workspace-stack {
+  gap: var(--workspace-section-heading-gap, 16px);
+}
+.workspace-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--workspace-section-gap, 32px);
+}
+.workspace-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: var(--workspace-section-heading-gap, 16px);
+}
+.workspace-section-header :is(h2, h3) {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+  scroll-margin-top: var(--workspace-heading-gap, 24px);
+}
+.workspace-section-header h3 {
+  font-size: var(--text-base);
+}
+.workspace-stack > .workspace-section-header {
+  margin-bottom: 0;
+}
+.workspace-section + .workspace-section {
+  margin-top: var(--workspace-section-gap, 32px);
+}
+.workspace-sections > .workspace-section {
+  margin-top: 0;
+}

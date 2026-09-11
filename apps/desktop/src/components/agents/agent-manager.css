@@ -1,21 +1,10 @@
 .agents-page-content {
   width: 100%;
-  max-width: 960px;
-  margin-inline: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
 }
 
 .agent-manager {
   container-type: inline-size;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
   min-width: 0;
-}
-.agent-manager > .workspace-heading {
-  padding-bottom: 0;
 }
 
 .agent-config-row {
@@ -282,13 +271,6 @@
 .agent-account-status {
   overflow-wrap: anywhere;
   margin-top: 8px;
-}
-
-.workspace-page.agent-settings-page {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-bottom: 64px;
 }
 
 .agent-install-guide {

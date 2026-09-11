@@ -14,6 +14,7 @@ import { Setting } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import '../settings/settings.css';
 
 export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
@@ -60,7 +61,7 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
     ...runs.map((run) => [run.projectId, run.projectName] as const),
   ]);
   return (
-    <div className="agent-metrics-dashboard space-y-6">
+    <div className="agent-metrics-dashboard workspace-sections">
       {sourceError && (
         <p role="alert" className="task-error">
           {sourceError}
@@ -84,8 +85,8 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
         explicit outcome-review decisions. Records describe the reviewed snapshot; files may have
         changed since.
       </p>
-      <section className="space-y-3">
-        <h2>Execution time</h2>
+      <section className="workspace-section workspace-stack">
+        <WorkspaceSectionHeading title="Execution time" />
         <p className="task-muted">
           Recorded work time across attempts. Parallel stages overlap in wall time; older tasks may
           have no timing records.
@@ -139,21 +140,26 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
           </div>
         ))}
       </dl>
-      <section className="space-y-3" aria-label="Findings from task history">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg">Findings from task history</h2>
-          <Select
-            aria-label="Insight category"
-            value={category}
-            onValueChange={(value) => setCategory(value as typeof category)}
-          >
-            {(['all', 'review', 'checks', 'learning', 'resilience'] as const).map((value) => (
-              <SelectItem key={value} value={value}>
-                {value === 'all' ? 'All findings' : value[0].toUpperCase() + value.slice(1)}
-              </SelectItem>
-            ))}
-          </Select>
-        </div>
+      <section
+        className="workspace-section workspace-stack"
+        aria-label="Findings from task history"
+      >
+        <WorkspaceSectionHeading
+          title="Findings from task history"
+          action={
+            <Select
+              aria-label="Insight category"
+              value={category}
+              onValueChange={(value) => setCategory(value as typeof category)}
+            >
+              {(['all', 'review', 'checks', 'learning', 'resilience'] as const).map((value) => (
+                <SelectItem key={value} value={value}>
+                  {value === 'all' ? 'All findings' : value[0].toUpperCase() + value.slice(1)}
+                </SelectItem>
+              ))}
+            </Select>
+          }
+        />
         {!shown.length && (
           <p className="task-muted" role="status">
             No findings in this view. Recorded review feedback, failed checks, quota handoffs and
@@ -188,8 +194,8 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
           </article>
         ))}
       </section>
-      <section className="space-y-3" aria-label="Automatic project lessons">
-        <h2 className="text-lg">Automatic project lessons</h2>
+      <section className="workspace-section workspace-stack" aria-label="Automatic project lessons">
+        <WorkspaceSectionHeading title="Automatic project lessons" />
         <p className="task-muted">
           Explicit preferences, review corrections and repository tooling are saved locally and
           matched to future tasks. Edit or pause a lesson here; remove it in Project → Context.
@@ -263,8 +269,8 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
           </>
         )}
       </section>
-      <section className="space-y-3" aria-label="Recorded agent runs">
-        <h2 className="text-lg">Recorded agent runs</h2>
+      <section className="workspace-section workspace-stack" aria-label="Recorded agent runs">
+        <WorkspaceSectionHeading title="Recorded agent runs" />
         <p className="task-muted">
           Grouped by the final assigned agent. Duration excludes active attempts and attempts with
           handoffs. Task complexity differs; these averages do not rank agents or measure

@@ -6,7 +6,6 @@
   padding: 44px clamp(24px, 5vw, 72px) 64px;
   color: var(--color-text-primary);
 }
-.task-home,
 .task-detail {
   max-width: 1120px;
   margin: 0 auto;
@@ -38,9 +37,6 @@
 .task-label {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-}
-.task-introduction {
-  margin: 8px 0 28px;
 }
 .task-composer {
   border-radius: 20px;
@@ -433,7 +429,7 @@ select option {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  margin: 35px 0;
+  margin: 0;
 }
 .usage-filters label {
   font-size: var(--text-xs);

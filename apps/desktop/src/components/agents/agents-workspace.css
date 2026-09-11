@@ -125,9 +125,6 @@
   }
 }
 
-.agents-page .agents-page-content {
-  max-width: 1320px;
-}
 .agent-roster-identity {
   min-width: 0;
   overflow-wrap: anywhere;

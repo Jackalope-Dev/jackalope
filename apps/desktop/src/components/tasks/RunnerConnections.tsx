@@ -17,6 +17,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/LoadingState';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
 import '../agents/agents-workspace.css';
 
 export function RunnerConnections({
@@ -98,8 +99,8 @@ export function RunnerConnections({
   }
   const missing = runners.filter((runner) => !identified.some((agent) => agent.id === runner.id));
   return (
-    <section className="task-page agents-page">
-      <div className="agents-page-content">
+    <WorkspacePage className="agents-page">
+      <div className="agents-page-content workspace-stack">
         <WorkspaceHeading
           title="Agents"
           action={
@@ -355,6 +356,6 @@ export function RunnerConnections({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </section>
+    </WorkspacePage>
   );
 }

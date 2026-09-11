@@ -1,4 +1,4 @@
-import { Search, Settings2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -12,6 +12,9 @@ import { ProjectPreferences } from '../projects/ProjectPreferences';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { AgentPreferences } from './AgentPreferences';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
@@ -140,25 +143,23 @@ export function SettingsPage({
     }
   };
   return (
-    <section className="workspace-page settings-page">
-      <header className="settings-header">
-        <div className="flex items-center gap-3">
-          <Settings2 size={20} />
-          <h1 ref={heading} tabIndex={-1}>
-            Settings
-          </h1>
-        </div>
-        <label className="settings-search">
-          <Search size={16} />
-          <input
-            aria-label="Search settings"
-            type="search"
-            placeholder="Search settings…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-      </header>
+    <WorkspacePage className="settings-page">
+      <WorkspaceHeading
+        title="Settings"
+        titleRef={heading}
+        action={
+          <label className="settings-search">
+            <Search size={16} />
+            <input
+              aria-label="Search settings"
+              type="search"
+              placeholder="Search settings…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+        }
+      />
       <p className="sr-only">
         General, appearance, agents, privacy, project preferences and local data. Changes save
         immediately unless a Save button is shown.
@@ -229,16 +230,12 @@ export function SettingsPage({
           {!visible.length && <p>No settings match “{query}”.</p>}
           {visible.map((c) => (
             <section key={c} className="settings-section">
-              <header className="settings-section-header">
-                <h2 className="settings-section-title">
-                  {c === 'Project' ? 'Project settings' : c}
-                </h2>
-                {c === 'Project' && project && (
-                  <p className="settings-section-subtitle project-settings-identity">
-                    {project.name} · {project.path}
-                  </p>
-                )}
-              </header>
+              <WorkspaceSectionHeading
+                title={c === 'Project' ? 'Project settings' : c}
+                description={
+                  c === 'Project' && project ? `${project.name} · ${project.path}` : undefined
+                }
+              />
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
@@ -401,6 +398,6 @@ export function SettingsPage({
           )}
         </div>
       </div>
-    </section>
+    </WorkspacePage>
   );
 }

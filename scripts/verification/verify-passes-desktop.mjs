@@ -40,7 +40,7 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('http://127.0.0.1:5199/.waitlist-fixture.html');
-    await page.getByText('Pass 5', { exact: true }).waitFor();
+    await page.getByText('No. 05', { exact: true }).waitFor();
     for (const dark of [false, true]) {
       await page.evaluate((dark) => {
         const store = window.fixtureTheme;
@@ -48,7 +48,7 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
           .getState()
           .setTheme({ ...store.getState().currentTheme, isDark: dark, appearance: 'manual' });
       }, dark);
-      assert.equal(await page.locator('.desktop-pass-strip li').count(), 5);
+      assert.equal(await page.locator('.brand-pass-tickets li').count(), 5);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await page.screenshot({
         path: `output/waitlist-referrals/desktop-passes-${viewport.width}-${dark ? 'dark' : 'light'}.png`,
@@ -59,7 +59,7 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
       getComputedStyle(document.documentElement).getPropertyValue('--color-bg'),
     );
     await page.reload();
-    await page.getByText('Pass 5', { exact: true }).waitFor();
+    await page.getByText('No. 05', { exact: true }).waitFor();
     assert.equal(
       await page.evaluate(() =>
         getComputedStyle(document.documentElement).getPropertyValue('--color-bg'),

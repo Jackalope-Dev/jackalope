@@ -23,6 +23,7 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
 import { McpAddCustomModal } from './McpAddCustomModal';
 import { McpMarketplaceCard } from './McpMarketplaceCard';
 import { McpServerPage } from './McpServerPage';
@@ -170,7 +171,7 @@ export function McpWorkspace({
   });
 
   return (
-    <div className="mcp-workspace" ref={workspace}>
+    <WorkspacePage className="mcp-workspace" ref={workspace}>
       {inspectingServer && activeTab === 'marketplace' ? (
         <McpServerPage
           key={inspectingServer.id}
@@ -687,6 +688,6 @@ export function McpWorkspace({
           )}
         </>
       )}
-    </div>
+    </WorkspacePage>
   );
 }

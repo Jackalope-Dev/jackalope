@@ -130,19 +130,6 @@
 .task-detail .task-next {
   margin-top: 24px;
 }
-.task-home .task-introduction .task-hero-title {
-  font-size: var(--text-4xl);
-}
-.task-home .task-introduction {
-  margin-top: 0;
-  margin-bottom: 24px;
-}
-.task-work-heading {
-  margin: 32px 0 20px;
-  font-size: var(--text-xl);
-  font-weight: 500;
-  scroll-margin-top: 24px;
-}
 .task-attention-link {
   display: inline-flex;
   align-items: center;
@@ -177,10 +164,7 @@
 .task-dialog.task-tools-dialog {
   width: min(960px, calc(100vw - 48px));
 }
-.task-tools-dialog .workspace-page {
-  padding: 20px 0;
-}
-.task-tools-dialog .task-page {
+.task-tools-dialog .workspace-page-layout {
   padding: 20px 0;
 }
 @media (max-width: 1000px) {

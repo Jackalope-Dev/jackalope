@@ -4,6 +4,7 @@ import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/Switch';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 const choices = [
   {
@@ -84,13 +85,12 @@ export function ProjectGitSettings({
   };
   const dirty = JSON.stringify(policy) !== JSON.stringify(saved);
   return (
-    <section className="project-preferences-section py-5" aria-labelledby={`${id}-title`}>
-      <h2 id={`${id}-title`}>Commits and cleanup</h2>
-      <p className="task-muted mt-2 mb-4">
-        Jackalope saves a checkpoint when a task succeeds and suggests its commit message. Review
-        the result, then merge. Jackalope creates one commit and can remove the finished worktree
-        and branch.
-      </p>
+    <section className="project-preferences-section" aria-labelledby={`${id}-title`}>
+      <WorkspaceSectionHeading
+        titleId={`${id}-title`}
+        title="Commits and cleanup"
+        description="Jackalope saves a checkpoint when a task succeeds and suggests its commit message. Review the result, then merge. Jackalope creates one commit and can remove the finished worktree and branch."
+      />
       {policy ? (
         <>
           <fieldset disabled={busy || disabled} className="grid gap-2">

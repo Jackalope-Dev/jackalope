@@ -17,6 +17,7 @@ import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/LoadingState';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import '../projects/project-context.css';
 
 export function CodebaseMemoryBar({ project }: { project: Project }) {
@@ -37,18 +38,20 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
     }
   };
   return (
-    <section className="context-overview" aria-label="Repository context">
-      <div className="context-section-heading">
-        <h2>Repository context</h2>
-        <Button
-          variant="ghost"
-          disabled={busy || !isTauriEnvironment()}
-          onClick={() => void refresh()}
-        >
-          <RefreshCw size={16} />
-          {busy ? 'Reading…' : 'Refresh context'}
-        </Button>
-      </div>
+    <section className="context-overview workspace-section" aria-label="Repository context">
+      <WorkspaceSectionHeading
+        title="Repository context"
+        action={
+          <Button
+            variant="ghost"
+            disabled={busy || !isTauriEnvironment()}
+            onClick={() => void refresh()}
+          >
+            <RefreshCw size={16} />
+            {busy ? 'Reading…' : 'Refresh context'}
+          </Button>
+        }
+      />
       {error && (
         <p role="alert" className="task-error">
           {error}

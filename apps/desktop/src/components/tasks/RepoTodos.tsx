@@ -35,6 +35,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { Tooltip } from '../ui/Tooltip';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
 import './repo-todos.css';
 
 export function RepoTodos({
@@ -177,7 +178,7 @@ export function RepoTodos({
   const groups = [...new Set(visible.map((item) => item.sectionLine))];
 
   return (
-    <section className="workspace-page repo-todos">
+    <WorkspacePage className="repo-todos">
       <WorkspaceHeading
         title="Repo TODOs"
         action={
@@ -682,6 +683,6 @@ export function RepoTodos({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </section>
+    </WorkspacePage>
   );
 }

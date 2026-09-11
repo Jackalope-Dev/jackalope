@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
 
 export function BrowserHarness({
   onOpenProject,
@@ -26,8 +27,8 @@ export function BrowserHarness({
       ((run.screenshots?.length ?? 0) > 0 || (run.validationSteps?.length ?? 0) > 0),
   );
   return (
-    <section className="task-page">
-      <div className="task-home">
+    <WorkspacePage className="">
+      <div>
         <WorkspaceHeading
           title="Evidence"
           description="Screenshots and check results saved by tasks in this project. Open a task for the full context."
@@ -84,6 +85,6 @@ export function BrowserHarness({
           </div>
         )}
       </div>
-    </section>
+    </WorkspacePage>
   );
 }

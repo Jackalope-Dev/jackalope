@@ -1,4 +1,7 @@
 import { LoadingState } from '../ui/LoadingState';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { FolderOpen, MoreHorizontal, Workflow } from 'lucide-react';
@@ -120,52 +123,54 @@ export function TaskWorkspace({
   if (parallel && project)
     return <ProjectQueue project={project} onBack={() => setParallel(false)} />;
   return (
-    <section className="task-page task-home">
-      <div className="task-introduction workspace-section-heading">
-        <div>
-          <h1 className="task-hero-title">What do you want to accomplish?</h1>
-          <p className="task-muted mt-3">Describe what to build, fix, or explore.</p>
-          {!!(needsInput || ready) && (
-            <a className="task-attention-link" href="#task-work">
-              {[
-                needsInput ? `${needsInput} ${needsInput === 1 ? 'needs' : 'need'} attention` : '',
-                ready ? `${ready} ready to review` : '',
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </a>
-          )}
-        </div>
-        <div className="task-home-actions">
-          {project && (
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button variant="ghost" aria-label="More task actions">
-                  <MoreHorizontal size={18} />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Content
-                  className="workspace-menu"
-                  align="end"
-                  sideOffset={8}
-                  collisionPadding={12}
-                >
-                  <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
-                    <Workflow size={16} />
-                    Plan feature work · {project.name}
-                  </Menu.Item>
-                </Menu.Content>
-              </Menu.Portal>
-            </Menu.Root>
-          )}
-        </div>
-      </div>
+    <WorkspacePage className="task-home">
+      <WorkspaceHeading
+        title="What do you want to accomplish?"
+        description="Describe what to build, fix, or explore."
+        action={
+          <div className="task-home-actions">
+            {!!(needsInput || ready) && (
+              <a className="task-attention-link" href="#task-work">
+                {[
+                  needsInput
+                    ? `${needsInput} ${needsInput === 1 ? 'needs' : 'need'} attention`
+                    : '',
+                  ready ? `${ready} ready to review` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </a>
+            )}
+            {project && (
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button variant="ghost" aria-label="More task actions">
+                    <MoreHorizontal size={18} />
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Content
+                    className="workspace-menu"
+                    align="end"
+                    sideOffset={8}
+                    collisionPadding={12}
+                  >
+                    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
+                      <Workflow size={16} />
+                      Plan feature work · {project.name}
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu.Root>
+            )}
+          </div>
+        }
+      />
       {composerVisible && <CaptureTask inline onClose={() => {}} onStarted={() => {}} />}
       {(runs.length > 0 || ideas.length > 0) && (
-        <h2 id="task-work" className="task-work-heading">
-          Your work
-        </h2>
+        <div className="mt-8">
+          <WorkspaceSectionHeading titleId="task-work" title="Your work" />
+        </div>
       )}
       {project && (
         <ProjectReturn
@@ -217,6 +222,6 @@ export function TaskWorkspace({
           onOpen={openItem}
         />
       ) : null}
-    </section>
+    </WorkspacePage>
   );
 }

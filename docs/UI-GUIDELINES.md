@@ -22,7 +22,12 @@ and [task outcomes](TASK-OUTCOMES.md).
 
 ## Navigation and copy
 
-Peer workspace views share WorkspaceSubnavigation and WorkspaceHeading.
+Peer workspace views use WorkspacePage for gutters and scrolling,
+WorkspaceHeading for the page title and actions, WorkspaceSectionHeading for
+section titles, and WorkspaceSubnavigation for peer tabs. Keep page headers in
+loading and empty states. Use the shared workspace spacing classes and tokens;
+avoid page-specific padding, title margins and nested page containers. Compact
+forms may constrain their fields without moving the page header.
 Give each page a clear purpose and one primary action. Keep filters and details
 near their content. Error and empty states should offer an actionable recovery path.
 

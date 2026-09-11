@@ -17,6 +17,8 @@ import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { AgentMetricsDashboard } from './AgentMetricsDashboard';
 import { CapacityPanel } from './CapacityPanel';
 import { tokenLabel, UsageInsights } from './UsageInsights';
@@ -208,7 +210,7 @@ export function UsageDashboard({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return (
-    <section className="task-page usage-page">
+    <WorkspacePage className="usage-page">
       <WorkspaceHeading
         title={view === 'analytics' ? 'Performance & insights' : 'Usage'}
         description={
@@ -366,35 +368,36 @@ export function UsageDashboard({
             </p>
           )}
           {!loading && !historyError && filtered.length > 0 && (
-            <div className="usage-ledger-heading">
-              <h2 id="usage-ledger" tabIndex={-1}>
-                {date ? `Calls dated ${date}` : 'Explore the work'}
-              </h2>
-              <div className="workspace-actions">
-                {date && (
-                  <Button variant="outline" onClick={() => setDate(null)}>
-                    Clear date
+            <WorkspaceSectionHeading
+              titleId="usage-ledger"
+              title={date ? `Calls dated ${date}` : 'Explore the work'}
+              action={
+                <div className="workspace-actions">
+                  {date && (
+                    <Button variant="outline" onClick={() => setDate(null)}>
+                      Clear date
+                    </Button>
+                  )}
+                  <Button
+                    variant={ledger === 'tasks' ? 'secondary' : 'ghost'}
+                    aria-pressed={ledger === 'tasks'}
+                    onClick={() => {
+                      setLedger('tasks');
+                      setDate(null);
+                    }}
+                  >
+                    Tasks
                   </Button>
-                )}
-                <Button
-                  variant={ledger === 'tasks' ? 'secondary' : 'ghost'}
-                  aria-pressed={ledger === 'tasks'}
-                  onClick={() => {
-                    setLedger('tasks');
-                    setDate(null);
-                  }}
-                >
-                  Tasks
-                </Button>
-                <Button
-                  variant={ledger === 'calls' ? 'secondary' : 'ghost'}
-                  aria-pressed={ledger === 'calls'}
-                  onClick={() => setLedger('calls')}
-                >
-                  Individual calls
-                </Button>
-              </div>
-            </div>
+                  <Button
+                    variant={ledger === 'calls' ? 'secondary' : 'ghost'}
+                    aria-pressed={ledger === 'calls'}
+                    onClick={() => setLedger('calls')}
+                  >
+                    Individual calls
+                  </Button>
+                </div>
+              }
+            />
           )}
           {error && (
             <p role="alert" className="task-error">
@@ -573,7 +576,7 @@ export function UsageDashboard({
           </details>
           {project === 'all' && agent === 'all' && account === 'all' && (
             <section className="usage-app-activity" aria-label="Other app activity">
-              <h2>Other app activity</h2>
+              <WorkspaceSectionHeading title="Other app activity" />
               <p className="task-muted">
                 Ask Jackalope · retained conversation, separate from task totals. These turns have
                 no saved dates or project links, so the period filter does not apply.
@@ -636,6 +639,6 @@ export function UsageDashboard({
           <CapacityPanel />
         </>
       )}
-    </section>
+    </WorkspacePage>
   );
 }

@@ -158,8 +158,8 @@ try {
     await page.getByRole('link', { name: 'Open my passes' }).waitFor();
     await page.goto('http://127.0.0.1:5198/access/#invitations');
     await page.getByRole('heading', { name: 'Bring your people.' }).waitFor();
-    assert.equal(await page.locator('.pass-strip li').count(), 5);
-    assert.equal(await page.locator('.pass-strip [data-state=Available]').count(), 3);
+    assert.equal(await page.locator('.brand-pass-tickets li').count(), 5);
+    assert.equal(await page.locator('.brand-pass-tickets [data-state=Available]').count(), 3);
     for (const dark of [false, true]) {
       if (dark) {
         const toggle = page.getByRole('button', { name: 'Switch to dark appearance' });

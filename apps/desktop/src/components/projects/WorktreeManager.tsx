@@ -26,6 +26,7 @@ import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
 
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
   const {
@@ -189,7 +190,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     }
   };
   return (
-    <section className="task-page">
+    <WorkspacePage className="">
       <WorkspaceHeading
         title="Worktrees"
         action={
@@ -433,6 +434,6 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )}
         </>
       )}
-    </section>
+    </WorkspacePage>
   );
 }

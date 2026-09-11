@@ -6,6 +6,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { McpConfigureServer } from './McpConfigureServer';
 import { McpServerIcon } from './McpServerIcon';
 import {
@@ -105,30 +106,29 @@ export function McpServerPage({
     return <McpConfigureServer server={server} onClose={() => setConfiguring(false)} />;
   return (
     <section className="mcp-server-page" aria-label={`${marketplaceName(server)} details`}>
-      <Button variant="ghost" onClick={onClose}>
-        <ArrowLeft size={16} />
-        Back to marketplace
-      </Button>
-      <header className="mcp-server-hero">
-        <McpServerIcon server={server} />
-        <div className="mcp-server-identity">
-          <h1 ref={heading} tabIndex={-1}>
-            {marketplaceName(server)}
-          </h1>
-          <p className="mcp-market-source">{sourceLabel(server.url)}</p>
-          <div className="mcp-market-labels">
-            <span>{categoryLabel(server.category)}</span>
-            <span>{setup.remote ? 'Remote server' : 'Local process'}</span>
-            {server.isOfficial && <span>Listed as official</span>}
+      <WorkspaceHeading
+        title={marketplaceName(server)}
+        titleRef={heading}
+        description={sourceLabel(server.url)}
+        icon={<McpServerIcon server={server} />}
+        action={
+          <div className="mcp-server-actions">
+            <Button variant="ghost" onClick={onClose}>
+              <ArrowLeft size={16} />
+              Back to marketplace
+            </Button>
+            <Button onClick={() => setConfiguring(true)}>
+              {scopes.length ? 'Reconfigure' : 'Configure server'}
+            </Button>
+            <SourceLink url={server.detailUrl}>View on AllMCPs</SourceLink>
           </div>
-        </div>
-        <div className="mcp-server-actions">
-          <Button onClick={() => setConfiguring(true)}>
-            {scopes.length ? 'Reconfigure' : 'Configure server'}
-          </Button>
-          <SourceLink url={server.detailUrl}>View on AllMCPs</SourceLink>
-        </div>
-      </header>
+        }
+      />
+      <div className="mcp-market-labels mb-6">
+        <span>{categoryLabel(server.category)}</span>
+        <span>{setup.remote ? 'Remote server' : 'Local process'}</span>
+        {server.isOfficial && <span>Listed as official</span>}
+      </div>
       <Tabs.Root
         defaultValue="overview"
         key={server.id}

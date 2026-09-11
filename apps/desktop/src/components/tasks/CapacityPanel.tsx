@@ -4,6 +4,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 
 const names: Record<string, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
@@ -47,20 +48,21 @@ export function CapacityPanel() {
   }, []);
   return (
     <section className="capacity-panel" aria-labelledby="capacity-title">
-      <div className="capacity-heading">
-        <div>
-          <h2 id="capacity-title">Connected capacity</h2>
-          <p className="task-muted">All accounts · includes activity outside Jackalope</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={refresh}
-          disabled={loading || now < nextRefresh || !isTauriEnvironment()}
-        >
-          <RefreshCw size={14} />
-          {loading ? 'Checking…' : 'Refresh capacity'}
-        </Button>
-      </div>
+      <WorkspaceSectionHeading
+        title="Connected capacity"
+        titleId="capacity-title"
+        description="All accounts · includes activity outside Jackalope"
+        action={
+          <Button
+            variant="outline"
+            onClick={refresh}
+            disabled={loading || now < nextRefresh || !isTauriEnvironment()}
+          >
+            <RefreshCw size={14} />
+            {loading ? 'Checking…' : 'Refresh capacity'}
+          </Button>
+        }
+      />
       {error && (
         <p role="alert" className="task-error mt-3">
           {error}

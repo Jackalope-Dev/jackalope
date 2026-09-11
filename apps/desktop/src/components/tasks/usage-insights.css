@@ -180,22 +180,10 @@
   background: var(--color-accent);
   border-radius: 3px;
 }
-.usage-ledger-heading {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
-  align-items: center;
-  margin: 28px 0 16px;
-}
-.usage-ledger-heading h2 {
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
 .usage-app-activity {
   border-top: 1px solid var(--color-border);
-  margin-top: 28px;
-  padding-top: 20px;
+  margin-top: var(--workspace-section-gap, 32px);
+  padding-top: var(--workspace-section-gap, 32px);
 }
 .usage-app-activity summary,
 .usage-measurement summary {
@@ -252,7 +240,9 @@
 }
 .usage-page .usage-filters {
   gap: 12px;
-  margin: 12px 0 24px;
+}
+.usage-page > .usage-filters {
+  margin-bottom: var(--workspace-heading-gap, 24px);
 }
 .usage-page .usage-filters label {
   flex-direction: column;

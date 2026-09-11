@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 
 export function KnowledgeLibrary({ project }: { project: Project }) {
@@ -29,52 +30,54 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
   const runs = useExecutionStore((s) => s.runs);
   const importer = useRef<HTMLInputElement>(null);
   return (
-    <section className="my-6 space-y-4" aria-label="Saved project knowledge">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl">Lessons and workflows</h2>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" disabled={!desktop} onClick={() => importer.current?.click()}>
-            Import workflow
-          </Button>
-          <input
-            ref={importer}
-            type="file"
-            className="hidden"
-            accept=".md,text/markdown,text/plain"
-            aria-label="Import workflow Markdown"
-            onChange={async (event) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (!file) return;
-              setActionError('');
-              try {
-                if (file.size > 6000)
-                  throw new Error('Choose a concise Markdown workflow up to 6,000 bytes.');
-                const entry = newKnowledge(project, 'workflow');
-                entry.content = await file.text();
-                entry.title = file.name.replace(/\.md$/i, '').slice(0, 100);
-                setEditing(entry);
-              } catch (cause) {
-                setActionError(String(cause));
-              }
-            }}
-          />
-          <Button
-            variant="outline"
-            disabled={!desktop}
-            onClick={() => setEditing(newKnowledge(project, 'memory'))}
-          >
-            Add lesson
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!desktop}
-            onClick={() => setEditing(newKnowledge(project, 'workflow'))}
-          >
-            Add workflow
-          </Button>
-        </div>
-      </div>
+    <section className="workspace-section workspace-stack" aria-label="Saved project knowledge">
+      <WorkspaceSectionHeading
+        title="Lessons and workflows"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" disabled={!desktop} onClick={() => importer.current?.click()}>
+              Import workflow
+            </Button>
+            <input
+              ref={importer}
+              type="file"
+              className="hidden"
+              accept=".md,text/markdown,text/plain"
+              aria-label="Import workflow Markdown"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (!file) return;
+                setActionError('');
+                try {
+                  if (file.size > 6000)
+                    throw new Error('Choose a concise Markdown workflow up to 6,000 bytes.');
+                  const entry = newKnowledge(project, 'workflow');
+                  entry.content = await file.text();
+                  entry.title = file.name.replace(/\.md$/i, '').slice(0, 100);
+                  setEditing(entry);
+                } catch (cause) {
+                  setActionError(String(cause));
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              disabled={!desktop}
+              onClick={() => setEditing(newKnowledge(project, 'memory'))}
+            >
+              Add lesson
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!desktop}
+              onClick={() => setEditing(newKnowledge(project, 'workflow'))}
+            >
+              Add workflow
+            </Button>
+          </div>
+        }
+      />
 
       {!desktop && <p className="task-notice">Open the desktop app to manage saved knowledge.</p>}
       {loading && <LoadingState label={'Loading saved knowledge…'} />}

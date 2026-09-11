@@ -237,9 +237,6 @@
 .task-first-project {
   align-items: flex-start;
 }
-.task-introduction .task-hero-title {
-  font-size: var(--text-4xl);
-}
 .task-back {
   margin-bottom: 16px;
 }
@@ -541,8 +538,7 @@ button:disabled {
     flex-shrink: 0;
   }
   .workspace-section-heading,
-  .queue-heading,
-  .capacity-heading {
+  .queue-heading {
     flex-wrap: wrap;
   }
   .tool-layout {
@@ -611,8 +607,7 @@ button:disabled {
 .workspace-canvas {
   --workspace-gutter: clamp(24px, 4vw, 48px);
 }
-.task-page,
-.mcp-workspace {
+.task-page {
   padding: 32px var(--workspace-gutter, 32px) 48px;
   max-width: 1280px;
   margin-inline: auto;
@@ -707,7 +702,7 @@ button:disabled {
   margin-inline: auto;
 }
 
-.workspace-shell .workspace-canvas > :is(.task-page, .workspace-page, .mcp-workspace) {
+.workspace-shell .workspace-canvas > :is(.task-page, .workspace-page) {
   flex: 1;
   min-height: 0;
   width: 100%;

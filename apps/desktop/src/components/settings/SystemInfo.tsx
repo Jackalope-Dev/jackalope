@@ -7,7 +7,7 @@ import {
   type SystemInfo,
 } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
-import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 export function SystemInfoView() {
   const [host, setHost] = useState<SystemInfo | null>(null);
@@ -49,9 +49,10 @@ export function SystemInfoView() {
     };
   }, [load]);
   return (
-    <section className="task-page">
-      <WorkspaceHeading
+    <section className="workspace-section">
+      <WorkspaceSectionHeading
         title="Devices"
+        level={3}
         action={
           <Button
             variant="outline"
@@ -72,7 +73,7 @@ export function SystemInfoView() {
         <div className="flex items-start gap-5 py-6">
           <Monitor size={32} className="text-[var(--color-accent-ink)] shrink-0" />
           <div>
-            <h2 className="text-xl font-medium break-words">{host.device_name}</h2>
+            <h3 className="text-xl font-medium break-words">{host.device_name}</h3>
             <p className="task-muted mt-2">
               This device · {host.os} · {host.arch}
             </p>

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { McpConnectionForm } from './McpConnectionForm';
 import { McpServerIcon } from './McpServerIcon';
 import { marketplaceName } from './marketplace-info';
@@ -29,19 +30,18 @@ export function McpConfigureServer({
   };
   return (
     <section className="mcp-configure-page" aria-label={`Configure ${marketplaceName(server)}`}>
-      <Button variant="ghost" disabled={busy} onClick={onClose}>
-        <ArrowLeft size={16} />
-        Back to server
-      </Button>
-      <header className="mcp-server-hero">
-        <McpServerIcon server={server} />
-        <div>
-          <h1 ref={heading} tabIndex={-1}>
-            Configure {marketplaceName(server)}
-          </h1>
-          <p className="task-muted">Review the connection and choose where it is available.</p>
-        </div>
-      </header>
+      <WorkspaceHeading
+        title={`Configure ${marketplaceName(server)}`}
+        titleRef={heading}
+        description="Review the connection and choose where it is available."
+        icon={<McpServerIcon server={server} />}
+        action={
+          <Button variant="ghost" disabled={busy} onClick={onClose}>
+            <ArrowLeft size={16} />
+            Back to server
+          </Button>
+        }
+      />
       {saved ? (
         <div className="mcp-configuration-saved" role="status">
           <Check size={28} />

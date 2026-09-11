@@ -5,6 +5,8 @@ import { Setting } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { RemoveProjectAction } from './RemoveProjectAction';
 import '../settings/settings.css';
@@ -17,8 +19,9 @@ export function ProjectPreferences({
 }) {
   const { projects, activeProjectId, updateProject, updateProjectPreferences } = useProjectStore();
   const project = projects.find((p) => p.id === (projectId ?? activeProjectId));
+  const Container = embedded ? 'section' : WorkspacePage;
   return (
-    <section className={embedded ? 'project-preferences' : 'workspace-page project-preferences'}>
+    <Container className="project-preferences">
       {!embedded && (
         <WorkspaceHeading
           title="Project settings"
@@ -70,7 +73,7 @@ export function ProjectPreferences({
             </section>
           )}
           <section className="project-preferences-section">
-            <h2>Task instructions</h2>
+            <WorkspaceSectionHeading title="Task instructions" />
             <div className="project-workspace-fields">
               <div className="project-preference-field">
                 <label htmlFor="project-instructions">Project instructions</label>
@@ -93,7 +96,7 @@ export function ProjectPreferences({
             </div>
           </section>
           <section className="project-preferences-section project-task-context">
-            <h2>Task context</h2>
+            <WorkspaceSectionHeading title="Task context" />
             <Setting
               title="Choose guidelines automatically"
               description="Match testing, security, onboarding and other guidance to each new task. Fine-tune the selection under Customize task → Context."
@@ -127,7 +130,7 @@ export function ProjectPreferences({
           </section>
           <ProjectGitSettings key={project.path} projectPath={project.path} />
           <section className="project-preferences-section">
-            <h2>Workspace</h2>
+            <WorkspaceSectionHeading title="Workspace" />
             <div className="project-workspace-fields">
               <div className="project-preference-field">
                 <label htmlFor="project-base-branch">Target branch</label>
@@ -165,7 +168,7 @@ export function ProjectPreferences({
             </div>
           </section>
           <section className="project-preferences-section">
-            <h2>Verification</h2>
+            <WorkspaceSectionHeading title="Verification" />
             <div className="project-workspace-fields">
               <div className="project-preference-field">
                 <label htmlFor="verification-command">Verification command</label>
@@ -212,6 +215,6 @@ export function ProjectPreferences({
           </section>
         </>
       )}
-    </section>
+    </Container>
   );
 }
