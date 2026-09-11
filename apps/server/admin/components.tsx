@@ -76,7 +76,7 @@ export function Refresh({
 }) {
   return (
     <Button variant="secondary" loading={loading} loadingLabel="Refreshing…" onClick={onClick}>
-      <RefreshIcon size={16} style={{ flexShrink: 0 }} aria-hidden="true" />
+      <RefreshIcon />
       {children}
     </Button>
   );

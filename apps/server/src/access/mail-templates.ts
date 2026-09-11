@@ -17,95 +17,91 @@ export const escapeHtml = (value: string) =>
   );
 
 export function accessEmail(mail: Mail, origin: string) {
+  const total = 'total' in mail ? mail.total : 0;
   const copy = {
     feedback_request: {
       subject: 'How is Jackalope working for you?',
-      title: 'What could feel better?',
-      intro:
-        'You’ve had some time with Jackalope. How has it fit into your workflow? What’s useful, and what’s getting in your way?',
-      action: 'Share a thought',
-      detail:
-        'A sentence or two is plenty. Good experiences, rough edges, and ideas are all welcome. Your feedback goes directly to the people building Jackalope.',
-      stamp: 'Early access / Your experience',
+      title: 'How’s it going?',
+      intro: 'What’s useful in Jackalope, and what could be better?',
+      action: 'Share feedback',
+      detail: 'A sentence or two is plenty.',
+      stamp: 'Feedback / Early access',
     },
     waitlist: {
       subject: 'You’re on the Jackalope waitlist',
-      title: 'Your next hop starts here.',
+      title: 'You’re on the list.',
       intro:
-        'Your place is saved. Confirm your email to see your waitlist number and get your personal referral link.' +
+        'Confirm your email to see your place on the waitlist and get your referral link.' +
         (mail.kind === 'waitlist' && mail.newsletter
-          ? ' This also confirms your request to receive optional Jackalope product notes. If you did not request them, do not use this link.'
+          ? ' This also confirms your product-note subscription. If you didn’t request it, don’t use this link.'
           : ''),
       action: 'See my place',
       detail:
-        'Share with as many people as you like. Each new person who verifies their email adds one day of priority to your signup time. Your number updates as the queue changes.',
+        'Each new person who verifies their email through your link earns you one day of waitlist priority. Share it with as many people as you like.',
       // No stamp: the intro already says what the link does, so the button
       // stands alone and centred instead of inside a labelled panel.
       stamp: '',
     },
     welcome: {
       subject: 'You’re in. Welcome to Jackalope',
-      title: 'There’s room for you.',
+      title: 'You’re in.',
       intro:
-        'Your early access is approved. You can now open your Jackalope space and share your five Instant Access Passes.',
-      action: 'Open my Jackalope space',
+        'Your early access is ready. Find setup steps and available downloads in your account.',
+      action: 'Open my account',
       detail:
-        'Each pass lets one person skip the waitlist after email verification. Available downloads and setup steps live in your space.',
-      stamp: 'You’re in / Bring five',
+        'You also have five Instant Access Passes to share. Each lets one person skip the waitlist after verifying their email.',
+      stamp: 'Early access / Welcome',
     },
     invite: {
       subject: 'An Instant Access Pass to Jackalope',
-      title: 'Skip the line. Come on in.',
+      title: 'Skip the line.',
       intro:
-        'A Jackalope member is sharing early access with you. Verify your email to claim a pass while their allowance is available.',
+        'You’ve been invited to Jackalope. Verify your email to claim a pass while one is available.',
       action: 'Claim my pass',
       detail:
-        'No second approval needed. Once you’re in, you get five passes of your own. Downloads appear when a reviewed build is available.',
+        'Your pass skips the waitlist. Once you’re in, you’ll get five passes to share. Downloads appear in your account when available.',
       stamp: 'Instant access pass / Admit one',
     },
     login: {
       subject: 'Your Jackalope sign-in link',
       title: 'Welcome back.',
-      intro: 'Your downloads, setup steps, and Instant Access Passes are one click away.',
-      action: 'Open my Jackalope space',
-      detail: 'This private, single-use sign-in link expires in 30 minutes.',
-      stamp: 'Your space / Your agents',
+      intro: 'Use this link to sign in to your Jackalope account.',
+      action: 'Sign in',
+      detail: '',
+      stamp: 'Your account / Sign in',
     },
     referral: {
-      subject: 'Your Jackalope referrals are adding up',
-      title: 'Good company. A little closer.',
-      intro: `${'total' in mail ? mail.total : 0} people have joined through your waitlist link and verified their email. Thanks for bringing them along.`,
+      subject: 'Your Jackalope referrals',
+      title: 'Thanks for sharing Jackalope.',
+      intro: `${total} ${total === 1 ? 'person has' : 'people have'} joined through your link and verified their email.`,
       action: 'See my progress',
       detail:
-        'Each verified referral earns one day of waitlist priority. Check your page for your current number. Referral sharing is unlimited and never spends an Instant Access Pass.',
-      stamp: 'Waitlist / A hop forward',
+        'Each verified referral earns one day of waitlist priority. Sharing is unlimited and doesn’t use your Instant Access Passes.',
+      stamp: 'Waitlist / Referrals',
     },
     passes_ready: {
-      subject: 'You’re in. Your Jackalope passes are ready',
-      title: 'Now bring your people.',
-      intro: `Your pass is claimed and your early access is ready. You have ${'total' in mail ? mail.total : 5} Instant Access Passes to share.`,
+      subject: 'Your Jackalope passes are ready',
+      title: 'Your passes are ready.',
+      intro: `You now have early access and ${total} Instant Access ${total === 1 ? 'Pass' : 'Passes'} to share.`,
       action: 'See my passes',
       detail:
-        'Each pass brings one person straight into early access after email verification. Your space also shows setup steps and downloads as reviewed builds become available.',
+        'Each pass lets one person skip the waitlist after verifying their email. Setup steps and downloads appear in your account when available.',
       stamp: 'Instant access / Pass it on',
     },
     pass_claimed: {
       subject: 'Someone claimed your Jackalope pass',
-      title: 'One more in your corner.',
-      intro: 'Someone you invited has verified their email and joined Jackalope early access.',
+      title: 'Your pass was claimed.',
+      intro: 'Someone you invited has verified their email and joined Jackalope.',
       action: 'See my passes',
-      detail:
-        'Your pass page shows who has joined, who has requested a download, and who has connected the desktop. Claimed passes count toward your allowance.',
+      detail: 'See who’s joined and how many passes you have left.',
       stamp: 'Instant access / Claimed',
     },
     pass_expired: {
       subject: 'A Jackalope pass is yours to share again',
-      title: 'Back in your pocket.',
-      intro:
-        'An email pass reservation expired without being claimed. That place is available again.',
+      title: 'A pass is ready to share.',
+      intro: 'Your invitation wasn’t claimed within 7 days, so the pass is available again.',
       action: 'See my passes',
-      detail:
-        'Email reservations last seven days. You can send a new pass to the same person or share it with someone else. Your page always shows the current allowance.',
+      detail: 'Send it to the same person or someone new.',
       stamp: 'Instant access / Available again',
     },
   }[mail.kind];
@@ -121,20 +117,32 @@ export function accessEmail(mail: Mail, origin: string) {
             : `${origin}/access/#invitations`;
   const expiry =
     mail.kind === 'invite' || mail.kind === 'welcome'
-      ? 'This private link expires in 7 days. Request a fresh link on the website if needed.'
+      ? 'This link expires in 7 days. Keep it private. You can request a new one on the website.'
       : mail.kind === 'waitlist' && mail.token
-        ? 'This is a private, single-use link. If it expires, request another from your waitlist page.'
-        : '';
+        ? 'This link works once. Keep it private. If it expires, request another from your waitlist page.'
+        : mail.kind === 'login'
+          ? 'This link works once and expires in 30 minutes. Keep it private.'
+          : '';
   const footer =
     mail.kind === 'feedback_request'
-      ? `Your Jackalope email preferences include this feedback invitation. This is a one-time invitation, with no reminders. Stop feedback emails: ${origin}/feedback/#unsubscribe=${mail.token}`
-      : 'If you did not expect this email, you can ignore it. Reply if you need help or want your account removed.';
+      ? `You opted in to feedback emails. We won’t send reminders. Stop feedback emails: ${origin}/feedback/#unsubscribe=${mail.token}`
+      : 'If you didn’t request this email, you can ignore it. Reply for help or to delete your account.';
   const footerHtml =
     mail.kind === 'feedback_request'
-      ? `Your Jackalope email preferences include this feedback invitation. This is a one-time invitation, with no reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
+      ? `You opted in to feedback emails. We won’t send reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
       : footer;
   const address = EMAIL_COMPANY.postalAddress;
-  const text = `${copy.title}\n\n${copy.intro}\n\n${copy.action}: ${link}\n\n${copy.detail}\n\n${expiry}\n\n${footer}\n\n${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${origin}/privacy/`;
+  const text = [
+    copy.title,
+    copy.intro,
+    `${copy.action}: ${link}`,
+    copy.detail,
+    expiry,
+    footer,
+    `${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${origin}/privacy/`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
   return {
     subject: copy.subject,
     preview: copy.intro,
@@ -146,9 +154,8 @@ export function accessEmail(mail: Mail, origin: string) {
       content: `<h1 class="lead-title" style="margin:0 0 22px;font-size:44px;line-height:1.06;letter-spacing:-1.6px;font-weight:600;color:${c.ink}">${escapeHtml(copy.title)}</h1>
 <p style="margin:0;font-size:17px;line-height:1.75;color:${c.muted}">${escapeHtml(copy.intro)}</p>
 ${callout(copy.stamp, copy.action, link)}
-<p style="margin:0;font-size:15px;line-height:1.8;color:${c.muted}">${escapeHtml(copy.detail)}</p>
-${expiry ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.7;color:${c.faint}">${escapeHtml(expiry)} Keep this link private.</p>` : ''}
-<p style="margin:30px 0 0;font-size:15px;line-height:1.8;color:${c.muted}">See you in there,<br><strong style="color:${c.ink}">Jackalope</strong></p>`,
+${copy.detail ? `<p style="margin:0;font-size:15px;line-height:1.8;color:${c.muted}">${escapeHtml(copy.detail)}</p>` : ''}
+${expiry ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.7;color:${c.faint}">${escapeHtml(expiry)}</p>` : ''}`,
       footer: footerHtml,
     }),
   };

@@ -143,8 +143,7 @@ ${
   action
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 0"><tr><td>${button(action.label, action.url, { arrow: true })}</td></tr></table>`
     : ''
-}
-<p style="margin:30px 0 0;font-size:15px;line-height:1.8;color:${c.muted}">Thanks for making room for Jackalope,<br><strong style="color:${c.ink}">Jackalope</strong></p>`;
+}`;
 
   return {
     subject: draft.subject,
@@ -155,8 +154,7 @@ ${
       origin,
       content,
       // Sequenzy appends the required unsubscribe link to campaign sends.
-      footer:
-        'You are receiving this because you asked for Jackalope product notes when you joined the waitlist. {{unsubscribe_link}}',
+      footer: 'You subscribed to Jackalope product notes. {{unsubscribe_link}}',
     }),
   };
 }

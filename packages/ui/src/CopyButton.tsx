@@ -1,6 +1,7 @@
 import { Check, Copy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button, type ButtonProps } from './Button';
+import { Icon } from './Icon';
 import { InlineNotice } from './InlineNotice';
 export function CopyButton({
   text,
@@ -70,7 +71,7 @@ export function CopyButton({
         loadingLabel={props.loadingLabel ?? 'Copying…'}
         onClick={() => void handleCopy()}
       >
-        {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+        <Icon icon={copied ? Check : Copy} />
         <span aria-live="polite">{copied ? copiedLabel : label}</span>
       </Button>
       {state?.text === text && state.status === 'error' && (

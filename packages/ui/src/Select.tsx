@@ -1,6 +1,7 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';
+import { Icon } from './Icon';
 import './select.css';
 
 type SelectProps = Pick<
@@ -35,7 +36,7 @@ export function Select({
       <SelectPrimitive.Trigger {...triggerProps} className={`themed-select ${className}`}>
         <SelectPrimitive.Value placeholder={placeholder} />
         <SelectPrimitive.Icon asChild>
-          <ChevronDown size={16} aria-hidden="true" />
+          <Icon icon={ChevronDown} />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
@@ -46,13 +47,13 @@ export function Select({
           collisionPadding={12}
         >
           <SelectPrimitive.ScrollUpButton className="themed-select-scroll">
-            <ChevronUp size={16} aria-hidden="true" />
+            <Icon icon={ChevronUp} />
           </SelectPrimitive.ScrollUpButton>
           <SelectPrimitive.Viewport className="themed-select-viewport" nonce={nonce}>
             {children}
           </SelectPrimitive.Viewport>
           <SelectPrimitive.ScrollDownButton className="themed-select-scroll">
-            <ChevronDown size={16} aria-hidden="true" />
+            <Icon icon={ChevronDown} />
           </SelectPrimitive.ScrollDownButton>
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
@@ -65,7 +66,7 @@ export function SelectItem({ children, ...props }: SelectPrimitive.SelectItemPro
     <SelectPrimitive.Item {...props} className="themed-select-option">
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator className="themed-select-check">
-        <Check size={16} aria-hidden="true" />
+        <Icon icon={Check} />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   );

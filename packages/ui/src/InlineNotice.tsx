@@ -1,5 +1,6 @@
 import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react';
 import { type ComponentPropsWithoutRef, forwardRef, type ReactNode } from 'react';
+import { Icon } from './Icon';
 import { cn } from './utils';
 import './styles.css';
 
@@ -8,7 +9,6 @@ export const InlineNotice = forwardRef<
   HTMLDivElement,
   ComponentPropsWithoutRef<'div'> & { tone?: keyof typeof icons; action?: ReactNode }
 >(function InlineNotice({ tone = 'info', action, children, className, role, ...props }, ref) {
-  const Icon = icons[tone];
   return (
     <div
       ref={ref}
@@ -17,7 +17,7 @@ export const InlineNotice = forwardRef<
       role={role ?? (tone === 'error' ? 'alert' : tone === 'success' ? 'status' : undefined)}
       {...props}
     >
-      <Icon size={18} aria-hidden="true" />
+      <Icon icon={icons[tone]} size={20} />
       <div className="inline-notice-content">{children}</div>
       {action && <div className="inline-notice-action">{action}</div>}
     </div>
