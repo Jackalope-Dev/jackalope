@@ -5,21 +5,21 @@ import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessi
 import { useSettingsStore } from '../../stores/settingsStore';
 import '../../stores/themeStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
-import { InlineNotice } from '../ui/InlineNotice';
 import { LiveSessionView } from './LiveSessionView';
+import { SessionRecovery } from './SessionRecovery';
 import '../ui/experience.css';
 
 export default function LiveSessionWindow({ id }: { id: string }) {
   useSettingsStore();
   useEffect(startThemeClock, []);
   useEffect(() => observeLiveSessions(id), [id]);
-  const { sessions, runs, error, loading } = useLiveSessionStore();
+  const { sessions, runs, loading } = useLiveSessionStore();
   const session = sessions.find((s) => s.id === id);
   return (
     <MotionConfig reducedMotion="user">
       <main className="live-window">
         <ResizeHandles />
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+        {!session && <SessionRecovery />}
         {session ? (
           <LiveSessionView session={session} runs={runs} detached />
         ) : (

@@ -13,10 +13,11 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { LiveSessionView } from './LiveSessionView';
+import { SessionRecovery } from './SessionRecovery';
 import './live-session.css';
 
 export function LiveSessions({ project, onBack }: { project?: Project; onBack: () => void }) {
-  const { sessions, runs, selectedId, select, loading, error, refresh } = useLiveSessionStore();
+  const { sessions, runs, selectedId, select, loading, refresh } = useLiveSessionStore();
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -105,7 +106,7 @@ export function LiveSessions({ project, onBack }: { project?: Project; onBack: (
         </form>
       )}
       {!project && <p className="live-muted">Choose a project to start a session.</p>}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <SessionRecovery />
       {createError && <InlineNotice tone="error">{createError}</InlineNotice>}
       {loading ? (
         <p role="status">Loading sessions…</p>

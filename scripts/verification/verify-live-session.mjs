@@ -124,6 +124,14 @@ try {
   await page.screenshot({ path: `${output}/session-1280-dark.png` });
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
+  console.log(
+    'Light theme colors',
+    await page.evaluate(() => ({
+      root: document.documentElement.style.getPropertyValue('--color-text-primary'),
+      session: getComputedStyle(document.querySelector('.live-session')).color,
+      title: getComputedStyle(document.querySelector('h1')).color,
+    })),
+  );
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.screenshot({ path: `${output}/session-960-light.png` });
   await page.evaluate(() =>

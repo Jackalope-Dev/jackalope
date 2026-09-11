@@ -5,6 +5,30 @@ isolated parallel work, coordination and review before integration.
 
 ## Use it
 
+### Live sessions
+
+In Tasks, choose **Live session**, name it and send messages. Capture stays available
+while a batch runs. Messages arriving together are grouped in order; subsequent
+batches continue in the same isolated worktree and retain the selected agent account.
+Use **Pop out** for a separate window; its pin controls always-on-top. Closing the
+window leaves execution running. **Pause dispatch** holds later messages, while
+**Stop work** also stops the active attempt through the existing runtime.
+
+Sessions save messages before claiming a batch, preserve draft revisions across
+windows, and pause after failures or restart. Pending launch retries reuse the saved
+attempt identifier. Interrupted process ownership keeps the normal runtime safeguards.
+Never edit the session journal while its profile is running. Reload saved sessions
+after resolving a storage error; failed loads preserve the original file.
+
+Review and preview pause dispatch. A running preview holds further writes to its
+workspace. **Changes** exports a cumulative binary-capable patch from the original
+base without committing or changing the index. A check applies only to the exact
+exported tree. The workspace and saved patch remain available for review and manual
+integration. Live sessions currently serialize batches; independent native task
+planning and automatic integration are not part of this flow.
+
+### Parallel task queues
+
 Ordinary tasks ask their lead agent to delegate useful independent work through
 available provider subagent tools. Users do not choose a split mode. This stays
 within the provider session and does not create native queue entries; see

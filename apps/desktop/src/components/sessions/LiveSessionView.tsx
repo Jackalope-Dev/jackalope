@@ -26,6 +26,7 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Tooltip } from '../ui/Tooltip';
 import { SessionComposer } from './SessionComposer';
+import { SessionRecovery } from './SessionRecovery';
 import './live-session.css';
 
 const TaskMarkdown = lazy(() => import('../tasks/TaskMarkdown'));
@@ -185,6 +186,7 @@ export function LiveSessionView({
         </div>
         <div className="app-titlebar-controls">{tools}</div>
       </header>
+      <SessionRecovery />
       <div className="live-statusbar">
         <button
           type="button"
