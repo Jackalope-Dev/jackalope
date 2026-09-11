@@ -134,6 +134,7 @@ try {
     window.cleanupFixture.failIdeaSave = false;
   });
   await page.getByRole('button', { name: 'Archive Explore shortcuts', exact: true }).click();
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Select tasks');
   assert.ok(
     await page.evaluate(
       () => JSON.parse(localStorage.getItem('jackalope-tasks')).state.tasks[0].archivedAt,

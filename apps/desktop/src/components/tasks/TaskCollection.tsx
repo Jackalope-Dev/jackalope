@@ -59,13 +59,10 @@ export function TaskCollection({
   const [notice, setNotice] = useState('');
   const [undo, setUndo] = useState<WorkItem[]>([]);
   const actionFocus = useRef<HTMLButtonElement>(null);
-  const returnFocus = useRef(false);
+  const [focusReturn, setFocusReturn] = useState(0);
   useEffect(() => {
-    if (!busy && returnFocus.current) {
-      returnFocus.current = false;
-      actionFocus.current?.focus();
-    }
-  }, [busy]);
+    if (focusReturn) actionFocus.current?.focus();
+  }, [focusReturn]);
   const projects = useProjectStore((state) => state.projects);
   const { filter, layout, query } = view;
   const setFilter = (filter: string) => onViewChange({ ...view, filter });
@@ -104,9 +101,9 @@ export function TaskCollection({
       setError(String(cause));
     } finally {
       pending.current = false;
-      returnFocus.current = true;
       setBusy(false);
       onBusyChange?.(false);
+      setFocusReturn((value) => value + 1);
     }
   };
   const card = (item: WorkItem) => (
