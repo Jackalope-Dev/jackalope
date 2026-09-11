@@ -1,6 +1,6 @@
 import { applyThemeTokens, PRESET_THEMES, type ThemePalette } from '@jackalope/brand/theme';
+import { Button, IconButton, DropdownMenu as Menu } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import * as Menu from '@radix-ui/react-dropdown-menu';
 import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
@@ -145,14 +145,14 @@ export function App({ path = '/' }: { path?: string }) {
                 Member access
               </a>
             )}
-            <button
+            <IconButton
               className="icon-button appearance-toggle"
               type="button"
-              aria-label={`Switch to ${dark ? 'light' : 'dark'} appearance`}
+              label={`Switch to ${dark ? 'light' : 'dark'} appearance`}
               onClick={() => setDark(!dark)}
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            </IconButton>
             {path === '/access/' || path === '/feedback/' ? (
               <a className="text-link" href="/tour/">
                 Take a look around <ArrowRight size={15} />
@@ -162,13 +162,13 @@ export function App({ path = '/' }: { path?: string }) {
             )}
             <Menu.Root>
               <Menu.Trigger asChild>
-                <button
+                <IconButton
                   type="button"
                   className="icon-button mobile-menu"
-                  aria-label="Open navigation"
+                  label="Open navigation"
                 >
                   <MenuIcon size={22} />
-                </button>
+                </IconButton>
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Content
@@ -282,14 +282,17 @@ export function App({ path = '/' }: { path?: string }) {
                   Explore the Jackalope workspace.
                 </Dialog.Description>
               </div>
-              <Dialog.Close className="icon-button" aria-label="Close walkthrough">
-                <X size={22} />
+              <Dialog.Close asChild>
+                <IconButton className="icon-button" label="Close walkthrough">
+                  <X size={22} />
+                </IconButton>
               </Dialog.Close>
             </div>
             {videoError ? (
               <div className="video-error">
                 <p>The walkthrough couldn’t load. You can still explore the app screenshots.</p>
-                <button
+                <Button
+                  variant="primary"
                   type="button"
                   className="button button-primary"
                   onClick={() => {
@@ -299,7 +302,7 @@ export function App({ path = '/' }: { path?: string }) {
                 >
                   Explore the workspace
                   <ArrowRight size={16} />
-                </button>
+                </Button>
               </div>
             ) : (
               <video

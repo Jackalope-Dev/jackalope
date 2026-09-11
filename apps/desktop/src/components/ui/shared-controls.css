@@ -1,7 +1,6 @@
 @import "@jackalope/ui/styles.css";
 
-.workspace-toolbar,
-.filter-group {
+.workspace-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -16,10 +15,4 @@
 }
 .workspace-toolbar:has(> .form-field) {
   align-items: flex-end;
-}
-.filter-group {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  gap: 8px;
 }

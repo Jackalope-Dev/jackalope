@@ -1,13 +1,5 @@
-import {
-  ArrowDownToLine,
-  ArrowRight,
-  Check,
-  Copy,
-  LoaderCircle,
-  LogOut,
-  Mail,
-  Share2,
-} from 'lucide-react';
+import { Button, CopyButton, Input, LoadingState, Textarea } from '@jackalope/ui';
+import { ArrowDownToLine, ArrowRight, Check, Copy, LogOut, Mail, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
@@ -46,30 +38,11 @@ export function AccessPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [copied, setCopied] = useState<'link' | 'message' | null>(null);
-  const [copyError, setCopyError] = useState('');
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [token, setToken] = useState('');
   const [invite, setInvite] = useState('');
   const [available, setAvailable] = useState<boolean | null>(null);
   const [sent, setSent] = useState(false);
   const pending = useRef(false);
-  useEffect(() => () => clearTimeout(copyTimer.current), []);
-  async function copyPass(target: 'link' | 'message') {
-    if (!member) return;
-    setCopyError('');
-    try {
-      await navigator.clipboard.writeText(
-        target === 'link' ? member.shareUrl : `${invitationMessage}\n\n${member.shareUrl}`,
-      );
-      clearTimeout(copyTimer.current);
-      setCopied(target);
-      copyTimer.current = setTimeout(() => setCopied(null), 2500);
-    } catch {
-      setCopied(null);
-      setCopyError('Couldn’t copy automatically. Select and copy the pass link above.');
-    }
-  }
   const refreshMembership = useCallback(() => {
     void accessRequest<Membership>('me')
       .then((value) => {
@@ -240,11 +213,7 @@ export function AccessPage() {
       <p className="access-notice" role="status" aria-live="polite">
         {notice}
       </p>
-      {loading ? (
-        <div className="access-loading" role="status">
-          <LoaderCircle className="signup-spinner" size={22} /> Loading…
-        </div>
-      ) : null}
+      {loading ? <LoadingState label="Loading your account…" compact /> : null}
       <DesktopConnection email={member?.email ?? null} refreshMembership={refreshMembership} />
       {loading ? null : !accessOrigin ? (
         <section className="access-card access-entry">
@@ -258,7 +227,8 @@ export function AccessPage() {
         <>
           <div className="access-identity">
             <span>{member.email}</span>
-            <button
+            <Button
+              variant="ghost"
               className="text-link"
               type="button"
               disabled={busy}
@@ -272,7 +242,7 @@ export function AccessPage() {
               }
             >
               Sign out <LogOut size={14} />
-            </button>
+            </Button>
           </div>
           <nav className="member-navigation" aria-label="Your account">
             <a href="#setup">Get started</a>
@@ -380,7 +350,7 @@ export function AccessPage() {
                 <p>Reserve a place for seven days. If it isn’t accepted, you can use it again.</p>
                 <form onSubmit={sendInvites}>
                   <label htmlFor="invite-emails">Email addresses</label>
-                  <textarea
+                  <Textarea
                     id="invite-emails"
                     name="emails"
                     rows={3}
@@ -393,13 +363,14 @@ export function AccessPage() {
                   <small id="invite-emails-help">
                     Up to five addresses, separated by commas or new lines.
                   </small>
-                  <button
+                  <Button
+                    variant="primary"
                     className="button button-primary button-download"
                     disabled={busy || member.remaining === 0}
                     type="submit"
                   >
                     Send passes <ArrowRight size={17} />
-                  </button>
+                  </Button>
                 </form>
               </div>
               <div>
@@ -411,56 +382,38 @@ export function AccessPage() {
                   have passes available.
                 </p>
                 <label htmlFor="share-link">Your pass link</label>
-                <input
+                <Input
                   id="share-link"
                   readOnly
                   value={member.shareUrl}
                   onFocus={(event) => event.currentTarget.select()}
                 />
                 <div className="access-copy-actions">
-                  <button
-                    type="button"
+                  <CopyButton
+                    variant="primary"
                     className="button button-primary"
+                    text={member.shareUrl}
+                    label="Copy pass link"
                     disabled={busy || member.remaining === 0}
-                    onClick={() => void copyPass('link')}
-                    aria-live="polite"
-                  >
-                    {copied === 'link' ? (
-                      <Check size={16} aria-hidden="true" />
-                    ) : (
-                      <Copy size={16} aria-hidden="true" />
-                    )}
-                    {copied === 'link' ? 'Copied' : 'Copy pass link'}
-                  </button>
-                  <button
-                    type="button"
+                  />
+                  <CopyButton
+                    variant="secondary"
                     className="button button-secondary"
+                    text={`${invitationMessage}\n\n${member.shareUrl}`}
+                    label="Copy message"
                     disabled={busy || member.remaining === 0}
-                    onClick={() => void copyPass('message')}
-                    aria-live="polite"
-                  >
-                    {copied === 'message' ? (
-                      <Check size={16} aria-hidden="true" />
-                    ) : (
-                      <Copy size={16} aria-hidden="true" />
-                    )}
-                    {copied === 'message' ? 'Copied' : 'Copy message'}
-                  </button>
+                  />
                 </div>
-                {copyError && (
-                  <p className="access-alert" role="alert">
-                    {copyError}
-                  </p>
-                )}
                 <div className="access-share-actions">
                   {typeof navigator.share === 'function' && (
-                    <button
+                    <Button
+                      variant="ghost"
                       type="button"
                       disabled={busy || member.remaining === 0}
                       onClick={() => void share('native')}
                     >
                       <Share2 size={15} /> Share
-                    </button>
+                    </Button>
                   )}
                   <a
                     aria-disabled={member.remaining === 0}
@@ -472,27 +425,30 @@ export function AccessPage() {
                   >
                     Email
                   </a>
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     disabled={member.remaining === 0}
                     onClick={() => void share('x')}
                   >
                     X (Twitter)
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
                     type="button"
                     disabled={member.remaining === 0}
                     onClick={() => void share('linkedin')}
                   >
                     LinkedIn
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
                     type="button"
                     disabled={member.remaining === 0}
                     onClick={() => void share('bluesky')}
                   >
                     Bluesky
-                  </button>
+                  </Button>
                 </div>
                 <small>
                   You’ll see who accepts, requests a download, and connects a desktop, not their
@@ -526,20 +482,22 @@ export function AccessPage() {
                         </span>
                       ) : (
                         <div className="access-invite-actions">
-                          <button
+                          <Button
+                            variant="ghost"
                             type="button"
                             disabled={busy}
                             onClick={() => change(item.id, 'resend')}
                           >
                             Resend
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="ghost"
                             type="button"
                             disabled={busy}
                             onClick={() => change(item.id, 'revoke')}
                           >
                             Withdraw
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </li>
@@ -566,15 +524,17 @@ export function AccessPage() {
                 <a href="/terms/">Terms</a>. See our <a href="/privacy/">Privacy Policy</a>.
               </p>
               <div className="access-entry-actions">
-                <button
+                <Button
+                  variant="primary"
                   className="button button-primary button-download"
                   disabled={busy}
                   type="button"
                   onClick={accept}
                 >
                   {busy ? 'Opening…' : 'Continue to Jackalope'} <ArrowRight size={18} />
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   className="text-link"
                   type="button"
                   disabled={busy}
@@ -584,7 +544,7 @@ export function AccessPage() {
                   }}
                 >
                   Need a fresh link?
-                </button>
+                </Button>
               </div>
             </>
           ) : sent ? (
@@ -594,9 +554,14 @@ export function AccessPage() {
                 If this address has access or a valid invitation, you’ll receive a sign-in link.
                 Check your inbox and spam folder.
               </p>
-              <button className="text-link" type="button" onClick={() => setSent(false)}>
+              <Button
+                variant="ghost"
+                className="text-link"
+                type="button"
+                onClick={() => setSent(false)}
+              >
                 Use another email or try again
-              </button>
+              </Button>
             </>
           ) : (
             <>
@@ -636,7 +601,7 @@ export function AccessPage() {
               )}
               <form onSubmit={signIn}>
                 <label htmlFor="access-email">Email address</label>
-                <input
+                <Input
                   id="access-email"
                   name="email"
                   type="email"
@@ -650,13 +615,14 @@ export function AccessPage() {
                   <label htmlFor="access-website">Leave this blank</label>
                   <input id="access-website" name="website" tabIndex={-1} autoComplete="off" />
                 </div>
-                <button
+                <Button
+                  variant="primary"
                   className="button button-primary button-download"
                   type="submit"
                   disabled={busy}
                 >
                   {busy ? 'Sending…' : 'Send sign-in link'} <ArrowRight size={17} />
-                </button>
+                </Button>
               </form>
               {invite && (
                 <small>

@@ -1,3 +1,4 @@
+import { IconButton } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   ArrowLeft,
@@ -84,9 +85,9 @@ export function LocalAiSetup({
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close local setup">
+              <IconButton variant="ghost" label="Close local setup">
                 <X size={20} />
-              </Button>
+              </IconButton>
             </Dialog.Close>
           </header>
           {open && (

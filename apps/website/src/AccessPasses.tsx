@@ -1,6 +1,7 @@
 import { PassTickets } from '@jackalope/brand/passes';
+import { Button, CopyButton, IconButton, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, Check, Copy, Mail, X } from 'lucide-react';
+import { ArrowRight, Check, Mail, X } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
@@ -22,19 +23,8 @@ export function AccessPasses({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [copied, setCopied] = useState(false);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const available = member.remaining > 0;
-  async function copy() {
-    setError('');
-    setCopied(false);
-    try {
-      await navigator.clipboard.writeText(member.shareUrl);
-      setCopied(true);
-    } catch {
-      setError('Couldn’t copy automatically. Select and copy the link below.');
-    }
-  }
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !available) return;
@@ -69,7 +59,6 @@ export function AccessPasses({
           setSelected(number);
           setError('');
           setNotice('');
-          setCopied(false);
         }}
       />
       <Dialog.Portal>
@@ -89,12 +78,14 @@ export function AccessPasses({
             if (busy) event.preventDefault();
           }}
         >
-          <Dialog.Close
-            className="icon-button dialog-close"
-            aria-label="Close share pass"
-            disabled={busy}
-          >
-            <X size={20} />
+          <Dialog.Close asChild>
+            <IconButton
+              className="icon-button dialog-close"
+              label="Close share pass"
+              disabled={busy}
+            >
+              <X size={20} />
+            </IconButton>
           </Dialog.Close>
           <BrandMark className="dialog-mark" />
           <Dialog.Title>Give someone a head start.</Dialog.Title>
@@ -103,22 +94,17 @@ export function AccessPasses({
             their email.
           </Dialog.Description>
           <div className="pass-dialog-link">
-            <button
+            <CopyButton
+              variant="primary"
               className="button button-primary"
-              type="button"
-              onClick={() => void copy()}
+              text={member.shareUrl}
+              label="Copy share link"
+              copiedLabel="Pass link copied"
               disabled={busy || !available}
-              aria-live="polite"
-            >
-              {copied ? (
-                <Check size={17} aria-hidden="true" />
-              ) : (
-                <Copy size={17} aria-hidden="true" />
-              )}
-              {copied ? 'Pass link copied' : 'Copy share link'}
-            </button>
+              errorMessage="Couldn’t copy automatically. Select and copy the link below."
+            />
             <label htmlFor="pass-dialog-url">Your shared pass link</label>
-            <input
+            <Input
               id="pass-dialog-url"
               readOnly
               value={member.shareUrl}
@@ -131,7 +117,7 @@ export function AccessPasses({
               <Mail size={17} /> Or send by email
             </label>
             <p>Reserve a place for seven days.</p>
-            <input
+            <Input
               id="pass-dialog-email"
               name="email"
               type="email"
@@ -141,10 +127,15 @@ export function AccessPasses({
               maxLength={254}
               disabled={busy || !available}
             />
-            <button className="button button-secondary" type="submit" disabled={busy || !available}>
+            <Button
+              variant="secondary"
+              className="button button-secondary"
+              type="submit"
+              disabled={busy || !available}
+            >
               {busy ? 'Sending…' : 'Send a pass'}
               <ArrowRight size={17} />
-            </button>
+            </Button>
           </form>
           {!available && <p>No passes are available right now.</p>}
           {notice && (

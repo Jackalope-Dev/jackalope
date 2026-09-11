@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { ChevronRight, ListFilter, Search } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Button } from '../ui/button';
@@ -22,7 +23,7 @@ export function TaskActivity({ entries, active }: { entries: string[]; active: b
       <div className="task-activity-body">
         <label className="task-activity-search" htmlFor={id}>
           <Search size={16} aria-hidden="true" />
-          <input
+          <Input
             id={id}
             type="search"
             value={query}

@@ -4,7 +4,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
-import * as Menu from '@radix-ui/react-dropdown-menu';
+import { DropdownMenu as Menu } from '@jackalope/ui';
 import { FolderOpen, MoreHorizontal, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';

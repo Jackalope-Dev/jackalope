@@ -1,0 +1,145 @@
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font:
+    14px / 1.6 "Plus Jakarta Sans Variable",
+    system-ui,
+    sans-serif;
+}
+button,
+input,
+textarea {
+  font: inherit;
+}
+a {
+  color: var(--color-accent-ink);
+  text-underline-offset: 4px;
+}
+a:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 4px;
+}
+.gallery {
+  max-width: 1200px;
+  padding: 48px 32px;
+  margin: auto;
+  display: grid;
+  gap: 24px;
+}
+.gallery .ui-page-header {
+  padding-bottom: 8px;
+}
+.gallery .ui-page-identity > svg {
+  flex-shrink: 0;
+}
+.gallery-mark {
+  width: 64px;
+  height: 64px;
+}
+.gallery-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.gallery-nav a {
+  padding-block: 12px;
+}
+.gallery-section {
+  padding: 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  background: var(--color-surface);
+  display: grid;
+  gap: 24px;
+  scroll-margin-top: 24px;
+  min-width: 0;
+}
+.gallery-section p {
+  margin: 0;
+}
+.gallery-row,
+.gallery-check,
+.gallery-copy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.gallery-check {
+  min-height: 44px;
+  cursor: pointer;
+  flex-wrap: nowrap;
+}
+.gallery-form {
+  display: grid;
+  max-width: 640px;
+  gap: 20px;
+}
+.gallery-output,
+.gallery output {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.gallery-output {
+  background: var(--color-surface-sunken);
+  border-radius: 8px;
+  padding: 12px;
+}
+.gallery-popover {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+.gallery-states,
+.gallery-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.gallery-states > * {
+  min-width: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  padding: 20px;
+}
+.gallery-states .empty-state {
+  min-height: 0;
+}
+.gallery-copy {
+  align-items: flex-end;
+}
+.gallery-copy .form-field {
+  flex: 1 1 200px;
+}
+.gallery-footer {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+@media (max-width: 720px) {
+  .gallery {
+    padding: 24px 16px;
+  }
+  .gallery-section {
+    padding: 20px;
+  }
+  .gallery-states,
+  .gallery-stats {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

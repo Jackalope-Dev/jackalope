@@ -439,7 +439,7 @@ export function ScheduleManager(props: {
               </>
             }
           />
-          <textarea
+          <Textarea
             className="task-output mt-4 w-full"
             aria-label="Recorded content diff"
             readOnly

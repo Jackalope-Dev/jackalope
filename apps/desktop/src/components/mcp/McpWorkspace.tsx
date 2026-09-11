@@ -592,7 +592,7 @@ export function McpWorkspace({
                       size={16}
                       className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                     />
-                    <input
+                    <Input
                       className="mcp-search-input"
                       aria-label="Search MCP marketplace"
                       placeholder="Search MCP servers…"

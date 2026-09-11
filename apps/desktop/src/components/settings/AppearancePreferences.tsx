@@ -1,3 +1,4 @@
+import { Checkbox } from '@jackalope/ui';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -39,8 +40,7 @@ export function AppearancePreferences({ projectId }: { projectId?: string }) {
       )}
       {!projectId && (
         <label className="appearance-toolbar-toggle">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={showThemePicker}
             onChange={(event) =>
               updateSettings({ showThemePickerInToolbar: event.currentTarget.checked })

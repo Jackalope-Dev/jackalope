@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
@@ -150,7 +151,7 @@ export function SettingsPage({
         action={
           <label className="settings-search">
             <Search size={16} />
-            <input
+            <Input
               aria-label="Search settings"
               type="search"
               placeholder="Search settings…"
@@ -358,7 +359,7 @@ export function SettingsPage({
                         >
                           Type RESET to confirm permanent deletion
                         </label>
-                        <input
+                        <Input
                           id="reset-confirmation"
                           autoComplete="off"
                           className="settings-input w-full"

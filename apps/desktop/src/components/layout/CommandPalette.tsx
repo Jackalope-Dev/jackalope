@@ -1,4 +1,5 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
+import { Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { LifeBuoy, Plus, Search, Settings2 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -87,7 +88,7 @@ export function CommandPalette({
           </Dialog.Description>
           <div className="command-search">
             <Search className="size-4 text-[var(--color-text-muted)]" />
-            <input
+            <Input
               aria-label="Search commands"
               placeholder="Where do you want to go?"
               value={query}

@@ -126,8 +126,18 @@ and actions. companionStore persists read identifiers only; reading a notice doe
 not change native task, update or recovery state. Keep action-local errors inline.
 
 components/tasks separates collection/composer, detail/result review, queue/add-work
-and integration review. Shared controls live in components/ui. System information
-belongs to Settings; saved task editing belongs to Tasks.
+and integration review. Browser-safe controls live in packages/ui, consumed as
+@jackalope/ui by desktop, website and admin. Desktop components/ui retains
+compatibility exports and app-specific compositions such as settings rows and
+workspace navigation. System information belongs to Settings; saved task editing
+belongs to Tasks.
+
+The UI package owns portable styling, accessible controls, overlays, feedback
+states and basic layout/data primitives. It has no native bridge, stores, routing
+or service calls. Consumers own data, permissions, irreversible actions and theme
+persistence. Its standalone gallery runs with pnpm ui:dev; gallery assets are not
+included in application release builds. Shared styles use the components cascade
+layer so application styles and utility classes can refine them.
 
 packages/brand owns theme/geometry exports and fonts. Both apps import that package;
 the website renders its own monochrome icon assets. Desktop stores own theme persistence. The lab is available

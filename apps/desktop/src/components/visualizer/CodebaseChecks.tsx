@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import {
   ArrowRight,
   CheckCheck,
@@ -76,7 +77,7 @@ export function CodebaseChecks({
       <div className="codebase-check-filter">
         <label>
           <Search size={17} />
-          <input
+          <Input
             className="task-input"
             aria-label="Search checks"
             placeholder="Find a file or reference…"

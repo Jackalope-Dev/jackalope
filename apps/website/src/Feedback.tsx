@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@jackalope/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessRequest } from './access-api';
 import './access.css';
@@ -110,14 +111,15 @@ export function FeedbackPage() {
               Stop feedback emails without changing your early access. You can still share thoughts
               whenever you want.
             </p>
-            <button
+            <Button
+              variant="primary"
               type="button"
               className="button button-primary"
               disabled={busy || !status}
               onClick={() => void act('unsubscribe')}
             >
               Stop feedback emails
-            </button>
+            </Button>
           </>
         )
       ) : status?.completed ? (
@@ -136,28 +138,30 @@ export function FeedbackPage() {
               <h2>Review your feedback</h2>
               <p className="feedback-preview">{message.trim()}</p>
               <div className="feedback-actions">
-                <button
+                <Button
+                  variant="primary"
                   type="button"
                   className="button button-primary"
                   disabled={busy}
                   onClick={() => void act('submit')}
                 >
                   {busy ? 'Sending…' : 'Send to Jackalope'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   type="button"
                   className="button button-secondary"
                   disabled={busy}
                   onClick={() => setPreview(false)}
                 >
                   Edit message
-                </button>
+                </Button>
               </div>
             </>
           ) : (
             <>
               <label htmlFor="feedback-message">What would you like us to know?</label>
-              <textarea
+              <Textarea
                 id="feedback-message"
                 rows={6}
                 maxLength={8000}
@@ -171,13 +175,14 @@ export function FeedbackPage() {
                 Only your message goes into the feedback inbox; include contact details if you’d
                 like a reply. Please leave out secrets and private code.
               </p>
-              <button
+              <Button
+                variant="primary"
                 type="submit"
                 className="button button-primary"
                 disabled={busy || !message.trim()}
               >
                 Review feedback
-              </button>
+              </Button>
             </>
           )}
           {status.unsubscribed ? (
@@ -185,14 +190,15 @@ export function FeedbackPage() {
               Feedback emails are off. You can still submit your thoughts here.
             </p>
           ) : (
-            <button
+            <Button
+              variant="ghost"
               type="button"
               className="feedback-optout"
               disabled={busy}
               onClick={() => setUnsubscribe(true)}
             >
               Stop feedback emails
-            </button>
+            </Button>
           )}
         </form>
       ) : (
@@ -202,14 +208,15 @@ export function FeedbackPage() {
         <div role="alert">
           <p>{error}</p>
           {/^[a-f0-9]{64}$/.test(token) && (
-            <button
+            <Button
+              variant="secondary"
               type="button"
               className="button button-secondary"
               disabled={busy}
               onClick={() => void act('status')}
             >
               Retry
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -1,0 +1,42 @@
+@import "./foundation.css";
+@layer components {
+  .ui-tabs {
+    min-width: 0;
+  }
+  .ui-tabs-list {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: 8px;
+  }
+  .ui-tabs-trigger {
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    cursor: pointer;
+  }
+  .ui-tabs-trigger[data-state="active"] {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-ink);
+  }
+  .ui-tabs-trigger:focus-visible,
+  .ui-tabs-content:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+  .ui-tabs-trigger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .ui-tabs-content {
+    padding-top: 20px;
+    min-width: 0;
+  }
+}

@@ -1,7 +1,7 @@
 import * as Primitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { type ComponentPropsWithoutRef, forwardRef, type ReactNode } from 'react';
-import { Button } from './Button';
+import { IconButton } from './IconButton';
 import { cn } from './utils';
 import './styles.css';
 
@@ -52,16 +52,15 @@ export function DialogCloseButton({
 }) {
   return (
     <Primitive.Close asChild>
-      <Button
+      <IconButton
         type="button"
         variant="ghost"
-        size="icon"
         className="app-dialog-close"
-        aria-label={label}
+        label={label}
         disabled={disabled}
       >
         <X size={18} aria-hidden="true" />
-      </Button>
+      </IconButton>
     </Primitive.Close>
   );
 }

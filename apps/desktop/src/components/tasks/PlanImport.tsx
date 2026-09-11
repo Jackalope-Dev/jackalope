@@ -1,3 +1,4 @@
+import { Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -274,7 +275,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
                 }}
               />
             </div>
-            <textarea
+            <Textarea
               id="plan-export"
               className="task-input w-full mt-2 font-mono text-xs"
               style={{ minHeight: 180, resize: 'vertical' }}

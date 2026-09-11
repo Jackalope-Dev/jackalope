@@ -1,6 +1,6 @@
+import { ErrorState } from '@jackalope/ui';
 import { Component, type ReactNode } from 'react';
 import { Button } from './button';
-import { WorkspaceHeading } from './WorkspaceHeading';
 import { WorkspacePage } from './WorkspacePage';
 
 export class PageErrorBoundary extends Component<
@@ -16,17 +16,20 @@ export class PageErrorBoundary extends Component<
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <WorkspacePage role="alert">
-        <WorkspaceHeading
+      <WorkspacePage>
+        <ErrorState
+          level={1}
           title="This page couldn’t open."
           description="Try another page or reload Jackalope to try again."
+          action={
+            <div className="flex flex-wrap gap-3">
+              {this.props.onBack && <Button onClick={this.props.onBack}>Back to tasks</Button>}
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Reload Jackalope
+              </Button>
+            </div>
+          }
         />
-        <div className="flex flex-wrap gap-3">
-          {this.props.onBack && <Button onClick={this.props.onBack}>Back to tasks</Button>}
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Reload Jackalope
-          </Button>
-        </div>
       </WorkspacePage>
     );
   }

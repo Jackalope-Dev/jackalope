@@ -11,7 +11,7 @@
     "format": "biome format --write .",
     "check": "biome check . --error-on-warnings",
     "check:write": "biome check --write .",
-    "typecheck": "pnpm --filter @jackalope/desktop --filter @jackalope/website typecheck",
+    "typecheck": "pnpm --filter @jackalope/ui --filter @jackalope/desktop --filter @jackalope/website typecheck",
     "test": "pnpm test:release && pnpm --filter @jackalope/desktop --filter @jackalope/server test",
     "test:release": "node --test \"scripts/release/*.test.mjs\"",
     "dev:website": "pnpm --filter @jackalope/website dev",
@@ -26,7 +26,10 @@
     "check:links:website": "node apps/website/scripts/audit-links.mjs",
     "check:changelog": "node scripts/changelog.mjs check",
     "changelog:add": "node scripts/changelog.mjs add",
-    "licenses:generate": "node scripts/licenses.mjs"
+    "licenses:generate": "node scripts/licenses.mjs",
+    "ui:dev": "pnpm --filter @jackalope/ui dev",
+    "ui:build": "pnpm --filter @jackalope/ui build",
+    "ui:test": "node scripts/verification/verify-ui.mjs"
   },
   "keywords": [
     "tauri",

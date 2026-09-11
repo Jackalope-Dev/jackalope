@@ -8,6 +8,7 @@ import {
   type ThemePalette,
   themeTokens,
 } from '@jackalope/brand/theme';
+import { Input } from '@jackalope/ui';
 import { Check, Clock3, Moon, Sun } from 'lucide-react';
 import { type PointerEvent, useEffect, useId, useState } from 'react';
 import './theme-editor.css';
@@ -163,7 +164,7 @@ export function ThemeEditor({
         <label htmlFor={inputId} className="text-[var(--color-text-secondary)]">
           Exact color
         </label>
-        <input
+        <Input
           id={inputId}
           aria-invalid={!validHex}
           value={hex}

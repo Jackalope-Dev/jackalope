@@ -259,7 +259,7 @@ export function AgentAccounts({
           label={`New ${agentName} account group`}
           disabled={locked}
         />
-        <input
+        <Input
           className="task-input"
           disabled={locked}
           value={name}

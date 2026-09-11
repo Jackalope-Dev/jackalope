@@ -1,5 +1,5 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import * as Tabs from '@radix-ui/react-tabs';
+import { Tabs } from '@jackalope/ui';
 import {
   ArrowDown,
   ArrowRight,

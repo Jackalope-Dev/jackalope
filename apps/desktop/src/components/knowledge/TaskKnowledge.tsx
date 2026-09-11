@@ -1,3 +1,4 @@
+import { Checkbox, Textarea } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { type ContextReceipt, type ContextSelection, useKnowledge } from '../../lib/knowledge';
 import { nativeTask } from '../../lib/task-runtime';
@@ -89,7 +90,7 @@ export function TaskKnowledge({
         {workflow?.process?.inputs.map((name, index) => (
           <label key={name} className="task-knowledge-field" htmlFor={`workflow-input-${index}`}>
             <span>{name}</span>
-            <textarea
+            <Textarea
               id={`workflow-input-${index}`}
               className="task-input w-full"
               rows={2}
@@ -116,8 +117,7 @@ export function TaskKnowledge({
           </ul>
         )}
         <label className="flex gap-3 items-center min-h-11">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={!selection.memoryOff}
             onChange={(e) => onChange({ ...selection, memoryOff: !e.target.checked })}
           />

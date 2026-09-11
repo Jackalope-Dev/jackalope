@@ -20,6 +20,7 @@ const checks = [
   [process.execPath, [pnpm, 'check:docs']],
   [process.execPath, [pnpm, 'check:changelog']],
   [process.execPath, [pnpm, 'test:release']],
+  [process.execPath, [pnpm, 'ui:build']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'types']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'typecheck']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'test']],

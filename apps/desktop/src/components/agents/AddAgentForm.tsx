@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { useId, useState } from 'react';
 import { type BuiltinAgentId, builtinAgents } from '../../lib/agent-catalog';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -28,7 +29,7 @@ export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
       <div className="agent-manual-form">
         <label className="task-label">
           Name
-          <input className="task-input" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input className="task-input" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label htmlFor={adapterId} className="task-label">
           CLI interface
@@ -46,7 +47,7 @@ export function AddAgentForm({ onAdded }: { onAdded: () => void }) {
         </label>
         <label className="task-label">
           Absolute executable path
-          <input
+          <Input
             className="task-input"
             value={path}
             onChange={(e) => setPath(e.target.value)}

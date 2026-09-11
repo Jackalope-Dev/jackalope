@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { Check, Plus, RefreshCw } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
@@ -138,7 +139,7 @@ export function AgentModels({
       )}
       {models.length > 0 && (
         <>
-          <input
+          <Input
             aria-label="Find a model"
             className="task-input"
             placeholder="Find a model…"

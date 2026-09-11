@@ -1,4 +1,5 @@
 import { EchoMark } from '@jackalope/brand/echo';
+import { Button, Checkbox } from '@jackalope/ui';
 import { Check, Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
@@ -214,8 +215,7 @@ export function DesktopConnection({
                 {preview.userCode.slice(0, 4)}–{preview.userCode.slice(4)}
               </p>
               <label className="desktop-code-confirm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={matches}
                   disabled={busy}
                   onChange={(event) => setMatches(event.target.checked)}
@@ -223,22 +223,24 @@ export function DesktopConnection({
                 This code matches my desktop
               </label>
               <div className="desktop-connection-actions">
-                <button
+                <Button
+                  variant="primary"
                   className="button button-primary"
                   type="button"
                   disabled={busy || !matches}
                   onClick={() => void decide('approve')}
                 >
                   Connect this desktop
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   className="text-link"
                   type="button"
                   disabled={busy}
                   onClick={() => void decide('deny')}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -249,7 +251,8 @@ export function DesktopConnection({
         <p className="access-alert" role="alert">
           {error}
           {!preview && signedIn && (
-            <button
+            <Button
+              variant="ghost"
               className="text-link"
               type="button"
               onClick={() => {
@@ -258,7 +261,7 @@ export function DesktopConnection({
               }}
             >
               Retry
-            </button>
+            </Button>
           )}
         </p>
       )}
@@ -409,7 +412,8 @@ export function ConnectedDesktops() {
           </div>
           <div className="desktop-device-actions">
             <div className="desktop-connection-actions">
-              <button
+              <Button
+                variant="ghost"
                 className={`button button-compact ${confirm === device.id ? 'button-primary' : 'button-quiet desktop-disconnect'}`}
                 type="button"
                 disabled={!!busy}
@@ -423,9 +427,10 @@ export function ConnectedDesktops() {
                   : confirm === device.id
                     ? 'Confirm disconnect'
                     : 'Disconnect'}
-              </button>
+              </Button>
               {confirm === device.id && (
-                <button
+                <Button
+                  variant="ghost"
                   className="button button-compact button-quiet"
                   type="button"
                   disabled={!!busy}
@@ -435,7 +440,7 @@ export function ConnectedDesktops() {
                   }}
                 >
                   Cancel
-                </button>
+                </Button>
               )}
             </div>
             {confirm === device.id && (
@@ -450,9 +455,15 @@ export function ConnectedDesktops() {
       {error && (
         <p className="access-alert" role="alert">
           {error}{' '}
-          <button className="text-link" type="button" disabled={!!busy} onClick={() => void load()}>
+          <Button
+            variant="ghost"
+            className="text-link"
+            type="button"
+            disabled={!!busy}
+            onClick={() => void load()}
+          >
             Retry
-          </button>
+          </Button>
         </p>
       )}
     </section>

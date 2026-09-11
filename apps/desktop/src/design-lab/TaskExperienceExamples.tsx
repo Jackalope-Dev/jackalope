@@ -1,3 +1,4 @@
+import { Checkbox } from '@jackalope/ui';
 import { useState } from 'react';
 import { AgentQuestion } from '../components/tasks/AgentQuestion';
 import { PatchPreview } from '../components/tasks/PatchPreview';
@@ -89,11 +90,7 @@ export function TaskExperienceExamples() {
           Reset question
         </Button>
         <label className="flex items-center gap-2 min-h-11 text-sm">
-          <input
-            type="checkbox"
-            checked={fail}
-            onChange={(event) => setFail(event.target.checked)}
-          />
+          <Checkbox checked={fail} onChange={(event) => setFail(event.target.checked)} />
           Simulate send failure
         </label>
       </div>
@@ -124,7 +121,7 @@ export function TaskExperienceExamples() {
         prompt={`${finalPrompt}\n\n[Project Guidelines]:\nKeep changes focused. Run the search tests.`}
       />
       <label className="flex items-center gap-2 min-h-11 text-sm">
-        <input type="checkbox" checked={long} onChange={(event) => setLong(event.target.checked)} />
+        <Checkbox checked={long} onChange={(event) => setLong(event.target.checked)} />
         Show long examples
       </label>
       <TaskActivity

@@ -1,4 +1,4 @@
-import { Button, Input } from '@jackalope/ui';
+import { Button, Checkbox, IconButton, Input } from '@jackalope/ui';
 import { accessMessage, accessOrigin, accessRequest } from './access-api';
 import { waitlistReferral } from './referral';
 import './access.css';
@@ -161,7 +161,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
           </p>
           {accessOrigin && (
             <label className="signup-newsletter">
-              <input name="newsletter" type="checkbox" disabled={state === 'sending'} />
+              <Checkbox name="newsletter" disabled={state === 'sending'} />
               <span>
                 Optional: product notes and one feedback email after trying Jackalope. Unsubscribe
                 anytime.
@@ -209,8 +209,10 @@ export function WaitlistButton({ compact = false, label }: { compact?: boolean; 
               ?.focus({ preventScroll: true });
           }}
         >
-          <Dialog.Close className="icon-button dialog-close" aria-label="Close waitlist">
-            <X size={20} />
+          <Dialog.Close asChild>
+            <IconButton className="icon-button dialog-close" label="Close waitlist">
+              <X size={20} />
+            </IconButton>
           </Dialog.Close>
           <div className="waitlist-art" aria-hidden="true">
             <span className="waitlist-orbit" />

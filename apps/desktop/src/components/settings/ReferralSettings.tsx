@@ -1,5 +1,6 @@
 import { PassTickets } from '@jackalope/brand/passes';
-import { ArrowUpRight, Check, Copy, Mail, RefreshCw } from 'lucide-react';
+import { CopyButton, Input } from '@jackalope/ui';
+import { ArrowUpRight, Check, Mail, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -106,29 +107,28 @@ export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
       <div className="referral-share">
         <label htmlFor="desktop-referral-link">Your pass link</label>
         <div className="referral-link-row">
-          <input
+          <Input
             id="desktop-referral-link"
             readOnly
             value={referrals.shareUrl}
             onFocus={(event) => event.currentTarget.select()}
           />
-          <Button
+          <CopyButton
+            variant="primary"
             disabled={!referrals.remaining}
-            onClick={() => void copy(referrals.shareUrl, 'Pass link copied.')}
-          >
-            <Copy size={16} /> Copy link
-          </Button>
+            text={referrals.shareUrl}
+            label="Copy link"
+            onCopied={() => useMascotStore.getState().say('Pass link copied.', 3500)}
+          />
         </div>
         <div className="referral-actions">
-          <Button
+          <CopyButton
             variant="outline"
             disabled={!referrals.remaining}
-            onClick={() =>
-              void copy(`${invitationMessage}\n\n${referrals.shareUrl}`, 'Pass message copied.')
-            }
-          >
-            <Copy size={16} /> Copy message
-          </Button>
+            text={`${invitationMessage}\n\n${referrals.shareUrl}`}
+            label="Copy message"
+            onCopied={() => useMascotStore.getState().say('Pass message copied.', 3500)}
+          />
           <Button
             variant="outline"
             disabled={!referrals.remaining}

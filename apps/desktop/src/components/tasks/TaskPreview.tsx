@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
@@ -57,7 +58,7 @@ export function TaskPreview({ run }: { run: TaskRun }) {
         </p>
         <label className="block" htmlFor="preview-command">
           Preview command
-          <input
+          <Input
             id="preview-command"
             className="task-input w-full"
             maxLength={4000}
@@ -69,7 +70,7 @@ export function TaskPreview({ run }: { run: TaskRun }) {
         </label>
         <label className="block" htmlFor="preview-port">
           Port
-          <input
+          <Input
             id="preview-port"
             className="task-input w-full"
             type="number"

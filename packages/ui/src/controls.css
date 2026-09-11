@@ -1,0 +1,109 @@
+@import "./foundation.css";
+@layer components {
+  .ui-checkbox {
+    appearance: auto;
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+  .ui-checkbox:focus-visible,
+  .ui-switch:focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 4px;
+  }
+  .ui-checkbox:disabled,
+  .ui-switch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .ui-switch {
+    display: inline-flex;
+    position: relative;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 24px;
+    background: transparent;
+    align-items: center;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .ui-switch-track {
+    display: inline-flex;
+    align-items: center;
+    width: 44px;
+    height: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    background: var(--color-surface-elevated);
+    transition: background-color 160ms;
+  }
+  .ui-switch-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--color-text-secondary);
+    transform: translateX(3px);
+    transition: transform 160ms;
+  }
+  .ui-switch[aria-checked="true"] .ui-switch-track {
+    background: var(--color-accent);
+    border-color: transparent;
+  }
+  .ui-switch[aria-checked="true"] .ui-switch-thumb {
+    transform: translateX(23px);
+    background: var(--color-on-accent);
+  }
+  .ui-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    gap: 6px;
+    width: fit-content;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    background: var(--color-surface-elevated);
+    color: var(--color-text-secondary);
+  }
+  .ui-badge[data-variant="accent"] {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-ink);
+    border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
+  }
+  .ui-badge[data-variant="outline"] {
+    background: transparent;
+    color: var(--color-text-primary);
+  }
+  .ui-badge[data-variant="success"] {
+    --badge-tone: var(--color-success);
+  }
+  .ui-badge[data-variant="warning"] {
+    --badge-tone: var(--color-warning);
+  }
+  .ui-badge[data-variant="danger"] {
+    --badge-tone: var(--color-danger);
+  }
+  .ui-badge:is([data-variant="success"], [data-variant="warning"], [data-variant="danger"]) {
+    color: var(--badge-tone);
+    background: color-mix(in srgb, var(--badge-tone) 12%, transparent);
+    border-color: color-mix(in srgb, var(--badge-tone) 30%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-switch-track,
+    .ui-switch-thumb {
+      transition: none;
+    }
+  }
+}

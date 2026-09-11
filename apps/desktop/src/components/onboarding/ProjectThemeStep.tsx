@@ -1,4 +1,5 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
+import { Checkbox } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { ThemeEditor } from '../theme/ThemeEditor';
@@ -25,8 +26,7 @@ export function ProjectThemeStep({
     <>
       <fieldset disabled={busy} className="onboarding-theme-editor">
         <label className="onboarding-theme-inherit">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={inherit}
             onChange={(event) => {
               setInherit(event.target.checked);

@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
@@ -397,7 +398,7 @@ export function CaptureTask({
           <label className="task-label mt-4" htmlFor="capture-title">
             Title
           </label>
-          <input
+          <Input
             id="capture-title"
             className="task-input w-full"
             value={current.title ?? ''}

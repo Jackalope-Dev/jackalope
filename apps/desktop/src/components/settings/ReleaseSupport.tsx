@@ -1,3 +1,4 @@
+import { Textarea } from '@jackalope/ui';
 import { LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
@@ -76,7 +77,7 @@ export function ReleaseSupport() {
             <label htmlFor="support-feedback" className="block text-sm font-medium">
               What were you trying to do, and what happened?
             </label>
-            <textarea
+            <Textarea
               id="support-feedback"
               className="settings-textarea"
               rows={4}

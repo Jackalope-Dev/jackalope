@@ -108,13 +108,19 @@ Maintain the existing setup acknowledgment and workspace-entry behavior.
 
 ## Components and verification
 
-Reuse WorkspaceHeading, WorkspaceSubnavigation, EmptyState, RunStatus,
-useDialogFocus and the shared theme and control primitives. Component ownership
-and runtime boundaries are documented in the architecture guide.
+Import portable controls from @jackalope/ui. The library includes Button,
+IconButton, Input, Textarea, FormField, Select, Checkbox, Switch, Badge, Tooltip,
+DropdownMenu, Popover, Tabs, SegmentedControl, dialogs, CopyButton, InlineNotice,
+LoadingState, EmptyState, ErrorState, PageHeader, SectionHeader, Toolbar, Stat,
+DefinitionList and Table. Reuse desktop compositions such as WorkspaceHeading,
+WorkspaceSubnavigation and RunStatus for their app-specific context. Component
+ownership and runtime boundaries are documented in the architecture guide.
 
 Standard dialogs compose DialogContent, DialogHeader, DialogCloseButton and
-DialogFooter. Keep dismissal, busy guards and focus-return handlers with the
-owning feature. Use contained dialog layout for editors with a scrolling body
+DialogFooter. ConfirmDialog owns pending guards, failure feedback and focus return
+for a single confirmation; its children can collect feature-specific acknowledgments.
+The feature supplies the actual operation and eligibility. Custom dialogs retain
+their own dismissal and focus-return policies. Use contained layout for editors with a scrolling body
 and fixed actions. Specialized canvases and command palettes may retain their
 own layouts.
 
@@ -124,6 +130,22 @@ and responsive control placement. Use InlineNotice for inline feedback, choosing
 the tone from the actual outcome; use its action slot for recovery controls.
 WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
 pressed filter choices; WorkspaceSubnavigation represents navigation between views.
+
+Checkbox retains native name/value, required and form-reset behavior. Switch is
+an immediate controlled preference, not a serialized form field. Wrap a checkbox
+in a label with a comfortable hit area or use FormField. Keep specialized file,
+color, range and editor controls local when their interaction requires it.
+DropdownMenu and Popover keep Portal explicit so nested overlays can choose their
+container. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
+buttons for filtering. CopyButton accepts a custom clipboard function, shows
+failure beside the action and clears stale feedback when its text changes.
+
+Use the standalone gallery with `pnpm ui:dev` at http://127.0.0.1:5190 to inspect
+shared controls without a native bridge or account service. `pnpm ui:build` checks
+the package and builds the gallery; `pnpm ui:test` exercises form semantics,
+keyboard/focus, async confirmation, copy feedback and responsive appearance.
+It uses installed Edge on Windows or Chrome elsewhere; set UI_BROWSER_CHANNEL
+to choose another Playwright browser channel. Gallery samples remain local.
 
 The /design-lab.html preview uses fictional fixtures and does not execute tasks.
 Verify the actual workspace at 1280 by 840 and 960 by 640, including pointer and

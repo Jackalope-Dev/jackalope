@@ -1,3 +1,4 @@
+import { Textarea } from '@jackalope/ui';
 import {
   ArrowRight,
   BookOpen,
@@ -156,7 +157,7 @@ export function TaskComposer({
           <label htmlFor="task-intent" className="sr-only">
             What do you want to accomplish?
           </label>
-          <textarea
+          <Textarea
             id="task-intent"
             className="composer-intent"
             value={current.prompt}

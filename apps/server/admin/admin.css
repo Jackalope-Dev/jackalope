@@ -385,27 +385,6 @@ tbody tr:last-child td {
 .quick-link:where(:hover) strong {
   color: var(--accent);
 }
-.service-list {
-  margin: 0;
-}
-.service-list div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
-}
-.service-list div:last-child {
-  border: 0;
-}
-.service-list dt {
-  color: var(--muted);
-}
-.service-list dd {
-  margin: 0;
-  font-weight: 550;
-  text-align: right;
-}
 .badge {
   display: inline-flex;
   padding: 3px 9px;
@@ -529,11 +508,6 @@ summary {
 }
 .person .actions button {
   font-size: 12px;
-}
-.status {
-  font-size: 12px;
-  color: var(--accent);
-  font-weight: 550;
 }
 .person .actions button:last-child:not(.primary) {
   color: var(--muted);
@@ -841,9 +815,6 @@ summary {
 }
 .inline-notice {
   margin: 12px 0;
-}
-.person .status {
-  margin: 4px 0;
 }
 .error-boundary {
   margin: 48px auto;

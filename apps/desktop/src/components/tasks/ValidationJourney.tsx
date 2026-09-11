@@ -1,3 +1,4 @@
+import { IconButton } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlertCircle,
@@ -12,7 +13,6 @@ import {
 import { useState } from 'react';
 import type { ScreenshotArtifact, ValidationStep } from '../../lib/task-runtime';
 import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { ValidationEvidence } from './ValidationEvidence';
@@ -198,15 +198,14 @@ export function ValidationJourney({ runId, steps, screenshots = [] }: Validation
                     {activeImage.url} · {activeImage.filePath}
                   </Dialog.Description>
                 </div>
-                <Button
+                <IconButton
                   variant="ghost"
-                  size="icon"
                   className="shrink-0"
-                  aria-label="Close screenshot details"
+                  label="Close screenshot details"
                   onClick={() => setActiveImage(null)}
                 >
                   <X size={16} />
-                </Button>
+                </IconButton>
               </div>
 
               <ScreenshotPreview

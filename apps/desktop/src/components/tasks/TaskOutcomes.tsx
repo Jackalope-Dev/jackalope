@@ -1,3 +1,4 @@
+import { Checkbox, Textarea } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { correctionPrompt, type Requirement, requirementState } from '../../lib/task-outcomes';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
@@ -103,8 +104,7 @@ export function TaskOutcomes({
         >
           <div className="flex gap-3 items-start">
             <label className="flex h-11 w-11 shrink-0 items-center justify-center">
-              <input
-                type="checkbox"
+              <Checkbox
                 aria-label={`Request correction: ${item.title}`}
                 disabled={!canReview || (item.checkpoint ? index !== step : !finalStep)}
                 checked={selected.includes(item.id)}
@@ -201,7 +201,7 @@ export function TaskOutcomes({
               )}
               <label className="block" htmlFor={`note-${item.id}`}>
                 What did you verify, or what needs to change?
-                <textarea
+                <Textarea
                   id={`note-${item.id}`}
                   rows={3}
                   className="task-input w-full"

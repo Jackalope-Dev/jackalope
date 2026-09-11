@@ -1,3 +1,4 @@
+import { Checkbox } from '@jackalope/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
@@ -237,7 +238,7 @@ export function McpConnectionForm({
             </div>
             {env.map((item, index) => (
               <div className="mcp-variable-row" key={item.id}>
-                <input
+                <Input
                   aria-label={`Variable ${index + 1} name`}
                   className="task-input font-mono"
                   placeholder="API_TOKEN"
@@ -252,7 +253,7 @@ export function McpConnectionForm({
                     )
                   }
                 />
-                <input
+                <Input
                   aria-label={`Variable ${index + 1} value`}
                   className="task-input"
                   type="password"
@@ -347,8 +348,7 @@ export function McpConnectionForm({
                 <div className="mcp-agent-options">
                   {builtinAgents.map((agent) => (
                     <label key={agent.id}>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={agents.includes(agent.id)}
                         onChange={(event) =>
                           setAgents(

@@ -1,4 +1,4 @@
-import * as Tabs from '@radix-ui/react-tabs';
+import { Checkbox, Tabs, Textarea } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
@@ -601,8 +601,7 @@ export function TaskDetail({
                 <p className="task-muted">Changes apply to the next continuation.</p>
                 {connections?.map((server) => (
                   <label key={server.id} className="flex items-center gap-3 min-h-11">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={(
                         drafts[key]?.connectionIds ??
                         run.connectionIds ??
@@ -658,7 +657,7 @@ export function TaskDetail({
                   ? 'Save a follow-up, or stop this attempt and send it'
                   : 'What would you like to adjust?'}
               </label>
-              <textarea
+              <Textarea
                 id="task-reply"
                 className="task-reply"
                 rows={3}

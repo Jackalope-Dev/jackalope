@@ -1,5 +1,5 @@
 import { applyThemeTokens } from '@jackalope/brand/theme';
-import * as Popover from '@radix-ui/react-popover';
+import { Popover } from '@jackalope/ui';
 import { RotateCcw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useThemeStore } from '../../stores/themeStore';

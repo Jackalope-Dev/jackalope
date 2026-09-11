@@ -1,3 +1,4 @@
+import { Checkbox, IconButton, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Check,
@@ -334,7 +335,7 @@ export function RepoTodos({
                           Edit headings, notes and checklist items together. Use - [ ] for an open
                           TODO.
                         </p>
-                        <textarea
+                        <Textarea
                           id="todo-source"
                           spellCheck={false}
                           disabled={saving}
@@ -427,10 +428,9 @@ export function RepoTodos({
                                         Start task
                                       </Button>
                                       <Tooltip content="Edit TODO">
-                                        <Button
+                                        <IconButton
                                           variant="ghost"
-                                          size="icon"
-                                          aria-label={`Edit ${item.title}`}
+                                          label={`Edit ${item.title}`}
                                           disabled={saving}
                                           onClick={() => {
                                             setEditing(item);
@@ -439,7 +439,7 @@ export function RepoTodos({
                                           }}
                                         >
                                           <Pencil size={15} aria-hidden="true" />
-                                        </Button>
+                                        </IconButton>
                                       </Tooltip>
                                     </div>
                                   </li>
@@ -570,9 +570,9 @@ export function RepoTodos({
                     : 'Start a repository list'}
               </Dialog.Title>
               <Dialog.Close asChild>
-                <Button variant="ghost" size="icon" aria-label="Close dialog">
+                <IconButton variant="ghost" label="Close dialog">
                   <X size={18} />
-                </Button>
+                </IconButton>
               </Dialog.Close>
             </div>
             <Dialog.Description>
@@ -602,8 +602,7 @@ export function RepoTodos({
                   onChange={(event) => setEditTitle(event.target.value)}
                 />
                 <label className="repo-todo-completion">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={editCompleted}
                     onChange={(event) => setEditCompleted(event.target.checked)}
                   />

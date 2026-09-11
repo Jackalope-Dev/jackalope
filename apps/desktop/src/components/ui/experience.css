@@ -1,28 +1,4 @@
-.empty-state {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  padding: 36px 0;
-  max-width: 680px;
-}
-.empty-state-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 64px;
-  height: 64px;
-  border-radius: 22px;
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-}
-.empty-state h2 {
-  font-size: var(--text-xl);
-  font-weight: 500;
-  letter-spacing: -0.025em;
-  margin: 2px 0 8px;
-}
-.empty-state-action {
-  margin-top: 20px;
-}
+@import "@jackalope/ui/styles.css";
 .workspace-section-heading {
   display: flex;
   justify-content: space-between;
@@ -377,19 +353,6 @@ button:disabled {
     var(--color-header-search, var(--color-surface-sunken)) 75%,
     transparent
   );
-}
-.workspace-tooltip {
-  z-index: 120;
-  max-width: min(320px, calc(100vw - 24px));
-  padding: 8px 12px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  overflow-wrap: anywhere;
 }
 .quiet-icon,
 .appearance-trigger {

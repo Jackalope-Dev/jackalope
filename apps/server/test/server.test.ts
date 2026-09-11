@@ -570,9 +570,24 @@ describe('private monitoring and feedback delivery', () => {
       .run();
     const expired = await (await call('/admin/api/summary')).json<{ feedback: unknown[] }>();
     expect(expired.feedback).toEqual([]);
-    const page = await call('/admin');
-    expect(page.headers.get('content-security-policy')).toContain("default-src 'none'");
-    expect(await page.text()).not.toContain(report.message);
+    for (const path of ['/admin', '/admin/access']) {
+      const page = await call(path);
+      const html = await page.text();
+      const nonce = html.match(/<script nonce="([^"]+)"/)?.[1];
+      expect(nonce).toBeTruthy();
+      expect(page.headers.get('cache-control')).toBe('no-store');
+      const policy = page.headers.get('content-security-policy');
+      expect(policy).toContain("default-src 'none'");
+      expect(policy).toContain(`script-src 'nonce-${nonce}'`);
+      expect(policy).toContain(`style-src 'nonce-${nonce}'`);
+      expect(policy).toContain("style-src-attr 'unsafe-inline'");
+      expect(policy).toContain('font-src data:');
+      expect(html).toContain(`<style nonce="${nonce}">`);
+      expect(html).toContain(`globalThis.__webpack_nonce__="${nonce}"`);
+      expect(html).toContain('<div id="root"></div>');
+      expect(html.match(/<\/script>/g)).toHaveLength(1);
+      expect(html).not.toContain(report.message);
+    }
   });
   it('keeps acknowledged feedback through email failure, retries with a lease, and stops after success', async () => {
     const now = Date.now(),

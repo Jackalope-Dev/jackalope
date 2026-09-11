@@ -1,3 +1,4 @@
+import { Checkbox } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Check,
@@ -267,8 +268,7 @@ export function DetectedKeysModal({
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={isChecked}
                             onChange={() => toggleKey(k.keyName)}
                             className="rounded border-[var(--color-border)] text-[var(--color-brand)] focus:ring-[var(--color-brand)]"

@@ -2,7 +2,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "jackalope-service-local",
   "main": "src/index.ts",
-  "build": { "command": "node scripts/build-admin.mjs" },
+  "build": {
+    "command": "node scripts/build-admin.mjs",
+    "watch_dir": ["admin", "scripts", "../../packages/ui/src", "../../packages/brand/src"]
+  },
   "compatibility_date": "2026-09-06",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,

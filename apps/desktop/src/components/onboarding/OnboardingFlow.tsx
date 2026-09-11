@@ -1,4 +1,5 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
+import { Input, Textarea } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -361,7 +362,7 @@ export function OnboardingFlow({
                     <label className="task-label" htmlFor="onboarding-project-name">
                       Project name
                     </label>
-                    <input
+                    <Input
                       id="onboarding-project-name"
                       className="task-input onboarding-project-name"
                       placeholder="My new project"
@@ -408,7 +409,7 @@ export function OnboardingFlow({
                       Repository folder
                     </label>
                     <div className="onboarding-folder">
-                      <input
+                      <Input
                         id="onboarding-path"
                         className="task-input"
                         placeholder="Paste a repository path"
@@ -734,7 +735,7 @@ export function OnboardingFlow({
               <label htmlFor="onboarding-prompt" className="task-label">
                 Your first task (optional)
               </label>
-              <textarea
+              <Textarea
                 id="onboarding-prompt"
                 className="task-input onboarding-prompt"
                 placeholder="What would you like to build, fix or understand?"

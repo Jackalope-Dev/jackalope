@@ -1,3 +1,4 @@
+import { Textarea } from '@jackalope/ui';
 import { Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
@@ -111,7 +112,7 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
         <label className="sr-only" htmlFor="helper-message">
           Message Jackalope
         </label>
-        <textarea
+        <Textarea
           ref={input}
           id="helper-message"
           value={helper.draft}

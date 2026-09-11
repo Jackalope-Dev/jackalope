@@ -1,12 +1,18 @@
 import {
+  Badge,
   Button,
+  Checkbox,
+  ConfirmDialog,
+  DefinitionList,
   Dialog,
   DialogCloseButton,
   DialogContent,
-  DialogFooter,
   DialogHeader,
+  EmptyState,
   FormField,
   Input,
+  LoadingState,
+  SegmentedControl,
   useDialogFocus,
 } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -83,6 +89,7 @@ export function People({ search }: { search: string }) {
     setOffset(0);
     setMembers([]);
     setNotice('');
+    request.reload();
   }
   function refresh() {
     setOffset(0);
@@ -110,18 +117,16 @@ export function People({ search }: { search: string }) {
           Waitlist referrals are unlimited. Each verified signup earns one day of priority. Instant
           Access Passes are a separate allowance after acceptance.
         </p>
-        <fieldset className="tabs" aria-label="Filter people">
-          {Object.entries(groupNames).map(([value, label]) => (
-            <Button
-              key={value}
-              variant="ghost"
-              aria-pressed={filters.status === value}
-              onClick={() => change({ status: value })}
-            >
-              {label} ({countMap[value] ?? '…'})
-            </Button>
-          ))}
-        </fieldset>
+        <SegmentedControl
+          className="tabs"
+          label="Filter people"
+          value={filters.status}
+          onChange={(status) => change({ status })}
+          items={Object.entries(groupNames).map(([id, label]) => ({
+            id,
+            label: `${label} (${countMap[id] ?? '…'})`,
+          }))}
+        />
         <form
           className="filters"
           onSubmit={(event) => {
@@ -192,7 +197,17 @@ export function People({ search }: { search: string }) {
             <article className="person" key={person.id}>
               <div>
                 <h3>{person.email}</h3>
-                <span className="status">
+                <Badge
+                  variant={
+                    person.status === 'revoked'
+                      ? 'danger'
+                      : person.status === 'waiting'
+                        ? 'warning'
+                        : person.devices > 0
+                          ? 'success'
+                          : 'default'
+                  }
+                >
                   {person.status === 'revoked'
                     ? 'Access revoked'
                     : person.status === 'waiting'
@@ -202,7 +217,7 @@ export function People({ search }: { search: string }) {
                         : person.verified_at
                           ? 'Signed in to website'
                           : 'Approved · awaiting first sign-in'}
-                </span>
+                </Badge>
                 <p>Requested {date(person.created_at)}</p>
                 <p>
                   {mailNames[person.mail_kind || ''] || 'Email'}: {mailStatus(person)}
@@ -255,9 +270,10 @@ export function People({ search }: { search: string }) {
           ))}
         </div>
         {!request.loading && !request.error && !members.length && (
-          <p className="empty">
-            No people match this view. Try another group or use Clear filters.
-          </p>
+          <EmptyState
+            title="No people match this view"
+            description="Try another group or use Clear filters."
+          />
         )}
         {request.data?.hasMore && (
           <Button
@@ -303,10 +319,6 @@ function ConfirmAction({
   onDone: (notice: string) => void;
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const sending = useRef(false);
-  const [error, setError] = useState('');
-  const focus = useDialogFocus();
   const needsDownload = kind === 'approve' && ready?.download !== 'available';
   const configured =
     (kind !== 'approve' && kind !== 'resend') || !!(ready?.enabled && ready.mailConfigured);
@@ -320,76 +332,54 @@ function ConfirmAction({
       'This returns the person to the waitlist. It sends no email and does not restore old sign-in links or desktop credentials.',
   };
   async function confirm() {
-    if (sending.current || !configured || (needsDownload && !acknowledged)) return;
-    sending.current = true;
-    setBusy(true);
-    setError('');
-    try {
-      const result = await post<{ mailQueued?: boolean }>('/admin/api/access', {
-        id: person.id,
-        action: kind,
-        allowWithoutDownload: kind === 'approve' && acknowledged,
-      });
-      onDone(
-        `Access updated for ${person.email}. ${kind === 'approve' || kind === 'resend' ? (result.mailQueued ? 'Email added to the outbox. Delivery is not confirmed yet.' : 'No new email was queued. A recent request or daily limit may apply; check Details before retrying.') : ''}`,
-      );
-    } catch (error) {
-      setError(message(error));
-    } finally {
-      sending.current = false;
-      setBusy(false);
-    }
+    const result = await post<{ mailQueued?: boolean }>('/admin/api/access', {
+      id: person.id,
+      action: kind,
+      allowWithoutDownload: kind === 'approve' && acknowledged,
+    });
+    onDone(
+      `Access updated for ${person.email}. ${kind === 'approve' || kind === 'resend' ? (result.mailQueued ? 'Email added to the outbox. Delivery is not confirmed yet.' : 'No new email was queued. A recent request or daily limit may apply; check Details before retrying.') : ''}`,
+    );
   }
   return (
-    <Dialog
+    <ConfirmDialog
       open
       onOpenChange={(open) => {
-        if (!open && !sending.current) onClose();
+        if (!open) onClose();
       }}
+      title={`${label}?`}
+      description={person.email}
+      label={label}
+      busyLabel="Updating…"
+      variant={kind === 'revoke' ? 'danger' : 'primary'}
+      disabled={!configured || (needsDownload && !acknowledged)}
+      dismissOnOutside={false}
+      onConfirm={confirm}
     >
-      <DialogContent
-        {...focus}
-        onEscapeKeyDown={(event) => {
-          if (sending.current) event.preventDefault();
-        }}
-        onInteractOutside={(event) => event.preventDefault()}
-      >
-        <DialogHeader title={`${label}?`} description={person.email} />
-        <p>{copy[kind]}</p>
-        {needsDownload && (
-          <label className="confirmation">
-            <input
-              type="checkbox"
-              checked={acknowledged}
-              onChange={(event) => setAcknowledged(event.target.checked)}
-              disabled={busy}
-            />
-            <span>
-              No download is available or it could not be checked. I understand this person may see
-              “No download available yet.”
-            </span>
-          </label>
-        )}
-        <ErrorNotice>
-          {error ||
-            (!configured
+      {({ busy }) => (
+        <>
+          <p>{copy[kind]}</p>
+          {needsDownload && (
+            <label className="confirmation">
+              <Checkbox
+                checked={acknowledged}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+                disabled={busy}
+              />
+              <span>
+                No download is available or it could not be checked. I understand this person may
+                see “No download available yet.”
+              </span>
+            </label>
+          )}
+          <ErrorNotice>
+            {!configured
               ? 'Recheck setup and configure early access and email before sending.'
-              : '')}
-        </ErrorNotice>
-        <DialogFooter>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant={kind === 'revoke' ? 'danger' : 'primary'}
-            disabled={busy || !configured || (needsDownload && !acknowledged)}
-            onClick={() => void confirm()}
-          >
-            {busy ? 'Updating…' : label}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              : ''}
+          </ErrorNotice>
+        </>
+      )}
+    </ConfirmDialog>
   );
 }
 
@@ -411,15 +401,15 @@ function Details({ person, onClose }: { person: Member; onClose: () => void }) {
             ? [
                 [
                   'Operating systems',
-                  preferences.platforms.map(audienceLabel).join(', ') || 'Not answered',
+                  preferences.platforms?.map(audienceLabel).join(', ') || 'Not answered',
                 ],
                 [
                   'Preferred agents',
-                  preferences.agents.map(audienceLabel).join(', ') || 'Not answered',
+                  preferences.agents?.map(audienceLabel).join(', ') || 'Not answered',
                 ],
                 [
                   'Priorities',
-                  preferences.priorities.map(audienceLabel).join(', ') || 'Not answered',
+                  preferences.priorities?.map(audienceLabel).join(', ') || 'Not answered',
                 ],
               ]
             : []),
@@ -470,14 +460,13 @@ function Details({ person, onClose }: { person: Member; onClose: () => void }) {
             Retry details
           </Refresh>
         )}
-        {request.loading && <p role="status">Loading details…</p>}
+        {request.loading && <LoadingState compact label="Loading details…" />}
         {data && (
           <>
-            <dl className="facts">
-              {facts.map(([label, value]) => (
-                <Fact key={label} label={label} value={value} />
-              ))}
-            </dl>
+            <DefinitionList
+              className="facts"
+              items={facts.map(([label, value]) => ({ label, value }))}
+            />
             <p>
               Website sign-in and desktop connection do not establish that a task was completed.
             </p>
@@ -516,14 +505,6 @@ function Details({ person, onClose }: { person: Member; onClose: () => void }) {
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </>
   );
 }
 function EmailEntry({ mail }: { mail: Mail }) {

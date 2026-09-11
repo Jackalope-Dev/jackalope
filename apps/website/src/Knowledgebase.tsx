@@ -1,4 +1,5 @@
 import { guideMarkdown } from '@jackalope/knowledge';
+import { Button, IconButton, Input } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight, Check, Copy, Info, Play, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { siteOrigin } from './content';
@@ -164,14 +165,15 @@ export function KnowledgebasePage({
           <h1>{activeGuide.title}</h1>
           <p className="knowledge-guide-lede">{activeGuide.description}</p>
           <div className="knowledge-agent-actions">
-            <button
+            <Button
+              variant="primary"
               type="button"
               className="button button-primary button-compact"
               onClick={() => void copyToClipboard('guide', guideMarkdown(activeGuide, siteOrigin))}
             >
               {copiedId === 'guide' ? <Check size={16} /> : <Copy size={16} />}
               {copiedId === 'guide' ? 'Copied' : 'Copy for your agent'}
-            </button>
+            </Button>
             <a className="knowledge-agent-markdown" href={`${guideHref(activeGuide.slug)}index.md`}>
               Read Markdown
             </a>
@@ -303,7 +305,7 @@ export function KnowledgebasePage({
             </p>
             <search className="knowledge-search-bar">
               <Search size={20} aria-hidden="true" />
-              <input
+              <Input
                 ref={searchRef}
                 type="search"
                 value={query}
@@ -313,9 +315,9 @@ export function KnowledgebasePage({
                 aria-controls="knowledge-results"
               />
               {query && (
-                <button type="button" onClick={clearSearch} aria-label="Clear search">
+                <IconButton type="button" onClick={clearSearch} label="Clear search">
                   <X size={18} />
-                </button>
+                </IconButton>
               )}
             </search>
           </div>
@@ -367,13 +369,14 @@ export function KnowledgebasePage({
             <div className="knowledge-empty">
               <h3>No guides found yet</h3>
               <p>Try a shorter phrase such as “account”, “Git lock”, or “browser”.</p>
-              <button
+              <Button
+                variant="primary"
                 type="button"
                 className="button button-primary button-compact"
                 onClick={clearSearch}
               >
                 Browse all guides
-              </button>
+              </Button>
             </div>
           )}
         </section>

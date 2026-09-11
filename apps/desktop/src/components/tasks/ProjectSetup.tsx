@@ -1,3 +1,4 @@
+import { Checkbox, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowRight, FolderOpen } from 'lucide-react';
 import { useState } from 'react';
@@ -80,7 +81,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
             Repository folder
           </label>
           <div className="flex gap-2 mt-2">
-            <input
+            <Input
               id="project-path"
               className="task-input flex-1 min-w-0"
               value={path}
@@ -104,8 +105,7 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
           )}
           <div className="mt-5 pt-4 border-t border-[var(--color-border)]">
             <label className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={useMcpMarketplace}
                 onChange={(e) => setUseMcpMarketplace(e.target.checked)}
                 className="mt-0.5 rounded border-[var(--color-border)] text-[var(--color-accent-ink)]"

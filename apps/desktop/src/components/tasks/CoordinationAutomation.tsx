@@ -1,3 +1,4 @@
+import { Checkbox } from '@jackalope/ui';
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -47,8 +48,7 @@ export function CoordinationAutomation({
           <p className="task-muted">Save a project verification command to enable these options.</p>
         )}
         <label className="coordination-option">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={policy?.resolve ?? false}
             disabled={busy || (!verifyCommand && !policy?.resolve)}
             onChange={(e) => void save('resolve', e.target.checked)}
@@ -56,8 +56,7 @@ export function CoordinationAutomation({
           Resolve conflicts and interface decisions automatically
         </label>
         <label className="coordination-option">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={policy?.merge ?? false}
             disabled={busy || (!verifyCommand && !policy?.merge)}
             onChange={(e) => void save('merge', e.target.checked)}

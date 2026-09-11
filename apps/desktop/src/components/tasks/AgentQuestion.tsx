@@ -1,3 +1,4 @@
+import { Textarea } from '@jackalope/ui';
 import { Check, MessageCircle, Send } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { PendingUserPrompt } from '../../lib/task-runtime';
@@ -148,7 +149,7 @@ export function AgentQuestion({
           {freeform && (
             <label className="agent-question-custom">
               Your response
-              <textarea
+              <Textarea
                 rows={3}
                 maxLength={4000}
                 value={answer}

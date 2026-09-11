@@ -1,4 +1,5 @@
 import { applyThemeTokens, DEFAULT_THEME, startThemeClock } from '@jackalope/brand/theme';
+import { Checkbox } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AgentAvatar } from './components/agents/AgentAvatar';
@@ -77,8 +78,7 @@ function DesignLab() {
                 Replay motion
               </Button>
               <label className="flex gap-2 items-center text-xs text-[var(--color-text-secondary)]">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={reduceMotion}
                   onChange={(event) => setReduceMotion(event.target.checked)}
                 />

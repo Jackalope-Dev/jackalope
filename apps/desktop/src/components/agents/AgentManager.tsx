@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { ArrowLeft, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
@@ -182,7 +183,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                 <div className="agent-config-fields">
                   <label className="task-label">
                     Executable override
-                    <input
+                    <Input
                       className="task-input"
                       value={options.command ?? ('command' in agent ? agent.command : '')}
                       onChange={(e) => update({ command: e.target.value })}

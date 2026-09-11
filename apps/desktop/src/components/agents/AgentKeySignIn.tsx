@@ -1,3 +1,4 @@
+import { Checkbox, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { type AgentProfile, saveAgentProfileKey } from '../../lib/agent-profiles';
@@ -112,7 +113,7 @@ export function AgentKeySignIn({
             )}
             <label className="task-label">
               API key
-              <input
+              <Input
                 className="task-input"
                 type="password"
                 autoComplete="off"
@@ -128,8 +129,7 @@ export function AgentKeySignIn({
               Stored locally. Sent only to the selected agent for authentication.
             </p>
             <label className="flex items-center gap-3 min-h-11">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={useForTasks}
                 onChange={(event) => setUseForTasks(event.target.checked)}
                 disabled={busy}

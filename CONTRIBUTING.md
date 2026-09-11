@@ -43,6 +43,12 @@ the component lab at `/design-lab.html` contains explicitly fictional UI fixture
 For a separate static lab build, use `pnpm --filter @jackalope/desktop build:lab`.
 Ordinary desktop builds exclude that entry point.
 
+Use `pnpm ui:dev` for the standalone shared component gallery on port 5190.
+`pnpm ui:build` typechecks the shared library and builds its gallery.
+`pnpm ui:test` runs browser regression checks against an isolated gallery server,
+using installed Edge on Windows or Chrome elsewhere (override with
+`UI_BROWSER_CHANNEL`). Screenshots go to ignored `output/ui-library/`.
+
 The [architecture guide](docs/ARCHITECTURE.md) maps the code. Follow
 [UI-GUIDELINES.md](docs/UI-GUIDELINES.md) for UI changes and [SELF-DEVELOPMENT.md](docs/SELF-DEVELOPMENT.md)
 when testing the native app without disturbing an existing profile. Server
@@ -73,7 +79,7 @@ pnpm check:secrets
 ```
 
 `verify` runs Biome, local documentation links, release-script tests, generated server bindings, server
-typecheck/tests/dry-run build, desktop JavaScript tests, Rust formatting/native
+typecheck/tests/dry-run build, shared UI typecheck/gallery build, desktop JavaScript tests, Rust formatting/native
 unit tests and frontend production builds. Install [Gitleaks 8.30.1](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1) to run the
 separate secret check; it scans reachable history and current nonignored files.
 CI runs both checks without deployment credentials. `pnpm licenses:generate` regenerates

@@ -1,3 +1,4 @@
+import { IconButton } from '@jackalope/ui';
 import {
   Archive,
   Check,
@@ -197,17 +198,16 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         action={
           project && (
             <div className="workspace-actions">
-              <Button
+              <IconButton
                 variant="ghost"
-                size="icon"
-                aria-label="Refresh worktrees"
+                label="Refresh worktrees"
                 ref={refreshButton}
                 title="Refresh worktrees"
                 disabled={refreshing || pending || !desktop}
                 onClick={() => void loadWorktreesForActiveProject(targetBranch)}
               >
                 <RefreshCw size={18} />
-              </Button>
+              </IconButton>
               <Button
                 aria-expanded={creating}
                 aria-controls="worktree-create"

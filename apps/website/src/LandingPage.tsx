@@ -1,6 +1,6 @@
 import { EchoMark, EchoWordmark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
-import * as Tabs from '@radix-ui/react-tabs';
+import { Tabs } from '@jackalope/ui';
 import {
   ArrowDown,
   ArrowRight,

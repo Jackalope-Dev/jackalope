@@ -1,6 +1,6 @@
 import '@jackalope/brand/fonts.css';
 import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character';
-import { Button, InlineNotice } from '@jackalope/ui';
+import { Button, ErrorState } from '@jackalope/ui';
 import {
   Activity,
   ArrowUpRight,
@@ -153,11 +153,12 @@ class AdminBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() {
     return this.state.failed ? (
       <div className="error-boundary">
-        <h1>Admin console unavailable</h1>
-        <InlineNotice tone="error">
-          The page could not be displayed. Reload to try again.
-        </InlineNotice>
-        <Button onClick={() => location.reload()}>Reload console</Button>
+        <ErrorState
+          level={1}
+          title="Admin console unavailable"
+          description="The page could not be displayed. Reload to try again."
+          action={<Button onClick={() => location.reload()}>Reload console</Button>}
+        />
       </div>
     ) : (
       this.props.children

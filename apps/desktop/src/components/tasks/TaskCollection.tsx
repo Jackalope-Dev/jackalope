@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { Check, ChevronRight, Columns3, Lightbulb, List, ListTodo, Search } from 'lucide-react';
 import { memo, type ReactNode, useMemo } from 'react';
 
@@ -87,7 +88,7 @@ export function TaskCollection({
         {scope}
         <label className="work-search">
           <Search size={16} aria-hidden="true" />
-          <input
+          <Input
             aria-label="Search tasks"
             placeholder="Find a task…"
             value={query}

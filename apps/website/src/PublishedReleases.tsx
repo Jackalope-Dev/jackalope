@@ -1,3 +1,4 @@
+import { Button } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 
 const service = 'https://api.jackalope.dev';
@@ -72,13 +73,14 @@ export function PublishedReleases() {
     return (
       <p className="release-status" role="status">
         Release history is temporarily unavailable.{' '}
-        <button
+        <Button
+          variant="ghost"
           type="button"
           className="text-link"
           onClick={() => setAttempt((value) => value + 1)}
         >
           Try again
-        </button>
+        </Button>
       </p>
     );
   if (!releases.length) return null;

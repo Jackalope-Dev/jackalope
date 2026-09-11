@@ -1,5 +1,14 @@
-import { Button, FormField, InlineNotice, Select, SelectItem } from '@jackalope/ui';
-import { ArrowUpRight, RefreshCw } from 'lucide-react';
+import {
+  Button,
+  EmptyState,
+  FormField,
+  InlineNotice,
+  PageHeader,
+  Select,
+  SelectItem,
+  Table as UiTable,
+} from '@jackalope/ui';
+import { ArrowUpRight, RotateCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 const nonce = document.querySelector<HTMLMetaElement>('meta[name="csp-nonce"]')?.content;
@@ -45,14 +54,13 @@ export function Heading({
   action?: ReactNode;
 }) {
   return (
-    <header className="page-heading">
-      <div>
-        <div className="eyebrow">{eyebrow}</div>
-        <h1>{title}</h1>
-        <p>{children}</p>
-      </div>
-      {action}
-    </header>
+    <PageHeader
+      title={title}
+      eyebrow={eyebrow}
+      description={children}
+      action={action}
+      className="page-heading"
+    />
   );
 }
 export function Refresh({
@@ -66,7 +74,7 @@ export function Refresh({
 }) {
   return (
     <Button variant="secondary" disabled={loading} onClick={onClick}>
-      <RefreshCw size={17} aria-hidden="true" />
+      <RotateCw size={16} style={{ flexShrink: 0 }} aria-hidden="true" />
       {children}
     </Button>
   );
@@ -102,35 +110,30 @@ export function Table({
   rows: (string | number)[][];
   label: string;
 }) {
-  return (
-    // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll overflowing tables.
-    <section className="table" tabIndex={0} aria-label={label}>
-      {rows.length ? (
-        <table>
-          <thead>
-            <tr>
-              {headers.map((header) => (
-                <th key={header} scope="col">
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.join('|')}>
-                {row.map((value, index) => (
-                  <td key={headers[index]}>
-                    {typeof value === 'number' ? value.toLocaleString() : value}
-                  </td>
-                ))}
-              </tr>
+  return rows.length ? (
+    <UiTable label={label} className="table">
+      <thead>
+        <tr>
+          {headers.map((header) => (
+            <th key={header} scope="col">
+              {header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.join('|')}>
+            {row.map((value, index) => (
+              <td key={headers[index]}>
+                {typeof value === 'number' ? value.toLocaleString() : value}
+              </td>
             ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="empty">No events in this selection.</p>
-      )}
-    </section>
+          </tr>
+        ))}
+      </tbody>
+    </UiTable>
+  ) : (
+    <EmptyState title="No events in this selection." />
   );
 }

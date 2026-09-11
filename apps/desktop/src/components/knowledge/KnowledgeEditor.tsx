@@ -1,3 +1,4 @@
+import { Checkbox, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useState } from 'react';
@@ -85,7 +86,7 @@ export function KnowledgeEditor({
             </label>
             <label className="block" htmlFor="knowledge-content">
               {memory ? 'Lesson' : 'Procedure'}
-              <textarea
+              <Textarea
                 id="knowledge-content"
                 required
                 className="task-input w-full"
@@ -156,8 +157,7 @@ export function KnowledgeEditor({
               </label>
             )}
             <label className="flex items-center gap-3 min-h-11">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={value.enabled}
                 onChange={(e) => setValue({ ...value, enabled: e.target.checked })}
               />

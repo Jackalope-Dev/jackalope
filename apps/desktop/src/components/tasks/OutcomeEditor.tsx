@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import { useId, useState } from 'react';
 import { Button } from '../ui/button';
 
@@ -24,7 +25,7 @@ export function OutcomeEditor({
       <legend className="font-medium">{label}</legend>
       {values.map((text, index) => (
         <div key={rowIds[index] ?? text} className="flex gap-2 items-start">
-          <input
+          <Input
             aria-label={`${label} ${index + 1}`}
             className="task-input flex-1 min-w-0"
             value={text}
@@ -46,7 +47,7 @@ export function OutcomeEditor({
       ))}
       {values.length < 12 && (
         <div className="flex gap-2">
-          <input
+          <Input
             id={id}
             aria-label={`Add: ${label}`}
             className="task-input flex-1 min-w-0"

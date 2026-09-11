@@ -1,3 +1,4 @@
+import { Button, Input } from '@jackalope/ui';
 import { ArrowRight, Check, Copy, LogOut, Mail, RefreshCw, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
@@ -164,7 +165,8 @@ export function WaitlistPage() {
           <h2>Make your place yours.</h2>
           <p>Confirm your email to see your number and start earning referral priority.</p>
           <div className="access-entry-actions">
-            <button
+            <Button
+              variant="primary"
               className="button button-primary"
               disabled={busy}
               onClick={() => void verify()}
@@ -172,22 +174,24 @@ export function WaitlistPage() {
             >
               {busy ? 'Confirming…' : 'Confirm email & see my place'}
               <ArrowRight size={18} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
               className="button button-secondary"
               disabled={busy}
               onClick={() => setToken('')}
               type="button"
             >
               Request a different link
-            </button>
+            </Button>
           </div>
         </section>
       ) : place ? (
         <>
           <div className="access-identity">
             <span>{place.email}</span>
-            <button
+            <Button
+              variant="ghost"
               className="text-link"
               disabled={busy}
               onClick={() =>
@@ -201,7 +205,7 @@ export function WaitlistPage() {
             >
               Sign out
               <LogOut size={14} />
-            </button>
+            </Button>
           </div>
           {place.status === 'approved' ? (
             <section className="waitlist-approved access-card">
@@ -237,7 +241,8 @@ export function WaitlistPage() {
                     <dd>{place.priorityDays.toLocaleString()}</dd>
                   </div>
                 </dl>
-                <button
+                <Button
+                  variant="ghost"
                   className="text-link"
                   type="button"
                   disabled={busy}
@@ -250,7 +255,7 @@ export function WaitlistPage() {
                 >
                   <RefreshCw size={16} />
                   Refresh my place
-                </button>
+                </Button>
               </div>
             </section>
           )}
@@ -271,14 +276,15 @@ export function WaitlistPage() {
               <label htmlFor="waitlist-share">
                 Share your link with others to move up the waitlist
               </label>
-              <input
+              <Input
                 id="waitlist-share"
                 value={place.shareUrl}
                 readOnly
                 onFocus={(e) => e.currentTarget.select()}
               />
               <div className="waitlist-actions">
-                <button
+                <Button
+                  variant="primary"
                   className="button button-primary"
                   onClick={() => void share()}
                   type="button"
@@ -286,8 +292,9 @@ export function WaitlistPage() {
                 >
                   {copied === 'share' ? <Check size={18} /> : <Share2 size={18} />}
                   {copied === 'share' ? 'Copied' : 'Share the waitlist'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   className="button button-secondary"
                   disabled={busy}
                   onClick={() => void copyText(place.shareUrl, 'link')}
@@ -295,7 +302,7 @@ export function WaitlistPage() {
                 >
                   {copied === 'link' ? <Check size={18} /> : <Copy size={18} />}
                   {copied === 'link' ? 'Copied' : 'Copy link'}
-                </button>
+                </Button>
               </div>
             </div>
           </section>
@@ -329,7 +336,7 @@ export function WaitlistPage() {
           {accessOrigin ? (
             <form onSubmit={signIn}>
               <label htmlFor="waitlist-email">Email address</label>
-              <input
+              <Input
                 id="waitlist-email"
                 name="email"
                 type="email"
@@ -342,10 +349,15 @@ export function WaitlistPage() {
                 <label htmlFor="waitlist-website">Website</label>
                 <input id="waitlist-website" name="website" tabIndex={-1} autoComplete="off" />
               </div>
-              <button className="button button-primary" type="submit" disabled={busy}>
+              <Button
+                variant="primary"
+                className="button button-primary"
+                type="submit"
+                disabled={busy}
+              >
                 {busy ? 'Sending…' : sent ? 'Send a fresh link' : 'Email my private link'}
                 <Mail size={18} />
-              </button>
+              </Button>
             </form>
           ) : (
             <p>Waitlist status will be available when sign-in opens.</p>

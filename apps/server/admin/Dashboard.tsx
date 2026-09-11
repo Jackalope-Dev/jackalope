@@ -1,4 +1,4 @@
-import { Button } from '@jackalope/ui';
+import { Button, DefinitionList, EmptyState, SectionHeader, Stat } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import {
   audienceLabel,
@@ -74,23 +74,24 @@ export function Dashboard() {
               ],
             ] as const
           ).map(([label, count, action, href]) => (
-            <div className="metric" key={label}>
-              <span>{label}</span>
-              <strong>{count.toLocaleString()}</strong>
-              <a href={href}>{action} →</a>
-            </div>
+            <Stat
+              className="metric"
+              key={label}
+              label={label}
+              value={count.toLocaleString()}
+              action={<a href={href}>{action} →</a>}
+            />
           ))}
         </div>
       )}
       <div className="two-col">
         <section className="panel">
-          <div className="section-heading">
-            <div>
-              <h2>Next steps</h2>
-              <p>Keep invitations and onboarding moving.</p>
-            </div>
-            <a href="/admin/access#people">View people</a>
-          </div>
+          <SectionHeader
+            className="section-heading"
+            title="Next steps"
+            description="Keep invitations and onboarding moving."
+            action={<a href="/admin/access#people">View people</a>}
+          />
           {data ? (
             <>
               <QuickLink
@@ -119,15 +120,16 @@ export function Dashboard() {
           )}
         </section>
         <section className="panel">
-          <div className="section-heading">
-            <h2>Service snapshot</h2>
-            <a href="/admin/access#setup">Setup</a>
-          </div>
+          <SectionHeader
+            className="section-heading"
+            title="Service snapshot"
+            action={<a href="/admin/access#setup">Setup</a>}
+          />
           <ErrorNotice>{setup.error}</ErrorNotice>
           {setup.loading && <p>Checking configuration…</p>}
           {setup.data && (
-            <dl className="service-list">
-              {[
+            <DefinitionList
+              items={[
                 ['Early access', setup.data.enabled ? 'Enabled' : 'Disabled'],
                 ['Account email', setup.data.mailConfigured ? 'Configured' : 'Needs setup'],
                 [
@@ -142,13 +144,8 @@ export function Dashboard() {
                           ? 'Could not check'
                           : 'Not configured',
                 ],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
+              ].map(([label, value]) => ({ label, value }))}
+            />
           )}
           <p className="privacy">
             Configuration checks do not confirm delivery or a successful installation.
@@ -288,15 +285,15 @@ export function Usage() {
               ['Feature uses', 'feature_used'],
               ['Reported errors', 'app_error'],
             ].map(([label, name]) => (
-              <div className="metric" key={name}>
-                <strong>
-                  {metrics
-                    .filter((row) => row.name === name)
-                    .reduce((total, row) => total + row.count, 0)
-                    .toLocaleString()}
-                </strong>
-                <span>{label}</span>
-              </div>
+              <Stat
+                className="metric"
+                key={name}
+                label={label}
+                value={metrics
+                  .filter((row) => row.name === name)
+                  .reduce((total, row) => total + row.count, 0)
+                  .toLocaleString()}
+              />
             ))}
           </div>
           <section className="panel">
@@ -482,7 +479,7 @@ export function Feedback() {
           );
         })}
         {!rows.length && !request.loading && !request.error && (
-          <p className="empty">You’re all caught up. No reports in this view.</p>
+          <EmptyState title="You’re all caught up" description="No reports in this view." />
         )}
         {request.data?.reports.length === 50 && (
           <Button

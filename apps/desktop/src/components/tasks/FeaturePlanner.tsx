@@ -1,3 +1,4 @@
+import { Checkbox, Input, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
@@ -124,7 +125,7 @@ export function FeaturePlanner({
         >
           <label className="block" htmlFor="feature-goal">
             What should this feature accomplish?
-            <textarea
+            <Textarea
               id="feature-goal"
               className="task-input w-full"
               rows={4}
@@ -293,7 +294,7 @@ export function FeaturePlanner({
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="block" htmlFor={`feature-title-${step.key}`}>
                   Task {index + 1}
-                  <input
+                  <Input
                     id={`feature-title-${step.key}`}
                     className="task-input w-full"
                     maxLength={160}
@@ -319,7 +320,7 @@ export function FeaturePlanner({
               </div>
               <label className="block" htmlFor={`feature-instruction-${step.key}`}>
                 Instructions
-                <textarea
+                <Textarea
                   id={`feature-instruction-${step.key}`}
                   className="task-input w-full"
                   rows={3}
@@ -330,7 +331,7 @@ export function FeaturePlanner({
               </label>
               <label className="block" htmlFor={`feature-scopes-${step.key}`}>
                 Files or folders (comma separated)
-                <input
+                <Input
                   id={`feature-scopes-${step.key}`}
                   className="task-input w-full"
                   value={step.scopes.join(', ')}
@@ -349,8 +350,7 @@ export function FeaturePlanner({
                   .filter((s) => s.key !== step.key)
                   .map((other) => (
                     <label key={other.key} className="flex gap-3 min-h-11 items-center">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={step.dependsOn.includes(other.key)}
                         onChange={(e) =>
                           change(index, {
@@ -394,8 +394,7 @@ export function FeaturePlanner({
           </InlineNotice>
         )}
         <label className="flex items-center gap-2 mt-4 min-h-11">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={draft.stagedDependencies ?? false}
             disabled={busy || draft.added}
             onChange={(event) => update({ stagedDependencies: event.target.checked })}

@@ -1,3 +1,4 @@
+import { Input } from '@jackalope/ui';
 import {
   AlertTriangle,
   Bot,
@@ -236,7 +237,7 @@ export function AuditLogWorkspace() {
               size={13}
               className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
             />
-            <input
+            <Input
               type="text"
               placeholder="Search audit events..."
               aria-label="Search audit events"

@@ -1,3 +1,4 @@
+import { Checkbox } from '@jackalope/ui';
 import { ArrowRight, Check, GitMerge, GitPullRequest } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { IntegrationPlan, QueueItem } from '../../lib/queue';
@@ -125,8 +126,7 @@ export function MergeReview({
       {candidates.length > 0 ? (
         <>
           <label className="queue-select-all">
-            <input
-              type="checkbox"
+            <Checkbox
               disabled={busy}
               checked={candidates.every((r) => chosen.includes(r.id))}
               onChange={(e) => changeSelection(e.target.checked ? candidates.map((r) => r.id) : [])}
@@ -135,8 +135,7 @@ export function MergeReview({
           </label>
           {candidates.map((run) => (
             <label className="queue-review-row" key={run.id}>
-              <input
-                type="checkbox"
+              <Checkbox
                 disabled={busy}
                 checked={chosen.includes(run.id)}
                 onChange={(e) => {
@@ -294,8 +293,7 @@ export function MergeReview({
                 kept.
               </p>
               <label className="flex items-center gap-3 min-h-11">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={cleanup}
                   disabled={busy}
                   onChange={(event) => setCleanup(event.target.checked)}

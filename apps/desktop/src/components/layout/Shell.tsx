@@ -1,4 +1,4 @@
-import * as Menu from '@radix-ui/react-dropdown-menu';
+import { DropdownMenu as Menu } from '@jackalope/ui';
 import { Check, ChevronDown, GitBranch, Plus, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { captureDraftForProject } from '../../lib/capture-draft';

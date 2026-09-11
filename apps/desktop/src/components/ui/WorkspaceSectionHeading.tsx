@@ -1,29 +1,11 @@
-import type { ReactNode } from 'react';
+import { SectionHeader } from '@jackalope/ui';
+import type { ComponentProps } from 'react';
 import './workspace-layout.css';
-
-export function WorkspaceSectionHeading({
-  title,
-  description,
-  action,
-  titleId,
-  level = 2,
-}: {
-  title: string;
-  description?: string;
-  action?: ReactNode;
-  titleId?: string;
-  level?: 2 | 3;
-}) {
-  const Heading = level === 2 ? 'h2' : 'h3';
+export function WorkspaceSectionHeading(props: ComponentProps<typeof SectionHeader>) {
   return (
-    <header className="workspace-section-header">
-      <div>
-        <Heading id={titleId} tabIndex={titleId ? -1 : undefined}>
-          {title}
-        </Heading>
-        {description && <p>{description}</p>}
-      </div>
-      {action}
-    </header>
+    <SectionHeader
+      {...props}
+      className={['workspace-section-header', props.className].filter(Boolean).join(' ')}
+    />
   );
 }

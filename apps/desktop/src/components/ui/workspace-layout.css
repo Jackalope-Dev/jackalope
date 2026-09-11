@@ -33,14 +33,6 @@
   min-width: 0;
   max-width: 65ch;
 }
-.workspace-heading-identity {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.workspace-heading-identity > div {
-  min-width: 0;
-}
 .workspace-heading h1 {
   margin: 0;
   color: var(--color-text-primary);

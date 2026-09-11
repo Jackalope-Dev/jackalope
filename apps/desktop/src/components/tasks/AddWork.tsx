@@ -1,3 +1,4 @@
+import { Checkbox, Input, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -108,7 +109,7 @@ export function AddWork({
         >
           <label>
             Task title
-            <input
+            <Input
               className="task-input"
               value={draft.title}
               maxLength={160}
@@ -119,7 +120,7 @@ export function AddWork({
           </label>
           <label>
             What should be delivered?
-            <textarea
+            <Textarea
               className="task-input"
               rows={4}
               required
@@ -149,7 +150,7 @@ export function AddWork({
             </label>
             <label>
               Owned files or folders
-              <input
+              <Input
                 className="task-input"
                 required
                 value={draft.scopes}
@@ -183,8 +184,7 @@ export function AddWork({
                   .filter((i) => !i.canceled)
                   .map((item) => (
                     <label key={item.id}>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={draft.dependencies.includes(item.id)}
                         onChange={(e) =>
                           update({

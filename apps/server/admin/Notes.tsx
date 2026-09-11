@@ -1,4 +1,4 @@
-import { Button, FormField, Input, Textarea } from '@jackalope/ui';
+import { Button, Checkbox, FormField, Input, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
 import { type Broadcast, message, post, useResource } from './api';
 import { ErrorNotice, Heading, Refresh, SelectField } from './components';
@@ -21,6 +21,8 @@ export function Notes() {
   const [saved, setSaved] = useState(JSON.stringify(initialNote));
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
+  const addSection = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<string | null>(null);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ url?: string } | null>(null);
   const dirty = JSON.stringify(note) !== saved;
@@ -163,8 +165,7 @@ export function Notes() {
           <fieldset className="entries" aria-labelledby="entries-heading">
             {request.data?.entries.map((entry) => (
               <label className="entry" key={entry.id}>
-                <input
-                  type="checkbox"
+                <Checkbox
                   disabled={busy}
                   checked={note.entries.includes(entry.id)}
                   onChange={(event) =>
@@ -211,6 +212,12 @@ export function Notes() {
             <div className="extra" key={extra.id}>
               <FormField label={`Section ${index + 1} title`}>
                 <Input
+                  ref={(input) => {
+                    if (input && pendingFocus.current === extra.id) {
+                      input.focus();
+                      pendingFocus.current = null;
+                    }
+                  }}
                   maxLength={200}
                   value={extra.title}
                   disabled={busy}
@@ -244,12 +251,13 @@ export function Notes() {
                 <Button
                   variant="ghost"
                   disabled={busy}
-                  onClick={() =>
+                  onClick={() => {
                     setNote((note) => ({
                       ...note,
                       extras: note.extras.filter((row) => row.id !== extra.id),
-                    }))
-                  }
+                    }));
+                    addSection.current?.focus();
+                  }}
                 >
                   Remove section {index + 1}
                 </Button>
@@ -260,12 +268,15 @@ export function Notes() {
             <Button
               variant="secondary"
               disabled={busy}
-              onClick={() =>
+              ref={addSection}
+              onClick={() => {
+                const id = crypto.randomUUID();
+                pendingFocus.current = id;
                 setNote((note) => ({
                   ...note,
-                  extras: [...note.extras, { id: crypto.randomUUID(), title: '', body: '' }],
-                }))
-              }
+                  extras: [...note.extras, { id, title: '', body: '' }],
+                }));
+              }}
             >
               Add a section
             </Button>

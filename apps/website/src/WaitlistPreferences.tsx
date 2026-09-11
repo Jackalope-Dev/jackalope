@@ -1,3 +1,4 @@
+import { Button, Checkbox } from '@jackalope/ui';
 import { ArrowRight, Check, Copy } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
@@ -93,9 +94,14 @@ export function WaitlistQuestions({
       <h2 id={`${id}-title`}>Help us decide what to build next.</h2>
       {!open ? (
         <div className="preference-actions">
-          <button type="button" className="button button-secondary" onClick={() => setOpen(true)}>
+          <Button
+            variant="secondary"
+            type="button"
+            className="button button-secondary"
+            onClick={() => setOpen(true)}
+          >
             Update my answers
-          </button>
+          </Button>
         </div>
       ) : (
         <form onSubmit={submit}>
@@ -105,8 +111,7 @@ export function WaitlistQuestions({
               <div className="preference-options">
                 {group.options.map(([value, label]) => (
                   <label key={value}>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       name={group.name}
                       value={value}
                       defaultChecked={chosen(group.name).includes(value)}
@@ -118,18 +123,24 @@ export function WaitlistQuestions({
             </fieldset>
           ))}
           <div className="preference-actions">
-            <button type="submit" className="button button-primary" disabled={state === 'saving'}>
+            <Button
+              variant="primary"
+              type="submit"
+              className="button button-primary"
+              disabled={state === 'saving'}
+            >
               {state === 'saving' ? 'Saving…' : 'Save my answers'} <Check size={16} />
-            </button>
+            </Button>
             {answers && (
-              <button
+              <Button
+                variant="ghost"
                 type="button"
                 className="text-link"
                 disabled={state === 'saving'}
                 onClick={() => setOpen(false)}
               >
                 Cancel
-              </button>
+              </Button>
             )}
           </div>
         </form>
@@ -178,7 +189,8 @@ export function WaitlistPreferences({ token }: { token: string }) {
           <a href="/tour/" className="button button-primary">
             Explore the app <ArrowRight size={16} />
           </a>
-          <button
+          <Button
+            variant="secondary"
             type="button"
             className="button button-secondary"
             onClick={async () => {
@@ -191,7 +203,7 @@ export function WaitlistPreferences({ token }: { token: string }) {
             }}
           >
             <Copy size={16} /> Copy public website link
-          </button>
+          </Button>
           <a className="button button-secondary" href="/waitlist/">
             See my waitlist place <ArrowRight size={16} />
           </a>
@@ -210,7 +222,7 @@ export function WaitlistPreferences({ token }: { token: string }) {
               <div className="preference-options">
                 {group.options.map(([value, label]) => (
                   <label key={value}>
-                    <input type="checkbox" name={group.name} value={value} />
+                    <Checkbox name={group.name} value={value} />
                     <span>{label}</span>
                   </label>
                 ))}
@@ -223,10 +235,16 @@ export function WaitlistPreferences({ token }: { token: string }) {
             preferences stay unchanged. <a href="/privacy/#access">Privacy</a>.
           </p>
           <div className="preference-actions">
-            <button type="submit" className="button button-primary" disabled={state === 'saving'}>
+            <Button
+              variant="primary"
+              type="submit"
+              className="button button-primary"
+              disabled={state === 'saving'}
+            >
               {state === 'saving' ? 'Saving…' : 'Save preferences'} <Check size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               type="button"
               className="text-link"
               disabled={state === 'saving'}
@@ -236,7 +254,7 @@ export function WaitlistPreferences({ token }: { token: string }) {
               }}
             >
               Skip for now
-            </button>
+            </Button>
           </div>
         </form>
       )}

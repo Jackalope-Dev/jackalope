@@ -1,4 +1,4 @@
-import * as Tabs from '@radix-ui/react-tabs';
+import { Input, Tabs } from '@jackalope/ui';
 import { ArrowLeft, ExternalLink, Search } from 'lucide-react';
 import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -256,7 +256,7 @@ export function McpServerPage({
               <>
                 <label className="mcp-tool-search">
                   <Search size={16} aria-hidden="true" />
-                  <input
+                  <Input
                     aria-label="Search listed tools"
                     placeholder="Find a tool…"
                     value={toolQuery}
