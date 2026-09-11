@@ -47,6 +47,11 @@ media and account flows. Its content is shared with bundled native help through
 `packages/knowledge`. Build and release tooling covers Windows installers, optional
 Microsoft Store distribution and unpublished cloud candidates.
 
+The private admin console groups access management, audience preferences, product-note
+drafts, service setup, aggregate usage and feedback, with overview links for onboarding
+and email follow-ups. Configuration and connection counts do not establish delivery,
+installation or completed tasks.
+
 Windows uses DPAPI; macOS uses Keychain; Linux uses Secret Service. Unix discovery,
 process guardians, browser ownership, notifications and tray/Dock behavior have
 platform-specific implementations. Native CI and device checks are described in

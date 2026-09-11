@@ -563,6 +563,13 @@ describe('private monitoring and feedback delivery', () => {
       reports: unknown[];
     };
     expect(inbox.reports).toHaveLength(1);
+    const summary = await (await call('/admin/api/summary')).json<{ feedback: unknown[] }>();
+    expect(summary.feedback).toContainEqual({ status: 'planned', count: 1 });
+    await env.DB.prepare('UPDATE feedback SET expires_at=? WHERE id=?')
+      .bind(Date.now() - 1, report.id)
+      .run();
+    const expired = await (await call('/admin/api/summary')).json<{ feedback: unknown[] }>();
+    expect(expired.feedback).toEqual([]);
     const page = await call('/admin');
     expect(page.headers.get('content-security-policy')).toContain("default-src 'none'");
     expect(await page.text()).not.toContain(report.message);

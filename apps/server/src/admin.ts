@@ -71,7 +71,7 @@ export async function adminRoutes(
       headers: {
         ...headers,
         'content-type': 'text/html; charset=utf-8',
-        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
       },
     });
   }
@@ -108,6 +108,22 @@ export async function adminRoutes(
       },
       { headers },
     );
+  }
+  if (request.method === 'GET' && url.pathname === '/admin/api/summary') {
+    const [people, feedback, mail] = await Promise.all([
+      env.DB.prepare(
+        "SELECT count(*) AS total,coalesce(sum(status='waiting'),0) AS waiting,coalesce(sum(status='approved'),0) AS approved,coalesce(sum(status='approved' AND verified_at IS NULL),0) AS notSignedIn,coalesce(sum(status='approved' AND verified_at IS NOT NULL AND first_desktop_at IS NULL),0) AS notConnected,coalesce(sum(status='approved' AND first_desktop_at IS NOT NULL),0) AS connected FROM access_members WHERE status!='revoked'",
+      ).first(),
+      env.DB.prepare(
+        'SELECT status,count(*) AS count FROM feedback WHERE expires_at>? GROUP BY status',
+      )
+        .bind(Date.now())
+        .all(),
+      env.DB.prepare(
+        "SELECT count(*) AS needsAttention FROM access_members m JOIN access_mail a ON a.rowid=(SELECT rowid FROM access_mail WHERE email=m.email ORDER BY created_at DESC,rowid DESC LIMIT 1) WHERE a.state='failed' OR a.delivery_status IN ('bounced','failed','complained')",
+      ).first(),
+    ]);
+    return Response.json({ people, feedback: feedback.results, mail }, { headers });
   }
   if (request.method === 'GET' && url.pathname === '/admin/api/feedback') {
     const status = url.searchParams.get('status') ?? 'new';

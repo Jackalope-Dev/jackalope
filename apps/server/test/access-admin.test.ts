@@ -75,6 +75,53 @@ it('checks the actual private object, distinguishes missing configuration and ne
   expect((await accessReadiness({ ...bindings, SEQUENZY_API_KEY: '' })).mailConfigured).toBe(false);
   await env.RELEASES.delete(bindings.ACCESS_INSTALLER_KEY);
 });
+it('summarizes actionable onboarding stages and only the latest email warning without exposing identities', async () => {
+  const summary = () =>
+    adminRoutes(new Request('https://api.jackalope.dev/admin/api/summary'), bindings, (r) =>
+      r.json(),
+    );
+  expect(await (await summary()).json()).toMatchObject({
+    people: { total: 0, waiting: 0, approved: 0, notSignedIn: 0, notConnected: 0, connected: 0 },
+    mail: { needsAttention: 0 },
+  });
+  for (const [email, status, verified, connected] of [
+    ['waiting@example.invalid', 'waiting', null, null],
+    ['invited@example.invalid', 'approved', null, null],
+    ['web@example.invalid', 'approved', 1, null],
+    ['desktop@example.invalid', 'approved', 1, 2],
+    ['revoked@example.invalid', 'revoked', 1, 2],
+  ] as const) {
+    const id = await person(email);
+    await env.DB.prepare(
+      'UPDATE access_members SET status=?,verified_at=?,first_desktop_at=? WHERE id=?',
+    )
+      .bind(status, verified, connected, id)
+      .run();
+  }
+  for (const [email, state, created] of [
+    ['waiting@example.invalid', 'failed', 1],
+    ['waiting@example.invalid', 'queued', 2],
+    ['invited@example.invalid', 'failed', 1],
+  ]) {
+    await env.DB.prepare(
+      "INSERT INTO access_mail(id,email,kind,payload,state,created_at) VALUES(?,?,'welcome','{}',?,?)",
+    )
+      .bind(crypto.randomUUID(), email, state, created)
+      .run();
+  }
+  const response = await summary();
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  const data = await response.json();
+  expect(data).toMatchObject({
+    people: { total: 4, waiting: 1, approved: 3, notSignedIn: 1, notConnected: 1, connected: 1 },
+    mail: { needsAttention: 1 },
+  });
+  expect(JSON.stringify(data)).not.toContain('@');
+  expect(
+    (await worker.fetch(new Request('https://api.jackalope.dev/admin/api/summary'), bindings))
+      .status,
+  ).toBe(403);
+});
 it('recognizes a configured Store listing and approves without a private installer override', async () => {
   bindings.ACCESS_STORE_URL = 'https://apps.microsoft.com/detail/9NBLGGH4R315';
   expect(await accessReadiness(bindings)).toMatchObject({

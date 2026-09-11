@@ -99,8 +99,14 @@ Keep `RATE_SECRET` in Worker secrets and resource IDs in private deployment sett
 An unset admin identity/issuer/audience fails closed. Public configuration uses blank
 admin values and disabled ingestion/email; it contains no owner's login address.
 
-Open `/admin` through Access. The dashboard provides 7/30-day filters, channel/version
-comparisons and a paginated feedback inbox with new/reviewing/planned/closed states.
+Open `/admin` through Access. The overview shows account totals, retained new feedback,
+onboarding follow-ups, latest account-email warnings and service configuration. Follow-up
+links open the matching people filters. Account totals exclude revoked access; desktop
+connection is a first-sign-in milestone, not current activity or task completion.
+The shared navigation separates people, audience preferences, product-note drafts,
+service setup, usage and feedback. Usage provides 7/30-day filters, daily UTC app-open
+counts and channel/version comparisons. The paginated feedback inbox supports
+new/reviewing/planned/closed states. Refresh controls update each view explicitly.
 Writes require a same-origin request in addition to the verified JWT. Responses are
 uncached, framed pages are blocked, and submitted text is never rendered as HTML.
 If the aggregate result limit is reached, the page labels results partial and asks
