@@ -5,7 +5,15 @@ import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
-export function ProjectVerification({ run, command }: { run: TaskRun; command?: string }) {
+export function ProjectVerification({
+  run,
+  command,
+  onCorrect,
+}: {
+  run: TaskRun;
+  command?: string;
+  onCorrect?: (prompt: string) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Verification | null>(null);
@@ -82,6 +90,22 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
             {(check.result.durationMs / 1000).toFixed(1)} seconds. File changes require another
             check.
           </p>
+          {onCorrect && !check.result.success && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const output = `${check.result.stdout}\n${check.result.stderr}`
+                  .trim()
+                  .slice(0, 8000);
+                document.getElementById('task-reply')?.focus();
+                onCorrect(
+                  `The project check failed. Fix the cause, keep the change focused, and run the same check.\n\nCommand: ${check.command || selected}\nExit: ${check.result.exitCode ?? 'unknown'}\n\n${output}`,
+                );
+              }}
+            >
+              Send this output as a correction
+            </Button>
+          )}
           <Disclosure>
             <DisclosureSummary className="task-summary">Read verification output</DisclosureSummary>
             {check.result.truncated && (

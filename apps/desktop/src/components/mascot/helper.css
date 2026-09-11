@@ -69,6 +69,16 @@
   text-align: center;
   color: var(--color-text-secondary);
 }
+.helper-starters {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  text-align: left;
+}
+.helper-starters button {
+  justify-content: flex-start;
+  white-space: normal;
+}
 .helper-composer {
   padding: 12px 20px 16px;
   border-top: 1px solid var(--color-border-subtle);

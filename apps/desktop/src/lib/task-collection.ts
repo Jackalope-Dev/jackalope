@@ -1,7 +1,9 @@
 import type { TaskTicket } from '../stores/taskStore.ts';
+import { taskAgents } from './agent-provider.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
-import type { TaskRun } from './task-runtime.ts';
+import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
+import { taskNextAction } from './task-workflow.ts';
 
 export const workStages = [
   { id: 'attention', label: 'Needs you' },
@@ -28,6 +30,35 @@ export interface WorkItem {
   run?: TaskRun;
   session?: LiveSession;
   archiveBlocked?: string;
+}
+
+export function workPresence(item: WorkItem): {
+  agents: string[];
+  state: 'idle' | 'working' | 'waiting';
+  action: string;
+} {
+  const run = item.run;
+  const pending = !!run?.prompts?.some((prompt) => prompt.status === 'pending');
+  const agents = taskAgents(run, item.session?.request.agent ?? item.idea?.assignedAgent);
+  const state = pending
+    ? 'waiting'
+    : (run && isActive(run)) || item.stage === 'working'
+      ? 'working'
+      : 'idle';
+  const action = item.session
+    ? pending
+      ? 'Answer question'
+      : item.stage === 'attention'
+        ? 'Inspect session'
+        : item.stage === 'working'
+          ? 'View activity'
+          : 'Open Chat'
+    : run
+      ? item.stage === 'finished'
+        ? 'Open result'
+        : taskNextAction(run)
+      : 'Open idea';
+  return { agents, state, action };
 }
 
 export function collectWorkspaceWork(

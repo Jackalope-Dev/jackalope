@@ -43,6 +43,7 @@ window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
   case 'task_outcome_snapshot': return 'snapshot';
   case 'mcp_list_servers': return [];
   case 'queue_snapshot': return {items: [], mergedRunIds: f.integrated ? ['sample'] : []};
+  case 'integration_plans': return [];
   case 'integration_list': return [];
   case 'task_stop':
    if(f.failStop) throw new Error('Could not stop the agent. Try again.');
@@ -341,7 +342,11 @@ try {
   await page.evaluate(() => window.taskFixture.update({ status: 'stopping' }));
   assert(await page.getByRole('button', { name: 'Stop', exact: true }).isDisabled());
   await page.evaluate(() => window.taskFixture.scenario('reviewed'));
-  await page.getByText('Reviewed · not integrated', { exact: true }).first().waitFor();
+  await page.getByText('Ready to merge', { exact: true }).first().waitFor();
+  await page.getByRole('button', { name: 'Merge into main' }).click();
+  await page.locator('#task-merge').waitFor();
+  await page.getByRole('heading', { name: 'Merge into main' }).waitFor();
+  await page.getByRole('button', { name: 'Preview merge into main' }).waitFor();
   await page.evaluate(() => {
     window.taskFixture.integrated = true;
     window.taskFixture.update({ workspace: '' });

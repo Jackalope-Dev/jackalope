@@ -177,18 +177,20 @@ function DesignLab() {
             </Select>
           </div>
           <div className="flex flex-wrap gap-8">
-            {['codex', 'claude', 'grok', 'opencode', 'antigravity', 'custom'].map((provider) => (
-              <figure key={provider} className="grid justify-items-center gap-3">
-                <AgentAvatar
-                  provider={provider}
-                  working={agentState === 'working'}
-                  waiting={agentState === 'waiting'}
-                />
-                <figcaption className="text-xs text-[var(--color-text-secondary)]">
-                  {provider}
-                </figcaption>
-              </figure>
-            ))}
+            {['codex', 'claude', 'grok', 'kimi', 'opencode', 'antigravity', 'custom'].map(
+              (provider) => (
+                <figure key={provider} className="grid justify-items-center gap-3">
+                  <AgentAvatar
+                    provider={provider}
+                    working={agentState === 'working'}
+                    waiting={agentState === 'waiting'}
+                  />
+                  <figcaption className="text-xs text-[var(--color-text-secondary)]">
+                    {provider}
+                  </figcaption>
+                </figure>
+              ),
+            )}
           </div>
         </section>
         <TaskExperienceExamples />

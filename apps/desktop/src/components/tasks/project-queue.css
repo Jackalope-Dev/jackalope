@@ -79,7 +79,8 @@
 }
 .queue-item {
   display: flex;
-  gap: 22px;
+  align-items: flex-start;
+  gap: 16px;
   padding: 25px 0;
   border-bottom: 1px solid var(--color-border-subtle);
 }
@@ -278,6 +279,31 @@
   flex: 1;
   min-width: 230px;
   font-size: var(--text-xs);
+}
+.merge-lifecycle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.merge-lifecycle li {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.merge-lifecycle li[data-current] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.merge-lifecycle li[data-complete] {
+  color: var(--color-text-primary);
 }
 .queue-history {
   display: flex;

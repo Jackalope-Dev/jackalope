@@ -193,7 +193,8 @@
   min-height: 56px;
   cursor: pointer;
 }
-.composer-choice > svg {
+.composer-choice > svg,
+.composer-choice > .agent-avatar {
   flex-shrink: 0;
 }
 .composer-config-panel .task-context-panel {

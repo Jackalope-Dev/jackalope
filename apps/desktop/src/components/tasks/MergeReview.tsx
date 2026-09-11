@@ -5,6 +5,7 @@ import type { IntegrationPlan, QueueItem } from '../../lib/queue';
 import { applyIntegration, integrationPlans, prepareIntegration } from '../../lib/queue';
 import type { TaskRun } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
+import { mergeDestination } from '../../lib/task-workflow';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
@@ -57,6 +58,12 @@ export function MergeReview({
   );
   const candidateIds = candidates.map((run) => run.id);
   const chosen = selected.filter((id) => candidateIds.includes(id));
+  const destination = mergeDestination(candidates[0] ?? { targetBranch: null }, project);
+  const candidateKey = candidateIds.join();
+  useEffect(() => {
+    if (!onlyRunId || !candidateKey.split(',').includes(onlyRunId)) return;
+    setSelected((current) => (current.includes(onlyRunId) ? current : [onlyRunId]));
+  }, [onlyRunId, candidateKey]);
   const changeSelection = (next: string[]) => {
     setSelected(next);
     setPlan(null);
@@ -115,51 +122,75 @@ export function MergeReview({
     }
   };
 
+  const applied = plan?.status === 'applied';
+  const cleaned = !!plan?.cleanupResults?.some((result) => result.removed);
   return (
-    <div className="merge-review">
+    <div className="merge-review" id="task-merge">
       <div className="queue-section-heading">
         <div>
-          <h2>{onlyRunId ? 'Review result' : 'Review & merge'}</h2>
+          <h2>{onlyRunId ? `Merge into ${destination}` : 'Review & merge'}</h2>
+          {onlyRunId && (
+            <p className="task-muted mt-2">
+              Review the change, merge it into {destination}, then remove this workspace.
+            </p>
+          )}
         </div>
         <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />
       </div>
+      {onlyRunId && (
+        <ol className="merge-lifecycle">
+          <li data-complete={!!plan || undefined}>Review the change</li>
+          <li data-complete={applied || undefined} data-current={(!applied && !!plan) || undefined}>
+            Merge into {plan?.targetBranch || destination}
+          </li>
+          <li data-complete={cleaned || undefined}>Remove this workspace</li>
+        </ol>
+      )}
       {candidates.length > 0 ? (
         <>
-          <label className="queue-select-all">
-            <Checkbox
-              disabled={busy}
-              checked={candidates.every((r) => chosen.includes(r.id))}
-              onChange={(e) => changeSelection(e.target.checked ? candidates.map((r) => r.id) : [])}
-            />
-            Select all ready tasks
-          </label>
-          {candidates.map((run) => (
-            <label className="queue-review-row" key={run.id}>
-              <Checkbox
-                disabled={busy}
-                checked={chosen.includes(run.id)}
-                onChange={(e) => {
-                  changeSelection(
-                    e.target.checked ? [...chosen, run.id] : chosen.filter((id) => id !== run.id),
-                  );
-                }}
-              />
-              <span>
-                <strong>{titleFor(run.id)}</strong>
-                <small>
-                  {run.agent} · {run.branch}
-                </small>
-              </span>
-              <button
-                type="button"
-                className="task-link"
-                onClick={() => useExecutionStore.getState().select(run.id)}
-              >
-                Read result
-                <ArrowRight size={13} />
-              </button>
-            </label>
-          ))}
+          {!onlyRunId && (
+            <>
+              <label className="queue-select-all">
+                <Checkbox
+                  disabled={busy}
+                  checked={candidates.every((r) => chosen.includes(r.id))}
+                  onChange={(e) =>
+                    changeSelection(e.target.checked ? candidates.map((r) => r.id) : [])
+                  }
+                />
+                Select all ready tasks
+              </label>
+              {candidates.map((run) => (
+                <label className="queue-review-row" key={run.id}>
+                  <Checkbox
+                    disabled={busy}
+                    checked={chosen.includes(run.id)}
+                    onChange={(e) => {
+                      changeSelection(
+                        e.target.checked
+                          ? [...chosen, run.id]
+                          : chosen.filter((id) => id !== run.id),
+                      );
+                    }}
+                  />
+                  <span>
+                    <strong>{titleFor(run.id)}</strong>
+                    <small>
+                      {run.agent} · {run.branch} → {mergeDestination(run, project)}
+                    </small>
+                  </span>
+                  <button
+                    type="button"
+                    className="task-link"
+                    onClick={() => useExecutionStore.getState().select(run.id)}
+                  >
+                    Read result
+                    <ArrowRight size={13} />
+                  </button>
+                </label>
+              ))}
+            </>
+          )}
           <label htmlFor={messageId} className="task-label block mt-5">
             Commit message
             <Input
@@ -181,13 +212,17 @@ export function MergeReview({
             loading={busy}
             loadingLabel="Preparing…"
           >
-            {`Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
+            {onlyRunId
+              ? `Preview merge into ${destination}`
+              : `Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
             <GitMerge size={15} />
           </Button>
         </>
       ) : !plan ? (
         <p className="task-muted py-5">
-          Finished tasks arrive here with their results and changes.
+          {onlyRunId
+            ? 'This result is not ready to merge yet. Finish review, pass required checks, and keep the workspace available.'
+            : 'Finished tasks arrive here with their results and changes.'}
         </p>
       ) : null}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
@@ -234,11 +269,16 @@ export function MergeReview({
           )}
           {!!plan.cleanupResults?.length && (
             <div role="status" className="task-notice merge-cleanup-results">
-              <p>The merge is complete.</p>
+              <p>
+                Merged into {plan.targetBranch}
+                {plan.cleanupResults.every((result) => result.removed)
+                  ? '. The task workspace was removed.'
+                  : '. The workspace is still here if you need it.'}
+              </p>
               <ul>
                 {plan.cleanupResults.map((result) => (
                   <li key={result.workspace} className="break-all">
-                    {result.removed ? 'Removed worktree and branch' : 'Kept for attention'}:{' '}
+                    {result.removed ? 'Removed workspace and local branch' : 'Kept for attention'}:{' '}
                     {result.workspace}
                     {result.error ? ` · ${result.error}` : ''}
                   </li>
@@ -292,9 +332,8 @@ export function MergeReview({
           {planEligible && ['ready', 'applying'].includes(plan.status) && (
             <div className="merge-approval">
               <p className="task-muted">
-                Creates one commit and updates {plan.targetBranch}. The target checkout must be
-                clean, and reviewed files must still match. Work that changed or remains in use is
-                kept.
+                Creates one commit on {plan.targetBranch}. That checkout must be clean, and the
+                reviewed files must still match. Publishing remains a separate step.
               </p>
               <label className="flex items-center gap-3 min-h-11">
                 <Checkbox
@@ -302,15 +341,17 @@ export function MergeReview({
                   disabled={busy}
                   onChange={(event) => setCleanup(event.target.checked)}
                 />
-                Remove completed worktrees and local branches after merging
+                Remove this workspace after merging
               </label>
               <Button
                 disabled={busy}
                 onClick={() => void apply()}
                 loading={busy}
-                loadingLabel="Integrating…"
+                loadingLabel="Merging…"
               >
-                {`Merge ${plan.runIds.length} ${plan.runIds.length === 1 ? 'task' : 'tasks'} into ${plan.targetBranch}`}
+                {cleanup
+                  ? `Merge into ${plan.targetBranch} and clean up`
+                  : `Merge into ${plan.targetBranch}`}
                 <GitMerge size={15} />
               </Button>
             </div>

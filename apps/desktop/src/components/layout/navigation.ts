@@ -60,7 +60,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Install and configure MCP tools.',
     icon: Plug,
     group: 'connections',
-    primary: true,
+    primary: false,
   },
   {
     id: 'mcp-marketplace',
@@ -76,7 +76,7 @@ export const WORKSPACE_VIEWS = [
     description: 'Understand consumption and account capacity.',
     icon: ChartNoAxesColumn,
     group: 'usage',
-    primary: true,
+    primary: false,
   },
   {
     id: 'repo-todos',

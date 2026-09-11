@@ -993,9 +993,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           code: 'On the saved-items page, show a helpful empty state when the list has no items.\nExplain what belongs here and include a link to the existing browse page.\nUse the shared controls and theme tokens. Preserve loading and error states.\nCheck the empty and populated states, keyboard focus, and a narrow layout.\nReport changed files, checks actually run, and any remaining uncertainty.',
         },
         steps: [
-          'Choose the project and confirm the target branch or workspace. A separate worktree is useful when other work is in progress.',
+          'Choose the project and confirm the target branch or workspace. Choose Work in a copy when other work is in progress.',
           'Pick an effort level and review Customize task for agent, account, context, and tools. Include a reachable preview URL when you expect browser checks.',
-          'Start the task and respond if it asks for missing information. Read the result and actual checks before deciding whether it is ready to integrate.',
+          'Start the task and respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
         ],
       },
       {

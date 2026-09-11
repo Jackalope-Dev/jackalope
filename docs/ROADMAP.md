@@ -11,7 +11,10 @@ aligned with this guide when capabilities or priorities change.
 ## Built: the local workspace
 
 Work discovery unifies tasks and chats with explicit project scope, remembered
-views and task/project command search. Tasks opens Chat first; Inbox holds the work list. Project overview surfaces unfinished work and
+views and task/project command search. Tasks opens Chat first; Inbox holds the work
+list. Work rows show each agent's character, live or next-action status and who is
+working now. Isolated results keep review, merge into the target branch and workspace
+cleanup together. Project overview surfaces unfinished work and
 local delivery receipts. Task follow-up stays visible through review. Preview setup,
 HTTP readiness, sandboxed local pages and fresh browser evidence capture are implemented.
 Delivery reads local Git and optional GitHub PR/CI state and prepares editable handoff

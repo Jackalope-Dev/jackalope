@@ -27,6 +27,7 @@ import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ProjectGitSettings } from '../projects/ProjectGitSettings';
+import { WorkspaceReadiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
@@ -50,7 +51,7 @@ const setupTips: Record<OnboardingStep, string[]> = {
     'Keep the app theme or give this project its own colors. Your choices are saved when setup finishes.',
   ],
   task: [
-    'Describe the result you want, relevant files, and how to check the work.',
+    'Describe the result you want. Choose a check so you can tell when the work is done.',
     'Your first task opens as a draft. Review it in the workspace before starting.',
   ],
 };
@@ -775,6 +776,7 @@ export function OnboardingFlow({
                   onboarding.setFirstTask(event.target.value);
                 }}
               />
+              {project && <WorkspaceReadiness project={project} mode="setup" />}
               <Button
                 variant="ghost"
                 disabled={busy}

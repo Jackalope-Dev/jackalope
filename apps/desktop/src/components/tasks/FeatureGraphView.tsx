@@ -9,7 +9,6 @@ import {
 } from '@xyflow/react';
 import {
   AlertCircle,
-  Bot,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -21,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { QueueItem } from '../../lib/queue';
 import { isActive } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
+import { AgentAvatar } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import '@xyflow/react/dist/style.css';
@@ -132,7 +132,12 @@ export function FeatureGraphView({
 
               <div className="feature-graph-node-meta">
                 <span className="flex items-center gap-1 text-[var(--color-text-secondary)]">
-                  <Bot size={11} />
+                  <AgentAvatar
+                    provider={item.agent}
+                    working={state === 'active'}
+                    waiting={state === 'attention'}
+                    size="xs"
+                  />
                   {item.agent}
                 </span>
                 {item.account && (
@@ -161,7 +166,15 @@ export function FeatureGraphView({
                   {state === 'review' && <CheckCircle2 size={10} />}
                   {state === 'attention' && <AlertCircle size={10} />}
                   {state === 'queued' && <Clock size={10} />}
-                  {state.toUpperCase()}
+                  {state === 'merged'
+                    ? 'Integrated'
+                    : state === 'active'
+                      ? 'Working'
+                      : state === 'review'
+                        ? 'Review'
+                        : state === 'attention'
+                          ? 'Needs you'
+                          : 'Waiting'}
                 </span>
 
                 {item.scopes.length > 0 && (

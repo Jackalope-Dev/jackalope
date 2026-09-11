@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { agentProvider, taskAgents } from '../src/lib/agent-provider.ts';
 import { taskNotices } from '../src/lib/companion-tasks.ts';
 import { waitForStoppedAttempt } from '../src/lib/continue-task.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { returnToProject } from '../src/lib/project-return.ts';
-import { collectWork, collectWorkspaceWork } from '../src/lib/task-collection.ts';
+import { collectWork, collectWorkspaceWork, workPresence } from '../src/lib/task-collection.ts';
 import {
   latestAttempt,
+  mergeDestination,
   safeResultLink,
   taskDecision,
   taskNextAction,
@@ -36,6 +38,11 @@ test('failed or missing checks take priority over review and integration actions
   );
   assert.equal(taskDecision(finished, false, 'pnpm test').section, 'verify');
   assert.equal(taskDecision(finished).section, 'integrate');
+  assert.equal(taskDecision(finished).action, 'Merge into your project');
+  assert.equal(taskDecision({ ...finished, targetBranch: 'main' }).action, 'Merge into main');
+  assert.equal(taskDecision({ ...finished, status: 'review' }).action, 'Review and merge');
+  assert.equal(mergeDestination({ targetBranch: 'release' }), 'release');
+  assert.equal(mergeDestination({ targetBranch: null }, { gitBranch: 'main' }), 'main');
   assert.equal(taskDecision({ ...finished, workspace: '/repo' }).section, 'delivery');
   assert.equal(taskDecision(finished, true).label, 'Changes integrated locally');
   assert.equal(
@@ -120,6 +127,38 @@ test('latest attempt follows timestamps and current questions override generic w
     'Answer question',
   );
   assert.equal(taskNextAction({ ...run, status: 'running', finishing: true }), 'View checks');
+});
+
+test('work presence names agents, waiting state and the next action', () => {
+  assert.equal(agentProvider('my-bot', 'claude'), 'claude');
+  assert.equal(agentProvider('kimi-code'), 'kimi');
+  assert.deepEqual(
+    taskAgents({
+      agent: 'claude',
+      routing: { handoffs: [{ agent: 'codex' }, { agent: 'claude' }] },
+    }),
+    ['claude', 'codex'],
+  );
+  const presence = workPresence({
+    id: 't',
+    title: 'Fix search',
+    stage: 'working',
+    date: '2026-09-11',
+    run: { ...run, agent: 'claude', status: 'running', prompts: [{ status: 'pending' }] },
+  });
+  assert.deepEqual(presence.agents, ['claude']);
+  assert.equal(presence.state, 'waiting');
+  assert.equal(presence.action, 'Answer question');
+  assert.equal(
+    workPresence({
+      id: 'idea',
+      title: 'Saved idea',
+      stage: 'ideas',
+      date: '2026-09-11',
+      idea: { assignedAgent: 'grok' },
+    }).agents[0],
+    'grok',
+  );
 });
 
 test('archived work stays grouped with its saved idea and resumes with a new attempt', () => {

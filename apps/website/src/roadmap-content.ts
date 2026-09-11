@@ -18,7 +18,7 @@ export const roadmapStages = [
         title: 'From request to a result you can inspect.',
         summary: 'Shared work discovery, local previews, and a clear delivery handoff.',
         detail:
-          'Tasks opens Chat first. Inbox keeps the shared work list with explicit project scope, remembered views, and command search. Project overview helps you resume unfinished work. Results prioritize questions and failed checks, with follow-up beside review. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
+          'Tasks opens Chat first. Inbox keeps the shared work list with explicit project scope, remembered views, and command search. Each row shows the assigned agent, live or next-action status, and the next useful step. Isolated results keep review, merge into the target branch, and workspace cleanup together. Project overview helps you resume unfinished work. Results prioritize questions and failed checks, with follow-up beside review. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
       },
       {
         title: 'Keep the ideas coming.',

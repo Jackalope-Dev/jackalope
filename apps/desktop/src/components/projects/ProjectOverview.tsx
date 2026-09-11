@@ -116,6 +116,12 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
               <Button variant="outline" onClick={() => navigateWorkspace('project-settings')}>
                 Project settings
               </Button>
+              <Button variant="outline" onClick={() => navigateWorkspace('mcps')}>
+                Connections
+              </Button>
+              <Button variant="outline" onClick={() => navigateWorkspace('usage')}>
+                Usage
+              </Button>
             </div>
           </section>
         </div>

@@ -8,8 +8,8 @@ still apply.
 1. Open a Git repository with at least one commit. Choose the agent you want.
 2. In Project Settings, choose the local target branch and a verification
    command such as `pnpm test`. The default target is the project's saved branch.
-3. Describe one concrete result. Keep isolation enabled to work in a separate
-   worktree. Commit any existing changes the agent needs before starting.
+3. Describe one concrete result. Keep **Work in a copy** enabled so the agent uses a
+   separate workspace. Commit any existing changes the agent needs before starting.
 4. Watch progress, respond to questions, or stop the attempt. Switching pages
    does not move the task to a different project or account.
 5. Inspect the result and changed files. Install dependencies in the task
@@ -17,9 +17,10 @@ still apply.
    OS permissions in that worktree and stops after five minutes.
 6. Ask for another iteration if necessary. A continuation keeps its original
    agent profile. To use another account, start a separate task.
-7. Open **Review & merge** and inspect the combined changes. Configured checks
-   must pass for the exact current file snapshot. Merge is an explicit action
-   and creates commits using your configured Git identity.
+7. Open **Review** and choose **Review and merge**. Inspect the combined
+   changes. Configured checks must pass for the exact current file snapshot.
+   Merge into the target branch is an explicit action, then the task workspace
+   is removed unless you keep it. Commits use your configured Git identity.
 
 Your target checkout must be on the selected branch and free of local changes.
 Jackalope does not stash or overwrite those changes. If files or the target

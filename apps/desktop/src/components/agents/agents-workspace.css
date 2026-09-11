@@ -45,23 +45,6 @@
   background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
   color: var(--color-text-primary);
 }
-.agent-avatar {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
-  background: radial-gradient(
-    ellipse at 40% 30%,
-    var(--color-accent-subtle),
-    var(--color-surface-sunken)
-  );
-}
-.agent-avatar svg {
-  width: 64px;
-  height: 64px;
-  overflow: visible;
-}
 .agent-account-summary {
   display: grid;
   gap: 4px;

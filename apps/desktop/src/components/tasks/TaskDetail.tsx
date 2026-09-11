@@ -99,7 +99,12 @@ export function TaskDetail({
         ?.focus();
     } else {
       setTab(['verify', 'integrate'].includes(section) ? 'changes' : section);
-      if (section === 'integrate') setIntegrating(true);
+      if (section === 'integrate') {
+        setIntegrating(true);
+        requestAnimationFrame(() =>
+          document.getElementById('task-merge')?.scrollIntoView({ block: 'start' }),
+        );
+      }
     }
   }, [workRequest, run.id]);
   const [integrating, setIntegrating] = useState(false);
@@ -146,7 +151,12 @@ export function TaskDetail({
         ?.focus();
     } else {
       setTab(section === 'integrate' || section === 'verify' ? 'changes' : section);
-      if (section === 'integrate') setIntegrating(true);
+      if (section === 'integrate') {
+        setIntegrating(true);
+        requestAnimationFrame(() =>
+          document.getElementById('task-merge')?.scrollIntoView({ block: 'start' }),
+        );
+      }
     }
   };
   const primaryAction = async () => {
@@ -367,7 +377,7 @@ export function TaskDetail({
                       setIntegrating(true);
                     }}
                   >
-                    <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Review merge'}
+                    <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Review and merge'}
                   </Menu.Item>
                 )}
                 <Menu.Item className="workspace-menu-item" onSelect={() => setTab('context')}>
@@ -575,7 +585,16 @@ export function TaskDetail({
                 )}
               </div>
               {!active && run.workspace && !integrated ? (
-                <ResultReview key={run.id} run={run} />
+                <ResultReview
+                  key={run.id}
+                  run={run}
+                  onCorrect={
+                    canContinue
+                      ? (prompt) =>
+                          draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
+                      : undefined
+                  }
+                />
               ) : (
                 <p className="task-muted">
                   {integrated
@@ -585,7 +604,7 @@ export function TaskDetail({
                       : 'No workspace was recorded for this attempt. Inspect its result and activity for more detail.'}
                 </p>
               )}
-              {(integrating || integrated) && finished && isLatest && (
+              {finished && isLatest && isolated && (
                 <TaskIntegration run={run} onApplied={applied} />
               )}
             </Tabs.Content>

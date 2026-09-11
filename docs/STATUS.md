@@ -8,12 +8,15 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
 - Tasks opens Chat first. Inbox keeps the project-scoped work list that includes chats,
-  with remembered filters, compact capture and keyboard row navigation. Task and project
-  command search covers both.
+  with remembered filters, compact capture and keyboard row navigation. Work rows show
+  each agent's character, live or next-action status and who is working now. Task and
+  project command search covers both.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
-- Result views prioritize unanswered questions, recovery and failed checks. Conversation,
-  review, preview and delivery share vocabulary and reusable result tools; task follow-up
-  remains visible while reading. Local previews remember project commands, choose a free
+- Result views prioritize unanswered questions, recovery and failed checks. Isolated
+  work keeps review, merge into the target branch and workspace cleanup on the Review
+  tab. Conversation, review, preview and delivery share vocabulary and reusable result
+  tools; task follow-up remains visible while reading. Failed checks can send their
+  output into the follow-up draft. Local previews remember project commands, choose a free
   port, check HTTP readiness and embed a sandboxed loopback page. Fresh isolated browser
   captures attach screenshots, page elements and errors to follow-up drafts; they do not
   reproduce embedded-page sign-in or unsaved interactions.

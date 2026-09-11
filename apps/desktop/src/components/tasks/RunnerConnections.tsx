@@ -12,7 +12,7 @@ import { AddAgentForm } from '../agents/AddAgentForm';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
-import { openAgentConfiguration } from '../layout/navigation';
+import { navigateWorkspace, openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
@@ -112,6 +112,9 @@ export function RunnerConnections({
               <Button variant="outline" onClick={() => setAdding(true)}>
                 <Plus size={18} />
                 Add agent
+              </Button>
+              <Button variant="ghost" onClick={() => navigateWorkspace('mcps')}>
+                Connections
               </Button>
             </div>
           }

@@ -1,0 +1,59 @@
+.agent-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 40% 30%,
+    var(--color-accent-subtle),
+    var(--color-surface-sunken)
+  );
+  color: var(--color-accent-ink);
+}
+.agent-avatar svg {
+  overflow: visible;
+}
+.agent-avatar[data-size="xs"] {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+}
+.agent-avatar[data-size="xs"] svg {
+  width: 20px;
+  height: 20px;
+}
+.agent-avatar[data-size="sm"] {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.agent-avatar[data-size="sm"] svg {
+  width: 32px;
+  height: 32px;
+}
+.agent-avatar[data-size="md"] {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+}
+.agent-avatar[data-size="md"] svg {
+  width: 40px;
+  height: 40px;
+}
+.agent-avatar[data-size="lg"] {
+  width: 72px;
+  height: 72px;
+}
+.agent-avatar[data-size="lg"] svg {
+  width: 64px;
+  height: 64px;
+}
+.agent-stack {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.agent-stack .agent-avatar + .agent-avatar {
+  margin-left: -12px;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}

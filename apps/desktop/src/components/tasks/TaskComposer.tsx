@@ -18,6 +18,7 @@ import { effortFor, taskEfforts } from '../../lib/task-effort';
 import type { Runner } from '../../lib/task-runtime';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import type { TaskDraft } from '../../stores/executionStore';
+import { AgentAvatar } from '../agents/AgentAvatar';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
@@ -115,7 +116,7 @@ export function TaskComposer({
       id: 'workspace',
       icon: GitBranch,
       label: 'Workspace',
-      value: current.isolated ? 'Separate worktree' : 'Current checkout',
+      value: current.isolated ? 'Work in a copy' : 'Edit these files',
     },
     {
       id: 'context',
@@ -187,7 +188,7 @@ export function TaskComposer({
           {current.agent
             ? runner?.name || current.agent
             : 'Jackalope chooses the agent and account'}{' '}
-          · {current.isolated ? 'Separate workspace' : 'Current checkout'}
+          · {current.isolated ? 'Work in a copy' : 'Edit these files'}
           {current.agent && runner?.account ? ` · ${runner.account}` : ''}
         </p>
         <Disclosure className="composer-customization">
@@ -285,7 +286,7 @@ export function TaskComposer({
                         aria-pressed={current.agent === agent.id}
                         onClick={() => onChange({ agent: agent.id, model: undefined })}
                       >
-                        <Bot size={20} aria-hidden="true" />
+                        <AgentAvatar provider={agent.id} size="sm" />
                         <span>
                           <strong>{agent.name}</strong>
                           <span>{agent.available ? 'Available' : 'Needs setup'}</span>
@@ -357,8 +358,11 @@ export function TaskComposer({
                   >
                     <GitBranch size={20} aria-hidden="true" />
                     <span>
-                      <strong>Separate worktree</strong>
-                      <span>Starts from the target branch; excludes uncommitted changes.</span>
+                      <strong>Work in a copy</strong>
+                      <span>
+                        Starts from the target branch. Your current files stay untouched until you
+                        merge.
+                      </span>
                     </span>
                   </button>
                   <button
@@ -369,8 +373,10 @@ export function TaskComposer({
                   >
                     <Folder size={20} aria-hidden="true" />
                     <span>
-                      <strong>Current checkout</strong>
-                      <span>Edits your files, including uncommitted changes.</span>
+                      <strong>Edit these files</strong>
+                      <span>
+                        Changes land in your current checkout, including uncommitted work.
+                      </span>
                     </span>
                   </button>
                 </div>

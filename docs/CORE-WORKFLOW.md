@@ -24,7 +24,9 @@ Tasks opens Chat. Inbox defaults to the selected project's work and offers an ex
 Chat and Inbox share discovery without duplicate attempts. Needs-input/recovery
 and failed-check work precede results ready for review, active work, saved ideas and
 finished work. Integration state comes from native verified receipts. Filters, search
-and list/board choices persist per scope. Arrow keys, Home and End move between visible
+and list/board choices persist per scope. Work rows show the assigned agent character,
+live or next-action status and the next useful action. Active and waiting work also
+appear in a compact in-progress strip. Arrow keys, Home and End move between visible
 work rows; command search also finds projects, tasks, sessions and current-task actions.
 Parallel planning remains inside Inbox with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
@@ -102,11 +104,13 @@ Existing tool scope carries forward by default. Users can explicitly select a
 different project connection list for the next continuation; connecting a service
 alone does not override an explicit scope. The active attempt retains its tools.
 
-Task detail reaches the existing integration preview directly with the task selected.
-The explicit merge action retains source/target snapshots, check requirements,
-conflict handling and receipt recovery. Mark reviewed still only records a review.
-Merging does not push. Source cleanup follows the explicit integration choice. Integrated work continues through a
-new task based on the updated target, with the earlier result attached.
+Finished isolated work keeps review, merge and workspace cleanup on the Review tab.
+The primary action opens that path: inspect the change, merge into the task target
+branch, then remove the workspace. The explicit merge still retains source/target
+snapshots, check requirements, conflict handling and receipt recovery. Mark reviewed
+still only records a review. Merging does not push. Source cleanup follows the merge
+choice and defaults on. Integrated work continues through a new task based on the
+updated target, with the earlier result attached.
 
 Make recurring opens the existing schedule editor with the task's original intent,
 project and agent. Timing presets supplement custom cron input. New schedules start

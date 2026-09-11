@@ -44,7 +44,31 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
     <section className="helper-chat" aria-label="Ask Jackalope">
       <div className="helper-body" ref={scroll}>
         <div className="helper-transcript">
-          {!count && <p className="helper-empty">How can I help?</p>}
+          {!count && (
+            <div className="helper-empty">
+              <p>How can I help?</p>
+              <div className="helper-starters">
+                {[
+                  'Where did my last task go?',
+                  "Why can't I start a task?",
+                  'How do I merge a finished task and clean up?',
+                ].map((prompt) => (
+                  <Button
+                    key={prompt}
+                    type="button"
+                    variant="outline"
+                    disabled={!native || working}
+                    onClick={() => {
+                      useHelperStore.setState({ draft: prompt });
+                      void useHelperStore.getState().send();
+                    }}
+                  >
+                    {prompt}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
           {helper.view.turns.map((turn) => (
             <article className="helper-turn" key={turn.id}>
               <p className="helper-user">{turn.prompt}</p>

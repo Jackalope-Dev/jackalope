@@ -25,6 +25,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
+import { AgentAvatar } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
@@ -363,6 +364,15 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                 return (
                   <article className="queue-item" key={item.id}>
                     <span className="queue-number">{String(index + 1).padStart(2, '0')}</span>
+                    <AgentAvatar
+                      provider={item.agent}
+                      working={phase === 'active'}
+                      waiting={
+                        phase === 'attention' &&
+                        !!run?.prompts?.some((prompt) => prompt.status === 'pending')
+                      }
+                      size="sm"
+                    />
                     <div className="queue-item-body">
                       <div className="queue-item-title">
                         <h3>{item.title}</h3>

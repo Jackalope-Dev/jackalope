@@ -4,8 +4,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
-import { DropdownMenu as Menu } from '@jackalope/ui';
-import { FolderOpen, MoreHorizontal, Radio, Workflow } from 'lucide-react';
+import { FolderOpen, Radio, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
 import { collectWorkspaceWork, type WorkItem } from '../../lib/task-collection';
@@ -209,26 +208,10 @@ export function TaskWorkspace({
               </a>
             )}
             {project && (
-              <Menu.Root>
-                <Menu.Trigger asChild>
-                  <Button variant="ghost" aria-label="More task actions">
-                    <MoreHorizontal size={18} />
-                  </Button>
-                </Menu.Trigger>
-                <Menu.Portal>
-                  <Menu.Content
-                    className="workspace-menu"
-                    align="end"
-                    sideOffset={8}
-                    collisionPadding={12}
-                  >
-                    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
-                      <Workflow size={16} />
-                      Plan feature work · {project.name}
-                    </Menu.Item>
-                  </Menu.Content>
-                </Menu.Portal>
-              </Menu.Root>
+              <Button variant="ghost" onClick={() => setParallel(true)}>
+                <Workflow size={16} />
+                Plan feature work
+              </Button>
             )}
           </div>
         }
@@ -287,7 +270,11 @@ export function TaskWorkspace({
                     ? 'No current tasks'
                     : 'No tasks in this project'
               }
-              description={archived ? 'Tasks you archive will appear here.' : undefined}
+              description={
+                archived
+                  ? 'Tasks you archive will appear here.'
+                  : 'Describe a change above, or start a Live conversation.'
+              }
               action={
                 projectFilter !== 'all' ? (
                   <Button variant="outline" onClick={() => setScope('all')}>

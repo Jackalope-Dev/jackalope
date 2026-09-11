@@ -92,11 +92,11 @@
 }
 .work-item {
   content-visibility: auto;
-  contain-intrinsic-block-size: auto 88px;
+  contain-intrinsic-block-size: auto 96px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 14px;
   padding: 14px;
   width: 100%;
   min-width: 0;
@@ -104,6 +104,59 @@
   border-radius: 12px;
   cursor: pointer;
   transition: background 150ms;
+}
+.work-avatar-fallback {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
+.work-now {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 20px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--color-surface-sunken);
+}
+.work-now-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  min-width: min(100%, 220px);
+  padding: 8px 12px;
+  border-radius: 12px;
+  text-align: left;
+  background: var(--color-surface-elevated);
+  cursor: pointer;
+}
+.work-now-item:hover,
+.work-now-item:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--color-accent-ink);
+}
+.work-now-copy {
+  display: grid;
+  min-width: 0;
+}
+.work-now-copy strong {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-now-copy span {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .work-item-row {
   display: flex;
@@ -147,6 +200,7 @@
   background: var(--color-surface-hover);
 }
 .work-item-content {
+  flex: 1;
   min-width: 0;
 }
 .work-item-title {

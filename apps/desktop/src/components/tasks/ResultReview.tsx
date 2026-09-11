@@ -9,7 +9,13 @@ import { PatchPreview } from './PatchPreview';
 import { ProjectVerification } from './ProjectVerification';
 import { TaskImpact } from './TaskImpact';
 
-export function ResultReview({ run }: { run: TaskRun }) {
+export function ResultReview({
+  run,
+  onCorrect,
+}: {
+  run: TaskRun;
+  onCorrect?: (prompt: string) => void;
+}) {
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,7 +59,11 @@ export function ResultReview({ run }: { run: TaskRun }) {
           {error}
         </InlineNotice>
       )}
-      <ProjectVerification run={run} command={project?.preferences?.verifyCommand} />
+      <ProjectVerification
+        run={run}
+        command={project?.preferences?.verifyCommand}
+        onCorrect={onCorrect}
+      />
       {loading && (
         <p role="status" className="task-muted">
           Reading changes from this task’s workspace…

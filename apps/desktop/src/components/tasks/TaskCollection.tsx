@@ -16,13 +16,19 @@ import {
   List,
   ListTodo,
   MoreHorizontal,
+  Radio,
 } from 'lucide-react';
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ideaStageLabels, type WorkItem, workStages } from '../../lib/task-collection';
+import {
+  ideaStageLabels,
+  type WorkItem,
+  workPresence,
+  workStages,
+} from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
-import { taskNextAction } from '../../lib/task-workflow';
 import { useProjectStore } from '../../stores/projectStore';
+import { AgentStack } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -92,6 +98,15 @@ export function TaskCollection({
   const eligible = filtered.filter((item) => archived || !item.archiveBlocked);
   const selected = eligible.filter((item) => selection.includes(item.id));
   const finished = eligible.filter((item) => item.stage === 'finished');
+  const happening = useMemo(
+    () =>
+      archived
+        ? []
+        : items
+            .map((item) => ({ item, presence: workPresence(item) }))
+            .filter(({ presence }) => presence.state !== 'idle'),
+    [archived, items],
+  );
   const changeArchive = async (targets: WorkItem[], archive: boolean) => {
     if (!onArchive || pending.current || !targets.length) return;
     pending.current = true;
@@ -132,14 +147,7 @@ export function TaskCollection({
           />
         </label>
       )}
-      <WorkCard
-        item={item}
-        runners={runners}
-        projects={projects}
-        onOpen={onOpen}
-        layout={layout}
-        disabled={busy}
-      />
+      <WorkCard item={item} runners={runners} projects={projects} onOpen={onOpen} disabled={busy} />
       {onArchive && !selecting && (
         <Button
           variant="ghost"
@@ -309,6 +317,35 @@ export function TaskCollection({
           </Button>
         </div>
       )}
+      {happening.length > 0 && (
+        <section className="work-now" aria-label="Work in progress">
+          {happening.slice(0, 4).map(({ item, presence }) => (
+            <button
+              key={item.id}
+              type="button"
+              className="work-now-item"
+              disabled={busy}
+              onClick={() => onOpen(item)}
+            >
+              {presence.agents.length ? (
+                <AgentStack agents={presence.agents} state={presence.state} />
+              ) : (
+                <span className="work-avatar-fallback" aria-hidden="true">
+                  {item.session ? <Radio size={16} /> : <Lightbulb size={16} />}
+                </span>
+              )}
+              <span className="work-now-copy">
+                <strong>{item.title}</strong>
+                <span>
+                  {presence.state === 'waiting'
+                    ? presence.action
+                    : item.run?.progress?.label || presence.action}
+                </span>
+              </span>
+            </button>
+          ))}
+        </section>
+      )}
       {!items.length && emptyState ? (
         emptyState
       ) : !filtered.length ? (
@@ -416,17 +453,16 @@ const WorkCard = memo(
     runners,
     projects,
     onOpen,
-    layout,
     disabled,
   }: {
     item: WorkItem;
     runners: Runner[];
     projects: ReturnType<typeof useProjectStore.getState>['projects'];
     onOpen: (item: WorkItem) => void;
-    layout: TaskCollectionView['layout'];
     disabled: boolean;
   }) {
-    const agent = item.run?.agent ?? item.idea?.assignedAgent;
+    const presence = workPresence(item);
+    const agent = presence.agents[0];
     const date = new Date(item.date);
     return (
       <button
@@ -437,6 +473,13 @@ const WorkCard = memo(
         className="work-item"
         onClick={() => onOpen(item)}
       >
+        {presence.agents.length ? (
+          <AgentStack agents={presence.agents} state={presence.state} />
+        ) : (
+          <span className="work-avatar-fallback" aria-hidden="true">
+            {item.session ? <Radio size={16} /> : <Lightbulb size={16} />}
+          </span>
+        )}
         <span className="work-item-content">
           <span className="work-item-title">{item.title}</span>
           <span className="work-item-meta">
@@ -444,25 +487,31 @@ const WorkCard = memo(
               {item.session?.request.projectName ??
                 item.run?.projectName ??
                 projects.find((p) => p.id === item.idea?.projectId)?.name ??
-                'No project yet'}{' '}
-              ·{' '}
+                'No project yet'}
+              {agent && agent !== 'Unassigned'
+                ? ` · ${runners.find((r) => r.id === agent)?.name ?? agent}`
+                : ''}
+              {presence.agents.length > 1 ? ` +${presence.agents.length - 1}` : ''}
             </span>
-            {agent && agent !== 'Unassigned' && (
-              <span>{runners.find((r) => r.id === agent)?.name ?? agent} · </span>
-            )}
             {Number.isNaN(date.getTime()) ? (
-              'Date unavailable'
+              ' · Date unavailable'
             ) : (
-              <time dateTime={item.date} title={dateTimeFormatter.format(date)}>
-                {dateFormatter.format(date)}
-              </time>
+              <>
+                {' · '}
+                <time dateTime={item.date} title={dateTimeFormatter.format(date)}>
+                  {dateFormatter.format(date)}
+                </time>
+              </>
             )}
           </span>
         </span>
         {item.session ? (
-          <span className="work-item-action">
-            Chat · Open conversation
-            <ChevronRight size={14} aria-hidden="true" />
+          <span className="work-item-status">
+            {item.run && <RunStatus status={item.run.status} progress={item.run.progress} />}
+            <span className="work-item-action">
+              {presence.action}
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
           </span>
         ) : item.run ? (
           <span className="work-item-status">
@@ -471,31 +520,34 @@ const WorkCard = memo(
                 <Check size={16} />
                 Integrated
               </Badge>
-            ) : layout === 'board' ||
-              (item.stage === 'attention' &&
-                ['failed', 'stopped', 'interrupted'].includes(item.run.status)) ? (
+            ) : (
               <RunStatus status={item.run.status} progress={item.run.progress} />
-            ) : null}
+            )}
             <span className="work-item-action">
-              {item.stage === 'finished' ? 'Open result' : taskNextAction(item.run)}
+              {presence.action}
               <ChevronRight size={14} aria-hidden="true" />
             </span>
             {item.run.persistenceError && <span className="work-item-meta">Not saved</span>}
           </span>
         ) : (
-          <Badge appearance="plain" className="work-idea-status">
-            {item.idea?.status === 'done' ? <Check size={15} /> : <Lightbulb size={15} />}
-            {item.idea?.runId
-              ? 'History unavailable'
-              : ideaStageLabels[item.idea?.status ?? 'backlog']}
-          </Badge>
+          <span className="work-item-status">
+            <Badge appearance="plain" className="work-idea-status">
+              {item.idea?.status === 'done' ? <Check size={15} /> : <Lightbulb size={15} />}
+              {item.idea?.runId
+                ? 'History unavailable'
+                : ideaStageLabels[item.idea?.status ?? 'backlog']}
+            </Badge>
+            <span className="work-item-action">
+              {presence.action}
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
+          </span>
         )}
       </button>
     );
   },
   (before, after) =>
     before.onOpen === after.onOpen &&
-    before.layout === after.layout &&
     before.disabled === after.disabled &&
     before.runners === after.runners &&
     before.projects === after.projects &&

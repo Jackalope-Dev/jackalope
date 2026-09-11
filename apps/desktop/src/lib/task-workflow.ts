@@ -39,15 +39,19 @@ export function taskDecision(run: TaskRun, integrated = false, verifyCommand?: s
     );
   if (!run.verification && (run.verifyCommand || verifyCommand))
     return state('Checks not run', 'Run checks', 'verify', 'warning');
-  if (run.status === 'reviewed') {
-    const isolated =
-      run.workspace.replaceAll('\\', '/').toLowerCase() !==
+  const isolated =
+    !!run.workspace &&
+    run.workspace.replaceAll('\\', '/').toLowerCase() !==
       run.projectPath.replaceAll('\\', '/').toLowerCase();
+  const target = run.targetBranch?.trim() || 'your project';
+  if (run.status === 'reviewed') {
     return isolated
-      ? state('Reviewed · not integrated', 'Review merge', 'integrate')
+      ? state('Ready to merge', `Merge into ${target}`, 'integrate')
       : state('Reviewed locally', 'View delivery', 'delivery');
   }
-  return state('Ready for your review', 'Review result', 'changes');
+  return isolated
+    ? state('Ready for your review', 'Review and merge', 'integrate')
+    : state('Ready for your review', 'Review result', 'changes');
 }
 
 export function latestAttempt(runs: TaskRun[], taskId: string) {
@@ -58,6 +62,18 @@ export function latestAttempt(runs: TaskRun[], taskId: string) {
 
 export function taskNextAction(run: TaskRun): string {
   return taskDecision(run).action;
+}
+
+export function mergeDestination(
+  run: { targetBranch?: string | null },
+  project?: { preferences?: { baseBranch?: string }; gitBranch?: string },
+): string {
+  return (
+    run.targetBranch?.trim() ||
+    project?.preferences?.baseBranch?.trim() ||
+    project?.gitBranch?.trim() ||
+    'your project'
+  );
 }
 
 export function safeResultLink(href: string | undefined): string | undefined {

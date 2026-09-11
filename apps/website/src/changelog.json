@@ -1,5 +1,29 @@
 [
   {
+    "id": "review-merge-and-clean-up-in-one-place",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Review, merge, and clean up in one place",
+    "description": "Finished work keeps review, merge into the target branch, and workspace cleanup together.",
+    "items": [
+      "After an isolated task, the next action is Review and merge, with the merge panel on the Review tab.",
+      "A single task skips the multi-task picker. Preview the change, merge into the target branch, and remove the workspace.",
+      "Failed checks can send their output into the follow-up draft. Setup can save a suggested project check."
+    ]
+  },
+  {
+    "id": "see-who-is-working-at-a-glance",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "See who is working at a glance",
+    "description": "The work list shows each agent's character, live status, and the next useful action.",
+    "items": [
+      "Work rows show the assigned agent, live or next-action status, and the next step, including when more than one agent took part.",
+      "In-progress work appears in a compact strip. Feature plans and the execution graph use the same agent characters.",
+      "Starting a task can work in a copy of your files. Plan feature work is available from the task home."
+    ]
+  },
+  {
     "id": "chat-is-the-first-tasks-view",
     "date": "2026-09-11",
     "status": "In development",
