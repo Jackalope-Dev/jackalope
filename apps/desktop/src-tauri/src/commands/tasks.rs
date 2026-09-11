@@ -2,7 +2,7 @@ mod antigravity;
 mod delegation;
 mod efficiency;
 pub(super) mod effort;
-mod events;
+pub(in crate::commands) mod events;
 pub(super) mod helper_process;
 mod journal;
 #[cfg(test)]
@@ -11,6 +11,7 @@ pub(super) mod kimi;
 mod models;
 #[cfg(test)]
 mod performance;
+pub(super) mod preparation;
 mod project_setup;
 mod routing;
 mod runners;
@@ -24,6 +25,7 @@ pub(super) mod timing;
 pub(super) use events::consume_adapter_event;
 use events::*;
 pub use models::*;
+pub use preparation::{PreparationRecord, StepProgress};
 pub use project_setup::*;
 use runners::discover_runner;
 pub(super) use runners::executable;

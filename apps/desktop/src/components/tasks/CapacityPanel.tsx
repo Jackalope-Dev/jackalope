@@ -1,4 +1,11 @@
-import { Badge, Disclosure, DisclosureSummary, Panel, RefreshIcon } from '@jackalope/ui';
+import {
+  Badge,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  Panel,
+  RefreshIcon,
+} from '@jackalope/ui';
 
 import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -49,7 +56,10 @@ export function CapacityPanel() {
     return () => clearInterval(timer);
   }, []);
   return (
-    <section className="capacity-panel" aria-labelledby="capacity-title">
+    <section
+      className="capacity-panel workspace-section workspace-stack"
+      aria-labelledby="capacity-title"
+    >
       <WorkspaceSectionHeading
         title="Account quota"
         titleId="capacity-title"
@@ -67,11 +77,7 @@ export function CapacityPanel() {
           </Button>
         }
       />
-      {error && (
-        <InlineNotice tone="error" className="mt-3">
-          {error}
-        </InlineNotice>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {loading && (
         <LoadingState
           label={records.length ? 'Updating account limits…' : 'Reading available account limits…'}
@@ -79,113 +85,117 @@ export function CapacityPanel() {
         />
       )}
       {!records.length && !loading && (
-        <p className="task-muted text-sm mt-4">
+        <p className="task-muted text-sm">
           {isTauriEnvironment()
             ? 'No account limits were reported. Sign in to an agent, then refresh.'
             : 'Account limits are available in the desktop app.'}
         </p>
       )}
-      <div className="capacity-connections">
-        {records.map((record) => {
-          const stale =
-            record.status === 'stale' ||
-            Boolean(record.observedAt && now - Date.parse(record.observedAt) > 300_000);
-          return (
-            <Panel className="capacity-connection" key={record.agent}>
-              <div className="capacity-identity">
-                <div>
-                  <h3>{names[record.agent] ?? record.agent}</h3>
-                  <p className="task-muted text-xs">{record.account}</p>
+      {records.length > 0 && (
+        <div className="capacity-connections workspace-card-grid">
+          {records.map((record) => {
+            const stale =
+              record.status === 'stale' ||
+              Boolean(record.observedAt && now - Date.parse(record.observedAt) > 300_000);
+            return (
+              <Panel className="capacity-connection" key={record.agent}>
+                <div className="capacity-identity">
+                  <div>
+                    <h3>{names[record.agent] ?? record.agent}</h3>
+                    <p className="task-muted text-xs">{record.account}</p>
+                  </div>
+                  {stale && <Badge variant="warning">Stale</Badge>}
                 </div>
-                {stale && <Badge variant="warning">Stale</Badge>}
-              </div>
-              <div className="capacity-measurement">
-                {record.windows.length ? (
-                  <div className="capacity-windows">
-                    {record.windows.map((window) => {
-                      const expired = window.resetsAt != null && window.resetsAt * 1000 <= now;
-                      const outdated = stale || expired;
-                      const remaining = window.remainingPercent;
-                      return (
-                        <div
-                          className="capacity-window"
-                          data-low={!outdated && remaining != null && remaining <= 20}
-                          key={`${window.poolId}:${window.window}`}
-                        >
-                          <div className="capacity-window-label">
-                            <span>{windowName(window)}</span>
-                            {!outdated && remaining != null && remaining <= 20 && (
-                              <Badge variant="warning">
-                                {remaining === 0 ? 'Limit reached' : 'Running low'}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="capacity-remaining" data-unavailable={remaining == null}>
-                            {remaining == null ? (
-                              'Unavailable'
+                <div className="capacity-measurement">
+                  {record.windows.length ? (
+                    <div className="capacity-windows">
+                      {record.windows.map((window) => {
+                        const expired = window.resetsAt != null && window.resetsAt * 1000 <= now;
+                        const outdated = stale || expired;
+                        const remaining = window.remainingPercent;
+                        return (
+                          <div
+                            className="capacity-window"
+                            data-low={!outdated && remaining != null && remaining <= 20}
+                            key={`${window.poolId}:${window.window}`}
+                          >
+                            <div className="capacity-window-label">
+                              <span>{windowName(window)}</span>
+                              {!outdated && remaining != null && remaining <= 20 && (
+                                <Badge variant="warning">
+                                  {remaining === 0 ? 'Limit reached' : 'Running low'}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="capacity-remaining" data-unavailable={remaining == null}>
+                              {remaining == null ? (
+                                'Unavailable'
+                              ) : (
+                                <>
+                                  <strong>
+                                    {remaining.toLocaleString(undefined, {
+                                      maximumFractionDigits: 1,
+                                    })}
+                                    <span>%</span>
+                                  </strong>
+                                  <span>{outdated ? 'last reported' : 'remaining'}</span>
+                                </>
+                              )}
+                            </p>
+                            {remaining != null && !outdated ? (
+                              <meter
+                                min={0}
+                                max={100}
+                                value={remaining}
+                                aria-label={`${names[record.agent] ?? record.agent} ${window.poolName} ${windowName(window)} remaining`}
+                              />
                             ) : (
-                              <>
-                                <strong>
-                                  {remaining.toLocaleString(undefined, {
-                                    maximumFractionDigits: 1,
-                                  })}
-                                  <span>%</span>
-                                </strong>
-                                <span>{outdated ? 'last reported' : 'remaining'}</span>
-                              </>
+                              <div className="capacity-unknown-track" aria-hidden="true" />
                             )}
-                          </p>
-                          {remaining != null && !outdated ? (
-                            <meter
-                              min={0}
-                              max={100}
-                              value={remaining}
-                              aria-label={`${names[record.agent] ?? record.agent} ${window.poolName} ${windowName(window)} remaining`}
-                            />
-                          ) : (
-                            <div className="capacity-unknown-track" aria-hidden="true" />
-                          )}
-                          <p className="task-muted text-xs">
-                            {window.poolName} ·{' '}
-                            {expired
-                              ? 'Window ended; refresh for current capacity'
-                              : window.resetsAt
-                                ? `Resets ${new Date(window.resetsAt * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-                                : 'Reset time not reported'}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="capacity-unavailable">
-                    <p>
-                      {record.status === 'notInstalled' ? 'Not installed' : 'Balance unavailable'}
-                    </p>
-                    <p className="capacity-detail">{record.detail}</p>
-                  </div>
-                )}
-                {(record.windows.length > 0 || record.observedAt) && (
-                  <Disclosure className="capacity-details">
-                    <DisclosureSummary>Reporting details</DisclosureSummary>
-                    {record.windows.length > 0 && (
-                      <p className="task-muted text-xs capacity-detail">{record.detail}</p>
-                    )}
-                    {record.observedAt && (
-                      <p className="task-muted text-xs capacity-source">
-                        {stale ? 'Stale snapshot' : 'Snapshot'} ·{' '}
-                        {new Date(record.observedAt).toLocaleTimeString()} · {record.source}
+                            <p className="task-muted text-xs">
+                              {window.poolName} ·{' '}
+                              {expired
+                                ? 'Window ended; refresh for current capacity'
+                                : window.resetsAt
+                                  ? `Resets ${new Date(window.resetsAt * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                                  : 'Reset time not reported'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="capacity-unavailable">
+                      <p>
+                        {record.status === 'notInstalled' ? 'Not installed' : 'Balance unavailable'}
                       </p>
-                    )}
-                  </Disclosure>
-                )}
-              </div>
-            </Panel>
-          );
-        })}
-      </div>
+                      <p className="capacity-detail">{record.detail}</p>
+                    </div>
+                  )}
+                  {(record.windows.length > 0 || record.observedAt) && (
+                    <Disclosure className="capacity-details">
+                      <DisclosureSummary>Reporting details</DisclosureSummary>
+                      <DisclosureBody>
+                        {record.windows.length > 0 && (
+                          <p className="task-muted text-xs capacity-detail">{record.detail}</p>
+                        )}
+                        {record.observedAt && (
+                          <p className="task-muted text-xs capacity-source">
+                            {stale ? 'Stale snapshot' : 'Snapshot'} ·{' '}
+                            {new Date(record.observedAt).toLocaleTimeString()} · {record.source}
+                          </p>
+                        )}
+                      </DisclosureBody>
+                    </Disclosure>
+                  )}
+                </div>
+              </Panel>
+            );
+          })}
+        </div>
+      )}
       {nextRefresh > now && !loading && (
-        <p className="task-muted text-xs mt-3">
+        <p className="task-muted text-xs">
           Refresh available in {Math.ceil((nextRefresh - now) / 1000)}s.
         </p>
       )}

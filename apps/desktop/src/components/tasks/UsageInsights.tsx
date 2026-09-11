@@ -1,4 +1,4 @@
-import { Badge, Disclosure, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
+import { Badge, Disclosure, DisclosureBody, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { UsageInsights as Insights } from '../../lib/usage-insights';
@@ -151,11 +151,13 @@ export function UsageInsights({
             About this chart
             {data.total.missing > 0 ? ` · ${data.total.missing} missing reports` : ''}
           </DisclosureSummary>
-          <p className="task-muted">
-            Workers use attempt start dates; routing and quota handoffs use their recorded dates, in
-            your local time. Shaded caps show agent selection; ? marks missing reports. Cached input
-            is counted once. This is not subscription quota or a monetary bill.
-          </p>
+          <DisclosureBody>
+            <p className="task-muted">
+              Workers use attempt start dates; routing and quota handoffs use their recorded dates,
+              in your local time. Shaded caps show agent selection; ? marks missing reports. Cached
+              input is counted once. This is not subscription quota or a monetary bill.
+            </p>
+          </DisclosureBody>
         </Disclosure>
       </Panel>
       <Panel className="usage-attribution" aria-labelledby="usage-attribution-title">
@@ -200,9 +202,15 @@ export function UsageInsights({
           exact token share is unavailable.
         </p>
       </Panel>
-      <section className="usage-outcomes" aria-label="Usage by outcome">
-        <h3>Usage by outcome</h3>
-        <p>Tokens spent in this view, grouped by each task’s latest saved review.</p>
+      <section
+        className="usage-outcomes workspace-section workspace-stack"
+        aria-label="Usage by outcome"
+      >
+        <WorkspaceSectionHeading
+          level={3}
+          title="Usage by outcome"
+          description="Tokens spent in this view, grouped by each task’s latest saved review."
+        />
         <div className="usage-outcome-grid">
           {data.outcomes.map((outcome) => (
             <div key={outcome.label}>

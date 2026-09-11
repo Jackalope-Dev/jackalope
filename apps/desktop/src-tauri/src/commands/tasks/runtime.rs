@@ -124,6 +124,7 @@ impl TaskRuntime {
     ) -> Result<(), String> {
         self.stage(id, Some("preparation"));
         self.prepare_workspace(id, req, previous.clone())?;
+        self.update(id, |run| run.progress = None);
         let mut request = req.clone();
         let mut resume = previous;
         loop {
@@ -136,9 +137,19 @@ impl TaskRuntime {
             }
             if request.agent == "auto" {
                 self.stage(id, Some("routing"));
+                self.update(id, |run| {
+                    run.progress = Some(StepProgress::new(
+                        "routing",
+                        "Choosing an agent and account",
+                        1,
+                    ))
+                });
                 self.route(&mut request)?;
             }
             self.stage(id, Some("execution"));
+            self.update(id, |run| {
+                run.progress = Some(StepProgress::new("agent", "Starting the agent", 1))
+            });
             self.execute_agent(
                 id,
                 &request,
@@ -190,6 +201,13 @@ impl TaskRuntime {
         {
             return Err("The checkout is on a different branch. Switch to the target branch or enable an isolated worktree.".into());
         }
+        self.update(id, |run| {
+            run.progress = Some(StepProgress::new("workspace", "Preparing the workspace", 1))
+        });
+        let reusable = req
+            .retry_of
+            .as_deref()
+            .and_then(|retried| self.reusable_workspace(retried));
         let (workspace, branch, base_head) = if let Some(ref old) = previous {
             if old.session_id.is_none() && req.live_session_id.is_none() {
                 return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
@@ -199,6 +217,14 @@ impl TaskRuntime {
                 old.branch.clone(),
                 old.base_head.clone(),
             )
+        } else if let Some((workspace, branch, base_head)) = reusable {
+            self.update(id, |run| {
+                activity(
+                    run,
+                    "Reusing the previous attempt's workspace; it has no uncommitted changes.",
+                )
+            });
+            (workspace, branch, base_head)
         } else if req.isolated {
             let parent = PathBuf::from(&root).join(".worktrees");
             std::fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
@@ -256,7 +282,7 @@ impl TaskRuntime {
                 .as_deref()
                 .filter(|command| !command.trim().is_empty())
             {
-                let result = crate::commands::verification::prepare(self, id, command, &workspace)?;
+                let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
                     self.update(id, |r| {
                         r.status = "stopped".into();
@@ -264,8 +290,8 @@ impl TaskRuntime {
                     });
                     return Ok(());
                 }
-                if !result.success {
-                    return Err("Workspace preparation failed. Inspect its recorded output, update the project setup command, and start a new task.".into());
+                if !record.success {
+                    return Err(preparation_failure(&record));
                 }
             }
         }

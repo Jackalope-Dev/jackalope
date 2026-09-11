@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   Disclosure,
+  DisclosureBody,
   DisclosureSummary,
   FeedbackIcon,
   FormField,
@@ -194,15 +195,23 @@ export function Patterns() {
           }}
         >
           <DisclosureSummary>How are these controls shared?</DisclosureSummary>
-          <p>Desktop, website, and admin use the same controls with their own data and actions.</p>
-          <Disclosure>
-            <DisclosureSummary>Can sections be nested?</DisclosureSummary>
-            <p>Each section opens independently and works with the keyboard.</p>
-          </Disclosure>
+          <DisclosureBody>
+            <p>
+              Desktop, website, and admin use the same controls with their own data and actions.
+            </p>
+            <Disclosure>
+              <DisclosureSummary>Can sections be nested?</DisclosureSummary>
+              <DisclosureBody>
+                <p>Each section opens independently and works with the keyboard.</p>
+              </DisclosureBody>
+            </Disclosure>
+          </DisclosureBody>
         </Disclosure>
         <Disclosure open>
           <DisclosureSummary>What happens when an action fails?</DisclosureSummary>
-          <p>Show the error beside the action and make it possible to retry.</p>
+          <DisclosureBody>
+            <p>Show the error beside the action and make it possible to retry.</p>
+          </DisclosureBody>
         </Disclosure>
         <output aria-label="Disclosure changes">
           {open ? 'Open' : 'Closed'} · {toggles} changes

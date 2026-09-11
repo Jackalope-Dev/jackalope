@@ -27,6 +27,15 @@
     color: var(--color-text-muted);
     transition: transform 160ms;
   }
+  .ui-disclosure-body {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+    padding-block: 8px;
+  }
+  .ui-disclosure-body > :where(p, ul, ol) {
+    margin-block: 0;
+  }
   .ui-disclosure[open] > .ui-disclosure-summary > .ui-disclosure-indicator {
     transform: rotate(180deg);
   }

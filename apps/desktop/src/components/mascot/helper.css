@@ -148,9 +148,9 @@
   background: var(--color-surface-hover);
 }
 .companion-panel .helper-tabs button[aria-pressed="true"] {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  box-shadow: var(--shadow-selection);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  box-shadow: inset 0 0 0 1px var(--color-accent-glow);
   text-decoration: underline;
   text-underline-offset: 4px;
 }

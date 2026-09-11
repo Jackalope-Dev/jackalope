@@ -1452,6 +1452,7 @@ mod tests {
                 exit_code: Some(1),
                 success: false,
                 timed_out: false,
+                stalled: false,
                 stdout: String::new(),
                 stderr: String::new(),
                 truncated: false,

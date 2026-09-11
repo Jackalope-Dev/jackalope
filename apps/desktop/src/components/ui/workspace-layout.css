@@ -57,7 +57,8 @@
   gap: var(--workspace-heading-gap, 24px);
   min-width: 0;
 }
-.workspace-stack > .workspace-heading {
+.workspace-stack > .workspace-heading,
+.workspace-sections > .workspace-heading {
   margin-bottom: 0;
 }
 .workspace-section.workspace-stack {
@@ -67,6 +68,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--workspace-section-gap, 32px);
+}
+.workspace-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--workspace-section-heading-gap, 16px);
+  min-width: 0;
 }
 .workspace-section-header {
   display: flex;

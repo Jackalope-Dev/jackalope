@@ -140,7 +140,12 @@ reserve space for the search and clear icons.
 
 Disclosure and DisclosureSummary render native details/summary elements, retaining
 open, name, onToggle and nested-section behavior. The shared chevron and focus style
-replace local markers. Panel, PanelHeader, PanelBody and PanelFooter provide optional
+replace local markers. Wrap expanded content in DisclosureBody for consistent spacing
+between paragraphs, nested disclosures and controls. Table owns cell padding and its
+keyboard-scrollable container; avoid recreating table gutters in page styles.
+Use workspace-sections for section gaps, workspace-section with workspace-stack for
+heading/content spacing, and workspace-card-grid for responsive grids of up to three cards.
+Panel, PanelHeader, PanelBody and PanelFooter provide optional
 surface and section layouts; use the plain variant for open page sections.
 
 Set Button loading and loadingLabel for asynchronous actions. Idle and pending

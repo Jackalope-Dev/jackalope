@@ -425,27 +425,6 @@ select option {
   letter-spacing: -0.05em;
   font-variant-numeric: tabular-nums;
 }
-.usage-table-scroll {
-  overflow-x: auto;
-}
-.usage-table {
-  width: 100%;
-  text-align: left;
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-}
-.usage-table th {
-  font-weight: 400;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  padding: 12px 16px 12px 0;
-  white-space: nowrap;
-}
-.usage-table td {
-  padding: 17px 16px 17px 0;
-  border-top: 1px solid var(--color-border-subtle);
-  vertical-align: top;
-}
 .usage-task-link {
   display: block;
   max-width: 290px;

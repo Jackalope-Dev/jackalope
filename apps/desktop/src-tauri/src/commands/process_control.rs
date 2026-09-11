@@ -204,10 +204,53 @@ pub struct CommandResult {
     pub exit_code: Option<i32>,
     pub success: bool,
     pub timed_out: bool,
+    /// The command was killed because it produced no output for the stall budget.
+    /// Distinct from `timed_out`, which means it ran past its total budget while
+    /// still making progress.
+    #[serde(default)]
+    pub stalled: bool,
     pub stdout: String,
     pub stderr: String,
     pub truncated: bool,
     pub duration_ms: u64,
+}
+
+impl CommandResult {
+    /// Why the command was killed, for an operator-facing message. None when it exited on its own.
+    pub fn interruption(&self) -> Option<String> {
+        let seconds = self.duration_ms / 1000;
+        if self.stalled {
+            Some(format!(
+                "produced no output for too long and was stopped after {seconds}s"
+            ))
+        } else if self.timed_out {
+            Some(format!("ran past its time budget and was stopped after {seconds}s"))
+        } else {
+            None
+        }
+    }
+}
+
+/// How long a supervised command may run. `total` is a hard ceiling; `stall` kills a
+/// command that has gone quiet, so a long command that keeps reporting progress is
+/// allowed to finish instead of being cut off mid-way.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    pub total: Duration,
+    pub stall: Option<Duration>,
+}
+
+impl Limits {
+    pub fn total(total: Duration) -> Self {
+        Self { total, stall: None }
+    }
+
+    pub fn supervised(total: Duration, stall: Duration) -> Self {
+        Self {
+            total,
+            stall: Some(stall),
+        }
+    }
 }
 
 pub fn run(command: Command, timeout: Duration) -> Result<CommandResult, String> {
@@ -223,8 +266,17 @@ pub fn run_cancellable(
 }
 
 pub fn run_cancellable_with_output(
-    mut command: Command,
+    command: Command,
     timeout: Duration,
+    canceled: impl Fn() -> bool,
+    observe: impl Fn(&[u8], bool) + Send + Sync + 'static,
+) -> Result<CommandResult, String> {
+    run_supervised(command, Limits::total(timeout), canceled, observe)
+}
+
+pub fn run_supervised(
+    mut command: Command,
+    limits: Limits,
     canceled: impl Fn() -> bool,
     observe: impl Fn(&[u8], bool) + Send + Sync + 'static,
 ) -> Result<CommandResult, String> {
@@ -257,22 +309,44 @@ pub fn run_cancellable_with_output(
     let stdout = child.stdout.take().ok_or("Missing command output")?;
     let stderr = child.stderr.take().ok_or("Missing command diagnostics")?;
     let observe = std::sync::Arc::new(observe);
+    // Milliseconds since `start` at which the command last wrote anything. Both reader
+    // threads publish here so the wait loop can tell "slow but working" from "wedged".
+    let spoke = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     let observe_stdout = observe.clone();
+    let stdout_spoke = spoke.clone();
     let out = std::thread::spawn(move || {
-        read_observed(stdout, OUTPUT_LIMIT, |bytes| observe_stdout(bytes, false))
+        read_observed(stdout, OUTPUT_LIMIT, |bytes| {
+            stdout_spoke.store(
+                start.elapsed().as_millis() as u64,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            observe_stdout(bytes, false)
+        })
     });
+    let stderr_spoke = spoke.clone();
     let err = std::thread::spawn(move || {
-        read_observed(stderr, OUTPUT_LIMIT, |bytes| observe(bytes, true))
+        read_observed(stderr, OUTPUT_LIMIT, |bytes| {
+            stderr_spoke.store(
+                start.elapsed().as_millis() as u64,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            observe(bytes, true)
+        })
     });
-    let (status, timed_out) = loop {
+    let (status, timed_out, stalled) = loop {
         if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-            break (status, false);
+            break (status, false, false);
         }
-        let timed_out = start.elapsed() >= timeout;
-        if timed_out || canceled() {
+        let elapsed = start.elapsed();
+        let timed_out = elapsed >= limits.total;
+        let quiet = elapsed.saturating_sub(Duration::from_millis(
+            spoke.load(std::sync::atomic::Ordering::Relaxed),
+        ));
+        let stalled = !timed_out && limits.stall.is_some_and(|stall| quiet >= stall);
+        if timed_out || stalled || canceled() {
             tree.terminate();
             let _ = child.kill();
-            break (child.wait().map_err(|e| e.to_string())?, timed_out);
+            break (child.wait().map_err(|e| e.to_string())?, timed_out, stalled);
         }
         std::thread::sleep(Duration::from_millis(30));
     };
@@ -287,8 +361,9 @@ pub fn run_cancellable_with_output(
         .map_err(|e| e.to_string())?;
     Ok(CommandResult {
         exit_code: status.code(),
-        success: status.success() && !timed_out,
+        success: status.success() && !timed_out && !stalled,
         timed_out,
+        stalled,
         stdout,
         stderr,
         truncated: out_cut || err_cut,
@@ -330,6 +405,44 @@ mod tests {
         assert!(!result.timed_out);
         assert!(!result.success);
         assert!(result.duration_ms < 3000);
+    }
+    #[test]
+    #[cfg(windows)]
+    fn a_quiet_command_stalls_while_a_talking_one_keeps_its_full_budget() {
+        let mut quiet = Command::new("cmd.exe");
+        quiet.args(["/D", "/C", "ping -n 30 127.0.0.1 >nul"]);
+        let result = run_supervised(
+            quiet,
+            Limits::supervised(Duration::from_secs(30), Duration::from_secs(1)),
+            || false,
+            |_, _| {},
+        )
+        .unwrap();
+        assert!(result.stalled);
+        assert!(!result.timed_out);
+        assert!(!result.success);
+        assert!(result.duration_ms < 5000);
+        assert!(result.interruption().unwrap().contains("no output"));
+
+        // Steady progress keeps the command alive well past the stall budget.
+        let mut talking = Command::new("cmd.exe");
+        talking.args([
+            "/D",
+            "/C",
+            "for /L %i in (1,1,6) do @(echo step %i & ping -n 2 127.0.0.1 >nul)",
+        ]);
+        let result = run_supervised(
+            talking,
+            Limits::supervised(Duration::from_secs(60), Duration::from_secs(3)),
+            || false,
+            |_, _| {},
+        )
+        .unwrap();
+        assert!(result.success, "{result:?}");
+        assert!(!result.stalled);
+        assert!(result.duration_ms > 4000, "{result:?}");
+        assert!(result.stdout.contains("step 6"));
+        assert!(result.interruption().is_none());
     }
     #[test]
     fn huge_lines_are_drained_without_losing_the_next_event() {

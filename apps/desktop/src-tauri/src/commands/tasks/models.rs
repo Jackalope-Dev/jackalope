@@ -38,6 +38,15 @@ pub struct TaskRun {
     pub dependency_invalidated: bool,
     #[serde(default)]
     pub stages: Vec<super::timing::ExecutionStage>,
+    /// The step running right now. Cleared when the run reaches a terminal status.
+    #[serde(default)]
+    pub progress: Option<super::preparation::StepProgress>,
+    /// Outcome of the project setup command for this attempt.
+    #[serde(default)]
+    pub preparation: Option<super::preparation::PreparationRecord>,
+    /// The attempt this run retried, linking a retry back to what it replaced.
+    #[serde(default)]
+    pub retry_of: Option<String>,
     #[serde(default)]
     pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(default)]
@@ -151,6 +160,10 @@ pub struct RunRequest {
     pub prompt: String,
     pub isolated: bool,
     pub previous_run_id: Option<String>,
+    /// The failed attempt this run replaces. Unlike `previous_run_id` it resumes no agent
+    /// session: it is a fresh attempt that may reuse the earlier attempt's prepared workspace.
+    #[serde(default)]
+    pub retry_of: Option<String>,
     #[serde(default)]
     pub connection_ids: Option<Vec<String>>,
     #[serde(skip)]
@@ -215,6 +228,9 @@ impl TaskRun {
             efficiency: self.efficiency.clone(),
             dependency_invalidated: self.dependency_invalidated,
             stages: self.stages.clone(),
+            progress: self.progress.clone(),
+            preparation: self.preparation.clone(),
+            retry_of: self.retry_of.clone(),
             dependency_snapshot: self.dependency_snapshot.clone(),
             checkpoint: self.checkpoint.clone(),
             checkpoint_error: self.checkpoint_error.clone(),

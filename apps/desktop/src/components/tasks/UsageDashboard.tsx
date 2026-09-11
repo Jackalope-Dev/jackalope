@@ -1,4 +1,4 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope/ui';
 import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { taskTitle } from '../../lib/task-title';
@@ -214,7 +214,7 @@ export function UsageDashboard({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return (
-    <WorkspacePage className="usage-page">
+    <WorkspacePage className="usage-page workspace-sections">
       <WorkspaceHeading
         title={view === 'analytics' ? 'Performance & insights' : 'Usage'}
         description={
@@ -254,175 +254,179 @@ export function UsageDashboard({
           </div>
         </>
       ) : (
-        <>
+        <div className="workspace-sections">
           <CapacityPanel />
-          <WorkspaceSectionHeading
-            title="Task usage"
-            description="Reported activity from your loaded Jackalope history."
-          />
-          <WorkspaceToolbar className="usage-filters">
-            <FormField label="Account">
-              <Select
-                id="usage-account"
-                aria-label="Usage account"
-                value={account}
-                onValueChange={(value) => {
-                  setAccount(value);
-                  setDate(null);
-                }}
-              >
-                <SelectItem value="all">All accounts</SelectItem>
-                {[...accounts].map(([id, label]) => (
-                  <SelectItem key={id} value={id}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Project">
-              <Select
-                id="usagedashboard-field-1"
-                aria-label="Project"
-                value={project}
-                onValueChange={(value) => {
-                  setProject(value);
-                  setDate(null);
-                }}
-              >
-                <SelectItem value="all">All projects</SelectItem>
-                {[...projectNames].map(([id, name]) => (
-                  <SelectItem key={id} value={id}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Period">
-              <Select
-                id="usagedashboard-field-2"
-                aria-label="Period"
-                value={period}
-                onValueChange={(value) => {
-                  setPeriod(value);
-                  setDate(null);
-                }}
-              >
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
-              </Select>
-            </FormField>
-            <FormField label="Agent">
-              <Select
-                id="usage-agent"
-                value={agent}
-                onValueChange={(value) => {
-                  setAgent(value);
-                  setDate(null);
-                }}
-              >
-                <SelectItem value="all">All agents</SelectItem>
-                {[...new Set(entries.map((r) => r.agent))].sort().map((id) => (
-                  <SelectItem key={id} value={id}>
-                    {id}
-                  </SelectItem>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Sort by">
-              <Select
-                id="usagedashboard-field-3"
-                aria-label="Sort by"
-                value={sort}
-                onValueChange={(value) => setSort(value)}
-              >
-                <SelectItem value="tokens">Tokens used</SelectItem>
-                <SelectItem value="project">Project</SelectItem>
-                <SelectItem value="agent">Agent</SelectItem>
-                <SelectItem value="model">Model</SelectItem>
-                <SelectItem value="account">Account</SelectItem>
-              </Select>
-            </FormField>
-          </WorkspaceToolbar>
-          {!loading && !historyError && filtered.length > 0 && (
-            <UsageInsights
-              data={insights}
-              selectedDate={date}
-              scope={project === 'all' ? 'All projects' : (projectNames.get(project) ?? 'Project')}
-              onProject={(id) => {
-                setProject(id);
-                setDate(null);
-              }}
-              onAgent={(id) => {
-                setAgent(id);
-                setDate(null);
-              }}
-              onDate={(value) => {
-                setDate(value);
-                setLedger('calls');
-                requestAnimationFrame(() => document.getElementById('usage-ledger')?.focus());
-              }}
-            />
-          )}
-          {historyError && (
-            <InlineNotice
-              tone="error"
-              action={
-                <Button variant="outline" onClick={() => void refresh()}>
-                  Reload history
-                </Button>
-              }
-            >
-              Usage is unavailable because saved history could not be loaded. {historyError}
-            </InlineNotice>
-          )}
-          {!loading && !historyError && filtered.length > 0 && (
+          <section className="workspace-section workspace-stack" aria-label="Task usage">
             <WorkspaceSectionHeading
-              titleId="usage-ledger"
-              title={date ? `Calls dated ${date}` : 'Explore the work'}
-              action={
-                <div className="workspace-actions">
-                  {date && (
-                    <Button variant="outline" onClick={() => setDate(null)}>
-                      Clear date
-                    </Button>
-                  )}
-                  <FilterGroup
-                    label="Usage detail"
-                    value={ledger}
-                    onChange={(value) => {
-                      setLedger(value);
-                      if (value === 'tasks') setDate(null);
-                    }}
-                    items={[
-                      { id: 'tasks', label: 'Tasks' },
-                      { id: 'calls', label: 'Individual calls' },
-                    ]}
-                  />
-                </div>
-              }
+              title="Task usage"
+              description="Reported activity from your loaded Jackalope history."
             />
-          )}
-          {error && <InlineNotice tone="error">{error}</InlineNotice>}
-          {loading ? (
-            <p role="status">Loading usage…</p>
-          ) : historyError ? null : !sorted.length ? (
-            <EmptyState
-              icon={ChartNoAxesColumn}
-              title="No attempts in this view"
-              description="Usage appears when agents report it. Try another project or period, or start a task."
-              action={
-                <Button variant="outline" onClick={onTask}>
-                  Go to tasks
-                </Button>
-              }
-            />
-          ) : ledger === 'tasks' ? (
-            <div className="usage-table-scroll">
-              <table className="usage-table">
-                <caption className="sr-only">
-                  Task usage across attempts in the selected filters, with latest saved outcomes
-                </caption>
+            <WorkspaceToolbar className="usage-filters">
+              <FormField label="Account">
+                <Select
+                  id="usage-account"
+                  aria-label="Usage account"
+                  value={account}
+                  onValueChange={(value) => {
+                    setAccount(value);
+                    setDate(null);
+                  }}
+                >
+                  <SelectItem value="all">All accounts</SelectItem>
+                  {[...accounts].map(([id, label]) => (
+                    <SelectItem key={id} value={id}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Project">
+                <Select
+                  id="usagedashboard-field-1"
+                  aria-label="Project"
+                  value={project}
+                  onValueChange={(value) => {
+                    setProject(value);
+                    setDate(null);
+                  }}
+                >
+                  <SelectItem value="all">All projects</SelectItem>
+                  {[...projectNames].map(([id, name]) => (
+                    <SelectItem key={id} value={id}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Period">
+                <Select
+                  id="usagedashboard-field-2"
+                  aria-label="Period"
+                  value={period}
+                  onValueChange={(value) => {
+                    setPeriod(value);
+                    setDate(null);
+                  }}
+                >
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
+                </Select>
+              </FormField>
+              <FormField label="Agent">
+                <Select
+                  id="usage-agent"
+                  value={agent}
+                  onValueChange={(value) => {
+                    setAgent(value);
+                    setDate(null);
+                  }}
+                >
+                  <SelectItem value="all">All agents</SelectItem>
+                  {[...new Set(entries.map((r) => r.agent))].sort().map((id) => (
+                    <SelectItem key={id} value={id}>
+                      {id}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Sort by">
+                <Select
+                  id="usagedashboard-field-3"
+                  aria-label="Sort by"
+                  value={sort}
+                  onValueChange={(value) => setSort(value)}
+                >
+                  <SelectItem value="tokens">Tokens used</SelectItem>
+                  <SelectItem value="project">Project</SelectItem>
+                  <SelectItem value="agent">Agent</SelectItem>
+                  <SelectItem value="model">Model</SelectItem>
+                  <SelectItem value="account">Account</SelectItem>
+                </Select>
+              </FormField>
+            </WorkspaceToolbar>
+            {!loading && !historyError && filtered.length > 0 && (
+              <UsageInsights
+                data={insights}
+                selectedDate={date}
+                scope={
+                  project === 'all' ? 'All projects' : (projectNames.get(project) ?? 'Project')
+                }
+                onProject={(id) => {
+                  setProject(id);
+                  setDate(null);
+                }}
+                onAgent={(id) => {
+                  setAgent(id);
+                  setDate(null);
+                }}
+                onDate={(value) => {
+                  setDate(value);
+                  setLedger('calls');
+                  requestAnimationFrame(() => document.getElementById('usage-ledger')?.focus());
+                }}
+              />
+            )}
+            {historyError && (
+              <InlineNotice
+                tone="error"
+                action={
+                  <Button variant="outline" onClick={() => void refresh()}>
+                    Reload history
+                  </Button>
+                }
+              >
+                Usage is unavailable because saved history could not be loaded. {historyError}
+              </InlineNotice>
+            )}
+          </section>
+          <section className="workspace-section workspace-stack" aria-label="Usage details">
+            {!loading && !historyError && filtered.length > 0 && (
+              <WorkspaceSectionHeading
+                titleId="usage-ledger"
+                title={date ? `Calls dated ${date}` : 'Explore the work'}
+                action={
+                  <div className="workspace-actions">
+                    {date && (
+                      <Button variant="outline" onClick={() => setDate(null)}>
+                        Clear date
+                      </Button>
+                    )}
+                    <FilterGroup
+                      label="Usage detail"
+                      value={ledger}
+                      onChange={(value) => {
+                        setLedger(value);
+                        if (value === 'tasks') setDate(null);
+                      }}
+                      items={[
+                        { id: 'tasks', label: 'Tasks' },
+                        { id: 'calls', label: 'Individual calls' },
+                      ]}
+                    />
+                  </div>
+                }
+              />
+            )}
+            {error && <InlineNotice tone="error">{error}</InlineNotice>}
+            {loading ? (
+              <p role="status">Loading usage…</p>
+            ) : historyError ? null : !sorted.length ? (
+              <EmptyState
+                icon={ChartNoAxesColumn}
+                title="No attempts in this view"
+                description="Usage appears when agents report it. Try another project or period, or start a task."
+                action={
+                  <Button variant="outline" onClick={onTask}>
+                    Go to tasks
+                  </Button>
+                }
+              />
+            ) : ledger === 'tasks' ? (
+              <Table
+                className="usage-ledger-table"
+                label="Task usage across attempts in the selected filters, with latest saved outcomes"
+              >
                 <thead>
                   <tr>
                     <th>Task / project</th>
@@ -476,12 +480,9 @@ export function UsageDashboard({
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="usage-table-scroll">
-              <table className="usage-table">
-                <caption className="sr-only">Usage for each execution attempt</caption>
+              </Table>
+            ) : (
+              <Table className="usage-ledger-table" label="Usage for each execution attempt">
                 <thead>
                   <tr>
                     <th>Task / project</th>
@@ -526,61 +527,74 @@ export function UsageDashboard({
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          )}
-          {!historyError && !loading && filtered.some((r) => r.usageObservations?.length) && (
-            <Disclosure className="my-6">
-              <DisclosureSummary>Message and subagent observations</DisclosureSummary>
-              <p className="task-muted">Partial observations; not added to the totals above.</p>
-              {filtered
-                .filter((r) => r.usageObservations?.length)
-                .map((r) => (
-                  <Disclosure key={r.usageKey} className="mt-4">
-                    <DisclosureSummary>
-                      {taskTitle(r.prompt)} · {r.usageObservations?.length} messages
-                    </DisclosureSummary>
-                    {r.usageObservations?.map((o) => (
-                      <p className="task-muted py-1" key={o.messageId}>
-                        {o.parentToolUseId ? `Child ${o.parentToolUseId}` : 'Main agent'} ·{' '}
-                        {o.model ?? 'Model unknown'} · {o.input.toLocaleString()} input /{' '}
-                        {o.output.toLocaleString()} output
-                      </p>
+              </Table>
+            )}
+            {!historyError && !loading && filtered.some((r) => r.usageObservations?.length) && (
+              <Disclosure>
+                <DisclosureSummary>Message and subagent observations</DisclosureSummary>
+                <DisclosureBody>
+                  <p className="task-muted">Partial observations; not added to the totals above.</p>
+                  {filtered
+                    .filter((r) => r.usageObservations?.length)
+                    .map((r) => (
+                      <Disclosure key={r.usageKey}>
+                        <DisclosureSummary>
+                          {taskTitle(r.prompt)} · {r.usageObservations?.length} messages
+                        </DisclosureSummary>
+                        <DisclosureBody>
+                          {r.usageObservations?.map((o) => (
+                            <p className="task-muted" key={o.messageId}>
+                              {o.parentToolUseId ? `Child ${o.parentToolUseId}` : 'Main agent'} ·{' '}
+                              {o.model ?? 'Model unknown'} · {o.input.toLocaleString()} input /{' '}
+                              {o.output.toLocaleString()} output
+                            </p>
+                          ))}
+                        </DisclosureBody>
+                      </Disclosure>
                     ))}
-                  </Disclosure>
-                ))}
-            </Disclosure>
-          )}
-        </>
+                </DisclosureBody>
+              </Disclosure>
+            )}
+          </section>
+        </div>
       )}
       {view === 'tokens' && (
-        <>
-          <Disclosure className="usage-measurement supporting-details">
+        <div className="workspace-sections">
+          <Disclosure className="usage-measurement">
             <DisclosureSummary>What these numbers include</DisclosureSummary>
-            <p>
-              Only loaded Jackalope task history is included. Archived, deleted or unreadable
-              history and work in other apps are excluded. Totals include routing failures,
-              quota-interrupted workers and continuation attempts. Unknown reports stay unavailable;
-              a partial total is only the known portion.
-            </p>
-            <p>
-              Input includes cached input; cache reads and message/subagent observations are not
-              added again. Reported tokens are not a provider invoice or subscription quota. Exact
-              tokens for prompts, coordination tools, verification and internal retries cannot be
-              split out of worker totals.
-            </p>
-            <p>
-              Opening this dashboard does not send a model prompt. Connected capacity is an
-              account-wide read and may include other apps; it is not added to task usage.
-            </p>
+            <DisclosureBody>
+              <p>
+                Only loaded Jackalope task history is included. Archived, deleted or unreadable
+                history and work in other apps are excluded. Totals include routing failures,
+                quota-interrupted workers and continuation attempts. Unknown reports stay
+                unavailable; a partial total is only the known portion.
+              </p>
+              <p>
+                Input includes cached input; cache reads and message/subagent observations are not
+                added again. Reported tokens are not a provider invoice or subscription quota. Exact
+                tokens for prompts, coordination tools, verification and internal retries cannot be
+                split out of worker totals.
+              </p>
+              <p>
+                Opening this dashboard does not send a model prompt. Connected capacity is an
+                account-wide read and may include other apps; it is not added to task usage.
+              </p>
+            </DisclosureBody>
           </Disclosure>
           {project === 'all' && agent === 'all' && account === 'all' && (
-            <section className="usage-app-activity" aria-label="Other app activity">
-              <WorkspaceSectionHeading title="Other app activity" />
-              <p className="task-muted">
-                Ask Jackalope · retained conversation, separate from task totals. These turns have
-                no saved dates or project links, so the period filter does not apply.
-              </p>
+            <section
+              className="usage-app-activity workspace-section workspace-stack"
+              aria-label="Other app activity"
+            >
+              <WorkspaceSectionHeading
+                title="Other app activity"
+                description="Ask Jackalope · retained conversation, separate from task totals. These turns have no saved dates or project links, so the period filter does not apply."
+                action={
+                  <Button variant="outline" onClick={() => void refreshHelper()}>
+                    Refresh helper history
+                  </Button>
+                }
+              />
               {helperLoading ? (
                 <p role="status">Loading helper history…</p>
               ) : helperError || helper.error ? (
@@ -588,23 +602,20 @@ export function UsageDashboard({
                   Helper usage could not be refreshed. {helperError ?? helper.error}
                 </InlineNotice>
               ) : (
-                <p>
+                <p className="task-muted">
                   {helper.turns.length ? tokenLabel(helperUsage.tokens) : 'No saved turns'}
                   {helper.turns.length > 0 &&
                     ` reported tokens · ${helperUsage.reported} of ${helperUsage.calls} turns reported usage`}
                 </p>
               )}
-              <Button variant="outline" onClick={() => void refreshHelper()}>
-                Refresh helper history
-              </Button>
               {helper.turns.length > 0 && !helperError && !helper.error && (
                 <Disclosure>
                   <DisclosureSummary>Inspect helper usage by turn</DisclosureSummary>
-                  <div className="usage-table-scroll">
-                    <table className="usage-table">
-                      <caption className="sr-only">
-                        Retained Ask Jackalope turns, not filtered by date
-                      </caption>
+                  <DisclosureBody>
+                    <Table
+                      className="usage-ledger-table"
+                      label="Retained Ask Jackalope turns, not filtered by date"
+                    >
                       <thead>
                         <tr>
                           <th>Turn</th>
@@ -630,13 +641,13 @@ export function UsageDashboard({
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
+                    </Table>
+                  </DisclosureBody>
                 </Disclosure>
               )}
             </section>
           )}
-        </>
+        </div>
       )}
     </WorkspacePage>
   );

@@ -19,3 +19,9 @@ export const DisclosureSummary = forwardRef<HTMLElement, ComponentPropsWithoutRe
   ),
 );
 DisclosureSummary.displayName = 'DisclosureSummary';
+export const DisclosureBody = forwardRef<HTMLDivElement, ComponentPropsWithoutRef<'div'>>(
+  ({ className, ...props }, ref) => (
+    <div {...props} ref={ref} className={cn('ui-disclosure-body', className)} />
+  ),
+);
+DisclosureBody.displayName = 'DisclosureBody';

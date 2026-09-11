@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn activity(run: &mut TaskRun, text: &str) {
+pub(in crate::commands) fn activity(run: &mut TaskRun, text: &str) {
     if text.trim().is_empty() {
         return;
     }
