@@ -51,7 +51,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         return;
     }
     let child = event["parent_tool_use_id"].as_str();
-    if adapter == "claude" && event["type"] == "assistant" {
+    if ["claude", "grok"].contains(&adapter) && event["type"] == "assistant" {
         let message = &event["message"];
         let usage = &message["usage"];
         if let Some(id) = message["id"].as_str().filter(|id| id.len() <= 200) {

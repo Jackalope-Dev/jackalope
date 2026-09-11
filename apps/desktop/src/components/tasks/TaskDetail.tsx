@@ -32,6 +32,7 @@ import {
 import { taskTitle } from '../../lib/task-title';
 import { latestAttempt, taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
+import { describeRunUsage } from '../../lib/usage-insights';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
@@ -730,9 +731,7 @@ export function TaskDetail({
                   </>
                 )}
                 Reported usage:{' '}
-                {run.usage.reported
-                  ? `${(run.usage.input + run.usage.output).toLocaleString()} tokens · ${run.usage.input.toLocaleString()} input · ${run.usage.output.toLocaleString()} output${run.accountBinding?.adapter === 'kimi' || run.agent === 'kimi' ? ' · Cache breakdown unavailable' : ` · ${run.usage.cacheRead.toLocaleString()} cached input (included)`}`
-                  : 'Unavailable for this attempt'}
+                {run.usage.reported ? describeRunUsage(run) : 'Unavailable for this attempt'}
               </p>
               {run.mcpUsage && (
                 <Disclosure className="my-3">

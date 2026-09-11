@@ -1,15 +1,5 @@
 import { IconButton, RefreshIcon } from '@jackalope/ui';
-import {
-  Archive,
-  Check,
-  Copy,
-  FolderGit2,
-  GitBranch,
-  GitMerge,
-  Lock,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { Archive, Copy, FolderGit2, GitBranch, GitMerge, Lock, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   archiveWorktree,
@@ -220,12 +210,15 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )
         }
       />
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {error && (
+        <InlineNotice tone="error" className="worktree-notice">
+          {error}
+        </InlineNotice>
+      )}
       <div role="status">
         {feedback && (
-          <InlineNotice>
-            <Check size={16} aria-hidden="true" />
-            <span className="break-all">{feedback}</span>
+          <InlineNotice tone="success" className="worktree-notice break-all">
+            {feedback}
           </InlineNotice>
         )}
       </div>

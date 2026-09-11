@@ -22,8 +22,11 @@ pub struct CleanupStatus {
     pub recoverable: bool,
     #[serde(default)]
     pub missing: bool,
+    /// Ignored paths (build output, dependencies, tool caches) cleanup deletes
+    /// along with the worktree. Anything holding secrets or local data blocks
+    /// instead, through `blocked_reason`.
     #[serde(default)]
-    pub generated_paths: Vec<String>,
+    pub discarded_paths: Vec<String>,
     #[serde(default)]
     pub content_merged: bool,
 }
@@ -170,7 +173,8 @@ fn hard_block(
 
 struct LocalContent {
     changes: bool,
-    generated_paths: Vec<String>,
+    /// Ignored paths cleanup will delete, exactly as Git reported them.
+    discarded_paths: Vec<String>,
     preserved_path: Option<String>,
 }
 
@@ -185,9 +189,9 @@ fn is_link(metadata: &std::fs::Metadata) -> bool {
     metadata.file_type().is_symlink()
 }
 
-// Only ignored output folders with an adjacent project manifest are disposable.
-// Broad ignores such as output/, scratch/ and *.local are never evidence of this.
-fn generated_ignored_path(root: &Path, name: &str) -> Option<String> {
+/// Resolve one path Git reported as ignored into a location inside `root`.
+/// `None` means the entry is not a plain relative path and must never be touched.
+fn ignored_location(root: &Path, name: &str) -> Option<PathBuf> {
     let relative = Path::new(name.trim_end_matches('/'));
     if relative.as_os_str().is_empty()
         || relative
@@ -196,76 +200,87 @@ fn generated_ignored_path(root: &Path, name: &str) -> Option<String> {
     {
         return None;
     }
-    for candidate in relative
-        .ancestors()
-        .filter(|path| !path.as_os_str().is_empty())
-    {
-        let manifest = match candidate.file_name().and_then(|value| value.to_str()) {
-            Some("node_modules" | ".pnpm-store" | "dist" | "dist-ssr" | "dist-lab") => {
-                "package.json"
-            }
-            Some("target") => "Cargo.toml",
-            _ => continue,
-        };
-        let path = root.join(candidate);
-        let metadata = std::fs::symlink_metadata(&path).ok()?;
-        if !metadata.is_dir() || is_link(&metadata) {
-            return None;
-        }
-        if path.parent()?.join(manifest).is_file() {
-            return Some(format!("{}/", candidate.to_string_lossy()));
-        }
-    }
-    None
+    Some(root.join(relative))
 }
 
-fn preserved_generated_content(root: &Path, name: &str) -> Result<Option<String>, String> {
-    let mut directories = vec![root.join(name)];
-    let mut inspected = 0usize;
+/// Names that carry secrets or local data rather than regenerable output. Ignored
+/// content matching these is never deleted; the worktree is kept until it moves out.
+fn sensitive_name(filename: &str) -> bool {
+    let filename = filename.to_ascii_lowercase();
+    matches!(
+        filename.as_str(),
+        ".git"
+            | ".env"
+            | ".envrc"
+            | ".npmrc"
+            | ".netrc"
+            | ".pypirc"
+            | ".dev.vars"
+            | "credentials"
+            | "credentials.toml"
+    ) || filename.starts_with(".env.")
+        || filename.starts_with(".dev.vars.")
+        || [
+            ".key",
+            ".pem",
+            ".p12",
+            ".pfx",
+            ".keystore",
+            ".db",
+            ".sqlite",
+            ".sqlite3",
+        ]
+        .iter()
+        .any(|suffix| filename.ends_with(suffix))
+}
+
+/// Walk one ignored path for content that must be preserved, returning the first
+/// offending path relative to the worktree root. Links are never followed: they are
+/// removed as links, so nothing outside the worktree is inspected or deleted.
+fn preserved_content(
+    root: &Path,
+    start: &Path,
+    budget: &mut usize,
+) -> Result<Option<String>, String> {
+    let relative = |path: &Path| -> Result<String, String> {
+        Ok(path
+            .strip_prefix(root)
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .into_owned())
+    };
+    let metadata = match std::fs::symlink_metadata(start) {
+        Ok(metadata) => metadata,
+        // Git listed it a moment ago; if it is already gone there is nothing to keep.
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.to_string()),
+    };
+    if is_link(&metadata) {
+        return Ok(None);
+    }
+    if !metadata.is_dir() {
+        let name = start
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        return if sensitive_name(&name) {
+            Ok(Some(relative(start)?))
+        } else {
+            Ok(None)
+        };
+    }
+    let mut directories = vec![start.to_path_buf()];
     while let Some(directory) = directories.pop() {
         for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
-            inspected += 1;
-            if inspected > 200_000 {
+            *budget = budget.saturating_sub(1);
+            if *budget == 0 {
                 return Err(
-                    "Generated folder is too large to inspect safely; review it manually.".into(),
+                    "Ignored content is too large to inspect safely; review it manually.".into(),
                 );
             }
-            let filename = entry.file_name().to_string_lossy().to_ascii_lowercase();
-            if matches!(
-                filename.as_str(),
-                ".git"
-                    | ".env"
-                    | ".envrc"
-                    | ".npmrc"
-                    | ".netrc"
-                    | ".pypirc"
-                    | ".dev.vars"
-                    | "credentials"
-                    | "credentials.toml"
-            ) || filename.starts_with(".env.")
-                || filename.starts_with(".dev.vars.")
-                || [
-                    ".key",
-                    ".pem",
-                    ".p12",
-                    ".pfx",
-                    ".keystore",
-                    ".db",
-                    ".sqlite",
-                    ".sqlite3",
-                ]
-                .iter()
-                .any(|suffix| filename.ends_with(suffix))
-            {
-                return Ok(Some(
-                    entry
-                        .path()
-                        .strip_prefix(root)
-                        .map_err(|e| e.to_string())?
-                        .to_string_lossy()
-                        .into_owned(),
-                ));
+            if sensitive_name(&entry.file_name().to_string_lossy()) {
+                return Ok(Some(relative(&entry.path())?));
             }
             // Dependency links are removed as links; never follow them outside the worktree.
             let metadata = std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
@@ -302,22 +317,24 @@ fn local_content(path: &Path) -> Result<LocalContent, String> {
     )?;
     let mut content = LocalContent {
         changes: !status.is_empty(),
-        generated_paths: Vec::new(),
+        discarded_paths: Vec::new(),
         preserved_path: None,
     };
+    let mut budget = 200_000usize;
     for name in ignored.split('\0').filter(|name| !name.is_empty()) {
-        if let Some(generated) = generated_ignored_path(path, name) {
-            if content.generated_paths.contains(&generated) {
-                continue;
-            }
-            if let Some(preserved) = preserved_generated_content(path, &generated)? {
+        if content.discarded_paths.iter().any(|seen| seen == name) {
+            continue;
+        }
+        let Some(location) = ignored_location(path, name) else {
+            content.preserved_path = Some(name.to_owned());
+            break;
+        };
+        match preserved_content(path, &location, &mut budget)? {
+            Some(preserved) => {
                 content.preserved_path = Some(preserved);
                 break;
             }
-            content.generated_paths.push(generated);
-        } else {
-            content.preserved_path = Some(name.to_owned());
-            break;
+            None => content.discarded_paths.push(name.to_owned()),
         }
     }
     Ok(content)
@@ -424,7 +441,7 @@ fn inspect_entries(
             merged: None,
             blocked_reason: None,
             recoverable: false,
-            generated_paths: Vec::new(),
+            discarded_paths: Vec::new(),
             content_merged: false,
             missing: Path::new(&entries[index].path)
                 .try_exists()
@@ -452,10 +469,10 @@ fn inspect_entries(
             Err(reason) => status.blocked_reason = Some(reason),
             Ok(()) => match canonical(&entries[index].path).and_then(|path| local_content(&path)) {
                 Ok(content) => {
-                    status.generated_paths = content.generated_paths;
+                    status.discarded_paths = content.discarded_paths;
                     if let Some(name) = content.preserved_path {
                         status.blocked_reason = Some(format!(
-                            "Local ignored content needs preserving: {name}. Move it out before cleanup or archiving; ignored files are not archived."
+                            "Ignored content holds secrets or local data: {name}. Move it out before cleanup or archiving; ignored files are not archived."
                         ));
                     } else if content.changes {
                         status.blocked_reason = Some(
@@ -529,15 +546,24 @@ pub(super) fn remove(
         );
     }
     let root = canonical(worktree_path)?;
-    for generated in &status.generated_paths {
-        let path = root.join(generated);
-        if !path.starts_with(&root)
-            || path == root
-            || is_link(&std::fs::symlink_metadata(&path).map_err(|e| e.to_string())?)
-        {
-            return Err("Generated folder changed. Refresh before cleanup.".into());
-        }
-        std::fs::remove_dir_all(&path).map_err(|e| format!("Cannot remove generated folder {}: {e}. Close terminals, development servers or file viewers using this folder, then retry. Other worktrees can still be cleaned.", path.display()))?;
+    for discarded in &status.discarded_paths {
+        let path = ignored_location(&root, discarded)
+            .filter(|path| path.starts_with(&root) && path != &root)
+            .ok_or("Ignored path changed. Refresh before cleanup.")?;
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        };
+        // A link is unlinked, never followed, so its target keeps its content.
+        let removed = if is_link(&metadata) {
+            std::fs::remove_file(&path).or_else(|_| std::fs::remove_dir(&path))
+        } else if metadata.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+        removed.map_err(|e| format!("Cannot remove ignored path {}: {e}. Close terminals, development servers or file viewers using this folder, then retry. Other worktrees can still be cleaned.", path.display()))?;
     }
     // Recheck after potentially slow dependency removal, before permitting dirty removal.
     let checked = inspect_entries(repo_path, Some(target_branch), runs, Some(worktree_path))?;

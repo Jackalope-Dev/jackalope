@@ -22,6 +22,9 @@ export function summarizeUsage(items: { usage: RunUsage }[]) {
   const reported = items.filter((r) => r.usage.reported);
   const input = reported.reduce((sum, r) => sum + r.usage.input, 0);
   const output = reported.reduce((sum, r) => sum + r.usage.output, 0);
+  const cacheRead = reported.reduce((sum, r) => sum + r.usage.cacheRead, 0);
+  const cacheWrite = reported.reduce((sum, r) => sum + r.usage.cacheWrite, 0);
+  const priced = reported.filter((r) => typeof r.usage.estimatedCostUsd === 'number');
   return {
     calls: items.length,
     reported: reported.length,
@@ -29,8 +32,47 @@ export function summarizeUsage(items: { usage: RunUsage }[]) {
     input,
     output,
     tokens: reported.length ? input + output : items.length ? null : 0,
-    cacheRead: reported.reduce((sum, r) => sum + r.usage.cacheRead, 0),
+    cacheRead,
+    cacheWrite,
+    // Cached and cache-write tokens are already inside `input`. They are the same context
+    // re-sent on later model calls, so only the remainder is context the provider read as new.
+    freshInput: reported.length
+      ? Math.max(0, input - cacheRead - cacheWrite)
+      : items.length
+        ? null
+        : 0,
+    costUsd: priced.length
+      ? priced.reduce((sum, r) => sum + (r.usage.estimatedCostUsd ?? 0), 0)
+      : null,
+    costMissing: reported.length - priced.length,
   };
+}
+
+/**
+ * Cumulative prompt tokens re-count the whole conversation on every model call, so they
+ * scale with turn count rather than work done. Lead with the figures that do not.
+ */
+export function describeRunUsage(run: TaskRun) {
+  const { usage } = run;
+  const cacheless = run.accountBinding?.adapter === 'kimi' || run.agent === 'kimi';
+  const calls = run.usageObservations?.length ?? 0;
+  const parts: string[] = [];
+  if (typeof usage.estimatedCostUsd === 'number') {
+    parts.push(`$${usage.estimatedCostUsd.toFixed(2)} reported cost`);
+  }
+  parts.push(
+    cacheless
+      ? `${usage.input.toLocaleString()} input · cache breakdown unavailable`
+      : `${Math.max(0, usage.input - usage.cacheRead - usage.cacheWrite).toLocaleString()} new context · ${usage.cacheRead.toLocaleString()} cached re-reads`,
+  );
+  parts.push(`${usage.output.toLocaleString()} output`);
+  if (calls) {
+    parts.push(
+      `${calls.toLocaleString()} model calls · ${Math.round(usage.input / calls).toLocaleString()} avg context`,
+    );
+  }
+  parts.push(`${(usage.input + usage.output).toLocaleString()} cumulative tokens`);
+  return parts.join(' · ');
 }
 export function usageInsights(
   entries: UsageEntry[],
