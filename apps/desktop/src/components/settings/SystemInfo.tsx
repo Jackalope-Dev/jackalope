@@ -60,9 +60,11 @@ export function SystemInfoView() {
             variant="outline"
             disabled={!desktop || loading || requestingPermissions}
             onClick={() => void load()}
+            loading={loading}
+            loadingLabel="Reading…"
           >
             <RefreshIcon size={16} />
-            {loading ? 'Reading…' : 'Refresh device'}
+            Refresh device
           </Button>
         }
       />
@@ -92,12 +94,12 @@ export function SystemInfoView() {
                       variant="outline"
                       disabled={requestingPermissions || loading}
                       onClick={() => void requestPermissions()}
+                      loading={requestingPermissions}
+                      loadingLabel="Setting up…"
                     >
-                      {requestingPermissions
-                        ? 'Setting up…'
-                        : host.os === 'linux'
-                          ? 'Install GNOME window control'
-                          : 'Set up macOS permissions'}
+                      {host.os === 'linux'
+                        ? 'Install GNOME window control'
+                        : 'Set up macOS permissions'}
                     </Button>
                   )}
               </div>

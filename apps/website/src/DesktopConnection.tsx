@@ -422,7 +422,7 @@ export function ConnectedDesktops() {
                   confirm === device.id ? void revoke(device.id) : setConfirm(device.id)
                 }
                 loading={busy === device.id}
-                loadingLabel={'Disconnecting…'}
+                loadingLabel="Disconnecting…"
               >
                 {confirm === device.id ? 'Confirm disconnect' : 'Disconnect'}
               </Button>

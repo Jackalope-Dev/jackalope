@@ -53,8 +53,10 @@ export function WorkspaceReadiness({
               setBusy(false);
             }
           }}
+          loading={busy}
+          loadingLabel="Inspecting…"
         >
-          {busy ? 'Inspecting…' : 'Inspect workspace setup'}
+          Inspect workspace setup
         </Button>
         {result && (
           <>

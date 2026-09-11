@@ -86,8 +86,13 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
             access to the history folder, then retry. Source files stay in the task workspace.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => void recover(false)}>
-              {busy ? 'Working…' : 'Retry saving'}
+            <Button
+              disabled={busy}
+              onClick={() => void recover(false)}
+              loading={busy}
+              loadingLabel="Working…"
+            >
+              Retry saving
             </Button>
             <Button variant="outline" disabled={busy} onClick={() => void recover(true)}>
               Save recovery copy…

@@ -201,8 +201,8 @@ export function AddWork({
             </fieldset>
           )}
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
-          <Button type="submit" disabled={busy} loading={busy} loadingLabel={'Adding…'}>
-            {'Add to plan'}
+          <Button type="submit" disabled={busy} loading={busy} loadingLabel="Adding…">
+            Add to plan
             <Plus size={15} />
           </Button>
         </form>

@@ -171,8 +171,10 @@ export function WaitlistPage() {
               disabled={busy}
               onClick={() => void verify()}
               type="button"
+              loading={busy}
+              loadingLabel="Confirming…"
             >
-              {busy ? 'Confirming…' : 'Confirm email & see my place'}
+              Confirm email &amp; see my place
               <ArrowRight size={18} />
             </Button>
             <Button
@@ -355,7 +357,7 @@ export function WaitlistPage() {
                 type="submit"
                 disabled={busy}
                 loading={busy}
-                loadingLabel={'Sending…'}
+                loadingLabel="Sending…"
               >
                 {sent ? 'Send a fresh link' : 'Email my private link'}
                 <MailIcon size={20} />

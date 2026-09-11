@@ -133,9 +133,9 @@ export function AccessPasses({
               type="submit"
               disabled={busy || !available}
               loading={busy}
-              loadingLabel={'Sending…'}
+              loadingLabel="Sending…"
             >
-              {'Send a pass'}
+              Send a pass
               <ArrowRight size={17} />
             </Button>
           </form>

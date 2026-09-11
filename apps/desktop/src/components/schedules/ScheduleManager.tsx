@@ -747,9 +747,9 @@ export function ScheduleManager(props: {
                         (!agent || (agent !== 'auto' && !isAgentAllowedForProject(project, agent))))
                     }
                     loading={busy}
-                    loadingLabel={'Saving…'}
+                    loadingLabel="Saving…"
                   >
-                    {'Save schedule'}
+                    Save schedule
                   </Button>
                 </div>
                 <p className="task-muted text-xs">

@@ -456,9 +456,9 @@ export function CaptureTask({
             disabled={!desktop || discovering}
             onClick={() => void discover()}
             loading={discovering}
-            loadingLabel={'Checking…'}
+            loadingLabel="Checking…"
           >
-            {'Refresh agents'}
+            Refresh agents
           </Button>
         </div>
       )}

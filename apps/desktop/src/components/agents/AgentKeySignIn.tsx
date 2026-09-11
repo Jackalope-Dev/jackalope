@@ -145,9 +145,9 @@ export function AgentKeySignIn({
                 type="submit"
                 disabled={busy || !key.trim()}
                 loading={busy}
-                loadingLabel={'Saving…'}
+                loadingLabel="Saving…"
               >
-                {'Connect account'}
+                Connect account
               </Button>
             </div>
           </form>

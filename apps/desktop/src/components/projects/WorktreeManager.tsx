@@ -318,10 +318,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   type="submit"
                   disabled={pending || !slug.trim() || !branchName.trim()}
                   loading={busy}
-                  loadingLabel={'Creating…'}
+                  loadingLabel="Creating…"
                 >
                   <GitBranch size={18} />
-                  {'Create worktree'}
+                  Create worktree
                 </Button>
               </div>
             </form>
@@ -387,10 +387,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                       aria-label={`Remove worktree ${wt.branch || wt.path}`}
                       onClick={() => void cleanup(wt)}
                       loading={removing === wt.path}
-                      loadingLabel={'Removing…'}
+                      loadingLabel="Removing…"
                     >
                       <Trash2 size={18} aria-hidden="true" />
-                      {'Remove worktree & branch'}
+                      Remove worktree &amp; branch
                     </Button>
                   )}
                 {wt.cleanup?.recoverable && (
@@ -406,10 +406,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         disabled={refreshing || pending || !desktop}
                         aria-label={`Archive and remove ${wt.branch || wt.path}`}
                         loading={removing === wt.path}
-                        loadingLabel={'Archiving…'}
+                        loadingLabel="Archiving…"
                       >
                         <Archive size={18} aria-hidden="true" />
-                        {'Archive & remove'}
+                        Archive &amp; remove
                       </Button>
                     }
                   />

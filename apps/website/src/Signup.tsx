@@ -3,7 +3,7 @@ import { accessMessage, accessOrigin, accessRequest } from './access-api';
 import { waitlistReferral } from './referral';
 import './access.css';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, Check, LoaderCircle, X } from 'lucide-react';
+import { ArrowRight, Check, X } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { BrandMark } from './BrandMark';
 import { signupActions } from './signup-config';
@@ -139,14 +139,11 @@ export function Signup({ popup = false }: { popup?: boolean }) {
             <Button
               className="button button-primary button-download"
               type="submit"
-              disabled={state === 'sending'}
+              loading={state === 'sending'}
+              loadingLabel="Joining…"
             >
-              <span>{state === 'sending' ? 'Joining…' : 'Join the waitlist'}</span>
-              {state === 'sending' ? (
-                <LoaderCircle className="signup-spinner" size={17} />
-              ) : (
-                <ArrowRight size={17} />
-              )}
+              <span>Join the waitlist</span>
+              <ArrowRight size={16} />
             </Button>
           </div>
           <p id={`${id}-consent`} className="signup-consent">

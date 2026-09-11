@@ -133,9 +133,9 @@ export function WaitlistQuestions({
               className="button button-primary"
               disabled={state === 'saving'}
               loading={state === 'saving'}
-              loadingLabel={'Saving…'}
+              loadingLabel="Saving…"
             >
-              {'Save my answers'} <Check size={16} />
+              Save my answers <Check size={16} />
             </Button>
             {answers && (
               <Button
@@ -247,9 +247,9 @@ export function WaitlistPreferences({ token }: { token: string }) {
               className="button button-primary"
               disabled={state === 'saving'}
               loading={state === 'saving'}
-              loadingLabel={'Saving…'}
+              loadingLabel="Saving…"
             >
-              {'Save preferences'} <Check size={16} />
+              Save preferences <Check size={16} />
             </Button>
             <Button
               variant="ghost"

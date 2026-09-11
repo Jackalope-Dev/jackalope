@@ -179,7 +179,7 @@ export function MergeReview({
             disabled={busy || !chosen.length}
             onClick={() => void prepare()}
             loading={busy}
-            loadingLabel={'Preparing…'}
+            loadingLabel="Preparing…"
           >
             {`Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
             <GitMerge size={15} />
@@ -304,10 +304,13 @@ export function MergeReview({
                 />
                 Remove completed worktrees and local branches after merging
               </label>
-              <Button disabled={busy} onClick={() => void apply()}>
-                {busy
-                  ? 'Integrating…'
-                  : `Merge ${plan.runIds.length} ${plan.runIds.length === 1 ? 'task' : 'tasks'} into ${plan.targetBranch}`}
+              <Button
+                disabled={busy}
+                onClick={() => void apply()}
+                loading={busy}
+                loadingLabel="Integrating…"
+              >
+                {`Merge ${plan.runIds.length} ${plan.runIds.length === 1 ? 'task' : 'tasks'} into ${plan.targetBranch}`}
                 <GitMerge size={15} />
               </Button>
             </div>

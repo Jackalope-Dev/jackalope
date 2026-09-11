@@ -372,6 +372,7 @@ function Gallery() {
             label="Copy example"
             resetAfterMs={0}
             copy={async (value) => {
+              await new Promise((resolve) => setTimeout(resolve, 650));
               if (failCopy) throw new Error('Clipboard unavailable');
               setClipboard(value);
             }}

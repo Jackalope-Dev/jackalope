@@ -35,8 +35,14 @@ export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
   };
   return (
     <section className="mt-5">
-      <Button variant="outline" disabled={busy || !files.length} onClick={() => void scan()}>
-        {busy ? 'Tracing references…' : 'Check affected files'}
+      <Button
+        variant="outline"
+        disabled={busy || !files.length}
+        onClick={() => void scan()}
+        loading={busy}
+        loadingLabel="Tracing references…"
+      >
+        Check affected files
       </Button>
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {affected && (

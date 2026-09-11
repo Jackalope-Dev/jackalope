@@ -1259,14 +1259,6 @@ fieldset {
   font-size: 13px;
   color: var(--color-text-secondary);
 }
-.signup-spinner {
-  animation: signup-spin 1s linear infinite;
-}
-@keyframes signup-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 .waitlist-dialog {
   width: min(570px, calc(100vw - 48px));
   padding: 0;
@@ -1690,8 +1682,5 @@ fieldset {
   }
   .wordmark:where(:hover, :focus-visible) svg {
     transform: none;
-  }
-  .signup-spinner {
-    animation: none;
   }
 }

@@ -532,9 +532,9 @@ export function AccessPage() {
                   type="button"
                   onClick={accept}
                   loading={busy}
-                  loadingLabel={'Opening…'}
+                  loadingLabel="Opening…"
                 >
-                  {'Continue to Jackalope'} <ArrowRight size={18} />
+                  Continue to Jackalope <ArrowRight size={18} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -624,9 +624,9 @@ export function AccessPage() {
                   type="submit"
                   disabled={busy}
                   loading={busy}
-                  loadingLabel={'Sending…'}
+                  loadingLabel="Sending…"
                 >
-                  {'Send sign-in link'} <ArrowRight size={17} />
+                  Send sign-in link <ArrowRight size={17} />
                 </Button>
               </form>
               {invite && (

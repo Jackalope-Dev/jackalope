@@ -250,9 +250,9 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
           <Button
             disabled={!desktop || searching || query.trim().length < 2}
             loading={searching}
-            loadingLabel={'Searching…'}
+            loadingLabel="Searching…"
           >
-            {'Search'}
+            Search
           </Button>
         </form>
 

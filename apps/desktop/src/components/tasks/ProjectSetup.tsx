@@ -129,9 +129,9 @@ export function ProjectSetup({ open, onClose }: { open: boolean; onClose: () => 
               type="submit"
               disabled={!desktop || !path.trim() || busy}
               loading={busy}
-              loadingLabel={'Checking repository…'}
+              loadingLabel="Checking repository…"
             >
-              {'Continue setup'}
+              Continue setup
               <ArrowRight size={15} />
             </Button>
           </DialogFooter>

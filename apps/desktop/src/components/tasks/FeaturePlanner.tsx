@@ -446,7 +446,7 @@ export function FeaturePlanner({
                 })
               }
               loading={busy}
-              loadingLabel={'Saving…'}
+              loadingLabel="Saving…"
             >
               {draft.added ? 'Open saved plan' : 'Add reviewed plan, paused'}
             </Button>

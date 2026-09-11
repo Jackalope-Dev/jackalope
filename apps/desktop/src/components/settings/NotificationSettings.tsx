@@ -51,9 +51,9 @@ export function NotificationSettings() {
             disabled={busy}
             onClick={() => void test()}
             loading={busy}
-            loadingLabel={'Sending…'}
+            loadingLabel="Sending…"
           >
-            {'Send test notification'}
+            Send test notification
           </Button>
         )}
         {(error || status?.error) && (

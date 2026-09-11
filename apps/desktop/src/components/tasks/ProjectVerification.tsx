@@ -45,9 +45,9 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
             disabled={busy}
             onClick={() => void verify()}
             loading={busy}
-            loadingLabel={'Checking…'}
+            loadingLabel="Checking…"
           >
-            {'Run checks'}
+            Run checks
           </Button>
         )}
       </div>

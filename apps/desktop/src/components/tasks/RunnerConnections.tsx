@@ -133,20 +133,20 @@ export function RunnerConnections({
               }}
               title="Reads each signed-in agent's account identity and remaining capacity."
               loading={capacity.loading}
-              loadingLabel={'Checking…'}
+              loadingLabel="Checking…"
             >
               <RefreshIcon size={16} />
-              {'Check accounts'}
+              Check accounts
             </Button>
             <Button
               variant="ghost"
               disabled={!desktop || checking || discovering}
               onClick={() => void checkAgents()}
               loading={checking || discovering}
-              loadingLabel={'Checking…'}
+              loadingLabel="Checking…"
             >
               <RefreshIcon size={16} />
-              {'Check agents'}
+              Check agents
             </Button>
           </div>
         </div>

@@ -137,9 +137,9 @@ function EditAccount({
               type="submit"
               disabled={busy || !name.trim()}
               loading={busy}
-              loadingLabel={'Saving…'}
+              loadingLabel="Saving…"
             >
-              {'Save account'}
+              Save account
             </Button>
           </DialogFooter>
         </form>
@@ -274,7 +274,7 @@ export function AgentAccounts({
           aria-label={`New ${agentName} account name`}
           maxLength={80}
         />
-        <Button type="submit" disabled={locked} loading={busy === 'add'} loadingLabel={'Adding…'}>
+        <Button type="submit" disabled={locked} loading={busy === 'add'} loadingLabel="Adding…">
           <Plus size={16} />
           {keyAccount ? 'Add account & connect' : 'Add account & sign in'}
         </Button>

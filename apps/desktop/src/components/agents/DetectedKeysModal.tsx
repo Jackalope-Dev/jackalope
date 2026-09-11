@@ -1,16 +1,6 @@
 import { Checkbox, RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import {
-  Check,
-  CheckCircle2,
-  Cpu,
-  KeyRound,
-  Loader2,
-  Server,
-  ShieldCheck,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { Check, CheckCircle2, Cpu, KeyRound, Server, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
   type DetectedKey,
@@ -320,18 +310,11 @@ export function DetectedKeysModal({
               onClick={() => void handleImport()}
               disabled={selectedKeys.size === 0 || importing}
               className="flex items-center gap-2"
+              loading={importing}
+              loadingLabel="Importing…"
             >
-              {importing ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={14} />
-                  Import Selected ({selectedKeys.size})
-                </>
-              )}
+              <Sparkles size={14} />
+              Import Selected ({selectedKeys.size})
             </Button>
           </div>
         </Dialog.Content>

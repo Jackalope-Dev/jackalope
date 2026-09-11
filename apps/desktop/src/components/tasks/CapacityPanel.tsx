@@ -60,10 +60,10 @@ export function CapacityPanel() {
             onClick={refresh}
             disabled={loading || now < nextRefresh || !isTauriEnvironment()}
             loading={loading}
-            loadingLabel={'Checking…'}
+            loadingLabel="Checking…"
           >
             <RefreshIcon size={16} />
-            {'Refresh capacity'}
+            Refresh capacity
           </Button>
         }
       />

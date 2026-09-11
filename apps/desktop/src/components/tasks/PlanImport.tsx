@@ -375,7 +375,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
             disabled={busy || !text.trim()}
             onClick={preview ? () => void add() : review}
             loading={busy}
-            loadingLabel={'Adding…'}
+            loadingLabel="Adding…"
           >
             {added ? 'Refresh queue' : preview ? `Add ${preview.length} tasks` : 'Review plan'}
             <ArrowRight size={14} />

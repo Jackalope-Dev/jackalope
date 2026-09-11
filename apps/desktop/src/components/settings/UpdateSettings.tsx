@@ -81,9 +81,9 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
             disabled={busy}
             onClick={() => void update.check()}
             loading={update.checking}
-            loadingLabel={'Checking…'}
+            loadingLabel="Checking…"
           >
-            {'Check for updates'}
+            Check for updates
           </Button>
           {update.lastChecked !== null &&
             !update.checking &&
@@ -107,14 +107,19 @@ export function UpdateSettings({ showHeading = true }: { showHeading?: boolean }
               Finish active tasks, resolve interrupted work and save task history to install.
             </p>
           )}
-          <Button disabled={busy || blocked} onClick={() => void update.install()}>
-            {update.installing
-              ? progress?.phase === 'installing'
+          <Button
+            disabled={busy || blocked}
+            onClick={() => void update.install()}
+            loading={update.installing}
+            loadingLabel={
+              progress?.phase === 'installing'
                 ? 'Installing and reopening…'
                 : percent === null
                   ? 'Downloading update…'
                   : `Downloading update… ${percent}%`
-              : 'Install and restart'}
+            }
+          >
+            Install and restart
           </Button>
           {update.installing && (
             <p className="settings-row-description" role="status">

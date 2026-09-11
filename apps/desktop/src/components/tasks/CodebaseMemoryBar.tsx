@@ -47,9 +47,11 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
             variant="ghost"
             disabled={busy || !isTauriEnvironment()}
             onClick={() => void refresh()}
+            loading={busy}
+            loadingLabel="Reading…"
           >
             <RefreshIcon size={16} />
-            {busy ? 'Reading…' : 'Refresh context'}
+            Refresh context
           </Button>
         }
       />

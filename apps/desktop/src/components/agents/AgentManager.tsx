@@ -62,10 +62,10 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
               onClick={() => void save()}
               disabled={!desktop || busy || discovering}
               loading={busy || discovering}
-              loadingLabel={'Checking…'}
+              loadingLabel="Checking…"
             >
               <RefreshIcon size={16} />
-              {'Save & check agents'}
+              Save &amp; check agents
             </Button>
             <Button type="button" variant="ghost" onClick={() => setAdding(!adding)}>
               <Plus size={15} />

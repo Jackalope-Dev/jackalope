@@ -168,7 +168,7 @@ export function KnowledgeEditor({
               type="submit"
               disabled={busy || bytes > limit}
               loading={busy}
-              loadingLabel={'Saving…'}
+              loadingLabel="Saving…"
             >
               {memory ? 'Save lesson' : 'Save workflow'}
             </Button>

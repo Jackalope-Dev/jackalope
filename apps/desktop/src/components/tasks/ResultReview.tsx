@@ -37,8 +37,15 @@ export function ResultReview({ run }: { run: TaskRun }) {
           <FileDiff size={16} />
           Workspace changes
         </h3>
-        <Button variant="ghost" size="sm" disabled={loading} onClick={() => void load()}>
-          {loading ? 'Reading…' : review ? 'Refresh changes' : 'Inspect changes'}
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={loading}
+          onClick={() => void load()}
+          loading={loading}
+          loadingLabel="Reading…"
+        >
+          {review ? 'Refresh changes' : 'Inspect changes'}
         </Button>
       </div>
       {error && (

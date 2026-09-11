@@ -278,15 +278,14 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
                 Export
               </Button>
             )}
-            <Button onClick={() => void scan()} disabled={busy || !isTauriEnvironment()}>
+            <Button
+              onClick={() => void scan()}
+              disabled={busy || !isTauriEnvironment()}
+              loading={busy}
+              loadingLabel="Analyzing…"
+            >
               <RefreshIcon size={16} />
-              {busy
-                ? 'Analyzing…'
-                : stale
-                  ? 'Update map'
-                  : snapshot
-                    ? 'Refresh map'
-                    : 'Analyze repository'}
+              {stale ? 'Update map' : snapshot ? 'Refresh map' : 'Analyze repository'}
             </Button>
           </div>
         }

@@ -144,9 +144,9 @@ export function JackalopeAccount({
             disabled={busy}
             onClick={() => void act('app_account_connect')}
             loading={busy}
-            loadingLabel={'Connecting…'}
+            loadingLabel="Connecting…"
           >
-            {'Connect account'}
+            Connect account
             {welcome && !busy && <ExternalLinkIcon size={20} aria-hidden="true" />}
           </Button>
         )}
@@ -179,9 +179,9 @@ export function JackalopeAccount({
               disabled={busy}
               onClick={() => void act('app_account_disconnect')}
               loading={busy}
-              loadingLabel={'Disconnecting…'}
+              loadingLabel="Disconnecting…"
             >
-              {'Disconnect this desktop'}
+              Disconnect this desktop
             </Button>
           </>
         )}

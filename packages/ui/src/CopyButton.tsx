@@ -67,7 +67,7 @@ export function CopyButton({
         variant="ghost"
         {...props}
         disabled={busy || props.disabled}
-        loading={busy || props.loading}
+        loading={busy || props.loading === true}
         loadingLabel={props.loadingLabel ?? 'Copying…'}
         onClick={() => void handleCopy()}
       >

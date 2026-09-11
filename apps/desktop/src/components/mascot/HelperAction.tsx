@@ -275,7 +275,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
               disabled={busy}
               onClick={() => void apply()}
               loading={busy}
-              loadingLabel={'Applying…'}
+              loadingLabel="Applying…"
             >
               {preview
                 ? 'Keep theme'

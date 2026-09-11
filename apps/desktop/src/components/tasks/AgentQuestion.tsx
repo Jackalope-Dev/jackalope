@@ -166,10 +166,10 @@ export function AgentQuestion({
               type="submit"
               disabled={sending || !hasResponse}
               loading={sending}
-              loadingLabel={'Sending…'}
+              loadingLabel="Sending…"
             >
               <Send size={16} aria-hidden="true" />
-              {'Send response'}
+              Send response
             </Button>
           </div>
         </form>

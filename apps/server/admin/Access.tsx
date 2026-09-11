@@ -540,9 +540,9 @@ function EmailEntry({ mail }: { mail: Mail }) {
             disabled={busy}
             onClick={() => void check()}
             loading={busy}
-            loadingLabel={'Checking…'}
+            loadingLabel="Checking…"
           >
-            {'Check delivery'}
+            Check delivery
           </Button>
         </div>
       ) : (

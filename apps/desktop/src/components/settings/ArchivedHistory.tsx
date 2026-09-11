@@ -91,14 +91,20 @@ export function ArchivedHistory() {
             disabled={!desktop || importing}
             onClick={() => void importRecovery()}
             loading={importing}
-            loadingLabel={'Importing…'}
+            loadingLabel="Importing…"
           >
             <Upload size={16} />
-            {'Import a recovery file…'}
+            Import a recovery file…
           </Button>
-          <Button variant="ghost" disabled={!desktop || loading} onClick={() => void load()}>
+          <Button
+            variant="ghost"
+            disabled={!desktop || loading}
+            onClick={() => void load()}
+            loading={loading}
+            loadingLabel="Reading…"
+          >
             <RefreshIcon size={16} />
-            {loading ? 'Reading…' : 'Refresh'}
+            Refresh
           </Button>
         </div>
       </div>
@@ -140,9 +146,9 @@ export function ArchivedHistory() {
                   disabled={!!busyId}
                   onClick={() => void restore(run)}
                   loading={busyId === run.id}
-                  loadingLabel={'Restoring…'}
+                  loadingLabel="Restoring…"
                 >
-                  {'Restore'}
+                  Restore
                 </Button>
               </li>
             ))}

@@ -157,8 +157,15 @@ try {
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
 
-  await page.getByRole('button', { name: 'Copy example', exact: true }).click();
+  const copy = page.getByRole('button', { name: 'Copy example', exact: true });
+  const copyAnnouncement = await copy.locator('[aria-live="polite"]').elementHandle();
+  const idleCopySize = await copy.boundingBox();
+  await copy.click();
+  const pendingCopy = page.getByRole('button', { name: 'Copying…', exact: true });
+  assert(await pendingCopy.isDisabled());
+  assert(Math.abs(idleCopySize.width - (await pendingCopy.boundingBox()).width) < 1);
   await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+  assert(await copyAnnouncement.evaluate((element) => element.isConnected));
   assert.equal(await page.getByLabel('Example clipboard').textContent(), 'A sample link');
   await page.getByRole('textbox', { name: 'Text to copy' }).fill('A different link');
   await page.getByRole('button', { name: 'Copy example', exact: true }).waitFor();

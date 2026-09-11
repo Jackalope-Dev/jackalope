@@ -679,12 +679,10 @@ export function TaskDetail({
                 <Button
                   type="submit"
                   disabled={!reply.trim() || submitting || acting || run.status === 'stopping'}
+                  loading={acting || submitting}
+                  loadingLabel="Continuing…"
                 >
-                  {acting || submitting
-                    ? 'Continuing…'
-                    : active
-                      ? 'Stop and send'
-                      : 'Continue task'}
+                  {active ? 'Stop and send' : 'Continue task'}
                   <ArrowRight size={15} />
                 </Button>
               </div>

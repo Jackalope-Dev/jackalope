@@ -368,8 +368,10 @@ export function SettingsPage({
                           <Button
                             disabled={confirmation !== 'RESET' || resetting}
                             onClick={() => void reset()}
+                            loading={resetting}
+                            loadingLabel="Restarting…"
                           >
-                            {resetting ? 'Restarting…' : 'Erase local data and restart'}
+                            Erase local data and restart
                           </Button>
                           <Button
                             variant="ghost"

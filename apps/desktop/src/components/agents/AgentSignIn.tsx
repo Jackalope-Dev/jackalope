@@ -443,9 +443,9 @@ export function AgentSignIn({
                   }
                 }}
                 loading={saving}
-                loadingLabel={'Saving…'}
+                loadingLabel="Saving…"
               >
-                {'Use for new tasks'}
+                Use for new tasks
               </Button>
             )}
         </div>

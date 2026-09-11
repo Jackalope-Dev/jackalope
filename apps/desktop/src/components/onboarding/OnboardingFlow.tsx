@@ -279,9 +279,11 @@ export function OnboardingFlow({
                 size="sm"
                 disabled={busy || execution.discovering || !desktop}
                 onClick={() => void refresh()}
+                loading={execution.discovering}
+                loadingLabel="Scanning agents…"
               >
                 <RefreshIcon size={16} />
-                {execution.discovering ? 'Scanning agents…' : 'Re-scan agents'}
+                Re-scan agents
               </Button>
             )}
           </div>
@@ -444,14 +446,14 @@ export function OnboardingFlow({
                         ? !projectName.trim() || (!parentPath && !defaultDirectory)
                         : !path.trim())
                     }
+                    loading={busy}
+                    loadingLabel={
+                      projectMode === 'new' ? 'Creating project…' : 'Checking repository…'
+                    }
                   >
-                    {busy
-                      ? projectMode === 'new'
-                        ? 'Creating project…'
-                        : 'Checking repository…'
-                      : projectMode === 'new'
-                        ? 'Create project and continue'
-                        : 'Continue with this project'}
+                    {projectMode === 'new'
+                      ? 'Create project and continue'
+                      : 'Continue with this project'}
                     <ArrowRight size={16} />
                   </Button>
                 </div>

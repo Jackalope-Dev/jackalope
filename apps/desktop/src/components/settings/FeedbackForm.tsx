@@ -116,9 +116,9 @@ export function FeedbackForm({
               disabled={busy || !settings?.configured}
               onClick={() => void act(send)}
               loading={busy}
-              loadingLabel={'Sending…'}
+              loadingLabel="Sending…"
             >
-              {'Send to Jackalope'}
+              Send to Jackalope
             </Button>
             <Button
               variant="outline"

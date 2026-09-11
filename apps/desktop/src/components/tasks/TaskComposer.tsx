@@ -486,9 +486,9 @@ export function TaskComposer({
               form="task-composer"
               disabled={!desktop || !current.prompt.trim() || !runner?.available || submitting}
               loading={submitting}
-              loadingLabel={'Starting…'}
+              loadingLabel="Starting…"
             >
-              {'Start task'}
+              Start task
               <ArrowRight size={15} />
             </Button>
           )}

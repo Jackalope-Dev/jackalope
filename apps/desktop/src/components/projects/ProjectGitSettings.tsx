@@ -171,10 +171,10 @@ export function ProjectGitSettings({
               }
               onClick={() => void save()}
               loading={busy}
-              loadingLabel={'Saving…'}
+              loadingLabel="Saving…"
             >
               <Check size={16} />
-              {'Save commit settings'}
+              Save commit settings
             </Button>
           )}
           {dirty && (

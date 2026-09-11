@@ -503,9 +503,11 @@ export function McpWorkspace({
                               onClick={() => void probeServer(server)}
                               disabled={isProbing}
                               title="Check connection and list tools"
+                              loading={isProbing}
+                              loadingLabel="Probing…"
                             >
-                              <Activity size={13} className={isProbing ? 'animate-spin' : ''} />
-                              {isProbing ? 'Probing…' : 'Check'}
+                              <Activity size={13} />
+                              Check
                             </Button>
                             <Button
                               variant="ghost"
