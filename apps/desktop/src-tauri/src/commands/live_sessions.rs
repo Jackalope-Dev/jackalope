@@ -1,10 +1,21 @@
 mod windows;
-pub use windows::{live_session_window, live_session_window_pin};
+pub use windows::*;
 
-use super::{coordination::Coordinator, history, tasks::{RunRequest, TaskRun, TaskRuntime}};
+use super::{
+    coordination::Coordinator,
+    history,
+    tasks::{RunRequest, TaskRun, TaskRuntime},
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex}, time::Duration};
+use std::{
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::Duration,
+};
 use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
@@ -79,37 +90,63 @@ pub struct LiveSessions {
     runtime: TaskRuntime,
     coordinator: Coordinator,
     alive: Arc<AtomicBool>,
+    gate: Arc<Mutex<()>>,
 }
 
 impl LiveSessions {
     pub fn new(path: PathBuf, runtime: TaskRuntime, coordinator: Coordinator) -> Self {
         let loaded = if path.exists() {
-            history::read_bounded(&path, 16_000_000)
-                .and_then(|bytes| serde_json::from_slice::<Ledger>(&bytes).map_err(|e| e.to_string()))
-        } else { Ok(Ledger::default()) };
+            history::read_bounded(&path, 16_000_000).and_then(|bytes| {
+                serde_json::from_slice::<Ledger>(&bytes).map_err(|e| e.to_string())
+            })
+        } else {
+            Ok(Ledger::default())
+        };
         let (mut ledger, error) = match loaded {
             Ok(ledger) => (ledger, None),
-            Err(error) => (Ledger::default(), Some(format!("Live sessions could not be loaded. The saved file is unchanged: {error}"))),
+            Err(error) => (
+                Ledger::default(),
+                Some(format!(
+                    "Live sessions could not be loaded. The saved file is unchanged: {error}"
+                )),
+            ),
         };
         for session in &mut ledger.sessions {
             session.paused = true;
             if session.batches.last().is_some_and(|batch| !batch.settled) {
-                session.error = Some("The session was interrupted. Review the last attempt before resuming.".into());
+                session.error = Some(
+                    "The session was interrupted. Review the last attempt before resuming.".into(),
+                );
             }
         }
-        Self { inner: Arc::new(Mutex::new(Inner {ledger, error})), path, runtime, coordinator, alive: Arc::new(AtomicBool::new(true)) }
+        Self {
+            inner: Arc::new(Mutex::new(Inner { ledger, error })),
+            path,
+            runtime,
+            coordinator,
+            alive: Arc::new(AtomicBool::new(true)),
+            gate: Arc::new(Mutex::new(())),
+        }
     }
 
     fn save(&self, ledger: &Ledger) -> Result<(), String> {
         let bytes = serde_json::to_vec(ledger).map_err(|e| e.to_string())?;
-        if bytes.len() > 16_000_000 { return Err("Live session storage is full. Finish or export existing sessions.".into()); }
-        std::fs::create_dir_all(self.path.parent().ok_or("Invalid session path")?).map_err(|e| e.to_string())?;
+        if bytes.len() > 16_000_000 {
+            return Err("Live session storage is full. Finish or export existing sessions.".into());
+        }
+        std::fs::create_dir_all(self.path.parent().ok_or("Invalid session path")?)
+            .map_err(|e| e.to_string())?;
         history::write_atomic(&self.path, &bytes)
     }
 
-    fn update<T>(&self, change: impl FnOnce(&mut Ledger) -> Result<T, String>) -> Result<T, String> {
+    fn update<T>(
+        &self,
+        change: impl FnOnce(&mut Ledger) -> Result<T, String>,
+    ) -> Result<T, String> {
         let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
-        if let Some(error) = &inner.error { return Err(error.clone()); }
+        if let Some(error) = &inner.error {
+            return Err(error.clone());
+        }
         let mut ledger = inner.ledger.clone();
         let result = change(&mut ledger)?;
         self.save(&ledger)?;
@@ -118,25 +155,40 @@ impl LiveSessions {
     }
 
     fn session<'a>(ledger: &'a mut Ledger, id: &str) -> Result<&'a mut LiveSession, String> {
-        ledger.sessions.iter_mut().find(|session| session.id == id).ok_or_else(|| "Session not found.".into())
+        ledger
+            .sessions
+            .iter_mut()
+            .find(|session| session.id == id)
+            .ok_or_else(|| "Session not found.".into())
     }
 
     fn snapshot(&self, id: Option<&str>) -> Result<SessionSnapshot, String> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
-        let sessions = inner.ledger.sessions.clone();
+        let mut sessions = inner.ledger.sessions.clone();
         let error = inner.error.clone();
         drop(inner);
-        let ids: Vec<_> = sessions.iter().flat_map(|s| s.batches.iter().map(|b| b.run_id.as_str())).collect();
-        let runs = self.runtime.integration_runs()?.into_iter().filter(|r| ids.contains(&r.id.as_str())).map(|run| {
-            if id == run.live_session_id.as_deref() { run } else { run.summary() }
-        }).collect();
-        Ok(SessionSnapshot { sessions, runs, error })
+        for session in &mut sessions {
+            for batch in &mut session.batches {
+                batch.prompt.clear();
+            }
+        }
+        let runs = self.runtime.live_session_runs(id)?;
+        Ok(SessionSnapshot {
+            sessions,
+            runs,
+            error,
+        })
     }
 
     fn create(&self, id: String, title: String, mut request: RunRequest) -> Result<String, String> {
         Uuid::parse_str(&id).map_err(|_| "Invalid session identifier")?;
-        if title.trim().is_empty() || title.len() > 160 { return Err("Use a session title up to 160 bytes.".into()); }
-        let target = super::tasks::resolve_target_branch(&request.project_path, request.target_branch.as_deref())?;
+        if title.trim().is_empty() || title.len() > 160 {
+            return Err("Use a session title up to 160 bytes.".into());
+        }
+        let target = super::tasks::resolve_target_branch(
+            &request.project_path,
+            request.target_branch.as_deref(),
+        )?;
         request.isolated = true;
         request.previous_run_id = None;
         request.target_branch = Some(target);
@@ -145,38 +197,84 @@ impl LiveSessions {
         request.live_session_id = None;
         self.update(|ledger| {
             if let Some(existing) = ledger.sessions.iter().find(|s| s.id == id) {
-                if existing.title == title.trim() && existing.request.project_path == request.project_path { return Ok(id); }
+                if existing.title == title.trim()
+                    && existing.request.project_path == request.project_path
+                {
+                    return Ok(id);
+                }
                 return Err("This session identifier is already in use.".into());
             }
-            if ledger.sessions.len() >= 100 { return Err("Live sessions are limited to 100 saved sessions.".into()); }
+            if ledger.sessions.len() >= 100 {
+                return Err("Live sessions are limited to 100 saved sessions.".into());
+            }
             let now = Utc::now().to_rfc3339();
-            ledger.sessions.push(LiveSession {pinned: false, id: id.clone(), title: title.trim().into(), request, created_at: now.clone(), updated_at: now, paused: false, closed: false, messages: vec![], batches: vec![], draft: Default::default(), error: None});
+            ledger.sessions.push(LiveSession {
+                pinned: false,
+                id: id.clone(),
+                title: title.trim().into(),
+                request,
+                created_at: now.clone(),
+                updated_at: now,
+                paused: false,
+                closed: false,
+                messages: vec![],
+                batches: vec![],
+                draft: Default::default(),
+                error: None,
+            });
             Ok(id)
         })
     }
 
-    fn send(&self, id: &str, message_id: String, text: String, draft_revision: Option<u64>) -> Result<(), String> {
+    fn send(
+        &self,
+        id: &str,
+        message_id: String,
+        text: String,
+        draft_revision: Option<u64>,
+    ) -> Result<SessionDraft, String> {
         Uuid::parse_str(&message_id).map_err(|_| "Invalid message identifier")?;
-        if text.trim().is_empty() || text.len() > 12_000 { return Err("Use a message between 1 and 12,000 bytes.".into()); }
+        if text.trim().is_empty() || text.len() > 12_000 {
+            return Err("Use a message between 1 and 12,000 bytes.".into());
+        }
         self.update(|ledger| {
             let session = Self::session(ledger, id)?;
             if let Some(existing) = session.messages.iter().find(|m| m.id == message_id) {
-                return if existing.text == text.trim() { Ok(()) } else { Err("This message was already saved with different text.".into()) };
+                return if existing.text == text.trim() {
+                    Ok(session.draft.clone())
+                } else {
+                    Err("This message was already saved with different text.".into())
+                };
             }
-            if session.closed { return Err("Reopen this session before sending a message.".into()); }
-            if session.messages.len() >= 1000 { return Err("Start a new session after 1,000 messages.".into()); }
+            if session.closed {
+                return Err("Reopen this session before sending a message.".into());
+            }
+            if session.messages.len() >= 1000 {
+                return Err("Start a new session after 1,000 messages.".into());
+            }
             let now = Utc::now().to_rfc3339();
-            session.messages.push(SessionMessage { id: message_id, text: text.trim().into(), created_at: now.clone(), run_id: None, canceled: false });
+            session.messages.push(SessionMessage {
+                id: message_id,
+                text: text.trim().into(),
+                created_at: now.clone(),
+                run_id: None,
+                canceled: false,
+            });
             session.updated_at = now;
             if draft_revision == Some(session.draft.revision) {
-                session.draft = SessionDraft {text: String::new(), revision: session.draft.revision + 1};
+                session.draft = SessionDraft {
+                    text: String::new(),
+                    revision: session.draft.revision + 1,
+                };
             }
-            Ok(())
+            Ok(session.draft.clone())
         })
     }
 
     fn draft(&self, id: &str, text: String, revision: u64) -> Result<SessionDraft, String> {
-        if text.len() > 12_000 { return Err("The message is limited to 12,000 bytes.".into()); }
+        if text.len() > 12_000 {
+            return Err("The message is limited to 12,000 bytes.".into());
+        }
         self.update(|ledger| {
             let session = Self::session(ledger, id)?;
             if session.draft.revision != revision { return Err("The draft changed in another window. Your text is retained here; reload the saved draft or send this message.".into()); }
@@ -186,11 +284,18 @@ impl LiveSessions {
     }
 
     fn action(&self, id: &str, action: &str, message_id: Option<&str>) -> Result<(), String> {
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        let runs = self.runtime.live_session_runs(None)?;
         self.update(|ledger| {
             let session = Self::session(ledger, id)?;
             match action {
                 "pause" => session.paused = true,
-                "resume" => { session.paused = false; session.closed = false; session.error = None; },
+                "resume" => {
+                    if session.batches.last().is_some_and(|batch| batch.error.is_some() && !runs.iter().any(|run| run.id == batch.run_id)) {
+                        return Err("Retry the pending launch before resuming dispatch.".into());
+                    }
+                    session.paused = false; session.closed = false; session.error = None;
+                },
                 "finish" => { session.paused = true; session.closed = true; },
                 "cancel-message" => {
                     let message = session.messages.iter_mut().find(|m| Some(m.id.as_str()) == message_id).ok_or("Message not found")?;
@@ -199,7 +304,7 @@ impl LiveSessions {
                 },
                 "retry" => {
                     let batch = session.batches.last_mut().ok_or("No work to retry")?;
-                    if self.runtime.integration_runs()?.iter().any(|r| r.id == batch.run_id) {
+                    if runs.iter().any(|r| r.id == batch.run_id) {
                         return Err("Send a follow-up to continue the existing attempt.".into());
                     }
                     batch.error = None;
@@ -215,28 +320,54 @@ impl LiveSessions {
     }
 
     fn tick(&self) -> Result<bool, String> {
-        let runs = self.runtime.integration_runs()?;
+        let runs = self.runtime.live_session_runs(None)?;
         let ids: Vec<_> = {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;
-            if inner.error.is_some() { return Ok(false); }
-            inner.ledger.sessions.iter().filter(|s| !s.closed).map(|s| s.id.clone()).collect()
+            if inner.error.is_some() {
+                return Ok(false);
+            }
+            inner
+                .ledger
+                .sessions
+                .iter()
+                .filter(|s| !s.closed)
+                .map(|s| s.id.clone())
+                .collect()
         };
         let mut changed = false;
         for id in ids {
             let snapshot = {
                 let inner = self.inner.lock().map_err(|e| e.to_string())?;
-                inner.ledger.sessions.iter().find(|s| s.id == id).cloned().ok_or("Session disappeared")?
+                inner
+                    .ledger
+                    .sessions
+                    .iter()
+                    .find(|s| s.id == id)
+                    .cloned()
+                    .ok_or("Session disappeared")?
             };
             if let Some(batch) = snapshot.batches.last().filter(|b| !b.settled) {
                 if let Some(run) = runs.iter().find(|r| r.id == batch.run_id) {
-                    if ["starting", "running", "stopping"].contains(&run.status.as_str()) { continue; }
+                    if ["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                        continue;
+                    }
                     self.update(|ledger| {
                         let session = Self::session(ledger, &id)?;
                         let batch = session.batches.last_mut().ok_or("Batch not found")?;
                         batch.settled = true;
-                        if !["review", "reviewed"].contains(&run.status.as_str()) || run.verification_error.is_some() || run.verification.as_ref().is_some_and(|v| !v.result.success) {
+                        if !["review", "reviewed"].contains(&run.status.as_str())
+                            || run.verification_error.is_some()
+                            || run.verification.as_ref().is_some_and(|v| !v.result.success)
+                        {
                             session.paused = true;
-                            session.error = Some(run.error.clone().or(run.verification_error.clone()).unwrap_or_else(|| "Review the last attempt before continuing.".into()));
+                            session.error = Some(
+                                run.error
+                                    .clone()
+                                    .or(run.verification_error.clone())
+                                    .unwrap_or_else(|| {
+                                        "Review the last attempt before continuing.".into()
+                                    }),
+                            );
                         }
                         Ok(())
                     })?;
@@ -244,53 +375,158 @@ impl LiveSessions {
                     continue;
                 }
             }
-            if snapshot.paused || snapshot.error.is_some() { continue; }
+            if snapshot.paused || snapshot.error.is_some() {
+                continue;
+            }
             if let Some(last) = snapshot.batches.last().filter(|batch| batch.settled) {
                 if let Some(run) = runs.iter().find(|r| r.id == last.run_id) {
-                    if !run.workspace.is_empty() && super::previews::ensure_idle(&run.workspace).is_err() { continue; }
+                    if !run.workspace.is_empty()
+                        && super::previews::ensure_idle(&run.workspace).is_err()
+                    {
+                        continue;
+                    }
                 }
             }
-            let batch = if let Some(batch) = snapshot.batches.last().filter(|b| !b.settled && b.error.is_none()) {
+            let batch = if let Some(batch) = snapshot
+                .batches
+                .last()
+                .filter(|b| !b.settled && b.error.is_none())
+            {
                 batch.clone()
             } else {
-                let pending: Vec<_> = snapshot.messages.iter().filter(|m| m.run_id.is_none() && !m.canceled).take(8).collect();
-                if pending.is_empty() { continue; }
-                let last_time = chrono::DateTime::parse_from_rfc3339(&pending.last().unwrap().created_at).map_err(|e| e.to_string())?;
-                if Utc::now().signed_duration_since(last_time).num_milliseconds() < 700 { continue; }
-                let batch = SessionBatch { run_id: Uuid::new_v4().to_string(), message_ids: pending.iter().map(|m| m.id.clone()).collect(), prompt: batch_prompt(&snapshot, &pending), previous_run_id: snapshot.batches.iter().rev().find(|b| runs.iter().any(|r| r.id == b.run_id && !r.workspace.is_empty())).map(|b| b.run_id.clone()), error: None, settled: false };
+                let pending: Vec<_> = snapshot
+                    .messages
+                    .iter()
+                    .filter(|m| m.run_id.is_none() && !m.canceled)
+                    .take(8)
+                    .collect();
+                if pending.is_empty() {
+                    continue;
+                }
+                let last_time =
+                    chrono::DateTime::parse_from_rfc3339(&pending.last().unwrap().created_at)
+                        .map_err(|e| e.to_string())?;
+                if Utc::now()
+                    .signed_duration_since(last_time)
+                    .num_milliseconds()
+                    < 700
+                {
+                    continue;
+                }
+                let batch = SessionBatch {
+                    run_id: Uuid::new_v4().to_string(),
+                    message_ids: pending.iter().map(|m| m.id.clone()).collect(),
+                    prompt: batch_prompt(&snapshot, &pending),
+                    previous_run_id: snapshot
+                        .batches
+                        .iter()
+                        .rev()
+                        .find(|b| {
+                            runs.iter()
+                                .any(|r| r.id == b.run_id && !r.workspace.is_empty())
+                        })
+                        .map(|b| b.run_id.clone()),
+                    error: None,
+                    settled: false,
+                };
                 let claimed = self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
-                    if session.paused || session.closed || batch.message_ids.iter().any(|id| session.messages.iter().find(|m| &m.id == id).is_none_or(|m| m.canceled || m.run_id.is_some())) { return Ok(false); }
+                    if session.paused
+                        || session.closed
+                        || batch.message_ids.iter().any(|id| {
+                            session
+                                .messages
+                                .iter()
+                                .find(|m| &m.id == id)
+                                .is_none_or(|m| m.canceled || m.run_id.is_some())
+                        })
+                    {
+                        return Ok(false);
+                    }
                     for message in &mut session.messages {
-                        if batch.message_ids.contains(&message.id) && !message.canceled { message.run_id = Some(batch.run_id.clone()); }
+                        if batch.message_ids.contains(&message.id) && !message.canceled {
+                            message.run_id = Some(batch.run_id.clone());
+                        }
                     }
                     session.batches.push(batch.clone());
                     Ok(true)
                 })?;
-                if !claimed { continue; }
+                if !claimed {
+                    continue;
+                }
                 changed = true;
                 batch
             };
+            let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+            if !self.alive.load(Ordering::Relaxed) {
+                return Ok(changed);
+            }
             let latest = {
                 let inner = self.inner.lock().map_err(|e| e.to_string())?;
-                inner.ledger.sessions.iter().find(|s| s.id == id).cloned().ok_or("Session not found")?
+                inner
+                    .ledger
+                    .sessions
+                    .iter()
+                    .find(|s| s.id == id)
+                    .cloned()
+                    .ok_or("Session not found")?
             };
-            if latest.paused || latest.closed || latest.batches.last().is_none_or(|b| b.run_id != batch.run_id) { continue; }
+            if latest.paused
+                || latest.closed
+                || latest
+                    .batches
+                    .last()
+                    .is_none_or(|b| b.run_id != batch.run_id)
+            {
+                continue;
+            }
             let mut request = latest.request.clone();
             request.id = batch.run_id.clone();
             request.live_session_id = Some(id.clone());
             request.prompt = batch.prompt.clone();
             request.previous_run_id = batch.previous_run_id.clone();
-            if let Some(previous) = runs.iter().find(|r| Some(&r.id) == batch.previous_run_id.as_ref()) {
+            if let Some(previous) = runs
+                .iter()
+                .find(|r| Some(&r.id) == batch.previous_run_id.as_ref())
+            {
                 request.agent = previous.agent.clone();
                 request.model = previous.model.clone();
-                request.agent_profile_id = previous.account_binding.as_ref().and_then(|b| b.profile_id.clone());
+                request.agent_profile_id = previous
+                    .account_binding
+                    .as_ref()
+                    .and_then(|b| b.profile_id.clone());
+                if previous.session_id.is_none() {
+                    let context: Vec<_> = latest
+                        .messages
+                        .iter()
+                        .filter(|message| {
+                            !message.canceled
+                                && message.run_id.is_some()
+                                && message.run_id.as_deref() != Some(&batch.run_id)
+                        })
+                        .rev()
+                        .take(12)
+                        .collect();
+                    let mut history = String::from("Earlier user messages for context; preserve completed work and apply only the new batch below:\n");
+                    for message in context.into_iter().rev() {
+                        history.push_str(&format!("\n{}\n", message.text));
+                    }
+                    request.prompt = format!("{history}\n{}", request.prompt);
+                }
             }
             if let Err(error) = self.coordinator.start_manual(request) {
-                if error == "Session is waiting for execution capacity." { continue; }
+                if error == "Session is waiting for execution capacity." {
+                    continue;
+                }
                 self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
-                    if let Some(batch) = session.batches.iter_mut().find(|b| b.run_id == batch.run_id) { batch.error = Some(error.clone()); }
+                    if let Some(batch) = session
+                        .batches
+                        .iter_mut()
+                        .find(|b| b.run_id == batch.run_id)
+                    {
+                        batch.error = Some(error.clone());
+                    }
                     session.paused = true;
                     session.error = Some(error);
                     Ok(())
@@ -306,62 +542,264 @@ impl LiveSessions {
         std::thread::spawn(move || {
             while service.alive.load(Ordering::Relaxed) {
                 match service.tick() {
-                    Ok(true) => { let _ = app.emit("live-sessions-changed", ()); },
+                    Ok(true) => {
+                        let _ = app.emit("live-sessions-changed", ());
+                    }
                     Err(error) => {
                         if let Ok(mut inner) = service.inner.lock() {
-                            for session in &mut inner.ledger.sessions { session.paused = true; }
+                            for session in &mut inner.ledger.sessions {
+                                session.paused = true;
+                            }
                             inner.error = Some(format!("Session dispatch paused: {error}"));
                         }
                         let _ = app.emit("live-sessions-changed", ());
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
                 std::thread::sleep(Duration::from_millis(400));
             }
         });
     }
 
-    pub fn shutdown(&self) { self.alive.store(false, Ordering::Relaxed); }
+    pub fn shutdown(&self) {
+        self.alive.store(false, Ordering::Relaxed);
+        drop(self.gate.lock());
+    }
 }
 
 fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
-    for message in messages { prompt.push_str(&format!("\nUser message {}:\n{}\n", message.id, message.text)); }
+    for message in messages {
+        prompt.push_str(&format!(
+            "\nUser message {}:\n{}\n",
+            message.id, message.text
+        ));
+    }
     prompt
 }
 
 #[tauri::command]
-pub async fn live_session_snapshot(service: State<'_, LiveSessions>, id: Option<String>) -> Result<SessionSnapshot, String> {
+pub async fn live_session_snapshot(
+    service: State<'_, LiveSessions>,
+    id: Option<String>,
+) -> Result<SessionSnapshot, String> {
     let service = service.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || service.snapshot(id.as_deref())).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || service.snapshot(id.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub async fn live_session_create(service: State<'_, LiveSessions>, app: AppHandle, id: String, title: String, request: RunRequest) -> Result<String, String> {
+pub async fn live_session_create(
+    service: State<'_, LiveSessions>,
+    app: AppHandle,
+    id: String,
+    title: String,
+    request: RunRequest,
+) -> Result<String, String> {
     let service = service.inner().clone();
-    let result = tauri::async_runtime::spawn_blocking(move || service.create(id, title, request)).await.map_err(|e| e.to_string())??;
+    let result = tauri::async_runtime::spawn_blocking(move || service.create(id, title, request))
+        .await
+        .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
     Ok(result)
 }
 
 #[tauri::command]
-pub async fn live_session_send(service: State<'_, LiveSessions>, app: AppHandle, id: String, message_id: String, text: String, draft_revision: Option<u64>) -> Result<(), String> {
+pub async fn live_session_send(
+    service: State<'_, LiveSessions>,
+    app: AppHandle,
+    id: String,
+    message_id: String,
+    text: String,
+    draft_revision: Option<u64>,
+) -> Result<SessionDraft, String> {
     let service = service.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || service.send(&id, message_id, text, draft_revision)).await.map_err(|e| e.to_string())??;
+    let draft = tauri::async_runtime::spawn_blocking(move || {
+        service.send(&id, message_id, text, draft_revision)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
-    Ok(())
+    Ok(draft)
 }
 
 #[tauri::command]
-pub async fn live_session_draft(service: State<'_, LiveSessions>, id: String, text: String, revision: u64) -> Result<SessionDraft, String> {
+pub async fn live_session_draft(
+    service: State<'_, LiveSessions>,
+    id: String,
+    text: String,
+    revision: u64,
+) -> Result<SessionDraft, String> {
     let service = service.inner().clone();
-    service.draft(&id, text, revision)
+    tauri::async_runtime::spawn_blocking(move || service.draft(&id, text, revision))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReview {
+    files: Vec<String>,
+    diff: String,
+    note: String,
+    patch_path: String,
+    tree: String,
+    verified: bool,
+}
+
+impl LiveSessions {
+    fn review(&self, id: &str) -> Result<SessionReview, String> {
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        let session = {
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            inner
+                .ledger
+                .sessions
+                .iter()
+                .find(|s| s.id == id)
+                .cloned()
+                .ok_or("Session not found")?
+        };
+        if !session.paused {
+            return Err("Pause dispatch before reviewing session changes.".into());
+        }
+        let _guard = super::integration::execution_guard()?;
+        let runs = self.runtime.integration_runs()?;
+        let run = session
+            .batches
+            .iter()
+            .rev()
+            .find_map(|batch| {
+                runs.iter()
+                    .find(|r| r.id == batch.run_id && !r.workspace.is_empty())
+            })
+            .ok_or("No workspace is available yet")?;
+        if runs.iter().any(|other| {
+            other.workspace == run.workspace
+                && ["starting", "running", "stopping", "interrupted"]
+                    .contains(&other.status.as_str())
+        }) {
+            return Err(
+                "Finish active work and resolve interrupted ownership before exporting changes."
+                    .into(),
+            );
+        }
+        super::verification::ensure_idle(&run.workspace)?;
+        let directory = self
+            .path
+            .parent()
+            .ok_or("Invalid session storage")?
+            .join("exports");
+        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let source = super::integration::snapshot(run, &directory)?;
+        let git = |args: &[&str]| -> Result<Vec<u8>, String> {
+            let result = super::git_command::command(
+                std::path::Path::new(&run.workspace),
+                args,
+                super::git_command::Policy::Inspection,
+            )
+            .output()
+            .map_err(|e| e.to_string())?;
+            if !result.status.success() {
+                return Err(String::from_utf8_lossy(&result.stderr).trim().into());
+            }
+            Ok(result.stdout)
+        };
+        let patch = git(&[
+            "diff",
+            "--binary",
+            "--full-index",
+            "--no-ext-diff",
+            "--no-textconv",
+            &run.base_head,
+            &source.tree,
+            "--",
+        ])?;
+        let files = git(&[
+            "diff",
+            "--name-only",
+            "-z",
+            &run.base_head,
+            &source.tree,
+            "--",
+        ])?;
+        let patch_path = directory.join(format!("{id}-{}.patch", source.tree));
+        history::write_atomic(&patch_path, &patch)?;
+        let verified = run
+            .verification
+            .as_ref()
+            .is_some_and(|check| check.tree.as_ref() == Some(&source.tree) && check.result.success);
+        Ok(SessionReview {
+            files: String::from_utf8_lossy(&files)
+                .split('\0')
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect(),
+            diff: String::from_utf8_lossy(&patch)
+                .chars()
+                .take(120_000)
+                .collect(),
+            note: if patch.len() > 120_000 {
+                "Preview truncated. The saved patch includes all changes and binary files.".into()
+            } else {
+                String::new()
+            },
+            patch_path: patch_path.to_string_lossy().into_owned(),
+            tree: source.tree,
+            verified,
+        })
+    }
 }
 
 #[tauri::command]
-pub async fn live_session_action(service: State<'_, LiveSessions>, app: AppHandle, id: String, action: String, message_id: Option<String>) -> Result<(), String> {
+pub async fn live_session_review(
+    service: State<'_, LiveSessions>,
+    id: String,
+) -> Result<SessionReview, String> {
     let service = service.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || service.action(&id, &action, message_id.as_deref())).await.map_err(|e| e.to_string())??;
+    tauri::async_runtime::spawn_blocking(move || service.review(&id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn live_session_recover(service: State<'_, LiveSessions>) -> Result<(), String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = service.gate.lock().map_err(|e| e.to_string())?;
+        let restored = LiveSessions::new(
+            service.path.clone(),
+            service.runtime.clone(),
+            service.coordinator.clone(),
+        );
+        let restored = restored.inner.lock().map_err(|e| e.to_string())?;
+        if let Some(error) = &restored.error {
+            return Err(error.clone());
+        }
+        let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
+        inner.ledger = restored.ledger.clone();
+        inner.error = None;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn live_session_action(
+    service: State<'_, LiveSessions>,
+    app: AppHandle,
+    id: String,
+    action: String,
+    message_id: Option<String>,
+) -> Result<(), String> {
+    let service = service.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        service.action(&id, &action, message_id.as_deref())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
     Ok(())
 }

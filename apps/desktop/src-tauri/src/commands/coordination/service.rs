@@ -423,7 +423,13 @@ impl Coordinator {
         if request.live_session_id.is_some() {
             let runs = self.runtime.integration_runs()?;
             if !runs.iter().any(|run| run.id == request.id)
-                && runs.iter().filter(|run| ["starting", "running", "stopping"].contains(&run.status.as_str())).count() >= inner.concurrency
+                && runs
+                    .iter()
+                    .filter(|run| {
+                        ["starting", "running", "stopping"].contains(&run.status.as_str())
+                    })
+                    .count()
+                    >= inner.concurrency
             {
                 return Err("Session is waiting for execution capacity.".into());
             }

@@ -139,7 +139,11 @@ impl TaskRuntime {
                 self.route(&mut request)?;
             }
             self.stage(id, Some("execution"));
-            self.execute_agent(id, &request, resume.take().filter(|old| old.session_id.is_some()))?;
+            self.execute_agent(
+                id,
+                &request,
+                resume.take().filter(|old| old.session_id.is_some()),
+            )?;
             let run = self
                 .inner
                 .lock()
@@ -378,9 +382,6 @@ impl TaskRuntime {
             ]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
-                if old.live_session_id != request.live_session_id {
-                    return Err("Continue this work from its live session.".into());
-                }
                 crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
@@ -1011,6 +1012,9 @@ impl TaskRuntime {
                 }
                 if old.status == "interrupted" {
                     return Err("This attempt was interrupted. Inspect the agent's CLI session and workspace before starting new work; automatic resume is unavailable because process ownership is unknown.".into());
+                }
+                if old.live_session_id != request.live_session_id {
+                    return Err("Continue this work from its live session.".into());
                 }
                 if inner.runs.values().any(|r| {
                     r.task_id == old.task_id

@@ -1,4 +1,5 @@
 import { DropdownMenu as Menu, SearchIcon } from '@jackalope/ui';
+import { listen } from '@tauri-apps/api/event';
 import { Check, ChevronDown, GitBranch, Plus, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { captureDraftForProject } from '../../lib/capture-draft';
@@ -8,6 +9,7 @@ import type { Feature } from '../../lib/telemetry';
 import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
+import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -101,6 +103,23 @@ export function Shell({
   }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
   const openProjectSetup = () => useOnboardingStore.getState().begin();
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void listen<string>('live-session-open', ({ payload }) => {
+      useLiveSessionStore.getState().select(payload);
+      setActiveTab('kanban');
+      requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('jackalope:live-session')));
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, []);
   useEffect(observeHelper, []);
   useEffect(() => {
     useHelperStore.setState({ screen: activeTab });

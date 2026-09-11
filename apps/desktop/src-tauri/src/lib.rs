@@ -104,6 +104,8 @@ pub fn run() {
             commands::live_sessions::live_session_action,
             commands::live_sessions::live_session_window,
             commands::live_sessions::live_session_window_pin,
+            commands::live_sessions::live_session_review,
+            commands::live_sessions::live_session_recover,
             commands::helper::helper_snapshot,
             commands::helper::helper_sync,
             commands::helper::helper_send,
@@ -249,10 +251,10 @@ pub fn run() {
                 app.state::<commands::helper::Helper>().stop();
                 app.state::<Scheduler>().shutdown();
                 app.state::<commands::notifications::Notifications>().shutdown();
+                app.state::<commands::live_sessions::LiveSessions>().shutdown();
                 commands::browser::close_all();
                 commands::previews::close_all();
                 app.state::<Coordinator>().shutdown();
-                app.state::<commands::live_sessions::LiveSessions>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
                 app.state::<AppState>().kill_all_pty_sessions();
                 app.state::<SignInService>().stop_all();

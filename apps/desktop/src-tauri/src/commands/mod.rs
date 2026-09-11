@@ -7,6 +7,7 @@ pub mod git;
 pub mod harness;
 pub mod helper;
 pub mod integration;
+pub mod live_sessions;
 pub mod mcp;
 pub mod mcp_broker;
 pub mod platform;
@@ -14,7 +15,6 @@ pub mod pty;
 pub mod repo_todos;
 pub mod system;
 pub mod tasks;
-pub mod live_sessions;
 pub mod worktree_cleanup;
 
 pub mod agent_models;

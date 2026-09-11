@@ -5,14 +5,16 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import { DropdownMenu as Menu } from '@jackalope/ui';
-import { FolderOpen, MoreHorizontal, Workflow } from 'lucide-react';
+import { FolderOpen, MessagesSquare, MoreHorizontal, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
 import { collectWork, type WorkItem } from '../../lib/task-collection';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
+import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { LiveSessions } from '../sessions/LiveSessions';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -43,6 +45,15 @@ export function TaskWorkspace({
   const ideas = useTaskStore((state) => state.tasks);
   const [projectFilter, setProjectFilter] = useState('all');
   const [parallel, setParallel] = useState(false);
+  const [live, setLive] = useState(!!useLiveSessionStore.getState().selectedId);
+  useEffect(() => {
+    const open = () => {
+      setLive(true);
+      select(null);
+    };
+    window.addEventListener('jackalope:live-session', open);
+    return () => window.removeEventListener('jackalope:live-session', open);
+  }, [select]);
   useEffect(() => {
     if (!composerFocus) return;
     setParallel(false);
@@ -110,6 +121,16 @@ export function TaskWorkspace({
   );
   const needsInput = items.filter((item) => item.stage === 'attention').length;
   const ready = items.filter((item) => item.stage === 'review').length;
+  if (live)
+    return (
+      <LiveSessions
+        project={project}
+        onBack={() => {
+          setLive(false);
+          useLiveSessionStore.getState().select(null);
+        }}
+      />
+    );
   if (selected)
     return (
       <TaskDetail
@@ -130,6 +151,12 @@ export function TaskWorkspace({
         description="Describe what to build, fix, or explore."
         action={
           <div className="task-home-actions">
+            {project && (
+              <Button variant="outline" onClick={() => setLive(true)}>
+                <MessagesSquare size={16} />
+                Live session
+              </Button>
+            )}
             {!!(needsInput || ready) && (
               <a className="task-attention-link" href="#task-work">
                 {[

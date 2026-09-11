@@ -11,6 +11,25 @@ pub struct TaskChanges {
 }
 
 impl TaskRuntime {
+    pub(in crate::commands) fn live_session_runs(
+        &self,
+        detail: Option<&str>,
+    ) -> Result<Vec<TaskRun>, String> {
+        let inner = self.inner.lock().map_err(|e| e.to_string())?;
+        Ok(inner
+            .runs
+            .values()
+            .filter(|run| run.live_session_id.is_some())
+            .map(|run| {
+                let mut summary = run.summary();
+                if detail.is_some() && detail == run.live_session_id.as_deref() {
+                    summary.result = run.result.clone();
+                }
+                summary
+            })
+            .collect())
+    }
+
     pub(super) fn snapshot(&self, detail: Option<&str>) -> Vec<TaskRun> {
         let inner = self.inner.lock().unwrap();
         let mut runs: Vec<_> = inner
