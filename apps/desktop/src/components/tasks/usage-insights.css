@@ -182,7 +182,7 @@
 .usage-attribution-grid,
 .usage-outcome-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: var(--workspace-heading-gap, 24px);
 }
 .usage-attribution-grid {
@@ -215,8 +215,25 @@
 }
 .usage-ranking-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: var(--workspace-section-gap, 32px);
+}
+.usage-rank-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: radial-gradient(
+    ellipse at 40% 30%,
+    var(--color-accent-subtle),
+    var(--color-surface-sunken)
+  );
+}
+.usage-rank-mark svg {
+  width: 26px;
+  height: 26px;
 }
 .usage-rank-row {
   width: 100%;
@@ -294,14 +311,11 @@
     font-size: var(--text-2xl, 1.5rem);
   }
   .usage-ranking-grid {
-    grid-template-columns: 1fr;
     gap: 24px;
   }
 }
 @media (max-width: 650px) {
-  .usage-metrics,
-  .usage-attribution-grid,
-  .usage-outcome-grid {
+  .usage-metrics {
     grid-template-columns: 1fr;
   }
   .usage-metrics > * + * {

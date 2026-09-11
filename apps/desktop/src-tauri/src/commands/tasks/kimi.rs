@@ -880,6 +880,7 @@ setInterval(()=>{},1000);
         std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
         std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
         let mut request = RunRequest {
+                retry_of: None,
             live_session_id: None,
             effort: None,
             dependency_snapshot: Default::default(),

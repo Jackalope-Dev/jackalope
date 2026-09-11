@@ -378,7 +378,7 @@ impl TaskRuntime {
         journal::Writer::wait(self.writer.submit(run.clone(), true)?)
     }
 
-    pub(super) fn update_output(
+    pub(in crate::commands) fn update_output(
         &self,
         id: &str,
         update: impl FnOnce(&mut TaskRun),
@@ -400,6 +400,9 @@ impl TaskRuntime {
     }
 
     fn bound_output(run: &mut TaskRun) {
+        if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+            run.progress = None;
+        }
         if run.result.len() > 128_000 {
             let mut end = 128_000;
             while !run.result.is_char_boundary(end) {

@@ -984,6 +984,63 @@ impl TaskRuntime {
     pub fn profiles_root(&self) -> PathBuf {
         self.directory.join("agent-profiles")
     }
+    /// Describe a fresh attempt at the same work as `id`. The retry keeps the task's
+    /// settings and agreed outcome, starts no agent session from the old attempt, and is
+    /// free to continue in that attempt's workspace when `reusable_workspace` allows it.
+    pub(in crate::commands) fn retry_request(&self, id: &str) -> Result<RunRequest, String> {
+        let run = self
+            .inner
+            .lock()
+            .map_err(|e| e.to_string())?
+            .runs
+            .get(id)
+            .cloned()
+            .ok_or("Attempt not found")?;
+        if !["failed", "stopped", "interrupted"].contains(&run.status.as_str()) {
+            return Err(
+                "Only an attempt that failed, stopped or was interrupted can be retried.".into(),
+            );
+        }
+        if crate::commands::integration::applied_run_ids(self)?.contains(&run.id) {
+            return Err("This attempt has already been integrated. Add a new task instead.".into());
+        }
+        // Routing chose the concrete agent, so retry the same way the task was requested.
+        let automatic = run.routing.is_some();
+        Ok(RunRequest {
+            live_session_id: run.live_session_id.clone(),
+            effort: run.effort,
+            dependency_snapshot: run.dependency_snapshot.clone(),
+            monitor_change: run.monitor_change.clone(),
+            context_selection: Default::default(),
+            context_receipt: Default::default(),
+            model: (!automatic).then(|| run.model.clone()).flatten(),
+            id: uuid::Uuid::new_v4().to_string(),
+            project_id: run.project_id.clone(),
+            project_name: run.project_name.clone(),
+            project_path: run.project_path.clone(),
+            agent: if automatic {
+                "auto".into()
+            } else {
+                run.agent.clone()
+            },
+            agent_profile_id: run
+                .account_binding
+                .as_ref()
+                .and_then(|binding| binding.profile_id.clone()),
+            verify_command: run.verify_command.clone(),
+            prepare_command: run.prepare_command.clone(),
+            auto_verify: run.auto_verify,
+            target_branch: run.target_branch.clone(),
+            account_binding: None,
+            prompt: run.prompt.clone(),
+            isolated: Path::new(&run.workspace) != Path::new(&run.project_path),
+            previous_run_id: None,
+            retry_of: Some(run.id.clone()),
+            connection_ids: run.connection_ids.clone(),
+            coordination: None,
+        })
+    }
+
     pub(in crate::commands) fn start(&self, request: RunRequest) -> Result<String, String> {
         let _integration_guard = crate::commands::integration::execution_guard()?;
         self.start_locked(request)
@@ -1044,6 +1101,7 @@ impl TaskRuntime {
         }
         self.apply_policy(&mut request)?;
         let previous;
+        let retried;
         if let Some(id) = &request.previous_run_id {
             let runs = self.integration_runs()?;
             if let Some(old) = runs.iter().find(|r| &r.id == id) {
@@ -1083,6 +1141,35 @@ impl TaskRuntime {
                         .ok_or("Previous attempt not found")
                 })
                 .transpose()?;
+            retried = request
+                .retry_of
+                .as_ref()
+                .map(|id| {
+                    inner
+                        .runs
+                        .get(id)
+                        .cloned()
+                        .ok_or("The attempt being retried was not found.")
+                })
+                .transpose()?;
+            if let Some(ref old) = retried {
+                if ["starting", "running", "stopping"].contains(&old.status.as_str()) {
+                    return Err("This attempt is still running. Stop it before retrying.".into());
+                }
+                if inner.runs.values().any(|r| {
+                    r.task_id == old.task_id
+                        && ["starting", "running", "stopping"].contains(&r.status.as_str())
+                }) {
+                    return Err("This task already has an active attempt.".into());
+                }
+                if inner
+                    .runs
+                    .values()
+                    .any(|r| r.task_id == old.task_id && r.started_at > old.started_at)
+                {
+                    return Err("Open the latest attempt before retrying this task.".into());
+                }
+            }
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 crate::commands::verification::ensure_idle(&old.workspace)?;
@@ -1165,7 +1252,17 @@ impl TaskRuntime {
                     request.connection_ids = old.connection_ids.clone();
                 }
             }
-            let context_receipt = if let Some(old) = &previous {
+            if let Some(old) = &retried {
+                request.effort = request.effort.or(old.effort);
+                request.verify_command = old.verify_command.clone();
+                request.prepare_command = old.prepare_command.clone();
+                request.auto_verify = old.auto_verify;
+                request.target_branch = old.target_branch.clone().or(request.target_branch.take());
+                if request.connection_ids.is_none() {
+                    request.connection_ids = old.connection_ids.clone();
+                }
+            }
+            let context_receipt = if let Some(old) = previous.as_ref().or(retried.as_ref()) {
                 old.context_receipt.clone()
             } else {
                 self.knowledge.select(
@@ -1176,7 +1273,10 @@ impl TaskRuntime {
                 )?
             };
             request.context_receipt = context_receipt.clone();
-            let contract = if let Some(old) = &previous {
+            let contract = if let Some(old) = &retried {
+                // A retry attempts the same agreed outcome again, not the next step.
+                old.contract.clone()
+            } else if let Some(old) = &previous {
                 advanced_contract
                     .clone()
                     .unwrap_or_else(|| old.contract.continuation())
@@ -1199,6 +1299,7 @@ impl TaskRuntime {
                 retry_of: request.retry_of.clone(),
                 dependency_snapshot: previous
                     .as_ref()
+                    .or(retried.as_ref())
                     .map(|old| old.dependency_snapshot.clone())
                     .unwrap_or_else(|| request.dependency_snapshot.clone()),
                 checkpoint: None,
@@ -1214,6 +1315,7 @@ impl TaskRuntime {
                 id: request.id.clone(),
                 task_id: previous
                     .as_ref()
+                    .or(retried.as_ref())
                     .map_or(request.id.clone(), |r| r.task_id.clone()),
                 project_id: request.project_id.clone(),
                 project_name: request.project_name.clone(),

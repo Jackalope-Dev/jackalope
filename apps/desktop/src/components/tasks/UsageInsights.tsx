@@ -1,3 +1,4 @@
+import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Badge, Disclosure, DisclosureBody, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
 import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
@@ -233,7 +234,7 @@ export function UsageInsights({
       </section>
       <div className="usage-ranking-grid">
         <UsageRanking title="By project" rows={data.projects} onSelect={onProject} projects />
-        <UsageRanking title="By agent" rows={data.agents} onSelect={onAgent} />
+        <UsageRanking title="By agent" rows={data.agents} onSelect={onAgent} agents />
       </div>
       <p className="task-muted">
         Accepted means the latest saved outcome review accepted the task’s requirements. It
@@ -249,11 +250,13 @@ function UsageRanking({
   rows,
   onSelect,
   projects = false,
+  agents = false,
 }: {
   title: string;
   rows: Insights['projects'];
   onSelect: (id: string) => void;
   projects?: boolean;
+  agents?: boolean;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.tokens ?? 0));
   return (
@@ -266,6 +269,11 @@ function UsageRanking({
           className="usage-rank-row"
           onClick={() => onSelect(row.id)}
         >
+          {agents && (
+            <span className="usage-rank-mark" aria-hidden="true">
+              <AgentCharacter provider={row.id} />
+            </span>
+          )}
           <span className="usage-rank-label">
             <span>{row.label}</span>
             <small>

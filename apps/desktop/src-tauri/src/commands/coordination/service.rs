@@ -266,6 +266,7 @@ impl Coordinator {
             let instructions = instructions(&item);
             let assigned = item.clone();
             let mut request = RunRequest {
+                retry_of: None,
                 live_session_id: None,
                 effort: None,
                 dependency_snapshot: Default::default(),

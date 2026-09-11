@@ -430,6 +430,23 @@ pub async fn task_respond_prompt(
     runtime.respond_prompt(&run_id, &prompt_id, &answer)
 }
 
+/// Start a fresh attempt at a task whose last attempt did not finish, reusing that
+/// attempt's prepared workspace when it is safe to.
+#[tauri::command]
+pub async fn task_retry(
+    id: String,
+    coordinator: State<'_, super::coordination::Coordinator>,
+    state: State<'_, TaskRuntime>,
+) -> Result<String, String> {
+    let runtime = state.inner().clone();
+    let coordinator = coordinator.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        coordinator.start_manual(runtime.retry_request(&id)?)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn task_stop(id: String, state: State<'_, TaskRuntime>) -> Result<(), String> {
     let runtime = state.inner().clone();

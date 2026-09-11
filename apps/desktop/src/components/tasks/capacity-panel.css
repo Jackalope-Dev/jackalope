@@ -1,103 +1,152 @@
-.capacity-connection {
+.capacity-connections {
+  --workspace-card-min-width: 340px;
+  align-items: start;
+}
+.capacity-card {
   display: flex;
   flex-direction: column;
-  gap: var(--workspace-heading-gap, 24px);
+  gap: 18px;
+  padding: 20px;
 }
-.capacity-identity {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.capacity-identity h3 {
-  font-size: var(--text-base);
-  font-weight: 600;
-}
-.capacity-identity p {
-  margin-top: 4px;
-  overflow-wrap: anywhere;
-}
-.capacity-measurement {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-}
-.capacity-windows {
-  display: grid;
-  gap: var(--workspace-heading-gap, 24px);
-  margin-bottom: var(--workspace-section-heading-gap, 16px);
-}
-.capacity-window-label {
-  min-height: 28px;
+.capacity-card-head {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: var(--text-sm);
+  gap: 14px;
+  min-width: 0;
 }
-.capacity-remaining {
+.capacity-agent-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: radial-gradient(
+    ellipse at 40% 30%,
+    var(--color-accent-subtle),
+    var(--color-surface-sunken)
+  );
+}
+.capacity-agent-mark svg {
+  width: 32px;
+  height: 32px;
+}
+.capacity-card-identity {
+  flex: 1;
+  min-width: 0;
+}
+.capacity-card-identity h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.capacity-card-identity p {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.capacity-dials {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+}
+.capacity-dial {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+.capacity-dial[data-tone="low"] {
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border-subtle));
+}
+
+/* Radial gauge */
+.capacity-gauge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+}
+.capacity-gauge svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.capacity-gauge circle {
+  fill: none;
+  stroke-width: 8;
+}
+.capacity-gauge-track {
+  stroke: var(--color-surface-sunken);
+}
+.capacity-dial[data-tone="unknown"] .capacity-gauge-track {
+  stroke: var(--color-border-subtle);
+  stroke-dasharray: 3 6;
+  stroke-linecap: round;
+}
+.capacity-gauge-value {
+  stroke: var(--color-accent);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 400ms ease;
+}
+.capacity-dial[data-tone="low"] .capacity-gauge-value {
+  stroke: var(--color-warning);
+}
+.capacity-dial[data-tone="stale"] .capacity-gauge-value {
+  stroke: var(--color-text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .capacity-gauge-value {
+    transition: none;
+  }
+}
+.capacity-gauge-readout {
+  position: absolute;
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+  gap: 1px;
+  color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
 }
-.capacity-remaining strong {
-  color: var(--color-text-primary);
-  font-size: var(--text-3xl, 2rem);
+.capacity-gauge-readout strong {
+  font-size: var(--text-base);
   font-weight: 600;
   letter-spacing: -0.04em;
 }
-.capacity-remaining strong span {
-  margin-left: 2px;
-  font-size: var(--text-lg);
-  font-weight: 400;
+.capacity-gauge-readout > span {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
-.capacity-remaining[data-unavailable="true"] {
-  min-height: 44px;
+.capacity-gauge-unknown {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Dial labels */
+.capacity-dial-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.capacity-dial-name {
+  display: flex;
   align-items: center;
-  font-size: var(--text-lg);
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
-.capacity-window meter,
-.capacity-unknown-track {
-  display: block;
-  width: 100%;
-  height: 8px;
-  margin: 10px 0;
-  border: 0;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--color-surface-sunken);
-}
-.capacity-window meter::-webkit-meter-bar {
-  height: 8px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--color-surface-sunken);
-}
-.capacity-window meter::-webkit-meter-optimum-value {
-  border-radius: 8px;
-  background: var(--color-accent);
-}
-.capacity-window meter::-moz-meter-bar {
-  border-radius: 8px;
-  background: var(--color-accent);
-}
-.capacity-window[data-low="true"] meter::-webkit-meter-optimum-value {
-  background: var(--color-warning);
-}
-.capacity-window[data-low="true"] meter::-moz-meter-bar {
-  background: var(--color-warning);
-}
-.capacity-unknown-track {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--color-surface-sunken) 0 4px,
-    var(--color-border-subtle) 4px 6px
-  );
+.capacity-dial-reset {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .capacity-details {
   margin-top: auto;
@@ -115,5 +164,4 @@
 .capacity-unavailable {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-  margin-bottom: var(--workspace-section-heading-gap, 16px);
 }

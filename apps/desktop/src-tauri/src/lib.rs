@@ -181,6 +181,7 @@ pub fn run() {
             task_runs,
             task_changes,
             task_history_recovery,
+            task_retry,
             task_retry_save,
             task_export_recovery,
             task_archived_runs,

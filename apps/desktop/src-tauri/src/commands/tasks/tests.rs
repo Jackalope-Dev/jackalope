@@ -2,6 +2,9 @@ use super::*;
 
 pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {
+        progress: None,
+        preparation: None,
+        retry_of: None,
         archived_at: None,
         live_session_id: None,
         effort: None,
@@ -260,6 +263,7 @@ fn installed_agent_lifecycle_trial() {
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let model = std::env::var("JACKALOPE_AGENT_MODEL").ok();
     let request = RunRequest {
+        retry_of: None,
         live_session_id: None,
                 effort: None,
         dependency_snapshot: Default::default(),
@@ -584,6 +588,7 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let request = RunRequest {
+        retry_of: None,
         live_session_id: None,
         effort: None,
         dependency_snapshot: Default::default(),
