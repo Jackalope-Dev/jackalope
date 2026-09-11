@@ -1,144 +1,124 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Input } from '@jackalope/ui';
-import { ArrowLeft, Plus } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { sessionCommand, sessionWork } from '../../lib/live-session';
-import type { RunRequest } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
-import { syncAgentConfig } from '../../stores/agentConfigStore';
+import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { sessionWork } from '../../lib/live-session';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
-import { agentAccountFor, type Project } from '../../stores/projectStore';
+import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
-import { InlineNotice } from '../ui/InlineNotice';
-import { WorkspaceHeading } from '../ui/WorkspaceHeading';
-import { WorkspacePage } from '../ui/WorkspacePage';
 import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
+import { SessionStart } from './SessionStart';
 import './live-session.css';
 
-export function LiveSessions({ project, onBack }: { project?: Project; onBack: () => void }) {
-  const { sessions, runs, selectedId, select, loading, refresh } = useLiveSessionStore();
-  const [title, setTitle] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const creationId = useRef<string | null>(null);
+export function LiveSessions({
+  project,
+  onOpenProject,
+}: {
+  project?: Project;
+  onOpenProject: () => void;
+}) {
+  const { sessions, runs, selectedId, select, loading } = useLiveSessionStore();
+  const [fresh, setFresh] = useState(0);
   useEffect(observeLiveSessions, []);
-  const session = sessions.find((s) => s.id === selectedId);
-  if (session) return <LiveSessionView session={session} runs={runs} onBack={() => select(null)} />;
-  const create = async () => {
-    if (!project || creating) return;
-    setCreating(true);
-    setCreateError('');
-    creationId.current ??= crypto.randomUUID();
-    const id = creationId.current;
-    try {
-      await syncAgentConfig();
-      const agent = project.preferences?.preferredRunner || 'auto';
-      const request: RunRequest = {
-        id,
-        projectId: project.id,
-        projectName: project.name,
-        projectPath: project.path,
-        agent,
-        agentProfileId: agentAccountFor(project, agent),
-        prompt: 'Live session',
-        isolated: true,
-        targetBranch: project.preferences?.baseBranch || project.gitBranch,
-        verifyCommand: project.preferences?.verifyCommand,
-        prepareCommand: project.preferences?.prepareCommand,
-        autoVerify: project.preferences?.autoVerify ?? true,
-      };
-      await sessionCommand('create', {
-        id,
-        title: title.trim() || `${project.name} session`,
-        request,
-      });
-      await refresh(id);
-      select(id);
-      creationId.current = null;
-      setTitle('');
-    } catch (cause) {
-      setCreateError(String(cause));
-    } finally {
-      setCreating(false);
-    }
-  };
-  const visible = sessions.filter((s) => !project || s.request.projectId === project.id).reverse();
+  const session = sessions.find(
+    (item) => item.id === selectedId && (!project || item.request.projectId === project.id),
+  );
+  const items = sessions
+    .filter((item) => !project || item.request.projectId === project.id)
+    .map((item) => {
+      const work = sessionWork(item, runs);
+      const group = item.closed
+        ? 3
+        : work.status === 'Needs attention' || work.questions.length
+          ? 0
+          : work.active || work.pending
+            ? 1
+            : 2;
+      return { session: item, work, group };
+    })
+    .sort((a, b) => a.group - b.group || b.session.updatedAt.localeCompare(a.session.updatedAt));
   return (
-    <WorkspacePage>
-      <WorkspaceHeading
-        title="Live sessions"
-        action={
-          <Button variant="ghost" onClick={onBack}>
-            <ArrowLeft size={16} />
-            Tasks
-          </Button>
-        }
-      />
-      {project && (
-        <form
-          className="live-create"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void create();
-          }}
-        >
-          <Input
-            aria-label="Session name"
-            placeholder="Session name"
-            value={title}
-            disabled={creating}
-            onChange={(event) => {
-              setTitle(event.target.value);
-              creationId.current = null;
-            }}
-            maxLength={160}
-          />
+    <section className="live-hub" aria-label="Live sessions">
+      <header className="live-hub-heading">
+        <h1>Live sessions</h1>
+        {items.length > 0 && (
           <Button
-            type="submit"
-            loading={creating}
-            loadingLabel="Creating…"
-            disabled={creating || !isTauriEnvironment()}
+            variant="ghost"
+            onClick={() => {
+              select(null);
+              setFresh((value) => value + 1);
+            }}
           >
             <Plus size={16} />
-            Start session
+            New session
           </Button>
-        </form>
-      )}
-      {!project && <p className="live-muted">Choose a project to start a session.</p>}
-      <SessionRecovery />
-      {createError && <InlineNotice tone="error">{createError}</InlineNotice>}
-      {loading ? (
-        <p role="status">Loading sessions…</p>
-      ) : (
-        <div className="live-session-list">
-          {visible.map((item) => {
-            const work = sessionWork(item, runs);
-            return (
-              <button
-                type="button"
-                className="live-session-row"
-                key={item.id}
-                onClick={() => select(item.id)}
-              >
-                <span className="live-mascot">
-                  <AgentCharacter
-                    provider={work.latest?.agent ?? item.request.agent}
-                    state={work.active ? 'working' : 'idle'}
-                  />
-                </span>
-                <span>
-                  <strong>{item.title}</strong>
-                  <span className="live-muted">
-                    {work.status}
-                    {work.pending ? ` · ${work.pending} queued` : ''}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
+        )}
+      </header>
+      <div className="live-hub-body" data-has-history={items.length > 0}>
+        <div className="live-hub-canvas">
+          {session ? (
+            <LiveSessionView
+              key={session.id}
+              session={session}
+              runs={runs}
+              initialDetailsOpen={false}
+            />
+          ) : (
+            <>
+              <SessionRecovery />
+              <SessionStart
+                key={`${project?.id}:${fresh}`}
+                project={project}
+                onOpenProject={onOpenProject}
+              />
+            </>
+          )}
         </div>
+        {items.length > 0 && (
+          <nav className="live-history" aria-label="Sessions">
+            {['Needs attention', 'In progress', 'Recent', 'Finished'].map((label, group) => {
+              const members = items.filter((item) => item.group === group);
+              return (
+                members.length > 0 && (
+                  <section key={label} className="live-history-group">
+                    <h2>{label}</h2>
+                    {members.map(({ session: item, work }) => (
+                      <button
+                        type="button"
+                        className="live-history-row"
+                        key={item.id}
+                        aria-current={item.id === session?.id ? 'page' : undefined}
+                        onClick={() => select(item.id)}
+                      >
+                        <span className="live-mascot" aria-hidden="true">
+                          <AgentCharacter
+                            provider={work.latest?.agent ?? item.request.agent}
+                            state={
+                              work.questions.length ? 'waiting' : work.active ? 'working' : 'idle'
+                            }
+                          />
+                        </span>
+                        <span className="live-history-copy">
+                          <strong>{item.title}</strong>
+                          <span className="live-muted">
+                            {work.status}
+                            {work.pending ? ` · ${work.pending} queued` : ''}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </section>
+                )
+              );
+            })}
+          </nav>
+        )}
+      </div>
+      {loading && !session && (
+        <span className="live-loading" role="status">
+          Loading sessions…
+        </span>
       )}
-    </WorkspacePage>
+    </section>
   );
 }

@@ -7,6 +7,8 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
+  builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window
   drafts, pin/dock/close, paused dispatch, preview, cumulative patch review and restart.
   Extend sessions to independent task planning and guarded integration after validating

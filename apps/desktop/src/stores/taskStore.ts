@@ -6,6 +6,7 @@ import type { TaskEffort } from '../lib/task-effort';
 export type TaskStatus = 'backlog' | 'refinement' | 'in_progress' | 'verification' | 'done';
 
 export interface TaskTicket {
+  archivedAt?: string | null;
   effort?: TaskEffort;
   model?: string;
   contextSelection?: ContextSelection;

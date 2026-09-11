@@ -49,6 +49,16 @@ export interface SessionReview {
 export const sessionCommand = <T>(command: string, args?: Record<string, unknown>) =>
   nativeTask<T>(`live_session_${command}`, args);
 
+export function sessionRunNeedsAttention(run: TaskRun) {
+  return (
+    !['review', 'reviewed'].includes(run.status) ||
+    !!run.error ||
+    !!run.persistenceError ||
+    !!run.verificationError ||
+    run.verification?.result.success === false
+  );
+}
+
 export function sessionWork(session: LiveSession, runs: TaskRun[]) {
   const ids = new Set(session.batches.map((batch) => batch.runId));
   const work = runs.filter((run) => ids.has(run.id));
@@ -57,15 +67,15 @@ export function sessionWork(session: LiveSession, runs: TaskRun[]) {
     .filter((run): run is TaskRun => !!run)
     .at(-1);
   const active = work.find(isActive);
-  const pending = session.messages.filter((message) => !message.runId && !message.canceled).length;
+  const pending = session.messages.filter(
+    (message) =>
+      !message.canceled &&
+      (!message.runId ||
+        (!work.some((run) => run.id === message.runId) &&
+          !session.batches.find((batch) => batch.runId === message.runId)?.error)),
+  ).length;
   const questions = active?.prompts?.filter((prompt) => prompt.status === 'pending') ?? [];
-  const failed =
-    latest &&
-    (latest.status === 'failed' ||
-      latest.status === 'interrupted' ||
-      latest.status === 'stopped' ||
-      latest.verificationError ||
-      latest.verification?.result.success === false);
+  const failed = latest && !isActive(latest) && sessionRunNeedsAttention(latest);
   const status = session.closed
     ? 'Finished'
     : questions.length

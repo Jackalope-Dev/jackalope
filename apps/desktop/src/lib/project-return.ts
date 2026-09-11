@@ -18,6 +18,7 @@ export function returnToProject(runs: TaskRun[], projectId: string, integratedId
   return [...latest.values()]
     .filter(
       (r) =>
+        !r.archivedAt &&
         !integratedIds.includes(r.id) &&
         (r.status !== 'reviewed' || (!!r.workspace && r.workspace !== r.projectPath)),
     )

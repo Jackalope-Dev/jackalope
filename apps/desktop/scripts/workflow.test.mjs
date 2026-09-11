@@ -70,6 +70,38 @@ test('latest attempt follows timestamps and current questions override generic w
   );
 });
 
+test('archived work stays grouped with its saved idea and resumes with a new attempt', () => {
+  const original = { ...run, id: 'task', status: 'failed' };
+  const archived = { ...run, archivedAt: '2026-09-02', startedAt: '2026-09-02' };
+  const idea = { id: 'idea', runId: 'task', title: 'Saved title', projectId: 'a' };
+  assert.equal(collectWork(null, [idea], [original, archived]).length, 0);
+  const items = collectWork(null, [idea], [original, archived], [], true);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].title, 'Saved title');
+  assert.equal(items[0].run.id, archived.id);
+  assert.equal(collectWork(null, [idea], [archived], [], true)[0].title, 'Saved title');
+  const resumed = { ...run, id: 'resumed', startedAt: '2026-09-03', status: 'running' };
+  assert.equal(collectWork(null, [idea], [original, archived, resumed])[0].run.id, 'resumed');
+  assert.equal(collectWork(null, [idea], [original, archived, resumed], [], true).length, 0);
+  const saved = { ...idea, runId: undefined, archivedAt: '2026-09-02' };
+  assert.equal(collectWork(null, [saved], []).length, 0);
+  assert.equal(collectWork(null, [saved], [], [], true)[0].idea.id, 'idea');
+});
+
+test('cleanup checks every attempt and keeps unfinished ownership visible', () => {
+  const finished = { ...run, id: 'new', status: 'reviewed', startedAt: '2026-09-02' };
+  for (const previous of [
+    { ...run, status: 'interrupted' },
+    { ...run, status: 'running' },
+    { ...run, persistenceError: 'Disk full' },
+    { ...run, liveSessionId: 'session' },
+    { ...run, finishing: true },
+  ]) {
+    assert.ok(collectWork(null, [], [previous, finished])[0].archiveBlocked);
+  }
+  assert.equal(collectWork(null, [], [run, finished])[0].archiveBlocked, undefined);
+});
+
 test('stop and send waits for actual termination and refuses interrupted or missing ownership', async () => {
   let reads = 0;
   let waits = 0;

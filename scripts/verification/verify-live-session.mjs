@@ -27,6 +27,7 @@ window.__TAURI_INTERNALS__ = { metadata:{currentWindow:{label:'live-session-sess
  f.calls.push({command,...args});
  const s = useLiveSessionStore.getState().sessions[0];
  switch(command) {
+ case 'live_session_snapshot': return {sessions:useLiveSessionStore.getState().sessions,runs:useLiveSessionStore.getState().runs,error:null};
  case 'live_session_draft':
   if(args.revision!==s.draft.revision) throw new Error('The draft changed in another window.');
   const draft={text:args.text,revision:s.draft.revision+1};f.update({draft});return draft;
@@ -118,19 +119,14 @@ try {
   await input.fill('');
   await page.getByRole('button', { name: 'Cancel queued message' }).first().click();
   assert.equal(await page.locator('.live-message[data-canceled=true]').count(), 1);
-  await page.getByRole('button', { name: 'Pause dispatch', exact: true }).click();
-  await page.getByRole('button', { name: 'Resume dispatch', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Pause queue', exact: true }).click();
+  await page.getByRole('button', { name: 'Resume queue', exact: true }).waitFor();
   assert.equal(await input.isEnabled(), true);
   await page.screenshot({ path: `${output}/session-1280-dark.png` });
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
-  console.log(
-    'Light theme colors',
-    await page.evaluate(() => ({
-      root: document.documentElement.style.getPropertyValue('--color-text-primary'),
-      session: getComputedStyle(document.querySelector('.live-session')).color,
-      title: getComputedStyle(document.querySelector('h1')).color,
-    })),
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('h1')).color === 'rgb(30, 30, 36)',
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.screenshot({ path: `${output}/session-960-light.png` });
@@ -145,6 +141,21 @@ try {
   await page.getByText('1 file · Checks passed').waitFor();
   const calls = await page.evaluate(() => window.sessionFixture.calls.map((c) => c.command));
   assert.ok(calls.lastIndexOf('live_session_action') < calls.lastIndexOf('live_session_review'));
+  await page.evaluate(() => window.sessionFixture.run({ verificationError: 'Check failed' }));
+  await page
+    .locator('.live-message')
+    .filter({ hasText: 'The search results need more room.' })
+    .getByText('Needs attention', { exact: true })
+    .waitFor();
+  await page.evaluate(async () => {
+    const { useLiveSessionStore } = await import('/src/stores/liveSessionStore.ts');
+    const s = useLiveSessionStore.getState().sessions[0];
+    useLiveSessionStore.setState({
+      runs: [],
+      sessions: [{ ...s, paused: false, messages: [s.messages[0]] }],
+    });
+  });
+  await page.getByRole('button', { name: 'Queued · 1 queued', exact: true }).waitFor();
   await page.goto(`${url}/?compact`, { waitUntil: 'domcontentloaded' });
   await page.setViewportSize({ width: 440, height: 620 });
   const pin = page.getByRole('button', { name: 'Always on top', exact: true });

@@ -25,6 +25,7 @@ export interface WorkItem {
   date: string;
   idea?: TaskTicket;
   run?: TaskRun;
+  archiveBlocked?: string;
 }
 
 export function collectWork(
@@ -32,12 +33,21 @@ export function collectWork(
   ideas: TaskTicket[],
   runs: TaskRun[],
   integratedRunIds: string[] = [],
+  archived = false,
 ): WorkItem[] {
   const projectRuns = runs.filter((run) => projectId === null || run.projectId === projectId);
   const byId = new Map(projectRuns.map((run) => [run.id, run]));
   const latest = new Map<string, TaskRun>();
   const original = new Map<string, TaskRun>();
+  const blocked = new Set<string>();
   for (const run of projectRuns) {
+    if (
+      !['review', 'reviewed', 'failed', 'stopped'].includes(run.status) ||
+      run.finishing ||
+      run.liveSessionId ||
+      run.persistenceError
+    )
+      blocked.add(run.taskId);
     const newest = latest.get(run.taskId);
     const oldest = original.get(run.taskId);
     if (!newest || Date.parse(run.startedAt) > Date.parse(newest.startedAt))
@@ -48,10 +58,11 @@ export function collectWork(
   const linkedIdeas = new Map<string, TaskTicket>();
   const items: WorkItem[] = [];
   for (const idea of ideas.filter((idea) => projectId === null || idea.projectId === projectId)) {
-    const run = idea.runId ? byId.get(idea.runId) : undefined;
+    const run = idea.runId ? (byId.get(idea.runId) ?? latest.get(idea.runId)) : undefined;
     if (run) {
       linkedIdeas.set(run.taskId, idea);
     } else {
+      if (!!idea.archivedAt !== archived) continue;
       items.push({
         id: idea.id,
         title: idea.title,
@@ -62,6 +73,7 @@ export function collectWork(
     }
   }
   for (const run of latest.values()) {
+    if (!!run.archivedAt !== archived) continue;
     const idea = linkedIdeas.get(run.taskId);
     const active = ['starting', 'running', 'stopping'].includes(run.status);
     const pending = active && run.prompts?.some((prompt) => prompt.status === 'pending');
@@ -83,6 +95,9 @@ export function collectWork(
       date: run.startedAt,
       idea,
       run,
+      archiveBlocked: blocked.has(run.taskId)
+        ? 'Finish or resolve all attempts and save their history first. Live session tasks stay with their session.'
+        : undefined,
     });
   }
   return items.sort(

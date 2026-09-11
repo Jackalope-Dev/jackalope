@@ -1105,6 +1105,7 @@ impl TaskRuntime {
                 )?
             };
             let run = TaskRun {
+                archived_at: None,
                 live_session_id: request.live_session_id.clone(),
                 effort: request.effort,
                 reasoning_effort: None,

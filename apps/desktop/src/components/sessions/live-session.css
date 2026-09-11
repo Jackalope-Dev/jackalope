@@ -225,6 +225,9 @@
 }
 .live-notice {
   padding: 8px 20px;
+  max-height: 20%;
+  overflow: auto;
+  flex: 0 1 auto;
 }
 .live-review-meta {
   display: flex;
@@ -244,42 +247,162 @@
   min-height: 44px;
   padding: 12px 0;
 }
-.live-create {
-  display: flex;
-  gap: 12px;
-  max-width: 600px;
-  margin: 16px 0 24px;
-}
-.live-create input {
-  flex: 1;
-  min-width: 0;
-}
-.live-session-list {
+.live-hub {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
-.live-session-row {
+.live-hub-heading {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px 0;
-  text-align: left;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px;
+  min-height: 80px;
   border-bottom: 1px solid var(--color-border-subtle);
-  cursor: pointer;
 }
-.live-session-row:hover {
-  background: var(--color-surface-hover);
+.live-hub-heading h1 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.03em;
 }
-.live-session-row > span:last-child {
+.live-hub-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.live-hub-body[data-has-history="true"] {
+  grid-template-columns: minmax(0, 1fr) 264px;
+}
+.live-hub-canvas {
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  container-type: inline-size;
+  container-name: session-canvas;
+}
+.live-hub-canvas > .live-session {
+  flex: 1;
+}
+.live-start {
+  width: 100%;
+  max-width: 660px;
+  padding: 32px;
+  margin: auto;
+  text-align: center;
+  overflow: auto;
+}
+.live-start-mark {
+  width: 104px;
+  height: 104px;
+  margin: 0 auto 20px;
+}
+.live-start-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.live-start h2 {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  margin: 6px 0 28px;
+  overflow-wrap: anywhere;
+}
+.live-start-composer {
+  padding: 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  background: var(--color-surface-elevated);
+  text-align: left;
+}
+.live-start-composer:focus-within {
+  border-color: var(--color-border-focus);
+}
+.live-start-composer textarea {
+  width: 100%;
+  min-height: 110px;
+  max-height: 240px;
+  resize: vertical;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px;
+}
+.live-start-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+.live-history {
+  padding: 24px 14px;
+  border-left: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  overflow: auto;
+  min-height: 0;
+}
+.live-history-group {
+  margin-bottom: 24px;
+}
+.live-history-group h2 {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: 0 10px 10px;
+}
+.live-history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 8px;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.live-history-row:hover,
+.live-history-row[aria-current="page"] {
+  background: var(--color-surface-hover);
+}
+.live-history-row .live-mascot {
+  width: 32px;
+  height: 32px;
+}
+.live-history-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   min-width: 0;
 }
-.live-session-row strong {
-  font-size: var(--text-sm);
+.live-history-copy strong {
+  font-size: var(--text-xs);
   font-weight: 500;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-loading {
+  position: absolute;
+  bottom: 16px;
+  left: 28px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+@container session-canvas (max-width: 800px) {
+  .live-columns[data-expanded="true"] {
+    display: flex;
+    flex-direction: column;
+  }
+  .live-conversation {
+    flex: 1;
+  }
+  .live-work {
+    border-left: 0;
+    border-top: 1px solid var(--color-border-subtle);
+    max-height: 45%;
+  }
 }
 .live-session-detached .live-header {
   padding: 8px 8px 8px 14px;
@@ -326,11 +449,22 @@
   }
 }
 @media (max-width: 400px) {
-  .live-create {
-    flex-direction: column;
-  }
   .live-session-detached .live-header .live-mascot {
     display: none;
+  }
+}
+@media (max-width: 760px) {
+  .live-hub-body[data-has-history="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .live-history {
+    max-height: 160px;
+    border-left: 0;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .live-hub-heading {
+    padding: 14px 20px;
+    min-height: 64px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

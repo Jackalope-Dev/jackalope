@@ -26,7 +26,8 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - Lead-agent guidance automatically assesses useful delegation through available
   provider subagent tools. Task capture has no split control; unsupported or denied
   delegation stays sequential. See [agent quality](AGENT-QUALITY.md) for boundaries.
-- Durable incremental task saves, bounded concurrent history loading, recovery
+- Individual and bulk task archiving with undo and restore, preserving results and workspaces.
+  Durable incremental task saves, bounded concurrent history loading, recovery
   exports and [archive management](HISTORY-RECOVERY.md).
 - Project guidance, editable lessons, codebase maps and task outcome insights.
 - MCP connections, task-owned Chromium sessions and scoped desktop-window grants.

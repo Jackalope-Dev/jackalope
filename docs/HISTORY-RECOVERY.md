@@ -6,11 +6,24 @@ checkpoints and crash recovery. A failed save never establishes successful persi
 
 ## Archives and imports
 
+Tasks offers individual archive actions, **Select tasks**, and **Archive finished**.
+Bulk actions apply only to tasks matching the current project, search and status
+filters. **Archived** lists manually archived tasks and saved ideas with restore
+actions; Undo restores the last successful archive batch. Results, usage, queue
+references and workspaces remain available. Archiving does not accept a result,
+remove a worktree or delete history.
+
+Manual archive state is saved on the latest native attempt, or on an unstarted
+saved idea. A new attempt brings its task back into the current list. Active,
+interrupted, finishing, unsaved and live-session attempts block manual archiving.
+Failed saves leave tasks visible; partial batch failures identify the affected tasks.
+
 On startup, reviewed runs beyond the most recent 200 move to `history/archive` in
 the native profile. Archived runs remain on disk and searchable. Active, review-ready,
-failed, interrupted and unsaved runs remain loaded.
+failed, interrupted, unsaved, manually archived and live-session runs remain loaded. Session attempts
+stay available because later batches depend on their workspace and account identity.
 
-Settings → Data & reset lists archives, restores selected runs and imports
+Tasks → Archived and Settings → Data & reset list retention archives, restore runs and import
 `jackalope-task-recovery` exports. An import or restoration cannot overwrite an
 existing run. Recovery exports contain private task data; inspect them before sharing.
 

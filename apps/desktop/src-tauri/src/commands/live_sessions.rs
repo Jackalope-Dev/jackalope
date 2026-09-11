@@ -29,6 +29,12 @@ pub struct SessionMessage {
     pub canceled: bool,
 }
 
+#[derive(Deserialize)]
+pub struct FirstMessage {
+    id: String,
+    text: String,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionBatch {
@@ -111,12 +117,16 @@ impl LiveSessions {
                 )),
             ),
         };
+        let runs = runtime.live_session_runs(None).unwrap_or_default();
         for session in &mut ledger.sessions {
             session.paused = true;
-            if session.batches.last().is_some_and(|batch| !batch.settled) {
+            if let Some(batch) = session.batches.last_mut().filter(|batch| !batch.settled) {
                 session.error = Some(
                     "The session was interrupted. Review the last attempt before resuming.".into(),
                 );
+                if !runs.iter().any(|run| run.id == batch.run_id) {
+                    batch.error = Some("The pending launch was interrupted. Retry it explicitly after reviewing saved task history.".into());
+                }
             }
         }
         Self {
@@ -180,10 +190,38 @@ impl LiveSessions {
         })
     }
 
-    fn create(&self, id: String, title: String, mut request: RunRequest) -> Result<String, String> {
+    fn create(
+        &self,
+        id: String,
+        title: String,
+        mut request: RunRequest,
+        first_message: Option<FirstMessage>,
+    ) -> Result<String, String> {
         Uuid::parse_str(&id).map_err(|_| "Invalid session identifier")?;
-        if title.trim().is_empty() || title.len() > 160 {
-            return Err("Use a session title up to 160 bytes.".into());
+        if let Some(message) = &first_message {
+            Uuid::parse_str(&message.id).map_err(|_| "Invalid message identifier")?;
+            if message.text.trim().is_empty() || message.text.len() > 12_000 {
+                return Err("Use a message between 1 and 12,000 bytes.".into());
+            }
+        }
+        let title = first_message
+            .as_ref()
+            .map(|message| {
+                let text = message
+                    .text
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let title: String = text.chars().take(64).collect();
+                if text.chars().count() > 64 {
+                    format!("{title}…")
+                } else {
+                    title
+                }
+            })
+            .unwrap_or(title);
+        if title.trim().is_empty() || title.chars().count() > 160 {
+            return Err("Use a session title up to 160 characters.".into());
         }
         let target = super::tasks::resolve_target_branch(
             &request.project_path,
@@ -199,6 +237,11 @@ impl LiveSessions {
             if let Some(existing) = ledger.sessions.iter().find(|s| s.id == id) {
                 if existing.title == title.trim()
                     && existing.request.project_path == request.project_path
+                    && first_message.as_ref().is_none_or(|first| {
+                        existing.messages.iter().any(|message| {
+                            message.id == first.id && message.text == first.text.trim()
+                        })
+                    })
                 {
                     return Ok(id);
                 }
@@ -208,6 +251,16 @@ impl LiveSessions {
                 return Err("Live sessions are limited to 100 saved sessions.".into());
             }
             let now = Utc::now().to_rfc3339();
+            let messages = first_message
+                .into_iter()
+                .map(|message| SessionMessage {
+                    id: message.id,
+                    text: message.text.trim().into(),
+                    created_at: now.clone(),
+                    run_id: None,
+                    canceled: false,
+                })
+                .collect();
             ledger.sessions.push(LiveSession {
                 pinned: false,
                 id: id.clone(),
@@ -217,7 +270,7 @@ impl LiveSessions {
                 updated_at: now,
                 paused: false,
                 closed: false,
-                messages: vec![],
+                messages,
                 batches: vec![],
                 draft: Default::default(),
                 error: None,
@@ -376,6 +429,18 @@ impl LiveSessions {
                 }
             }
             if snapshot.paused || snapshot.error.is_some() {
+                continue;
+            }
+            if snapshot.batches.last().is_some_and(|batch| {
+                batch.settled && !runs.iter().any(|run| run.id == batch.run_id)
+            }) {
+                self.update(|ledger| {
+                    let session = Self::session(ledger, &id)?;
+                    session.paused = true;
+                    session.error = Some("Restore the missing attempt from task history before continuing this session.".into());
+                    Ok(())
+                })?;
+                changed = true;
                 continue;
             }
             if let Some(last) = snapshot.batches.last().filter(|batch| batch.settled) {
@@ -594,13 +659,21 @@ pub async fn live_session_create(
     service: State<'_, LiveSessions>,
     app: AppHandle,
     id: String,
-    title: String,
+    title: Option<String>,
     request: RunRequest,
+    first_message: Option<FirstMessage>,
 ) -> Result<String, String> {
     let service = service.inner().clone();
-    let result = tauri::async_runtime::spawn_blocking(move || service.create(id, title, request))
-        .await
-        .map_err(|e| e.to_string())??;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        service.create(
+            id,
+            title.unwrap_or_else(|| "New session".into()),
+            request,
+            first_message,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
     Ok(result)
 }

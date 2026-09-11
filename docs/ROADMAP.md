@@ -27,7 +27,8 @@ Antigravity subscription capacity are implemented. Installed-agent acceptance re
 in progress; provider-specific reporting and permission boundaries still apply.
 
 Projects, agent accounts, tasks, queues, Git worktrees, checks and reviewed
-integration are implemented. The workspace also includes schedules, local change
+integration are implemented. Task cleanup includes individual and bulk archiving
+with undo and restore while retaining results and workspaces. The workspace also includes schedules, local change
 monitors, MCP connections, browser sessions, project lessons, codebase maps,
 capacity-aware routing and Ask Jackalope. Provider and platform limits apply;
 implementation does not establish release acceptance.

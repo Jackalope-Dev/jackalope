@@ -5,16 +5,16 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import { DropdownMenu as Menu } from '@jackalope/ui';
-import { FolderOpen, MessagesSquare, MoreHorizontal, Workflow } from 'lucide-react';
+import { FolderOpen, MoreHorizontal, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
 import { collectWork, type WorkItem } from '../../lib/task-collection';
+import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
-import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { LiveSessions } from '../sessions/LiveSessions';
+import { ArchivedHistory } from '../settings/ArchivedHistory';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
@@ -44,16 +44,9 @@ export function TaskWorkspace({
   const error = useExecutionStore((state) => state.error);
   const ideas = useTaskStore((state) => state.tasks);
   const [projectFilter, setProjectFilter] = useState('all');
+  const [archived, setArchived] = useState(false);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
   const [parallel, setParallel] = useState(false);
-  const [live, setLive] = useState(!!useLiveSessionStore.getState().selectedId);
-  useEffect(() => {
-    const open = () => {
-      setLive(true);
-      select(null);
-    };
-    window.addEventListener('jackalope:live-session', open);
-    return () => window.removeEventListener('jackalope:live-session', open);
-  }, [select]);
   useEffect(() => {
     if (!composerFocus) return;
     setParallel(false);
@@ -116,21 +109,30 @@ export function TaskWorkspace({
         ideas,
         runs,
         integratedIds,
+        archived,
       ),
-    [projectFilter, ideas, runs, integratedIds],
+    [projectFilter, ideas, runs, integratedIds, archived],
   );
+  const archiveItems = async (selected: WorkItem[], archive: boolean) => {
+    const failures: string[] = [];
+    for (const item of selected) {
+      try {
+        if (item.run) {
+          await nativeTask('task_set_archived', { id: item.run.id, archived: archive });
+        } else if (item.idea) {
+          useTaskStore.getState().updateTask(item.idea.id, {
+            archivedAt: archive ? new Date().toISOString() : null,
+          });
+        }
+      } catch (cause) {
+        failures.push(`${item.title}: ${String(cause)}`);
+      }
+    }
+    await useExecutionStore.getState().refresh();
+    if (failures.length) throw new Error(failures.join('\n'));
+  };
   const needsInput = items.filter((item) => item.stage === 'attention').length;
   const ready = items.filter((item) => item.stage === 'review').length;
-  if (live)
-    return (
-      <LiveSessions
-        project={project}
-        onBack={() => {
-          setLive(false);
-          useLiveSessionStore.getState().select(null);
-        }}
-      />
-    );
   if (selected)
     return (
       <TaskDetail
@@ -151,12 +153,6 @@ export function TaskWorkspace({
         description="Describe what to build, fix, or explore."
         action={
           <div className="task-home-actions">
-            {project && (
-              <Button variant="outline" onClick={() => setLive(true)}>
-                <MessagesSquare size={16} />
-                Live session
-              </Button>
-            )}
             {!!(needsInput || ready) && (
               <a className="task-attention-link" href="#task-work">
                 {[
@@ -200,7 +196,7 @@ export function TaskWorkspace({
           <WorkspaceSectionHeading titleId="task-work" title="Your work" />
         </div>
       )}
-      {project && (
+      {project && !archived && (
         <ProjectReturn
           key={project.id}
           project={project}
@@ -211,8 +207,30 @@ export function TaskWorkspace({
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <fieldset className="work-toolbar" aria-label="Task history">
+        <Button
+          disabled={cleanupBusy}
+          variant={archived ? 'ghost' : 'secondary'}
+          aria-pressed={!archived}
+          onClick={() => setArchived(false)}
+        >
+          Current tasks
+        </Button>
+        <Button
+          disabled={cleanupBusy}
+          variant={archived ? 'secondary' : 'ghost'}
+          aria-pressed={archived}
+          onClick={() => setArchived(true)}
+        >
+          Archived
+        </Button>
+      </fieldset>
       {runs.length > 0 || ideas.length > 0 ? (
         <TaskCollection
+          key={String(archived)}
+          archived={archived}
+          onArchive={archiveItems}
+          onBusyChange={setCleanupBusy}
           scope={
             <Select
               aria-label="Filter by project"
@@ -231,7 +249,7 @@ export function TaskWorkspace({
           emptyState={
             <EmptyState
               icon={FolderOpen}
-              title="No tasks in this project"
+              title={archived ? 'No archived tasks in this project' : 'No tasks in this project'}
               action={
                 <Button variant="outline" onClick={() => setProjectFilter('all')}>
                   Show all projects
@@ -246,6 +264,7 @@ export function TaskWorkspace({
           onOpen={openItem}
         />
       ) : null}
+      {archived && <ArchivedHistory />}
     </WorkspacePage>
   );
 }

@@ -10,28 +10,30 @@ export function SessionRecovery() {
   const [failure, setFailure] = useState('');
   if (!error) return null;
   return (
-    <InlineNotice tone="error">
-      {failure || error}
-      <Button
-        variant="outline"
-        loading={busy}
-        loadingLabel="Reloading…"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          setFailure('');
-          try {
-            await sessionCommand('recover');
-            await refresh();
-          } catch (cause) {
-            setFailure(String(cause));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        Reload saved sessions
-      </Button>
-    </InlineNotice>
+    <div className="live-notice">
+      <InlineNotice tone="error">
+        {failure || error}
+        <Button
+          variant="outline"
+          loading={busy}
+          loadingLabel="Reloading…"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setFailure('');
+            try {
+              await sessionCommand('recover');
+              await refresh();
+            } catch (cause) {
+              setFailure(String(cause));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Reload saved sessions
+        </Button>
+      </InlineNotice>
+    </div>
   );
 }

@@ -11,12 +11,14 @@ In Tasks, choose **Live session**, name it and send messages. Capture stays avai
 while a batch runs. Messages arriving together are grouped in order; subsequent
 batches continue in the same isolated worktree and retain the selected agent account.
 Use **Pop out** for a separate window; its pin controls always-on-top. Closing the
-window leaves execution running. **Pause dispatch** holds later messages, while
+window leaves execution running. **Pause queue** holds later messages, while
 **Stop work** also stops the active attempt through the existing runtime.
 
 Sessions save messages before claiming a batch, preserve draft revisions across
 windows, and pause after failures or restart. Pending launch retries reuse the saved
-attempt identifier. Interrupted process ownership keeps the normal runtime safeguards.
+attempt identifier. An interrupted launch requires an explicit retry. Session attempts
+stay in loaded history; a missing completed attempt blocks continuation until restored.
+Interrupted process ownership keeps the normal runtime safeguards.
 Never edit the session journal while its profile is running. Reload saved sessions
 after resolving a storage error; failed loads preserve the original file.
 

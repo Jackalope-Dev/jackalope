@@ -3,7 +3,7 @@ use super::*;
 /// Most recent reviewed runs kept in the loaded history. Older reviewed runs are
 /// moved to `archive/` on startup: still on disk and restorable, but out of the
 /// in-memory set that every poll serialises. Active, review-ready, failed,
-/// interrupted and unsaved runs are never archived.
+/// interrupted, unsaved and live-session runs are never archived.
 const RETAINED_REVIEWED: usize = 200;
 
 impl TaskRuntime {
@@ -190,7 +190,12 @@ impl TaskRuntime {
             let mut reviewed: Vec<&TaskRun> = inner
                 .runs
                 .values()
-                .filter(|run| run.status == "reviewed" && run.persistence_error.is_none())
+                .filter(|run| {
+                    run.status == "reviewed"
+                        && run.persistence_error.is_none()
+                        && run.live_session_id.is_none()
+                        && run.archived_at.is_none()
+                })
                 .collect();
             reviewed.sort_by(|a, b| Self::recency_key(b).cmp(Self::recency_key(a)));
             reviewed
@@ -212,6 +217,42 @@ impl TaskRuntime {
                 self.inner.lock().unwrap().runs.remove(&id);
             }
         }
+    }
+
+    pub(in crate::commands) fn set_archived(&self, id: &str, archived: bool) -> Result<(), String> {
+        let _guard = crate::commands::integration::execution_guard()?;
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        let current = inner.runs.get(id).ok_or("Task attempt not found")?;
+        if archived {
+            for run in inner
+                .runs
+                .values()
+                .filter(|run| run.task_id == current.task_id)
+            {
+                if !["review", "reviewed", "failed", "stopped"].contains(&run.status.as_str())
+                    || run.finishing
+                    || run.live_session_id.is_some()
+                {
+                    return Err("Finish or resolve all attempts before archiving this task. Live session tasks stay with their session.".into());
+                }
+                if run.persistence_error.is_some() || self.writer.error(&run.id).is_some() {
+                    return Err("Save this task's history before archiving it.".into());
+                }
+                if chrono::DateTime::parse_from_rfc3339(&run.started_at).ok()
+                    > chrono::DateTime::parse_from_rfc3339(&current.started_at).ok()
+                {
+                    return Err(
+                        "This task has a newer attempt. Refresh the task list and try again."
+                            .into(),
+                    );
+                }
+            }
+        }
+        let mut updated = current.clone();
+        updated.archived_at = archived.then(|| Utc::now().to_rfc3339());
+        self.save(&updated)?;
+        inner.runs.insert(id.to_string(), updated);
+        Ok(())
     }
 
     /// Parse the newest `limit` archived records by modification time.

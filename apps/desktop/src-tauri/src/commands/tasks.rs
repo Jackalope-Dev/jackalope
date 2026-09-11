@@ -348,6 +348,18 @@ pub async fn task_screenshot(
 }
 
 #[tauri::command]
+pub async fn task_set_archived(
+    id: String,
+    archived: bool,
+    state: State<'_, TaskRuntime>,
+) -> Result<(), String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || runtime.set_archived(&id, archived))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub async fn task_archived_runs(state: State<'_, TaskRuntime>) -> Result<Vec<ArchivedRun>, String> {
     let runtime = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || runtime.archived_runs())

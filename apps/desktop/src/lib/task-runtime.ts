@@ -18,6 +18,8 @@ export interface RunUsage {
   estimatedCostUsd: number | null;
 }
 export interface TaskRun {
+  archivedAt?: string | null;
+  liveSessionId?: string | null;
   effort?: import('./task-effort').TaskEffort | null;
   reasoningEffort?: string | null;
   efficiency?: {

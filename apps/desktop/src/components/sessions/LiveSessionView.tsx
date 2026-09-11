@@ -15,6 +15,7 @@ import {
   type LiveSession,
   type SessionReview,
   sessionCommand,
+  sessionRunNeedsAttention,
   sessionWork,
 } from '../../lib/live-session';
 import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/task-runtime';
@@ -37,14 +38,16 @@ export function LiveSessionView({
   runs,
   detached = false,
   onBack,
+  initialDetailsOpen = !detached,
 }: {
   session: LiveSession;
   runs: TaskRun[];
   detached?: boolean;
   onBack?: () => void;
+  initialDetailsOpen?: boolean;
 }) {
   const { active, latest, pending, questions, status } = sessionWork(session, runs);
-  const [expanded, setExpanded] = useState(!detached);
+  const [expanded, setExpanded] = useState(initialDetailsOpen);
   const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState<'work' | 'changes' | 'preview'>('work');
   const [error, setError] = useState('');
@@ -255,14 +258,12 @@ export function LiveSessionView({
                           : run
                             ? isActive(run)
                               ? 'Working'
-                              : run.status === 'review' || run.status === 'reviewed'
-                                ? 'Handled'
-                                : 'Needs attention'
+                              : sessionRunNeedsAttention(run)
+                                ? 'Needs attention'
+                                : 'Handled'
                             : batch?.error
                               ? 'Needs attention'
-                              : message.runId
-                                ? 'Assigned'
-                                : 'Queued'}
+                              : 'Queued'}
                         {!message.runId && !message.canceled && (
                           <button
                             type="button"
@@ -413,8 +414,8 @@ export function LiveSessionView({
                     {session.closed
                       ? 'Reopen session'
                       : session.paused
-                        ? 'Resume dispatch'
-                        : 'Pause dispatch'}
+                        ? 'Resume queue'
+                        : 'Pause queue'}
                   </Button>
                   {active && (
                     <Button

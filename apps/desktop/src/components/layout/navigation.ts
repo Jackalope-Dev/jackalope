@@ -10,6 +10,7 @@ import {
   ListTodo,
   Network,
   Plug,
+  Radio,
   Settings2,
   Share2,
 } from 'lucide-react';
@@ -20,6 +21,14 @@ export const WORKSPACE_VIEWS = [
     description: 'Plan, execute and review work.',
     icon: Layers3,
     group: 'tasks',
+    primary: true,
+  },
+  {
+    id: 'live-sessions',
+    label: 'Live',
+    description: 'Live sessions: send ideas, follow work and review changes.',
+    icon: Radio,
+    group: 'live',
     primary: true,
   },
   {

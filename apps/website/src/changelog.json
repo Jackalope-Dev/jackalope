@@ -1,5 +1,16 @@
 [
   {
+    "id": "an-easier-way-to-clear-old-tasks",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "An easier way to clear old tasks.",
+    "description": "Keep your task list focused with reversible cleanup.",
+    "items": [
+      "Archive tasks individually, select a batch, or archive finished tasks matching your filters.",
+      "Undo an archive or restore tasks from Archived. Results and workspaces stay available."
+    ]
+  },
+  {
     "id": "live-sessions",
     "date": "2026-09-11",
     "status": "In development",

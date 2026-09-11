@@ -25,6 +25,8 @@ pub struct UsageObservation {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]
+    pub archived_at: Option<String>,
+    #[serde(default)]
     pub live_session_id: Option<String>,
     #[serde(default)]
     pub effort: Option<super::effort::TaskEffort>,
@@ -206,6 +208,7 @@ impl TaskRun {
             check
         });
         Self {
+            archived_at: self.archived_at.clone(),
             live_session_id: self.live_session_id.clone(),
             effort: self.effort,
             reasoning_effort: self.reasoning_effort.clone(),

@@ -2,6 +2,7 @@ use super::*;
 
 pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {
+        archived_at: None,
         live_session_id: None,
         effort: None,
         reasoning_effort: None,
@@ -1025,9 +1026,125 @@ fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
 }
 
 #[test]
+fn manual_archive_preserves_history_and_restores_after_restart() {
+    let folder =
+        std::env::temp_dir().join(format!("jackalope-manual-archive-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("codex");
+    run.status = "reviewed".into();
+    run.result = "Keep this result".into();
+    runtime.save(&run).unwrap();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(run.id.clone(), run.clone());
+    runtime.set_archived(&run.id, true).unwrap();
+    assert!(runtime.snapshot(None)[0].archived_at.is_some());
+    drop(runtime);
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let saved = runtime.snapshot(Some(&run.id));
+    assert!(saved[0].archived_at.is_some());
+    assert_eq!(saved[0].result, run.result);
+    assert_eq!(saved[0].status, "reviewed");
+    runtime.set_archived(&run.id, false).unwrap();
+    drop(runtime);
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    assert!(runtime.snapshot(None)[0].archived_at.is_none());
+    drop(runtime);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+fn manual_archive_rejects_unfinished_unsaved_session_and_stale_attempts() {
+    let folder =
+        std::env::temp_dir().join(format!("jackalope-archive-guards-{}", uuid::Uuid::new_v4()));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("codex");
+    for status in ["starting", "running", "stopping", "interrupted"] {
+        run.status = status.into();
+        runtime
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .insert(run.id.clone(), run.clone());
+        assert!(runtime.set_archived(&run.id, true).is_err());
+    }
+    run.status = "reviewed".into();
+    for blocked in [
+        TaskRun {
+            persistence_error: Some("disk full".into()),
+            ..run.clone()
+        },
+        TaskRun {
+            finishing: true,
+            ..run.clone()
+        },
+        TaskRun {
+            live_session_id: Some("session".into()),
+            ..run.clone()
+        },
+    ] {
+        runtime
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .insert(run.id.clone(), blocked);
+        assert!(runtime.set_archived(&run.id, true).is_err());
+    }
+    run.started_at = "2026-09-06T23:00:00Z".into();
+    let newer = TaskRun {
+        id: "newer-attempt".into(),
+        started_at: "2026-09-06T18:00:00-06:00".into(),
+        ..run.clone()
+    };
+    {
+        let mut inner = runtime.inner.lock().unwrap();
+        inner.runs.insert(run.id.clone(), run.clone());
+        inner.runs.insert(newer.id.clone(), newer.clone());
+    }
+    assert!(runtime.set_archived(&run.id, true).is_err());
+    runtime.set_archived(&newer.id, true).unwrap();
+    assert!(runtime.set_archived("missing", true).is_err());
+    drop(runtime);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
+fn manual_archive_failed_save_keeps_task_visible() {
+    let folder = std::env::temp_dir().join(format!(
+        "jackalope-archive-failure-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut run = sample("codex");
+    run.status = "failed".into();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(run.id.clone(), run.clone());
+    std::fs::create_dir(folder.join(format!("{}.json", run.id))).unwrap();
+    assert!(runtime.set_archived(&run.id, true).is_err());
+    assert!(runtime.snapshot(None)[0].archived_at.is_none());
+    drop(runtime);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[test]
 fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let folder = std::env::temp_dir().join(format!("jackalope-retention-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let mut session_run = sample("codex");
+    session_run.id = "keep-live-session".into();
+    session_run.live_session_id = Some("live-session".into());
+    session_run.status = "reviewed".into();
+    session_run.started_at = "2025-01-01T00:00:00Z".into();
+    runtime.save(&session_run).unwrap();
     for status in ["review", "failed", "interrupted"] {
         let mut run = sample("codex");
         run.id = format!("keep-{status}");
@@ -1048,8 +1165,9 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let loaded = restarted.integration_runs().unwrap();
     assert_eq!(
         loaded.iter().filter(|r| r.status == "reviewed").count(),
-        200
+        201
     );
+    assert!(loaded.iter().any(|r| r.id == "keep-live-session"));
     assert!(loaded.iter().any(|r| r.id == "reviewed-0204"));
     assert!(!loaded.iter().any(|r| r.id == "reviewed-0000"));
     for status in ["review", "failed", "interrupted"] {

@@ -46,6 +46,9 @@ export type { ActiveTab } from './navigation';
 // Workspace views and heavy dialogs load on demand so the first paint ships only
 // the task workspace. Each stays in its own chunk keyed by the tab that shows it.
 const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default: m.RepoTodos })));
+const LiveSessions = lazy(() =>
+  import('../sessions/LiveSessions').then((m) => ({ default: m.LiveSessions })),
+);
 const CodebaseMap = lazy(() =>
   import('../visualizer/CodebaseMap').then((m) => ({ default: m.CodebaseMap })),
 );
@@ -109,8 +112,9 @@ export function Shell({
     let stop: (() => void) | undefined;
     void listen<string>('live-session-open', ({ payload }) => {
       useLiveSessionStore.getState().select(payload);
-      setActiveTab('kanban');
-      requestAnimationFrame(() => window.dispatchEvent(new CustomEvent('jackalope:live-session')));
+      const session = useLiveSessionStore.getState().sessions.find((item) => item.id === payload);
+      if (session) useProjectStore.getState().selectProject(session.request.projectId);
+      setActiveTab('live-sessions');
     }).then((unlisten) => {
       if (disposed) unlisten();
       else stop = unlisten;
@@ -447,6 +451,9 @@ export function Shell({
             )}
             {activeTab === 'worktrees' && (
               <WorktreeManager key={activeProjectId} onOpenProject={openProjectSetup} />
+            )}
+            {activeTab === 'live-sessions' && (
+              <LiveSessions project={project} onOpenProject={openProjectSetup} />
             )}
             {activeTab === 'repo-todos' && (
               <RepoTodos

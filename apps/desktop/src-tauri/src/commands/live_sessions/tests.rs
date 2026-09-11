@@ -32,7 +32,7 @@ fn fixture() -> (PathBuf, LiveSessions, String) {
     let request: RunRequest = serde_json::from_value(serde_json::json!({"id": Uuid::new_v4().to_string(), "projectId":"fixture", "projectName":"Fixture", "projectPath":repo.to_string_lossy(), "agent":"codex", "model":null, "prompt":"Session", "isolated":true, "previousRunId":null})).unwrap();
     let id = Uuid::new_v4().to_string();
     service
-        .create(id.clone(), "Walkthrough".into(), request)
+        .create(id.clone(), "Walkthrough".into(), request, None)
         .unwrap();
     (root, service, id)
 }
@@ -59,6 +59,53 @@ fn messages_are_durable_idempotent_and_keep_order() {
     let prompt = batch_prompt(&saved.sessions[0], &messages);
     assert!(prompt.find("Move the button").unwrap() < prompt.find("Desktop only").unwrap());
     assert!(prompt.contains("Do not commit"));
+}
+
+#[test]
+fn first_message_starts_and_names_the_session_atomically() {
+    let (_root, service, existing) = fixture();
+    let request = service.snapshot(None).unwrap().sessions[0].request.clone();
+    let id = Uuid::new_v4().to_string();
+    let message_id = Uuid::new_v4().to_string();
+    for _ in 0..2 {
+        service
+            .create(
+                id.clone(),
+                String::new(),
+                request.clone(),
+                Some(FirstMessage {
+                    id: message_id.clone(),
+                    text: "  Fix the search\n spacing  ".into(),
+                }),
+            )
+            .unwrap();
+    }
+    let snapshot = service.snapshot(Some(&id)).unwrap();
+    let session = snapshot
+        .sessions
+        .iter()
+        .find(|session| session.id == id)
+        .unwrap();
+    assert_eq!(session.title, "Fix the search spacing");
+    assert_eq!(session.messages.len(), 1);
+    assert_eq!(session.messages[0].text, "Fix the search\n spacing");
+    assert!(!session.paused);
+    assert!(snapshot
+        .sessions
+        .iter()
+        .any(|session| session.id == existing));
+    assert!(service
+        .create(
+            Uuid::new_v4().to_string(),
+            String::new(),
+            request,
+            Some(FirstMessage {
+                id: message_id,
+                text: " ".into()
+            })
+        )
+        .is_err());
+    assert_eq!(service.snapshot(None).unwrap().sessions.len(), 2);
 }
 
 #[test]
@@ -98,6 +145,49 @@ fn restart_pauses_dispatch_and_preserves_unclaimed_messages() {
     assert!(snapshot.sessions[0].paused);
     assert!(snapshot.sessions[0].messages[0].run_id.is_none());
     assert!(!restored.tick().unwrap());
+}
+
+#[test]
+fn missing_attempts_require_recovery_instead_of_silent_replay() {
+    let (_root, service, id) = fixture();
+    let run_id = Uuid::new_v4().to_string();
+    service
+        .update(|ledger| {
+            LiveSessions::session(ledger, &id)?
+                .batches
+                .push(SessionBatch {
+                    run_id: run_id.clone(),
+                    message_ids: vec![],
+                    prompt: "Pending".into(),
+                    previous_run_id: None,
+                    error: None,
+                    settled: false,
+                });
+            Ok(())
+        })
+        .unwrap();
+    let restored = LiveSessions::new(
+        service.path.clone(),
+        service.runtime.clone(),
+        service.coordinator.clone(),
+    );
+    assert!(restored.action(&id, "resume", None).is_err());
+    assert!(!restored.tick().unwrap());
+    restored.action(&id, "retry", None).unwrap();
+    assert_eq!(
+        restored.snapshot(None).unwrap().sessions[0].batches[0].run_id,
+        run_id
+    );
+    restored
+        .update(|ledger| {
+            LiveSessions::session(ledger, &id)?.batches[0].settled = true;
+            Ok(())
+        })
+        .unwrap();
+    assert!(restored.tick().unwrap());
+    assert!(restored.snapshot(None).unwrap().sessions[0].paused);
+    assert!(!restored.tick().unwrap());
+    assert!(restored.runtime.integration_runs().unwrap().is_empty());
 }
 
 #[test]
