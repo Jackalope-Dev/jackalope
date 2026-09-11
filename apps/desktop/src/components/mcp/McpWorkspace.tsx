@@ -22,8 +22,11 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
+import { InlineNotice } from '../ui/InlineNotice';
+import { Input } from '../ui/input';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
+import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { McpAddCustomModal } from './McpAddCustomModal';
 import { McpMarketplaceCard } from './McpMarketplaceCard';
 import { McpServerPage } from './McpServerPage';
@@ -225,9 +228,9 @@ export function McpWorkspace({
             }
           />
           {copyError && (
-            <p role="alert" className="task-error mb-4">
+            <InlineNotice tone="error" className="mb-4">
               {copyError}
-            </p>
+            </InlineNotice>
           )}
 
           {/* Main Tabs */}
@@ -261,15 +264,18 @@ export function McpWorkspace({
           {activeTab === 'configured' && (
             <section>
               {serversError && (
-                <p role="alert" className="task-error mb-4">
+                <InlineNotice tone="error" className="mb-4">
                   {serversError}
-                </p>
+                </InlineNotice>
               )}
 
               {/* Scope Filters & Search */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <div className="mcp-scope-filters">
-                  {[
+              <WorkspaceToolbar className="mb-4">
+                <FilterGroup
+                  label="Connection scope"
+                  value={scopeFilter}
+                  onChange={setScopeFilter}
+                  items={[
                     { id: 'all', label: `All (${servers.length})` },
                     ...(activeProjectId
                       ? [
@@ -295,33 +301,23 @@ export function McpWorkspace({
                       id: 'grok',
                       label: `Grok (${servers.filter((s) => s.scope === 'grok').length})`,
                     },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setScopeFilter(item.id)}
-                      aria-pressed={scopeFilter === item.id}
-                      className={`mcp-scope-chip ${scopeFilter === item.id ? 'active' : ''}`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+                  ]}
+                />
 
                 <div className="relative min-w-56">
                   <Search
                     size={14}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                   />
-                  <input
+                  <Input
                     aria-label="Filter connections"
-                    className="task-input with-search-icon w-full py-1.5 text-xs"
+                    className="with-search-icon"
                     placeholder="Filter connections or checked tools…"
                     value={configuredSearch}
                     onChange={(e) => setConfiguredSearch(e.target.value)}
                   />
                 </div>
-              </div>
+              </WorkspaceToolbar>
 
               {/* Servers Grid */}
               {loadingServers ? (
@@ -631,9 +627,9 @@ export function McpWorkspace({
                   </div>
 
                   {marketplaceError && (
-                    <p role="alert" className="task-error mb-4">
+                    <InlineNotice tone="error" className="mb-4">
                       {marketplaceError}
-                    </p>
+                    </InlineNotice>
                   )}
 
                   {loadingMarketplace ? (

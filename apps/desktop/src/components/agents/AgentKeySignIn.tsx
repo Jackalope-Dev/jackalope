@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { type AgentProfile, saveAgentProfileKey } from '../../lib/agent-profiles';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
@@ -135,11 +136,7 @@ export function AgentKeySignIn({
               />
               Use for new tasks
             </label>
-            {error && (
-              <p role="alert" className="task-error">
-                {error}
-              </p>
-            )}
+            {error && <InlineNotice tone="error">{error}</InlineNotice>}
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
                 Cancel

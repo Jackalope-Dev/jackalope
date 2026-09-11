@@ -23,7 +23,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
-import { Setting } from './Setting';
+import { Setting, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
@@ -296,7 +296,7 @@ export function SettingsPage({
               {c === 'Privacy' && (
                 <>
                   <PrivacySettings />
-                  <div className="settings-group mt-6">
+                  <SettingGroup className="mt-6">
                     <Setting
                       title="Use MCP marketplace"
                       description="Allow searches and server details from allmcps.com. Disabling cancels marketplace requests; configured MCP servers remain available."
@@ -307,7 +307,7 @@ export function SettingsPage({
                         onCheckedChange={settings.setUseMcpMarketplace}
                       />
                     </Setting>
-                  </div>
+                  </SettingGroup>
                   <p className="settings-disclosure-box">
                     Publisher avatars load from GitHub. Marketplace searches go to AllMCPs, which
                     publicly logs requests, with User-Agent Jackalope/0.1.0. Your connected agents

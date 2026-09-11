@@ -4,8 +4,12 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 import { Button } from '../ui/button';
+import { FormField } from '../ui/FormField';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import { Textarea } from '../ui/Textarea';
+import { Setting } from './Setting';
 
 type Counts = { attempts: number; reviewed: number; failed: number; historySaveFailures: number };
 type Report = {
@@ -125,47 +129,47 @@ export function FeedbackForm({
         </>
       ) : (
         <>
-          <label htmlFor={`${id}-kind`} className="block text-sm font-medium">
-            Type
-          </label>
-          <Select
-            id={`${id}-kind`}
-            className="settings-input"
-            disabled={busy}
-            value={kind}
-            onValueChange={(value) => setKind(value as Report['kind'])}
+          <FormField label="Type">
+            <Select
+              id={`${id}-kind`}
+              disabled={busy}
+              value={kind}
+              onValueChange={(value) => setKind(value as Report['kind'])}
+            >
+              <SelectItem value="bug">Bug report</SelectItem>
+              <SelectItem value="feature">Feature request</SelectItem>
+              <SelectItem value="idea">Idea</SelectItem>
+            </Select>
+          </FormField>
+          <FormField label="What would you like us to know?">
+            <Textarea
+              ref={messageInput}
+              id={`${id}-message`}
+              rows={5}
+              maxLength={8000}
+              value={message}
+              disabled={busy}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={
+                invited
+                  ? 'Tell us what helped, what got in your way, or what you’d change.'
+                  : 'For a bug, include what you expected, what happened, and the steps to reproduce it.'
+              }
+            />
+          </FormField>
+          <Setting
+            title="Include task outcome counts"
+            description="Preview before sending"
+            controlId={`${id}-include`}
           >
-            <SelectItem value="bug">Bug report</SelectItem>
-            <SelectItem value="feature">Feature request</SelectItem>
-            <SelectItem value="idea">Idea</SelectItem>
-          </Select>
-          <label htmlFor={`${id}-message`} className="block text-sm font-medium">
-            What would you like us to know?
-          </label>
-          <textarea
-            ref={messageInput}
-            id={`${id}-message`}
-            className="settings-textarea"
-            rows={5}
-            maxLength={8000}
-            value={message}
-            disabled={busy}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder={
-              invited
-                ? 'Tell us what helped, what got in your way, or what you’d change.'
-                : 'For a bug, include what you expected, what happened, and the steps to reproduce it.'
-            }
-          />
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Include task outcome counts (preview before sending)</span>
             <Switch
+              id={`${id}-include`}
               label="Include task outcome counts"
               checked={include}
               onCheckedChange={setInclude}
               disabled={busy}
             />
-          </div>
+          </Setting>
           <Button
             variant="outline"
             disabled={busy || !isTauriEnvironment() || !settings?.configured || !message.trim()}
@@ -175,11 +179,7 @@ export function FeedbackForm({
           </Button>
         </>
       )}
-      {status && (
-        <p role="status" className="text-sm break-words">
-          {status}
-        </p>
-      )}
+      {status && <InlineNotice role="status">{status}</InlineNotice>}
     </section>
   );
 }

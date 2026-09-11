@@ -1,7 +1,6 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { recoveryHandoff } from '../../lib/project-return';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
@@ -13,6 +12,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview } from './ResultReview';
@@ -241,10 +241,10 @@ export function TaskDetail({
       )}
       <TaskSaveRecovery run={run} />
       {run.dependencyInvalidated && (
-        <p role="alert" className="task-error">
+        <InlineNotice tone="error">
           A predecessor was retried. Preserve this work and create a fresh feature plan before
           continuing or integrating.
-        </p>
+        </InlineNotice>
       )}
       {!!run.dependencySnapshot?.sources.length && (
         <details className="task-notice">
@@ -261,11 +261,7 @@ export function TaskDetail({
           Review {run.contract.requirements.length} outcomes and checkpoints
         </Button>
       )}
-      {run.error && (
-        <p role="alert" className="task-error">
-          {run.error}
-        </p>
-      )}
+      {run.error && <InlineNotice tone="error">{run.error}</InlineNotice>}
       {!!pending.length && (
         <div className="space-y-3 mb-5">
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>
@@ -741,11 +737,7 @@ export function TaskDetail({
           {notice}
         </p>
       )}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </section>
   );
 }

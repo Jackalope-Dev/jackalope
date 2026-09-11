@@ -4,6 +4,7 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import './task-knowledge.css';
 
@@ -123,9 +124,7 @@ export function TaskKnowledge({
           Use matching project lessons (up to three)
         </label>
         {(error || previewError) && (
-          <p role="alert" className="task-error">
-            {error || previewError}
-          </p>
+          <InlineNotice tone="error">{error || previewError}</InlineNotice>
         )}
         {receipt?.entries.map((entry) => (
           <div key={entry.id} className="py-2">

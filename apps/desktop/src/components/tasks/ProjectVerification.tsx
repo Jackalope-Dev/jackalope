@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { nativeTask, type TaskRun, type Verification } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 export function ProjectVerification({ run, command }: { run: TaskRun; command?: string }) {
   const [busy, setBusy] = useState(false);
@@ -44,15 +45,11 @@ export function ProjectVerification({ run, command }: { run: TaskRun; command?: 
         )}
       </div>
       {run.verificationError && !check && (
-        <p role="alert" className="task-error">
+        <InlineNotice tone="error">
           Automatic checks could not finish: {run.verificationError}
-        </p>
+        </InlineNotice>
       )}
-      {error && (
-        <p className="task-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {check ? (
         <div className="space-y-2">
           <p

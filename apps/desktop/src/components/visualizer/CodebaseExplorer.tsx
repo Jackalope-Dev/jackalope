@@ -20,6 +20,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
@@ -290,10 +291,10 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
         }
       />
       {error && (
-        <p role="alert" className="task-error">
+        <InlineNotice tone="error">
           {error}
           {snapshot && ' The previous snapshot is still shown.'}
-        </p>
+        </InlineNotice>
       )}
       {busy && <LoadingState compact={!!snapshot} label="Mapping files and references…" />}
       {watchError && (
@@ -316,9 +317,9 @@ export default function CodebaseExplorer({ project }: { project: Project }) {
       ) : (
         <>
           {snapshot.truncated && (
-            <p className="task-error" role="status">
+            <InlineNotice tone="error" role="status">
               Partial snapshot: a scan limit was reached. Some files or references are missing.
-            </p>
+            </InlineNotice>
           )}
           <div className="codebase-toolbar">
             <span className="codebase-inline-count">

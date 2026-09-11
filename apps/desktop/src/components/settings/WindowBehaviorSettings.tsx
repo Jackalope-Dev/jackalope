@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
+import { Setting, SettingGroup } from './Setting';
 
 interface DesktopSettings {
   closeToTray: boolean;
@@ -46,32 +48,30 @@ export function WindowBehaviorSettings() {
 
   return (
     <>
-      <div className="settings-group-card mt-6">
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">Close to system tray</div>
-            <p id="close-to-tray-description" className="settings-row-description">
-              Keep tasks running when the window closes.
-            </p>
-          </div>
-          <div className="settings-control-wrapper">
-            <Switch
-              label="Close to system tray"
-              aria-describedby="close-to-tray-description"
-              checked={settings?.closeToTray ?? true}
-              disabled={!settings?.trayAvailable || saving}
-              onCheckedChange={update}
-            />
-          </div>
-        </div>
-      </div>
+      <SettingGroup className="mt-6">
+        <Setting
+          title="Close to system tray"
+          controlId="close-to-tray"
+          descriptionId="close-to-tray-description"
+          description="Keep tasks running when the window closes."
+        >
+          <Switch
+            id="close-to-tray"
+            label="Close to system tray"
+            aria-describedby="close-to-tray-description"
+            checked={settings?.closeToTray ?? true}
+            disabled={!settings?.trayAvailable || saving}
+            onCheckedChange={update}
+          />
+        </Setting>
+      </SettingGroup>
       {settings && !settings.trayAvailable && (
-        <p className="settings-disclosure-box">System tray unavailable. Closing quits Jackalope.</p>
+        <InlineNotice tone="warning">
+          System tray unavailable. Closing quits Jackalope.
+        </InlineNotice>
       )}
       {error && (
-        <p role="alert" className="text-sm text-[var(--color-danger)]">
-          Could not save or load window preferences: {error}
-        </p>
+        <InlineNotice tone="error">Could not save or load window preferences: {error}</InlineNotice>
       )}
     </>
   );

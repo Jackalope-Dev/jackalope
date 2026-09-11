@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
@@ -64,9 +65,9 @@ export function CapacityPanel() {
         }
       />
       {error && (
-        <p role="alert" className="task-error mt-3">
+        <InlineNotice tone="error" className="mt-3">
           {error}
-        </p>
+        </InlineNotice>
       )}
       {loading && (
         <LoadingState

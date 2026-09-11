@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { accountGroupChoices } from '../../lib/account-groups';
 import { listAgentProfiles } from '../../lib/agent-profiles';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 export function ProjectAccountGroup({
   agents,
@@ -68,9 +69,9 @@ export function ProjectAccountGroup({
       </div>
       {busy && <LoadingState label={'Checking accounts…'} compact />}
       {error && (
-        <p role="alert" className="task-error mt-3">
+        <InlineNotice tone="error" className="mt-3">
           {error}
-        </p>
+        </InlineNotice>
       )}
       {preview && (
         <div className="mt-3 grid gap-3">
@@ -86,10 +87,10 @@ export function ProjectAccountGroup({
             </p>
           )}
           {!!preview.ambiguous.length && (
-            <p className="task-error">
+            <InlineNotice tone="error">
               Multiple {choice} accounts for {names(preview.ambiguous)}. Choose those accounts
               individually below.
-            </p>
+            </InlineNotice>
           )}
           <div>
             <Button

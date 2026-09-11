@@ -11,6 +11,7 @@ import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigSt
 import { useProjectStore } from '../../stores/projectStore';
 import { ProjectAccountGroup } from '../projects/ProjectAccountGroup';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
@@ -103,11 +104,7 @@ export function AgentPreferences({ projectId }: { projectId?: string }) {
           }
         />
       )}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <div className="agent-preferences-list">
         {available.map((agent) => {
           const appEnabled = agents.isAgentEnabled(agent.id);
@@ -220,9 +217,7 @@ function AccountPreferences({
   if (error)
     return (
       <div>
-        <p role="alert" className="task-error">
-          {error}
-        </p>
+        <InlineNotice tone="error">{error}</InlineNotice>
         <Button variant="ghost" onClick={() => setRevision((value) => value + 1)}>
           Retry accounts
         </Button>

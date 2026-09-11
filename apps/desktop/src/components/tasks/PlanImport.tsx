@@ -1,11 +1,13 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, X } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { queueCommand } from '../../lib/queue';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
+import { InlineNotice } from '../ui/InlineNotice';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
 interface PlanEntry {
@@ -233,155 +235,149 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
         if (!open && !busy) onClose();
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content
-          {...dialogFocus}
-          className="task-dialog appearance-panel"
-          style={{
-            width: 'min(720px, calc(100vw - 40px))',
-            maxHeight: 'calc(100vh - 48px)',
-            overflowY: 'auto',
-          }}
-        >
-          <Dialog.Close className="task-close" aria-label="Close plan import" disabled={busy}>
-            <X size={18} />
-          </Dialog.Close>
-          <Dialog.Title className="text-2xl font-medium tracking-tight">
-            Bring a plan to {project.name}.
-          </Dialog.Title>
-          <Dialog.Description className="task-muted mt-3 mb-5">
-            Load a plan from your agent or project docs, or paste an export. Check the assignments,
-            then add the tasks together.
-          </Dialog.Description>
-          {!preview ? (
+      <DialogContent
+        {...dialogFocus}
+        style={{
+          width: 'min(720px, calc(100vw - 40px))',
+          maxHeight: 'calc(100vh - 48px)',
+          overflowY: 'auto',
+        }}
+      >
+        <DialogCloseButton disabled={busy} label="Close plan import" />
+        <DialogHeader
+          title={<>Bring a plan to {project.name}.</>}
+          description={
             <>
-              <div className="flex items-center justify-between gap-3">
-                <label htmlFor="plan-export" className="task-label">
-                  Plan export · JSON
-                </label>
-                <Button variant="outline" onClick={() => fileInput.current?.click()}>
-                  Load plan file
-                </Button>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  aria-label="Choose a JSON plan file"
-                  onChange={(event) => {
-                    void loadFile(event.target.files?.[0]);
-                    event.target.value = '';
-                  }}
-                />
-              </div>
-              <textarea
-                id="plan-export"
-                className="task-input w-full mt-2 font-mono text-xs"
-                style={{ minHeight: 180, resize: 'vertical' }}
-                maxLength={256_000}
-                value={text}
-                onChange={(event) => edit(event.target.value)}
-                spellCheck={false}
-                aria-describedby="plan-format"
+              Load a plan from your agent or project docs, or paste an export. Check the
+              assignments, then add the tasks together.
+            </>
+          }
+        />
+        {!preview ? (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="plan-export" className="task-label">
+                Plan export · JSON
+              </label>
+              <Button variant="outline" onClick={() => fileInput.current?.click()}>
+                Load plan file
+              </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                aria-label="Choose a JSON plan file"
+                onChange={(event) => {
+                  void loadFile(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
               />
-              <p id="plan-format" className="task-muted text-xs mt-2">
-                Each task names an agent, file or folder scopes, and any tasks it depends on. Keep
-                the instructions concrete enough to review the result.
+            </div>
+            <textarea
+              id="plan-export"
+              className="task-input w-full mt-2 font-mono text-xs"
+              style={{ minHeight: 180, resize: 'vertical' }}
+              maxLength={256_000}
+              value={text}
+              onChange={(event) => edit(event.target.value)}
+              spellCheck={false}
+              aria-describedby="plan-format"
+            />
+            <p id="plan-format" className="task-muted text-xs mt-2">
+              Each task names an agent, file or folder scopes, and any tasks it depends on. Keep the
+              instructions concrete enough to review the result.
+            </p>
+            <details className="mt-4 text-sm">
+              <summary className="task-link cursor-pointer">Show the export format</summary>
+              <pre className="task-muted text-xs mt-3 overflow-x-auto whitespace-pre-wrap break-words">
+                {example}
+              </pre>
+            </details>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <p className="font-medium">
+                {preview.length} tasks · {new Set(preview.map((item) => item.agent)).size} agents
               </p>
-              <details className="mt-4 text-sm">
-                <summary className="task-link cursor-pointer">Show the export format</summary>
-                <pre className="task-muted text-xs mt-3 overflow-x-auto whitespace-pre-wrap break-words">
-                  {example}
-                </pre>
-              </details>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-4 mb-3">
-                <p className="font-medium">
-                  {preview.length} tasks · {new Set(preview.map((item) => item.agent)).size} agents
-                </p>
-                {!added && (
-                  <Button variant="ghost" disabled={busy} onClick={() => setPreview(null)}>
-                    Edit plan
-                  </Button>
-                )}
-              </div>
-              <ol className="space-y-4">
-                {preview.map((item, index) => (
-                  <li key={item.key} className="border-t border-[var(--color-border)] pt-4">
-                    <p className="text-sm font-medium">
-                      {index + 1}. {item.title}
-                    </p>
-                    <p className="task-muted text-xs mt-1 break-words">
-                      {item.agent === 'claude'
-                        ? 'Claude Code'
-                        : item.agent === 'codex'
-                          ? 'Codex'
-                          : 'Grok'}{' '}
-                      · {item.scopes.join(', ')}
-                    </p>
-                    <p className="task-muted text-xs mt-1">
-                      {item.dependsOn.length
-                        ? `After: ${item.dependsOn.map((key) => preview.find((task) => task.key === key)?.title ?? key).join(', ')}`
-                        : 'No dependencies'}
-                    </p>
-                    <details className="mt-2 text-xs">
-                      <summary className="task-link cursor-pointer">Read instructions</summary>
-                      <p className="task-muted mt-2 whitespace-pre-wrap break-words">
-                        {item.prompt}
-                      </p>
-                    </details>
-                  </li>
-                ))}
-              </ol>
-              {enabled && !added && (
-                <p className="task-notice mt-5">
-                  Adding this plan pauses project dispatch so you can review the tasks before
-                  starting.
-                </p>
+              {!added && (
+                <Button variant="ghost" disabled={busy} onClick={() => setPreview(null)}>
+                  Edit plan
+                </Button>
               )}
-              {!enabled && !added && (
-                <p className="task-muted text-xs mt-5">
-                  The tasks will wait in your queue until you start parallel work.
-                </p>
-              )}
-              {added && (
-                <p role="status" className="task-notice mt-5">
-                  Your tasks were added. Refresh the queue to see them; this will not import them
-                  again.
-                </p>
-              )}
-            </>
-          )}
-          {storageError && (
-            <p className="task-muted text-xs mt-3">
-              This device could not save the draft. Keep a copy before closing.
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="task-error mt-4">
-              {error}
-            </p>
-          )}
-          <div className="flex justify-end gap-3 mt-6">
-            <Button variant="ghost" disabled={busy} onClick={onClose}>
-              {added ? 'Close' : 'Cancel'}
-            </Button>
-            <Button disabled={busy || !text.trim()} onClick={preview ? () => void add() : review}>
-              {busy
-                ? 'Adding…'
-                : added
-                  ? 'Refresh queue'
-                  : preview
-                    ? `Add ${preview.length} tasks`
-                    : 'Review plan'}
-              <ArrowRight size={14} />
-            </Button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
+            </div>
+            <ol className="space-y-4">
+              {preview.map((item, index) => (
+                <li key={item.key} className="border-t border-[var(--color-border)] pt-4">
+                  <p className="text-sm font-medium">
+                    {index + 1}. {item.title}
+                  </p>
+                  <p className="task-muted text-xs mt-1 break-words">
+                    {item.agent === 'claude'
+                      ? 'Claude Code'
+                      : item.agent === 'codex'
+                        ? 'Codex'
+                        : 'Grok'}{' '}
+                    · {item.scopes.join(', ')}
+                  </p>
+                  <p className="task-muted text-xs mt-1">
+                    {item.dependsOn.length
+                      ? `After: ${item.dependsOn.map((key) => preview.find((task) => task.key === key)?.title ?? key).join(', ')}`
+                      : 'No dependencies'}
+                  </p>
+                  <details className="mt-2 text-xs">
+                    <summary className="task-link cursor-pointer">Read instructions</summary>
+                    <p className="task-muted mt-2 whitespace-pre-wrap break-words">{item.prompt}</p>
+                  </details>
+                </li>
+              ))}
+            </ol>
+            {enabled && !added && (
+              <InlineNotice className="mt-5">
+                Adding this plan pauses project dispatch so you can review the tasks before
+                starting.
+              </InlineNotice>
+            )}
+            {!enabled && !added && (
+              <p className="task-muted text-xs mt-5">
+                The tasks will wait in your queue until you start parallel work.
+              </p>
+            )}
+            {added && (
+              <InlineNotice role="status" className="mt-5">
+                Your tasks were added. Refresh the queue to see them; this will not import them
+                again.
+              </InlineNotice>
+            )}
+          </>
+        )}
+        {storageError && (
+          <p className="task-muted text-xs mt-3">
+            This device could not save the draft. Keep a copy before closing.
+          </p>
+        )}
+        {error && (
+          <InlineNotice tone="error" className="mt-4">
+            {error}
+          </InlineNotice>
+        )}
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="ghost" disabled={busy} onClick={onClose}>
+            {added ? 'Close' : 'Cancel'}
+          </Button>
+          <Button disabled={busy || !text.trim()} onClick={preview ? () => void add() : review}>
+            {busy
+              ? 'Adding…'
+              : added
+                ? 'Refresh queue'
+                : preview
+                  ? `Add ${preview.length} tasks`
+                  : 'Review plan'}
+            <ArrowRight size={14} />
+          </Button>
+        </div>
+      </DialogContent>
     </Dialog.Root>
   );
 }

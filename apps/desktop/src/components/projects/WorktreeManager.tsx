@@ -22,6 +22,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { EmptyState } from '../ui/EmptyState';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
@@ -220,17 +221,13 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
           )
         }
       />
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <div role="status">
         {feedback && (
-          <p className="task-notice">
+          <InlineNotice>
             <Check size={16} aria-hidden="true" />
             <span className="break-all">{feedback}</span>
-          </p>
+          </InlineNotice>
         )}
       </div>
       {!project ? (
@@ -420,11 +417,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
               </div>
             </article>
           ))}
-          {worktreesError && (
-            <p role="alert" className="task-error">
-              {worktreesError}
-            </p>
-          )}
+          {worktreesError && <InlineNotice tone="error">{worktreesError}</InlineNotice>}
           {!loading && !worktreesError && !worktrees.length && (
             <EmptyState
               icon={GitBranch}

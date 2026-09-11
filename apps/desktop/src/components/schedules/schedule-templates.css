@@ -94,10 +94,6 @@
   gap: 12px;
 }
 
-.schedule-editor-heading {
-  padding: 24px 64px 20px 24px;
-  border-bottom: 1px solid var(--color-border-subtle);
-}
 .schedule-editor-form {
   display: flex;
   flex-direction: column;
@@ -108,7 +104,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   gap: 28px;
-  padding: 24px;
+  padding: 0 32px 24px;
   overflow: auto;
   min-height: 0;
   flex: 1;
@@ -139,7 +135,7 @@
 .schedule-fields {
   font-size: var(--text-sm);
 }
-.schedule-fields > label:last-child:nth-child(odd),
+.schedule-fields > .form-field:last-child:nth-child(odd),
 .schedule-fields > .schedule-field-wide {
   grid-column: 1 / -1;
 }
@@ -163,7 +159,7 @@
 }
 .schedule-editor-footer {
   flex-shrink: 0;
-  padding: 16px 24px;
+  padding: 16px 32px;
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-surface-elevated);
 }

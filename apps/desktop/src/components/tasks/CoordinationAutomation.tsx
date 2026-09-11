@@ -1,6 +1,7 @@
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 export function CoordinationAutomation({
   project,
@@ -77,7 +78,7 @@ export function CoordinationAutomation({
           <article key={job.id} className="queue-message">
             <h3>Reconciliation · {job.status === 'review' ? 'Ready for review' : job.status}</h3>
             <p>{job.sourceIds.length} source tasks</p>
-            {job.error && <p className="task-error">{job.error}</p>}
+            {job.error && <InlineNotice tone="error">{job.error}</InlineNotice>}
             {job.runId && (
               <Button variant="outline" onClick={() => onSelect(job.runId as string)}>
                 Open reconciliation task

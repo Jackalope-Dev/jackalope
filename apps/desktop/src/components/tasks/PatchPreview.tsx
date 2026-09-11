@@ -1,6 +1,7 @@
 import { Check, Copy, FileDiff } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { DiffPreview } from './DiffPreview';
 import './task-experience.css';
 
@@ -30,11 +31,7 @@ export function PatchPreview({ patch }: { patch: string }) {
           {copied ? 'Copied' : 'Copy patch'}
         </Button>
       </div>
-      {error && (
-        <p role="alert" className="task-experience-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {open && <DiffPreview patch={patch} />}
     </details>
   );

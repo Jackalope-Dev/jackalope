@@ -2,6 +2,7 @@ import { Bot, Check, UserRound, UsersRound } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/Switch';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -189,16 +190,8 @@ export function ProjectGitSettings({
           </p>
         )
       )}
-      {notice && (
-        <p role="status" className="task-notice">
-          {notice}
-        </p>
-      )}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {notice && <InlineNotice role="status">{notice}</InlineNotice>}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {!policy && error && (
         <Button variant="outline" onClick={() => setRetry(retry + 1)}>
           Retry settings

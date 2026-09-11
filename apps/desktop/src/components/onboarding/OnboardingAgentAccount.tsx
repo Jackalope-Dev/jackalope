@@ -4,6 +4,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { accountProfiles, useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 
 export function OnboardingAgentAccount({
@@ -44,9 +45,7 @@ export function OnboardingAgentAccount({
     <div className="onboarding-agent-account">
       {entry?.error ? (
         <div>
-          <p className="task-error" role="alert">
-            Could not load {agentName} accounts.
-          </p>
+          <InlineNotice tone="error">Could not load {agentName} accounts.</InlineNotice>
           <Button
             variant="ghost"
             disabled={disabled || entry.loading}
@@ -79,9 +78,9 @@ export function OnboardingAgentAccount({
             ))}
           </Select>
           {value && !selected ? (
-            <p className="task-error" role="alert">
+            <InlineNotice tone="error">
               The saved account is unavailable. Choose another account.
-            </p>
+            </InlineNotice>
           ) : (
             <p className="task-muted" role="status">
               {selected

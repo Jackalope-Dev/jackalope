@@ -19,6 +19,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import type { ActiveTab } from '../layout/navigation';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 const destinations: Record<string, ActiveTab> = {
   tasks: 'kanban',
@@ -321,11 +322,7 @@ export function HelperAction({ action, onNavigate }: { action: Action; onNavigat
           Undo change
         </button>
       )}
-      {error && (
-        <p role="alert" className="helper-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </article>
   );
 }

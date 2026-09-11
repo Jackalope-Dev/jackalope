@@ -3,6 +3,7 @@ import { scanCodebase } from '../../lib/codebase';
 import { affectedFiles } from '../../lib/codebase-impact';
 import type { TaskRun } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
   const [affected, setAffected] = useState<string[] | null>(null);
@@ -37,11 +38,7 @@ export function TaskImpact({ run, files }: { run: TaskRun; files: string[] }) {
       <Button variant="outline" disabled={busy || !files.length} onClick={() => void scan()}>
         {busy ? 'Tracing references…' : 'Check affected files'}
       </Button>
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {affected && (
         <section className="mt-3">
           <h3 className="text-base font-medium">{affected.length} files depend on these changes</h3>

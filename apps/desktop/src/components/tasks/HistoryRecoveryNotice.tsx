@@ -1,10 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Copy, X } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
 import { Button } from '../ui/button';
+import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
+import { InlineNotice } from '../ui/InlineNotice';
 import './history-recovery.css';
 
 interface HistoryRecovery {
@@ -88,79 +90,75 @@ export function HistoryRecoveryNotice() {
         setCopyStatus('');
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content
-          className="task-dialog appearance-panel history-recovery-dialog"
-          onCloseAutoFocus={returnToCompanion}
-        >
-          <Dialog.Close className="task-close" aria-label="Close history recovery">
-            <X size={18} />
-          </Dialog.Close>
-          <Dialog.Title className="text-xl font-medium pr-10">
+      <DialogContent className="history-recovery-dialog" onCloseAutoFocus={returnToCompanion}>
+        <DialogCloseButton label="Close history recovery" />
+        <DialogHeader
+          title="
             Task history needs attention
-          </Dialog.Title>
-          <Dialog.Description className="task-muted mt-3">
-            These files need recovery or inspection. Other readable tasks are still available. This
-            report covers task records, unfinished saves and queue history across this app profile,
-            as of startup.
-          </Dialog.Description>
-          {error && (
-            <div className="my-4">
-              <p className="task-error" role="status">
-                {loading ? 'Checking task history…' : error}
-              </p>
-              <Button variant="ghost" disabled={loading} onClick={() => void load()}>
-                Retry
+          "
+          description={
+            <>
+              These files need recovery or inspection. Other readable tasks are still available.
+              This report covers task records, unfinished saves and queue history across this app
+              profile, as of startup.
+            </>
+          }
+        />
+        {error && (
+          <div className="my-4">
+            <InlineNotice tone="error" role="status">
+              {loading ? 'Checking task history…' : error}
+            </InlineNotice>
+            <Button variant="ghost" disabled={loading} onClick={() => void load()}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {!error && !count && (
+          <p className="task-muted mt-3">No unreadable history files were found.</p>
+        )}
+        {recovery && count > 0 && (
+          <>
+            <p className="task-muted mt-3">
+              Files set aside are preserved for inspection. Close Jackalope before repairing
+              history, and keep a separate backup. Restart after repairs to reload the history.
+            </p>
+            <div className="history-recovery-folder">
+              <h3 className="text-base font-medium">History folder</h3>
+              <p className="history-recovery-path">{recovery.directory}</p>
+              <Button
+                variant="outline"
+                onClick={() => void copy(recovery.directory, 'Folder path')}
+              >
+                <Copy size={16} aria-hidden="true" /> Copy folder path
               </Button>
             </div>
-          )}
-          {!error && !count && (
-            <p className="task-muted mt-3">No unreadable history files were found.</p>
-          )}
-          {recovery && count > 0 && (
-            <>
-              <p className="task-muted mt-3">
-                Files set aside are preserved for inspection. Close Jackalope before repairing
-                history, and keep a separate backup. Restart after repairs to reload the history.
-              </p>
-              <div className="history-recovery-folder">
-                <h3 className="text-base font-medium">History folder</h3>
-                <p className="history-recovery-path">{recovery.directory}</p>
-                <Button
-                  variant="outline"
-                  onClick={() => void copy(recovery.directory, 'Folder path')}
-                >
-                  <Copy size={16} aria-hidden="true" /> Copy folder path
-                </Button>
-              </div>
-              <p role="status" className="task-muted" aria-live="polite">
-                {copyStatus}
-              </p>
-              <ul className="history-recovery-files">
-                {recovery.entries.map((entry) => (
-                  <li key={entry.path}>
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-base font-medium">
-                        {entry.quarantined ? 'Set aside' : 'Original remains in place'}
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        aria-label={`Copy path for ${entry.path}`}
-                        onClick={() => void copy(entry.path, 'File path')}
-                      >
-                        <Copy size={16} aria-hidden="true" /> Copy path
-                      </Button>
-                    </div>
-                    <p className="history-recovery-path">{entry.path}</p>
-                    <p className="task-muted mt-2">{entry.reason}</p>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
+            <p role="status" className="task-muted" aria-live="polite">
+              {copyStatus}
+            </p>
+            <ul className="history-recovery-files">
+              {recovery.entries.map((entry) => (
+                <li key={entry.path}>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-base font-medium">
+                      {entry.quarantined ? 'Set aside' : 'Original remains in place'}
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      aria-label={`Copy path for ${entry.path}`}
+                      onClick={() => void copy(entry.path, 'File path')}
+                    >
+                      <Copy size={16} aria-hidden="true" /> Copy path
+                    </Button>
+                  </div>
+                  <p className="history-recovery-path">{entry.path}</p>
+                  <p className="task-muted mt-2">{entry.reason}</p>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </DialogContent>
     </Dialog.Root>
   );
 }

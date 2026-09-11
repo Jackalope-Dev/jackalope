@@ -7,6 +7,7 @@ import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -79,15 +80,15 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
         }
       />
 
-      {!desktop && <p className="task-notice">Open the desktop app to manage saved knowledge.</p>}
+      {!desktop && <InlineNotice>Open the desktop app to manage saved knowledge.</InlineNotice>}
       {loading && <LoadingState label={'Loading saved knowledge…'} />}
       {(error || actionError) && (
-        <p role="alert" className="task-error">
+        <InlineNotice tone="error">
           {error || actionError}
           <Button variant="ghost" onClick={() => void refresh()}>
             Reload
           </Button>
-        </p>
+        </InlineNotice>
       )}
       {desktop && !loading && !error && !entries.length && (
         <div className="context-knowledge-empty">

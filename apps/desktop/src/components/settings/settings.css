@@ -1,3 +1,5 @@
+@import "./setting.css";
+
 .appearance-theme-editor {
   width: 100%;
   max-width: 340px;
@@ -168,51 +170,10 @@
 }
 
 /* Setting Card / Rows */
-.settings-group {
-  background: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  margin-bottom: 20px;
-  overflow: hidden;
-}
-
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  gap: 20px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  min-height: 56px;
-}
-
-.settings-row:last-child {
-  border-bottom: none;
-}
 
 .appearance-preferences > .settings-row {
   padding: 0 0 24px;
   margin-bottom: 28px;
-}
-
-.settings-row-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.settings-row-label {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--color-text-primary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.settings-row-description {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  line-height: 1.4;
 }
 
 .settings-badge-advanced {
@@ -226,13 +187,6 @@
   letter-spacing: 0.04em;
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
-}
-
-.settings-control-wrapper {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .settings-input {
@@ -297,15 +251,6 @@
   .settings-content {
     padding: 20px;
   }
-  .settings-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  .settings-control-wrapper {
-    width: 100%;
-    justify-content: flex-start;
-  }
   .settings-input {
     width: 100%;
   }
@@ -337,16 +282,6 @@
   container-type: inline-size;
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
-}
-.settings-row-description {
-  display: block;
-}
-.settings-row-label {
-  flex-wrap: wrap;
-}
-.settings-control-wrapper {
-  min-width: 0;
-  max-width: 100%;
 }
 .settings-input {
   min-width: 0;
@@ -477,14 +412,6 @@
   color: var(--color-success);
 }
 @container (max-width: 520px) {
-  .settings-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  .settings-control-wrapper {
-    flex-wrap: wrap;
-  }
   .settings-input {
     width: 100%;
   }
@@ -641,23 +568,6 @@
 .project-settings-identity {
   overflow-wrap: anywhere;
 }
-.project-preference-field {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-.project-preference-field > label {
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.project-preference-field > .settings-row-description {
-  margin: 0;
-  line-height: 1.6;
-}
-.project-preference-field .settings-input {
-  width: 100%;
-  min-height: 44px;
-}
 .project-preferences-section > .settings-row {
   padding: 20px 0 0;
   margin-top: 8px;
@@ -674,18 +584,8 @@
   margin: 0;
   padding: 16px 0;
 }
-.project-preferences .settings-row-info,
-.agent-preferences .settings-row-info {
-  min-width: 0;
-  flex: 1;
-}
 .project-preferences .settings-row-description {
   overflow-wrap: anywhere;
-}
-.project-preferences .settings-control-wrapper,
-.agent-preferences .settings-control-wrapper {
-  min-width: 0;
-  max-width: 55%;
 }
 .settings-content .activity-log {
   padding: 0;
@@ -693,10 +593,4 @@
 }
 .project-preferences .settings-input {
   min-width: 0;
-}
-@container (max-width: 520px) {
-  .project-preferences .settings-control-wrapper,
-  .agent-preferences .settings-control-wrapper {
-    max-width: 100%;
-  }
 }

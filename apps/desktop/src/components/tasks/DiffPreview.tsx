@@ -1,4 +1,5 @@
 import { Component, lazy, type ReactNode, Suspense } from 'react';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 
 const RichDiff = lazy(() => import('./RichDiff'));
@@ -11,9 +12,9 @@ class DiffBoundary extends Component<{ patch: string; children: ReactNode }, { f
   render() {
     return this.state.failed ? (
       <div>
-        <p className="task-notice">
+        <InlineNotice>
           The formatted diff is unavailable. The original patch is shown below.
-        </p>
+        </InlineNotice>
         <section
           aria-label="Original patch"
           // biome-ignore lint/a11y/noNoninteractiveTabindex: The fallback patch needs keyboard scrolling.

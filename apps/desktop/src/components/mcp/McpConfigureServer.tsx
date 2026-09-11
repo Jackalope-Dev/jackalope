@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { McpConnectionForm } from './McpConnectionForm';
 import { McpServerIcon } from './McpServerIcon';
@@ -51,9 +52,9 @@ export function McpConfigureServer({
         </div>
       ) : (
         <>
-          <p className="task-notice mb-4">
+          <InlineNotice className="mb-4">
             Review the publisher and command. Packages may download when the connection starts.
-          </p>
+          </InlineNotice>
           <McpConnectionForm
             initial={{
               id: server.id,

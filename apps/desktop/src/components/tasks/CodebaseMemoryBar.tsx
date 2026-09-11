@@ -16,6 +16,7 @@ import type { Project } from '../../stores/projectStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import '../projects/project-context.css';
@@ -52,11 +53,7 @@ export function CodebaseMemoryBar({ project }: { project: Project }) {
           </Button>
         }
       />
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {busy && <LoadingState label="Reading project files…" compact={!!memory} />}
       {!memory ? (
         !busy && (

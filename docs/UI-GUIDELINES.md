@@ -109,6 +109,19 @@ Reuse WorkspaceHeading, WorkspaceSubnavigation, EmptyState, RunStatus,
 useDialogFocus and the shared theme and control primitives. Component ownership
 and runtime boundaries are documented in the architecture guide.
 
+Standard dialogs compose DialogContent, DialogHeader, DialogCloseButton and
+DialogFooter. Keep dismissal, busy guards and focus-return handlers with the
+owning feature. Use contained dialog layout for editors with a scrolling body
+and fixed actions. Specialized canvases and command palettes may retain their
+own layouts.
+
+Use FormField with Input, Textarea or Select for labelled controls and associated
+help or validation text. Setting and SettingGroup own preference rows, dividers
+and responsive control placement. Use InlineNotice for inline feedback, choosing
+the tone from the actual outcome; use its action slot for recovery controls.
+WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
+pressed filter choices; WorkspaceSubnavigation represents navigation between views.
+
 The /design-lab.html preview uses fictional fixtures and does not execute tasks.
 Verify the actual workspace at 1280 by 840 and 960 by 640, including pointer and
 keyboard controls, Escape/focus return, screen-reader labels, both themes,

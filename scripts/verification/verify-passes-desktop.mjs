@@ -19,11 +19,13 @@ try {
 import {createRoot} from 'react-dom/client';
 import {ReferralSettings} from './src/components/settings/ReferralSettings';
 import {useThemeStore} from './src/stores/themeStore';
+import {useMascotStore} from './src/stores/mascotStore';
 import './src/index.css';
 import './src/components/settings/settings.css';
 const sample={limit:5,remaining:3,accepted:1,downloaded:1,connected:0,shareUrl:'https://jackalope.dev/access/?invite=${'c'.repeat(64)}',invites:[]};
 window.__TAURI_INTERNALS__={invoke:async()=>sample};
 window.fixtureTheme=useThemeStore;
+window.fixtureMascot=useMascotStore;
 document.body.style.cssText='background:var(--color-bg);color:var(--color-text-primary);padding:32px';
 createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,margin:'auto'}}><h1 style={{fontSize:28,marginBottom:24}}>Instant Access Passes</h1><ReferralSettings onAccount={()=>{}}/></div>);`,
   );
@@ -69,7 +71,11 @@ createRoot(document.getElementById('root')).render(<div style={{maxWidth:780,mar
     const copy = page.getByRole('button', { name: 'Copy link', exact: true });
     await copy.focus();
     await page.keyboard.press('Enter');
-    await page.getByRole('status').filter({ hasText: 'Pass link copied.' }).waitFor();
+    // Copy confirmations speak through the mascot, which this fixture does not
+    // mount - so read the message off the store it publishes to.
+    await page
+      .waitForFunction(() => window.fixtureMascot.getState().message === 'Pass link copied.')
+      .catch(() => assert.fail('No pass copy confirmation was published.'));
     assert.notEqual(await copy.evaluate((el) => getComputedStyle(el).outlineStyle), 'none');
     assert(
       (await page.evaluate(() => navigator.clipboard.readText())).includes('/access/?invite='),

@@ -660,9 +660,6 @@ button:disabled {
 .mcp-scope-chip {
   min-height: 44px;
 }
-.mcp-scope-filters {
-  margin-bottom: 0;
-}
 .activity-log .p-6 {
   padding-inline: 0;
 }

@@ -5,6 +5,7 @@ import { useHelperStore } from '../../stores/helperStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { type NotificationLevel, useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 
@@ -171,9 +172,7 @@ export function CompanionSettings() {
         </div>
       </details>
       {(localError || helper.syncError) && (
-        <p role="alert" className="helper-error">
-          {localError || helper.syncError}
-        </p>
+        <InlineNotice tone="error">{localError || helper.syncError}</InlineNotice>
       )}
     </section>
   );

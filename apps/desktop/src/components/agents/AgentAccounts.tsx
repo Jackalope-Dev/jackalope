@@ -21,6 +21,10 @@ import {
 } from '../../stores/agentAccountsStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
+import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
+import { FormField } from '../ui/FormField';
+import { InlineNotice } from '../ui/InlineNotice';
+import { Input } from '../ui/input';
 import { LoadingState } from '../ui/LoadingState';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { AgentKeySignIn } from './AgentKeySignIn';
@@ -80,79 +84,60 @@ function EditAccount({
         if (!open && !busy) onClose();
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content
-          {...dialogFocus}
-          className="task-dialog appearance-panel confirm-action-dialog agent-account-edit"
+      <DialogContent {...dialogFocus} className="confirm-action-dialog agent-account-edit">
+        <DialogHeader
+          title="Edit account"
+          description={<>Choose a name, label and group to keep your accounts organized.</>}
+        />
+        <form
+          className="agent-account-edit-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError('');
+            try {
+              await onSave(name.trim(), group, tag.trim() || null);
+              onClose();
+            } catch (e) {
+              setError(String(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
         >
-          <Dialog.Title className="text-xl font-medium">Edit account</Dialog.Title>
-          <Dialog.Description className="task-muted mt-2">
-            Choose a name, label and group to keep your accounts organized.
-          </Dialog.Description>
-          <form
-            className="agent-account-edit-form"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              setError('');
-              try {
-                await onSave(name.trim(), group, tag.trim() || null);
-                onClose();
-              } catch (e) {
-                setError(String(e));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <label className="task-label">
-              Account name
-              <input
-                className="task-input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={busy}
-                required
-                maxLength={80}
-              />
-            </label>
-            <label className="task-label">
-              Custom label (optional)
-              <input
-                className="task-input"
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-                disabled={busy}
-                placeholder="e.g. Client A or Research"
-                maxLength={40}
-              />
-            </label>
-            <div className="task-label">
-              <span aria-hidden="true">Account group</span>
-              <AccountGroup
-                value={group}
-                onChange={setGroup}
-                label="Account group"
-                disabled={busy}
-              />
-            </div>
-            {error && (
-              <p role="alert" className="task-error">
-                {error}
-              </p>
-            )}
-            <div className="agent-account-edit-actions">
-              <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy || !name.trim()}>
-                {busy ? 'Saving…' : 'Save account'}
-              </Button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
+          <FormField label="Account name">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={busy}
+              required
+              maxLength={80}
+            />
+          </FormField>
+          <FormField label="Custom label (optional)">
+            <Input
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              disabled={busy}
+              placeholder="e.g. Client A or Research"
+              maxLength={40}
+            />
+          </FormField>
+          <div className="task-label">
+            <span aria-hidden="true">Account group</span>
+            <AccountGroup value={group} onChange={setGroup} label="Account group" disabled={busy} />
+          </div>
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !name.trim()}>
+              {busy ? 'Saving…' : 'Save account'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
     </Dialog.Root>
   );
 }
@@ -214,9 +199,7 @@ export function AgentAccounts({
     return (
       <div>
         {(error || accountData?.error) && (
-          <p role="alert" className="task-error">
-            {error || accountData?.error}
-          </p>
+          <InlineNotice tone="error">{error || accountData?.error}</InlineNotice>
         )}
         {loading ? (
           <LoadingState label={'Loading accounts…'} />
@@ -239,9 +222,7 @@ export function AgentAccounts({
   return (
     <div className="agent-accounts">
       {(error || accountData?.error) && (
-        <p role="alert" className="task-error">
-          {error || accountData?.error}
-        </p>
+        <InlineNotice tone="error">{error || accountData?.error}</InlineNotice>
       )}
       <form
         className="agent-account-add"

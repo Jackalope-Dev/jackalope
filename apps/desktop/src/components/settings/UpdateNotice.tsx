@@ -1,8 +1,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useUpdateStore } from '../../stores/updateStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
+import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { UpdateSettings } from './UpdateSettings';
 
 export function UpdateNotice() {
@@ -56,20 +56,15 @@ export function UpdateNotice() {
   );
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content
-          className="task-dialog appearance-panel history-recovery-dialog"
-          onCloseAutoFocus={returnToCompanion}
-          aria-describedby={undefined}
-        >
-          <Dialog.Close className="task-close" aria-label="Close update details">
-            <X size={18} />
-          </Dialog.Close>
-          <Dialog.Title className="text-xl font-medium pr-10 mb-6">App updates</Dialog.Title>
-          <UpdateSettings showHeading={false} />
-        </Dialog.Content>
-      </Dialog.Portal>
+      <DialogContent
+        className="history-recovery-dialog"
+        onCloseAutoFocus={returnToCompanion}
+        aria-describedby={undefined}
+      >
+        <DialogCloseButton label="Close update details" />
+        <DialogHeader title="App updates" />
+        <UpdateSettings showHeading={false} />
+      </DialogContent>
     </Dialog.Root>
   );
 }

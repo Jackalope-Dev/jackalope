@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
@@ -44,9 +45,9 @@ export function AgentModels({
           preferences. Use local setup to check and connect another local model.
         </p>
         {restricted && !detectedSelected.length && (
-          <p className="task-error">
+          <InlineNotice tone="error">
             This model is excluded by your model restriction. Add it to allow tasks.
-          </p>
+          </InlineNotice>
         )}
         {!detectedSelected.length && models[0] && (
           <Button
@@ -73,11 +74,7 @@ export function AgentModels({
         </Button>
       </div>
       {loading && <LoadingState label="Reading available models…" compact />}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {catalog?.detail && <p className="task-muted text-xs">{catalog.detail}</p>}
       {!loading && !models.length && (
         <p className="task-muted">
@@ -113,10 +110,10 @@ export function AgentModels({
         </div>
       )}
       {restricted && !loading && !detectedSelected.length && (
-        <p className="task-error">
+        <InlineNotice tone="error">
           No selected models could be verified. Refresh models, choose available models or turn off
           the restriction.
-        </p>
+        </InlineNotice>
       )}
       {!loading && (unavailable.length > 0 || (defaultModel && !defaultAvailable)) && (
         <div className="task-notice">

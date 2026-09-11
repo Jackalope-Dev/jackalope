@@ -1,11 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
 import { useState } from 'react';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
 import { Button } from '../ui/button';
+import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
+import { InlineNotice } from '../ui/InlineNotice';
 
 export function UnsavedTasksNotice() {
   const runs = useExecutionStore((state) => state.runs);
@@ -31,23 +32,19 @@ export function UnsavedTasksNotice() {
         if (!open) setSelectedId(null);
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content
-          className="task-dialog appearance-panel history-recovery-dialog"
-          onCloseAutoFocus={returnToCompanion}
-        >
-          <Dialog.Close className="task-close" aria-label="Close unsaved task recovery">
-            <X size={18} />
-          </Dialog.Close>
-          <Dialog.Title className="text-xl font-medium pr-10">Recover task history</Dialog.Title>
-          <Dialog.Description className="task-muted mt-3">
-            {selected?.projectName} · {selected?.agent}. Save this task’s latest state before
-            closing Jackalope.
-          </Dialog.Description>
-          {selected && <TaskSaveRecovery key={selected.id} run={selected} />}
-        </Dialog.Content>
-      </Dialog.Portal>
+      <DialogContent className="history-recovery-dialog" onCloseAutoFocus={returnToCompanion}>
+        <DialogCloseButton label="Close unsaved task recovery" />
+        <DialogHeader
+          title="Recover task history"
+          description={
+            <>
+              {selected?.projectName} · {selected?.agent}. Save this task’s latest state before
+              closing Jackalope.
+            </>
+          }
+        />
+        {selected && <TaskSaveRecovery key={selected.id} run={selected} />}
+      </DialogContent>
     </Dialog.Root>
   );
 }
@@ -83,9 +80,7 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
       {run.persistenceError && (
         <>
           <h2 className="font-medium">Keep your latest work safe</h2>
-          <p role="alert" className="task-error">
-            {run.persistenceError}
-          </p>
+          <InlineNotice tone="error">{run.persistenceError}</InlineNotice>
           <p className="task-muted">
             The latest task state is still in memory. Keep Jackalope open, free space or restore
             access to the history folder, then retry. Source files stay in the task workspace.
@@ -105,15 +100,11 @@ export function TaskSaveRecovery({ run }: { run: TaskRun }) {
         </>
       )}
       {message && (
-        <p role="status" className="task-muted break-all">
+        <InlineNotice tone="success" className="break-all">
           {message}
-        </p>
+        </InlineNotice>
       )}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </section>
   );
 }

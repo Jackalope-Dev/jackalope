@@ -3,7 +3,10 @@ import { useProjectStore } from '../../stores/projectStore';
 import { openProjectSettings } from '../layout/navigation';
 import { Setting } from '../settings/Setting';
 import { Button } from '../ui/button';
+import { FormField } from '../ui/FormField';
+import { Input } from '../ui/input';
 import { Switch } from '../ui/Switch';
+import { Textarea } from '../ui/Textarea';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -35,15 +38,13 @@ export function ProjectPreferences({
       ) : (
         <>
           <div className="project-workspace-fields">
-            <div className="project-preference-field">
-              <label htmlFor="project-name">Project name</label>
-              <input
+            <FormField label="Project name">
+              <Input
                 id="project-name"
-                className="settings-input"
                 value={project.name}
                 onChange={(e) => updateProject(project.id, { name: e.target.value })}
               />
-            </div>
+            </FormField>
           </div>
           {!embedded && (
             <section className="project-preferences-section project-settings-links">
@@ -75,15 +76,12 @@ export function ProjectPreferences({
           <section className="project-preferences-section">
             <WorkspaceSectionHeading title="Task instructions" />
             <div className="project-workspace-fields">
-              <div className="project-preference-field">
-                <label htmlFor="project-instructions">Project instructions</label>
-                <p id="project-instructions-help" className="settings-row-description">
-                  Appended to prompts launched from the task composer.
-                </p>
-                <textarea
+              <FormField
+                label="Project instructions"
+                description={<>Appended to prompts launched from the task composer.</>}
+              >
+                <Textarea
                   id="project-instructions"
-                  aria-describedby="project-instructions-help"
-                  className="settings-textarea"
                   rows={5}
                   value={project.preferences?.customInstructions ?? ''}
                   onChange={(e) =>
@@ -92,7 +90,7 @@ export function ProjectPreferences({
                     })
                   }
                 />
-              </div>
+              </FormField>
             </div>
           </section>
           <section className="project-preferences-section project-task-context">
@@ -132,53 +130,48 @@ export function ProjectPreferences({
           <section className="project-preferences-section">
             <WorkspaceSectionHeading title="Workspace" />
             <div className="project-workspace-fields">
-              <div className="project-preference-field">
-                <label htmlFor="project-base-branch">Target branch</label>
-                <p id="project-base-branch-help" className="settings-row-description">
-                  Starting branch for new tasks and their review.
-                </p>
-                <input
+              <FormField
+                label="Target branch"
+                description={<>Starting branch for new tasks and their review.</>}
+              >
+                <Input
                   id="project-base-branch"
-                  aria-describedby="project-base-branch-help"
-                  className="settings-input w-full"
                   value={project.preferences?.baseBranch ?? ''}
                   placeholder={project.gitBranch}
                   onChange={(e) =>
                     updateProjectPreferences(project.id, { baseBranch: e.target.value })
                   }
                 />
-              </div>
-              <div className="project-preference-field">
-                <label htmlFor="preparation-command">Workspace preparation</label>
-                <p id="preparation-command-help" className="settings-row-description">
-                  Runs before new tasks, with your OS permissions. Five-minute limit; skipped for
-                  continuations.
-                </p>
-                <input
+              </FormField>
+              <FormField
+                label="Workspace preparation"
+                description={
+                  <>
+                    Runs before new tasks, with your OS permissions. Five-minute limit; skipped for
+                    continuations.
+                  </>
+                }
+              >
+                <Input
                   id="preparation-command"
-                  aria-describedby="preparation-command-help"
-                  className="settings-input w-full"
                   value={project.preferences?.prepareCommand ?? ''}
                   placeholder="pnpm install --frozen-lockfile"
                   onChange={(event) =>
                     updateProjectPreferences(project.id, { prepareCommand: event.target.value })
                   }
                 />
-              </div>
+              </FormField>
             </div>
           </section>
           <section className="project-preferences-section">
             <WorkspaceSectionHeading title="Verification" />
             <div className="project-workspace-fields">
-              <div className="project-preference-field">
-                <label htmlFor="verification-command">Verification command</label>
-                <p id="verification-command-help" className="settings-row-description">
-                  Runs with your OS permissions. Five-minute limit.
-                </p>
-                <input
+              <FormField
+                label="Verification command"
+                description={<>Runs with your OS permissions. Five-minute limit.</>}
+              >
+                <Input
                   id="verification-command"
-                  aria-describedby="verification-command-help"
-                  className="settings-input w-full"
                   value={project.preferences?.verifyCommand ?? ''}
                   placeholder="pnpm build"
                   onChange={(e) =>
@@ -187,7 +180,7 @@ export function ProjectPreferences({
                     })
                   }
                 />
-              </div>
+              </FormField>
             </div>
             <Setting
               title="Check results automatically"

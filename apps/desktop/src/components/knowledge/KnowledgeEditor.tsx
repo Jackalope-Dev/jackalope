@@ -5,6 +5,7 @@ import type { KnowledgeEntry } from '../../lib/knowledge';
 import { nativeTask } from '../../lib/task-runtime';
 import { OutcomeEditor } from '../tasks/OutcomeEditor';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { useDialogFocus } from '../ui/useDialogFocus';
 
@@ -162,11 +163,7 @@ export function KnowledgeEditor({
               />
               Available for future tasks
             </label>
-            {error && (
-              <p role="alert" className="task-error">
-                {error}
-              </p>
-            )}
+            {error && <InlineNotice tone="error">{error}</InlineNotice>}
             <Button type="submit" disabled={busy || bytes > limit}>
               {busy ? 'Saving…' : memory ? 'Save lesson' : 'Save workflow'}
             </Button>

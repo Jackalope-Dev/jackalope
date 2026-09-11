@@ -3,7 +3,9 @@ import { nativeTask } from '../../lib/task-runtime';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
+import { Setting, SettingGroup } from './Setting';
 
 export function NotificationSettings() {
   const { status, error } = useNotificationStore();
@@ -23,24 +25,20 @@ export function NotificationSettings() {
     }
   };
   return (
-    <div className="settings-group-card mt-6">
-      <div className="settings-row">
-        <div className="settings-row-info">
-          <div className="settings-row-label">OS task notifications</div>
-          <p className="settings-row-description">
-            Use the preference above while Jackalope is in the background. Task content stays
-            private.
-          </p>
-        </div>
-        <div className="settings-control-wrapper">
-          <Switch
-            label="OS task notifications"
-            checked={osNotifications}
-            disabled={!status?.supported}
-            onCheckedChange={(osNotifications) => updateSettings({ osNotifications })}
-          />
-        </div>
-      </div>
+    <SettingGroup className="mt-6">
+      <Setting
+        title="OS task notifications"
+        controlId="os-task-notifications"
+        description="Use the preference above while Jackalope is in the background. Task content stays private."
+      >
+        <Switch
+          id="os-task-notifications"
+          label="OS task notifications"
+          checked={osNotifications}
+          disabled={!status?.supported}
+          onCheckedChange={(osNotifications) => updateSettings({ osNotifications })}
+        />
+      </Setting>
       <div className="space-y-3 px-5 py-4">
         <p className="task-muted">
           {!status?.supported
@@ -53,16 +51,10 @@ export function NotificationSettings() {
           </Button>
         )}
         {(error || status?.error) && (
-          <p role="alert" className="task-error">
-            {error || status?.error}
-          </p>
+          <InlineNotice tone="error">{error || status?.error}</InlineNotice>
         )}
-        {result && (
-          <p role="status" className="task-muted">
-            {result}
-          </p>
-        )}
+        {result && <InlineNotice role="status">{result}</InlineNotice>}
       </div>
-    </div>
+    </SettingGroup>
   );
 }

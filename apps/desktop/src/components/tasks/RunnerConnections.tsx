@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, CircleAlert, Plus, RefreshCw, Settings2, X } from 'lucide-react';
+import { ArrowRight, CircleAlert, Plus, RefreshCw, Settings2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -13,7 +13,9 @@ import { AgentInstallGuide } from '../agents/AgentInstallGuide';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
+import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -144,9 +146,7 @@ export function RunnerConnections({
           </div>
         </div>
         {(checkError || error || capacity.error) && (
-          <p role="alert" className="task-error">
-            {checkError || error || capacity.error}
-          </p>
+          <InlineNotice tone="error">{checkError || error || capacity.error}</InlineNotice>
         )}
         {!desktop && <p className="task-muted">Agent discovery requires the desktop app.</p>}
         {identified.length === 0 && (discovering || checking) ? (
@@ -337,24 +337,19 @@ export function RunnerConnections({
         <LocalAiSetup compact />
       </div>
       <Dialog.Root open={adding} onOpenChange={setAdding}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="task-dialog-overlay" />
-          <Dialog.Content {...dialogFocus} className="task-dialog appearance-panel">
-            <Dialog.Close className="task-close" aria-label="Close add agent">
-              <X size={18} />
-            </Dialog.Close>
-            <Dialog.Title className="text-2xl font-medium mb-3">Add an agent</Dialog.Title>
-            <Dialog.Description className="task-muted mb-6">
-              Give your installed agent a name and tell Jackalope where to find it.
-            </Dialog.Description>
-            <AddAgentForm
-              onAdded={() => {
-                setAdding(false);
-                if (desktop) void checkAgents();
-              }}
-            />
-          </Dialog.Content>
-        </Dialog.Portal>
+        <DialogContent {...dialogFocus}>
+          <DialogCloseButton label="Close add agent" />
+          <DialogHeader
+            title="Add an agent"
+            description={<>Give your installed agent a name and tell Jackalope where to find it.</>}
+          />
+          <AddAgentForm
+            onAdded={() => {
+              setAdding(false);
+              if (desktop) void checkAgents();
+            }}
+          />
+        </DialogContent>
       </Dialog.Root>
     </WorkspacePage>
   );

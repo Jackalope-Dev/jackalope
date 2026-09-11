@@ -12,9 +12,12 @@ import { useProjectStore } from '../../stores/projectStore';
 import { KnowledgeEditor } from '../knowledge/KnowledgeEditor';
 import { Setting } from '../settings/Setting';
 import { Button } from '../ui/button';
+import { FormField } from '../ui/FormField';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import '../settings/settings.css';
 
 export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
@@ -62,14 +65,9 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
   ]);
   return (
     <div className="agent-metrics-dashboard workspace-sections">
-      {sourceError && (
-        <p role="alert" className="task-error">
-          {sourceError}
-        </p>
-      )}
-      <div className="usage-filters">
-        <label htmlFor="insights-project">
-          Project
+      {sourceError && <InlineNotice tone="error">{sourceError}</InlineNotice>}
+      <WorkspaceToolbar className="usage-filters">
+        <FormField label="Project">
           <Select id="insights-project" value={projectId} onValueChange={setProjectId}>
             <SelectItem value="all">All projects</SelectItem>
             {[...names].map(([id, name]) => (
@@ -78,8 +76,8 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
               </SelectItem>
             ))}
           </Select>
-        </label>
-      </div>
+        </FormField>
+      </WorkspaceToolbar>
       <p className="task-muted">
         Loaded Jackalope history only. Acceptance uses the latest saved attempt per task with
         explicit outcome-review decisions. Records describe the reviewed snapshot; files may have
@@ -204,17 +202,17 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
         {!project ? (
           <p className="task-muted">Choose a registered project to inspect its lessons.</p>
         ) : !isTauriEnvironment() ? (
-          <p className="task-notice">Open the desktop app to inspect local project lessons.</p>
+          <InlineNotice>Open the desktop app to inspect local project lessons.</InlineNotice>
         ) : (
           <>
             {knowledge.loading && <p role="status">Reading project evidence…</p>}
             {knowledge.error && (
-              <p className="task-error" role="alert">
+              <InlineNotice tone="error">
                 {knowledge.error}
                 <Button variant="ghost" onClick={() => void knowledge.refresh()}>
                   Retry
                 </Button>
-              </p>
+              </InlineNotice>
             )}
             {!knowledge.loading && !knowledge.error && !lessons.length && (
               <p className="task-muted">
@@ -320,11 +318,7 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
             onCheckedChange={(value) => void changeHandoff(value)}
           />
         </Setting>
-        {handoffError && (
-          <p role="alert" className="task-error">
-            {handoffError}
-          </p>
-        )}
+        {handoffError && <InlineNotice tone="error">{handoffError}</InlineNotice>}
       </div>
       {editing && (
         <KnowledgeEditor

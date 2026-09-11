@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { nativeTask, type ScreenshotArtifact } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 export function ScreenshotPreview({
   runId,
@@ -34,9 +35,7 @@ export function ScreenshotPreview({
   if (error)
     return (
       <div className="py-6 space-y-3">
-        <p role="alert" className="task-error">
-          {error}
-        </p>
+        <InlineNotice tone="error">{error}</InlineNotice>
         <p className="task-muted">The original file location is listed above.</p>
         <Button variant="outline" onClick={onRetry}>
           Retry image

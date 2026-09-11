@@ -4,6 +4,7 @@ import type { TaskRun } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 
 export function TaskLearning({ run }: { run: TaskRun }) {
@@ -22,11 +23,11 @@ export function TaskLearning({ run }: { run: TaskRun }) {
   return (
     <section className="my-5 space-y-3" aria-label="Project knowledge used by this task">
       {run.monitorChange && (
-        <p className="task-notice">
+        <InlineNotice>
           Started after committed changes to {run.monitorChange.path || 'this project'} on{' '}
           {run.monitorChange.branch}. The agent received the before and after content revisions;
           inspect the recorded change in Recurring.
-        </p>
+        </InlineNotice>
       )}
       {!!context?.entries.length && (
         <section>

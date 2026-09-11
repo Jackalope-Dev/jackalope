@@ -36,6 +36,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
+import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import './repo-todos.css';
 
 export function RepoTodos({
@@ -343,24 +344,18 @@ export function RepoTodos({
                       </div>
                     ) : (
                       <>
-                        <div className="repo-todo-toolbar">
-                          <fieldset className="repo-todo-filters" aria-label="Filter TODOs">
-                            {[
-                              ['open', 'Open'],
-                              ['done', 'Completed'],
-                              ['all', 'All'],
-                            ].map(([id, label]) => (
-                              <button
-                                type="button"
-                                key={id}
-                                ref={filter === id ? filterButton : undefined}
-                                aria-pressed={filter === id}
-                                onClick={() => setFilter(id)}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </fieldset>
+                        <WorkspaceToolbar className="repo-todo-toolbar">
+                          <FilterGroup
+                            label="Filter TODOs"
+                            value={filter}
+                            onChange={setFilter}
+                            activeRef={filterButton}
+                            items={[
+                              { id: 'open', label: 'Open' },
+                              { id: 'done', label: 'Completed' },
+                              { id: 'all', label: 'All' },
+                            ]}
+                          />
                           <div className="repo-todo-search">
                             <Search size={16} aria-hidden="true" />
                             <Input
@@ -370,7 +365,7 @@ export function RepoTodos({
                               onChange={(event) => setQuery(event.target.value)}
                             />
                           </div>
-                        </div>
+                        </WorkspaceToolbar>
                         {groups.map((sectionLine) => {
                           const group = visible.filter((item) => item.sectionLine === sectionLine);
                           return (

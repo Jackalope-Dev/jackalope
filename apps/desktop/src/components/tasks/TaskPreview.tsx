@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 interface Preview {
   port: number;
@@ -146,11 +147,7 @@ export function TaskPreview({ run }: { run: TaskRun }) {
           bounded logs in task diagnostics. Closing this panel leaves it running; exiting the app
           stops it.
         </p>
-        {error && (
-          <p role="alert" className="task-error">
-            {error}
-          </p>
-        )}
+        {error && <InlineNotice tone="error">{error}</InlineNotice>}
       </div>
     </details>
   );

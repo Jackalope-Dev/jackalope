@@ -1,6 +1,7 @@
 import type { QueueCommand, QueueView } from '../../lib/queue';
 import type { TaskRun } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 export function CoordinationDecisions({
   queue,
@@ -30,11 +31,11 @@ export function CoordinationDecisions({
         return (
           <article className="queue-message" key={audit.runId}>
             <h3>Changed files · {title(audit.taskId)}</h3>
-            {audit.error && <p className="task-error">{audit.error}</p>}
+            {audit.error && <InlineNotice tone="error">{audit.error}</InlineNotice>}
             {audit.overlaps.length > 0 && (
-              <p className="task-error">
+              <InlineNotice tone="error">
                 These files also changed in another task. Reconcile the edits before merging.
-              </p>
+              </InlineNotice>
             )}
             <details>
               <summary className="task-summary">

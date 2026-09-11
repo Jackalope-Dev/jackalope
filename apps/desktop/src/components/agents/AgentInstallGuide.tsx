@@ -2,6 +2,7 @@ import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import './agent-manager.css';
 
 export function AgentInstallGuide({
@@ -41,11 +42,7 @@ export function AgentInstallGuide({
         CLI setup guide
         <ExternalLink size={15} />
       </Button>
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </section>
   );
 }

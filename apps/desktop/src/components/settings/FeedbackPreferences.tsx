@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useFeedbackStore } from '../../stores/feedbackStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 
 export function FeedbackPreferences() {
@@ -31,12 +32,12 @@ export function FeedbackPreferences() {
         sending feedback ends this round.
       </p>
       {view?.completed && (
-        <p role="status" className="settings-row-description">
+        <InlineNotice role="status">
           Thanks for sharing your thoughts. This round of invitations is complete.
-        </p>
+        </InlineNotice>
       )}
       {error && (
-        <p role="alert" className="settings-row-description">
+        <InlineNotice tone="error">
           {error}{' '}
           <Button
             variant="ghost"
@@ -45,7 +46,7 @@ export function FeedbackPreferences() {
           >
             Retry
           </Button>
-        </p>
+        </InlineNotice>
       )}
     </section>
   );

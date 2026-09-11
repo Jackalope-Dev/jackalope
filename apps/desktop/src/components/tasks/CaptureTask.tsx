@@ -21,6 +21,7 @@ import {
 import { type TaskStatus, useTaskStore } from '../../stores/taskStore';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { MultiAgentSplitDialog } from './MultiAgentSplitDialog';
@@ -464,9 +465,9 @@ export function CaptureTask({
         </Button>
       )}
       {(error || connectionError || modelError || toolError) && (
-        <p role="alert" className="task-error mt-4">
+        <InlineNotice tone="error" className="mt-4">
           {error || connectionError || modelError || toolError}
-        </p>
+        </InlineNotice>
       )}
       <ProjectSetup
         open={setup}

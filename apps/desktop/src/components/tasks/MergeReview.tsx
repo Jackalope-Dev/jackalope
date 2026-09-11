@@ -8,6 +8,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { DiffPreview } from './DiffPreview';
 export function MergeReview({
@@ -186,11 +187,7 @@ export function MergeReview({
           Finished tasks arrive here with their results and changes.
         </p>
       ) : null}
-      {error && (
-        <p className="task-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {plan && (
         <section className="merge-preview" aria-label="Combined change review">
           <div className="queue-section-heading">
@@ -265,10 +262,10 @@ export function MergeReview({
             </div>
           )}
           {!planEligible && (
-            <p className="task-notice">
+            <InlineNotice>
               A selected task changed or was integrated elsewhere. Prepare a fresh review before
               merging.
-            </p>
+            </InlineNotice>
           )}
 
           <div className="merge-patch-layout">

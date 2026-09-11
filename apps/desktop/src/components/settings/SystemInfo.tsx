@@ -7,6 +7,7 @@ import {
   type SystemInfo,
 } from '../../lib/tauri-bridge';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 export function SystemInfoView() {
@@ -65,9 +66,9 @@ export function SystemInfoView() {
         }
       />
       {error && (
-        <p role="alert" className="task-error mb-5">
+        <InlineNotice tone="error" className="mb-5">
           {error}
-        </p>
+        </InlineNotice>
       )}
       {host ? (
         <div className="flex items-start gap-5 py-6">

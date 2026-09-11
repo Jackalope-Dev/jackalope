@@ -25,6 +25,7 @@ import { telemetry } from '../../stores/communityStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { Select, SelectItem } from '../ui/Select';
 import { AddWork } from './AddWork';
@@ -207,11 +208,11 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
           const integrated = steps.filter((i) => state(i) === 'merged').length;
           const attention = steps.filter((i) => state(i) === 'attention').length;
           return (
-            <p key={featureId} className="task-notice my-3">
+            <InlineNotice key={featureId} className="my-3">
               {feature} · {integrated} of {steps.length} tasks integrated
               {attention ? ` · ${attention} need attention` : ''}
               {integrated === steps.length ? ' · Plan integrated; check the combined feature.' : ''}
-            </p>
+            </InlineNotice>
           );
         },
       )}
@@ -230,14 +231,12 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
         </button>
       </nav>
       {!desktop && (
-        <p className="task-notice">
+        <InlineNotice>
           Open the desktop app to coordinate agents and review real changes.
-        </p>
+        </InlineNotice>
       )}
       {(error || queue.bridgeError) && (
-        <p className="task-error" role="alert">
-          {error || queue.bridgeError}
-        </p>
+        <InlineNotice tone="error">{error || queue.bridgeError}</InlineNotice>
       )}
       {tab === 'review' ? (
         <MergeReview
@@ -380,7 +379,7 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                         {item.agent} · {item.scopes.join(', ')}
                       </p>
                       {phase === 'queued' && <p className="queue-wait">{reason(item)}</p>}
-                      {item.error && <p className="task-error">{item.error}</p>}
+                      {item.error && <InlineNotice tone="error">{item.error}</InlineNotice>}
                       <details className="mt-2">
                         <summary className="task-summary">Task brief</summary>
                         <p className="queue-brief">{item.prompt}</p>

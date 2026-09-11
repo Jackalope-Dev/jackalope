@@ -54,6 +54,24 @@ const noOverflow = async (page, label) =>
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     `${label}: overflow`,
   );
+/**
+ * Put the page in a known appearance.
+ *
+ * The header control is labelled by what it switches to, so it doubles as a
+ * readout of the current theme: no control means we are already there. The
+ * theme survives navigation, so each page has to set the one it wants rather
+ * than assume it starts light.
+ */
+const setAppearance = async (page, dark) => {
+  const want = dark ? 'dark' : 'light';
+  const toggle = page.getByRole('button', { name: `Switch to ${want} appearance` });
+  if ((await toggle.count()) === 0) return;
+  if (await toggle.isVisible()) await toggle.click();
+  else {
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('menuitem', { name: new RegExp(`${want} appearance`) }).click();
+  }
+};
 try {
   for (const size of sizes) {
     const context = await browser.newContext({
@@ -114,14 +132,7 @@ try {
     await page.goto('http://127.0.0.1:5198/waitlist/');
     await page.getByText('#248', { exact: true }).waitFor();
     for (const dark of [false, true]) {
-      if (dark) {
-        const toggle = page.getByRole('button', { name: 'Switch to dark appearance' });
-        if (await toggle.isVisible()) await toggle.click();
-        else {
-          await page.getByRole('button', { name: 'Open navigation' }).click();
-          await page.getByRole('menuitem', { name: /dark appearance/ }).click();
-        }
-      }
+      await setAppearance(page, dark);
       await noOverflow(page, 'Waitlist');
       await page.screenshot({
         path: `${output}/waitlist-${size.width}-${dark ? 'dark' : 'light'}.png`,
@@ -161,14 +172,7 @@ try {
     assert.equal(await page.locator('.brand-pass-tickets li').count(), 5);
     assert.equal(await page.locator('.brand-pass-tickets [data-state=Available]').count(), 3);
     for (const dark of [false, true]) {
-      if (dark) {
-        const toggle = page.getByRole('button', { name: 'Switch to dark appearance' });
-        if (await toggle.isVisible()) await toggle.click();
-        else {
-          await page.getByRole('button', { name: 'Open navigation' }).click();
-          await page.getByRole('menuitem', { name: /dark appearance/ }).click();
-        }
-      }
+      await setAppearance(page, dark);
       await noOverflow(page, 'Passes');
       await page.evaluate(() => {
         document.activeElement?.blur();

@@ -5,6 +5,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useHelperStore } from '../../stores/helperStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { HelperAction } from './HelperAction';
 import './helper.css';
 
@@ -95,9 +96,9 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
           ))}
         </div>
         {(localError || helper.error || helper.syncError || helper.view.error) && (
-          <p role="alert" className="helper-error">
+          <InlineNotice tone="error">
             {localError || helper.error || helper.syncError || helper.view.error}
-          </p>
+          </InlineNotice>
         )}
       </div>
       <form

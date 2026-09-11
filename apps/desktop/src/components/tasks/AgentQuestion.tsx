@@ -2,6 +2,7 @@ import { Check, MessageCircle, Send } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { PendingUserPrompt } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import './task-experience.css';
 
 export function AgentQuestion({
@@ -157,11 +158,7 @@ export function AgentQuestion({
               />
             </label>
           )}
-          {error && (
-            <p role="alert" className="task-experience-error">
-              {error}
-            </p>
-          )}
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <div className="agent-question-footer">
             <span className="task-experience-muted">Review your answer before sending.</span>
             <Button type="submit" disabled={sending || !hasResponse}>

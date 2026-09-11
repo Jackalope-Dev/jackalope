@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { CrossModelReviewPanel } from './CrossModelReviewPanel';
 import { PatchPreview } from './PatchPreview';
 import { ProjectVerification } from './ProjectVerification';
@@ -41,9 +42,9 @@ export function ResultReview({ run }: { run: TaskRun }) {
         </Button>
       </div>
       {error && (
-        <p role="alert" className="task-error mt-3">
+        <InlineNotice tone="error" className="mt-3">
           {error}
-        </p>
+        </InlineNotice>
       )}
       <ProjectVerification run={run} command={project?.preferences?.verifyCommand} />
       {loading && (

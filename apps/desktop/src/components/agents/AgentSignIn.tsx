@@ -15,6 +15,8 @@ import {
 } from '../../lib/agent-profiles';
 import { isClaudeAuthorizationUrl, signInUrl, terminalSignInLinks } from '../../lib/sign-in-links';
 import { Button } from '../ui/button';
+import { DialogContent, DialogHeader } from '../ui/Dialog';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import '@xterm/xterm/css/xterm.css';
@@ -298,154 +300,154 @@ export function AgentSignIn({
         if (!open) void close();
       }}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay className="task-dialog-overlay" />
-        <Dialog.Content
-          {...dialogFocus}
-          onCloseAutoFocus={(event) => {
-            if (returnFocus?.isConnected) {
-              event.preventDefault();
-              returnFocus.focus();
-            } else {
-              dialogFocus.onCloseAutoFocus(event);
-            }
-          }}
-          onKeyDownCapture={(event) => {
-            if (event.key === 'Tab' && host?.contains(event.target as Node)) {
-              event.preventDefault();
-              event.stopPropagation();
-              (event.shiftKey
-                ? (lastLinkAction.current ?? finish.current)
-                : finish.current
-              )?.focus();
-            }
-          }}
-          className="task-dialog appearance-panel agent-sign-in-dialog"
-          onInteractOutside={(event) => event.preventDefault()}
-        >
-          <Dialog.Title className="text-xl font-medium">
-            Sign in to {agentName} · {profileName}
-          </Dialog.Title>
-          <Dialog.Description className="task-muted mt-2">
-            This account has its own sign-in. Follow the provider prompts below or in your browser.
-            Choose the intended work or personal identity in the browser. When reconnecting, use the
-            same identity to preserve existing task continuations.
-          </Dialog.Description>
-          <p role="status" className="mt-4">
-            {checking ? 'Checking account…' : result ? accountStatusLabel(result) : stage}
-          </p>
-          {result && (
-            <div className="agent-account-status">
-              <strong>{result.identity}</strong>
-              <p className="task-muted">{result.detail}</p>
-            </div>
-          )}
-          {error && (
-            <p role="alert" className="task-error mt-2">
-              {error}
-            </p>
-          )}
-          {links.length > 0 && (
-            <div className="mt-4 grid gap-3">
-              {links.map((url, index) => (
-                <div key={url} className="grid gap-2">
-                  <label className="task-muted" htmlFor={`sign-in-link-${index}`}>
-                    Sign-in link{links.length > 1 ? ` ${index + 1}` : ''}
-                  </label>
-                  <Input
-                    id={`sign-in-link-${index}`}
-                    value={url}
-                    readOnly
-                    onFocus={(event) => event.currentTarget.select()}
-                  />
-                  <div className="flex flex-wrap gap-3">
-                    <Button variant="outline" onClick={() => void openLink(url)}>
-                      Open browser
-                    </Button>
-                    <Button
-                      ref={index === links.length - 1 ? lastLinkAction : undefined}
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(url);
-                          setLinkMessage('Link copied.');
-                        } catch {
-                          setLinkMessage(
-                            'Could not copy the link. Select it above and copy it manually.',
-                          );
-                        }
-                      }}
-                    >
-                      Copy link
-                    </Button>
-                  </div>
+      <DialogContent
+        {...dialogFocus}
+        onCloseAutoFocus={(event) => {
+          if (returnFocus?.isConnected) {
+            event.preventDefault();
+            returnFocus.focus();
+          } else {
+            dialogFocus.onCloseAutoFocus(event);
+          }
+        }}
+        onKeyDownCapture={(event) => {
+          if (event.key === 'Tab' && host?.contains(event.target as Node)) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event.shiftKey ? (lastLinkAction.current ?? finish.current) : finish.current)?.focus();
+          }
+        }}
+        className="agent-sign-in-dialog"
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader
+          title={
+            <>
+              Sign in to {agentName} · {profileName}
+            </>
+          }
+          description={
+            <>
+              This account has its own sign-in. Follow the provider prompts below or in your
+              browser. Choose the intended work or personal identity in the browser. When
+              reconnecting, use the same identity to preserve existing task continuations.
+            </>
+          }
+        />
+        <p role="status" className="mt-4">
+          {checking ? 'Checking account…' : result ? accountStatusLabel(result) : stage}
+        </p>
+        {result && (
+          <div className="agent-account-status">
+            <strong>{result.identity}</strong>
+            <p className="task-muted">{result.detail}</p>
+          </div>
+        )}
+        {error && (
+          <InlineNotice tone="error" className="mt-2">
+            {error}
+          </InlineNotice>
+        )}
+        {links.length > 0 && (
+          <div className="mt-4 grid gap-3">
+            {links.map((url, index) => (
+              <div key={url} className="grid gap-2">
+                <label className="task-muted" htmlFor={`sign-in-link-${index}`}>
+                  Sign-in link{links.length > 1 ? ` ${index + 1}` : ''}
+                </label>
+                <Input
+                  id={`sign-in-link-${index}`}
+                  value={url}
+                  readOnly
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="outline" onClick={() => void openLink(url)}>
+                    Open browser
+                  </Button>
+                  <Button
+                    ref={index === links.length - 1 ? lastLinkAction : undefined}
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(url);
+                        setLinkMessage('Link copied.');
+                      } catch {
+                        setLinkMessage(
+                          'Could not copy the link. Select it above and copy it manually.',
+                        );
+                      }
+                    }}
+                  >
+                    Copy link
+                  </Button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {linkMessage && (
+          <p role="status" className="task-muted mt-2">
+            {linkMessage}
+          </p>
+        )}
+        <div className="agent-sign-in-terminal" ref={setHost} />
+        <div className="flex flex-wrap justify-end gap-3 mt-4">
+          {running && ['gemini', 'goose', 'opencode'].includes(agentId) && (
+            <Button disabled={saving || checking} onClick={() => void completeSetup.current?.()}>
+              Finish setup
+            </Button>
           )}
-          {linkMessage && (
-            <p role="status" className="task-muted mt-2">
-              {linkMessage}
-            </p>
+          {!running && !checking && (
+            <Button
+              variant="outline"
+              disabled={saving}
+              onClick={async () => {
+                try {
+                  if (session.current) await stopSignIn(session.current);
+                  session.current = null;
+                  setAttempt((n) => n + 1);
+                } catch (e) {
+                  setError(String(e));
+                }
+              }}
+            >
+              Retry sign-in
+            </Button>
           )}
-          <div className="agent-sign-in-terminal" ref={setHost} />
-          <div className="flex flex-wrap justify-end gap-3 mt-4">
-            {running && ['gemini', 'goose', 'opencode'].includes(agentId) && (
-              <Button disabled={saving || checking} onClick={() => void completeSetup.current?.()}>
-                Finish setup
-              </Button>
-            )}
-            {!running && !checking && (
+          <Button
+            ref={finish}
+            variant={running ? 'outline' : 'primary'}
+            disabled={saving || checking}
+            onClick={() => void close()}
+          >
+            {running ? 'Cancel sign-in' : 'Done'}
+          </Button>
+          {!running &&
+            !checking &&
+            onUse &&
+            (result?.state === 'signedIn' || result?.state === 'configured') && (
               <Button
-                variant="outline"
                 disabled={saving}
                 onClick={async () => {
+                  setSaving(true);
+                  setError('');
                   try {
                     if (session.current) await stopSignIn(session.current);
-                    session.current = null;
-                    setAttempt((n) => n + 1);
+                    await onUse();
+                    await onClose();
                   } catch (e) {
                     setError(String(e));
+                  } finally {
+                    setSaving(false);
                   }
                 }}
               >
-                Retry sign-in
+                {saving ? 'Saving…' : 'Use for new tasks'}
               </Button>
             )}
-            <Button
-              ref={finish}
-              variant={running ? 'outline' : 'primary'}
-              disabled={saving || checking}
-              onClick={() => void close()}
-            >
-              {running ? 'Cancel sign-in' : 'Done'}
-            </Button>
-            {!running &&
-              !checking &&
-              onUse &&
-              (result?.state === 'signedIn' || result?.state === 'configured') && (
-                <Button
-                  disabled={saving}
-                  onClick={async () => {
-                    setSaving(true);
-                    setError('');
-                    try {
-                      if (session.current) await stopSignIn(session.current);
-                      await onUse();
-                      await onClose();
-                    } catch (e) {
-                      setError(String(e));
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  {saving ? 'Saving…' : 'Use for new tasks'}
-                </Button>
-              )}
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
+        </div>
+      </DialogContent>
     </Dialog.Root>
   );
 }

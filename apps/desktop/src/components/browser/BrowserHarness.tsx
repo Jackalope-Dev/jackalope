@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { ValidationJourney } from '../tasks/ValidationJourney';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -35,9 +36,7 @@ export function BrowserHarness({
         />
         {error && (
           <div className="mb-5 flex flex-wrap items-center gap-3">
-            <p role="alert" className="task-error">
-              Could not refresh task evidence: {error}
-            </p>
+            <InlineNotice tone="error">Could not refresh task evidence: {error}</InlineNotice>
             <Button variant="outline" onClick={() => void refresh()}>
               Retry
             </Button>

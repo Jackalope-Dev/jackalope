@@ -28,6 +28,7 @@ import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ProjectGitSettings } from '../projects/ProjectGitSettings';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { ProjectThemeStep } from './ProjectThemeStep';
@@ -98,7 +99,7 @@ export function OnboardingFlow({
     setTimeout(() => setCopiedCommand((curr) => (curr === text ? null : curr)), 2500);
   };
   const heading = useRef<HTMLHeadingElement>(null);
-  const errorMessage = useRef<HTMLParagraphElement>(null);
+  const errorMessage = useRef<HTMLDivElement>(null);
   const tipIndex = useRef(0);
   const desktop = isTauriEnvironment();
   const step = !project ? 'project' : onboarding.step;
@@ -322,9 +323,9 @@ export function OnboardingFlow({
                 </Button>
               </fieldset>
               {!desktop && (
-                <p className="task-notice">
+                <InlineNotice>
                   Open the desktop app to create or choose a project and discover agents.
-                </p>
+                </InlineNotice>
               )}
               <form
                 onSubmit={(event) => {
@@ -395,9 +396,7 @@ export function OnboardingFlow({
                       </Button>
                     </div>
                     {directoryError && !parentPath && (
-                      <p role="alert" className="task-error">
-                        {directoryError}
-                      </p>
+                      <InlineNotice tone="error">{directoryError}</InlineNotice>
                     )}
                     <p className="onboarding-note">
                       Creates a new folder with Git ready for your first task.
@@ -570,11 +569,7 @@ export function OnboardingFlow({
                   Enable at least one available agent to continue.
                 </p>
               )}
-              {execution.error && (
-                <p className="task-error" role="alert">
-                  {execution.error}
-                </p>
-              )}
+              {execution.error && <InlineNotice tone="error">{execution.error}</InlineNotice>}
               {project && (
                 <ProjectGitSettings
                   key={project.path}
@@ -790,9 +785,9 @@ export function OnboardingFlow({
             </>
           )}
           {error && (
-            <p className="task-error mt-4" role="alert" ref={errorMessage} tabIndex={-1}>
+            <InlineNotice tone="error" className="mt-4" ref={errorMessage} tabIndex={-1}>
               {error}
-            </p>
+            </InlineNotice>
           )}
         </section>
       </main>

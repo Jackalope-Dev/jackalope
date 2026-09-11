@@ -1,3 +1,4 @@
+import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -182,11 +183,7 @@ export function TaskWorkspace({
         />
       )}
       {loading && <LoadingState label={'Loading task history…'} />}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {runs.length > 0 || ideas.length > 0 ? (
         <TaskCollection
           scope={

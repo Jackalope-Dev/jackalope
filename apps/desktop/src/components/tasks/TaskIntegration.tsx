@@ -3,6 +3,7 @@ import { type QueueView, queueSnapshot } from '../../lib/queue';
 import type { TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { InlineNotice } from '../ui/InlineNotice';
 import { MergeReview } from './MergeReview';
 
 export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: () => void }) {
@@ -23,12 +24,7 @@ export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: (
   useEffect(() => {
     void refresh();
   }, [refresh]);
-  if (error)
-    return (
-      <p role="alert" className="task-error">
-        {error}
-      </p>
-    );
+  if (error) return <InlineNotice tone="error">{error}</InlineNotice>;
   if (!project)
     return <p className="task-muted">Restore this project before integrating its changes.</p>;
   if (!queue)
@@ -40,15 +36,15 @@ export function TaskIntegration({ run, onApplied }: { run: TaskRun; onApplied: (
   return (
     <div>
       {run.checkpoint && (
-        <p className="task-notice">
+        <InlineNotice>
           Checkpoint saved: {run.checkpoint.head.slice(0, 8)} ·{' '}
           {run.checkpoint.message.split('\n')[0]}
-        </p>
+        </InlineNotice>
       )}
       {run.checkpointError && (
-        <p role="alert" className="task-error">
+        <InlineNotice tone="error">
           Automatic checkpoint needs attention: {run.checkpointError}
-        </p>
+        </InlineNotice>
       )}
       <MergeReview
         project={project}

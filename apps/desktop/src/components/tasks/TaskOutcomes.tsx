@@ -3,6 +3,7 @@ import { correctionPrompt, type Requirement, requirementState } from '../../lib/
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
@@ -272,11 +273,7 @@ export function TaskOutcomes({
           {selected.length === 1 ? 'requirement' : 'requirements'}
         </Button>
       )}
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </section>
   );
 }

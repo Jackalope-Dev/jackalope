@@ -69,27 +69,8 @@
   margin-top: 6px;
 }
 .repo-todo-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
   border-block: 1px solid var(--color-border-subtle);
   padding: 12px 0;
-}
-.repo-todo-filters {
-  display: flex;
-  gap: 4px;
-}
-.repo-todo-filters button {
-  min-height: 44px;
-  padding: 0 14px;
-  border-radius: 8px;
-  color: var(--color-text-secondary);
-}
-.repo-todo-filters button[aria-pressed="true"] {
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
-  font-weight: 600;
 }
 .repo-todo-search {
   position: relative;

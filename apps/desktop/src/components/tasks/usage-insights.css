@@ -191,9 +191,6 @@
   min-height: 44px;
   padding: 12px 0;
 }
-.usage-page .usage-filters {
-  flex-wrap: wrap;
-}
 .usage-page .usage-table td {
   vertical-align: top;
 }
@@ -238,18 +235,8 @@
 .usage-outcome-grid h4 {
   font-size: var(--text-sm);
 }
-.usage-page .usage-filters {
-  gap: 12px;
-}
 .usage-page > .usage-filters {
   margin-bottom: var(--workspace-heading-gap, 24px);
-}
-.usage-page .usage-filters label {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  flex: 1;
-  min-width: 130px;
 }
 @media (max-width: 650px) {
   .usage-outcome-grid {

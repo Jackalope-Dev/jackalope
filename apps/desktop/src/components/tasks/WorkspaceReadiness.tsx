@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 export interface Readiness {
   head: string;
@@ -60,17 +61,17 @@ export function WorkspaceReadiness({
               Branch: {result.branch || 'Detached HEAD'} · {result.head.slice(0, 8)}
             </p>
             {result.dependenciesMissing && (
-              <p className="task-notice">
+              <InlineNotice>
                 This workspace has no node_modules folder. Dependencies may need preparing before
                 work can run.
-              </p>
+              </InlineNotice>
             )}
             {!!result.missingConfiguration.length && (
-              <p className="task-notice">
+              <InlineNotice>
                 Configuration names missing from local environment files and the app environment:{' '}
                 {result.missingConfiguration.join(', ')}. Configure values in your usual local
                 tools.
-              </p>
+              </InlineNotice>
             )}
             {result.prepareCommand && (
               <div className="space-y-2">
@@ -131,11 +132,7 @@ export function WorkspaceReadiness({
           </>
         )}
         {saved && <p role="status">{saved}</p>}
-        {error && (
-          <p role="alert" className="task-error">
-            {error}
-          </p>
-        )}
+        {error && <InlineNotice tone="error">{error}</InlineNotice>}
       </div>
     </details>
   );

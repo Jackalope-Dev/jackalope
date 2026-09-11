@@ -3,6 +3,7 @@ import { FileDiff, Virtualizer, WorkerPoolContextProvider } from '@pierre/diffs/
 import { useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import './rich-content.css';
 
 const poolOptions = {
@@ -82,15 +83,13 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
         </Button>
       </fieldset>
       {unmatched && (
-        <p className="task-notice">Showing all changes because this file could not be isolated.</p>
+        <InlineNotice>Showing all changes because this file could not be isolated.</InlineNotice>
       )}
       {!loading && !parsed && patch && (
-        <p className="task-notice">Showing the original patch because it could not be rendered.</p>
+        <InlineNotice>Showing the original patch because it could not be rendered.</InlineNotice>
       )}
       {loading && !raw ? (
-        <p role="status" className="task-notice">
-          Preparing code changes…
-        </p>
+        <InlineNotice role="status">Preparing code changes…</InlineNotice>
       ) : raw || !files ? (
         // biome-ignore lint/a11y/noNoninteractiveTabindex: The original patch supports keyboard scrolling.
         <section className="rich-diff-raw" aria-label="Original patch" tabIndex={0}>

@@ -4,6 +4,7 @@ import { type ArchivedRun, nativeTask, statusLabel } from '../../lib/task-runtim
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 
 const PAGE = 20;
 
@@ -102,9 +103,9 @@ export function ArchivedHistory() {
         Older reviewed tasks stay searchable and can be restored.
       </p>
       {error && (
-        <p role="alert" className="task-error mt-4">
+        <InlineNotice tone="error" className="mt-4">
           {error}
-        </p>
+        </InlineNotice>
       )}
       {notice && (
         <p role="status" className="task-muted mt-4">

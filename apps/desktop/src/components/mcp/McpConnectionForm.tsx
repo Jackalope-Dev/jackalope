@@ -6,7 +6,12 @@ import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { useMcpStore } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
+import { DialogFooter } from '../ui/Dialog';
+import { FormField } from '../ui/FormField';
+import { InlineNotice } from '../ui/InlineNotice';
+import { Input } from '../ui/input';
 import { Switch } from '../ui/Switch';
+import { Textarea } from '../ui/Textarea';
 
 export function McpConnectionForm({
   initial,
@@ -116,10 +121,8 @@ export function McpConnectionForm({
         <section className="mcp-form-section">
           <h2>Connection</h2>
           <div className="mcp-field-pair">
-            <label className="task-label">
-              Name
-              <input
-                className="task-input"
+            <FormField label="Name">
+              <Input
                 required
                 value={name}
                 onChange={(event) => {
@@ -129,11 +132,9 @@ export function McpConnectionForm({
                 }}
                 placeholder="Postgres"
               />
-            </label>
-            <label className="task-label">
-              Identifier
-              <input
-                className="task-input"
+            </FormField>
+            <FormField label="Identifier">
+              <Input
                 required
                 disabled={editing}
                 value={id}
@@ -142,7 +143,7 @@ export function McpConnectionForm({
                   setId(event.target.value);
                 }}
               />
-            </label>
+            </FormField>
           </div>
           <fieldset className="mcp-scope-options" aria-label="Connection type">
             {[
@@ -163,16 +164,15 @@ export function McpConnectionForm({
           </fieldset>
           {transport === 'stdio' ? (
             <>
-              <label className="task-label">
-                Command
-                <input
-                  className="task-input font-mono"
+              <FormField label="Command">
+                <Input
+                  className="font-mono"
                   value={command}
                   onChange={(event) => setCommand(event.target.value)}
                   placeholder="npx, uvx, or an executable path"
                   required
                 />
-              </label>
+              </FormField>
               <div>
                 <div className="mcp-field-heading">
                   <h3>Arguments</h3>
@@ -187,7 +187,7 @@ export function McpConnectionForm({
                 </div>
                 {args.map((item, index) => (
                   <div className="mcp-variable-row" key={item.id}>
-                    <input
+                    <Input
                       aria-label={`Argument ${index + 1}`}
                       className="task-input font-mono"
                       value={item.value}
@@ -212,17 +212,16 @@ export function McpConnectionForm({
               </div>
             </>
           ) : (
-            <label className="task-label">
-              Endpoint URL
-              <input
-                className="task-input font-mono"
+            <FormField label="Endpoint URL">
+              <Input
+                className="font-mono"
                 type="url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
                 required
                 placeholder="https://example.com/mcp"
               />
-            </label>
+            </FormField>
           )}
           <div>
             <div className="mcp-field-heading">
@@ -280,16 +279,15 @@ export function McpConnectionForm({
               </div>
             ))}
           </div>
-          <label className="task-label">
-            Headers and client options (JSON)
-            <textarea
-              className="task-input font-mono"
+          <FormField label="Headers and client options (JSON)">
+            <Textarea
+              className="font-mono"
               rows={4}
               value={extra}
               onChange={(event) => setExtra(event.target.value)}
               spellCheck={false}
             />
-          </label>
+          </FormField>
         </section>
         <section className="mcp-form-section">
           <h2>Availability</h2>
@@ -389,19 +387,15 @@ export function McpConnectionForm({
           )}
         </section>
       </fieldset>
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
-      <div className="mcp-configure-actions">
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      <DialogFooter className="mcp-configure-actions">
         <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
           {busy ? 'Saving…' : editing ? 'Save changes' : 'Add connection'}
         </Button>
-      </div>
+      </DialogFooter>
     </form>
   );
 }

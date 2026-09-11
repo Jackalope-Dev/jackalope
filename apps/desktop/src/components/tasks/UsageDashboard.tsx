@@ -15,10 +15,13 @@ import { useProjectStore } from '../../stores/projectStore';
 import type { UsageView } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
+import { FormField } from '../ui/FormField';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
+import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { AgentMetricsDashboard } from './AgentMetricsDashboard';
 import { CapacityPanel } from './CapacityPanel';
 import { tokenLabel, UsageInsights } from './UsageInsights';
@@ -238,12 +241,12 @@ export function UsageDashboard({
         <>
           {loading && <p role="status">Loading saved task history…</p>}
           {historyError && (
-            <p className="task-error" role="alert">
+            <InlineNotice tone="error">
               {historyError}
               <Button variant="ghost" onClick={() => void refresh()}>
                 Reload history
               </Button>
-            </p>
+            </InlineNotice>
           )}
           <div hidden={loading || Boolean(historyError)}>
             <AgentMetricsDashboard runs={runs} />
@@ -251,9 +254,8 @@ export function UsageDashboard({
         </>
       ) : (
         <>
-          <div className="usage-filters">
-            <label htmlFor="usage-account">
-              Account
+          <WorkspaceToolbar className="usage-filters">
+            <FormField label="Account">
               <Select
                 id="usage-account"
                 aria-label="Usage account"
@@ -270,9 +272,8 @@ export function UsageDashboard({
                   </SelectItem>
                 ))}
               </Select>
-            </label>
-            <label htmlFor="usagedashboard-field-1">
-              Project
+            </FormField>
+            <FormField label="Project">
               <Select
                 id="usagedashboard-field-1"
                 aria-label="Project"
@@ -289,9 +290,8 @@ export function UsageDashboard({
                   </SelectItem>
                 ))}
               </Select>
-            </label>
-            <label htmlFor="usagedashboard-field-2">
-              Period
+            </FormField>
+            <FormField label="Period">
               <Select
                 id="usagedashboard-field-2"
                 aria-label="Period"
@@ -305,9 +305,8 @@ export function UsageDashboard({
                 <SelectItem value="30">Last 30 days</SelectItem>
                 <SelectItem value="all">All time</SelectItem>
               </Select>
-            </label>
-            <label htmlFor="usage-agent">
-              Agent
+            </FormField>
+            <FormField label="Agent">
               <Select
                 id="usage-agent"
                 value={agent}
@@ -323,9 +322,8 @@ export function UsageDashboard({
                   </SelectItem>
                 ))}
               </Select>
-            </label>
-            <label htmlFor="usagedashboard-field-3">
-              Sort by
+            </FormField>
+            <FormField label="Sort by">
               <Select
                 id="usagedashboard-field-3"
                 aria-label="Sort by"
@@ -338,8 +336,8 @@ export function UsageDashboard({
                 <SelectItem value="model">Model</SelectItem>
                 <SelectItem value="account">Account</SelectItem>
               </Select>
-            </label>
-          </div>
+            </FormField>
+          </WorkspaceToolbar>
           {!loading && !historyError && filtered.length > 0 && (
             <UsageInsights
               data={insights}
@@ -360,12 +358,16 @@ export function UsageDashboard({
             />
           )}
           {historyError && (
-            <p role="alert" className="task-error">
+            <InlineNotice
+              tone="error"
+              action={
+                <Button variant="outline" onClick={() => void refresh()}>
+                  Reload history
+                </Button>
+              }
+            >
               Usage is unavailable because saved history could not be loaded. {historyError}
-              <Button variant="outline" onClick={() => void refresh()}>
-                Reload history
-              </Button>
-            </p>
+            </InlineNotice>
           )}
           {!loading && !historyError && filtered.length > 0 && (
             <WorkspaceSectionHeading
@@ -378,32 +380,23 @@ export function UsageDashboard({
                       Clear date
                     </Button>
                   )}
-                  <Button
-                    variant={ledger === 'tasks' ? 'secondary' : 'ghost'}
-                    aria-pressed={ledger === 'tasks'}
-                    onClick={() => {
-                      setLedger('tasks');
-                      setDate(null);
+                  <FilterGroup
+                    label="Usage detail"
+                    value={ledger}
+                    onChange={(value) => {
+                      setLedger(value);
+                      if (value === 'tasks') setDate(null);
                     }}
-                  >
-                    Tasks
-                  </Button>
-                  <Button
-                    variant={ledger === 'calls' ? 'secondary' : 'ghost'}
-                    aria-pressed={ledger === 'calls'}
-                    onClick={() => setLedger('calls')}
-                  >
-                    Individual calls
-                  </Button>
+                    items={[
+                      { id: 'tasks', label: 'Tasks' },
+                      { id: 'calls', label: 'Individual calls' },
+                    ]}
+                  />
                 </div>
               }
             />
           )}
-          {error && (
-            <p role="alert" className="task-error">
-              {error}
-            </p>
-          )}
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
           {loading ? (
             <p role="status">Loading usage…</p>
           ) : historyError ? null : !sorted.length ? (
@@ -584,9 +577,9 @@ export function UsageDashboard({
               {helperLoading ? (
                 <p role="status">Loading helper history…</p>
               ) : helperError || helper.error ? (
-                <p role="alert" className="task-error">
+                <InlineNotice tone="error">
                   Helper usage could not be refreshed. {helperError ?? helper.error}
-                </p>
+                </InlineNotice>
               ) : (
                 <p>
                   {helper.turns.length ? tokenLabel(helperUsage.tokens) : 'No saved turns'}

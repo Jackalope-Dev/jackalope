@@ -6,6 +6,7 @@ import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigSt
 import { useExecutionStore } from '../../stores/executionStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
+import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { AddAgentForm } from './AddAgentForm';
@@ -70,11 +71,7 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           </div>
         }
       />
-      {error && (
-        <p role="alert" className="task-error">
-          {error}
-        </p>
-      )}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {saved && (
         <p role="status" className="task-muted">
           Agent settings saved. Existing runs keep their current configuration.
@@ -207,9 +204,9 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
           );
         })}
       {!config.defaultMetaAgent && (
-        <p className="task-error">
+        <InlineNotice tone="error">
           Choose an enabled default agent before starting internal agent work.
-        </p>
+        </InlineNotice>
       )}
     </div>
   );
