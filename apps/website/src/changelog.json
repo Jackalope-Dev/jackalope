@@ -1,5 +1,16 @@
 [
   {
+    "id": "chat-is-the-first-tasks-view",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Chat is the first Tasks view.",
+    "description": "Opening Tasks starts a conversation. Inbox keeps the work list for planning, review, and archive.",
+    "items": [
+      "Tasks opens Chat first, with Inbox, Evidence, and Recurring as peer tabs.",
+      "Chat and Inbox replace the Live and Work labels."
+    ]
+  },
+  {
     "id": "a-clearer-path-from-request-to-delivery",
     "date": "2026-09-11",
     "status": "In development",

@@ -461,7 +461,7 @@ const WorkCard = memo(
         </span>
         {item.session ? (
           <span className="work-item-action">
-            Live session · Open conversation
+            Chat · Open conversation
             <ChevronRight size={14} aria-hidden="true" />
           </span>
         ) : item.run ? (

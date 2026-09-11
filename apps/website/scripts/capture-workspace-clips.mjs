@@ -43,6 +43,10 @@ try {
             .getByRole('heading', { name: 'Weekly dependency review', exact: true })
             .waitFor();
         } else {
+          await page
+            .getByRole('navigation', { name: 'tasks views', exact: true })
+            .getByRole('button', { name: 'Inbox', exact: true })
+            .click();
           await page.getByRole('button', { name: 'Board', exact: true }).click();
         }
         await page.waitForTimeout(600);

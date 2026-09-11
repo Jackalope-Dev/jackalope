@@ -43,9 +43,9 @@ export function LiveSessions({
     })
     .sort((a, b) => a.group - b.group || b.activity - a.activity);
   return (
-    <section className="live-hub" aria-label="Live sessions">
+    <section className="live-hub" aria-label="Chat">
       <header className="live-hub-heading">
-        <h1>Live sessions</h1>
+        <h1>Chat</h1>
         {items.length > 0 && (
           <Button
             variant="ghost"
@@ -55,7 +55,7 @@ export function LiveSessions({
             }}
           >
             <Plus size={16} />
-            New session
+            New chat
           </Button>
         )}
       </header>
@@ -80,7 +80,7 @@ export function LiveSessions({
           )}
         </div>
         {items.length > 0 && (
-          <nav className="live-history" aria-label="Sessions">
+          <nav className="live-history" aria-label="Chats">
             {['Needs attention', 'In progress', 'Recent', 'Finished'].map((label, group) => {
               const members = items.filter((item) => item.group === group);
               return (
@@ -123,7 +123,7 @@ export function LiveSessions({
       </div>
       {loading && !session && (
         <span className="live-loading" role="status">
-          Loading sessions…
+          Loading chats…
         </span>
       )}
     </section>

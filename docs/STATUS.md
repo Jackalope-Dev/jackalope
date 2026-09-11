@@ -7,8 +7,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 ## Desktop workspace
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
-- Tasks and Live sessions share a project-scoped work list and task/project command search.
-  Returning work uses compact capture, remembered filters and keyboard row navigation.
+- Tasks opens Chat first. Inbox keeps the project-scoped work list that includes chats,
+  with remembered filters, compact capture and keyboard row navigation. Task and project
+  command search covers both.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
 - Result views prioritize unanswered questions, recovery and failed checks. Conversation,
   review, preview and delivery share vocabulary and reusable result tools; task follow-up
@@ -20,8 +21,8 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   PR, CI and deployment preparation carry evidence into editable drafts. Publishing and
   deployment remain explicit user-approved steps; a local merge does not establish either.
 - Live sessions capture short messages while work runs, batch them in order in one
-  isolated workspace, and retain drafts, results and cumulative patch exports. The Live
-  navigation entry starts sessions from the first message and groups history automatically.
+  isolated workspace, and retain drafts, results and cumulative patch exports. Chat
+  starts a session from the first message and groups history automatically.
   Sessions can pop out into a compact window with an always-on-top pin. Dispatch pauses after
   failures or restart; installed-provider and native-window acceptance remain open.
 - Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity adapters with

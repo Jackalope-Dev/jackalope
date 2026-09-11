@@ -67,7 +67,7 @@ export function CommandPalette({
       title: session.title,
       project: session.request.projectName,
       date: session.updatedAt,
-      state: 'Live session',
+      state: 'Chat',
     })),
   ]
     .filter((item) => `${item.title} ${item.project} ${item.state}`.toLowerCase().includes(search))
@@ -276,7 +276,7 @@ export function CommandPalette({
                 }}
               >
                 <item.icon className="size-4 text-[var(--color-accent-ink)]" />
-                <span>{item.label}</span>
+                <span>{item.id === 'live-sessions' ? 'Chat' : item.label}</span>
               </button>
             ))}
             {themes.length > 0 && <p className="menu-label">Change atmosphere</p>}

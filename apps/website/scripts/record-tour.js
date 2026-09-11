@@ -2,6 +2,10 @@ async function _recordTour(page) {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 1440, height: 840 });
   await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'tasks views', exact: true })
+    .getByRole('button', { name: 'Inbox', exact: true })
+    .click();
   const allTasks = page.getByRole('button', { name: 'All tasks', exact: true });
   if (await allTasks.isVisible()) await allTasks.click();
   await page.getByRole('button', { name: 'Board', exact: true }).click();

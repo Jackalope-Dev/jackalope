@@ -7,7 +7,7 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-Choose **Start Live conversation** from Tasks, or open **Tasks → Live**, and send a message.
+Open **Tasks → Chat** and send a message, or choose **Open Chat** from Inbox.
 The first message names the session;
 history groups sessions by attention, activity and completion, with recent work first.
 Capture stays available while a batch runs. Messages arriving together are grouped

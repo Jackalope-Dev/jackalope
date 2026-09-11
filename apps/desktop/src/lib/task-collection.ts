@@ -64,7 +64,7 @@ export function collectWorkspaceWork(
                 : 'review',
         run: work.latest,
         session,
-        archiveBlocked: 'Live sessions stay together. Open the session to finish or resume it.',
+        archiveBlocked: 'Chat sessions stay together. Open Chat to finish or resume it.',
       });
     }
   return items.sort(
@@ -151,7 +151,7 @@ export function collectWork(
       idea,
       run,
       archiveBlocked: blocked.has(run.taskId)
-        ? 'Finish or resolve all attempts and save their history first. Live session tasks stay with their session.'
+        ? 'Finish or resolve all attempts and save their history first. Chat tasks stay with their session.'
         : undefined,
     });
   }

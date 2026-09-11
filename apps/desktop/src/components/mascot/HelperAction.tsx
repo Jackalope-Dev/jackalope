@@ -22,7 +22,7 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
 const destinations: Record<string, ActiveTab> = {
-  tasks: 'kanban',
+  tasks: 'live-sessions',
   agents: 'agents',
   'agent-settings': 'agent-settings',
   mcp: 'mcps',

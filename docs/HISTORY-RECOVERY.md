@@ -23,7 +23,7 @@ the native profile. Archived runs remain on disk and searchable. Active, review-
 failed, interrupted, unsaved, manually archived and live-session runs remain loaded. Session attempts
 stay available because later batches depend on their workspace and account identity.
 
-Tasks → Archived and Settings → Data & reset list retention archives, restore runs and import
+Tasks → Inbox → Archived and Settings → Data & reset list retention archives, restore runs and import
 `jackalope-task-recovery` exports. An import or restoration cannot overwrite an
 existing run. Recovery exports contain private task data; inspect them before sharing.
 

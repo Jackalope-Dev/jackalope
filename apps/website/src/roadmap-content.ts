@@ -18,13 +18,13 @@ export const roadmapStages = [
         title: 'From request to a result you can inspect.',
         summary: 'Shared work discovery, local previews, and a clear delivery handoff.',
         detail:
-          'Tasks and Live sessions share a work list with explicit project scope, remembered views, and command search. Project overview helps you resume unfinished work. Results prioritize questions and failed checks, with follow-up beside review. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
+          'Tasks opens Chat first. Inbox keeps the shared work list with explicit project scope, remembered views, and command search. Project overview helps you resume unfinished work. Results prioritize questions and failed checks, with follow-up beside review. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
       },
       {
         title: 'Keep the ideas coming.',
         summary: 'A running conversation with a compact window you can pin.',
         detail:
-          'Open Live and send a message to start. Sessions name themselves and keep history organized while processing your messages in one isolated workspace. Follow agent results, pause upcoming work, and review a combined patch. Pop the conversation into its own window and pin it above other apps. Drafts and messages persist; sessions pause after restart. Installed-provider and window validation remain in progress. Independent task planning and guarded integration are follow-up work.',
+          'Open Chat and send a message to start. Sessions name themselves and keep history organized while processing your messages in one isolated workspace. Follow agent results, pause upcoming work, and review a combined patch. Pop the conversation into its own window and pin it above other apps. Drafts and messages persist; sessions pause after restart. Installed-provider and window validation remain in progress. Independent task planning and guarded integration are follow-up work.',
       },
       {
         title: 'Your agents. One workspace.',

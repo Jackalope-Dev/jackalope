@@ -282,12 +282,16 @@ try {
   assert.ok(
     await page.evaluate(() =>
       window.sessionFixture.navigation.some(
-        (view) => view.id === 'live-sessions' && view.label === 'Live' && view.group === 'tasks',
+        (view) =>
+          view.id === 'live-sessions' &&
+          view.label === 'Tasks' &&
+          view.group === 'tasks' &&
+          view.primary === true,
       ),
     ),
   );
   assert.equal(await page.getByRole('textbox').count(), 1);
-  assert.equal(await page.getByRole('button', { name: 'New session', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'New chat', exact: true }).count(), 0);
   assert.ok(await input.evaluate((element) => element === document.activeElement));
   await page.screenshot({ path: `${output}/hub-start-1280-dark.png` });
   await input.fill('Make search results easier to scan.');
@@ -325,7 +329,7 @@ try {
   assert.equal(creates[1].title, undefined);
   assert.equal(await page.locator('.live-message').count(), 1);
   await page.evaluate(() => window.sessionFixture.history());
-  const history = page.getByRole('navigation', { name: 'Sessions', exact: true });
+  const history = page.getByRole('navigation', { name: 'Chats', exact: true });
   await history.getByRole('heading', { name: 'Finished', exact: true }).waitFor();
   assert.deepEqual(await history.getByRole('heading').allTextContents(), [
     'Needs attention',
@@ -338,14 +342,14 @@ try {
   assert.ok(titles.indexOf('Review new results') < titles.indexOf('Earlier session'));
   assert.equal(titles.at(-1), 'Finished walkthrough');
   await page.screenshot({ path: `${output}/hub-1280-dark.png` });
-  await page.getByRole('button', { name: 'New session', exact: true }).click();
+  await page.getByRole('button', { name: 'New chat', exact: true }).click();
   assert.equal(await input.inputValue(), '');
   await input.fill('A separate draft');
   await history
     .getByRole('button', { name: 'Make search results easier to scan.', exact: false })
     .click();
   assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
-  await page.getByRole('button', { name: 'New session', exact: true }).click();
+  await page.getByRole('button', { name: 'New chat', exact: true }).click();
   assert.equal(await input.inputValue(), 'A separate draft');
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));

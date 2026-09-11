@@ -197,7 +197,7 @@ try {
       tab,
     );
   };
-  await page.getByRole('heading', { name: 'Tasks', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Chat', exact: true }).waitFor();
   await navigate('repo-todos');
   const row = page.locator('.repo-todo-group li').first();
   await row.waitFor();

@@ -20,13 +20,13 @@ agent, project and connection controls without discarding the draft.
 
 ## Work and results
 
-Tasks defaults to the selected project's work and offers an explicit All work scope.
-Tasks and Live sessions share discovery without duplicate attempts. Needs-input/recovery
+Tasks opens Chat. Inbox defaults to the selected project's work and offers an explicit All work scope.
+Chat and Inbox share discovery without duplicate attempts. Needs-input/recovery
 and failed-check work precede results ready for review, active work, saved ideas and
 finished work. Integration state comes from native verified receipts. Filters, search
 and list/board choices persist per scope. Arrow keys, Home and End move between visible
 work rows; command search also finds projects, tasks, sessions and current-task actions.
-Parallel planning remains inside Tasks with the existing ownership and dependency
+Parallel planning remains inside Inbox with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
 Task detail keeps the assigned agent, recorded progress and next action together.

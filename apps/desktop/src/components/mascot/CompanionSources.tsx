@@ -99,7 +99,7 @@ export function CompanionSources() {
             detail: error,
             kind: 'attention',
             actionLabel: 'Open tasks',
-            onOpen: () => navigateWorkspace('kanban'),
+            onOpen: () => navigateWorkspace('live-sessions'),
           },
         ]
       : [],

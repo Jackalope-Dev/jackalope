@@ -56,6 +56,15 @@ try {
     }),
   );
   await page.goto(url);
+  await page.getByRole('heading', { name: 'Chat', exact: true }).waitFor();
+  const taskTabs = page.getByRole('navigation', { name: 'tasks views', exact: true });
+  assert.deepEqual(await taskTabs.getByRole('button').allTextContents(), [
+    'Chat',
+    'Inbox',
+    'Evidence',
+    'Recurring',
+  ]);
+  await taskTabs.getByRole('button', { name: 'Inbox', exact: true }).click();
   await page.getByRole('heading', { name: 'Work in Atlas', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: /Improve billing/ }).count(), 0);
   await page.locator('.work-item').filter({ hasText: 'Live keyboard exploration' }).waitFor();
@@ -94,6 +103,11 @@ try {
   await page.getByRole('option', { name: 'All work · every project', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('billing');
   await page.reload();
+  await page.getByRole('heading', { name: 'Chat', exact: true }).waitFor();
+  await page
+    .getByRole('navigation', { name: 'tasks views', exact: true })
+    .getByRole('button', { name: 'Inbox', exact: true })
+    .click();
   await page.getByRole('heading', { name: 'All work', exact: true }).waitFor();
   assert.equal(
     await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).inputValue(),

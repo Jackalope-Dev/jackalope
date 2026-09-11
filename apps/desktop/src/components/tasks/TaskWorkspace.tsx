@@ -194,7 +194,7 @@ export function TaskWorkspace({
               }}
             >
               <Radio size={16} />
-              Start Live conversation
+              Open Chat
             </Button>
             {!!(needsInput || ready) && (
               <a className="task-attention-link" href="#task-work">

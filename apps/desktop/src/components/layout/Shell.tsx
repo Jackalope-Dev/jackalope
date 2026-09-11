@@ -33,6 +33,7 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import {
   type ActiveTab,
+  DEFAULT_WORKSPACE_TAB,
   type ProjectSettingsDestination,
   USAGE_VIEWS,
   type UsageView,
@@ -108,7 +109,7 @@ export function Shell({
       canvas.current?.focus();
   }, [focusOnMount, initialDraftKey, initialTaskAgent, initialCapture]);
   const openProjectSetup = () => useOnboardingStore.getState().begin();
-  const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(DEFAULT_WORKSPACE_TAB);
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let disposed = false;
@@ -134,7 +135,7 @@ export function Shell({
     useHelperStore.setState({ screen: activeTab });
   }, [activeTab]);
   const [usageView, setUsageView] = useState<UsageView>('tokens');
-  const previousView = useRef<ActiveTab>('kanban');
+  const previousView = useRef<ActiveTab>(DEFAULT_WORKSPACE_TAB);
   useEffect(() => {
     if (activeTab !== 'preferences') previousView.current = activeTab;
   }, [activeTab]);
@@ -152,6 +153,7 @@ export function Shell({
   useEffect(() => {
     const feature: Partial<Record<ActiveTab, Feature>> = {
       kanban: 'tasks',
+      'live-sessions': 'tasks',
       topology: 'codebase',
       agents: 'agents',
       mcps: 'connections',
@@ -422,21 +424,23 @@ export function Shell({
               items={WORKSPACE_VIEWS.filter((item) => item.group === view.group).map((item) => ({
                 id: item.id,
                 label:
-                  item.id === 'kanban'
-                    ? 'Work'
-                    : item.id === 'project-overview'
-                      ? 'Overview'
-                      : item.id === 'topology'
-                        ? 'Codebase'
-                        : item.id === 'agents'
-                          ? 'Runners'
-                          : item.id === 'agent-settings'
-                            ? 'Configuration'
-                            : item.id === 'mcps'
-                              ? 'Connections'
-                              : item.id === 'project-settings'
-                                ? 'Settings'
-                                : item.label,
+                  item.id === 'live-sessions'
+                    ? 'Chat'
+                    : item.id === 'kanban'
+                      ? 'Inbox'
+                      : item.id === 'project-overview'
+                        ? 'Overview'
+                        : item.id === 'topology'
+                          ? 'Codebase'
+                          : item.id === 'agents'
+                            ? 'Runners'
+                            : item.id === 'agent-settings'
+                              ? 'Configuration'
+                              : item.id === 'mcps'
+                                ? 'Connections'
+                                : item.id === 'project-settings'
+                                  ? 'Settings'
+                                  : item.label,
               }))}
             />
           )}
@@ -450,7 +454,11 @@ export function Shell({
         )}
         <PageErrorBoundary
           key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
-          onBack={activeTab === 'kanban' ? undefined : () => setActiveTab('kanban')}
+          onBack={
+            activeTab === DEFAULT_WORKSPACE_TAB
+              ? undefined
+              : () => setActiveTab(DEFAULT_WORKSPACE_TAB)
+          }
         >
           <Suspense
             fallback={

@@ -10,24 +10,23 @@ import {
   ListTodo,
   Network,
   Plug,
-  Radio,
   Settings2,
   Share2,
 } from 'lucide-react';
 export const WORKSPACE_VIEWS = [
   {
-    id: 'kanban',
+    id: 'live-sessions',
     label: 'Tasks',
-    description: 'Plan, execute and review work.',
+    description: 'Chat: live conversation to send a message, follow work and review changes.',
     icon: Layers3,
     group: 'tasks',
     primary: true,
   },
   {
-    id: 'live-sessions',
-    label: 'Live',
-    description: 'Live sessions: send ideas, follow work and review changes.',
-    icon: Radio,
+    id: 'kanban',
+    label: 'Inbox',
+    description: 'Inbox: plan, review and archive work.',
+    icon: ListTodo,
     group: 'tasks',
     primary: false,
   },
@@ -161,6 +160,7 @@ export const WORKSPACE_VIEWS = [
   },
 ] as const;
 export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
+export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'live-sessions';
 export const USAGE_VIEWS = [
   { id: 'tokens', label: 'Tokens & usage' },
   { id: 'analytics', label: 'Performance & insights' },

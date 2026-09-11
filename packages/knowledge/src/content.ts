@@ -986,7 +986,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'first-task',
         question: 'Try it: improve one empty state',
         paragraphs: [
-          'Use a small visible change for a first task. Describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
+          'Tasks opens Chat. Send a message to start a conversation, or open Inbox or New task for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
         ],
         codeBox: {
           title: 'Example task brief',
@@ -1012,7 +1012,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Choose Try result after work stops. Detect or enter your project’s local preview command, review it, and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
           'Use the embedded page or open it in your browser. Describe what should change and add it to your follow-up. Capture screenshot and page details opens a fresh browser and lets you attach a screenshot, page element and errors. That fresh capture does not copy the embedded page’s sign-in or unsaved interactions.',
-          'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Live sessions also let you queue messages or explicitly stop current work and send.',
+          'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Chat also lets you queue messages or explicitly stop current work and send.',
         ],
       },
       {

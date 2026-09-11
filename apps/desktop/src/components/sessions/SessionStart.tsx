@@ -91,7 +91,7 @@ export function SessionStart({
       <div className="live-start-mark" aria-hidden="true">
         <AgentCharacter provider={project?.preferences?.preferredRunner || 'auto'} />
       </div>
-      <span className="live-start-label">New session</span>
+      <span className="live-start-label">New chat</span>
       <h2>{project?.name ?? 'Choose a project'}</h2>
       {project ? (
         <form

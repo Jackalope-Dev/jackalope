@@ -2,6 +2,10 @@ async function _captureTour(page) {
   const light = await page.evaluate(() => document.documentElement.style.colorScheme === 'light');
   const imagePath = (name) => `apps/website/public/media/${name}${light ? '-light' : ''}.png`;
   await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'tasks views', exact: true })
+    .getByRole('button', { name: 'Inbox', exact: true })
+    .click();
   const allTasks = page.getByRole('button', { name: 'All tasks', exact: true });
   if (await allTasks.isVisible()) await allTasks.click();
   await page.getByRole('button', { name: 'Board', exact: true }).click();
