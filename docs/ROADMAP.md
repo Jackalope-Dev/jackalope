@@ -34,6 +34,10 @@ agreements and changed-file scope reviews gate dependent work and integration. O
 agent reconciliation and verified local merges keep source worktrees and recovery receipts. Repeated [execution evaluations](EXECUTION-EVALUATION.md)
 and installed acceptance are required before claiming throughput or quality gains.
 
+Lead-agent instructions assess delegation automatically using available provider
+subagent tools, with sequential fallback and combined-result responsibility. Task
+capture has no split control. Provider execution and quality acceptance remain open.
+
 Process-scoped model effort requests for Codex/Claude, usage attribution and direct-CLI
 quality comparisons are implemented. Broader independent evaluation and automatic
 effort escalation remain open; see [agent quality](AGENT-QUALITY.md).

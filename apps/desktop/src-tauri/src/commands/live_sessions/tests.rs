@@ -3,7 +3,8 @@ use std::process::Command;
 
 fn fixture() -> (PathBuf, LiveSessions, String) {
     let root = std::env::temp_dir().join(format!("jackalope-live-{}", Uuid::new_v4()));
-    std::fs::create_dir_all(&root).unwrap();
+    let repo = root.join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
     for args in [
         vec!["init", "-b", "main"],
         vec![
@@ -18,7 +19,7 @@ fn fixture() -> (PathBuf, LiveSessions, String) {
         ],
     ] {
         assert!(Command::new("git")
-            .current_dir(&root)
+            .current_dir(&repo)
             .args(args)
             .output()
             .unwrap()
@@ -28,7 +29,7 @@ fn fixture() -> (PathBuf, LiveSessions, String) {
     let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
     let coordinator = Coordinator::new(root.join("coordination"), runtime.clone()).unwrap();
     let service = LiveSessions::new(root.join("sessions/sessions.json"), runtime, coordinator);
-    let request: RunRequest = serde_json::from_value(serde_json::json!({"id": Uuid::new_v4().to_string(), "projectId":"fixture", "projectName":"Fixture", "projectPath":root.to_string_lossy(), "agent":"codex", "model":null, "prompt":"Session", "isolated":true, "previousRunId":null})).unwrap();
+    let request: RunRequest = serde_json::from_value(serde_json::json!({"id": Uuid::new_v4().to_string(), "projectId":"fixture", "projectName":"Fixture", "projectPath":repo.to_string_lossy(), "agent":"codex", "model":null, "prompt":"Session", "isolated":true, "previousRunId":null})).unwrap();
     let id = Uuid::new_v4().to_string();
     service
         .create(id.clone(), "Walkthrough".into(), request)
@@ -147,4 +148,160 @@ fn session_checkpoints_never_create_commits() {
             .unwrap()
             .is_none()
     );
+}
+
+#[test]
+fn failed_save_retains_the_previous_ledger() {
+    let (root, service, id) = fixture();
+    service
+        .send(&id, Uuid::new_v4().to_string(), "Saved".into(), None)
+        .unwrap();
+    std::fs::rename(root.join("sessions"), root.join("sessions-backup")).unwrap();
+    std::fs::write(root.join("sessions"), b"unwritable parent").unwrap();
+    assert!(service
+        .send(&id, Uuid::new_v4().to_string(), "Unsaved".into(), None)
+        .is_err());
+    assert_eq!(
+        service.snapshot(None).unwrap().sessions[0].messages.len(),
+        1
+    );
+    let saved: Ledger =
+        serde_json::from_slice(&std::fs::read(root.join("sessions-backup/sessions.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved.sessions[0].messages[0].text, "Saved");
+}
+
+fn attach_run(root: &std::path::Path, service: &mut LiveSessions, id: &str, run: TaskRun) {
+    let history = root.join(format!("history-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&history).unwrap();
+    std::fs::write(
+        history.join(format!("{}.json", run.id)),
+        serde_json::to_vec(&run).unwrap(),
+    )
+    .unwrap();
+    service.runtime = TaskRuntime::with_test_access(history).unwrap();
+    service.coordinator = Coordinator::new(
+        root.join(format!("coordination-{}", Uuid::new_v4())),
+        service.runtime.clone(),
+    )
+    .unwrap();
+    service
+        .update(|ledger| SelfSession::add(ledger, id, &run.id))
+        .unwrap();
+}
+
+struct SelfSession;
+impl SelfSession {
+    fn add(ledger: &mut Ledger, id: &str, run_id: &str) -> Result<(), String> {
+        let session = LiveSessions::session(ledger, id)?;
+        session.paused = true;
+        session.batches.push(SessionBatch {
+            run_id: run_id.into(),
+            message_ids: vec![],
+            prompt: String::new(),
+            previous_run_id: None,
+            error: None,
+            settled: false,
+        });
+        Ok(())
+    }
+}
+
+#[test]
+fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_commit() {
+    let (root, mut service, id) = fixture();
+    let repo = root.join("repo");
+    let git = |path: &std::path::Path, args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(path)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    std::fs::write(repo.join("tracked.txt"), b"initial\n").unwrap();
+    git(&repo, &["add", "."]);
+    git(
+        &repo,
+        &[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-m",
+            "Tracked fixture",
+        ],
+    );
+    let base = git(&repo, &["rev-parse", "HEAD"]);
+    std::fs::write(repo.join("tracked.txt"), b"staged\n").unwrap();
+    git(&repo, &["add", "."]);
+    let index = std::fs::read(repo.join(".git/index")).unwrap();
+    std::fs::write(repo.join("tracked.txt"), b"final\n").unwrap();
+    std::fs::write(repo.join("new.txt"), b"new text\n").unwrap();
+    let binary = [0, 1, 255, 128, 0, 42];
+    std::fs::write(repo.join("image.bin"), binary).unwrap();
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        live_session_id: Some(id.clone()),
+        status: "review".into(),
+        workspace: repo.to_string_lossy().into_owned(),
+        project_path: repo.to_string_lossy().into_owned(),
+        base_head: base.clone(),
+        branch: "main".into(),
+        ..Default::default()
+    };
+    attach_run(&root, &mut service, &id, run);
+    let exported = service.review(&id).unwrap();
+    assert_eq!(exported.files.len(), 3);
+    assert!(exported.diff.contains("GIT binary patch"));
+    assert!(!exported.verified);
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), base);
+    assert_eq!(std::fs::read(repo.join(".git/index")).unwrap(), index);
+    let target = root.join("apply");
+    git(
+        &root,
+        &[
+            "clone",
+            "--no-hardlinks",
+            repo.to_str().unwrap(),
+            target.to_str().unwrap(),
+        ],
+    );
+    git(&target, &["apply", "--check", &exported.patch_path]);
+    git(&target, &["apply", &exported.patch_path]);
+    assert_eq!(
+        std::fs::read(target.join("tracked.txt")).unwrap(),
+        b"final\n"
+    );
+    assert_eq!(
+        std::fs::read(target.join("new.txt")).unwrap(),
+        b"new text\n"
+    );
+    assert_eq!(std::fs::read(target.join("image.bin")).unwrap(), binary);
+    assert_eq!(git(&target, &["rev-parse", "HEAD"]), base);
+}
+
+#[test]
+fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
+    let (root, mut service, id) = fixture();
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        live_session_id: Some(id.clone()),
+        status: "failed".into(),
+        error: Some("Agent failed".into()),
+        ..Default::default()
+    };
+    attach_run(&root, &mut service, &id, run);
+    assert!(service.tick().unwrap());
+    let snapshot = service.snapshot(Some(&id)).unwrap();
+    assert!(snapshot.sessions[0].paused);
+    assert!(snapshot.sessions[0].batches[0].settled);
+    assert_eq!(snapshot.sessions[0].error.as_deref(), Some("Agent failed"));
+    assert!(!service.tick().unwrap());
 }

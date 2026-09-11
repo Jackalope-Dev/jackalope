@@ -303,10 +303,7 @@ export function FeatureGraphView({
           <div className="h-full flex flex-col items-center justify-center p-6 text-center text-[var(--color-text-muted)]">
             <Network size={32} className="opacity-40 mb-2" />
             <p className="text-sm font-medium">No tasks currently queued</p>
-            <p className="text-xs max-w-sm mt-1">
-              Plan a feature or split a task into multi-agent subtasks to visualize the execution
-              flow.
-            </p>
+            <p className="text-xs max-w-sm mt-1">Plan a feature to visualize the execution flow.</p>
           </div>
         ) : (
           <ReactFlow

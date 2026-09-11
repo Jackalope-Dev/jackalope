@@ -68,9 +68,11 @@ export function LiveSessionView({
   useEffect(() => {
     const node = transcript.current;
     if (collapsed || !node) return;
-    const scroll = () => { if (follow.current) node.scrollTop = node.scrollHeight; };
+    const scroll = () => {
+      if (follow.current) node.scrollTop = node.scrollHeight;
+    };
     const observer = new MutationObserver(scroll);
-    observer.observe(node, {childList: true, subtree: true, characterData: true});
+    observer.observe(node, { childList: true, subtree: true, characterData: true });
     scroll();
     return () => observer.disconnect();
   }, [collapsed]);
@@ -338,7 +340,7 @@ export function LiveSessionView({
         </div>
         {expanded && (
           <aside className="live-work" id="live-session-work">
-            <div className="live-tabs" aria-label="Session details">
+            <div className="live-tabs" role="group" aria-label="Session details">
               {(['work', 'changes', 'preview'] as const).map((value) => (
                 <Button
                   key={value}
@@ -454,30 +456,27 @@ export function LiveSessionView({
                 </div>
               </>
             )}
-            {tab === 'changes' && (
-              <>
-                {active ? (
-                  <p className="live-muted">Finish or stop work to review the current changes.</p>
-                ) : review ? (
-                  <>
-                    <div className="live-review-meta">
-                      <span>
-                        {review.files.length} files ·{' '}
-                        {review.verified ? 'Checks passed' : 'Not verified'}
-                      </span>
-                      <CopyButton text={review.patchPath} label="Copy patch path" />
-                    </div>
-                    <p className="live-muted">Dispatch paused. Changes remain uncommitted.</p>
-                    {review.note && <p className="live-muted">{review.note}</p>}
-                    <Suspense fallback={<p>Loading diff…</p>}>
-                      <RichDiff patch={review.diff} />
-                    </Suspense>
-                  </>
-                ) : (
-                  <p className="live-muted">{latest ? 'Loading changes…' : 'No changes yet.'}</p>
-                )}
-              </>
-            )}
+            {tab === 'changes' &&
+              (active ? (
+                <p className="live-muted">Finish or stop work to review the current changes.</p>
+              ) : review ? (
+                <>
+                  <div className="live-review-meta">
+                    <span>
+                      {review.files.length} files ·{' '}
+                      {review.verified ? 'Checks passed' : 'Not verified'}
+                    </span>
+                    <CopyButton text={review.patchPath} label="Copy patch path" />
+                  </div>
+                  <p className="live-muted">Dispatch paused. Changes remain uncommitted.</p>
+                  {review.note && <p className="live-muted">{review.note}</p>}
+                  <Suspense fallback={<p>Loading diff…</p>}>
+                    <RichDiff patch={review.diff} />
+                  </Suspense>
+                </>
+              ) : (
+                <p className="live-muted">{latest ? 'Loading changes…' : 'No changes yet.'}</p>
+              ))}
             {tab === 'preview' &&
               (latest && !active ? (
                 <TaskPreview run={latest} />

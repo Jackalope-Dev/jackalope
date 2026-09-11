@@ -25,7 +25,6 @@ import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
-import { MultiAgentSplitDialog } from './MultiAgentSplitDialog';
 import { ProjectSetup } from './ProjectSetup';
 import { TaskComposer } from './TaskComposer';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
@@ -86,7 +85,6 @@ export function CaptureTask({
   const defaultAgent = config.defaultMetaAgent;
   const currentAgent = current.agent || defaultAgent;
   const runner = (current.agent ? allowed : runners).find((r) => r.id === currentAgent);
-  const [splitOpen, setSplitOpen] = useState(false);
   const [toolRevision, setToolRevision] = useState(0);
   const adapter = config.customAgents.find((a) => a.id === currentAgent)?.adapter ?? currentAgent;
   const modelCatalog = useAgentModels(
@@ -355,7 +353,6 @@ export function CaptureTask({
           (modelCatalog.catalog?.models ?? []).map((model) => [model.id, model.name]),
         )}
         automaticAgent={runners.find((r) => r.id === defaultAgent)?.name}
-        onSplitTask={project ? () => setSplitOpen(true) : undefined}
         runner={runner}
         allowedRunners={allowed}
         submitting={submitting}
@@ -486,20 +483,6 @@ export function CaptureTask({
             });
         }}
       />
-      {project && (
-        <MultiAgentSplitDialog
-          open={splitOpen}
-          onClose={() => setSplitOpen(false)}
-          goal={current.prompt}
-          project={project}
-          runners={allowed}
-          onImported={() => {
-            setSplitOpen(false);
-            clear();
-            onClose();
-          }}
-        />
-      )}
     </>
   );
   if (inline) return <div className="task-inline-capture">{content}</div>;

@@ -7,6 +7,16 @@ provider's own GUI.
 
 ## Prompt and output contracts
 
+- Every worker launch and continuation asks the lead to assess delegation after
+  inspecting repository context. Small or tightly coupled work stays sequential;
+  useful independent work can use the provider's available, permitted subagent
+  tools without a separate split decision from the user. Explicit user/repository
+  restrictions still apply. The lead assigns bounded ownership, reviews worker
+  results, waits for workers and verifies the combined changes. Missing or denied
+  subagent tools fall back to sequential work; no extra CLI, account or queue task
+  is launched to emulate them. These are agent instructions, not native enforcement
+  of a worker count or evidence that a provider actually delegated. Provider
+  lifecycle, usage coverage and quality still require installed trials.
 - Automatic guidelines distinguish design tokens from authentication tokens, skip
   negated requests and fenced examples, and avoid a debugging workflow for spelling
   fixes. Explicitly selected guidelines and project defaults remain available.

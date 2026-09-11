@@ -2,6 +2,7 @@ import { Checkbox, Input, Textarea } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import { featureDraftKey } from '../../lib/feature-draft';
 import { type FeatureStep, featurePlanningPrompt, readFeaturePlan } from '../../lib/feature-plan';
 import { queueCommand } from '../../lib/queue';
 import { multiAgentPlanningPrompt } from '../../lib/task-decomposition';
@@ -45,7 +46,7 @@ export function FeaturePlanner({
   const available = runners.filter(
     (r) => r.available && config.isAgentEnabled(r.id) && isAgentAllowedForProject(project, r.id),
   );
-  const storageKey = `jackalope-feature-plan:${project.id}${multiAgent ? ':multi' : ''}`;
+  const [storageKey] = useState(() => featureDraftKey(localStorage, project.id, multiAgent));
   const [draft, setDraft] = useState<Draft>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem(storageKey) ?? 'null');

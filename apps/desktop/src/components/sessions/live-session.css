@@ -121,10 +121,6 @@
   min-height: 28px;
   cursor: pointer;
 }
-.live-message[data-canceled="true"] > p {
-  text-decoration: line-through;
-  color: var(--color-text-muted);
-}
 .live-reply {
   display: flex;
   gap: 12px;
@@ -222,6 +218,10 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 20px;
+}
+.live-message[data-canceled="true"] > p {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
 }
 .live-notice {
   padding: 8px 20px;

@@ -471,6 +471,7 @@ impl TaskRuntime {
         }
         let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n", req.prompt);
         let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
+        input.push_str(super::delegation::INSTRUCTIONS);
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
         input.push_str("\nJackalope manages commits and attribution. Leave changes uncommitted. End your result with: Commit message: <imperative summary of the actual changes>.\n");
         if req.previous_run_id.is_none() {

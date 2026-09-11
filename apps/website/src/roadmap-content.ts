@@ -28,9 +28,9 @@ export const roadmapStages = [
       },
       {
         title: 'Room to work in parallel.',
-        summary: 'Separate worktrees. Shared context. Review before integration.',
+        summary: 'Useful delegation, separate worktrees, and shared context.',
         detail:
-          'Repository-aware plans preserve the full request. Parallel queues prioritize dependencies and share capacity across projects. Optional verified snapshots let dependent tasks continue before final review, with structured progress reports and recorded execution timings. Saved ownership handoffs, interface agreements, and changed-file reviews help agents coordinate across worktrees and block unresolved work before integration. Projects can opt into agent conflict resolution and verified local merging, with source worktrees retained. Installed acceptance and repeated quality evaluations remain in progress. Tasks save checkpoints with project-level commit attribution. Review the patch and message, then merge as one commit and clean up finished worktrees and branches. Worktrees separate changes; they do not sandbox an agent’s access to your computer.',
+          'Lead agents decide when available subagent tools can help and remain responsible for the combined result. Repository-aware plans preserve the full request. Parallel queues prioritize dependencies and share capacity across projects. Optional verified snapshots let dependent tasks continue before final review, with structured progress reports and recorded execution timings. Saved ownership handoffs, interface agreements, and changed-file reviews help agents coordinate across worktrees and block unresolved work before integration. Projects can opt into agent conflict resolution and verified local merging, with source worktrees retained. Installed acceptance and repeated quality evaluations remain in progress. Tasks save checkpoints with project-level commit attribution. Review the patch and message, then merge as one commit and clean up finished worktrees and branches. Worktrees separate changes; they do not sandbox an agent’s access to your computer.',
       },
       {
         title: 'Tools that travel with the work.',

@@ -56,7 +56,6 @@ interface Props {
   onChange: (value: Partial<TaskDraft>) => void;
   onLaunch: () => Promise<void>;
   onSave: () => void;
-  onSplitTask?: () => void;
 }
 
 const effortIcons = [Zap, Layers, ShieldCheck];
@@ -91,7 +90,6 @@ export function TaskComposer({
   onChange,
   onLaunch,
   onSave,
-  onSplitTask,
 }: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const effort = effortFor(current.effort);
@@ -251,7 +249,7 @@ export function TaskComposer({
                   <>
                     <div className="composer-section-heading">
                       <span>Lead agent</span>
-                      <span>One agent per task</span>
+                      <span>Owns the result and verification</span>
                     </div>
                     <div className="composer-choice-grid">
                       <button
@@ -466,12 +464,6 @@ export function TaskComposer({
           </span>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
-          {onSplitTask && current.prompt.trim().length > 25 && (
-            <Button type="button" variant="outline" disabled={submitting} onClick={onSplitTask}>
-              <Sparkles size={15} />
-              Split into subtasks
-            </Button>
-          )}
           <Button
             type="button"
             variant={executionReady ? 'ghost' : 'primary'}

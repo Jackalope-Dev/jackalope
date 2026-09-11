@@ -44,7 +44,10 @@ release dates.
   probes do not establish authenticated execution acceptance.
 - [ ] Complete real account login/switch/resume coverage, including expiry,
   cancellation, saved model defaults and continuation with the bound account.
-- [ ] Verify routing, quota handoff, decomposition, outcome/workflow gates and
+- [ ] Verify automatic delegation with real providers: independent versus tightly
+  coupled work, explicit restrictions, unavailable tools, stop/resume, combined
+  verification and reported usage. Compare outcomes before claiming quality gains.
+- [ ] Verify routing, quota handoff, repository planning, outcome/workflow gates and
   coordination with installed agents. Exercise ownership handoffs, rejected interfaces,
   scope review, automatic reconciliation/merge opt-ins and restart recovery in the installed app; measure duplicate work and
   conflict frequency before claiming an improvement.

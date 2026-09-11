@@ -5,6 +5,14 @@ isolated parallel work, coordination and review before integration.
 
 ## Use it
 
+Ordinary tasks ask their lead agent to delegate useful independent work through
+available provider subagent tools. Users do not choose a split mode. This stays
+within the provider session and does not create native queue entries; see
+[agent quality](AGENT-QUALITY.md) for limits. Explicit feature plans remain available
+for reviewing a queue before dispatch. Unfinished drafts from the former split
+dialog reopen in feature planning after any unfinished regular plan is imported;
+their saved run, steps and storage remain intact.
+
 1. Open the native desktop app and choose a Git project with a committed local target branch.
 2. In Tasks, choose **Plan parallel work**. Add focused tasks, or **Import a plan**
    from JSON. Review titles, instructions, assigned agents, owned paths and dependencies.

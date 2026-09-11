@@ -1,5 +1,17 @@
 [
   {
+    "id": "let-the-task-choose-its-approach",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Let the task choose its approach.",
+    "description": "Start a task without deciding whether to split it first.",
+    "items": [
+      "Lead agents assess useful delegation through available subagent tools and remain responsible for the combined result and checks.",
+      "Small or tightly coupled work stays together; saved split plans remain recoverable in feature planning."
+    ],
+    "note": "Delegation depends on the selected provider's available tools. Real-provider validation remains in progress."
+  },
+  {
     "id": "a-simpler-task-view",
     "date": "2026-09-11",
     "status": "In development",

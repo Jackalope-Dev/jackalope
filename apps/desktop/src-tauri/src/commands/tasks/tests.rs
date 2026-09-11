@@ -2,6 +2,7 @@ use super::*;
 
 pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {
+        live_session_id: None,
         effort: None,
         reasoning_effort: None,
         efficiency: Default::default(),
@@ -556,7 +557,12 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     )
     .unwrap();
     let executable = folder.join("fixture.cmd");
-    std::fs::write(&executable, "@echo off\r\nset /p TASK_INPUT=\r\necho %*>args.txt\r\necho {\"type\":\"thread.started\",\"thread_id\":\"fixture-session\"}\r\necho {\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Fixture complete\"}}\r\n").unwrap();
+    std::fs::write(
+        folder.join("capture.ps1"),
+        "[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'input.txt'), [Console]::In.ReadToEnd())",
+    )
+    .unwrap();
+    std::fs::write(&executable, "@echo off\r\npowershell.exe -NoProfile -File \"%~dp0capture.ps1\"\r\necho %*>args.txt\r\necho {\"type\":\"thread.started\",\"thread_id\":\"fixture-session\"}\r\necho {\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Fixture complete\"}}\r\n").unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "custom-fixture".into();
@@ -621,6 +627,10 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     assert!(std::fs::read_to_string(folder.join("args.txt"))
         .unwrap()
         .contains("--model test-model"));
+    let delivered = std::fs::read_to_string(folder.join("input.txt")).unwrap();
+    assert!(delivered.starts_with("Fixture only"));
+    assert!(delivered.contains(super::delegation::INSTRUCTIONS));
+    assert!(delivered.contains("Leave changes uncommitted"));
     policy.enabled_agents.insert("custom-fixture".into(), false);
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let mut blocked = request;
