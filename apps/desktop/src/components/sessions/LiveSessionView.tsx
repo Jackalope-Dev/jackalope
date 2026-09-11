@@ -465,7 +465,7 @@ export function LiveSessionView({
                 <>
                   <div className="live-review-meta">
                     <span>
-                      {review.files.length} files ·{' '}
+                      {review.files.length} {review.files.length === 1 ? 'file' : 'files'} ·{' '}
                       {review.verified ? 'Checks passed' : 'Not verified'}
                     </span>
                     <CopyButton text={review.patchPath} label="Copy patch path" />

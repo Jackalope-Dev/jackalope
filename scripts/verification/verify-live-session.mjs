@@ -142,7 +142,7 @@ try {
     }),
   );
   await page.getByRole('button', { name: 'Review changes', exact: true }).click();
-  await page.getByText('1 files · Checks passed').waitFor();
+  await page.getByText('1 file · Checks passed').waitFor();
   const calls = await page.evaluate(() => window.sessionFixture.calls.map((c) => c.command));
   assert.ok(calls.lastIndexOf('live_session_action') < calls.lastIndexOf('live_session_review'));
   await page.goto(`${url}/?compact`, { waitUntil: 'domcontentloaded' });
@@ -169,6 +169,12 @@ try {
   await page.getByText('A compact thought', { exact: true }).waitFor();
   await page.setViewportSize({ width: 320, height: 320 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('h1')).color === 'rgb(30, 30, 36)',
+  );
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   await page.screenshot({ path: `${output}/window-320-light.png` });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   const inputBox = await input.boundingBox();

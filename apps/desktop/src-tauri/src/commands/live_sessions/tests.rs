@@ -300,3 +300,111 @@ fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
     assert_eq!(snapshot.sessions[0].error.as_deref(), Some("Agent failed"));
     assert!(!service.tick().unwrap());
 }
+
+#[test]
+#[cfg(windows)]
+fn queued_messages_execute_once_in_the_same_uncommitted_workspace() {
+    use crate::commands::agent_policy::{AgentPolicy, CustomAgent};
+    let (root, service, id) = fixture();
+    let executable = root.join("fixture.cmd");
+    std::fs::write(&executable, "@echo off\r\nnode \"%~dp0fixture.cjs\"\r\n").unwrap();
+    std::fs::write(root.join("fixture.cjs"), r#"
+let prompt='';
+process.stdin.on('data',chunk=>prompt+=chunk);
+process.stdin.on('end',()=>{
+ console.log(JSON.stringify({type:'thread.started',thread_id:'live-fixture-session'}));
+ setTimeout(()=>{
+  require('fs').appendFileSync('changes.txt','change\n');
+  console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Fixture complete'}}));
+ },800);
+});
+"#).unwrap();
+    let mut policy = AgentPolicy::default();
+    policy.custom_agents.push(CustomAgent {
+        id: "live-fixture".into(),
+        name: "Live fixture".into(),
+        command: executable.to_string_lossy().into_owned(),
+        adapter: Some("codex".into()),
+    });
+    std::fs::create_dir_all(service.runtime.policy_path().parent().unwrap()).unwrap();
+    std::fs::write(
+        service.runtime.policy_path(),
+        serde_json::to_vec(&policy).unwrap(),
+    )
+    .unwrap();
+    service
+        .update(|ledger| {
+            LiveSessions::session(ledger, &id)?.request.agent = "live-fixture".into();
+            Ok(())
+        })
+        .unwrap();
+    service.coordinator.launch();
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while !service.coordinator.bridge_ready() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "Coordinator did not start"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    service
+        .send(&id, Uuid::new_v4().to_string(), "First change".into(), None)
+        .unwrap();
+    let mut sent_followup = false;
+    loop {
+        service.tick().unwrap();
+        let snapshot = service.snapshot(Some(&id)).unwrap();
+        let active = snapshot
+            .runs
+            .iter()
+            .filter(|run| ["starting", "running", "stopping"].contains(&run.status.as_str()))
+            .count();
+        assert!(active <= 1);
+        if active == 1 && !sent_followup {
+            service
+                .send(
+                    &id,
+                    Uuid::new_v4().to_string(),
+                    "Second change".into(),
+                    None,
+                )
+                .unwrap();
+            sent_followup = true;
+        }
+        if snapshot.sessions[0].error.is_some() || std::time::Instant::now() >= deadline {
+            service.runtime.stop_all();
+            service.coordinator.shutdown();
+            panic!("Session failed: {:?}", snapshot.sessions[0].error);
+        }
+        if snapshot.sessions[0].batches.len() == 2
+            && snapshot.sessions[0]
+                .batches
+                .iter()
+                .all(|batch| batch.settled)
+        {
+            assert_eq!(snapshot.runs.len(), 2);
+            let workspace = &snapshot.runs[0].workspace;
+            assert!(snapshot.runs.iter().all(|run| &run.workspace == workspace
+                && run.status == "review"
+                && run.checkpoint.is_none()));
+            assert_eq!(
+                std::fs::read_to_string(std::path::Path::new(workspace).join("changes.txt"))
+                    .unwrap(),
+                "change\nchange\n"
+            );
+            let head = Command::new("git")
+                .current_dir(workspace)
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .unwrap();
+            assert_eq!(
+                String::from_utf8(head.stdout).unwrap().trim(),
+                snapshot.runs[0].base_head
+            );
+            assert!(!service.tick().unwrap());
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(40));
+    }
+    service.coordinator.shutdown();
+}

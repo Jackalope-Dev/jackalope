@@ -144,7 +144,6 @@ export function SessionComposer({
         </InlineNotice>
       )}
       <div className="live-composer-actions">
-        <span className="live-muted">{session.request.projectName}</span>
         <Button
           type="submit"
           disabled={!text.trim() || saving || session.closed}
