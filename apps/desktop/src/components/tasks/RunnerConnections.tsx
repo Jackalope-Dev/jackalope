@@ -320,23 +320,21 @@ export function RunnerConnections({
                       />
                       <span aria-hidden="true">{enabled ? 'Enabled' : 'Disabled'}</span>
                     </div>
-                    {canStart ? (
+                    {!canStart &&
+                    runner.id === 'antigravity' &&
+                    runner.desktopInstalled &&
+                    !runner.available ? (
+                      <AgentInstallGuide desktopInstalled compact />
+                    ) : (
                       <Button
                         variant="outline"
+                        disabled={!canStart}
+                        title={canStart ? undefined : (detail ?? status ?? undefined)}
                         aria-label={`New task with ${custom?.name ?? runner.name}`}
                         onClick={() => onNewTask(runner.id)}
                       >
                         New task
                         <ArrowRight size={16} />
-                      </Button>
-                    ) : runner.id === 'antigravity' &&
-                      runner.desktopInstalled &&
-                      !runner.available ? (
-                      <AgentInstallGuide desktopInstalled compact />
-                    ) : (
-                      <Button variant="ghost" onClick={() => openAgentConfiguration(runner.id)}>
-                        Configure
-                        <Settings2 size={16} />
                       </Button>
                     )}
                   </div>
