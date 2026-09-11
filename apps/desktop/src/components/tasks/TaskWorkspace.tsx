@@ -115,24 +115,34 @@ export function TaskWorkspace({
   );
   const archiveItems = async (selected: WorkItem[], archive: boolean) => {
     const failures: string[] = [];
+    const updatedRuns: string[] = [];
     for (const item of selected) {
       try {
         if (item.run) {
           await nativeTask('task_set_archived', { id: item.run.id, archived: archive });
+          updatedRuns.push(item.run.id);
         } else if (item.idea) {
-          useTaskStore.getState().updateTask(item.idea.id, {
-            archivedAt: archive ? new Date().toISOString() : null,
-          });
+          useTaskStore.getState().setArchived(item.idea.id, archive);
         }
       } catch (cause) {
         failures.push(`${item.title}: ${String(cause)}`);
       }
     }
     await useExecutionStore.getState().refresh();
+    if (
+      useExecutionStore
+        .getState()
+        .runs.some((run) => updatedRuns.includes(run.id) && !!run.archivedAt !== archive)
+    ) {
+      await useExecutionStore.getState().refresh();
+    }
+    if (useExecutionStore.getState().historyError) {
+      failures.push('The task list could not refresh. Retry loading history to see saved changes.');
+    }
     if (failures.length) throw new Error(failures.join('\n'));
   };
-  const needsInput = items.filter((item) => item.stage === 'attention').length;
-  const ready = items.filter((item) => item.stage === 'review').length;
+  const needsInput = archived ? 0 : items.filter((item) => item.stage === 'attention').length;
+  const ready = archived ? 0 : items.filter((item) => item.stage === 'review').length;
   if (selected)
     return (
       <TaskDetail
@@ -249,11 +259,20 @@ export function TaskWorkspace({
           emptyState={
             <EmptyState
               icon={FolderOpen}
-              title={archived ? 'No archived tasks in this project' : 'No tasks in this project'}
+              title={
+                archived
+                  ? 'No archived tasks'
+                  : projectFilter === 'all'
+                    ? 'No current tasks'
+                    : 'No tasks in this project'
+              }
+              description={archived ? 'Tasks you archive will appear here.' : undefined}
               action={
-                <Button variant="outline" onClick={() => setProjectFilter('all')}>
-                  Show all projects
-                </Button>
+                projectFilter !== 'all' ? (
+                  <Button variant="outline" onClick={() => setProjectFilter('all')}>
+                    Show all projects
+                  </Button>
+                ) : undefined
               }
             />
           }

@@ -199,8 +199,8 @@ export function LiveSessionView({
           onClick={() => setExpanded(!expanded)}
         >
           <span aria-live="polite">
-            {status}
-            {pending ? ` · ${pending} queued` : ''}
+            {status === 'Queued' ? `${pending} queued` : status}
+            {pending && status !== 'Queued' ? ` · ${pending} queued` : ''}
           </span>
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>

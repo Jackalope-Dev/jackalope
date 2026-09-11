@@ -9,7 +9,7 @@ import {
   List,
   ListTodo,
 } from 'lucide-react';
-import { memo, type ReactNode, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ideaStageLabels, type WorkItem, workStages } from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
@@ -59,6 +59,13 @@ export function TaskCollection({
   const [notice, setNotice] = useState('');
   const [undo, setUndo] = useState<WorkItem[]>([]);
   const actionFocus = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  useEffect(() => {
+    if (!busy && returnFocus.current) {
+      returnFocus.current = false;
+      actionFocus.current?.focus();
+    }
+  }, [busy]);
   const projects = useProjectStore((state) => state.projects);
   const { filter, layout, query } = view;
   const setFilter = (filter: string) => onViewChange({ ...view, filter });
@@ -97,9 +104,9 @@ export function TaskCollection({
       setError(String(cause));
     } finally {
       pending.current = false;
+      returnFocus.current = true;
       setBusy(false);
       onBusyChange?.(false);
-      requestAnimationFrame(() => actionFocus.current?.focus());
     }
   };
   const card = (item: WorkItem) => (

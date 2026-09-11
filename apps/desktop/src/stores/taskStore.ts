@@ -34,12 +34,13 @@ interface TaskState {
   tasks: TaskTicket[];
   addTask: (task: Omit<TaskTicket, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateTask: (id: string, updates: Partial<TaskTicket>) => void;
+  setArchived: (id: string, archived: boolean) => void;
   deleteTask: (id: string) => void;
 }
 
 export const useTaskStore = create<TaskState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       tasks: [],
 
       addTask: (taskData) => {
@@ -60,6 +61,24 @@ export const useTaskStore = create<TaskState>()(
             t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t,
           ),
         }));
+      },
+
+      setArchived: (id, archived) => {
+        const tasks = get().tasks;
+        try {
+          set({
+            tasks: tasks.map((task) =>
+              task.id === id
+                ? { ...task, archivedAt: archived ? new Date().toISOString() : null }
+                : task,
+            ),
+          });
+        } catch (error) {
+          try {
+            set({ tasks });
+          } catch {}
+          throw error;
+        }
       },
 
       deleteTask: (id) => {

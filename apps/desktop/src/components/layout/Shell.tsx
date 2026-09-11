@@ -110,10 +110,12 @@ export function Shell({
     if (!isTauriEnvironment()) return;
     let disposed = false;
     let stop: (() => void) | undefined;
-    void listen<string>('live-session-open', ({ payload }) => {
-      useLiveSessionStore.getState().select(payload);
+    void listen<string>('live-session-open', async ({ payload }) => {
+      await useLiveSessionStore.getState().refresh(payload);
+      if (disposed) return;
       const session = useLiveSessionStore.getState().sessions.find((item) => item.id === payload);
       if (session) useProjectStore.getState().selectProject(session.request.projectId);
+      useLiveSessionStore.getState().select(payload);
       setActiveTab('live-sessions');
     }).then((unlisten) => {
       if (disposed) unlisten();

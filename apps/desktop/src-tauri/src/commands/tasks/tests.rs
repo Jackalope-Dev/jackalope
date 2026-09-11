@@ -1131,6 +1131,12 @@ fn manual_archive_failed_save_keeps_task_visible() {
     std::fs::create_dir(folder.join(format!("{}.json", run.id))).unwrap();
     assert!(runtime.set_archived(&run.id, true).is_err());
     assert!(runtime.snapshot(None)[0].archived_at.is_none());
+    assert!(runtime.snapshot(None)[0].persistence_error.is_some());
+    std::fs::remove_dir(folder.join(format!("{}.json", run.id))).unwrap();
+    runtime.update_checked(&run.id, |_| {}).unwrap();
+    runtime.set_archived(&run.id, true).unwrap();
+    assert!(runtime.snapshot(None)[0].archived_at.is_some());
+    assert!(runtime.snapshot(None)[0].persistence_error.is_none());
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
 }

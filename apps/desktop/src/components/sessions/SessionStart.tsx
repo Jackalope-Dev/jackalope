@@ -74,10 +74,10 @@ export function SessionStart({
         request,
         firstMessage: { id: attempt.messageId, text: value },
       });
+      await useLiveSessionStore.getState().refresh(attempt.id);
       const next = latest.current.trim() === value ? '' : latest.current;
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);
       localStorage.removeItem(draftKey);
-      await useLiveSessionStore.getState().refresh(attempt.id);
       if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
     } catch (cause) {
       if (mounted.current) setError(String(cause));

@@ -7,9 +7,11 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-In Tasks, choose **Live session**, name it and send messages. Capture stays available
-while a batch runs. Messages arriving together are grouped in order; subsequent
-batches continue in the same isolated worktree and retain the selected agent account.
+Open **Live** and send a message to start a session. The first message names it;
+history groups sessions by attention, activity and completion, with recent work first.
+Capture stays available while a batch runs. Messages arriving together are grouped
+in order; subsequent batches continue in the same isolated worktree and retain the
+selected agent account.
 Use **Pop out** for a separate window; its pin controls always-on-top. Closing the
 window leaves execution running. **Pause queue** holds later messages, while
 **Stop work** also stops the active attempt through the existing runtime.

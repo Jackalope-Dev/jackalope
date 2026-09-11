@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { taskNotices } from '../src/lib/companion-tasks.ts';
 import { waitForStoppedAttempt } from '../src/lib/continue-task.ts';
 import { planningDraft } from '../src/lib/planning.ts';
+import { returnToProject } from '../src/lib/project-return.ts';
 import { collectWork } from '../src/lib/task-collection.ts';
 import { latestAttempt, safeResultLink, taskNextAction } from '../src/lib/task-workflow.ts';
 import { usageEntries } from '../src/lib/usage-entries.ts';
@@ -100,6 +102,17 @@ test('cleanup checks every attempt and keeps unfinished ownership visible', () =
     assert.ok(collectWork(null, [], [previous, finished])[0].archiveBlocked);
   }
   assert.equal(collectWork(null, [], [run, finished])[0].archiveBlocked, undefined);
+});
+
+test('archiving clears task reminders without reviving an older attempt', () => {
+  const previous = { ...run, status: 'failed' };
+  const archived = { ...run, id: 'new', startedAt: '2026-09-02', archivedAt: '2026-09-03' };
+  assert.deepEqual(
+    taskNotices([previous, archived], () => {}),
+    [],
+  );
+  assert.deepEqual(returnToProject([previous, archived], 'a', []), []);
+  assert.equal(taskNotices([previous, { ...archived, archivedAt: null }], () => {}).length, 1);
 });
 
 test('stop and send waits for actual termination and refuses interrupted or missing ownership', async () => {

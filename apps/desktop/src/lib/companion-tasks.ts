@@ -12,6 +12,7 @@ export function taskNotices(runs: TaskRun[], open: (run: TaskRun) => void): Comp
     if (!titles.has(key)) titles.set(key, taskTitle(run.prompt));
   }
   return [...latest.values()].reverse().flatMap((run): CompanionNotice[] => {
+    if (run.archivedAt) return [];
     // Name the agent so a waiting or failed attempt is attributable from the
     // companion alone. A routed attempt has no agent until routing resolves.
     const agent =

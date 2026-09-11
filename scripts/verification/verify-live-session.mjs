@@ -9,6 +9,8 @@ const fixture = `
 import React from '/node_modules/.vite/deps/react.js';
 import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
 import { LiveSessionView } from '/src/components/sessions/LiveSessionView.tsx';
+import { LiveSessions } from '/src/components/sessions/LiveSessions.tsx';
+import { WORKSPACE_VIEWS } from '/src/components/layout/navigation.ts';
 import { useLiveSessionStore } from '/src/stores/liveSessionStore.ts';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
@@ -18,16 +20,25 @@ import '/src/components/ui/experience.css';
 const run = {id:'run',taskId:'run',liveSessionId:'session',projectId:'atlas',projectName:'Atlas',projectPath:'C:/Projects/atlas',workspace:'C:/Projects/atlas-session',branch:'session/search',targetBranch:'main',baseHead:'base',agent:'codex',account:'Personal',model:'Example',prompt:'Improve search',status:'running',startedAt:'2026-09-11T12:00:00Z',endedAt:null,sessionId:'provider-session',result:'',activity:[],diagnostics:[],prompts:[],error:null,persistenceError:null,exitCode:null,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:false}};
 const session = {id:'session',title:'Search walkthrough',request:{projectId:'atlas',projectName:'Atlas',projectPath:run.projectPath,agent:'codex'},createdAt:run.startedAt,updatedAt:run.startedAt,paused:false,closed:false,pinned:false,draft:{text:'',revision:0},error:null,messages:[{id:'first',text:'The search results need more room.',createdAt:run.startedAt,runId:'run',canceled:false}],batches:[{runId:'run',messageIds:['first'],previousRunId:null,error:null,settled:false}]};
 const f = window.sessionFixture = {
- calls:[], failSend:false, holdSend:false, failPin:false, release:null,
+ calls:[], failSend:false, holdSend:false, failPin:false, failCreate:false, holdCreate:false, release:null,
+ navigation: WORKSPACE_VIEWS,
  theme: appearance => applyThemeTokens({...DEFAULT_THEME,isDark:appearance==='dark'}),
  update: changes => useLiveSessionStore.setState(s=>({sessions:s.sessions.map(item=>({...item,...changes}))})),
  run: changes => useLiveSessionStore.setState(s=>({runs:s.runs.map(item=>({...item,...changes}))})),
 };
-window.__TAURI_INTERNALS__ = { metadata:{currentWindow:{label:'live-session-session'}}, invoke: async (command,args={}) => {
+window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:{label:'live-session-session'}}, invoke: async (command,args={}) => {
  f.calls.push({command,...args});
  const s = useLiveSessionStore.getState().sessions[0];
  switch(command) {
  case 'live_session_snapshot': return {sessions:useLiveSessionStore.getState().sessions,runs:useLiveSessionStore.getState().runs,error:null};
+ case 'live_session_create': {
+  if(f.failCreate) throw new Error('The session could not be saved.');
+  if(f.holdCreate) await new Promise(resolve=>{f.release=resolve});
+  const existing=useLiveSessionStore.getState().sessions;
+  if(!existing.some(item=>item.id===args.id)) useLiveSessionStore.setState({sessions:[...existing,{...session,id:args.id,title:args.firstMessage.text.trim().split(/\\s+/).join(' ').slice(0,64),request:args.request,messages:[{id:args.firstMessage.id,text:args.firstMessage.text,createdAt:new Date().toISOString(),runId:null,canceled:false}],batches:[]}]});
+  return args.id;
+ }
+ case 'agent_save_policy': case 'plugin:event|listen': case 'plugin:event|unlisten': return 0;
  case 'live_session_draft':
   if(args.revision!==s.draft.revision) throw new Error('The draft changed in another window.');
   const draft={text:args.text,revision:s.draft.revision+1};f.update({draft});return draft;
@@ -51,9 +62,16 @@ window.__TAURI_INTERNALS__ = { metadata:{currentWindow:{label:'live-session-sess
  default: throw new Error('Unexpected fixture command: '+command);
  }
 }};
-useLiveSessionStore.setState({sessions:[session],runs:[run],selectedId:'session',loading:false,refresh:async()=>{}});
+const hub=location.search.includes('hub');
+useLiveSessionStore.setState({sessions:hub?[]:[session],runs:hub?[]:[run],selectedId:hub?null:'session',loading:false,refresh:async()=>{}});
+f.history=()=>useLiveSessionStore.setState(s=>({sessions:[...s.sessions,
+ {...session,id:'finished',title:'Finished walkthrough',closed:true,batches:[]},
+ {...session,id:'old',title:'Earlier session',updatedAt:'2026-09-10T12:00:00Z',messages:[],batches:[]},
+ {...session,id:'review',title:'Review new results',messages:[],batches:[{runId:'review-run',messageIds:[],settled:true}]},
+ {...session,id:'attention',title:'Resolve a failed check',error:'Checks failed',batches:[]},
+ session],runs:[run,{...run,id:'review-run',status:'review',endedAt:'2026-09-12T12:00:00Z'}]}));
 f.theme('dark');
-function Example(){const {sessions,runs}=useLiveSessionStore();return React.createElement('main',{style:{height:'100vh',display:'flex',flexDirection:'column'}},React.createElement('p',{style:{fontSize:11,padding:'4px 14px',color:'var(--color-text-muted)'}},'Browser fixture only; no native tasks launched.'),React.createElement(LiveSessionView,{session:sessions[0],runs,detached:location.search.includes('compact'),onBack:()=>{}}));}
+function Example(){const {sessions,runs}=useLiveSessionStore();return React.createElement('main',{style:{height:'100vh',display:'flex',flexDirection:'column'}},React.createElement('p',{style:{fontSize:11,padding:'4px 14px',color:'var(--color-text-muted)'}},'Browser fixture only; no native tasks launched.'),hub?React.createElement(LiveSessions,{project:{id:'atlas',name:'Atlas',path:run.projectPath,gitBranch:'main'},onOpenProject:()=>{}}):React.createElement(LiveSessionView,{session:sessions[0],runs,detached:location.search.includes('compact'),onBack:()=>{}}));}
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Example));
 `;
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -155,7 +173,7 @@ try {
       sessions: [{ ...s, paused: false, messages: [s.messages[0]] }],
     });
   });
-  await page.getByRole('button', { name: 'Queued · 1 queued', exact: true }).waitFor();
+  await page.getByRole('button', { name: '1 queued', exact: true }).waitFor();
   await page.goto(`${url}/?compact`, { waitUntil: 'domcontentloaded' });
   await page.setViewportSize({ width: 440, height: 620 });
   const pin = page.getByRole('button', { name: 'Always on top', exact: true });
@@ -203,6 +221,90 @@ try {
   const closeCalls = await page.evaluate(() => window.sessionFixture.calls);
   assert.ok(closeCalls.some((c) => c.command === 'plugin:window|close'));
   assert.ok(!closeCalls.some((c) => c.command === 'task_stop'));
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto(`${url}/?hub`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: 'Atlas', exact: true }).waitFor();
+  assert.ok(
+    await page.evaluate(() =>
+      window.sessionFixture.navigation.some(
+        (view) => view.id === 'live-sessions' && view.label === 'Live' && view.primary,
+      ),
+    ),
+  );
+  assert.equal(await page.getByRole('textbox').count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'New session', exact: true }).count(), 0);
+  assert.ok(await input.evaluate((element) => element === document.activeElement));
+  await page.screenshot({ path: `${output}/hub-start-1280-dark.png` });
+  await input.fill('Make search results easier to scan.');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await input.waitFor();
+  assert.equal(await input.inputValue(), 'Make search results easier to scan.');
+  await page.evaluate(() => {
+    window.sessionFixture.failCreate = true;
+  });
+  await input.press('Enter');
+  await page.getByText('The session could not be saved.', { exact: false }).waitFor();
+  assert.equal(await input.inputValue(), 'Make search results easier to scan.');
+  await page.evaluate(() => {
+    window.sessionFixture.failCreate = false;
+    window.sessionFixture.holdCreate = true;
+  });
+  await input.press('Enter');
+  await page.waitForFunction(() => !!window.sessionFixture.release);
+  await input.fill('And keep keyboard focus in the search box.');
+  await page.evaluate(() => {
+    window.sessionFixture.holdCreate = false;
+    window.sessionFixture.release();
+  });
+  await page
+    .getByRole('heading', { name: 'Make search results easier to scan.', exact: true })
+    .waitFor();
+  assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
+  const creates = await page.evaluate(() =>
+    window.sessionFixture.calls.filter((call) => call.command === 'live_session_create'),
+  );
+  assert.equal(creates.length, 2);
+  assert.equal(creates[0].id, creates[1].id);
+  assert.equal(creates[0].firstMessage.id, creates[1].firstMessage.id);
+  assert.equal(creates[1].firstMessage.text, 'Make search results easier to scan.');
+  assert.equal(creates[1].title, undefined);
+  assert.equal(await page.locator('.live-message').count(), 1);
+  await page.evaluate(() => window.sessionFixture.history());
+  const history = page.getByRole('navigation', { name: 'Sessions', exact: true });
+  assert.deepEqual(await history.getByRole('heading').allTextContents(), [
+    'Needs attention',
+    'In progress',
+    'Recent',
+    'Finished',
+  ]);
+  const titles = await history.locator('strong').allTextContents();
+  assert.equal(titles[0], 'Resolve a failed check');
+  assert.ok(titles.indexOf('Review new results') < titles.indexOf('Earlier session'));
+  assert.equal(titles.at(-1), 'Finished walkthrough');
+  await page.screenshot({ path: `${output}/hub-1280-dark.png` });
+  await page.getByRole('button', { name: 'New session', exact: true }).click();
+  assert.equal(await input.inputValue(), '');
+  await input.fill('A separate draft');
+  await history
+    .getByRole('button', { name: 'Make search results easier to scan.', exact: false })
+    .click();
+  assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
+  await page.getByRole('button', { name: 'New session', exact: true }).click();
+  assert.equal(await input.inputValue(), 'A separate draft');
+  await page.setViewportSize({ width: 960, height: 640 });
+  await page.evaluate(() => window.sessionFixture.theme('light'));
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('h1')).color === 'rgb(30, 30, 36)',
+  );
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  await page.screenshot({ path: `${output}/hub-960-light.png` });
+  await page.setViewportSize({ width: 640, height: 700 });
+  await page.screenshot({ path: `${output}/hub-640-light.png` });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  const startBox = await input.boundingBox();
+  assert.ok(startBox.y + startBox.height <= 700);
   assert.deepEqual(errors, []);
   console.log(
     `Live-session browser checks passed. Screenshots: ${output}. Browser fixtures only; no native tasks launched.`,

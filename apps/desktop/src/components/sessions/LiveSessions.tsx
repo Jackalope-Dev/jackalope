@@ -34,9 +34,14 @@ export function LiveSessions({
           : work.active || work.pending
             ? 1
             : 2;
-      return { session: item, work, group };
+      const activity = Math.max(
+        ...[item.updatedAt, work.latest?.startedAt, work.latest?.endedAt].map(
+          (time) => Date.parse(time ?? '') || 0,
+        ),
+      );
+      return { session: item, work, group, activity };
     })
-    .sort((a, b) => a.group - b.group || b.session.updatedAt.localeCompare(a.session.updatedAt));
+    .sort((a, b) => a.group - b.group || b.activity - a.activity);
   return (
     <section className="live-hub" aria-label="Live sessions">
       <header className="live-hub-heading">
@@ -101,8 +106,10 @@ export function LiveSessions({
                         <span className="live-history-copy">
                           <strong>{item.title}</strong>
                           <span className="live-muted">
-                            {work.status}
-                            {work.pending ? ` · ${work.pending} queued` : ''}
+                            {work.status === 'Queued' ? `${work.pending} queued` : work.status}
+                            {work.pending && work.status !== 'Queued'
+                              ? ` · ${work.pending} queued`
+                              : ''}
                           </span>
                         </span>
                       </button>

@@ -10,9 +10,10 @@ aligned with this guide when capabilities or priorities change.
 
 ## Built: the local workspace
 
-Live sessions capture messages during execution and process ordered batches in a
-shared isolated worktree. A compact detachable window, always-on-top pin, persistent
-drafts, agent results and cumulative patch exports are implemented. Sessions pause
+Live sessions start from a message in the Live workspace, name themselves and group
+history automatically. They capture messages during execution and process ordered
+batches in a shared isolated worktree. A compact detachable window, always-on-top
+pin, persistent drafts, agent results and cumulative patch exports are implemented. Sessions pause
 after restart; installed acceptance and independent task planning remain open.
 
 Optional local-agent setup includes hardware guidance, download choices and a real

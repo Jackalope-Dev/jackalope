@@ -18,7 +18,7 @@ export const roadmapStages = [
         title: 'Keep the ideas coming.',
         summary: 'A running conversation with a compact window you can pin.',
         detail:
-          'Live sessions save short messages as you work and process them in order in one isolated workspace. Follow agent results, pause upcoming work, and review a combined patch. Pop the conversation into its own window and pin it above other apps. Drafts and messages persist; sessions pause after restart. Installed-provider and window validation remain in progress. Independent task planning and guarded integration are follow-up work.',
+          'Open Live and send a message to start. Sessions name themselves and keep history organized while processing your messages in one isolated workspace. Follow agent results, pause upcoming work, and review a combined patch. Pop the conversation into its own window and pin it above other apps. Drafts and messages persist; sessions pause after restart. Installed-provider and window validation remain in progress. Independent task planning and guarded integration are follow-up work.',
       },
       {
         title: 'Your agents. One workspace.',

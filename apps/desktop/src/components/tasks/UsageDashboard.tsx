@@ -219,7 +219,7 @@ export function UsageDashboard({
         title={view === 'analytics' ? 'Performance & insights' : 'Usage'}
         description={
           view === 'tokens'
-            ? 'See where tokens go and the outcomes behind them, across Jackalope or within a project.'
+            ? 'Your account limits, token activity and the work behind them.'
             : undefined
         }
         action={
@@ -255,6 +255,11 @@ export function UsageDashboard({
         </>
       ) : (
         <>
+          <CapacityPanel />
+          <WorkspaceSectionHeading
+            title="Task usage"
+            description="Reported activity from your loaded Jackalope history."
+          />
           <WorkspaceToolbar className="usage-filters">
             <FormField label="Account">
               <Select
@@ -342,6 +347,7 @@ export function UsageDashboard({
           {!loading && !historyError && filtered.length > 0 && (
             <UsageInsights
               data={insights}
+              selectedDate={date}
               scope={project === 'all' ? 'All projects' : (projectNames.get(project) ?? 'Project')}
               onProject={(id) => {
                 setProject(id);
@@ -630,7 +636,6 @@ export function UsageDashboard({
               )}
             </section>
           )}
-          <CapacityPanel />
         </>
       )}
     </WorkspacePage>

@@ -1,14 +1,12 @@
 .usage-insights {
   display: grid;
-  gap: 28px;
-  margin: 24px 0;
+  gap: 24px;
+  margin: 24px 0 var(--workspace-section-gap, 32px);
 }
-.usage-insights h2 {
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-.usage-insights h3 {
-  font-weight: 600;
+.usage-insights,
+.usage-insights > *,
+.usage-chart-scroll {
+  min-width: 0;
 }
 .usage-insights p,
 .usage-insights small {
@@ -17,71 +15,86 @@
 }
 .usage-scope-heading {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
-}
-.usage-scope-heading > span {
+  margin-bottom: 20px;
   font-size: var(--text-sm);
+  font-weight: 500;
 }
 .usage-metrics {
   display: grid;
-  grid-template-columns: 1.1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1fr 1fr;
   gap: 24px;
 }
-.usage-metrics dt {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+.usage-metrics > * + * {
+  border-left: 1px solid var(--color-border-subtle);
+  padding-left: 24px;
 }
-.usage-metrics dd {
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
+.usage-metrics .ui-stat-value {
   margin: 4px 0;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
-.usage-rank-label small {
-  display: block;
+.usage-metrics :where(.ui-stat-value) small {
+  font-size: var(--text-lg);
   font-weight: 400;
+  letter-spacing: normal;
 }
-.usage-metrics dd small {
-  font-size: 20px;
-  font-weight: 400;
+.usage-chart-legend,
+.usage-chart-legend > span {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
-.usage-metrics p {
-  margin: 0;
+.usage-chart-legend {
+  gap: 16px;
 }
-.usage-attribution {
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 20px;
+.usage-legend-swatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
 }
-.usage-attribution-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  margin-top: 20px;
+.usage-attribution-bar [data-kind="worker"],
+.usage-legend-swatch[data-kind="worker"] {
+  background: var(--color-accent);
 }
-.usage-attribution h4 {
-  font-size: var(--text-sm);
-  margin-bottom: 8px;
+.usage-attribution-bar [data-kind="handoff"],
+.usage-legend-swatch[data-kind="handoff"] {
+  background: var(--color-warning);
 }
-.usage-attribution strong {
-  font-size: var(--text-xl);
+.usage-attribution-bar [data-kind="routing"],
+.usage-legend-swatch[data-kind="routing"] {
+  background: var(--color-text-secondary);
+}
+.usage-chart-frame {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.usage-chart-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 32px 0 33px;
+  min-width: 36px;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
-}
-.usage-attribution-grid p {
-  margin-top: 8px;
-}
-.usage-attribution-note {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
 }
 .usage-chart-scroll {
+  flex: 1;
   overflow-x: auto;
-  margin-top: 16px;
+  scrollbar-width: thin;
+  padding-bottom: 8px;
 }
 .usage-chart {
   display: flex;
@@ -94,9 +107,11 @@
   border-radius: 6px;
   cursor: pointer;
 }
-.usage-chart-point:hover {
+.usage-chart-point:hover,
+.usage-chart-point[aria-pressed="true"] {
   background: var(--color-surface-hover);
 }
+
 .usage-chart-point:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
@@ -104,61 +119,133 @@
 .usage-chart-value,
 .usage-chart-date {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-xs);
   white-space: nowrap;
   color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.usage-chart-point[aria-pressed="true"] .usage-chart-date {
+  color: var(--color-text-primary);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .usage-chart-track {
   position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  height: 100px;
+  height: 160px;
   border-bottom: 1px solid var(--color-border);
-  margin: 8px 0;
+  margin: 10px 0;
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0 calc(50% - 1px),
+    var(--color-border-subtle) calc(50% - 1px) 50%
+  );
 }
 .usage-chart-fill {
   display: flex;
   flex-direction: column;
-  width: 70%;
+  width: 60%;
+  max-width: 48px;
   background: var(--color-accent);
-  border-radius: 3px 3px 0 0;
+  border-radius: 4px 4px 0 0;
 }
 .usage-chart-routing {
   display: block;
   background: var(--color-text-secondary);
-  border-radius: 3px 3px 0 0;
+  border-radius: 4px 4px 0 0;
 }
 .usage-chart-missing {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 4px;
+  right: 2px;
   color: var(--color-text-primary);
+  font-size: var(--text-xs);
 }
-.usage-trend > p {
+.usage-chart-details {
   margin-top: 12px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.usage-chart-details summary {
+  min-height: 44px;
+}
+.usage-attribution-bar {
+  display: flex;
+  height: 12px;
+  margin-top: 24px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+}
+.usage-attribution-grid,
+.usage-outcome-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 20px;
+}
+.usage-attribution h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.usage-attribution h4,
+.usage-outcome-grid h4 {
+  font-size: var(--text-sm);
+  margin-bottom: 8px;
+}
+.usage-attribution strong,
+.usage-outcome-grid strong {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.usage-attribution-grid p,
+.usage-outcome-grid p {
+  margin-top: 8px;
+}
+.usage-attribution-note {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.usage-outcomes,
+.usage-ranking-grid {
+  padding-top: 8px;
+}
+.usage-outcomes h3 {
+  font-weight: 600;
+}
+.usage-outcomes > p {
+  margin-top: 6px;
 }
 .usage-ranking-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 32px;
-}
-.usage-ranking h3 {
-  margin-bottom: 8px;
 }
 .usage-rank-row {
   width: 100%;
   height: auto;
-  min-height: 72px;
+  min-height: 80px;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 12px 8px;
   gap: 16px;
   text-align: left;
   font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: 0;
 }
 .usage-rank-label {
   flex: 1;
   min-width: 0;
+}
+.usage-rank-label small {
+  display: block;
+  font-weight: 400;
 }
 .usage-rank-label > span:first-child {
   display: block;
@@ -166,30 +253,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .usage-rank-track {
   display: block;
   height: 4px;
-  margin-top: 7px;
-  background: var(--color-surface-hover);
+  margin-top: 10px;
+  background: var(--color-surface-sunken);
   border-radius: 3px;
 }
 .usage-rank-track > span {
   display: block;
   height: 100%;
   background: var(--color-accent);
-  border-radius: 3px;
+  border-radius: inherit;
 }
-.usage-app-activity {
-  border-top: 1px solid var(--color-border);
-  margin-top: var(--workspace-section-gap, 32px);
-  padding-top: var(--workspace-section-gap, 32px);
+.usage-page > .usage-filters {
+  margin-top: 20px;
+  margin-bottom: var(--workspace-heading-gap, 24px);
 }
-.usage-app-activity summary,
-.usage-measurement summary {
-  cursor: pointer;
-  min-height: 44px;
-  padding: 12px 0;
+.usage-page .usage-table-scroll {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  margin-top: 16px;
+}
+.usage-page .usage-table th {
+  background: var(--color-surface-elevated);
 }
 .usage-page .usage-table td {
   vertical-align: top;
@@ -199,53 +286,41 @@
   margin-top: 4px;
   color: var(--color-text-secondary);
 }
+.usage-app-activity {
+  border-top: 1px solid var(--color-border-subtle);
+  margin-top: var(--workspace-section-gap, 32px);
+  padding-top: var(--workspace-section-gap, 32px);
+}
+.usage-app-activity summary,
+.usage-measurement summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+}
 @media (max-width: 1050px) {
   .usage-metrics {
     gap: 16px;
   }
-  .usage-metrics dd {
-    font-size: 26px;
+  .usage-metrics > * + * {
+    padding-left: 16px;
   }
-  .usage-attribution-grid {
-    gap: 16px;
+  .usage-metrics .ui-stat-value {
+    font-size: var(--text-2xl, 1.5rem);
   }
   .usage-ranking-grid {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 24px;
   }
 }
 @media (max-width: 650px) {
   .usage-metrics,
-  .usage-attribution-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.usage-outcome-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  margin-top: 16px;
-}
-.usage-outcome-grid strong {
-  display: block;
-  font-size: var(--text-xl);
-  margin-top: 8px;
-}
-.usage-outcome-grid h4 {
-  font-size: var(--text-sm);
-}
-.usage-page > .usage-filters {
-  margin-bottom: var(--workspace-heading-gap, 24px);
-}
-@media (max-width: 650px) {
+  .usage-attribution-grid,
   .usage-outcome-grid {
     grid-template-columns: 1fr;
   }
-}
-
-.usage-insights,
-.usage-insights > *,
-.usage-chart-scroll {
-  min-width: 0;
+  .usage-metrics > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--color-border-subtle);
+    padding: 16px 0 0;
+  }
 }

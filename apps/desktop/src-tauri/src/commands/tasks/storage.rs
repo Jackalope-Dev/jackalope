@@ -250,7 +250,13 @@ impl TaskRuntime {
         }
         let mut updated = current.clone();
         updated.archived_at = archived.then(|| Utc::now().to_rfc3339());
-        self.save(&updated)?;
+        if let Err(error) = self.save(&updated) {
+            let error = format!("History could not be saved: {error}");
+            inner.runs.get_mut(id).unwrap().persistence_error = Some(error.clone());
+            self.writer.changed(id);
+            return Err(error);
+        }
+        updated.persistence_error = None;
         inner.runs.insert(id.to_string(), updated);
         Ok(())
     }

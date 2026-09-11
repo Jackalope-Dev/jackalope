@@ -1,6 +1,9 @@
+import { Badge, Disclosure, DisclosureSummary, Panel, Stat } from '@jackalope/ui';
+import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { UsageInsights as Insights } from '../../lib/usage-insights';
 import { Button } from '../ui/button';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './usage-insights.css';
 
 export const tokenLabel = (tokens: number | null) =>
@@ -11,12 +14,14 @@ const compact = (tokens: number) =>
 export function UsageInsights({
   data,
   scope,
+  selectedDate,
   onProject,
   onAgent,
   onDate,
 }: {
   data: Insights;
   scope: string;
+  selectedDate?: string | null;
   onProject: (id: string) => void;
   onAgent: (id: string) => void;
   onDate: (date: string) => void;
@@ -27,63 +32,160 @@ export function UsageInsights({
     if (lastDate && chart.current) chart.current.scrollLeft = chart.current.scrollWidth;
   }, [lastDate]);
   const max = Math.max(1, ...data.trend.map((p) => p.tokens ?? 0));
+  const attribution = [
+    {
+      title: 'Task execution',
+      stats: data.worker,
+      kind: 'worker',
+      description: 'Agent work, context, tools and in-task checks.',
+    },
+    {
+      title: 'Quota-interrupted work',
+      stats: data.handoffs,
+      kind: 'handoff',
+      description: 'Worker usage before switching accounts or agents.',
+    },
+    {
+      title: 'Agent selection',
+      stats: data.routing,
+      kind: 'routing',
+      description: 'Model calls to choose an agent, including failed selections.',
+    },
+  ];
   return (
     <div className="usage-insights">
-      <div className="usage-scope-heading">
-        <h2>{scope}</h2>
-        <span className="task-muted">Task activity · loaded history</span>
-      </div>
-      <dl className="usage-metrics">
-        <div>
-          <dt>Reported tokens</dt>
-          <dd>{tokenLabel(data.total.tokens)}</dd>
-          <p>
-            {data.total.reported} of {data.total.calls} calls reported usage
-            {data.total.missing ? ' · partial total' : ''}
-          </p>
+      <Panel className="usage-summary" aria-label={`${scope} usage summary`}>
+        <div className="usage-scope-heading">
+          <span>{scope}</span>
+          {data.total.missing > 0 && <Badge variant="warning">Partial reporting</Badge>}
         </div>
-        <div>
-          <dt>Tasks with activity</dt>
-          <dd>{data.tasks.length}</dd>
-          <p>
-            {data.projects.length} projects · {data.agents.length} agents
-          </p>
+        <div className="usage-metrics">
+          <Stat
+            label="Reported tokens"
+            value={tokenLabel(data.total.tokens)}
+            description={`${data.total.reported} of ${data.total.calls} calls reported usage`}
+          />
+          <Stat
+            label="Tasks with activity"
+            value={data.tasks.length}
+            description={`${data.projects.length} projects · ${data.agents.length} agents`}
+          />
+          <Stat
+            label="Accepted by you"
+            value={
+              <>
+                {data.accepted}
+                <small> / {data.tasks.length}</small>
+              </>
+            }
+            description={`${data.changes} need changes · ${data.tasks.length - data.accepted - data.changes} without a complete decision`}
+          />
         </div>
-        <div>
-          <dt>Accepted by you</dt>
-          <dd>
-            {data.accepted}
-            <small> / {data.tasks.length}</small>
-          </dd>
-          <p>
-            {data.changes} need changes · {data.tasks.length - data.accepted - data.changes} without
-            a complete decision
-          </p>
+      </Panel>
+      <Panel className="usage-trend" aria-labelledby="usage-trend-title">
+        <WorkspaceSectionHeading
+          level={3}
+          titleId="usage-trend-title"
+          title="Usage over time"
+          description="Select a bar to explore its calls."
+          action={
+            <div className="usage-chart-legend">
+              <span>
+                <i className="usage-legend-swatch" data-kind="worker" />
+                Worker usage
+              </span>
+              <span>
+                <i className="usage-legend-swatch" data-kind="routing" />
+                Agent selection
+              </span>
+            </div>
+          }
+        />
+        <div className="usage-chart-frame">
+          <div className="usage-chart-axis" aria-hidden="true">
+            <span>{compact(max)}</span>
+            <span>{compact(max / 2)}</span>
+            <span>0</span>
+          </div>
+          <div className="usage-chart-scroll" ref={chart}>
+            <div
+              className="usage-chart"
+              style={{ minWidth: Math.max(320, data.trend.length * 46) }}
+            >
+              {data.trend.map((point) => (
+                <button
+                  key={point.date}
+                  type="button"
+                  className="usage-chart-point"
+                  aria-pressed={selectedDate === point.date}
+                  onClick={() => onDate(point.date)}
+                  aria-label={`${point.date}: ${tokenLabel(point.tokens)} reported tokens, ${tokenLabel(point.routing)} routing tokens, ${point.missing} missing reports. Inspect calls.`}
+                >
+                  <span className="usage-chart-value">
+                    {point.tokens === null ? '—' : compact(point.tokens)}
+                  </span>
+                  <span className="usage-chart-track" aria-hidden="true">
+                    <span
+                      className="usage-chart-fill"
+                      style={{ height: `${((point.tokens ?? 0) / max) * 100}%` }}
+                    >
+                      <span
+                        className="usage-chart-routing"
+                        style={{
+                          height: `${point.tokens ? ((point.routing ?? 0) / point.tokens) * 100 : 0}%`,
+                        }}
+                      />
+                    </span>
+                    {point.missing > 0 && <span className="usage-chart-missing">?</span>}
+                  </span>
+                  <span className="usage-chart-date">
+                    {point.date.length === 10 ? point.date.slice(5) : point.date}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </dl>
-      <section className="usage-attribution" aria-labelledby="usage-attribution-title">
-        <h3 id="usage-attribution-title">Where the tokens went</h3>
+        <Disclosure className="usage-chart-details">
+          <DisclosureSummary>
+            About this chart
+            {data.total.missing > 0 ? ` · ${data.total.missing} missing reports` : ''}
+          </DisclosureSummary>
+          <p className="task-muted">
+            Workers use attempt start dates; routing and quota handoffs use their recorded dates, in
+            your local time. Shaded caps show agent selection; ? marks missing reports. Cached input
+            is counted once. This is not subscription quota or a monetary bill.
+          </p>
+        </Disclosure>
+      </Panel>
+      <Panel className="usage-attribution" aria-labelledby="usage-attribution-title">
+        <WorkspaceSectionHeading
+          level={3}
+          titleId="usage-attribution-title"
+          title="Where the tokens went"
+        />
+        <div className="usage-attribution-bar" aria-hidden="true">
+          {attribution.map(({ kind, stats }) => (
+            <span
+              key={kind}
+              data-kind={kind}
+              style={{
+                width: `${data.total.tokens ? ((stats.tokens ?? 0) / data.total.tokens) * 100 : 0}%`,
+              }}
+            />
+          ))}
+        </div>
         <div className="usage-attribution-grid">
-          {[
-            ['Task execution', data.worker, 'Agent work, context, tools and in-task checks.'],
-            [
-              'Quota-interrupted work',
-              data.handoffs,
-              'Worker usage before switching to another account or agent.',
-            ],
-            [
-              'Agent selection overhead',
-              data.routing,
-              'Model calls Jackalope made to choose an agent, including failed selections.',
-            ],
-          ].map(([title, value, description]) => {
-            const stats = value as Insights['total'];
+          {attribution.map(({ title, stats, kind, description }) => {
             return (
-              <div key={String(title)}>
-                <h4>{String(title)}</h4>
+              <div key={title}>
+                <h4>
+                  <span className="usage-legend-swatch" data-kind={kind} aria-hidden="true" />
+                  {title}
+                </h4>
                 <strong>{tokenLabel(stats.tokens)}</strong>
                 <span className="task-muted"> tokens{stats.missing ? ' · partial' : ''}</span>
-                <p>{String(description)}</p>
+                <p>{description}</p>
               </div>
             );
           })}
@@ -97,52 +199,7 @@ export function UsageInsights({
           Prompt and coordination overhead inside worker calls is included in task execution; its
           exact token share is unavailable.
         </p>
-      </section>
-      <section className="usage-trend" aria-labelledby="usage-trend-title">
-        <div className="usage-scope-heading">
-          <h3 id="usage-trend-title">Usage over time</h3>
-          <span className="task-muted">Select a bar to inspect calls</span>
-        </div>
-        <div className="usage-chart-scroll" ref={chart}>
-          <div className="usage-chart" style={{ minWidth: Math.max(320, data.trend.length * 46) }}>
-            {data.trend.map((point) => (
-              <button
-                key={point.date}
-                type="button"
-                className="usage-chart-point"
-                onClick={() => onDate(point.date)}
-                aria-label={`${point.date}: ${tokenLabel(point.tokens)} reported tokens, ${tokenLabel(point.routing)} routing tokens, ${point.missing} missing reports. Inspect calls.`}
-              >
-                <span className="usage-chart-value">
-                  {point.tokens === null ? '—' : compact(point.tokens)}
-                </span>
-                <span className="usage-chart-track" aria-hidden="true">
-                  <span
-                    className="usage-chart-fill"
-                    style={{ height: `${((point.tokens ?? 0) / max) * 100}%` }}
-                  >
-                    <span
-                      className="usage-chart-routing"
-                      style={{
-                        height: `${point.tokens ? ((point.routing ?? 0) / point.tokens) * 100 : 0}%`,
-                      }}
-                    />
-                  </span>
-                  {point.missing > 0 && <span className="usage-chart-missing">?</span>}
-                </span>
-                <span className="usage-chart-date">
-                  {point.date.length === 10 ? point.date.slice(5) : point.date}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <p className="task-muted">
-          Workers use attempt start dates; routing and quota handoffs use their recorded dates, in
-          your local time. Shaded caps show agent selection; ? marks missing reports. Cached input
-          is counted once. This is not subscription quota or a monetary bill.
-        </p>
-      </section>
+      </Panel>
       <section className="usage-outcomes" aria-label="Usage by outcome">
         <h3>Usage by outcome</h3>
         <p>Tokens spent in this view, grouped by each task’s latest saved review.</p>
@@ -193,7 +250,7 @@ function UsageRanking({
   const max = Math.max(1, ...rows.map((r) => r.tokens ?? 0));
   return (
     <section className="usage-ranking" aria-label={title}>
-      <h3>{title}</h3>
+      <WorkspaceSectionHeading level={3} title={title} />
       {rows.slice(0, 8).map((row) => (
         <Button
           variant="ghost"
@@ -215,6 +272,7 @@ function UsageRanking({
             {tokenLabel(row.tokens)}
             <small> tokens</small>
           </span>
+          <ArrowUpRight size={16} aria-hidden="true" />
         </Button>
       ))}
       {rows.length > 8 && (
