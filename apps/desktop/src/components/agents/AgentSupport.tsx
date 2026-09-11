@@ -1,4 +1,8 @@
+import { Check, Minus, X } from 'lucide-react';
 import { agentCapabilities } from '../../lib/agent-capabilities';
+
+type SupportState = 'yes' | 'partial' | 'no';
+const icons = { yes: Check, partial: Minus, no: X };
 
 export function AgentSupport({ adapter }: { adapter: string }) {
   const support = agentCapabilities(adapter);
@@ -10,57 +14,71 @@ export function AgentSupport({ adapter }: { adapter: string }) {
         Separate account setup is available. Running tasks with this agent is still in development.
       </p>
     );
-  const rows = [
-    ['Project context, task awareness & messages', 'Available'],
+  // `detail` carries the nuance as a tooltip so the page stays scannable.
+  const features: [string, SupportState, string][] = [
+    ['Project context', 'yes', 'Project context, task awareness and messages at checkpoints.'],
     [
-      'User questions & validation',
-      support.bridge === 'mcp' ? 'Built-in tools' : 'Through permitted shell/network tools',
+      'Questions & approvals',
+      'yes',
+      support.bridge === 'mcp'
+        ? 'Questions and validation through built-in tools.'
+        : 'Questions and validation through permitted shell and network tools.',
     ],
     [
-      'Browser evidence & interaction',
+      'Browser evidence',
+      adapter === 'codex' ? 'partial' : 'yes',
       adapter === 'codex'
-        ? 'Read tools; actions may require permission'
-        : 'Subject to CLI permissions',
+        ? 'Read tools; browser actions may require permission.'
+        : 'Browser evidence and interaction, subject to CLI permissions.',
     ],
     [
-      'Selected project connections',
-      support.direct.length ? 'Direct and on-demand tools' : 'On-demand tools',
+      'Project connections',
+      'yes',
+      support.direct.length
+        ? 'Selected project connections through direct and on-demand tools.'
+        : 'Selected project connections through on-demand tools.',
     ],
-    ['Continuation, stop & saved history', 'Available'],
+    ['History & resume', 'yes', 'Continuation, stop and saved history.'],
     [
       'Separate accounts',
+      support.accounts ? 'yes' : 'no',
       adapter === 'antigravity'
-        ? 'Gemini API keys; current CLI subscription login'
+        ? 'Gemini API keys; current CLI subscription login.'
         : support.accounts
-          ? 'Available'
-          : 'Current CLI account only',
+          ? 'Separate accounts can be connected.'
+          : 'Uses the current CLI account only.',
     ],
     [
-      'Subscription capacity',
-      support.capacity ? 'When reported by the account' : 'No connected quota interface',
+      'Quota reporting',
+      support.capacity ? 'yes' : 'no',
+      support.capacity
+        ? 'Subscription capacity when the account reports it.'
+        : 'No connected quota interface; usage depends on provider reports.',
     ],
   ];
   return (
     <section aria-label="Agent support" className="mt-4">
       <h3 className="text-base font-medium">Supported in Jackalope</h3>
-      <dl className="agent-support-list">
-        {rows.map(([label, value]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <ul className="agent-support-grid">
+        {features.map(([label, state, detail]) => {
+          const Icon = icons[state];
+          return (
+            <li key={label} data-state={state} title={detail}>
+              <Icon size={14} aria-hidden="true" />
+              <span>{label}</span>
+              <span className="sr-only">
+                {state === 'yes' ? 'Supported' : state === 'partial' ? 'Limited' : 'Not supported'}.{' '}
+                {detail}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
       {adapter === 'kimi' && (
         <p className="task-muted">
-          Use the current Kimi Code CLI for tasks, routing, and Ask Jackalope. Tool approvals and
-          structured questions appear in the task. Membership quota needs a current managed login.
-          Legacy Python kimi-cli accounts need migration through Kimi Code CLI.
+          Legacy Python kimi-cli accounts need migration through the Kimi Code CLI.
         </p>
       )}
-      <p className="task-muted">
-        Messages arrive at checkpoints. Usage depends on provider reports.
-      </p>
     </section>
   );
 }

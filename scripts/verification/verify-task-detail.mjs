@@ -48,6 +48,11 @@ window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
    if(f.failStop) throw new Error('Could not stop the agent. Try again.');
    f.update({status: 'stopped'}); return;
   case 'task_mark_reviewed': f.update({status: 'reviewed'}); return;
+  case 'task_retry':
+   useExecutionStore.setState(s => ({ runs: [...s.runs, {...base, id: 'retry-attempt', status: 'starting',
+    retryOf: args.id, workspace: base.workspace, activity: [], result: '', error: null,
+    progress: {step:'workspace', label:'Preparing the workspace', detail:'', startedAt:new Date().toISOString(), attempt:1}}] }));
+   return 'retry-attempt';
   case 'task_respond_prompt': f.update({prompts: []}); return true;
   default: throw new Error('Unexpected fixture command: ' + command);
  }
@@ -263,6 +268,74 @@ try {
   await page.evaluate(() => window.taskFixture.scenario('starting', { workspace: '' }));
   await tabs.getByRole('tab', { name: 'Output', exact: true }).click();
   await page.getByText('Preparing workspace', { exact: true }).waitFor();
+
+  // A long step reports the work it is doing instead of a fixed label.
+  await page.evaluate(() =>
+    window.taskFixture.scenario('starting', {
+      prepareCommand: 'pnpm install --frozen-lockfile',
+      progress: {
+        step: 'dependencies',
+        label: 'Running project setup',
+        detail: 'Progress: resolved 337, reused 337, downloaded 0, added 334',
+        startedAt: new Date(Date.now() - 134_000).toISOString(),
+        attempt: 2,
+      },
+    }),
+  );
+  const live = page.locator('.task-progress-live');
+  await live.getByText('Running project setup · attempt 2', { exact: true }).waitFor();
+  await live.getByText('Progress: resolved 337, reused 337, downloaded 0, added 334').waitFor();
+  await live.getByText('2m 14s', { exact: true }).waitFor();
+  await page.getByText('Running project setup', { exact: true }).first().waitFor();
+  const steps = page.locator('.task-progress-steps li');
+  assert.equal(await steps.count(), 4, 'setup earns its own step once a project uses one');
+  await steps.filter({ hasText: 'Setup' }).getByText('Retrying (2)', { exact: true }).waitFor();
+  await page.screenshot({ path: `${output}/live-progress-1280-dark.png` });
+
+  // A setup failure names the interruption, shows the command's own output, and offers a retry.
+  await page.evaluate(() =>
+    window.taskFixture.scenario('failed', {
+      prepareCommand: 'pnpm install --frozen-lockfile',
+      error:
+        'The project setup command (pnpm install --frozen-lockfile) produced no output for too long and was stopped after 310s. Tried 2 times.',
+      preparation: {
+        command: 'pnpm install --frozen-lockfile',
+        skipped: false,
+        reason: 'produced no output for too long and was stopped after 310s',
+        attempts: 2,
+        durationMs: 310_000,
+        exitCode: null,
+        success: false,
+        outputTail: 'Progress: resolved 337, reused 337, downloaded 0, added 334',
+        finishedAt: new Date().toISOString(),
+      },
+    }),
+  );
+  await page.getByText('produced no output for too long', { exact: false }).first().waitFor();
+  await page.getByText('Setup output', { exact: false }).click();
+  await page.getByText('added 334', { exact: false }).first().waitFor();
+  await page.screenshot({ path: `${output}/setup-failure-1280-dark.png` });
+  await page.evaluate(() => {
+    window.taskFixture.calls.length = 0;
+  });
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await page.waitForFunction(() => window.taskFixture.calls.length > 0);
+  assert.deepEqual(
+    await page.evaluate(() => window.taskFixture.calls.map((call) => call.command)),
+    ['task_retry'],
+    'retry dispatches the native retry command rather than starting an unrelated task',
+  );
+  // The new attempt is opened and reports its own first step.
+  await page.getByText('Preparing the workspace', { exact: true }).first().waitFor();
+  assert.equal(
+    await page.evaluate(() => window.taskFixture.calls.at(-1).id),
+    'sample',
+    'the retry names the attempt it replaces',
+  );
+
+  // An attempt that already finished offers no retry.
+  await page.evaluate(() => window.taskFixture.scenario('review'));
+  assert.equal(await page.getByRole('button', { name: 'Retry', exact: true }).count(), 0);
   await page.evaluate(() => window.taskFixture.update({ status: 'stopping' }));
   assert(await page.getByRole('button', { name: 'Stop', exact: true }).isDisabled());
   await page.evaluate(() => window.taskFixture.scenario('reviewed'));
@@ -288,7 +361,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    'Task detail browser fixtures passed: states, themes, responsive layouts, reduced motion, keyboard tabs/menu, activity search, error disclosure, history and stop-before-continue recovery. No native tasks launched.',
+    'Task detail browser fixtures passed: states, themes, responsive layouts, reduced motion, keyboard tabs/menu, activity search, live step progress, setup-failure detail, retry dispatch, error disclosure, history and stop-before-continue recovery. No native tasks launched.',
   );
 } finally {
   await browser.close();

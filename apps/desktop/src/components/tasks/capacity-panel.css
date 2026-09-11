@@ -1,6 +1,5 @@
 .capacity-connections {
-  --workspace-card-min-width: 340px;
-  align-items: start;
+  --workspace-card-min-width: 360px;
 }
 .capacity-card {
   display: flex;
@@ -42,18 +41,21 @@
 }
 .capacity-card-identity p {
   margin-top: 2px;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .capacity-dials {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
 }
 .capacity-dial {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 14px;
-  min-width: 0;
+  min-height: 90px;
   padding: 12px 14px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
@@ -63,18 +65,19 @@
   border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border-subtle));
 }
 
-/* Radial gauge */
+/* Radial gauge: svg and readout share one grid cell so the number is never clipped. */
 .capacity-gauge {
-  position: relative;
   display: grid;
   place-items: center;
-  flex-shrink: 0;
   width: 64px;
   height: 64px;
 }
+.capacity-gauge > * {
+  grid-area: 1 / 1;
+}
 .capacity-gauge svg {
-  width: 100%;
-  height: 100%;
+  width: 64px;
+  height: 64px;
   transform: rotate(-90deg);
 }
 .capacity-gauge circle {
@@ -106,19 +109,21 @@
   }
 }
 .capacity-gauge-readout {
-  position: absolute;
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: 1px;
+  white-space: nowrap;
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .capacity-gauge-readout strong {
   font-size: var(--text-base);
   font-weight: 600;
   letter-spacing: -0.04em;
 }
-.capacity-gauge-readout > span {
+.capacity-gauge-readout strong + span {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
@@ -127,7 +132,7 @@
   color: var(--color-text-muted);
 }
 
-/* Dial labels */
+/* Dial labels: three fixed single lines keep every tile the same height. */
 .capacity-dial-meta {
   display: grid;
   gap: 2px;
@@ -135,29 +140,31 @@
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
+.capacity-dial-meta > * {
+  min-width: 0;
+}
+.capacity-dial-line,
+.capacity-dial-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.5;
+}
 .capacity-dial-name {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
   font-size: var(--text-sm);
   font-weight: 600;
+  line-height: 1.5;
   color: var(--color-text-primary);
 }
-.capacity-dial-reset {
-  line-height: 1.5;
-  overflow-wrap: anywhere;
+.capacity-dial-name .ui-badge {
+  white-space: nowrap;
 }
-.capacity-details {
-  margin-top: auto;
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-}
-.capacity-details summary {
-  min-height: 44px;
-}
-.capacity-detail,
-.capacity-source {
+
+.capacity-detail {
   line-height: 1.7;
   overflow-wrap: anywhere;
 }

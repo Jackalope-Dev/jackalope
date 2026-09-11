@@ -1,12 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import {
-  Badge,
-  Disclosure,
-  DisclosureBody,
-  DisclosureSummary,
-  Panel,
-  RefreshIcon,
-} from '@jackalope/ui';
+import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
 
 import { useEffect, useState } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
@@ -33,6 +26,24 @@ function windowName(window: CapacityWindow) {
   if (minutes % 60 === 0) return `${minutes / 60}-hour window`;
   return `${minutes}-minute window`;
 }
+
+const windowExpired = (window: CapacityWindow, now: number) =>
+  window.resetsAt != null && window.resetsAt * 1000 <= now;
+/** Single-line reset text; the tiles ellipsize, so the full wording lives in `resetDetail`. */
+function resetLabel(window: CapacityWindow, now: number) {
+  if (windowExpired(window, now)) return 'Window ended';
+  if (window.resetsAt == null) return 'Reset time not reported';
+  return `Resets ${new Date(window.resetsAt * 1000).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`;
+}
+const resetDetail = (window: CapacityWindow, now: number) =>
+  windowExpired(window, now)
+    ? 'Window ended; refresh for current capacity'
+    : resetLabel(window, now);
 
 const GAUGE_RADIUS = 32;
 const GAUGE_LENGTH = 2 * Math.PI * GAUGE_RADIUS;
@@ -150,15 +161,16 @@ export function CapacityPanel() {
                   </span>
                   <div className="capacity-card-identity">
                     <h3>{name}</h3>
-                    <p className="task-muted text-xs">{record.account}</p>
+                    <p className="task-muted text-xs" title={record.account}>
+                      {record.account}
+                    </p>
                   </div>
                   {stale && <Badge variant="warning">Stale</Badge>}
                 </header>
                 {record.windows.length ? (
                   <div className="capacity-dials">
                     {record.windows.map((window) => {
-                      const expired = window.resetsAt != null && window.resetsAt * 1000 <= now;
-                      const outdated = stale || expired;
+                      const outdated = stale || windowExpired(window, now);
                       const remaining = window.remainingPercent;
                       const low = !outdated && remaining != null && remaining <= 20;
                       return (
@@ -172,27 +184,23 @@ export function CapacityPanel() {
                           <CapacityGauge remaining={remaining} />
                           <div className="capacity-dial-meta">
                             <span className="capacity-dial-name">
-                              {windowName(window)}
+                              <span>{windowName(window)}</span>
                               {low && (
                                 <Badge variant="warning">
                                   {remaining === 0 ? 'Limit reached' : 'Low'}
                                 </Badge>
                               )}
                             </span>
-                            <span className="capacity-dial-status">
+                            <span className="capacity-dial-line">
                               {remaining == null
                                 ? 'Balance unavailable'
                                 : outdated
                                   ? 'Last reported'
-                                  : 'Remaining'}
+                                  : 'Remaining'}{' '}
+                              · {window.poolName}
                             </span>
-                            <span className="capacity-dial-reset">
-                              {window.poolName} ·{' '}
-                              {expired
-                                ? 'Window ended; refresh for current capacity'
-                                : window.resetsAt
-                                  ? `Resets ${new Date(window.resetsAt * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-                                  : 'Reset time not reported'}
+                            <span className="capacity-dial-line" title={resetDetail(window, now)}>
+                              {resetLabel(window, now)}
                             </span>
                           </div>
                         </div>
@@ -206,22 +214,6 @@ export function CapacityPanel() {
                     </p>
                     <p className="capacity-detail">{record.detail}</p>
                   </div>
-                )}
-                {(record.windows.length > 0 || record.observedAt) && (
-                  <Disclosure className="capacity-details">
-                    <DisclosureSummary>Reporting details</DisclosureSummary>
-                    <DisclosureBody>
-                      {record.windows.length > 0 && (
-                        <p className="task-muted text-xs capacity-detail">{record.detail}</p>
-                      )}
-                      {record.observedAt && (
-                        <p className="task-muted text-xs capacity-source">
-                          {stale ? 'Stale snapshot' : 'Snapshot'} ·{' '}
-                          {new Date(record.observedAt).toLocaleTimeString()} · {record.source}
-                        </p>
-                      )}
-                    </DisclosureBody>
-                  </Disclosure>
                 )}
               </Panel>
             );

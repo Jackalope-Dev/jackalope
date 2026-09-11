@@ -1,10 +1,32 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Badge } from '@jackalope/ui';
-import { ArrowUpRight, Check, Circle, CircleAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { isActive, type TaskRun } from '../../lib/task-runtime';
+import { ArrowUpRight, Check, Circle, CircleAlert, LoaderCircle } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { elapsedLabel, isActive, type TaskRun } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
 import { RunStatus } from './RunStatus';
+
+/** Re-render once a second so a running step's elapsed time stays honest. */
+function useTicker(active: boolean) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, [active]);
+}
+
+/** What the project setup command did, phrased for the step list. */
+function setupDetail(run: TaskRun): string {
+  const preparation = run.preparation;
+  if (run.progress?.step === 'dependencies')
+    return run.progress.attempt > 1 ? `Retrying (${run.progress.attempt})` : 'Running';
+  if (!preparation) return run.status === 'starting' ? 'Waiting' : 'Not run';
+  if (preparation.skipped) return 'Already current';
+  if (!preparation.success) return 'Failed';
+  return `Done in ${Math.max(1, Math.round(preparation.durationMs / 1000))}s`;
+}
+
 export function TaskProgress({
   run,
   integrated,
@@ -19,17 +41,34 @@ export function TaskProgress({
   onActivity: () => void;
 }) {
   const active = isActive(run);
+  const progress = active ? run.progress : null;
+  useTicker(!!progress);
   const needsInput = pending > 0 && active && run.status !== 'stopping' && !run.finishing;
   const finished = ['review', 'reviewed'].includes(run.status);
   const blocked = ['failed', 'interrupted', 'stopped'].includes(run.status);
   const checked = !!run.verification?.result.success && !!run.verification.tree;
   const checksFailed = !!run.verificationError || (!!run.verification && !checked);
+  const setupRan = !!run.preparation || !!run.prepareCommand;
   const steps = [
     {
       name: 'Workspace',
-      detail: run.status === 'starting' ? 'Preparing' : run.workspace ? 'Recorded' : 'Not recorded',
-      done: !!run.workspace && run.status !== 'starting',
+      detail:
+        progress?.step === 'workspace'
+          ? 'Preparing'
+          : run.workspace
+            ? run.branch || 'Recorded'
+            : 'Not recorded',
+      done: !!run.workspace && progress?.step !== 'workspace',
     },
+    ...(setupRan
+      ? [
+          {
+            name: 'Setup',
+            detail: setupDetail(run),
+            done: !!run.preparation?.success,
+          },
+        ]
+      : []),
     {
       name: 'Agent',
       detail:
@@ -43,7 +82,9 @@ export function TaskProgress({
                 ? 'Stopping'
                 : run.status === 'running'
                   ? 'Working'
-                  : 'Waiting',
+                  : progress?.step === 'routing'
+                    ? 'Choosing agent'
+                    : 'Waiting',
       done: finished || !!run.finishing,
     },
     {
@@ -74,11 +115,9 @@ export function TaskProgress({
                 : checked
                   ? 'Project checks passed for the recorded snapshot.'
                   : 'No project checks recorded.'
-            : run.status === 'starting'
-              ? 'Preparing the workspace and agent session.'
-              : run.status === 'stopping'
-                ? 'Waiting for the agent to stop.'
-                : '';
+            : run.status === 'stopping'
+              ? 'Waiting for the agent to stop.'
+              : '';
   return (
     <section className="task-progress" aria-label="Task progress">
       <div className="task-progress-main">
@@ -107,7 +146,7 @@ export function TaskProgress({
                 Needs your input
               </Badge>
             ) : (
-              <RunStatus status={run.status} />
+              <RunStatus status={run.status} progress={progress} />
             )}
           </div>
           <p className="task-muted">
@@ -117,7 +156,22 @@ export function TaskProgress({
         </div>
         {action && <div className="task-progress-action">{action}</div>}
       </div>
-      <ol className="task-progress-steps" aria-label="Task stages">
+      {progress && (
+        <p className="task-progress-live" role="status">
+          <LoaderCircle size={14} aria-hidden="true" />
+          <span className="task-progress-live-step">
+            {progress.label}
+            {progress.attempt > 1 && ` · attempt ${progress.attempt}`}
+          </span>
+          {progress.detail && (
+            <span className="task-progress-live-detail" title={progress.detail}>
+              {progress.detail}
+            </span>
+          )}
+          <span className="task-progress-live-elapsed">{elapsedLabel(progress.startedAt)}</span>
+        </p>
+      )}
+      <ol className="task-progress-steps" data-count={steps.length} aria-label="Task stages">
         {steps.map((step) => (
           <li key={step.name} data-complete={step.done}>
             {step.done ? (

@@ -319,9 +319,8 @@ export function LiveSessionView({
                   <span className="live-muted">
                     {active.finishing
                       ? 'Checking changes'
-                      : active.status === 'starting'
-                        ? 'Preparing workspace'
-                        : 'Working'}
+                      : active.progress?.label ||
+                        (active.status === 'starting' ? 'Preparing workspace' : 'Working')}
                   </span>
                 </div>
               )}

@@ -451,6 +451,132 @@ fn installed_agent_lifecycle_trial() {
 }
 
 #[test]
+fn a_retry_repeats_the_task_and_reuses_only_a_clean_worktree() {
+    let root = std::env::temp_dir().join(format!("jackalope-retry-{}", uuid::Uuid::new_v4()));
+    let repo = root.join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    let repo_path = repo.to_string_lossy().into_owned();
+    git(&repo_path, &["init", "--initial-branch=main"]).unwrap();
+    git(&repo_path, &["config", "user.email", "fixture@localhost"]).unwrap();
+    git(&repo_path, &["config", "user.name", "Fixture"]).unwrap();
+    std::fs::write(repo.join("README.md"), "fixture").unwrap();
+    git(&repo_path, &["add", "README.md"]).unwrap();
+    git(
+        &repo_path,
+        &["-c", "commit.gpgsign=false", "commit", "-m", "Baseline"],
+    )
+    .unwrap();
+    let worktree = root.join("worktree");
+    let worktree_path = worktree.to_string_lossy().into_owned();
+    git(
+        &repo_path,
+        &["worktree", "add", "-b", "attempt", &worktree_path],
+    )
+    .unwrap();
+
+    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let mut failed = sample("codex");
+    failed.status = "failed".into();
+    failed.project_path = repo_path.clone();
+    failed.workspace = worktree_path.clone();
+    failed.branch = "attempt".into();
+    failed.base_head = git(&repo_path, &["rev-parse", "HEAD"]).unwrap();
+    failed.target_branch = Some("main".into());
+    failed.prepare_command = Some("pnpm install --frozen-lockfile".into());
+    failed.verify_command = Some("pnpm verify".into());
+    failed.auto_verify = true;
+    failed.error = Some("setup stalled".into());
+    let failed_id = failed.id.clone();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(failed_id.clone(), failed.clone());
+
+    let request = runtime.retry_request(&failed_id).unwrap();
+    assert_eq!(request.retry_of.as_deref(), Some(failed_id.as_str()));
+    assert!(
+        request.previous_run_id.is_none(),
+        "a retry starts a fresh agent session rather than resuming a dead one"
+    );
+    assert_ne!(request.id, failed_id);
+    assert_eq!(request.prompt, failed.prompt);
+    assert_eq!(request.agent, failed.agent);
+    assert_eq!(request.prepare_command, failed.prepare_command);
+    assert_eq!(request.verify_command, failed.verify_command);
+    assert_eq!(request.target_branch.as_deref(), Some("main"));
+    assert!(request.auto_verify);
+    assert!(
+        request.isolated,
+        "an attempt that ran in a worktree retries in one"
+    );
+
+    // A clean worktree carries its prepared dependencies into the retry.
+    let reused = runtime.reusable_workspace(&failed_id).unwrap();
+    assert_eq!(reused.0, worktree_path);
+    assert_eq!(reused.1, "attempt");
+    assert_eq!(reused.2, failed.base_head);
+
+    // Uncommitted agent work is never inherited.
+    std::fs::write(worktree.join("half-done.txt"), "partial").unwrap();
+    assert!(
+        runtime.reusable_workspace(&failed_id).is_none(),
+        "a dirty worktree must force a fresh one"
+    );
+    std::fs::remove_file(worktree.join("half-done.txt")).unwrap();
+    assert!(runtime.reusable_workspace(&failed_id).is_some());
+
+    // A running attempt is neither retryable nor a source of a reusable workspace.
+    runtime.update(&failed_id, |run| run.status = "running".into());
+    assert!(runtime.retry_request(&failed_id).is_err());
+    assert!(runtime.reusable_workspace(&failed_id).is_none());
+    runtime.update(&failed_id, |run| run.status = "failed".into());
+
+    // Nor is a workspace a later attempt already owns.
+    let mut newer = sample("codex");
+    newer.id = uuid::Uuid::new_v4().to_string();
+    newer.task_id = failed.task_id.clone();
+    newer.status = "running".into();
+    newer.workspace = worktree_path.clone();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(newer.id.clone(), newer);
+    assert!(runtime.reusable_workspace(&failed_id).is_none());
+
+    // Preparation failures explain the interruption rather than blaming the command.
+    let stalled = crate::commands::process_control::CommandResult {
+        exit_code: None,
+        success: false,
+        timed_out: false,
+        stalled: true,
+        stdout: String::new(),
+        stderr: String::new(),
+        truncated: false,
+        duration_ms: 310_000,
+    };
+    let message = super::runtime::preparation_failure(&PreparationRecord::from_result(
+        "pnpm install --frozen-lockfile",
+        2,
+        &stalled,
+    ));
+    assert!(message.contains("pnpm install --frozen-lockfile"));
+    assert!(message.contains("no output"));
+    assert!(message.contains("Tried 2 times"));
+
+    git(
+        &repo_path,
+        &["worktree", "remove", "--force", &worktree_path],
+    )
+    .unwrap();
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
     let folder = std::env::temp_dir().join(format!("jackalope-answer-{}", uuid::Uuid::new_v4()));
     let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();

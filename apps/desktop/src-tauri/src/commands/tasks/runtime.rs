@@ -70,7 +70,8 @@ impl TaskRuntime {
         if runs.runs.values().any(|other| {
             other.id != retried
                 && other.workspace == old.workspace
-                && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
+                && ["starting", "running", "stopping", "interrupted"]
+                    .contains(&other.status.as_str())
         }) {
             return None;
         }
@@ -142,6 +143,7 @@ impl TaskRuntime {
                 return Ok(());
             }
             run.status = "stopping".into();
+            run.progress = None;
             run.persistence_error = self
                 .save(run)
                 .err()
@@ -674,6 +676,8 @@ impl TaskRuntime {
             if r.status == "starting" {
                 r.status = "running".into();
             }
+            // The agent is live now; its own activity replaces the startup step.
+            r.progress = None;
             if spawn_attempts > 1 {
                 activity(
                     r,

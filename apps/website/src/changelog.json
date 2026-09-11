@@ -1,5 +1,19 @@
 [
   {
+    "id": "live-task-setup-progress-and-retry",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Live task setup progress and retry",
+    "description": "Tasks report the step they are on while it runs, explain why a setup command was stopped, skip setup that is already current, and can be retried after a failure.",
+    "items": [
+      "Preparation and verification commands are stopped for going quiet rather than at a fixed total runtime, so a slow command that keeps reporting progress finishes.",
+      "A task shows its current step, that step's newest output line and its elapsed time, in both the task list and task detail.",
+      "A workspace whose dependency manifests are unchanged skips its setup command instead of running it again.",
+      "A setup command stopped mid-progress is retried once automatically, and failures name the interruption and show the command output.",
+      "A failed, stopped or interrupted attempt can be retried, continuing in the previous worktree when the agent left it clean."
+    ]
+  },
+  {
     "id": "an-easier-way-to-clear-old-tasks",
     "date": "2026-09-11",
     "status": "In development",

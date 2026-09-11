@@ -224,7 +224,9 @@ impl CommandResult {
                 "produced no output for too long and was stopped after {seconds}s"
             ))
         } else if self.timed_out {
-            Some(format!("ran past its time budget and was stopped after {seconds}s"))
+            Some(format!(
+                "ran past its time budget and was stopped after {seconds}s"
+            ))
         } else {
             None
         }

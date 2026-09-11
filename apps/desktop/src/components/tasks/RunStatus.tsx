@@ -1,6 +1,6 @@
 import { Badge, type BadgeProps } from '@jackalope/ui';
 import { Check, CircleAlert, CircleCheck, Clock3, LoaderCircle, Square } from 'lucide-react';
-import { statusLabel, type TaskRun } from '../../lib/task-runtime';
+import { type StepProgress, statusLabel, type TaskRun } from '../../lib/task-runtime';
 
 const icons = {
   starting: Clock3,
@@ -13,7 +13,14 @@ const icons = {
   reviewed: Check,
 };
 
-export function RunStatus({ status }: { status: TaskRun['status'] }) {
+export function RunStatus({
+  status,
+  progress,
+}: {
+  status: TaskRun['status'];
+  /** Names the step actually running, which is more use than the broad status it belongs to. */
+  progress?: StepProgress | null;
+}) {
   const variant: BadgeProps['variant'] =
     status === 'review' || status === 'reviewed'
       ? 'success'
@@ -26,9 +33,9 @@ export function RunStatus({ status }: { status: TaskRun['status'] }) {
       className="task-status"
       data-state={status}
       variant={variant}
-      icon={icons[status]}
+      icon={progress ? LoaderCircle : icons[status]}
     >
-      {statusLabel[status]}
+      {progress?.label || statusLabel[status]}
     </Badge>
   );
 }

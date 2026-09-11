@@ -419,7 +419,7 @@ const WorkCard = memo(
             ) : layout === 'board' ||
               (item.stage === 'attention' &&
                 ['failed', 'stopped', 'interrupted'].includes(item.run.status)) ? (
-              <RunStatus status={item.run.status} />
+              <RunStatus status={item.run.status} progress={item.run.progress} />
             ) : null}
             <span className="work-item-action">
               {item.stage === 'finished' ? 'Open result' : taskNextAction(item.run)}

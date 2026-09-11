@@ -46,6 +46,19 @@ A project's optional preparation command authorizes a bounded, cancellable comma
 in each new task workspace before its agent starts. Continuations skip preparation.
 Preparation failure retains workspace/history and its recorded command output.
 
+Preparation and verification commands are bounded by silence rather than by total
+runtime: a command is stopped when it produces no output for its stall budget, so a
+slow command that keeps reporting progress is allowed to finish. Both are still
+capped by an overall ceiling. The recorded outcome distinguishes a command that was
+stopped for going quiet, one stopped at the ceiling, and one that exited with a
+failing status, and the task's error repeats that distinction.
+
+A workspace records the dependency manifests its preparation command completed
+against. When a later attempt finds those manifests unchanged, preparation is
+skipped and reported as skipped rather than run again. A preparation command that
+was stopped mid-progress is retried once automatically; a command that ran and
+reported a failing status is not repeated.
+
 Automatic verification is explicitly enabled in Project defaults. Its saved command
 and authorization travel with the task, queue item or schedule and survive account
 or preference changes. After a successful agent result the task remains active
@@ -54,9 +67,23 @@ cancel it; Stop does. Matching successful checks are reused only for the same fi
 snapshot. Missing commands, command failures and unstable file snapshots remain
 visible. Historical records default to automatic verification off and no preparation.
 
+While a task is active it reports the step it is on (workspace, project setup,
+agent selection, agent start or project checks), the newest line that step produced,
+how long it has been running and which automatic attempt it is. Summaries carry the
+same step, so the task list reports live progress without the full activity log. The
+step is cleared when an attempt reaches a terminal status.
+
 The coordinator → execution guard → runtime ordering, active reservations, owned
 process trees, interrupted ownership and history failure guards remain in force.
-No general retry loop, historical replay or inferred dependency installation is added.
+No historical replay or inferred dependency installation is added.
+
+An attempt that failed, stopped or was interrupted can be retried explicitly. A retry
+is a fresh attempt in the same task: it keeps the task's prompt, agent request,
+account, project settings, recorded context and agreed outcome, resumes no agent
+session, and is refused for an attempt that is already integrated or superseded by a
+later attempt. It continues in the previous attempt's worktree only when that worktree
+still exists, no other attempt owns it, and the agent left no uncommitted changes;
+otherwise a fresh worktree is cut and the earlier one is kept for inspection.
 
 ## Iteration and delivery
 
@@ -89,5 +116,6 @@ installed-app acceptance.
 
 With a desktop Vite preview running, use `JACKALOPE_PREVIEW_URL` to select its URL
 and run `node scripts/verification/verify-task-detail.mjs`. This browser fixture
-checks task states, review sections, keyboard navigation and continuation guards;
-it does not launch agents or establish native execution acceptance.
+checks task states, review sections, keyboard navigation, live step progress,
+preparation-failure detail, retry dispatch and continuation guards; it does not
+launch agents or establish native execution acceptance.

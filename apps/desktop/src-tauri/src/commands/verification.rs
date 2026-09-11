@@ -201,7 +201,11 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         runtime.stage(&run.id, Some("verification"));
         let agent_active = ["starting", "running"].contains(&run.status.as_str());
         runtime.update(&run.id, |r| {
-            r.progress = Some(StepProgress::new("verification", "Running project checks", 1))
+            r.progress = Some(StepProgress::new(
+                "verification",
+                "Running project checks",
+                1,
+            ))
         });
         let result = process_control::run_supervised(
             shell(command, &run.workspace)?,

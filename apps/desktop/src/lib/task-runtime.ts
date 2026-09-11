@@ -33,6 +33,12 @@ export interface TaskRun {
     verificationDeliveredBytes: number;
   };
   dependencyInvalidated?: boolean;
+  /** The step running right now. Absent once the attempt reaches a terminal status. */
+  progress?: StepProgress | null;
+  /** What the project setup command did for this attempt. */
+  preparation?: PreparationRecord | null;
+  /** The attempt this one retried. */
+  retryOf?: string | null;
   stages?: {
     stage: string;
     startedAt: string;
@@ -148,6 +154,27 @@ export interface TaskRun {
   validationSteps?: ValidationStep[];
   screenshots?: ScreenshotArtifact[];
 }
+export interface StepProgress {
+  /** Stable key: `workspace`, `dependencies`, `routing`, `agent` or `verification`. */
+  step: string;
+  label: string;
+  /** Newest concrete signal from the step, usually the command's latest output line. */
+  detail: string;
+  startedAt: string;
+  /** 1 on the first try; higher while an automatic retry runs. */
+  attempt: number;
+}
+export interface PreparationRecord {
+  command: string;
+  skipped: boolean;
+  reason: string | null;
+  attempts: number;
+  durationMs: number;
+  exitCode: number | null;
+  success: boolean;
+  outputTail: string;
+  finishedAt: string;
+}
 export interface ArchivedRun {
   id: string;
   taskId: string;
@@ -228,6 +255,19 @@ export interface Review {
   note: string;
 }
 export const isActive = (run: TaskRun) => ['starting', 'running', 'stopping'].includes(run.status);
+/** An attempt that ended without finishing can be tried again from the same task. */
+export const canRetry = (run: TaskRun) => ['failed', 'stopped', 'interrupted'].includes(run.status);
+/** Start a fresh attempt at a task whose last attempt did not finish. */
+export async function retryTask(id: string): Promise<string> {
+  return nativeTask<string>('task_retry', { id });
+}
+/** How long the current step has been running, as a compact `2m 14s`. */
+export function elapsedLabel(since: string, now: number = Date.now()): string {
+  const seconds = Math.max(0, Math.round((now - Date.parse(since)) / 1000));
+  if (!Number.isFinite(seconds)) return '';
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
+}
 export const statusLabel: Record<TaskRun['status'], string> = {
   starting: 'Preparing workspace',
   running: 'Working',

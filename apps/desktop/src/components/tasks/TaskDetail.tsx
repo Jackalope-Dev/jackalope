@@ -20,7 +20,14 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { recoveryHandoff } from '../../lib/project-return';
-import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
+import {
+  canRetry,
+  isActive,
+  nativeTask,
+  retryTask,
+  statusLabel,
+  type TaskRun,
+} from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
 import { latestAttempt } from '../../lib/task-workflow';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
@@ -74,6 +81,7 @@ export function TaskDetail({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [acting, setActing] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [tab, setTab] = useState('result');
   const [integrating, setIntegrating] = useState(false);
   const [appliedHere, setIntegrated] = useState(false);
@@ -137,6 +145,21 @@ export function TaskDetail({
       setError(String(cause));
     } finally {
       setActing(false);
+    }
+  };
+  /** Start a fresh attempt at this task and follow it. */
+  const retry = async () => {
+    if (retrying || submitting) return;
+    setRetrying(true);
+    setError('');
+    try {
+      const id = await retryTask(run.id);
+      await refresh();
+      useExecutionStore.getState().select(id);
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      setRetrying(false);
     }
   };
   const continueTask = async () => {
@@ -345,7 +368,15 @@ export function TaskDetail({
           continuing or integrating.
         </InlineNotice>
       )}
-      {run.error && <TaskFailure message={run.error} onInspect={() => setTab('activity')} />}
+      {run.error && (
+        <TaskFailure
+          message={run.error}
+          preparation={run.preparation}
+          retrying={retrying}
+          onRetry={isLatest && canRetry(run) && !integrated ? () => void retry() : undefined}
+          onInspect={() => setTab('activity')}
+        />
+      )}
       {!!pending.length && (
         <div className="space-y-3 mb-5">
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>

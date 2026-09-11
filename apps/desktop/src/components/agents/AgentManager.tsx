@@ -1,5 +1,5 @@
 import { Input, Panel, PanelBody, PanelHeader, RefreshIcon } from '@jackalope/ui';
-import { ArrowLeft, Plus, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, Star, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -10,7 +10,6 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
-import { AddAgentForm } from './AddAgentForm';
 import { AgentAccounts } from './AgentAccounts';
 import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';
@@ -27,11 +26,25 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
   const [modelsRevision, setModelsRevision] = useState(0);
   const refreshModels = useCallback(() => setModelsRevision((value) => value + 1), []);
   const [busy, setBusy] = useState(false);
-  const [adding, setAdding] = useState(false);
   const [selectedAgent] = useState(initialAgentId ?? config.defaultMetaAgent);
   const desktop = isTauriEnvironment();
   const agents = [...builtinAgents, ...config.customAgents];
   const selected = agents.find((agent) => agent.id === selectedAgent) ?? agents[0];
+  const selectedRunner = runners.find((r) => r.id === selected?.id);
+  const selectedEnabled = selected ? config.isAgentEnabled(selected.id) : false;
+  const isDefault = !!selected && config.defaultMetaAgent === selected.id;
+  const orchestrates =
+    !!selected &&
+    ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
+      ('adapter' in selected ? selected.adapter : undefined) ?? selected.id,
+    );
+  const defaultBlockedReason = !orchestrates
+    ? `${selected?.name} cannot orchestrate routing. Choose Codex, Claude, Grok, OpenCode or Kimi Code.`
+    : !selectedEnabled
+      ? `Enable ${selected?.name} before making it the default.`
+      : !selectedRunner?.available
+        ? `${selected?.name} is not available on this computer yet.`
+        : undefined;
   const save = async () => {
     setBusy(true);
     setError('');
@@ -68,9 +81,22 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
               <RefreshIcon size={16} />
               Save &amp; check agents
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setAdding(!adding)}>
-              <Plus size={15} />
-              Add agent manually
+            <Button
+              type="button"
+              variant={isDefault ? 'outline' : 'ghost'}
+              aria-pressed={isDefault}
+              disabled={
+                isDefault || !selectedEnabled || !selectedRunner?.available || !orchestrates
+              }
+              title={isDefault ? undefined : defaultBlockedReason}
+              onClick={() => {
+                if (!selected) return;
+                config.setDefaultMetaAgent(selected.id);
+                setSaved(false);
+              }}
+            >
+              <Star size={15} fill={isDefault ? 'currentColor' : 'none'} />
+              {isDefault ? 'Current default agent' : 'Use as default'}
             </Button>
           </div>
         }
@@ -80,14 +106,6 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
         <p role="status" className="task-muted">
           Agent settings saved. Existing runs keep their current configuration.
         </p>
-      )}
-      {adding && (
-        <AddAgentForm
-          onAdded={() => {
-            setAdding(false);
-            setSaved(false);
-          }}
-        />
       )}
       {selected?.id === 'opencode' && <LocalAiSetup onConnected={refreshModels} />}
       {agents
@@ -104,18 +122,6 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
             setSaved(false);
           };
           const enabled = config.isAgentEnabled(agent.id);
-          const isDefault = config.defaultMetaAgent === agent.id;
-          const orchestrates = ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
-            ('adapter' in agent ? agent.adapter : undefined) ?? agent.id,
-          );
-          const canBeDefault = enabled && !!runner?.available && orchestrates;
-          const defaultBlockedReason = !orchestrates
-            ? `${agent.name} cannot orchestrate routing. Choose Codex, Claude, Grok, OpenCode or Kimi Code.`
-            : !enabled
-              ? `Enable ${agent.name} before making it the default.`
-              : !runner?.available
-                ? `${agent.name} is not available on this computer yet.`
-                : undefined;
           return (
             <Panel variant="plain" key={agent.id} className="agent-config-row">
               <PanelHeader className="agent-config-heading">
@@ -138,20 +144,6 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                   </p>
                 </div>
                 <div className="agent-config-actions">
-                  <Button
-                    type="button"
-                    variant={isDefault ? 'outline' : 'ghost'}
-                    aria-pressed={isDefault}
-                    disabled={isDefault || !canBeDefault}
-                    title={isDefault ? undefined : defaultBlockedReason}
-                    onClick={() => {
-                      config.setDefaultMetaAgent(agent.id);
-                      setSaved(false);
-                    }}
-                  >
-                    <Star size={15} fill={isDefault ? 'currentColor' : 'none'} />
-                    {isDefault ? 'Current default agent' : 'Use as default'}
-                  </Button>
                   <div className="agent-enable">
                     <Switch
                       checked={enabled}
