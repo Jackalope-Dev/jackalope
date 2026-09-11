@@ -59,6 +59,9 @@
   animation: companion-arrive 500ms ease-out;
 }
 .companion-panel {
+  /* The shared popover pads its contents; this panel lays out its own header,
+     scrolling body and edge-to-edge footer, so it takes that padding back. */
+  padding: 0;
   width: min(400px, calc(100vw - 32px));
   max-height: min(600px, var(--radix-popover-content-available-height));
   display: flex;
@@ -76,7 +79,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 20px 14px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 .companion-header h2 {
@@ -211,8 +214,6 @@
 .companion-shortcuts {
   display: flex;
   flex-shrink: 0;
-  gap: 8px;
-  padding: 8px 16px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border-subtle);
 }
@@ -222,9 +223,19 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  padding: 0 12px;
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-  border-radius: 10px;
+  border-radius: 0;
+}
+/* Keep the two actions distinguishable now that nothing separates them. */
+.companion-shortcuts button + button {
+  border-left: 1px solid var(--color-border-subtle);
+}
+/* A flush control has no inset for a ring, so draw the focus inside its own edges. */
+.companion-shortcuts button:focus-visible {
+  outline-offset: -3px;
+  border-radius: 0;
 }
 .companion-panel button:hover {
   color: var(--color-accent-ink);

@@ -11,7 +11,7 @@ mkdirSync('output/connected-desktops', { recursive: true });
 process.env.VITE_ACCESS_API = 'https://devices.example.invalid';
 const server = await createServer({
   root: 'apps/website',
-  server: { host: '127.0.0.1', port: 5188, strictPort: true },
+  server: { host: '127.0.0.1', port: 5189, strictPort: true },
 });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
@@ -71,7 +71,7 @@ createRoot(document.getElementById('root')).render(<main className="access-page"
         }
         await route.fulfill({ json: devices });
       });
-      await page.goto(`http://127.0.0.1:5188/.devices-fixture.html${dark ? '?dark' : ''}`);
+      await page.goto(`http://127.0.0.1:5189/.devices-fixture.html${dark ? '?dark' : ''}`);
       await page.getByText('Jackalope 0.1.0 · Development build', { exact: true }).waitFor();
       assert.equal(await page.locator('.desktop-device-row').count(), 2);
       assert.equal(await page.getByText('Not recorded yet', { exact: true }).count(), 1);

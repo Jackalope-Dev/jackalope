@@ -28,7 +28,7 @@ node scripts/verification/verify-agent-accounts.mjs
 | verify-orchestration.mjs | Desktop 5391; ORCHESTRATION_PREVIEW_URL override | Coordination UI and explicit capability states |
 | verify-worktree-lifecycle.mjs | Desktop 5197; JACKALOPE_VERIFY_URL override | Project attribution, cleanup and merge review |
 | verify-settings-sync.mjs | Desktop 5179 | Sync consent, conflicts and theme rollback |
-| verify-connected-desktops.mjs | Starts its own website server on 5188 | Device metadata, legacy records and scoped revocation |
+| verify-connected-desktops.mjs | Starts its own website server on 5189 | Device metadata, legacy records and scoped revocation |
 | verify-feedback.mjs | Desktop 5297 and website 5296, VITE_ACCESS_API=https://feedback-fixture.invalid | Feedback forms, delivery states and opt-out |
 | verify-waitlist.mjs | Website 5198, VITE_ACCESS_API=https://api.jackalope.test | Waitlist, referrals, passes and admin fixtures |
 | verify-passes-desktop.mjs | Desktop 5199 | Pass view, clipboard and keyboard |
@@ -39,6 +39,12 @@ node scripts/verification/verify-agent-accounts.mjs
 Some scripts create temporary entry files and remove them on completion. If one
 stops unexpectedly, inspect the leftover fixture before rerunning; do not overwrite
 another task's fixture. Keep preview ports isolated from concurrent work.
+
+Give each fixture a preview it started. A preview left running across unrelated edits
+serves modules a later update has already replaced, so a component can hold a different
+copy of a store than the fixture writes to; the symptom is a control that never appears
+even though its source is correct. A server bound by a different script fails the same
+way. Start the indicated preview for the run, and stop it afterwards.
 
 The website also has Playwright CLI callbacks for media, signup and rendered-route
 checks; see its [README](../apps/website/README.md#verification). Desktop callbacks
