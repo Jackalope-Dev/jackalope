@@ -8,7 +8,8 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["./worker-configuration.d.ts", "node", "@cloudflare/vitest-plugin/types"]
+    "types": ["./worker-configuration.d.ts", "node", "@cloudflare/vitest-plugin/types"],
+    "allowJs": true
   },
   "include": ["src/**/*.ts", "vitest.config.ts", "test/**/*.ts"]
 }

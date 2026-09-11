@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { accessAdminPage } from './admin-page';
+import { adminPage } from '../admin-page';
 import { MANAGED_TAGS } from './audience';
 import {
   broadcastEmail,
@@ -64,11 +64,11 @@ export async function accessAdmin(
   const json = (value: unknown, status = 200) => Response.json(value, { status, headers });
   if (request.method === 'GET' && url.pathname === '/admin/access') {
     const nonce = crypto.randomUUID();
-    return new Response(accessAdminPage(nonce), {
+    return new Response(adminPage(nonce), {
       headers: {
         ...headers,
         'content-type': 'text/html; charset=utf-8',
-        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; style-src-attr 'unsafe-inline'; font-src data:; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
       },
     });
   }

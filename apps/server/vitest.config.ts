@@ -2,6 +2,9 @@ import { fileURLToPath, URL } from 'node:url';
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 import changelog from '../website/src/changelog.json' with { type: 'json' };
+import { buildAdmin } from './scripts/build-admin.mjs';
+
+await buildAdmin();
 
 export default defineConfig({
   plugins: [

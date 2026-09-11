@@ -117,3 +117,5 @@ dist-lab/
 /apps/desktop/src-tauri/icons/android/
 /apps/desktop/src-tauri/icons/ios/
 /patches/glib/Cargo.lock
+
+/apps/server/src/generated/admin-assets.ts

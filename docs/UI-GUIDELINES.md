@@ -43,7 +43,10 @@ activity, unsupported capability claims and implementation jargon in product cop
 ## Shared appearance
 
 Derive colors, typography, surfaces and motion from packages/brand and shared
-controls. Use the local font stacks and established size tokens. Favor clear
+controls from `@jackalope/ui`. Its Button, Input, Textarea, Select, FormField,
+InlineNotice and Dialog components are browser-safe and include their CSS without
+requiring Tailwind. Keep native bridges, API clients and app state out of this package.
+Desktop compatibility exports can retain existing import paths. Use the local font stacks and established size tokens. Favor clear
 hierarchy, generous space and restrained surfaces over repeated metric cards.
 
 Use semantic action and accent tokens with their matching text colors. Keep

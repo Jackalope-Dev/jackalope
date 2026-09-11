@@ -1,0 +1,90 @@
+:where(.ui-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    color 150ms,
+    transform 150ms;
+}
+:where(.ui-button):active {
+  transform: scale(0.98);
+}
+:where(.ui-button):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+:where(.ui-button):disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+:where(.ui-button[data-variant="primary"]) {
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-weight: 600;
+  box-shadow: var(--shadow-flat);
+}
+:where(.ui-button[data-variant="primary"]):hover {
+  background: var(--color-action-hover);
+}
+:where(.ui-button[data-variant="secondary"]) {
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+:where(.ui-button[data-variant="outline"]) {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+:where(.ui-button[data-variant="ghost"]) {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+:where(
+  .ui-button[data-variant="secondary"],
+  .ui-button[data-variant="outline"],
+  .ui-button[data-variant="ghost"]
+):hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+:where(.ui-button[data-variant="danger"]) {
+  background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+  color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+}
+:where(.ui-button[data-variant="danger"]):hover {
+  background: color-mix(in srgb, var(--color-danger) 25%, transparent);
+}
+:where(.ui-button[data-size="sm"]) {
+  padding: 0 12px;
+}
+:where(.ui-button[data-size="lg"]) {
+  padding: 0 20px;
+  gap: 10px;
+  font-size: var(--text-base, 1rem);
+}
+:where(.ui-button[data-size="icon"]) {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-button {
+    transition: none;
+  }
+  .ui-button:active {
+    transform: none;
+  }
+}

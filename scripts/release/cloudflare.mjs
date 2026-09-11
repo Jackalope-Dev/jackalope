@@ -30,6 +30,7 @@ if (process.argv[2] === 'verify') {
   delete config.$schema;
   delete config.account_id;
   config.main = resolve(root, 'apps/server', config.main);
+  config.build = { command: 'node scripts/build-admin.mjs', cwd: resolve(root, 'apps/server') };
   for (const settings of [config, ...Object.values(config.env)]) {
     for (const binding of settings.d1_databases ?? [])
       binding.migrations_dir = resolve(root, 'apps/server', binding.migrations_dir);

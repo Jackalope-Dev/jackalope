@@ -1,3 +1,4 @@
+import { Button, Input } from '@jackalope/ui';
 import { accessMessage, accessOrigin, accessRequest } from './access-api';
 import { waitlistReferral } from './referral';
 import './access.css';
@@ -114,7 +115,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
         >
           <label htmlFor={`${id}-email`}>Email address</label>
           <div className="signup-fields">
-            <input
+            <Input
               id={`${id}-email`}
               name="email"
               type="email"
@@ -135,7 +136,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
                 autoComplete="off"
               />
             </div>
-            <button
+            <Button
               className="button button-primary button-download"
               type="submit"
               disabled={state === 'sending'}
@@ -146,7 +147,7 @@ export function Signup({ popup = false }: { popup?: boolean }) {
               ) : (
                 <ArrowRight size={17} />
               )}
-            </button>
+            </Button>
           </div>
           <p id={`${id}-consent`} className="signup-consent">
             {!accessOrigin && (
