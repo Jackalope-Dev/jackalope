@@ -333,12 +333,8 @@ export function CaptureTask({
                 Open project
               </Button>
             </div>
-            {!project && (
-              <p className="task-muted mb-4">
-                {current.projectId
-                  ? 'Project unavailable. Choose another project.'
-                  : 'Choose a project to start, or save for later.'}
-              </p>
+            {!project && current.projectId && (
+              <p className="task-muted mb-4">Project unavailable. Choose another project.</p>
             )}
           </>
         }

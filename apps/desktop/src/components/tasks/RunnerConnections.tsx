@@ -111,7 +111,6 @@ export function RunnerConnections({
             </div>
           }
         />
-        <LocalAiSetup />
         <div className="agent-roster-heading">
           <span>On this computer</span>
           <div className="flex gap-2">
@@ -334,6 +333,7 @@ export function RunnerConnections({
             through the CLI, then check again.
           </p>
         )}
+        <LocalAiSetup compact />
       </div>
       <Dialog.Root open={adding} onOpenChange={setAdding}>
         <Dialog.Portal>

@@ -131,9 +131,12 @@ try {
     const copy = page.getByRole('button', { name: 'Copy link', exact: true });
     await copy.focus();
     await page.keyboard.press('Enter');
-    await page.getByRole('status').filter({ hasText: 'Referral link copied.' }).waitFor();
+    // The confirmation lands on the button itself and clears after a couple of
+    // seconds, so read it before touching the clipboard.
+    const copied = page.getByRole('button', { name: 'Copied', exact: true });
+    await copied.waitFor();
+    assert.notEqual(await copied.evaluate((el) => getComputedStyle(el).outlineStyle), 'none');
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), place.shareUrl);
-    assert.notEqual(await copy.evaluate((el) => getComputedStyle(el).outlineStyle), 'none');
     failRefresh = true;
     await page.getByRole('button', { name: 'Refresh my place' }).click();
     await page.getByRole('alert').waitFor();

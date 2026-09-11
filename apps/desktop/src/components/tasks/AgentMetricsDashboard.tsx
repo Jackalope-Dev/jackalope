@@ -10,9 +10,11 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { KnowledgeEditor } from '../knowledge/KnowledgeEditor';
+import { Setting } from '../settings/Setting';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
 import { Switch } from '../ui/Switch';
+import '../settings/settings.css';
 
 export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
   const projects = useProjectStore((state) => state.projects);
@@ -303,20 +305,21 @@ export function AgentMetricsDashboard({ runs }: { runs: TaskRun[] }) {
           </div>
         )}
       </section>
-      <details className="border-t border-[var(--color-border)] pt-3">
-        <summary className="cursor-pointer min-h-11 py-3">Automatic quota handoff setting</summary>
-        <Switch
-          label="Automatic quota handoff"
-          checked={automaticQuotaHandoff}
-          disabled={savingHandoff || !isTauriEnvironment()}
-          onCheckedChange={(value) => void changeHandoff(value)}
-        />
+      <div className="border-t border-[var(--color-border)] pt-3">
+        <Setting title="Automatic quota handoff">
+          <Switch
+            label="Automatic quota handoff"
+            checked={automaticQuotaHandoff}
+            disabled={savingHandoff || !isTauriEnvironment()}
+            onCheckedChange={(value) => void changeHandoff(value)}
+          />
+        </Setting>
         {handoffError && (
           <p role="alert" className="task-error">
             {handoffError}
           </p>
         )}
-      </details>
+      </div>
       {editing && (
         <KnowledgeEditor
           key={editing.id}

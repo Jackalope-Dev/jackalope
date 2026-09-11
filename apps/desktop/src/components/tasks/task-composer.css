@@ -109,6 +109,7 @@
   font-weight: 600;
 }
 .composer-effort-description {
+  margin-top: 12px;
   min-height: 20px;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);

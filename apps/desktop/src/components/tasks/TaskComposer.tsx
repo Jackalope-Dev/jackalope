@@ -459,14 +459,12 @@ export function TaskComposer({
         </fieldset>
       </form>
       <div className="task-composer-footer">
-        <span className="composer-dispatch-note">
-          {executionReady
-            ? current.isolated
-              ? 'Runs in a separate worktree'
-              : 'Edits your current checkout'
-            : 'Save an idea now. Choose a project when you’re ready.'}
-        </span>
-        <div className="flex flex-wrap gap-2">
+        {executionReady && (
+          <span className="composer-dispatch-note">
+            {current.isolated ? 'Runs in a separate worktree' : 'Edits your current checkout'}
+          </span>
+        )}
+        <div className="ml-auto flex flex-wrap gap-2">
           {onSplitTask && current.prompt.trim().length > 25 && (
             <Button type="button" variant="outline" disabled={submitting} onClick={onSplitTask}>
               <Sparkles size={15} />
