@@ -56,6 +56,9 @@ impl Drop for IndexLock {
 // Called only after the owned process tree has exited, under the execution guard.
 // The real index is locked and retained until the branch update succeeds.
 pub(super) fn create(run: &TaskRun, directory: &Path) -> Result<Option<Checkpoint>, String> {
+    if run.live_session_id.is_some() {
+        return Ok(None);
+    }
     let policy = project_git::read(Path::new(&run.project_path))?;
     if !policy.auto_checkpoint {
         return Ok(None);

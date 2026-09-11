@@ -266,6 +266,7 @@ impl Coordinator {
             let instructions = instructions(&item);
             let assigned = item.clone();
             let mut request = RunRequest {
+                live_session_id: None,
                 effort: None,
                 dependency_snapshot: Default::default(),
                 monitor_change: None,
@@ -419,6 +420,14 @@ impl Coordinator {
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
         let mut assigned = None;
+        if request.live_session_id.is_some() {
+            let runs = self.runtime.integration_runs()?;
+            if !runs.iter().any(|run| run.id == request.id)
+                && runs.iter().filter(|run| ["starting", "running", "stopping"].contains(&run.status.as_str())).count() >= inner.concurrency
+            {
+                return Err("Session is waiting for execution capacity.".into());
+            }
+        }
         if let Some(previous_id) = &request.previous_run_id {
             let runs = self.runtime.integration_runs()?;
             if let Some(previous) = runs.iter().find(|r| &r.id == previous_id) {

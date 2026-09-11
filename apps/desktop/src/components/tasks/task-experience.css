@@ -33,6 +33,14 @@
   color: var(--color-text-muted);
   font-weight: 400;
 }
+/* Model and account behind the question, so a waiting prompt is attributable
+   without opening the task. */
+.agent-question-identity {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
 .agent-question-title {
   margin: 16px 0;
   font-size: var(--text-base);

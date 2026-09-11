@@ -1,4 +1,5 @@
 import type { CompanionNotice } from '../stores/companionStore.ts';
+import { getAgentMetadata } from './agent-catalog.ts';
 import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
 
@@ -11,7 +12,11 @@ export function taskNotices(runs: TaskRun[], open: (run: TaskRun) => void): Comp
     if (!titles.has(key)) titles.set(key, taskTitle(run.prompt));
   }
   return [...latest.values()].reverse().flatMap((run): CompanionNotice[] => {
-    const detail = `${run.projectName} · ${titles.get(`${run.projectId}:${run.taskId}`)}`;
+    // Name the agent so a waiting or failed attempt is attributable from the
+    // companion alone. A routed attempt has no agent until routing resolves.
+    const agent =
+      run.agent && run.agent !== 'auto' ? (getAgentMetadata(run.agent)?.name ?? run.agent) : null;
+    const detail = `${[agent, run.projectName].filter(Boolean).join(' · ')} · ${titles.get(`${run.projectId}:${run.taskId}`)}`;
     const onOpen = () => open(run);
     const pending = isActive(run)
       ? (run.prompts?.filter((prompt) => prompt.status === 'pending') ?? [])

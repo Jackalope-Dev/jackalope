@@ -4,7 +4,6 @@ import { useId, useState } from 'react';
 import { Button } from '../ui/button';
 import { CodeSurface } from './CodeSurface';
 import './task-experience.css';
-
 export function TaskActivity({ entries, active }: { entries: string[]; active: boolean }) {
   const id = useId();
   const [query, setQuery] = useState('');
@@ -17,8 +16,8 @@ export function TaskActivity({ entries, active }: { entries: string[]; active: b
     <section className="task-activity" aria-label="Task activity">
       <div className="task-experience-summary">
         <ListFilter size={18} aria-hidden="true" />
-        <span>Activity</span>
-        <span className="task-experience-meta">{entries.length} retained entries</span>
+        <span>Agent activity</span>
+        <span className="task-experience-meta">{entries.length} entries</span>
       </div>
       <div className="task-activity-body">
         <SearchField
@@ -32,11 +31,11 @@ export function TaskActivity({ entries, active }: { entries: string[]; active: b
           }}
           containerClassName="task-activity-search"
         />
-        <p className="task-experience-muted" role="status">
-          {query.trim()
-            ? `${matching.length} matching entries`
-            : 'Recent messages reported by the agent. Entries are not completion or verification results.'}
-        </p>
+        {query.trim() && (
+          <p className="task-experience-muted" role="status">
+            {matching.length} matching entries
+          </p>
+        )}
         {matching.length > limit && (
           <Button variant="ghost" onClick={() => setLimit((value) => value + 40)}>
             Show earlier entries ({matching.length - limit})

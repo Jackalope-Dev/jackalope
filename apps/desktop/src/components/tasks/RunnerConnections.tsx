@@ -1,6 +1,6 @@
 import { RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, CircleAlert, Plus, Settings2 } from 'lucide-react';
+import { ArrowRight, CircleAlert, Plus, Settings2, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { isActive, type Runner, type TaskRun } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
@@ -18,6 +18,7 @@ import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
+import { Switch } from '../ui/Switch';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -229,7 +230,21 @@ export function RunnerConnections({
                   : identity || profile.name;
               });
               return (
-                <article key={runner.id} className="agent-roster-row" data-provider={provider}>
+                <article
+                  key={runner.id}
+                  className="agent-roster-row"
+                  data-provider={provider}
+                  data-default={(config.defaultMetaAgent === runner.id && enabled) || undefined}
+                >
+                  <button
+                    type="button"
+                    className="agent-configure"
+                    onClick={() => openAgentConfiguration(runner.id)}
+                    title={`Configure ${custom?.name ?? runner.name}`}
+                    aria-label={`Configure ${custom?.name ?? runner.name}`}
+                  >
+                    <Settings2 size={16} />
+                  </button>
                   <AgentAvatar
                     provider={provider}
                     working={working && !waitingRun}
@@ -239,7 +254,10 @@ export function RunnerConnections({
                     <div className="agent-roster-name">
                       <h2>{custom?.name ?? runner.name}</h2>
                       {config.defaultMetaAgent === runner.id && enabled && (
-                        <span className="agent-default">Default</span>
+                        <span className="agent-default">
+                          <Star size={12} />
+                          Default agent
+                        </span>
                       )}
                       {custom && <span className="agent-custom">Manual</span>}
                     </div>
@@ -289,16 +307,19 @@ export function RunnerConnections({
                     )}
                   </div>
                   <div className="agent-roster-action">
-                    {canStart && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => openAgentConfiguration(runner.id)}
-                        aria-label={`Configure ${custom?.name ?? runner.name}`}
-                      >
-                        <Settings2 size={16} />
-                        Configure
-                      </Button>
-                    )}
+                    <div className="agent-enable">
+                      <Switch
+                        checked={enabled}
+                        disabled={!desktop}
+                        onCheckedChange={(value) => {
+                          setCheckError('');
+                          config.toggleAgent(runner.id, value);
+                          void syncAgentConfig().catch((cause) => setCheckError(String(cause)));
+                        }}
+                        label={`Enable ${custom?.name ?? runner.name}`}
+                      />
+                      <span aria-hidden="true">{enabled ? 'Enabled' : 'Disabled'}</span>
+                    </div>
                     {canStart ? (
                       <Button
                         variant="outline"

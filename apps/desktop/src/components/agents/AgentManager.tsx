@@ -16,6 +16,7 @@ import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';
 import { AgentSupport } from './AgentSupport';
 import { LocalAiSetup } from './LocalAiSetup';
+import './agents-workspace.css';
 import './agent-manager.css';
 
 export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
@@ -103,6 +104,18 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
             setSaved(false);
           };
           const enabled = config.isAgentEnabled(agent.id);
+          const isDefault = config.defaultMetaAgent === agent.id;
+          const orchestrates = ['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
+            ('adapter' in agent ? agent.adapter : undefined) ?? agent.id,
+          );
+          const canBeDefault = enabled && !!runner?.available && orchestrates;
+          const defaultBlockedReason = !orchestrates
+            ? `${agent.name} cannot orchestrate routing. Choose Codex, Claude, Grok, OpenCode or Kimi Code.`
+            : !enabled
+              ? `Enable ${agent.name} before making it the default.`
+              : !runner?.available
+                ? `${agent.name} is not available on this computer yet.`
+                : undefined;
           return (
             <Panel variant="plain" key={agent.id} className="agent-config-row">
               <PanelHeader className="agent-config-heading">
@@ -110,7 +123,10 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                   <h3 className="font-medium">
                     {agent.name}
                     {config.defaultMetaAgent === agent.id && (
-                      <span className="ml-3 text-sm text-[var(--color-accent-ink)]">Default</span>
+                      <span className="agent-default ml-3">
+                        <Star size={12} />
+                        Default agent
+                      </span>
                     )}
                   </h3>
                   <p className="task-muted">
@@ -124,30 +140,29 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                 <div className="agent-config-actions">
                   <Button
                     type="button"
-                    variant="ghost"
-                    disabled={
-                      !enabled ||
-                      !runner?.available ||
-                      !['codex', 'claude', 'grok', 'opencode', 'kimi'].includes(
-                        ('adapter' in agent ? agent.adapter : undefined) ?? agent.id,
-                      )
-                    }
+                    variant={isDefault ? 'outline' : 'ghost'}
+                    aria-pressed={isDefault}
+                    disabled={isDefault || !canBeDefault}
+                    title={isDefault ? undefined : defaultBlockedReason}
                     onClick={() => {
                       config.setDefaultMetaAgent(agent.id);
                       setSaved(false);
                     }}
                   >
-                    <Star size={15} />
-                    Use as default
+                    <Star size={15} fill={isDefault ? 'currentColor' : 'none'} />
+                    {isDefault ? 'Current default agent' : 'Use as default'}
                   </Button>
-                  <Switch
-                    checked={enabled}
-                    onCheckedChange={(value) => {
-                      config.toggleAgent(agent.id, value);
-                      setSaved(false);
-                    }}
-                    label={`Enable ${agent.name}`}
-                  />
+                  <div className="agent-enable">
+                    <Switch
+                      checked={enabled}
+                      onCheckedChange={(value) => {
+                        config.toggleAgent(agent.id, value);
+                        setSaved(false);
+                      }}
+                      label={`Enable ${agent.name}`}
+                    />
+                    <span aria-hidden="true">{enabled ? 'Enabled' : 'Disabled'}</span>
+                  </div>
                   {'isCustom' in agent && (
                     <Button
                       type="button"

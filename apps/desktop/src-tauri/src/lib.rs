@@ -64,6 +64,9 @@ pub fn run() {
             app.manage(commands::community::Community::load(preferences.join("community.json")));
             let coordinator = Coordinator::new(directory.join("coordination"), runtime.clone())?;
             coordinator.launch();
+            let sessions = commands::live_sessions::LiveSessions::new(directory.join("live-sessions/sessions.json"), runtime.clone(), coordinator.clone());
+            sessions.launch(app.handle().clone());
+            app.manage(sessions);
             let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator.clone());
             scheduler.launch();
             app.manage(scheduler);
@@ -94,6 +97,13 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::live_sessions::live_session_snapshot,
+            commands::live_sessions::live_session_create,
+            commands::live_sessions::live_session_send,
+            commands::live_sessions::live_session_draft,
+            commands::live_sessions::live_session_action,
+            commands::live_sessions::live_session_window,
+            commands::live_sessions::live_session_window_pin,
             commands::helper::helper_snapshot,
             commands::helper::helper_sync,
             commands::helper::helper_send,
@@ -242,6 +252,7 @@ pub fn run() {
                 commands::browser::close_all();
                 commands::previews::close_all();
                 app.state::<Coordinator>().shutdown();
+                app.state::<commands::live_sessions::LiveSessions>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
                 app.state::<AppState>().kill_all_pty_sessions();
                 app.state::<SignInService>().stop_all();

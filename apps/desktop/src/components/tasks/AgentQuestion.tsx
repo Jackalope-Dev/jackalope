@@ -9,10 +9,14 @@ import './task-experience.css';
 export function AgentQuestion({
   prompt,
   active,
+  agentName,
+  agentDetail,
   onAnswer,
 }: {
   prompt: PendingUserPrompt;
   active: boolean;
+  agentName?: string;
+  agentDetail?: string;
   onAnswer: (answer: string) => Promise<void>;
 }) {
   const id = useId();
@@ -70,13 +74,14 @@ export function AgentQuestion({
           {answered
             ? 'Your response'
             : active
-              ? 'The agent needs your input'
+              ? `${agentName ?? 'The agent'} needs your input`
               : 'Unanswered question'}
         </span>
         <span className="task-experience-meta">
           {answered ? 'Answered' : active ? 'Awaiting response' : 'Task ended'}
         </span>
       </div>
+      {agentDetail && <p className="agent-question-identity">{agentDetail}</p>}
       <h3 id={`${id}-question`} className="agent-question-title">
         {prompt.question}
       </h3>

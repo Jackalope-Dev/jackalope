@@ -1,6 +1,23 @@
-import { Badge, Checkbox, Disclosure, DisclosureSummary, Tabs, Textarea } from '@jackalope/ui';
-import { ArrowLeft, ArrowRight, CalendarClock, Check, Copy, GitMerge, Square } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import {
+  Checkbox,
+  DefinitionList,
+  Disclosure,
+  DisclosureSummary,
+  DropdownMenu as Menu,
+  Tabs,
+  Textarea,
+} from '@jackalope/ui';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarClock,
+  Check,
+  Copy,
+  GitMerge,
+  MoreHorizontal,
+  Square,
+} from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { recoveryHandoff } from '../../lib/project-return';
 import { isActive, nativeTask, statusLabel, type TaskRun } from '../../lib/task-runtime';
@@ -14,18 +31,22 @@ import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
+import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { WorkspacePage } from '../ui/WorkspacePage';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview } from './ResultReview';
-import { RunStatus } from './RunStatus';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
+import { TaskFailure } from './TaskFailure';
 import { TaskIntegration } from './TaskIntegration';
 import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
+import { TaskProgress } from './TaskProgress';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
 import { ValidationJourney } from './ValidationJourney';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
+import './task-detail.css';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 // The tools panel pulls in the agent, connection and project editors; load it
@@ -46,8 +67,9 @@ export function TaskDetail({
   onCapture: (ideaId?: string) => void;
 }) {
   const { runs, start, submitting, refresh, drafts, draft } = useExecutionStore();
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    if (!run.detailsOmitted) document.getElementById('task-heading')?.focus();
+    if (!run.detailsOmitted) heading.current?.focus();
   }, [run.detailsOmitted]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -196,43 +218,118 @@ export function TaskDetail({
   };
   if (run.detailsOmitted)
     return (
-      <section className="task-page" aria-busy="true">
-        <button type="button" className="task-back" onClick={onBack}>
+      <WorkspacePage className="task-detail" aria-busy="true">
+        <Button variant="ghost" onClick={onBack}>
+          <ArrowLeft size={16} />
           All tasks
-        </button>
-        <p role="status">Loading this result…</p>
-      </section>
+        </Button>
+        <WorkspaceHeading title={title} />
+        <p role="status">Loading task…</p>
+      </WorkspacePage>
     );
   return (
-    <section className="task-page task-detail">
-      <button type="button" className="task-back" onClick={onBack}>
-        <ArrowLeft size={15} />
-        All tasks
-      </button>
-      <div className="task-detail-heading">
-        <div>
-          <p className="task-detail-context">
-            {run.projectName} · {run.accountBinding?.label || run.account}
-          </p>
-          <h1 id="task-heading" tabIndex={-1} className="task-title task-prompt-title">
-            {title}
-          </h1>
-        </div>
-        <div role="status">
-          {run.finishing ? (
-            <Badge appearance="plain" className="task-status">
-              Checking result
-            </Badge>
-          ) : integrated ? (
-            <Badge appearance="plain" className="task-status">
-              <Check size={16} />
-              Integrated
-            </Badge>
-          ) : (
-            <RunStatus status={run.status} />
+    <WorkspacePage className="task-detail">
+      <div className="task-detail-navigation">
+        <Button variant="ghost" onClick={onBack}>
+          <ArrowLeft size={16} />
+          All tasks
+        </Button>
+        <div className="task-detail-utilities">
+          {attempts.length > 1 && (
+            <Select
+              aria-label="Attempt history"
+              value={run.id}
+              onValueChange={(id) => useExecutionStore.getState().select(id)}
+            >
+              {attempts.map((attempt, index) => (
+                <SelectItem key={attempt.id} value={attempt.id}>
+                  Attempt {index + 1} · {statusLabel[attempt.status]}
+                </SelectItem>
+              ))}
+            </Select>
           )}
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="ghost" aria-label="More task actions">
+                <MoreHorizontal size={20} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content
+                className="workspace-menu"
+                align="end"
+                sideOffset={8}
+                collisionPadding={12}
+              >
+                {!!run.result && (
+                  <Menu.Item className="workspace-menu-item" onSelect={() => void copyResult()}>
+                    <Copy size={16} />
+                    Copy output
+                  </Menu.Item>
+                )}
+                {finished && isLatest && (
+                  <Menu.Item className="workspace-menu-item" onSelect={onSchedule}>
+                    <CalendarClock size={16} />
+                    Make recurring
+                  </Menu.Item>
+                )}
+                <Menu.Item className="workspace-menu-item" onSelect={() => setTab('context')}>
+                  Task details
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
         </div>
       </div>
+      <WorkspaceHeading title={title} titleRef={heading} description={run.projectName} />
+      <TaskProgress
+        run={run}
+        integrated={integrated}
+        pending={pending.length}
+        onActivity={() => setTab('activity')}
+        action={
+          active ? (
+            <Button
+              variant="outline"
+              disabled={acting || run.status === 'stopping'}
+              onClick={() => void act('task_stop')}
+            >
+              <Square size={14} />
+              Stop
+            </Button>
+          ) : finished && isLatest ? (
+            <div className="task-detail-utilities">
+              {isolated && (
+                <Button
+                  onClick={() => {
+                    setTab('changes');
+                    setIntegrating(true);
+                  }}
+                >
+                  <GitMerge size={16} />
+                  {integrated ? 'Merge receipt' : 'Review integration'}
+                </Button>
+              )}
+              {run.status === 'review' && (
+                <Button
+                  variant={isolated ? 'outline' : 'primary'}
+                  disabled={acting || !!run.persistenceError}
+                  onClick={() => void act('task_mark_reviewed')}
+                >
+                  <Check size={16} />
+                  Mark reviewed
+                </Button>
+              )}
+            </div>
+          ) : undefined
+        }
+      />
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {notice && (
+        <p role="status" className="task-muted">
+          {notice}
+        </p>
+      )}
       {!isLatest && latest && (
         <div className="task-notice">
           <span>You’re viewing an earlier attempt.</span>
@@ -248,24 +345,7 @@ export function TaskDetail({
           continuing or integrating.
         </InlineNotice>
       )}
-      {!!run.dependencySnapshot?.sources.length && (
-        <Disclosure className="task-notice">
-          <DisclosureSummary>
-            Verified feature inputs ({run.dependencySnapshot.sources.length})
-          </DisclosureSummary>
-          {run.dependencySnapshot.sources.map((source) => (
-            <p key={source.runId}>
-              {source.runId} · {source.tree.slice(0, 12)}
-            </p>
-          ))}
-        </Disclosure>
-      )}
-      {!!run.contract?.requirements.length && (
-        <Button variant="ghost" onClick={() => setTab('outcomes')}>
-          Review {run.contract.requirements.length} outcomes and checkpoints
-        </Button>
-      )}
-      {run.error && <InlineNotice tone="error">{run.error}</InlineNotice>}
+      {run.error && <TaskFailure message={run.error} onInspect={() => setTab('activity')} />}
       {!!pending.length && (
         <div className="space-y-3 mb-5">
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>
@@ -279,126 +359,20 @@ export function TaskDetail({
           ))}
         </div>
       )}
-      {active && (
-        <div className="task-progress-summary">
-          <div>
-            <h2 className="text-base">
-              {run.finishing
-                ? 'Preparing a checked result'
-                : run.status === 'starting'
-                  ? 'Preparing your workspace'
-                  : run.status === 'stopping'
-                    ? 'Stopping this attempt'
-                    : 'Work is underway'}
-            </h2>
-            <p className="task-muted mt-2">
-              {run.finishing
-                ? 'Running the verification command saved for this task. You can stop these checks.'
-                : pending.length
-                  ? 'Answer above to help the agent continue.'
-                  : 'Work continues while you use the rest of Jackalope.'}
-            </p>
-            {!!run.activity.length && (
-              <p className="task-latest-activity">{run.activity.at(-1)?.split('\n')[0]}</p>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            disabled={acting || run.status === 'stopping'}
-            onClick={() => void act('task_stop')}
-          >
-            <Square size={14} />
-            Stop
-          </Button>
-        </div>
-      )}
-      {finished && isLatest && (
-        <div className="result-actions">
-          {isolated && (
-            <Button
-              onClick={() => {
-                setTab('changes');
-                setIntegrating(true);
-              }}
-            >
-              <GitMerge size={16} />
-              {integrated ? 'Merge receipt' : 'Review integration'}
-            </Button>
-          )}
-          {run.status === 'review' && (
-            <Button
-              variant="outline"
-              disabled={acting || !!run.persistenceError}
-              onClick={() => void act('task_mark_reviewed')}
-            >
-              <Check size={16} />
-              Mark reviewed
-            </Button>
-          )}
-          {!!run.result && (
-            <Button variant="ghost" onClick={() => void copyResult()}>
-              <Copy size={16} />
-              Copy result
-            </Button>
-          )}
-          <Button variant="ghost" onClick={onSchedule}>
-            <CalendarClock size={16} />
-            Make recurring
-          </Button>
-        </div>
-      )}
-      {!active && run.status !== 'interrupted' && !!run.workspace && (
-        <TaskPreview key={`preview:${run.id}`} run={run} />
-      )}
       <Tabs.Root value={tab} onValueChange={setTab}>
         <Tabs.List className="result-tabs" aria-label="Task sections">
           {[
-            'result',
-            ...(run.contract?.requirements.length ? ['outcomes'] : []),
-            'changes',
-            'evidence',
-            'activity',
-            'context',
-          ].map((value) => (
+            { value: 'result', label: 'Output' },
+            { value: 'changes', label: 'Review' },
+            { value: 'activity', label: 'Activity' },
+            { value: 'context', label: 'Details' },
+          ].map(({ value, label }) => (
             <Tabs.Trigger key={value} value={value}>
-              {value === 'result'
-                ? 'Result'
-                : value === 'outcomes'
-                  ? 'Outcomes'
-                  : value === 'changes'
-                    ? 'Changes & checks'
-                    : value === 'evidence'
-                      ? 'Evidence'
-                      : value === 'activity'
-                        ? 'Activity'
-                        : 'Context'}
+              {label}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
         <div className="result-canvas">
-          <Tabs.Content value="outcomes" forceMount hidden={tab !== 'outcomes'}>
-            <TaskOutcomes
-              key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
-              run={run}
-              canReview={finished && isLatest && !integrated}
-              onCorrect={(prompt) =>
-                draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
-              }
-              onAdvance={async () => {
-                await start({
-                  projectId: run.projectId,
-                  projectName: run.projectName,
-                  projectPath: run.projectPath,
-                  agent: run.agent,
-                  prompt:
-                    'Continue with the next agreed workflow step. Preserve completed work and report evidence for this step.',
-                  isolated: false,
-                  previousRunId: run.id,
-                  contextSelection: { advanceWorkflow: true },
-                });
-              }}
-            />
-          </Tabs.Content>
           <Tabs.Content value="result">
             {!!run.screenshots?.length && (
               <figure className="result-preview">
@@ -428,31 +402,50 @@ export function TaskDetail({
             ) : (
               <p className="task-muted">
                 {active
-                  ? 'The result will appear here as the agent reports it.'
-                  : 'No final response was recorded. Your workspace and activity are available for inspection.'}
+                  ? 'Waiting for the agent’s output…'
+                  : 'No final output recorded. Review the workspace or activity to see where this attempt ended.'}
               </p>
-            )}
-            {finished && (
-              <p className="task-result-assurance">
-                {run.verification?.result.success && run.verification.tree
-                  ? 'Checks passed for the recorded snapshot.'
-                  : run.verificationError
-                    ? `Checks need attention: ${run.verificationError}`
-                    : run.verification
-                      ? 'Checks need attention.'
-                      : 'No checks recorded.'}
-              </p>
-            )}
-            {!active && !run.detailsOmitted && (
-              <FeedbackTouchpoint
-                key={run.id}
-                runId={run.id}
-                paused={acting || integrating || !!reply.trim() || pending.length > 0}
-              />
             )}
           </Tabs.Content>
           {((!active && run.workspace) || tab === 'changes') && (
             <Tabs.Content value="changes" forceMount hidden={tab !== 'changes'}>
+              {!!run.contract?.requirements.length && (
+                <div className="task-review-section">
+                  <TaskOutcomes
+                    key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
+                    run={run}
+                    canReview={finished && isLatest && !integrated}
+                    onCorrect={(prompt) =>
+                      draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
+                    }
+                    onAdvance={async () => {
+                      await start({
+                        projectId: run.projectId,
+                        projectName: run.projectName,
+                        projectPath: run.projectPath,
+                        agent: run.agent,
+                        prompt:
+                          'Continue with the next agreed workflow step. Preserve completed work and report evidence for this step.',
+                        isolated: false,
+                        previousRunId: run.id,
+                        contextSelection: { advanceWorkflow: true },
+                      });
+                    }}
+                  />
+                </div>
+              )}
+              <div className="task-review-section">
+                {!!(run.validationSteps?.length || run.screenshots?.length) && (
+                  <ValidationJourney
+                    runId={run.id}
+                    steps={run.validationSteps ?? []}
+                    screenshots={run.screenshots ?? []}
+                  />
+                )}
+              </div>
+              {!active && run.status !== 'interrupted' && !!run.workspace && (
+                <TaskPreview key={`preview:${run.id}`} run={run} />
+              )}
               {!active && run.workspace && !integrated ? (
                 <ResultReview key={run.id} run={run} />
               ) : (
@@ -469,48 +462,40 @@ export function TaskDetail({
               )}
             </Tabs.Content>
           )}
-          <Tabs.Content value="evidence">
-            {run.validationSteps?.length || run.screenshots?.length ? (
-              <ValidationJourney
-                runId={run.id}
-                steps={run.validationSteps ?? []}
-                screenshots={run.screenshots ?? []}
-              />
-            ) : (
-              <p className="task-muted">No evidence has been recorded for this attempt.</p>
-            )}
-          </Tabs.Content>
           <Tabs.Content value="activity">
             <TaskActivity entries={run.activity} active={active} />
           </Tabs.Content>
           <Tabs.Content value="context">
-            {' '}
             <section className="task-environment" aria-label="Context, history and usage">
               {run.status !== 'reviewed' && <TaskLearning key={`knowledge:${run.id}`} run={run} />}
-              <p className="task-muted">
-                {run.agent} · {run.model || 'Agent-configured model'} · {run.account} · This
-                computer
-              </p>
-              <p className="task-path">
-                {run.workspace || (active ? 'Workspace being prepared' : 'No workspace recorded')} ·{' '}
-                {run.branch || 'No branch recorded'} · Target: {run.targetBranch || 'Not recorded'}
-              </p>
-              {attempts.length > 1 && (
-                <label className="task-attempt-picker" htmlFor="attempt-history">
-                  Attempt
-                  <Select
-                    id="attempt-history"
-                    aria-label="Attempt history"
-                    value={run.id}
-                    onValueChange={(id) => useExecutionStore.getState().select(id)}
-                  >
-                    {attempts.map((attempt, index) => (
-                      <SelectItem key={attempt.id} value={attempt.id}>
-                        {index + 1} · {statusLabel[attempt.status]}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                </label>
+              <DefinitionList
+                items={[
+                  { label: 'Agent', value: run.agent },
+                  { label: 'Model', value: run.model || 'Agent default' },
+                  { label: 'Account', value: run.accountBinding?.label || run.account },
+                  { label: 'Started', value: new Date(run.startedAt).toLocaleString() },
+                  ...(run.endedAt
+                    ? [{ label: 'Ended', value: new Date(run.endedAt).toLocaleString() }]
+                    : []),
+                  {
+                    label: 'Workspace',
+                    value: run.workspace || (active ? 'Preparing' : 'Not recorded'),
+                  },
+                  { label: 'Branch', value: run.branch || 'Not recorded' },
+                  { label: 'Target', value: run.targetBranch || 'Not recorded' },
+                ]}
+              />
+              {!!run.dependencySnapshot?.sources.length && (
+                <Disclosure className="task-notice">
+                  <DisclosureSummary>
+                    Verified feature inputs ({run.dependencySnapshot.sources.length})
+                  </DisclosureSummary>
+                  {run.dependencySnapshot.sources.map((source) => (
+                    <p key={source.runId}>
+                      {source.runId} · {source.tree.slice(0, 12)}
+                    </p>
+                  ))}
+                </Disclosure>
               )}
               <section className="my-4">
                 <h3 className="text-base font-medium">Instruction for this attempt</h3>
@@ -637,18 +622,27 @@ export function TaskDetail({
                 </Button>
               </section>
             )}
+            {!active && !run.detailsOmitted && (
+              <FeedbackTouchpoint
+                key={run.id}
+                runId={run.id}
+                paused={acting || integrating || !!reply.trim() || pending.length > 0}
+              />
+            )}
+            {run.status === 'reviewed' && <TaskLearning key={`learning:${run.id}`} run={run} />}
+            {!active && currentProject && (
+              <WorkspaceReadiness
+                key={`readiness:${run.id}`}
+                project={currentProject}
+                path={run.workspace || run.projectPath}
+              />
+            )}
           </Tabs.Content>
         </div>
       </Tabs.Root>
       {isLatest && (
         <div className="task-next">
-          <h2 className="text-base mb-3">
-            {active
-              ? 'Have a change in direction?'
-              : integrated
-                ? 'Continue from the integrated result'
-                : 'Keep shaping the result'}
-          </h2>
+          <h2 className="text-base mb-3">{integrated ? 'Start a follow-up' : 'Follow-up'}</h2>
           {canContinue ? (
             <form
               onSubmit={(event) => {
@@ -656,15 +650,11 @@ export function TaskDetail({
                 void continueTask();
               }}
             >
-              <label htmlFor="task-reply" className="task-label">
-                {active
-                  ? 'Save a follow-up, or stop this attempt and send it'
-                  : 'What would you like to adjust?'}
-              </label>
               <Textarea
                 id="task-reply"
+                aria-label="Follow-up instructions"
                 className="task-reply"
-                rows={3}
+                rows={2}
                 value={reply}
                 onChange={(event) => draft(key, { prompt: event.target.value })}
                 placeholder="Tell Jackalope what to do next…"
@@ -673,7 +663,7 @@ export function TaskDetail({
               <div className="task-followup-footer">
                 <p className="task-muted">
                   {active
-                    ? 'Sending stops this attempt, then resumes the same agent session with your instruction.'
+                    ? 'Sending stops this attempt and resumes the same session.'
                     : `Continues with ${run.agent} in the same workspace and account.`}
                 </p>
                 <Button
@@ -707,14 +697,6 @@ export function TaskDetail({
           )}
         </div>
       )}
-      {run.status === 'reviewed' && <TaskLearning key={`learning:${run.id}`} run={run} />}
-      {!active && currentProject && (
-        <WorkspaceReadiness
-          key={`readiness:${run.id}`}
-          project={currentProject}
-          path={run.workspace || run.projectPath}
-        />
-      )}
       {toolsOpen && (
         <Suspense fallback={null}>
           <TaskTools
@@ -733,12 +715,6 @@ export function TaskDetail({
           />
         </Suspense>
       )}
-      {notice && (
-        <p role="status" className="task-muted">
-          {notice}
-        </p>
-      )}
-      {error && <InlineNotice tone="error">{error}</InlineNotice>}
-    </section>
+    </WorkspacePage>
   );
 }

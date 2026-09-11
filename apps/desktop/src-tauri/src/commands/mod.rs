@@ -14,6 +14,7 @@ pub mod pty;
 pub mod repo_todos;
 pub mod system;
 pub mod tasks;
+pub mod live_sessions;
 pub mod worktree_cleanup;
 
 pub mod agent_models;

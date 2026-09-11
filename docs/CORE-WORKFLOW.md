@@ -26,11 +26,15 @@ comes from native verified receipts. Project filters and the board remain availa
 Parallel planning remains inside Tasks with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
-Result detail leads with the agent's output and latest recorded screenshot when
-available. Changes load without an Inspect action, including while their section
-is hidden. Evidence, change review and activity remain separate sections of the
-same task. Account/project consequences remain visible; paths, models, usage,
-instructions and attempt history are disclosed on demand.
+Task detail keeps the assigned agent, recorded progress and next action together.
+Output contains the agent's response and latest screenshot. Review groups outcomes,
+workspace changes, project checks, agent evidence and integration; Activity keeps
+searchable agent messages. Details contains account, model, workspace, instructions,
+usage and connection choices. Attempt history stays beside the page navigation.
+Changes load automatically for finished work, including while Review is hidden.
+Long errors keep a concise summary with expandable full details. Copy output and
+Make recurring share the task actions menu. Questions and save recovery remain
+visible above the task sections.
 
 HTTP(S) result links open through the OS browser in desktop. Other schemes are
 not executed. Copy result reports clipboard failures. Screenshots still use the
@@ -82,3 +86,8 @@ Automated regression coverage and isolated native trials are described in
 [CONTRIBUTING.md](../CONTRIBUTING.md) and [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md).
 Record detailed local receipts privately. Fixtures and source builds do not prove
 installed-app acceptance.
+
+With a desktop Vite preview running, use `JACKALOPE_PREVIEW_URL` to select its URL
+and run `node scripts/verification/verify-task-detail.mjs`. This browser fixture
+checks task states, review sections, keyboard navigation and continuation guards;
+it does not launch agents or establish native execution acceptance.

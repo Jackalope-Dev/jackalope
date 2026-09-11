@@ -139,7 +139,7 @@ impl TaskRuntime {
                 self.route(&mut request)?;
             }
             self.stage(id, Some("execution"));
-            self.execute_agent(id, &request, resume.take())?;
+            self.execute_agent(id, &request, resume.take().filter(|old| old.session_id.is_some()))?;
             let run = self
                 .inner
                 .lock()
@@ -187,7 +187,7 @@ impl TaskRuntime {
             return Err("The checkout is on a different branch. Switch to the target branch or enable an isolated worktree.".into());
         }
         let (workspace, branch, base_head) = if let Some(ref old) = previous {
-            if old.session_id.is_none() {
+            if old.session_id.is_none() && req.live_session_id.is_none() {
                 return Err("This attempt has no resumable agent session. Start a new task with the relevant context.".into());
             }
             (
@@ -378,6 +378,9 @@ impl TaskRuntime {
             ]);
             if let Some(ref old) = previous {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
+                if old.live_session_id != request.live_session_id {
+                    return Err("Continue this work from its live session.".into());
+                }
                 crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
@@ -1097,6 +1100,7 @@ impl TaskRuntime {
                 )?
             };
             let run = TaskRun {
+                live_session_id: request.live_session_id.clone(),
                 effort: request.effort,
                 reasoning_effort: None,
                 efficiency: Default::default(),

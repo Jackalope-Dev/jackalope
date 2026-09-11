@@ -10,6 +10,9 @@
   max-width: 1120px;
   margin: 0 auto;
 }
+.task-detail > .inline-notice {
+  margin-top: 20px;
+}
 .task-eyebrow {
   color: var(--color-accent-ink);
   font-size: var(--text-xs);
@@ -168,19 +171,6 @@ select option {
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
   margin-bottom: 28px;
-}
-.task-detail-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 24px;
-}
-.task-prompt-title {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: var(--text-2xl);
-  max-height: 220px;
-  overflow-y: auto;
 }
 .task-context-line {
   display: flex;

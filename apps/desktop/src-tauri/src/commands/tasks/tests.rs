@@ -258,6 +258,7 @@ fn installed_agent_lifecycle_trial() {
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let model = std::env::var("JACKALOPE_AGENT_MODEL").ok();
     let request = RunRequest {
+        live_session_id: None,
                 effort: None,
         dependency_snapshot: Default::default(),
         id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
@@ -576,6 +577,7 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let request = RunRequest {
+        live_session_id: None,
         effort: None,
         dependency_snapshot: Default::default(),
         monitor_change: None,

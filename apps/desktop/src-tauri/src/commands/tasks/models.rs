@@ -25,6 +25,8 @@ pub struct UsageObservation {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRun {
     #[serde(default)]
+    pub live_session_id: Option<String>,
+    #[serde(default)]
     pub effort: Option<super::effort::TaskEffort>,
     #[serde(default)]
     pub reasoning_effort: Option<String>,
@@ -111,6 +113,8 @@ pub struct TaskRun {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRequest {
+    #[serde(skip)]
+    pub live_session_id: Option<String>,
     #[serde(default)]
     pub effort: Option<super::effort::TaskEffort>,
     #[serde(skip)]
@@ -187,7 +191,7 @@ pub struct Runner {
 }
 
 impl TaskRun {
-    pub(super) fn summary(&self) -> Self {
+    pub(in crate::commands) fn summary(&self) -> Self {
         let mut context_receipt = self.context_receipt.clone();
         for entry in &mut context_receipt.entries {
             entry.content.clear();
@@ -202,6 +206,7 @@ impl TaskRun {
             check
         });
         Self {
+            live_session_id: self.live_session_id.clone(),
             effort: self.effort,
             reasoning_effort: self.reasoning_effort.clone(),
             efficiency: self.efficiency.clone(),

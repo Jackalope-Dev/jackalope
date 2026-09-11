@@ -320,6 +320,39 @@ fn choose<'a>(text: &str, candidates: &'a [Candidate]) -> Result<(&'a Candidate,
     Ok((candidate, choice))
 }
 
+/// Deterministic selection when no routing model can be consulted: the default
+/// orchestrator has no eligible account, model or quota, but workers remain.
+/// Ranks the project's preferred runner first, then the most remaining quota,
+/// then the least loaded account. Unknown quota sorts as the neutral 50%.
+fn rank_by_capacity<'a>(candidates: &'a [Candidate], reason: &str) -> (&'a Candidate, Choice) {
+    let mut ranked: Vec<&Candidate> = candidates.iter().collect();
+    ranked.sort_by(|a, b| {
+        b.preferred
+            .cmp(&a.preferred)
+            .then_with(|| {
+                b.remaining_percent
+                    .unwrap_or(50.0)
+                    .total_cmp(&a.remaining_percent.unwrap_or(50.0))
+            })
+            .then_with(|| a.active_tasks.cmp(&b.active_tasks))
+    });
+    let candidate = ranked[0];
+    (
+        candidate,
+        Choice {
+            candidate_id: candidate.id.clone(),
+            reason: reason.into(),
+            expected_usage_percent: None,
+            alternatives: ranked
+                .iter()
+                .skip(1)
+                .take(8)
+                .map(|c| c.id.clone())
+                .collect(),
+        },
+    )
+}
+
 fn ranked_fallback<'a>(
     history: &RoutingHistory,
     candidates: &'a [Candidate],
@@ -563,6 +596,10 @@ impl TaskRuntime {
         });
         let single = candidates.len() == 1;
         let router = if single { None } else { routers.first() };
+        // No routing model to consult and no prior handoff ranking to reuse: the
+        // orchestrator itself is unavailable, not out of quota. Workers are still
+        // eligible here, so select one deterministically instead of failing.
+        let deterministic = !single && router.is_none() && history.fallbacks.is_empty();
         let observations = evidence::evidence(&self.integration_runs()?, req);
         let prompt = prompt::build(req, &run, &candidates, observations, &history);
         let output = router
@@ -593,12 +630,14 @@ impl TaskRuntime {
             .is_none_or(|output| output.quota_failure.is_some());
         let (_, mut choice) = if single {
             (&candidates[0], Choice { candidate_id: candidates[0].id.clone(), reason: "Only one eligible agent, model and account; no routing model call was needed.".into(), expected_usage_percent: None, alternatives: vec![] })
+        } else if deterministic {
+            rank_by_capacity(&candidates, "The default orchestrator had no eligible account, model or quota, so no routing model was consulted. Selected the highest-capacity eligible option.")
         } else if fallback {
             ranked_fallback(&history, &candidates)?
         } else {
             choose(&output.as_ref().unwrap().result, &candidates)?
         };
-        let ranked = if fallback {
+        let ranked = if fallback && !deterministic {
             history.fallbacks.clone()
         } else {
             choice
@@ -675,7 +714,7 @@ impl TaskRuntime {
             orchestrator_model: router.and_then(|router| router.model.clone()),
             orchestrator_account: router.map(|router| router.account.clone()).unwrap_or_else(
                 || {
-                    if single {
+                    if single || deterministic {
                         "Deterministic selection".into()
                     } else {
                         "Previously ranked fallback".into()

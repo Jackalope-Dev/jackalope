@@ -1,5 +1,16 @@
 [
   {
+    "id": "a-simpler-task-view",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "A simpler task view",
+    "description": "Follow work and review results in a clearer task layout.",
+    "items": [
+      "See task progress with agent artwork, grouped review tools and concise errors.",
+      "Switch attempts and continue work with fewer competing controls."
+    ]
+  },
+  {
     "id": "usage-insights-across-projects",
     "date": "2026-09-10",
     "status": "In development",
