@@ -42,7 +42,6 @@ export function WorkspaceTransition({
       optional?: boolean;
     }[]
   >([]);
-  const [minimumElapsed, setMinimumElapsed] = useState(false);
   const [slow, setSlow] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -54,8 +53,6 @@ export function WorkspaceTransition({
 
   useEffect(() => {
     heading.current?.focus();
-    const minimum = setTimeout(() => setMinimumElapsed(true), 5000);
-    return () => clearTimeout(minimum);
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry and project identity restart checks; metadata updates do not.
@@ -88,16 +85,16 @@ export function WorkspaceTransition({
   }, [attempt, project?.id, project?.path]);
 
   const complete = () => {
-    if (!minimumElapsed || finished.current) return;
+    if (finished.current) return;
     finished.current = true;
     onComplete();
   };
   useEffect(() => {
-    if (minimumElapsed && !preparing && !error && !finished.current) {
+    if (!preparing && !error && !finished.current) {
       finished.current = true;
       onComplete();
     }
-  }, [minimumElapsed, preparing, error, onComplete]);
+  }, [preparing, error, onComplete]);
 
   return (
     <div className="workspace-transition">
@@ -147,11 +144,7 @@ export function WorkspaceTransition({
         )}
         <div className="workspace-transition-actions">
           {error && <Button onClick={() => setAttempt((value) => value + 1)}>Retry</Button>}
-          {(error || slow) && (
-            <Button disabled={!minimumElapsed} onClick={complete}>
-              Open workspace
-            </Button>
-          )}
+          {(error || slow) && <Button onClick={complete}>Open workspace</Button>}
           <Button variant="ghost" onClick={onBack}>
             Back to setup
           </Button>

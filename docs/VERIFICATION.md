@@ -33,6 +33,7 @@ node scripts/verification/verify-agent-accounts.mjs
 | verify-waitlist.mjs | Website 5198, VITE_ACCESS_API=https://api.jackalope.test | Waitlist, referrals, passes and admin fixtures |
 | verify-passes-desktop.mjs | Desktop 5199 | Pass view, clipboard and keyboard |
 | verify-task-detail.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Task states, live step progress, preparation failure detail and retry dispatch |
+| verify-core-flows.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Project scope, unified work, keyboard search, preview readiness and delivery drafts |
 | performance.mjs --production | Builds and starts its own fixture | History lists, output, rich rendering and production CSP |
 
 Some scripts create temporary entry files and remove them on completion. If one

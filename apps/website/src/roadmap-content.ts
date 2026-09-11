@@ -15,6 +15,12 @@ export const roadmapStages = [
     link: { label: 'Explore agent compatibility', href: '/agents/' },
     items: [
       {
+        title: 'From request to a result you can inspect.',
+        summary: 'Shared work discovery, local previews, and a clear delivery handoff.',
+        detail:
+          'Tasks and Live sessions share a work list with explicit project scope, remembered views, and command search. Project overview helps you resume unfinished work. Results prioritize questions and failed checks, with follow-up beside review. Local previews remember setup and can capture fresh browser evidence for corrections. Delivery reads local Git and optional GitHub PR/CI state, then prepares editable handoff drafts. Publishing and deployment remain explicit steps. Installed acceptance and usability validation are still in progress.',
+      },
+      {
         title: 'Keep the ideas coming.',
         summary: 'A running conversation with a compact window you can pin.',
         detail:

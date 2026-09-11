@@ -86,6 +86,7 @@ export function OnboardingFlow({
   const [allowedAgents, setAllowedAgents] = useState<string[] | null>(
     project?.preferences?.allowedAgents ?? null,
   );
+  const [showAllAgents, setShowAllAgents] = useState(false);
   const [working, setBusy] = useState(false);
   const [nodding, setNodding] = useState(false);
   const pendingAdvance = useRef<(() => void) | null>(null);
@@ -132,6 +133,19 @@ export function OnboardingFlow({
   };
   const projectEnabled = (id: string) => allowedAgents === null || allowedAgents.includes(id);
   const detectedAgents = execution.runners.filter((item) => item.available && available(item.id));
+  const recommendedAgent =
+    detectedAgents.find((item) => item.id === agent && projectEnabled(item.id)) ??
+    detectedAgents.find((item) => item.signedIn && projectEnabled(item.id)) ??
+    detectedAgents.find((item) => projectEnabled(item.id));
+  const recommendedId = recommendedAgent?.id;
+  useEffect(() => {
+    if (
+      recommendedId &&
+      !execution.discovering &&
+      !detectedAgents.some((item) => item.id === agent)
+    )
+      setAgent(recommendedId);
+  }, [recommendedId, execution.discovering, agent, detectedAgents]);
   const installableAgents = builtinAgents.filter(
     (item) =>
       available(item.id) &&
@@ -463,11 +477,14 @@ export function OnboardingFlow({
           {step === 'agent' && (
             <>
               <p className="onboarding-description">
-                Choose a default, then switch other detected agents on or off for this project.
-                Change these choices later in Project settings.
+                Start with one available agent. You can add agents and change project defaults
+                later.
               </p>
               <fieldset className="onboarding-runner-list" aria-label="Choose your project agent">
-                {detectedAgents.map((item) => {
+                {(showAllAgents
+                  ? detectedAgents
+                  : detectedAgents.filter((item) => item.id === recommendedId)
+                ).map((item) => {
                   const adapter =
                     config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
                   const meta = getAgentMetadata(item.id);
@@ -501,12 +518,14 @@ export function OnboardingFlow({
                             <small>{item.detail || 'Installed'}</small>
                           </div>
                         </button>
-                        <Switch
-                          label={`Use ${item.name} in this project`}
-                          checked={projectEnabled(item.id)}
-                          disabled={busy}
-                          onCheckedChange={(checked) => toggleAgent(item.id, checked)}
-                        />
+                        {showAllAgents && (
+                          <Switch
+                            label={`Use ${item.name} in this project`}
+                            checked={projectEnabled(item.id)}
+                            disabled={busy}
+                            onCheckedChange={(checked) => toggleAgent(item.id, checked)}
+                          />
+                        )}
                       </div>
                       {projectEnabled(item.id) && (
                         <OnboardingAgentAccount
@@ -538,6 +557,13 @@ export function OnboardingFlow({
                   </p>
                 )}
               </fieldset>
+              {detectedAgents.length > 1 && (
+                <Button variant="ghost" onClick={() => setShowAllAgents((value) => !value)}>
+                  {showAllAgents
+                    ? 'Show recommended agent'
+                    : `Choose another agent (${detectedAgents.length})`}
+                </Button>
+              )}
               <div className="onboarding-local-agent">
                 <LocalAiSetup
                   compact
@@ -573,12 +599,15 @@ export function OnboardingFlow({
               )}
               {execution.error && <InlineNotice tone="error">{execution.error}</InlineNotice>}
               {project && (
-                <ProjectGitSettings
-                  key={project.path}
-                  projectPath={project.path}
-                  onDraftChange={setCommitPolicy}
-                  disabled={busy}
-                />
+                <Disclosure>
+                  <DisclosureSummary>Advanced · Git ownership and commits</DisclosureSummary>
+                  <ProjectGitSettings
+                    key={project.path}
+                    projectPath={project.path}
+                    onDraftChange={setCommitPolicy}
+                    disabled={busy}
+                  />
+                </Disclosure>
               )}
               <p className="onboarding-note">
                 Add more agents, supported accounts and models in <strong>Settings → Agents</strong>

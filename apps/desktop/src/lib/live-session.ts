@@ -1,5 +1,5 @@
-import type { RunRequest, TaskRun } from './task-runtime';
-import { isActive, nativeTask } from './task-runtime';
+import type { RunRequest, TaskRun } from './task-runtime.ts';
+import { isActive, nativeTask } from './task-runtime.ts';
 
 export interface SessionMessage {
   id: string;

@@ -27,6 +27,7 @@ export interface ProjectPreferences {
   branchPrefix?: string;
   worktreeDir?: string;
   verifyCommand?: string;
+  previewCommand?: string;
   prepareCommand?: string;
   autoVerify?: boolean;
   isolatedByDefault?: boolean;

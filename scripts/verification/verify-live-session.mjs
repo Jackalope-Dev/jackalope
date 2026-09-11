@@ -57,6 +57,11 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
   return;
  case 'live_session_review': return {files:['src/search.tsx'],diff:'diff --git a/src/search.tsx b/src/search.tsx\\n--- a/src/search.tsx\\n+++ b/src/search.tsx\\n@@ -1 +1 @@\\n-narrow\\n+roomy\\n',note:'',patchPath:'C:/Exports/session.patch',tree:'tree',verified:true};
  case 'task_respond_prompt': f.run({prompts:[]});return true;
+ case 'task_stop':
+  if(f.failStop)throw new Error('Could not stop this attempt.');
+  f.run({status:'stopping'});
+  if(f.holdStop)await new Promise(resolve=>{f.releaseStop=resolve});
+  f.run({status:'stopped'});f.update({batches:s.batches.map(batch=>({...batch,settled:true}))});return;
  case 'task_preview_status': return null;
  case 'plugin:window|minimize': case 'plugin:window|close': return;
  default: throw new Error('Unexpected fixture command: '+command);
@@ -120,7 +125,7 @@ try {
     window.sessionFixture.holdSend = false;
     window.sessionFixture.release();
   });
-  await page.getByRole('button', { name: 'Send', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Queue message', exact: true }).waitFor();
   await page.waitForFunction(() =>
     window.sessionFixture.calls.some(
       (c) =>
@@ -136,6 +141,7 @@ try {
   assert.equal(await input.inputValue(), 'First line\nSecond line');
   await input.fill('');
   await page.getByRole('button', { name: 'Cancel queued message' }).first().click();
+  await page.locator('.live-message[data-canceled=true]').first().waitFor();
   assert.equal(await page.locator('.live-message[data-canceled=true]').count(), 1);
   await page.getByRole('button', { name: 'Pause queue', exact: true }).click();
   await page.getByRole('button', { name: 'Resume queue', exact: true }).waitFor();
@@ -174,6 +180,55 @@ try {
     });
   });
   await page.getByRole('button', { name: '1 queued', exact: true }).waitFor();
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await input.fill('Use the simpler search layout.');
+  await page.evaluate(() => {
+    window.sessionFixture.holdStop = true;
+  });
+  await page.getByRole('button', { name: 'Stop and send', exact: true }).click();
+  await page.waitForFunction(() => !!window.sessionFixture.releaseStop);
+  assert.equal(
+    await page.evaluate(() =>
+      window.sessionFixture.calls.some((call) => call.command === 'live_session_send'),
+    ),
+    false,
+  );
+  await page.evaluate(() => window.sessionFixture.releaseStop());
+  await page.waitForFunction(() => document.querySelector('textarea').value === '');
+  assert.deepEqual(
+    await page.evaluate(() =>
+      window.sessionFixture.calls
+        .filter((call) =>
+          ['task_stop', 'live_session_send', 'live_session_action'].includes(call.command),
+        )
+        .map((call) => call.action || call.command),
+    ),
+    ['pause', 'task_stop', 'live_session_send', 'resume'],
+  );
+  await page.evaluate(() => {
+    window.sessionFixture.run({ status: 'running' });
+    window.sessionFixture.failStop = true;
+  });
+  await input.fill('Preserve this if stopping fails.');
+  await page.getByRole('button', { name: 'Stop and send', exact: true }).click();
+  await page.getByText('Could not stop this attempt.', { exact: false }).waitFor();
+  assert.equal(await input.inputValue(), 'Preserve this if stopping fails.');
+  await page.evaluate(() => window.sessionFixture.run({ status: 'review' }));
+  await input.fill('x'.repeat(11990));
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  const feedback = page.getByRole('textbox', { name: 'What should change?', exact: true });
+  await feedback.fill('Make the Save action clearer.');
+  await page.getByRole('button', { name: 'Add to follow-up', exact: true }).click();
+  await page.getByText('This would exceed the message limit.', { exact: false }).first().waitFor();
+  assert.equal(await feedback.inputValue(), 'Make the Save action clearer.');
+  assert.equal((await input.inputValue()).length, 11990);
+  await input.fill('Keep the keyboard shortcuts.');
+  await page.getByRole('button', { name: 'Add to follow-up', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#preview-feedback').value === '');
+  assert.match(
+    await input.inputValue(),
+    /Keep the keyboard shortcuts[\s\S]*Make the Save action clearer/,
+  );
   await page.goto(`${url}/?compact`, { waitUntil: 'domcontentloaded' });
   await page.setViewportSize({ width: 440, height: 620 });
   const pin = page.getByRole('button', { name: 'Always on top', exact: true });
@@ -227,7 +282,7 @@ try {
   assert.ok(
     await page.evaluate(() =>
       window.sessionFixture.navigation.some(
-        (view) => view.id === 'live-sessions' && view.label === 'Live' && view.primary,
+        (view) => view.id === 'live-sessions' && view.label === 'Live' && view.group === 'tasks',
       ),
     ),
   );
@@ -271,6 +326,7 @@ try {
   assert.equal(await page.locator('.live-message').count(), 1);
   await page.evaluate(() => window.sessionFixture.history());
   const history = page.getByRole('navigation', { name: 'Sessions', exact: true });
+  await history.getByRole('heading', { name: 'Finished', exact: true }).waitFor();
   assert.deepEqual(await history.getByRole('heading').allTextContents(), [
     'Needs attention',
     'In progress',

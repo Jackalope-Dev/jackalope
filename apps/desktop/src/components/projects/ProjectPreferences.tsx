@@ -167,7 +167,7 @@ export function ProjectPreferences({
             </div>
           </section>
           <section className="project-preferences-section">
-            <WorkspaceSectionHeading title="Verification" />
+            <WorkspaceSectionHeading title="Checks and preview" />
             <div className="project-workspace-fields">
               <FormField
                 label="Verification command"
@@ -181,6 +181,25 @@ export function ProjectPreferences({
                     updateProjectPreferences(project.id, {
                       verifyCommand: e.target.value,
                     })
+                  }
+                />
+              </FormField>
+              <FormField
+                label="Preview command"
+                description={
+                  <>
+                    Runs only when you choose Start preview. Use {'{port}'} for an available local
+                    port.
+                  </>
+                }
+              >
+                <Input
+                  id="project-preview-command"
+                  value={project.preferences?.previewCommand ?? ''}
+                  maxLength={4000}
+                  placeholder="pnpm run dev -- --port {port} --host 127.0.0.1"
+                  onChange={(event) =>
+                    updateProjectPreferences(project.id, { previewCommand: event.target.value })
                   }
                 />
               </FormField>

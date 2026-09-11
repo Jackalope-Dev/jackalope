@@ -1,5 +1,55 @@
 import type { TaskRun } from './task-runtime.ts';
 
+export function taskDecision(run: TaskRun, integrated = false, verifyCommand?: string) {
+  const active = ['starting', 'running', 'stopping'].includes(run.status);
+  const state = (
+    label: string,
+    action: string,
+    section: string,
+    tone: 'default' | 'warning' | 'success' = 'default',
+  ) => ({ label, action, section, tone });
+  if (run.persistenceError)
+    return state('History needs saving', 'Recover saved history', 'recovery', 'warning');
+  if (active) {
+    if (run.status === 'stopping') return state('Stopping', 'View activity', 'activity');
+    if (!run.finishing && run.prompts?.some((p) => p.status === 'pending'))
+      return state('Waiting for your answer', 'Answer question', 'question', 'warning');
+    if (run.finishing) return state('Checking result', 'View checks', 'changes');
+    return state(
+      run.progress?.label || (run.status === 'starting' ? 'Preparing' : 'Working'),
+      'View activity',
+      'activity',
+    );
+  }
+  if (integrated)
+    return state('Changes integrated locally', 'View delivery', 'delivery', 'success');
+  if (run.status === 'interrupted')
+    return state('Work interrupted', 'Inspect interrupted work', 'activity', 'warning');
+  if (
+    run.verificationError ||
+    (run.verification && (!run.verification.result.success || !run.verification.tree))
+  )
+    return state('Checks need attention', 'Inspect failed check', 'changes', 'warning');
+  if (!['review', 'reviewed'].includes(run.status))
+    return state(
+      run.status === 'stopped' ? 'Work stopped' : 'Work needs attention',
+      'Inspect and continue',
+      'activity',
+      'warning',
+    );
+  if (!run.verification && (run.verifyCommand || verifyCommand))
+    return state('Checks not run', 'Run checks', 'verify', 'warning');
+  if (run.status === 'reviewed') {
+    const isolated =
+      run.workspace.replaceAll('\\', '/').toLowerCase() !==
+      run.projectPath.replaceAll('\\', '/').toLowerCase();
+    return isolated
+      ? state('Reviewed · not integrated', 'Review merge', 'integrate')
+      : state('Reviewed locally', 'View delivery', 'delivery');
+  }
+  return state('Ready for your review', 'Review result', 'changes');
+}
+
 export function latestAttempt(runs: TaskRun[], taskId: string) {
   return runs
     .filter((run) => run.taskId === taskId)
@@ -7,18 +57,7 @@ export function latestAttempt(runs: TaskRun[], taskId: string) {
 }
 
 export function taskNextAction(run: TaskRun): string {
-  if (run.persistenceError) return 'Recover saved history';
-  if (run.status === 'running' || run.status === 'starting') {
-    if (run.prompts?.some((prompt) => prompt.status === 'pending')) return 'Answer a question';
-    return run.finishing ? 'Checking the result' : 'View progress';
-  }
-  if (run.status === 'stopping') return 'Stopping work';
-  if (run.status === 'interrupted') return 'Inspect interrupted work';
-  if (run.verification && (!run.verification.result.success || !run.verification.tree))
-    return 'Inspect checks';
-  if (run.status === 'review') return 'Review result';
-  if (run.status === 'reviewed') return 'Open result';
-  return 'Inspect and continue';
+  return taskDecision(run).action;
 }
 
 export function safeResultLink(href: string | undefined): string | undefined {

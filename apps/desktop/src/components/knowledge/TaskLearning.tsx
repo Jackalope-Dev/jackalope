@@ -7,7 +7,7 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
 
-export function TaskLearning({ run }: { run: TaskRun }) {
+export function TaskLearning({ run, allowSave = false }: { run: TaskRun; allowSave?: boolean }) {
   const [editing, setEditing] = useState<KnowledgeEntry | null>(null);
   const [saved, setSaved] = useState('');
   const context = run.contextReceipt;
@@ -46,7 +46,7 @@ export function TaskLearning({ run }: { run: TaskRun }) {
           ))}
         </section>
       )}
-      {run.status === 'reviewed' && (
+      {(run.status === 'reviewed' || allowSave) && (
         <>
           <h2 className="text-base font-medium">Save project knowledge</h2>
 

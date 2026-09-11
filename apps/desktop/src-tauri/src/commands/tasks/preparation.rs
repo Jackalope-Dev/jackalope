@@ -18,6 +18,39 @@ const MANIFESTS: [&str; 10] = [
 ];
 
 const MARKER: &str = ".jackalope/prepared.json";
+/// Top-level pattern that hides the marker directory from the working tree.
+const EXCLUDE: &str = "/.jackalope/";
+
+/// Keep the marker out of `git status`. A non-isolated task prepares the user's own
+/// checkout, so an untracked file there is something an agent could notice or commit.
+/// info/exclude is per-clone and never committed, unlike a tracked .gitignore.
+fn exclude_marker(workspace: &Path) {
+    let Ok(path) = git(
+        &workspace.to_string_lossy(),
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "info/exclude",
+        ],
+    ) else {
+        return;
+    };
+    if std::fs::read_to_string(&path)
+        .unwrap_or_default()
+        .lines()
+        .any(|line| line.trim() == EXCLUDE)
+    {
+        return;
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(file, "\n{EXCLUDE}");
+    }
+}
 
 /// The step a run is on right now, shown while it is happening rather than only in hindsight.
 /// Summaries keep this, so the task list can report live progress without the full activity log.
@@ -138,6 +171,7 @@ pub fn already_prepared(workspace: &Path, fingerprint: &str) -> Option<String> {
 /// Record that this workspace is prepared for these manifests. A failure to write is not fatal:
 /// the only cost is that the next attempt repeats work it could have skipped.
 pub fn record_prepared(workspace: &Path, fingerprint: &str, command: &str) {
+    exclude_marker(workspace);
     let path = workspace.join(MARKER);
     let Some(parent) = path.parent() else { return };
     if std::fs::create_dir_all(parent).is_err() {
@@ -196,6 +230,8 @@ mod tests {
     fn a_marker_is_reused_only_while_the_manifests_still_match() {
         let workspace = scratch();
         std::fs::write(workspace.join("pnpm-lock.yaml"), "packages: {}").unwrap();
+        let path = workspace.to_string_lossy().into_owned();
+        git(&path, &["init", "--initial-branch=main"]).unwrap();
         let command = "pnpm install --frozen-lockfile";
         let digest = fingerprint(&workspace, command);
         assert!(already_prepared(&workspace, &digest).is_none());
@@ -206,6 +242,18 @@ mod tests {
         assert!(
             already_prepared(&workspace, &changed).is_none(),
             "a changed lockfile must force the setup command to run again"
+        );
+        // The marker must never appear as a change the agent could notice or commit.
+        assert_eq!(
+            git(&path, &["status", "--porcelain", "--untracked-files=all"]).unwrap(),
+            "?? pnpm-lock.yaml",
+            "only the fixture lockfile is untracked; the marker is excluded"
+        );
+        record_prepared(&workspace, &changed, command);
+        assert_eq!(
+            git(&path, &["status", "--porcelain", "--untracked-files=all"]).unwrap(),
+            "?? pnpm-lock.yaml",
+            "recording the marker twice must not add a second exclude entry or a change"
         );
         std::fs::remove_dir_all(workspace).unwrap();
     }

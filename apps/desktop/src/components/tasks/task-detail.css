@@ -7,15 +7,15 @@
 }
 .task-detail-navigation {
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 .task-detail .workspace-heading {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 .task-progress {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 12px;
   background: var(--color-surface);
   overflow: hidden;
 }
@@ -23,12 +23,12 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-  padding: 20px;
+  gap: 12px;
+  padding: 12px 16px;
 }
 .task-progress-art {
-  width: 72px;
-  flex: 0 0 72px;
+  width: 40px;
+  flex: 0 0 40px;
   color: var(--color-accent-ink);
 }
 .task-progress-identity {
@@ -184,14 +184,16 @@
 }
 .task-detail .task-next {
   margin-top: 8px;
-  padding: 20px;
+  padding: 12px 16px;
   border: 1px solid var(--color-border);
   border-radius: 16px;
   background: var(--color-surface);
+  max-height: 220px;
+  overflow-y: auto;
 }
 .task-detail .task-reply {
-  margin-block: 0 12px;
-  min-height: 80px;
+  margin-block: 0 8px;
+  min-height: 52px;
 }
 @media (max-width: 700px) {
   .task-progress-main {
@@ -226,4 +228,61 @@
   .task-detail .task-next {
     padding: 16px;
   }
+}
+.task-preview-frame {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.task-preview-frame iframe {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  border: 0;
+  background: white;
+}
+.task-preview-frame[data-narrow="true"] iframe {
+  width: min(390px, 100%);
+  margin-inline: auto;
+}
+.task-detail.workspace-page-layout {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-block: 16px;
+}
+.task-detail > :not(.task-working-area) {
+  flex-shrink: 0;
+}
+.task-detail .task-working-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100px;
+  overflow: hidden;
+}
+.task-working-area .result-tabs {
+  flex: none;
+}
+.task-working-area .result-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.task-detail #task-questions,
+.task-detail #task-recovery {
+  max-height: min(30vh, 220px);
+  overflow-y: auto;
+}
+.task-detail-navigation > .workspace-heading {
+  flex: 1;
+  margin-bottom: 0;
+}
+.task-detail-navigation .workspace-heading h1 {
+  font-size: var(--text-xl);
+}
+.task-detail-navigation .workspace-heading p {
+  margin-top: 4px;
 }

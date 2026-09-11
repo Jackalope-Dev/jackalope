@@ -42,6 +42,7 @@ pub mod readiness;
 pub mod schedules;
 
 pub mod browser;
+pub mod delivery;
 pub mod desktop_control;
 
 mod resolver_fs;

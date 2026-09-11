@@ -15,11 +15,13 @@ export function ProjectReturn({
   runs,
   integratedIds,
   onOpen,
+  expanded = false,
 }: {
   project: Project;
   runs: TaskRun[];
   integratedIds: string[];
   onOpen: (id: string) => void;
+  expanded?: boolean;
 }) {
   const unfinished = returnToProject(runs, project.id, integratedIds);
   const { entries, error: knowledgeError } = useKnowledge(project.id, project.path);
@@ -41,7 +43,7 @@ export function ProjectReturn({
   }, [project.path]);
   if (!unfinished.length && !entries.length) return null;
   return (
-    <Disclosure className="project-return my-5">
+    <Disclosure className="project-return my-5" open={expanded || undefined}>
       <DisclosureSummary className="min-h-11 py-3 font-medium">
         Pick up in {project.name} · {unfinished.length} unfinished
       </DisclosureSummary>
@@ -59,7 +61,7 @@ export function ProjectReturn({
         ))}
         {unfinished.length > 3 && (
           <p className="task-muted">
-            {unfinished.length - 3} more unfinished tasks are in the collection below.
+            {unfinished.length - 3} more unfinished tasks are in project work.
           </p>
         )}
         {!!entries.filter((e) => e.enabled && e.kind === 'memory').length && (
@@ -88,7 +90,7 @@ export function ProjectReturn({
                   )}
                 </div>
               ))}
-            <Button variant="ghost" onClick={() => navigateWorkspace('project-settings')}>
+            <Button variant="ghost" onClick={() => navigateWorkspace('project-knowledge')}>
               Review saved knowledge
             </Button>
           </Disclosure>

@@ -13,6 +13,7 @@ import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
 import { RemoveProjectAction } from '../projects/RemoveProjectAction';
@@ -30,7 +31,6 @@ import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
-import { InvitationsButton } from './InvitationsButton';
 import {
   type ActiveTab,
   type ProjectSettingsDestination,
@@ -51,6 +51,9 @@ const LiveSessions = lazy(() =>
 );
 const CodebaseMap = lazy(() =>
   import('../visualizer/CodebaseMap').then((m) => ({ default: m.CodebaseMap })),
+);
+const ProjectOverview = lazy(() =>
+  import('../projects/ProjectOverview').then((m) => ({ default: m.ProjectOverview })),
 );
 const ScheduleManager = lazy(() =>
   import('../schedules/ScheduleManager').then((m) => ({ default: m.ScheduleManager })),
@@ -209,6 +212,29 @@ export function Shell({
     selectProject(id);
   };
   const selectedTaskId = useExecutionStore((state) => state.selectedId);
+  const workRequest = useWorkViewStore((state) => state.request);
+  useEffect(() => {
+    if (!workRequest) return;
+    const session = useLiveSessionStore
+      .getState()
+      .sessions.find((item) => `session:${item.id}` === workRequest.id);
+    if (session) {
+      selectProject(session.request.projectId);
+      useLiveSessionStore.getState().select(session.id);
+      setActiveTab('live-sessions');
+      return;
+    }
+    const run = useExecutionStore.getState().runs.find((item) => item.id === workRequest.id);
+    if (!run) return;
+    selectProject(run.projectId);
+    if (run.liveSessionId) {
+      useLiveSessionStore.getState().select(run.liveSessionId);
+      setActiveTab('live-sessions');
+    } else {
+      useExecutionStore.getState().select(run.id);
+      setActiveTab('kanban');
+    }
+  }, [workRequest, selectProject]);
   const project = projects.find((item) => item.id === activeProjectId);
   const view = WORKSPACE_VIEWS.find((item) => item.id === activeTab) ?? WORKSPACE_VIEWS[0];
   const navigate = useCallback((tab: ActiveTab) => {
@@ -378,12 +404,6 @@ export function Shell({
             </button>
           ))}
         </nav>
-        <InvitationsButton
-          onClick={() => {
-            setSettingsCategory('Invitations');
-            setActiveTab('preferences');
-          }}
-        />
       </div>
       <main
         ref={canvas}
@@ -404,17 +424,19 @@ export function Shell({
                 label:
                   item.id === 'kanban'
                     ? 'Work'
-                    : item.id === 'topology'
-                      ? 'Codebase'
-                      : item.id === 'agents'
-                        ? 'Runners'
-                        : item.id === 'agent-settings'
-                          ? 'Configuration'
-                          : item.id === 'mcps'
-                            ? 'Connections'
-                            : item.id === 'project-settings'
-                              ? 'Settings'
-                              : item.label,
+                    : item.id === 'project-overview'
+                      ? 'Overview'
+                      : item.id === 'topology'
+                        ? 'Codebase'
+                        : item.id === 'agents'
+                          ? 'Runners'
+                          : item.id === 'agent-settings'
+                            ? 'Configuration'
+                            : item.id === 'mcps'
+                              ? 'Connections'
+                              : item.id === 'project-settings'
+                                ? 'Settings'
+                                : item.label,
               }))}
             />
           )}
@@ -526,6 +548,9 @@ export function Shell({
                 }}
               />
             )}
+            {activeTab === 'project-overview' && (
+              <ProjectOverview onOpenProject={openProjectSetup} />
+            )}
             {activeTab === 'topology' && <CodebaseMap onOpenProject={openProjectSetup} />}
           </Suspense>
         </PageErrorBoundary>
@@ -573,6 +598,7 @@ export function Shell({
             onClose={() => setCommandsOpen(false)}
             onNavigate={navigate}
             onCapture={focusComposer}
+            onSelectProject={switchProject}
             onOpenSettings={() => setActiveTab('preferences')}
           />
         )}

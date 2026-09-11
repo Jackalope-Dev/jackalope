@@ -99,9 +99,9 @@ try {
     await page.screenshot({ path: `${output}/load-failure.png` });
     throw error;
   }
-  assert.equal(await page.getByRole('tab').count(), 4);
+  assert.equal(await page.getByRole('tab').count(), 6);
   const tabs = page.getByRole('tablist', { name: 'Task sections' });
-  await tabs.getByRole('tab', { name: 'Output', exact: true }).focus();
+  await tabs.getByRole('tab', { name: 'Conversation', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   await page
     .locator('[role=tab][data-state=active]')
@@ -119,7 +119,7 @@ try {
     .click();
   await page.getByText('Selection follows the focused result.', { exact: false }).waitFor();
   await page.screenshot({ path: `${output}/activity-1280-dark.png` });
-  await tabs.getByRole('tab', { name: 'Output', exact: true }).click();
+  await tabs.getByRole('tab', { name: 'Conversation', exact: true }).click();
   const menu = page.getByRole('button', { name: 'More task actions' });
   await menu.focus();
   await page.keyboard.press('Enter');
@@ -171,7 +171,7 @@ try {
             }),
           status,
         );
-        await tabs.getByRole('tab', { name: 'Output', exact: true }).click();
+        await tabs.getByRole('tab', { name: 'Conversation', exact: true }).click();
         if (status === 'review')
           await page.getByText('Search is ready for review.', { exact: true }).waitFor();
         await page.locator('.task-detail').evaluate((el) => (el.scrollTop = 0));
@@ -217,7 +217,7 @@ try {
       ],
     }),
   );
-  await page.getByText('Needs your input', { exact: true }).waitFor();
+  await page.getByText('Waiting for your answer', { exact: true }).waitFor();
   assert.equal(await page.locator('.brand-agent-character').getAttribute('data-state'), 'waiting');
   await page.evaluate(async () => {
     const { useExecutionStore } = await import('/src/stores/executionStore.ts');
@@ -266,8 +266,8 @@ try {
   await page.getByText('Example model', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${output}/details-960-dark.png` });
   await page.evaluate(() => window.taskFixture.scenario('starting', { workspace: '' }));
-  await tabs.getByRole('tab', { name: 'Output', exact: true }).click();
-  await page.getByText('Preparing workspace', { exact: true }).waitFor();
+  await tabs.getByRole('tab', { name: 'Conversation', exact: true }).click();
+  await page.getByText('Preparing', { exact: true }).waitFor();
 
   // A long step reports the work it is doing instead of a fixed label.
   await page.evaluate(() =>
@@ -287,9 +287,11 @@ try {
   await live.getByText('Progress: resolved 337, reused 337, downloaded 0, added 334').waitFor();
   await live.getByText('2m 14s', { exact: true }).waitFor();
   await page.getByText('Running project setup', { exact: true }).first().waitFor();
-  const steps = page.locator('.task-progress-steps li');
-  assert.equal(await steps.count(), 4, 'setup earns its own step once a project uses one');
-  await steps.filter({ hasText: 'Setup' }).getByText('Retrying (2)', { exact: true }).waitFor();
+  assert.equal(
+    await page.locator('.task-progress-steps').count(),
+    0,
+    'compact progress keeps the current step above the result',
+  );
   await page.screenshot({ path: `${output}/live-progress-1280-dark.png` });
 
   // A setup failure names the interruption, shows the command's own output, and offers a retry.
@@ -339,7 +341,7 @@ try {
   await page.evaluate(() => window.taskFixture.update({ status: 'stopping' }));
   assert(await page.getByRole('button', { name: 'Stop', exact: true }).isDisabled());
   await page.evaluate(() => window.taskFixture.scenario('reviewed'));
-  await page.getByText('Reviewed', { exact: true }).first().waitFor();
+  await page.getByText('Reviewed · not integrated', { exact: true }).first().waitFor();
   await page.evaluate(() => {
     window.taskFixture.integrated = true;
     window.taskFixture.update({ workspace: '' });
@@ -363,6 +365,13 @@ try {
   console.log(
     'Task detail browser fixtures passed: states, themes, responsive layouts, reduced motion, keyboard tabs/menu, activity search, live step progress, setup-failure detail, retry dispatch, error disclosure, history and stop-before-continue recovery. No native tasks launched.',
   );
+} catch (error) {
+  const page = browser.contexts()[0]?.pages()[0];
+  if (page) {
+    console.error(await page.locator('body').innerText());
+    await page.screenshot({ path: `${output}/failure.png` });
+  }
+  throw error;
 } finally {
   await browser.close();
 }

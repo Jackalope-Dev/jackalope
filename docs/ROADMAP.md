@@ -10,6 +10,14 @@ aligned with this guide when capabilities or priorities change.
 
 ## Built: the local workspace
 
+Work discovery unifies tasks and Live sessions with explicit project scope, remembered
+views and task/project command search. Project overview surfaces unfinished work and
+local delivery receipts. Task follow-up stays visible through review. Preview setup,
+HTTP readiness, sandboxed local pages and fresh browser evidence capture are implemented.
+Delivery reads local Git and optional GitHub PR/CI state and prepares editable handoff
+drafts. Remote publication and deployment still require explicit user action; installed
+acceptance and usability trials remain open.
+
 Live sessions start from a message in the Live workspace, name themselves and group
 history automatically. They capture messages during execution and process ordered
 batches in a shared isolated worktree. A compact detachable window, always-on-top

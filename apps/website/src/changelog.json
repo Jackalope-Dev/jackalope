@@ -1,5 +1,18 @@
 [
   {
+    "id": "a-clearer-path-from-request-to-delivery",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "A clearer path from request to delivery",
+    "description": "Find work across projects, inspect results with a persistent follow-up, and prepare the next delivery step.",
+    "items": [
+      "Unified task and Live discovery, project overview, remembered work views, and task/project command search.",
+      "Evidence-driven task actions and local preview setup with readiness checks, embedded pages, and fresh browser capture.",
+      "Local delivery and optional PR/CI inspection with editable handoff drafts; publication and deployment remain explicit steps."
+    ],
+    "note": "Implemented in source; installed-app acceptance remains in progress."
+  },
+  {
     "id": "live-task-setup-progress-and-retry",
     "date": "2026-09-11",
     "status": "In development",

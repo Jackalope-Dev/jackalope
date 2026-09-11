@@ -75,8 +75,8 @@ test('return view selects latest attempts, prioritizes blockers and retains revi
     ['blocked', 'new', 'reviewed'],
   );
   assert.deepEqual(returnToProject([run, latest], 'p', ['new']), []);
-  assert.match(nextAction(blocker), /ownership/);
-  assert.match(nextAction(reviewed), /Integrate/);
+  assert.equal(nextAction(blocker), 'Inspect interrupted work');
+  assert.equal(nextAction(reviewed), 'Review merge');
 });
 
 test('recovery preserves failure, workspace and acceptance without claiming old checks still pass', () => {

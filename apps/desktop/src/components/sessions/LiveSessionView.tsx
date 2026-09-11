@@ -19,9 +19,12 @@ import {
   sessionWork,
 } from '../../lib/live-session';
 import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/task-runtime';
+import { taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
+import { TaskDelivery } from '../tasks/TaskDelivery';
 import { TaskPreview } from '../tasks/TaskPreview';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -49,7 +52,24 @@ export function LiveSessionView({
   const { active, latest, pending, questions, status } = sessionWork(session, runs);
   const [expanded, setExpanded] = useState(initialDetailsOpen);
   const [collapsed, setCollapsed] = useState(false);
-  const [tab, setTab] = useState<'work' | 'changes' | 'preview'>('work');
+  const [tab, setTab] = useState<'work' | 'changes' | 'preview' | 'delivery'>('work');
+  const [addition, setAddition] = useState<{
+    text: string;
+    revision: number;
+    applied: (error?: string) => void;
+  }>();
+  const append = (text: string) =>
+    new Promise<void>((resolve, reject) => {
+      if (session.closed) {
+        reject(new Error('This session is finished. Copy the delivery handoff into a new task.'));
+        return;
+      }
+      setAddition((value) => ({
+        text,
+        revision: (value?.revision ?? 0) + 1,
+        applied: (error) => (error ? reject(new Error(error)) : resolve()),
+      }));
+    });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [review, setReview] = useState<SessionReview | null>(null);
@@ -199,7 +219,11 @@ export function LiveSessionView({
           onClick={() => setExpanded(!expanded)}
         >
           <span aria-live="polite">
-            {status === 'Queued' ? `${pending} queued` : status}
+            {status === 'Queued'
+              ? `${pending} queued`
+              : latest && !active && status === 'Ready to review'
+                ? taskDecision(latest).label
+                : status}
             {pending && status !== 'Queued' ? ` · ${pending} queued` : ''}
           </span>
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -338,12 +362,19 @@ export function LiveSessionView({
               ))}
             </div>
           )}
-          <SessionComposer key={session.id} session={session} onSent={refresh} />
+          <SessionComposer
+            key={session.id}
+            session={session}
+            onSent={refresh}
+            active={active}
+            latestRun={latest}
+            addition={addition}
+          />
         </div>
         {expanded && (
           <aside className="live-work" id="live-session-work">
             <fieldset className="live-tabs" aria-label="Session details">
-              {(['work', 'changes', 'preview'] as const).map((value) => (
+              {(['work', 'changes', 'preview', 'delivery'] as const).map((value) => (
                 <Button
                   key={value}
                   variant="ghost"
@@ -359,7 +390,13 @@ export function LiveSessionView({
                     }
                   }}
                 >
-                  {value === 'work' ? 'Work' : value === 'changes' ? 'Changes' : 'Preview'}
+                  {value === 'work'
+                    ? 'Activity'
+                    : value === 'changes'
+                      ? 'Review'
+                      : value === 'preview'
+                        ? 'Preview'
+                        : 'Delivery'}
                 </Button>
               ))}
             </fieldset>
@@ -481,13 +518,22 @@ export function LiveSessionView({
               ))}
             {tab === 'preview' &&
               (latest && !active ? (
-                <TaskPreview run={latest} />
+                <TaskPreview run={latest} onFeedback={session.closed ? undefined : append} />
               ) : (
                 <p className="live-muted">
                   {active
                     ? 'Finish or stop work to start a preview.'
                     : 'Run a change to start a preview.'}
                 </p>
+              ))}
+            {tab === 'delivery' &&
+              (latest && !active ? (
+                <>
+                  <TaskDelivery run={latest} onReview={showReview} onHandoff={append} />
+                  <TaskLearning run={latest} allowSave />
+                </>
+              ) : (
+                <p className="live-muted">Finish or stop work to prepare delivery.</p>
               ))}
             {latest?.workspace && (
               <details className="live-workspace">

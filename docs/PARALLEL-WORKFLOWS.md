@@ -7,11 +7,15 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
-Open **Live** and send a message to start a session. The first message names it;
+Choose **Start Live conversation** from Tasks, or open **Tasks → Live**, and send a message.
+The first message names the session;
 history groups sessions by attention, activity and completion, with recent work first.
 Capture stays available while a batch runs. Messages arriving together are grouped
 in order; subsequent batches continue in the same isolated worktree and retain the
 selected agent account.
+**Queue message** saves input for the next batch. **Stop and send** pauses dispatch,
+waits for actual shutdown and saves the message before resuming. Failed saves retain
+the draft. A paused queue keeps new messages until explicitly resumed.
 Use **Pop out** for a separate window; its pin controls always-on-top. Closing the
 window leaves execution running. **Pause queue** holds later messages, while
 **Stop work** also stops the active attempt through the existing runtime.
@@ -252,3 +256,21 @@ Automated regression coverage and isolated native trials are described in
 [CONTRIBUTING.md](../CONTRIBUTING.md) and [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md).
 Record detailed local receipts privately. Fixtures and source builds do not prove
 installed-app acceptance.
+Task result views keep Conversation, Review, Preview, Activity, Details and Delivery
+together. Recovery, unanswered questions and failed checks drive the primary action.
+Review is a separate decision from passing checks or local integration.
+
+**Try result** starts the reviewed preview command in the task workspace, remembers
+it for that project, and selects a free port when the port is zero. HTTP readiness
+means the root page returns a success or redirect response, not that behavior is correct.
+The embedded page is sandboxed and has no native IPC permissions. **Capture screenshot
+and page details** uses a fresh isolated browser and saves a screenshot with bounded
+page elements and errors. It does not copy login or interactions from the embedded page.
+Users can attach that evidence to a follow-up, cancel a capture, and explicitly stop
+the preview before continuing. Preview ownership still blocks integration and cleanup.
+
+Delivery can inspect local Git state or read PR/CI through an installed, authenticated
+GitHub CLI. Ahead/behind counts use local upstream references, without fetching. PR
+checks apply to their recorded head; a different local head is shown explicitly.
+Delivery preparation creates an editable handoff and does not publish, merge or deploy.
+Deployment remains unverified until checked in the target environment.

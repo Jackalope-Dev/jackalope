@@ -4,8 +4,13 @@ import { taskNotices } from '../src/lib/companion-tasks.ts';
 import { waitForStoppedAttempt } from '../src/lib/continue-task.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { returnToProject } from '../src/lib/project-return.ts';
-import { collectWork } from '../src/lib/task-collection.ts';
-import { latestAttempt, safeResultLink, taskNextAction } from '../src/lib/task-workflow.ts';
+import { collectWork, collectWorkspaceWork } from '../src/lib/task-collection.ts';
+import {
+  latestAttempt,
+  safeResultLink,
+  taskDecision,
+  taskNextAction,
+} from '../src/lib/task-workflow.ts';
 import { usageEntries } from '../src/lib/usage-entries.ts';
 
 const run = {
@@ -17,6 +22,54 @@ const run = {
   status: 'review',
   sessionId: 'session',
 };
+
+test('failed or missing checks take priority over review and integration actions', () => {
+  const finished = { ...run, workspace: '/repo/task', projectPath: '/repo', status: 'reviewed' };
+  assert.equal(taskDecision({ ...finished, verificationError: 'Check failed' }).section, 'changes');
+  assert.equal(
+    taskDecision({ ...finished, verification: { result: { success: false }, tree: 'tree' } }).tone,
+    'warning',
+  );
+  assert.equal(
+    taskDecision({ ...finished, verification: { result: { success: true }, tree: null } }).tone,
+    'warning',
+  );
+  assert.equal(taskDecision(finished, false, 'pnpm test').section, 'verify');
+  assert.equal(taskDecision(finished).section, 'integrate');
+  assert.equal(taskDecision({ ...finished, workspace: '/repo' }).section, 'delivery');
+  assert.equal(taskDecision(finished, true).label, 'Changes integrated locally');
+  assert.equal(
+    taskDecision({ ...finished, persistenceError: 'Disk full' }, true).section,
+    'recovery',
+  );
+});
+
+test('unified work includes live sessions once and respects project scope and archive', () => {
+  const session = {
+    id: 'live',
+    title: 'Live work',
+    request: { projectId: 'a' },
+    updatedAt: '2026-09-02',
+    messages: [],
+    batches: [{ runId: 'live-run' }],
+    closed: false,
+    paused: false,
+  };
+  const liveRun = {
+    ...run,
+    id: 'live-run',
+    taskId: 'live-task',
+    liveSessionId: 'live',
+    status: 'running',
+    prompts: [{ status: 'pending' }],
+  };
+  const items = collectWorkspaceWork('a', [], [run, liveRun], [session]);
+  assert.equal(items.length, 2);
+  assert.equal(items[0].session.id, 'live');
+  assert.equal(items[0].stage, 'attention');
+  assert.equal(collectWorkspaceWork('b', [], [run, liveRun], [session]).length, 0);
+  assert.equal(collectWorkspaceWork('a', [], [run, liveRun], [session], [], true).length, 0);
+});
 
 test('global work prioritizes decisions, review, running work and saved projectless ideas', () => {
   const items = collectWork(
@@ -64,12 +117,9 @@ test('latest attempt follows timestamps and current questions override generic w
   assert.equal(collectWork(null, [], [utc, offset])[0].run.id, 'offset');
   assert.equal(
     taskNextAction({ ...run, status: 'running', prompts: [{ status: 'pending' }] }),
-    'Answer a question',
+    'Answer question',
   );
-  assert.equal(
-    taskNextAction({ ...run, status: 'running', finishing: true }),
-    'Checking the result',
-  );
+  assert.equal(taskNextAction({ ...run, status: 'running', finishing: true }), 'View checks');
 });
 
 test('archived work stays grouped with its saved idea and resumes with a new attempt', () => {

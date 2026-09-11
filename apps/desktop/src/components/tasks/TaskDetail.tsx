@@ -15,6 +15,7 @@ import {
   Copy,
   GitMerge,
   MoreHorizontal,
+  Play,
   Square,
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
@@ -29,11 +30,12 @@ import {
   type TaskRun,
 } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
-import { latestAttempt } from '../../lib/task-workflow';
+import { latestAttempt, taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -44,6 +46,7 @@ import { FeedbackTouchpoint } from './FeedbackTouchpoint';
 import { ResultReview } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
+import { TaskDelivery } from './TaskDelivery';
 import { TaskFailure } from './TaskFailure';
 import { TaskIntegration } from './TaskIntegration';
 import { TaskOutcomes } from './TaskOutcomes';
@@ -51,6 +54,7 @@ import { TaskPreview } from './TaskPreview';
 import { TaskProgress } from './TaskProgress';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
 import { UserPromptCard } from './UserPromptCard';
+import { useManagedPreview } from './useManagedPreview';
 import { ValidationJourney } from './ValidationJourney';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 import './task-detail.css';
@@ -82,7 +86,21 @@ export function TaskDetail({
   const [notice, setNotice] = useState('');
   const [acting, setActing] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const workRequest = useWorkViewStore((state) => state.request);
   const [tab, setTab] = useState('result');
+  useEffect(() => {
+    if (workRequest?.id !== run.id) return;
+    const section = workRequest.section;
+    if (section === 'question' || section === 'recovery') {
+      document
+        .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
+        ?.querySelector<HTMLElement>('button, input, textarea')
+        ?.focus();
+    } else {
+      setTab(['verify', 'integrate'].includes(section) ? 'changes' : section);
+      if (section === 'integrate') setIntegrating(true);
+    }
+  }, [workRequest, run.id]);
   const [integrating, setIntegrating] = useState(false);
   const [appliedHere, setIntegrated] = useState(false);
   const integrated = alreadyIntegrated || appliedHere;
@@ -93,6 +111,7 @@ export function TaskDetail({
   const key = `reply:${run.taskId}`;
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
+  const previewRunning = useManagedPreview(run.id, !active && !integrated);
   const routing = run.routing;
   const attempts = runs
     .filter((r) => r.taskId === run.taskId)
@@ -114,6 +133,37 @@ export function TaskDetail({
       run.projectPath.replaceAll('\\', '/').toLowerCase();
   const finished = !active && ['review', 'reviewed'].includes(run.status);
   const canContinue = isLatest && !!run.sessionId && run.status !== 'interrupted' && !integrated;
+  const decision = taskDecision(run, integrated, currentProject?.preferences?.verifyCommand);
+  const inspect = (section: string) => {
+    if (section === 'question' || section === 'recovery') {
+      document
+        .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
+        ?.scrollIntoView({ block: 'center' });
+      document
+        .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
+        ?.querySelector<HTMLElement>('button, input, textarea')
+        ?.focus();
+    } else {
+      setTab(section === 'integrate' || section === 'verify' ? 'changes' : section);
+      if (section === 'integrate') setIntegrating(true);
+    }
+  };
+  const primaryAction = async () => {
+    inspect(decision.section);
+    if (decision.section !== 'verify' || acting) return;
+    const command = run.verifyCommand || currentProject?.preferences?.verifyCommand;
+    if (!command) return;
+    setActing(true);
+    setError('');
+    try {
+      await nativeTask('task_verify', { id: run.id, command });
+      await refresh();
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      setActing(false);
+    }
+  };
 
   useEffect(() => {
     if (tab !== 'context' || !isLatest || connections !== null) return;
@@ -162,12 +212,14 @@ export function TaskDetail({
       setRetrying(false);
     }
   };
-  const continueTask = async () => {
+
+  const continueTask = async (stopPreview = false) => {
     if (!reply.trim() || acting || submitting || !canContinue) return;
     setActing(true);
     setError('');
     const prompt = reply.trim();
     try {
+      if (stopPreview) await nativeTask('task_preview_stop', { id: run.id });
       if (active) {
         await nativeTask('task_stop', { id: run.id });
         await waitForStoppedAttempt(
@@ -257,6 +309,7 @@ export function TaskDetail({
           <ArrowLeft size={16} />
           All tasks
         </Button>
+        <WorkspaceHeading title={title} titleRef={heading} description={run.projectName} />
         <div className="task-detail-utilities">
           {attempts.length > 1 && (
             <Select
@@ -296,6 +349,26 @@ export function TaskDetail({
                     Make recurring
                   </Menu.Item>
                 )}
+                {finished && isLatest && run.status === 'review' && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    disabled={acting || !!run.persistenceError}
+                    onSelect={() => void act('task_mark_reviewed')}
+                  >
+                    <Check size={16} /> Mark reviewed
+                  </Menu.Item>
+                )}
+                {finished && isLatest && isolated && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => {
+                      setTab('changes');
+                      setIntegrating(true);
+                    }}
+                  >
+                    <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Review merge'}
+                  </Menu.Item>
+                )}
                 <Menu.Item className="workspace-menu-item" onSelect={() => setTab('context')}>
                   Task details
                 </Menu.Item>
@@ -304,45 +377,43 @@ export function TaskDetail({
           </Menu.Root>
         </div>
       </div>
-      <WorkspaceHeading title={title} titleRef={heading} description={run.projectName} />
       <TaskProgress
         run={run}
         integrated={integrated}
         pending={pending.length}
+        verifyCommand={currentProject?.preferences?.verifyCommand}
         onActivity={() => setTab('activity')}
         action={
           active ? (
-            <Button
-              variant="outline"
-              disabled={acting || run.status === 'stopping'}
-              onClick={() => void act('task_stop')}
-            >
-              <Square size={14} />
-              Stop
-            </Button>
-          ) : finished && isLatest ? (
             <div className="task-detail-utilities">
-              {isolated && (
-                <Button
-                  onClick={() => {
-                    setTab('changes');
-                    setIntegrating(true);
-                  }}
-                >
-                  <GitMerge size={16} />
-                  {integrated ? 'Merge receipt' : 'Review integration'}
+              {!!pending.length && (
+                <Button onClick={() => inspect('question')}>Answer question</Button>
+              )}
+              <Button
+                variant="outline"
+                disabled={acting || run.status === 'stopping'}
+                onClick={() => void act('task_stop')}
+              >
+                <Square size={14} />
+                Stop
+              </Button>
+            </div>
+          ) : isLatest ? (
+            <div className="task-detail-utilities">
+              {run.workspace && run.status !== 'interrupted' && !integrated && (
+                <Button variant="outline" onClick={() => setTab('preview')}>
+                  <Play size={16} />
+                  Try result
                 </Button>
               )}
-              {run.status === 'review' && (
-                <Button
-                  variant={isolated ? 'outline' : 'primary'}
-                  disabled={acting || !!run.persistenceError}
-                  onClick={() => void act('task_mark_reviewed')}
-                >
-                  <Check size={16} />
-                  Mark reviewed
-                </Button>
-              )}
+              <Button
+                disabled={acting || submitting}
+                loading={acting}
+                loadingLabel="Working…"
+                onClick={() => void primaryAction()}
+              >
+                {decision.action}
+              </Button>
             </div>
           ) : undefined
         }
@@ -361,7 +432,9 @@ export function TaskDetail({
           </Button>
         </div>
       )}
-      <TaskSaveRecovery run={run} />
+      <div id="task-recovery">
+        <TaskSaveRecovery run={run} />
+      </div>
       {run.dependencyInvalidated && (
         <InlineNotice tone="error">
           A predecessor was retried. Preserve this work and create a fresh feature plan before
@@ -378,7 +451,7 @@ export function TaskDetail({
         />
       )}
       {!!pending.length && (
-        <div className="space-y-3 mb-5">
+        <div className="space-y-3 mb-5" id="task-questions">
           <h2 className="text-base">{active ? 'A decision needs you' : 'Questions left open'}</h2>
           {pending.map((p) => (
             <UserPromptCard
@@ -390,13 +463,15 @@ export function TaskDetail({
           ))}
         </div>
       )}
-      <Tabs.Root value={tab} onValueChange={setTab}>
+      <Tabs.Root className="task-working-area" value={tab} onValueChange={setTab}>
         <Tabs.List className="result-tabs" aria-label="Task sections">
           {[
-            { value: 'result', label: 'Output' },
+            { value: 'result', label: 'Conversation' },
             { value: 'changes', label: 'Review' },
+            { value: 'preview', label: 'Preview' },
             { value: 'activity', label: 'Activity' },
             { value: 'context', label: 'Details' },
+            { value: 'delivery', label: 'Delivery' },
           ].map(({ value, label }) => (
             <Tabs.Trigger key={value} value={value}>
               {label}
@@ -405,6 +480,30 @@ export function TaskDetail({
         </Tabs.List>
         <div className="result-canvas">
           <Tabs.Content value="result">
+            <Disclosure className="task-original-request">
+              <DisclosureSummary>Original request</DisclosureSummary>
+              <p className="whitespace-pre-wrap break-words">{attempts[0]?.prompt ?? run.prompt}</p>
+            </Disclosure>
+            {attempts
+              .filter((attempt) => Date.parse(attempt.startedAt) < Date.parse(run.startedAt))
+              .map((attempt, index) => (
+                <Disclosure key={attempt.id} className="my-3">
+                  <DisclosureSummary>
+                    Earlier exchange {index + 1} · {statusLabel[attempt.status]}
+                  </DisclosureSummary>
+                  <p className="task-request whitespace-pre-wrap">{attempt.prompt}</p>
+                  <Suspense fallback={<p>{attempt.result}</p>}>
+                    <TaskMarkdown
+                      content={attempt.result || 'No result recorded.'}
+                      active={false}
+                      onOpenLink={openLink}
+                    />
+                  </Suspense>
+                </Disclosure>
+              ))}
+            {attempts.length > 1 && (
+              <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
+            )}
             {!!run.screenshots?.length && (
               <figure className="result-preview">
                 <ScreenshotPreview
@@ -474,9 +573,6 @@ export function TaskDetail({
                   />
                 )}
               </div>
-              {!active && run.status !== 'interrupted' && !!run.workspace && (
-                <TaskPreview key={`preview:${run.id}`} run={run} />
-              )}
               {!active && run.workspace && !integrated ? (
                 <ResultReview key={run.id} run={run} />
               ) : (
@@ -495,6 +591,54 @@ export function TaskDetail({
           )}
           <Tabs.Content value="activity">
             <TaskActivity entries={run.activity} active={active} />
+          </Tabs.Content>
+          <Tabs.Content value="preview">
+            {!active && run.status !== 'interrupted' && run.workspace && !integrated ? (
+              <TaskPreview
+                key={`preview:${run.id}`}
+                run={run}
+                onFeedback={
+                  canContinue
+                    ? (text) => {
+                        const prompt = [reply, text].filter(Boolean).join('\n\n');
+                        if (prompt.length > 24000)
+                          throw new Error(
+                            'Feedback would exceed the follow-up limit. Send or shorten the existing draft first.',
+                          );
+                        draft(key, { prompt });
+                        document.getElementById('task-reply')?.focus();
+                      }
+                    : undefined
+                }
+              />
+            ) : (
+              <p className="task-muted">
+                {integrated
+                  ? 'These changes are integrated. Start a new task from the updated project to preview further changes.'
+                  : 'Finish or stop work before trying this result.'}
+              </p>
+            )}
+          </Tabs.Content>
+          <Tabs.Content value="delivery">
+            <TaskDelivery
+              key={run.id}
+              run={run}
+              integrated={integrated}
+              onReview={() => {
+                setTab('changes');
+                if (isolated) setIntegrating(true);
+              }}
+              onHandoff={(text) => {
+                const id = useTaskStore.getState().addTask({
+                  projectId: run.projectId,
+                  title: `Deliver: ${title}`.slice(0, 160),
+                  rawPrompt: text,
+                  status: 'backlog',
+                });
+                onCapture(id);
+              }}
+            />
+            {finished && isLatest && <TaskLearning run={run} allowSave />}
           </Tabs.Content>
           <Tabs.Content value="context">
             <section className="task-environment" aria-label="Context, history and usage">
@@ -678,7 +822,7 @@ export function TaskDetail({
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                void continueTask();
+                void continueTask(previewRunning);
               }}
             >
               <Textarea
@@ -690,12 +834,24 @@ export function TaskDetail({
                 onChange={(event) => draft(key, { prompt: event.target.value })}
                 placeholder="Tell Jackalope what to do next…"
                 maxLength={24000}
+                onKeyDown={(event) => {
+                  if (
+                    (event.ctrlKey || event.metaKey) &&
+                    event.key === 'Enter' &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    void continueTask(previewRunning);
+                  }
+                }}
               />
               <div className="task-followup-footer">
                 <p className="task-muted">
-                  {active
-                    ? 'Sending stops this attempt and resumes the same session.'
-                    : `Continues with ${run.agent} in the same workspace and account.`}
+                  {previewRunning
+                    ? 'Stops the managed preview, saves its logs, then continues in this workspace.'
+                    : active
+                      ? 'Sending stops this attempt and resumes the same session.'
+                      : `Continues with ${run.agent} in the same workspace and account.`}
                 </p>
                 <Button
                   type="submit"
@@ -703,7 +859,11 @@ export function TaskDetail({
                   loading={acting || submitting}
                   loadingLabel="Continuing…"
                 >
-                  {active ? 'Stop and send' : 'Continue task'}
+                  {previewRunning
+                    ? 'Stop preview and continue'
+                    : active
+                      ? 'Stop and send'
+                      : 'Continue task'}
                   <ArrowRight size={15} />
                 </Button>
               </div>

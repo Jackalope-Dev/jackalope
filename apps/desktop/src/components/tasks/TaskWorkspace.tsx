@@ -5,23 +5,25 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import { DropdownMenu as Menu } from '@jackalope/ui';
-import { FolderOpen, MoreHorizontal, Workflow } from 'lucide-react';
+import { FolderOpen, MoreHorizontal, Radio, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
-import { collectWork, type WorkItem } from '../../lib/task-collection';
+import { collectWorkspaceWork, type WorkItem } from '../../lib/task-collection';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
+import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { ArchivedHistory } from '../settings/ArchivedHistory';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { CaptureTask } from './CaptureTask';
 import { ProjectQueue } from './ProjectQueue';
-import { ProjectReturn } from './ProjectReturn';
-import { TaskCollection, type TaskCollectionView } from './TaskCollection';
+import { TaskCollection } from './TaskCollection';
 import { TaskDetail } from './TaskDetail';
 
 export function TaskWorkspace({
@@ -37,13 +39,21 @@ export function TaskWorkspace({
 }) {
   const { projects, activeProjectId } = useProjectStore();
   const runs = useExecutionStore((state) => state.runs);
+  const sessions = useLiveSessionStore((state) => state.sessions);
+  const sessionRuns = useLiveSessionStore((state) => state.runs);
+  useEffect(observeLiveSessions, []);
+  const allRuns = useMemo(
+    () => [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
+    [runs, sessionRuns],
+  );
   const runners = useExecutionStore((state) => state.runners);
   const selectedId = useExecutionStore((state) => state.selectedId);
   const select = useExecutionStore((state) => state.select);
   const loading = useExecutionStore((state) => state.loading);
   const error = useExecutionStore((state) => state.error);
   const ideas = useTaskStore((state) => state.tasks);
-  const [projectFilter, setProjectFilter] = useState('all');
+  const { scope, setScope, views, setView: saveView } = useWorkViewStore();
+  const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
   const [archived, setArchived] = useState(false);
   const [cleanupBusy, setCleanupBusy] = useState(false);
   const [parallel, setParallel] = useState(false);
@@ -57,17 +67,19 @@ export function TaskWorkspace({
     });
     return () => cancelAnimationFrame(frame);
   }, [composerFocus]);
-  const [view, setView] = useState<TaskCollectionView>({
-    filter: 'all',
-    layout: 'list',
-    query: '',
-  });
+  const viewKey = `${projectFilter}:${archived ? 'archive' : 'current'}`;
+  const view = views[viewKey] ?? defaultWorkView;
+  const setView = (value: typeof view) => saveView(viewKey, value);
   const [integratedIds, setIntegratedIds] = useState<string[]>([]);
   const lastOpened = useRef<string | null>(null);
   const openItem = useCallback(
     (item: WorkItem) => {
       lastOpened.current = item.id;
-      if (item.run) select(item.run.id);
+      if (item.session) {
+        useLiveSessionStore.getState().select(item.session.id);
+        useProjectStore.getState().selectProject(item.session.request.projectId);
+        navigateWorkspace('live-sessions');
+      } else if (item.run) select(item.run.id);
       else if (item.idea) onCapture(item.idea.id);
     },
     [select, onCapture],
@@ -104,14 +116,15 @@ export function TaskWorkspace({
   );
   const items = useMemo(
     () =>
-      collectWork(
+      collectWorkspaceWork(
         projectFilter === 'all' ? null : projectFilter === 'unassigned' ? '' : projectFilter,
         ideas,
-        runs,
+        allRuns,
+        sessions,
         integratedIds,
         archived,
       ),
-    [projectFilter, ideas, runs, integratedIds, archived],
+    [projectFilter, ideas, allRuns, sessions, integratedIds, archived],
   );
   const archiveItems = async (selected: WorkItem[], archive: boolean) => {
     const failures: string[] = [];
@@ -159,10 +172,30 @@ export function TaskWorkspace({
   return (
     <WorkspacePage className="task-home">
       <WorkspaceHeading
-        title="What do you want to accomplish?"
-        description="Describe what to build, fix, or explore."
+        title={
+          runs.length || ideas.length || sessions.length
+            ? scope === 'all'
+              ? 'All work'
+              : `Work in ${project?.name ?? 'your workspace'}`
+            : 'What do you want to accomplish?'
+        }
+        description={
+          runs.length || ideas.length || sessions.length
+            ? undefined
+            : 'Describe what to build, fix, or explore.'
+        }
         action={
           <div className="task-home-actions">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                useLiveSessionStore.getState().select(null);
+                navigateWorkspace('live-sessions');
+              }}
+            >
+              <Radio size={16} />
+              Start Live conversation
+            </Button>
             {!!(needsInput || ready) && (
               <a className="task-attention-link" href="#task-work">
                 {[
@@ -200,60 +233,48 @@ export function TaskWorkspace({
           </div>
         }
       />
-      {composerVisible && <CaptureTask inline onClose={() => {}} onStarted={() => {}} />}
-      {(runs.length > 0 || ideas.length > 0) && (
-        <div className="mt-8">
+      {composerVisible && (
+        <CaptureTask
+          inline
+          compact={!!(runs.length || ideas.length || sessions.length)}
+          onClose={() => {}}
+          onStarted={() => {}}
+        />
+      )}
+      {(runs.length > 0 || ideas.length > 0 || sessions.length > 0) && (
+        <div className="sr-only">
           <WorkspaceSectionHeading titleId="task-work" title="Your work" />
         </div>
       )}
-      {project && !archived && (
-        <ProjectReturn
-          key={project.id}
-          project={project}
-          runs={runs}
-          integratedIds={integratedIds}
-          onOpen={select}
-        />
-      )}
       {loading && <LoadingState label={'Loading task history…'} />}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      <fieldset className="work-toolbar" aria-label="Task history">
-        <Button
-          disabled={cleanupBusy}
-          variant={archived ? 'ghost' : 'secondary'}
-          aria-pressed={!archived}
-          onClick={() => setArchived(false)}
-        >
-          Current tasks
-        </Button>
-        <Button
-          disabled={cleanupBusy}
-          variant={archived ? 'secondary' : 'ghost'}
-          aria-pressed={archived}
-          onClick={() => setArchived(true)}
-        >
-          Archived
-        </Button>
-      </fieldset>
-      {runs.length > 0 || ideas.length > 0 ? (
+      {runs.length > 0 || ideas.length > 0 || sessions.length > 0 ? (
         <TaskCollection
           key={String(archived)}
           archived={archived}
           onArchive={archiveItems}
           onBusyChange={setCleanupBusy}
+          history={
+            <Select
+              aria-label="Task history"
+              disabled={cleanupBusy}
+              value={archived ? 'archive' : 'current'}
+              onValueChange={(value) => setArchived(value === 'archive')}
+            >
+              <SelectItem value="current">Current work</SelectItem>
+              <SelectItem value="archive">Archived work</SelectItem>
+            </Select>
+          }
           scope={
             <Select
               aria-label="Filter by project"
-              value={projectFilter}
-              onValueChange={setProjectFilter}
+              value={scope}
+              onValueChange={(value) => setScope(value as 'all' | 'project')}
             >
-              <SelectItem value="all">All projects</SelectItem>
-              <SelectItem value="unassigned">No project yet</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="all">All work · every project</SelectItem>
+              <SelectItem value="project">
+                {project?.name ?? 'No project yet'} · project work
+              </SelectItem>
             </Select>
           }
           emptyState={
@@ -269,7 +290,7 @@ export function TaskWorkspace({
               description={archived ? 'Tasks you archive will appear here.' : undefined}
               action={
                 projectFilter !== 'all' ? (
-                  <Button variant="outline" onClick={() => setProjectFilter('all')}>
+                  <Button variant="outline" onClick={() => setScope('all')}>
                     Show all projects
                   </Button>
                 ) : undefined

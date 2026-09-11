@@ -20,21 +20,26 @@ agent, project and connection controls without discarding the draft.
 
 ## Work and results
 
-Tasks defaults to all projects and orders needs-input/recovery work before results
-ready for review, active work, saved ideas and finished work. Integration state
-comes from native verified receipts. Project filters and the board remain available.
+Tasks defaults to the selected project's work and offers an explicit All work scope.
+Tasks and Live sessions share discovery without duplicate attempts. Needs-input/recovery
+and failed-check work precede results ready for review, active work, saved ideas and
+finished work. Integration state comes from native verified receipts. Filters, search
+and list/board choices persist per scope. Arrow keys, Home and End move between visible
+work rows; command search also finds projects, tasks, sessions and current-task actions.
 Parallel planning remains inside Tasks with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
 Task detail keeps the assigned agent, recorded progress and next action together.
-Output contains the agent's response and latest screenshot. Review groups outcomes,
+Conversation contains the original request, earlier exchanges, agent response and latest screenshot. Review groups outcomes,
 workspace changes, project checks, agent evidence and integration; Activity keeps
 searchable agent messages. Details contains account, model, workspace, instructions,
 usage and connection choices. Attempt history stays beside the page navigation.
 Changes load automatically for finished work, including while Review is hidden.
 Long errors keep a concise summary with expandable full details. Copy output and
 Make recurring share the task actions menu. Questions and save recovery remain
-visible above the task sections.
+visible above the task sections. Follow-up stays visible while the content scrolls.
+Preview and Delivery are separate task sections. Their setup, ownership, evidence and
+publication boundaries are described in [parallel workflows](PARALLEL-WORKFLOWS.md).
 
 HTTP(S) result links open through the OS browser in desktop. Other schemes are
 not executed. Copy result reports clipboard failures. Screenshots still use the

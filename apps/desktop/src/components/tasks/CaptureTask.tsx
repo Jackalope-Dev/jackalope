@@ -40,6 +40,7 @@ export function CaptureTask({
   onClose,
   onStarted,
   inline = false,
+  compact = false,
 }: {
   ideaId?: string;
   agent?: string;
@@ -47,6 +48,7 @@ export function CaptureTask({
   onClose: () => void;
   onStarted: () => void;
   inline?: boolean;
+  compact?: boolean;
 }) {
   const focus = useDialogFocus();
   const { projects, activeProjectId, selectProject } = useProjectStore();
@@ -277,6 +279,7 @@ export function CaptureTask({
     <>
       <TaskComposer
         inline={inline}
+        compact={compact}
         workspaceSetup={project && <WorkspaceReadiness key={project.id} project={project} />}
         setup={
           <Button
@@ -292,6 +295,7 @@ export function CaptureTask({
           </Button>
         }
         projectId={project?.id ?? ''}
+        projectName={project?.name}
         projectPath={project?.path ?? ''}
         executionReady={!!project}
         context={

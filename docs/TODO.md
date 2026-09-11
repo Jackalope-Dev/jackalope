@@ -7,6 +7,10 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Validate the unified work list, project scope, command search, persistent follow-up,
+  preview readiness/cancellation/evidence capture and PR/CI reads in installed WebViews.
+  Test first-result, visual correction, failed-check recovery, project return and delivery
+  with entry developers and power users; measure completion, detours and scope mistakes.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window

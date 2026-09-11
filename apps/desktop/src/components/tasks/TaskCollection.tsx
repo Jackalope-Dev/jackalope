@@ -1,4 +1,11 @@
-import { Badge, Checkbox, Disclosure, DisclosureSummary, SearchField } from '@jackalope/ui';
+import {
+  Badge,
+  Checkbox,
+  Disclosure,
+  DisclosureSummary,
+  DropdownMenu as Menu,
+  SearchField,
+} from '@jackalope/ui';
 import {
   Archive,
   ArchiveRestore,
@@ -8,6 +15,7 @@ import {
   Lightbulb,
   List,
   ListTodo,
+  MoreHorizontal,
 } from 'lucide-react';
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -35,6 +43,7 @@ export function TaskCollection({
   view,
   onViewChange,
   scope,
+  history,
   emptyState,
   archived = false,
   onArchive,
@@ -46,6 +55,7 @@ export function TaskCollection({
   view: TaskCollectionView;
   onViewChange: (view: TaskCollectionView) => void;
   scope?: ReactNode;
+  history?: ReactNode;
   emptyState?: ReactNode;
   archived?: boolean;
   onArchive?: (items: WorkItem[], archived: boolean) => Promise<void>;
@@ -153,27 +163,8 @@ export function TaskCollection({
 
   return (
     <div className="task-collection">
-      {items.length > 0 && !archived && (
-        <fieldset className="work-priorities" aria-label="Focus your work">
-          {workStages
-            .filter((stage) => stage.id !== 'finished')
-            .map((stage) => {
-              const count = items.filter((item) => item.stage === stage.id).length;
-              return (
-                <button
-                  key={stage.id}
-                  type="button"
-                  aria-pressed={filter === stage.id}
-                  onClick={() => setFilter(filter === stage.id ? 'all' : stage.id)}
-                >
-                  <strong>{count}</strong>
-                  <span>{stage.label}</span>
-                </button>
-              );
-            })}
-        </fieldset>
-      )}
       <div className="work-toolbar">
+        {history}
         {scope}
         <SearchField
           aria-label="Search tasks"
@@ -204,12 +195,41 @@ export function TaskCollection({
             Board
           </button>
         </fieldset>
+        {onArchive && (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button ref={actionFocus} variant="ghost" aria-label="Organize work" disabled={busy}>
+                <MoreHorizontal size={18} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    setSelecting(!selecting);
+                    setSelection([]);
+                  }}
+                >
+                  {selecting ? 'Done selecting' : 'Select tasks'}
+                </Menu.Item>
+                {!archived && finished.length > 0 && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => void changeArchive(finished, true)}
+                  >
+                    Archive finished ({finished.length})
+                  </Menu.Item>
+                )}
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
+        )}
       </div>
-      {onArchive && (
+      {onArchive && (selecting || archived) && (
         <>
           <div className="work-toolbar work-cleanup">
             <Button
-              ref={actionFocus}
               variant="outline"
               disabled={busy}
               aria-pressed={selecting}
@@ -256,11 +276,13 @@ export function TaskCollection({
               </Button>
             ) : null}
           </div>
-          <p className="task-muted work-archive-help">
-            {archived
-              ? 'Restore a task to bring it back to your current tasks.'
-              : 'Archived tasks can be restored. Results and workspaces are kept.'}
-          </p>
+          {(archived || selecting) && (
+            <p className="task-muted work-archive-help">
+              {archived
+                ? 'Restore a task to bring it back to your current tasks.'
+                : 'Archived tasks can be restored. Results and workspaces are kept.'}
+            </p>
+          )}
         </>
       )}
       {error && <InlineNotice tone="error">Some tasks could not be updated. {error}</InlineNotice>}
@@ -300,7 +322,34 @@ export function TaskCollection({
           }
         />
       ) : layout === 'list' ? (
-        <div className="work-list">
+        <fieldset
+          className="work-list"
+          aria-label="Work items"
+          onKeyDown={(event) => {
+            if (
+              !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) ||
+              !(event.target instanceof HTMLElement) ||
+              !event.target.classList.contains('work-item')
+            )
+              return;
+            const rows = Array.from(
+              event.currentTarget.querySelectorAll<HTMLButtonElement>('.work-item:not(:disabled)'),
+            ).filter((row) => row.getClientRects().length);
+            const index = rows.indexOf(event.target as HTMLButtonElement);
+            if (index < 0) return;
+            event.preventDefault();
+            const next =
+              event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? rows.length - 1
+                  : Math.max(
+                      0,
+                      Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)),
+                    );
+            rows[next]?.focus();
+          }}
+        >
           {workStages.map((stage) => {
             const stageItems = filtered.filter((item) => item.stage === stage.id);
             if (!stageItems.length) return null;
@@ -325,7 +374,7 @@ export function TaskCollection({
               </section>
             );
           })}
-        </div>
+        </fieldset>
       ) : (
         <div className="work-board">
           {workStages
@@ -392,7 +441,8 @@ const WorkCard = memo(
           <span className="work-item-title">{item.title}</span>
           <span className="work-item-meta">
             <span>
-              {item.run?.projectName ??
+              {item.session?.request.projectName ??
+                item.run?.projectName ??
                 projects.find((p) => p.id === item.idea?.projectId)?.name ??
                 'No project yet'}{' '}
               ·{' '}
@@ -409,7 +459,12 @@ const WorkCard = memo(
             )}
           </span>
         </span>
-        {item.run ? (
+        {item.session ? (
+          <span className="work-item-action">
+            Live session · Open conversation
+            <ChevronRight size={14} aria-hidden="true" />
+          </span>
+        ) : item.run ? (
           <span className="work-item-status">
             {item.stage === 'finished' && item.run.status !== 'reviewed' ? (
               <Badge appearance="plain" className="task-status">
@@ -449,5 +504,6 @@ const WorkCard = memo(
     before.item.stage === after.item.stage &&
     before.item.date === after.item.date &&
     before.item.run === after.item.run &&
+    before.item.session === after.item.session &&
     before.item.idea === after.item.idea,
 );

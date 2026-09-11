@@ -403,3 +403,97 @@
     font-size: var(--text-base);
   }
 }
+.task-composer[data-compact="true"] .composer-intent {
+  min-height: 52px;
+  height: 52px;
+  resize: vertical;
+}
+.task-inline-capture:has(.task-composer[data-compact="true"]) {
+  padding: 12px 16px;
+  margin-bottom: 0;
+}
+.task-composer[data-compact="true"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+}
+.task-composer[data-compact="true"] :is(.composer-intent, .composer-launch-summary) {
+  grid-column: 1 / -1;
+}
+.task-composer[data-compact="true"] .composer-launch-summary {
+  margin: 4px 0;
+  padding: 0;
+}
+.task-composer[data-compact="true"] .task-composer-footer {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  align-self: start;
+}
+.task-composer[data-compact="true"] .composer-customization[open] {
+  grid-column: 1 / -1;
+}
+.task-composer[data-compact="true"]:has(.composer-customization[open]) .task-composer-footer {
+  grid-column: 1 / -1;
+}
+.task-composer[data-compact="true"]:focus-within .composer-intent {
+  min-height: 96px;
+}
+.task-composer[data-compact="true"] .capture-destination {
+  margin-block: 0 8px;
+}
+.task-composer[data-compact="true"] .composer-customization {
+  margin-top: 0;
+}
+.workspace-page-layout.task-home {
+  --workspace-heading-gap: 12px;
+  padding-block: 16px;
+}
+.task-home .task-collection {
+  margin-top: 16px;
+}
+.task-home .work-toolbar {
+  margin-bottom: 12px;
+}
+@media (max-width: 1000px) {
+  .task-home .task-composer[data-compact="true"] .composer-intent {
+    grid-column: 1;
+    margin-bottom: 0;
+    font-size: var(--text-base);
+  }
+  .task-home .task-composer[data-compact="true"] .task-composer-footer {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+  .task-home .task-composer[data-compact="true"] .composer-launch-summary {
+    grid-column: 1;
+    align-self: center;
+    font-size: var(--text-xs);
+  }
+  .task-home .task-composer[data-compact="true"] .composer-customization {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .task-home .task-composer[data-compact="true"] .composer-customization[open] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: stretch;
+  }
+  .task-home .work-group h2 {
+    min-height: 28px;
+    padding-block: 4px;
+  }
+  .task-home .work-toolbar > [role="combobox"] {
+    max-width: 160px;
+    font-size: var(--text-xs);
+  }
+  .task-home .work-search {
+    flex-basis: 120px;
+  }
+  .task-home .work-layout button {
+    font-size: 0;
+    gap: 0;
+  }
+}

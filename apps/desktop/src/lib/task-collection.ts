@@ -1,4 +1,5 @@
 import type { TaskTicket } from '../stores/taskStore.ts';
+import { type LiveSession, sessionWork } from './live-session.ts';
 import type { TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
 
@@ -25,7 +26,52 @@ export interface WorkItem {
   date: string;
   idea?: TaskTicket;
   run?: TaskRun;
+  session?: LiveSession;
   archiveBlocked?: string;
+}
+
+export function collectWorkspaceWork(
+  projectId: string | null,
+  ideas: TaskTicket[],
+  runs: TaskRun[],
+  sessions: LiveSession[],
+  integratedRunIds: string[] = [],
+  archived = false,
+): WorkItem[] {
+  const sessionIds = new Set(sessions.map((session) => session.id));
+  const items = collectWork(
+    projectId,
+    ideas,
+    runs.filter((run) => !run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+    integratedRunIds,
+    archived,
+  );
+  if (!archived)
+    for (const session of sessions) {
+      if (projectId !== null && session.request.projectId !== projectId) continue;
+      const work = sessionWork(session, runs);
+      items.push({
+        id: `session:${session.id}`,
+        title: session.title,
+        date: session.updatedAt,
+        stage:
+          work.questions.length || work.status === 'Needs attention'
+            ? 'attention'
+            : work.active || work.pending
+              ? 'working'
+              : session.closed
+                ? 'finished'
+                : 'review',
+        run: work.latest,
+        session,
+        archiveBlocked: 'Live sessions stay together. Open the session to finish or resume it.',
+      });
+    }
+  return items.sort(
+    (a, b) =>
+      workStages.findIndex((s) => s.id === a.stage) -
+        workStages.findIndex((s) => s.id === b.stage) || Date.parse(b.date) - Date.parse(a.date),
+  );
 }
 
 export function collectWork(
@@ -81,7 +127,12 @@ export function collectWork(
       id: idea?.id ?? run.taskId,
       title: idea?.title ?? taskTitle(original.get(run.taskId)?.prompt ?? run.prompt),
       stage:
-        pending || run.persistenceError
+        pending ||
+        run.persistenceError ||
+        (!active &&
+          !integratedRunIds.includes(run.id) &&
+          (run.verificationError ||
+            (run.verification && (!run.verification.result.success || !run.verification.tree))))
           ? 'attention'
           : integratedRunIds.includes(run.id)
             ? 'finished'
@@ -90,7 +141,11 @@ export function collectWork(
               : run.status === 'review'
                 ? 'review'
                 : run.status === 'reviewed'
-                  ? 'finished'
+                  ? run.workspace &&
+                    run.workspace.replaceAll('\\', '/').toLowerCase() !==
+                      run.projectPath.replaceAll('\\', '/').toLowerCase()
+                    ? 'review'
+                    : 'finished'
                   : 'attention',
       date: run.startedAt,
       idea,

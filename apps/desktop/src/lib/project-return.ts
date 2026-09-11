@@ -1,4 +1,5 @@
 import { isActive, type TaskRun } from './task-runtime.ts';
+import { taskDecision } from './task-workflow.ts';
 
 export function returnToProject(runs: TaskRun[], projectId: string, integratedIds: string[]) {
   const latest = new Map<string, TaskRun>();
@@ -7,6 +8,9 @@ export function returnToProject(runs: TaskRun[], projectId: string, integratedId
     if (!old || Date.parse(run.startedAt) > Date.parse(old.startedAt)) latest.set(run.taskId, run);
   }
   const priority = (run: TaskRun) =>
+    run.persistenceError ||
+    run.verificationError ||
+    run.verification?.result.success === false ||
     run.prompts?.some((p) => p.status === 'pending') ||
     ['failed', 'interrupted', 'stopped'].includes(run.status)
       ? 0
@@ -26,14 +30,7 @@ export function returnToProject(runs: TaskRun[], projectId: string, integratedId
 }
 
 export function nextAction(run: TaskRun) {
-  if (run.persistenceError) return 'Recover the unsaved result';
-  if (run.status === 'interrupted') return 'Inspect the workspace and resolve process ownership';
-  if (run.prompts?.some((p) => p.status === 'pending')) return 'Answer the outstanding question';
-  if (run.status === 'failed' || run.status === 'stopped')
-    return 'Inspect the failure and prepare a recovery';
-  if (run.status === 'reviewed') return 'Integrate the reviewed changes when ready';
-  if (run.status === 'review') return 'Review the expected outcomes and changes';
-  return 'Check progress';
+  return taskDecision(run).action;
 }
 
 export function recoveryHandoff(run: TaskRun, original: string, next: string) {

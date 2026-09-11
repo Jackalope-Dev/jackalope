@@ -7,6 +7,18 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 ## Desktop workspace
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
+- Tasks and Live sessions share a project-scoped work list and task/project command search.
+  Returning work uses compact capture, remembered filters and keyboard row navigation.
+  Project opens an overview with unfinished work, setup and recorded local deliveries.
+- Result views prioritize unanswered questions, recovery and failed checks. Conversation,
+  review, preview and delivery share vocabulary and reusable result tools; task follow-up
+  remains visible while reading. Local previews remember project commands, choose a free
+  port, check HTTP readiness and embed a sandboxed loopback page. Fresh isolated browser
+  captures attach screenshots, page elements and errors to follow-up drafts; they do not
+  reproduce embedded-page sign-in or unsaved interactions.
+- Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
+  PR, CI and deployment preparation carry evidence into editable drafts. Publishing and
+  deployment remain explicit user-approved steps; a local merge does not establish either.
 - Live sessions capture short messages while work runs, batch them in order in one
   isolated workspace, and retain drafts, results and cumulative patch exports. The Live
   navigation entry starts sessions from the first message and groups history automatically.

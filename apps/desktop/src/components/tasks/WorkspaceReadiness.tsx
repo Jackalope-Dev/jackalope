@@ -21,16 +21,18 @@ export interface Readiness {
 export function WorkspaceReadiness({
   project,
   path = project.path,
+  expanded = false,
 }: {
   project: Project;
   path?: string;
+  expanded?: boolean;
 }) {
   const [result, setResult] = useState<Readiness | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   return (
-    <Disclosure className="my-4">
+    <Disclosure className="my-4" open={expanded || undefined}>
       <DisclosureSummary className="min-h-11 py-3">Workspace readiness</DisclosureSummary>
       <div className="space-y-3">
         <p className="task-muted">
@@ -118,6 +120,27 @@ export function WorkspaceReadiness({
                   }}
                 >
                   Use this check after tasks finish
+                </Button>
+              </div>
+            )}
+            {result.previewCommand && (
+              <div className="space-y-2">
+                <p>
+                  Suggested preview: <code>{result.previewCommand}</code>
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    useProjectStore.getState().updateProjectPreferences(project.id, {
+                      previewCommand: result.previewCommand ?? undefined,
+                    });
+                    setSaved(
+                      'Preview command saved. Start it from a task when you want to try the result.',
+                    );
+                  }}
+                >
+                  Use this preview command
                 </Button>
               </div>
             )}

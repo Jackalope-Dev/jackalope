@@ -1007,6 +1007,23 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'try-result',
+        question: 'How do I see the result and request a correction?',
+        paragraphs: [
+          'Choose Try result after work stops. Detect or enter your project’s local preview command, review it, and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
+          'Use the embedded page or open it in your browser. Describe what should change and add it to your follow-up. Capture screenshot and page details opens a fresh browser and lets you attach a screenshot, page element and errors. That fresh capture does not copy the embedded page’s sign-in or unsaved interactions.',
+          'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Live sessions also let you queue messages or explicitly stop current work and send.',
+        ],
+      },
+      {
+        id: 'delivery-state',
+        question: 'Are my changes published after a local merge?',
+        paragraphs: [
+          'A local merge integrates changes into your target branch. It does not push, publish or deploy them. Delivery can inspect the local branch and, through your installed and signed-in GitHub CLI, read the PR and its checks. A PR with a different head does not verify your current local result.',
+          'Prepare a PR, CI verification or deployment to create an editable handoff with the result and recorded checks. Review the draft before starting it. The handoff asks for concrete destinations and effects before any publishing action. Deployment stays unverified until behavior is checked in the intended environment.',
+        ],
+      },
+      {
         id: 'prompt-refinement',
         question: 'How do I give a task the right instructions?',
         paragraphs: [

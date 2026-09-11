@@ -1,11 +1,17 @@
 import { PRESET_THEMES } from '@jackalope/brand/theme';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LifeBuoy, Plus, Settings2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Folder, LifeBuoy, MessageSquare, Plus, Settings2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { shortcutLabel } from '../../lib/platform-shortcuts';
+import { taskTitle } from '../../lib/task-title';
+import { taskDecision } from '../../lib/task-workflow';
 import { openExternalUrl } from '../../lib/tauri-bridge';
+import { useExecutionStore } from '../../stores/executionStore';
+import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { type ActiveTab, WORKSPACE_VIEWS } from './navigation';
 
 export function CommandPalette({
@@ -14,17 +20,75 @@ export function CommandPalette({
   onNavigate,
   onOpenSettings,
   onCapture,
+  onSelectProject,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: ActiveTab) => void;
   onOpenSettings?: () => void;
   onCapture?: () => void;
+  onSelectProject?: (id: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const previousFocus = useRef<HTMLElement | null>(null);
   const setTheme = useThemeStore((state) => state.setTheme);
   const search = query.trim().toLowerCase();
+  const projects = useProjectStore((state) => state.projects);
+  const runs = useExecutionStore((state) => state.runs);
+  const sessions = useLiveSessionStore((state) => state.sessions);
+  const selected = useExecutionStore((state) => state.selectedId);
+  const current = runs.find((run) => run.id === selected);
+  const latest = useMemo(() => {
+    const tasks = new Map<
+      string,
+      { run: (typeof runs)[number]; original: (typeof runs)[number] }
+    >();
+    for (const run of runs) {
+      if (run.liveSessionId) continue;
+      const task = tasks.get(run.taskId);
+      if (!task) tasks.set(run.taskId, { run, original: run });
+      else {
+        if (Date.parse(run.startedAt) > Date.parse(task.run.startedAt)) task.run = run;
+        if (Date.parse(run.startedAt) < Date.parse(task.original.startedAt)) task.original = run;
+      }
+    }
+    return [...tasks.values()];
+  }, [runs]);
+  const work = [
+    ...latest.map(({ run, original }) => ({
+      id: run.id,
+      title: taskTitle(original.prompt),
+      project: run.projectName,
+      date: run.startedAt,
+      state: taskDecision(run).label,
+    })),
+    ...sessions.map((session) => ({
+      id: `session:${session.id}`,
+      title: session.title,
+      project: session.request.projectName,
+      date: session.updatedAt,
+      state: 'Live session',
+    })),
+  ]
+    .filter((item) => `${item.title} ${item.project} ${item.state}`.toLowerCase().includes(search))
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+    .slice(0, 8);
+  const matchingProjects = projects
+    .filter((project) => `${project.name} ${project.path}`.toLowerCase().includes(search))
+    .slice(0, 6);
+  const actions = current
+    ? [
+        { label: taskDecision(current).action, section: taskDecision(current).section },
+        { label: 'Open conversation', section: 'result' },
+        ...(['review', 'reviewed', 'failed', 'stopped'].includes(current.status)
+          ? [
+              { label: 'Try result', section: 'preview' },
+              { label: 'Review changes and checks', section: 'changes' },
+              { label: 'Prepare delivery', section: 'delivery' },
+            ]
+          : []),
+      ].filter((action) => action.label.toLowerCase().includes(search))
+    : [];
   const showSettings =
     Boolean(onOpenSettings) &&
     ('settings preferences options configuration project'
@@ -82,14 +146,14 @@ export function CommandPalette({
             }
           }}
         >
-          <Dialog.Title className="sr-only">Jump to a view or theme</Dialog.Title>
+          <Dialog.Title className="sr-only">Find work or run a command</Dialog.Title>
           <Dialog.Description className="sr-only">
             Search, then use arrow keys and Enter to choose. Escape closes this dialog.
           </Dialog.Description>
           <div className="command-search">
             <SearchField
               aria-label="Search commands"
-              placeholder="Where do you want to go?"
+              placeholder="Search tasks, projects, and actions…"
               value={query}
               onValueChange={(value) => setQuery(value)}
             />
@@ -98,6 +162,65 @@ export function CommandPalette({
             </Dialog.Close>
           </div>
           <div className="max-h-[50vh] overflow-y-auto">
+            {actions.length > 0 && <p className="menu-label">Current task</p>}
+            {actions.map((action) => (
+              <button
+                key={action.label}
+                data-command
+                type="button"
+                className="workspace-menu-item w-full text-left"
+                onClick={() => {
+                  if (current) useWorkViewStore.getState().open(current.id, action.section);
+                  onClose();
+                }}
+              >
+                <MessageSquare size={16} />
+                <span>{action.label}</span>
+              </button>
+            ))}
+            {work.length > 0 && (
+              <p className="menu-label">{search ? 'Matching work' : 'Recent work'}</p>
+            )}
+            {work.map((item) => (
+              <button
+                key={item.id}
+                data-command
+                type="button"
+                className="workspace-menu-item w-full text-left"
+                onClick={() => {
+                  useWorkViewStore.getState().open(item.id);
+                  onClose();
+                }}
+              >
+                <MessageSquare size={16} />
+                <span className="min-w-0">
+                  <span className="block truncate">{item.title}</span>
+                  <small className="block text-[var(--color-text-secondary)]">
+                    {item.project} · {item.state}
+                  </small>
+                </span>
+              </button>
+            ))}
+            {matchingProjects.length > 0 && <p className="menu-label">Projects</p>}
+            {matchingProjects.map((project) => (
+              <button
+                key={project.id}
+                data-command
+                type="button"
+                className="workspace-menu-item w-full text-left"
+                onClick={() => {
+                  if (onSelectProject) onSelectProject(project.id);
+                  else useProjectStore.getState().selectProject(project.id);
+                  useWorkViewStore.getState().setScope('project');
+                  onNavigate('project-overview');
+                  onClose();
+                }}
+              >
+                <Folder size={16} />
+                <span>{project.name}</span>
+              </button>
+            ))}
+            <p className="menu-label">Commands</p>
             {onCapture && ('new task capture idea'.includes(search) || !search) && (
               <button
                 data-command
@@ -179,11 +302,18 @@ export function CommandPalette({
                 <span>{theme.name}</span>
               </button>
             ))}
-            {!views.length && !themes.length && !showSettings && (
-              <p className="p-6 text-sm text-[var(--color-text-secondary)]">
-                No matches. Try “tasks”, “agents”, or a color.
-              </p>
-            )}
+            {!views.length &&
+              !themes.length &&
+              !showSettings &&
+              !showHelp &&
+              !work.length &&
+              !matchingProjects.length &&
+              !actions.length &&
+              !(onCapture && 'new task capture idea'.includes(search)) && (
+                <p className="p-6 text-sm text-[var(--color-text-secondary)]">
+                  No matches. Try “tasks”, “agents”, or a color.
+                </p>
+              )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>
