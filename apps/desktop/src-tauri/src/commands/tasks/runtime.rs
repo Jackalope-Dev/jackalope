@@ -28,12 +28,68 @@ pub(super) fn spawn_agent(
     ))
 }
 
+/// Explain a failed setup command in terms of what actually went wrong, so the next
+/// step is obvious: a command that was cut off needs different action than one that ran
+/// and reported a problem.
+pub(super) fn preparation_failure(record: &PreparationRecord) -> String {
+    let command = &record.command;
+    let tried = (record.attempts > 1)
+        .then(|| format!(" Tried {} times.", record.attempts))
+        .unwrap_or_default();
+    match (&record.reason, record.exit_code) {
+        (Some(reason), _) => format!(
+            "The project setup command ({command}) {reason}.{tried} Check whether the command \
+             still finishes on its own, or reduce what it does before running work here."
+        ),
+        (None, Some(code)) => format!(
+            "The project setup command ({command}) failed with exit code {code}.{tried} \
+             Its output is recorded below; fix the command in Project Settings, then retry."
+        ),
+        (None, None) => format!(
+            "The project setup command ({command}) did not complete.{tried} Its output is \
+             recorded below; fix the command in Project Settings, then retry."
+        ),
+    }
+}
+
 impl TaskRuntime {
+    /// The workspace of a finished attempt, when a retry can safely continue in it: the
+    /// directory is an isolated worktree that still exists, nothing else is using it, and
+    /// the agent left no uncommitted changes for a new attempt to trip over.
+    pub(super) fn reusable_workspace(&self, retried: &str) -> Option<(String, String, String)> {
+        let runs = self.inner.lock().ok()?;
+        let old = runs.runs.get(retried)?;
+        if ["starting", "running", "stopping"].contains(&old.status.as_str())
+            || old.workspace.is_empty()
+            || old.branch.is_empty()
+            || Path::new(&old.workspace) == Path::new(&old.project_path)
+            || !Path::new(&old.workspace).is_dir()
+        {
+            return None;
+        }
+        if runs.runs.values().any(|other| {
+            other.id != retried
+                && other.workspace == old.workspace
+                && ["starting", "running", "stopping", "interrupted"].contains(&other.status.as_str())
+        }) {
+            return None;
+        }
+        let workspace = old.workspace.clone();
+        let reused = (workspace.clone(), old.branch.clone(), old.base_head.clone());
+        drop(runs);
+        // A dirty worktree holds half-finished agent work; start clean rather than inherit it.
+        git(&workspace, &["status", "--porcelain"])
+            .ok()
+            .filter(|changes| changes.trim().is_empty())
+            .map(|_| reused)
+    }
+
     pub(super) fn fail(&self, id: &str, error: String) {
         self.update(id, |run| {
             run.status = "failed".into();
             run.error = Some(error);
             run.ended_at = Some(Utc::now().to_rfc3339());
+            run.progress = None;
         });
     }
 
@@ -1138,6 +1194,9 @@ impl TaskRuntime {
                 efficiency: Default::default(),
                 dependency_invalidated: false,
                 stages: vec![],
+                progress: None,
+                preparation: None,
+                retry_of: request.retry_of.clone(),
                 dependency_snapshot: previous
                     .as_ref()
                     .map(|old| old.dependency_snapshot.clone())
