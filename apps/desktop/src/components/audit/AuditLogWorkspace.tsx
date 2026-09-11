@@ -235,7 +235,6 @@ export function AuditLogWorkspace() {
             placeholder="Search audit events..."
             aria-label="Search audit events"
             value={searchQuery}
-            className="h-11 w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
             onValueChange={(value) => setSearchQuery(value)}
             containerClassName="relative min-w-[220px]"
           />

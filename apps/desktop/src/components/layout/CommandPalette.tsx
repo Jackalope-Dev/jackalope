@@ -91,7 +91,6 @@ export function CommandPalette({
               aria-label="Search commands"
               placeholder="Where do you want to go?"
               value={query}
-              className="w-full bg-transparent text-sm py-1 outline-none"
               onValueChange={(value) => setQuery(value)}
             />
             <Dialog.Close className="quiet-icon text-xs" aria-label="Close commands">

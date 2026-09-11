@@ -68,7 +68,6 @@ export function CodebaseChecks({
       </div>
       <div className="codebase-check-filter">
         <SearchField
-          className="task-input"
           aria-label="Search checks"
           placeholder="Find a file or reference…"
           value={query}

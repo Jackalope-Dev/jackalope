@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { createServer } from '../../packages/ui/node_modules/vite/dist/node/index.js';
+import { verifyPatternLayout, verifyPatterns } from './ui-patterns.mjs';
 
 const output = 'output/ui-library';
 mkdirSync(output, { recursive: true });
@@ -37,7 +38,7 @@ try {
   await page.getByRole('button', { name: 'Save example', exact: true }).click();
   assert.match(await page.getByLabel('Submitted values').textContent(), /Submit to inspect/);
   await page.getByRole('checkbox', { name: 'I reviewed the example' }).check();
-  const select = page.getByRole('combobox', { name: 'Digest frequency' });
+  const select = page.locator('#forms').getByRole('combobox', { name: 'Digest frequency' });
   await select.click();
   await page.getByRole('option', { name: 'Daily', exact: true }).click();
   await page.getByRole('button', { name: 'Save example', exact: true }).click();
@@ -172,6 +173,7 @@ try {
   await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
   assert.equal(await page.getByLabel('Example clipboard').textContent(), 'A different link');
 
+  await verifyPatterns(page);
   for (const width of [1280, 960, 375]) {
     for (const dark of [false, true]) {
       await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
@@ -185,6 +187,7 @@ try {
       );
       const switchSize = await page.getByRole('switch', { name: 'Dark appearance' }).boundingBox();
       assert(switchSize.width >= 44 && switchSize.height >= 44);
+      await verifyPatternLayout(page, dark);
       await page.screenshot({
         path: `${output}/gallery-${width}-${dark ? 'dark' : 'light'}.png`,
         fullPage: true,
@@ -244,7 +247,7 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(
-    'Shared UI passed: forms, refs, validation, keyboard overlays, confirmations, copy recovery, and six responsive/theme views.',
+    'Shared UI passed: forms, search, settings, disclosures, loading actions, status labels, keyboard overlays, confirmations, copy recovery, and six responsive/theme views.',
   );
 } finally {
   await browser?.close();

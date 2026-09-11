@@ -17,7 +17,7 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
     ref,
   ) => {
     const input = useRef<HTMLInputElement>(null);
-    useImperativeHandle(ref, () => input.current as HTMLInputElement);
+    useImperativeHandle(ref, () => input.current as HTMLInputElement, []);
     return (
       <div className={cn('ui-search-field', containerClassName)}>
         <SearchIcon className="ui-search-icon" />

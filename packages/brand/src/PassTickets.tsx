@@ -63,7 +63,11 @@ export function PassTickets({
                 <span className="brand-pass-ticket-stub">
                   <span>{state === 'Available' ? label : state}</span>
                   {state === 'Available' &&
-                    (copied ? <Check size={16} aria-hidden="true" /> : <ArrowRight size={16} aria-hidden="true" />)}
+                    (copied ? (
+                      <Check size={16} aria-hidden="true" />
+                    ) : (
+                      <ArrowRight size={16} aria-hidden="true" />
+                    ))}
                 </span>
               </button>
             </li>

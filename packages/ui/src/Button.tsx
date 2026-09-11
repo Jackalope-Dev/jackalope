@@ -36,7 +36,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     >
       {loading !== undefined ? (
         <span className="ui-button-labels">
-          <span className="ui-button-content" aria-hidden={loading || undefined}>{children}</span>
+          <span className="ui-button-content" aria-hidden={loading || undefined}>
+            {children}
+          </span>
           <span className="ui-button-pending" aria-hidden={!loading || undefined}>
             <LoadingIcon />
             {size === 'icon' ? <span className="ui-sr-only">{loadingLabel}</span> : loadingLabel}

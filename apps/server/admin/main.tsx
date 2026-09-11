@@ -1,13 +1,7 @@
 import '@jackalope/brand/fonts.css';
 import { characterMarkViewBox, characterPaths } from '@jackalope/brand/character';
 import { Button, ErrorState, ExternalLinkIcon, FeedbackIcon, MailIcon } from '@jackalope/ui';
-import {
-  Activity,
-  ChartNoAxesColumn,
-  LayoutDashboard,
-  Users,
-  Wrench,
-} from 'lucide-react';
+import { Activity, ChartNoAxesColumn, LayoutDashboard, Users, Wrench } from 'lucide-react';
 import { Component, type ReactNode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Audience, People, Setup } from './Access';

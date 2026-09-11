@@ -126,6 +126,27 @@ a:focus-visible {
   color: var(--color-text-muted);
   font-size: 12px;
 }
+.gallery-patterns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.gallery-pattern-options {
+  margin-block: 16px;
+}
+.gallery-icon-set {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+@media (max-width: 1050px) {
+  .gallery-patterns {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 720px) {
   .gallery {
     padding: 24px 16px;

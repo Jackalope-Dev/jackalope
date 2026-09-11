@@ -1,10 +1,9 @@
 import { EchoMark, EchoWordmark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
-import { Disclosure, DisclosureSummary, Tabs } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, ExternalLinkIcon, Tabs } from '@jackalope/ui';
 import {
   ArrowDown,
   ArrowRight,
-  ArrowUpRight,
   Check,
   GitBranch,
   GitMerge,
@@ -461,7 +460,7 @@ export function LandingPage({
                   <Play size={18} fill="currentColor" /> See the workspace in action
                 </span>
                 <span>
-                  {tour.durationSeconds} sec <ArrowUpRight size={16} />
+                  {tour.durationSeconds} sec <ExternalLinkIcon />
                 </span>
               </span>
             </button>
@@ -497,7 +496,7 @@ export function LandingPage({
                     <p>{feature.detail}</p>
                   </Disclosure>
                   <a className="feature-card-link" href={feature.href}>
-                    {feature.link} <ArrowUpRight size={17} aria-hidden="true" />
+                    {feature.link} <ExternalLinkIcon />
                   </a>
                 </div>
               </article>
@@ -635,10 +634,10 @@ export function LandingPage({
       <div className="landing-width support-disclosure">
         <p className="landing-further">
           <a href="/compare/">
-            Compare workspaces <ArrowUpRight size={16} />
+            Compare workspaces <ExternalLinkIcon />
           </a>
           <a href="/roadmap/">
-            Explore the roadmap <ArrowUpRight size={16} />
+            Explore the roadmap <ExternalLinkIcon />
           </a>
         </p>
         <Disclosure>

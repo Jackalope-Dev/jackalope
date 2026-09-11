@@ -128,8 +128,8 @@ not change native task, update or recovery state. Keep action-local errors inlin
 components/tasks separates collection/composer, detail/result review, queue/add-work
 and integration review. Browser-safe controls live in packages/ui, consumed as
 @jackalope/ui by desktop, website and admin. Desktop components/ui retains
-compatibility exports and app-specific compositions such as settings rows and
-workspace navigation. System information belongs to Settings; saved task editing
+compatibility exports and app-specific compositions such as workspace navigation
+and task state mapping. System information belongs to Settings; saved task editing
 belongs to Tasks.
 
 The UI package owns portable styling, accessible controls, overlays, feedback
@@ -138,6 +138,11 @@ or service calls. Consumers own data, permissions, irreversible actions and them
 persistence. Its standalone gallery runs with pnpm ui:dev; gallery assets are not
 included in application release builds. Shared styles use the components cascade
 layer so application styles and utility classes can refine them.
+
+SearchField, native Disclosure/DisclosureSummary, SettingRow/SettingGroup and
+Panel compositions share repeated screen patterns. Button owns the visual loading
+state; the caller owns the operation, pending guard and recovery. Shared Badge
+appearances and Lucide action icons keep labels, glyphs and sizing consistent.
 
 packages/brand owns theme/geometry exports and fonts. Both apps import that package;
 the website renders its own monochrome icon assets. Desktop stores own theme persistence. The lab is available

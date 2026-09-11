@@ -719,9 +719,6 @@ summary {
   .metric strong {
     font-size: 28px;
   }
-  .panel,
-  .readiness {
-  }
   .insight-grid,
   .checks {
     grid-template-columns: 1fr;

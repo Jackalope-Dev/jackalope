@@ -1,4 +1,4 @@
-import { Checkbox, LoadingIcon } from '@jackalope/ui';
+import { Checkbox, RefreshIcon } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Check,
@@ -172,9 +172,11 @@ export function DetectedKeysModal({
                   size="sm"
                   onClick={() => void scan()}
                   disabled={loading}
+                  loading={loading}
+                  loadingLabel="Scanning…"
                   className="h-7 text-xs flex items-center gap-1.5"
                 >
-                  <LoadingIcon size={16} className={loading ? 'animate-spin' : ''} />
+                  <RefreshIcon />
                   Re-scan
                 </Button>
               </div>

@@ -40,6 +40,7 @@ import {
 } from '../src';
 import '@jackalope/brand/fonts.css';
 import './styles.css';
+import { Patterns } from './Patterns';
 
 function Gallery() {
   const [dark, setDark] = useState(new URLSearchParams(location.search).has('dark'));
@@ -82,6 +83,7 @@ function Gallery() {
         <a href="#navigation">Navigation</a>
         <a href="#feedback">Feedback</a>
         <a href="#data">Data</a>
+        <a href="#patterns">Patterns</a>
       </nav>
       <section className="gallery-section" id="controls" aria-labelledby="controls-title">
         <SectionHeader
@@ -430,6 +432,7 @@ function Gallery() {
           </tbody>
         </Table>
       </section>
+      <Patterns />
       <footer className="gallery-footer">
         Shared behavior in @jackalope/ui · Brand foundations in @jackalope/brand
       </footer>

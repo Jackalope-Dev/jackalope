@@ -112,7 +112,8 @@ Import portable controls from @jackalope/ui. The library includes Button,
 IconButton, Input, Textarea, FormField, Select, Checkbox, Switch, Badge, Tooltip,
 DropdownMenu, Popover, Tabs, SegmentedControl, dialogs, CopyButton, InlineNotice,
 LoadingState, EmptyState, ErrorState, PageHeader, SectionHeader, Toolbar, Stat,
-DefinitionList and Table. Reuse desktop compositions such as WorkspaceHeading,
+DefinitionList, Table, SearchField, Disclosure, SettingRow, SettingGroup and Panel.
+Reuse desktop compositions such as WorkspaceHeading,
 WorkspaceSubnavigation and RunStatus for their app-specific context. Component
 ownership and runtime boundaries are documented in the architecture guide.
 
@@ -125,11 +126,35 @@ and fixed actions. Specialized canvases and command palettes may retain their
 own layouts.
 
 Use FormField with Input, Textarea or Select for labelled controls and associated
-help or validation text. Setting and SettingGroup own preference rows, dividers
+help or validation text. SettingRow and SettingGroup own preference rows, dividers
 and responsive control placement. Use InlineNotice for inline feedback, choosing
 the tone from the actual outcome; use its action slot for recovery controls.
 WorkspaceToolbar owns filter/action wrapping and spacing. FilterGroup represents
 pressed filter choices; WorkspaceSubnavigation represents navigation between views.
+
+SearchField uses a controlled string value and onValueChange, forwards its input
+ref and native attributes, and returns focus to the input after clearing. Use
+FormField or an accessible label; keep filtering, debouncing and form reset state
+with the feature. Its containerClassName adjusts placement, while shared styles
+reserve space for the search and clear icons.
+
+Disclosure and DisclosureSummary render native details/summary elements, retaining
+open, name, onToggle and nested-section behavior. The shared chevron and focus style
+replace local markers. Panel, PanelHeader, PanelBody and PanelFooter provide optional
+surface and section layouts; use the plain variant for open page sections.
+
+Set Button loading and loadingLabel for asynchronous actions. Idle and pending
+labels share space to avoid width changes, and pending buttons are disabled and
+expose aria-busy. The feature still owns duplicate-operation guards, cancellation
+and error recovery. Reduced motion disables the shared loading animation.
+
+Use Badge for short status labels and metadata, choosing soft or plain appearance
+and an optional Lucide icon. Keep state-to-label and tone mappings in the feature.
+Badge labels stay on one line; their containing row may wrap. Shared Icon uses
+16, 20 and 24 pixel sizes, with semantic RefreshIcon, FeedbackIcon, MailIcon and
+ExternalLinkIcon exports for common actions. Decorative icons are hidden from
+assistive technology; standalone meaningful icons need an accessible label.
+Keep branded artwork and data visualizations in their owning packages.
 
 Checkbox retains native name/value, required and form-reset behavior. Switch is
 an immediate controlled preference, not a serialized form field. Wrap a checkbox

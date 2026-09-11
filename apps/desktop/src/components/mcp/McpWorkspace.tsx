@@ -306,7 +306,6 @@ export function McpWorkspace({
 
                 <SearchField
                   aria-label="Filter connections"
-                  className="with-search-icon"
                   placeholder="Filter connections or checked tools…"
                   value={configuredSearch}
                   onValueChange={(value) => setConfiguredSearch(value)}
@@ -590,7 +589,6 @@ export function McpWorkspace({
                   {/* Search input */}
                   <div className="mcp-search-bar relative">
                     <SearchField
-                      className="mcp-search-input"
                       aria-label="Search MCP marketplace"
                       placeholder="Search MCP servers…"
                       value={searchQuery}
