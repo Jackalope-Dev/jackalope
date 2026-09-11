@@ -199,7 +199,9 @@ The launcher also injects a bounded repository map built by `codebase.rs` static
 analysis: file names and resolved imports for the files a task's own words and the
 paths recent attempts touched rank highest. It costs no model calls, is capped well
 below the prompt budget and is presented as a starting point, not an authoritative
-file list. `JACKALOPE_REPO_MAP=off` removes it for comparison runs. The launch prompt
+file list. The scan is cached by repository and commit rather than directory, so an
+isolated task in a fresh worktree reuses the analysis of the repository it branched
+from instead of repeating it. `JACKALOPE_REPO_MAP=off` removes it for comparison runs. The launch prompt
 is ordered invariant text, then project-stable text, then the task, so the prefix a
 provider can serve from cache stays byte-identical between tasks.
 

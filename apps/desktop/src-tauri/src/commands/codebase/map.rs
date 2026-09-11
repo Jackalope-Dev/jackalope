@@ -7,13 +7,13 @@
 
 use super::{scan, CodebaseSnapshot};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// A repeated task in the same project reuses the scan instead of paying for it again.
+/// A repeated task on the same repository and commit reuses the scan, across worktrees.
 const CACHE_TTL: Duration = Duration::from_secs(600);
-const CACHE_PROJECTS: usize = 4;
+const CACHE_ENTRIES: usize = 6;
 const SEEDS: usize = 14;
 const MAX_ENTRIES: usize = 40;
 const EDGES_PER_ENTRY: usize = 5;
@@ -96,14 +96,48 @@ struct Cached {
     snapshot: Arc<CodebaseSnapshot>,
 }
 
-static CACHE: OnceLock<Mutex<HashMap<PathBuf, Cached>>> = OnceLock::new();
+static CACHE: OnceLock<Mutex<HashMap<String, Cached>>> = OnceLock::new();
+
+/// Identifies the content a scan would see, so unrelated checkouts stay separate but every
+/// worktree of one repository at one commit shares a single scan.
+///
+/// Isolated tasks get a fresh worktree each time, and keying on the directory made each one
+/// pay for a full scan of a tree that was already analyzed. `--git-common-dir` is shared by a
+/// repository and all of its worktrees, and `HEAD` distinguishes the commits they sit on;
+/// together they identify the tracked content. Uncommitted edits are not in the key: the map
+/// is file names and imports offered as a starting point, so a file added since the commit is
+/// a miss the worker resolves by searching, not a wrong answer. A checkout that is not a
+/// repository falls back to its own path.
+fn fingerprint(root: &Path) -> String {
+    let git = |args: &[&str]| -> Option<String> {
+        let output = crate::commands::git_command::command(
+            root,
+            args,
+            crate::commands::git_command::Policy::Inspection,
+        )
+        .output()
+        .ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+            .filter(|value| !value.is_empty())
+    };
+    match (
+        git(&["rev-parse", "--path-format=absolute", "--git-common-dir"]),
+        git(&["rev-parse", "HEAD"]),
+    ) {
+        (Some(repository), Some(head)) => format!("{repository}@{head}"),
+        _ => root.to_string_lossy().into_owned(),
+    }
+}
 
 /// Scans `root`, reusing a recent snapshot when one is cached. The scan runs inside the
 /// cache lock so a second launch waits for the first result rather than repeating the work.
 fn snapshot(root: &Path) -> Option<Arc<CodebaseSnapshot>> {
+    let key = fingerprint(root);
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let mut guard = cache.lock().ok()?;
-    let key = root.to_path_buf();
     if let Some(entry) = guard.get(&key) {
         if entry.at.elapsed() < CACHE_TTL {
             return Some(entry.snapshot.clone());
@@ -111,11 +145,11 @@ fn snapshot(root: &Path) -> Option<Arc<CodebaseSnapshot>> {
     }
     let fresh = Arc::new(scan(root).ok()?);
     guard.retain(|_, entry| entry.at.elapsed() < CACHE_TTL);
-    if guard.len() >= CACHE_PROJECTS {
+    if guard.len() >= CACHE_ENTRIES {
         if let Some(oldest) = guard
             .iter()
             .min_by_key(|(_, entry)| entry.at)
-            .map(|(path, _)| path.clone())
+            .map(|(key, _)| key.clone())
         {
             guard.remove(&oldest);
         }
@@ -345,6 +379,7 @@ pub(crate) fn task_map(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn splits_identifiers_and_drops_template_headings() {
@@ -422,6 +457,49 @@ mod tests {
         assert!(task_map(&f.0, "Move the ToDos page", &[], 1).is_none());
         // A task about something absent from the tree adds nothing to the prompt.
         assert!(task_map(&f.0, "Rotate the signing certificate", &[], DEFAULT_BUDGET).is_none());
+    }
+
+    #[test]
+    fn worktrees_of_one_repository_and_commit_share_a_scan_but_other_checkouts_do_not() {
+        let f = Fixture::new();
+        f.write("src/todos.ts", "export const parse = () => [];");
+        let git = |root: &Path, args: &[&str]| {
+            let ok = crate::commands::git_command::command(
+                root,
+                args,
+                crate::commands::git_command::Policy::Inspection,
+            )
+            .output()
+            .is_ok_and(|out| out.status.success());
+            assert!(ok, "git {args:?} failed");
+        };
+        git(&f.0, &["init", "-q"]);
+        git(&f.0, &["config", "user.email", "fixture@example.invalid"]);
+        git(&f.0, &["config", "user.name", "Fixture"]);
+        git(&f.0, &["add", "-A"]);
+        git(&f.0, &["commit", "-qm", "fixture"]);
+        let tree = f.0.join(".worktrees/task");
+        git(
+            &f.0,
+            &["worktree", "add", "-q", "-d", tree.to_str().unwrap()],
+        );
+
+        // The worktree is a different directory, so a path-keyed cache would rescan it.
+        assert_eq!(fingerprint(&f.0), fingerprint(&tree));
+        let separate = Fixture::new();
+        separate.write("src/todos.ts", "export const parse = () => [];");
+        assert_ne!(fingerprint(&f.0), fingerprint(&separate.0));
+
+        let first = snapshot(&f.0).expect("scan");
+        let reused = snapshot(&tree).expect("scan");
+        assert!(
+            Arc::ptr_eq(&first, &reused),
+            "the worktree reused the repository scan"
+        );
+        git(
+            &f.0,
+            &["worktree", "remove", "--force", tree.to_str().unwrap()],
+        );
     }
 
     #[test]
