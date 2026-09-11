@@ -7,6 +7,10 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Validate live sessions with installed providers: rapid capture, concurrent window
+  drafts, pin/dock/close, paused dispatch, preview, cumulative patch review and restart.
+  Extend sessions to independent task planning and guarded integration after validating
+  the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
   defaults and explicit overrides, including cancellation and restart.
 - [ ] Check keyboard and screen-reader access, narrow layouts, title-bar controls,

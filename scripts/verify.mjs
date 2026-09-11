@@ -16,6 +16,8 @@ const checks = [
   [process.execPath, ['scripts/security/dependencies.mjs', '--patch-only']],
   [process.execPath, ['scripts/knowledge.mjs', '--check']],
   [process.execPath, [pnpm, 'check']],
+  [process.execPath, [pnpm, 'typecheck']],
+  [process.execPath, [pnpm, 'test:hooks']],
   [process.execPath, ['--test', 'scripts/docs-policy.test.mjs']],
   [process.execPath, [pnpm, 'check:docs']],
   [process.execPath, [pnpm, 'check:changelog']],
@@ -41,7 +43,14 @@ const checks = [
   [process.execPath, [pnpm, 'build']],
 ];
 for (const [command, args] of checks) {
+  const started = performance.now();
+  console.log(`\n> ${command} ${args.join(' ')}`);
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', windowsHide: true });
   if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  const seconds = ((performance.now() - started) / 1000).toFixed(1);
+  if (result.status !== 0) {
+    console.error(`Check failed after ${seconds}s (exit ${result.status ?? 1}).`);
+    process.exit(result.status ?? 1);
+  }
+  console.log(`Check passed in ${seconds}s.`);
 }

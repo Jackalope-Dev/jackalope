@@ -23,7 +23,7 @@ const f = window.sessionFixture = {
  update: changes => useLiveSessionStore.setState(s=>({sessions:s.sessions.map(item=>({...item,...changes}))})),
  run: changes => useLiveSessionStore.setState(s=>({runs:s.runs.map(item=>({...item,...changes}))})),
 };
-window.__TAURI_INTERNALS__ = { invoke: async (command,args={}) => {
+window.__TAURI_INTERNALS__ = { metadata:{currentWindow:{label:'live-session-session'}}, invoke: async (command,args={}) => {
  f.calls.push({command,...args});
  const s = useLiveSessionStore.getState().sessions[0];
  switch(command) {
@@ -61,29 +61,53 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15000);
-  await page.route('**/src/main.tsx*', (route) => route.fulfill({ contentType: 'application/javascript', body: fixture }));
+  await page.route('**/src/main.tsx*', (route) =>
+    route.fulfill({ contentType: 'application/javascript', body: fixture }),
+  );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Search walkthrough' }).waitFor();
   const input = page.getByRole('textbox', { name: 'Message', exact: true });
   await input.fill('Keep the result titles on one line.');
-  await page.evaluate(() => { window.sessionFixture.failSend = true; });
+  await page.evaluate(() => {
+    window.sessionFixture.failSend = true;
+  });
   await input.press('Enter');
   await page.getByText('Could not save this message. Try again.', { exact: false }).waitFor();
   assert.equal(await input.inputValue(), 'Keep the result titles on one line.');
-  await page.evaluate(() => { window.sessionFixture.failSend = false; });
+  await page.evaluate(() => {
+    window.sessionFixture.failSend = false;
+  });
   await input.press('Enter');
   await page.waitForFunction(() => document.querySelector('textarea').value === '');
-  const sends = await page.evaluate(() => window.sessionFixture.calls.filter(c => c.command === 'live_session_send'));
+  const sends = await page.evaluate(() =>
+    window.sessionFixture.calls.filter((c) => c.command === 'live_session_send'),
+  );
   assert.equal(sends[0].messageId, sends[1].messageId);
-  assert.equal(await page.locator('.live-message').filter({ hasText: 'Keep the result titles on one line.' }).count(), 1);
-  await page.evaluate(() => { window.sessionFixture.holdSend = true; });
+  assert.equal(
+    await page
+      .locator('.live-message')
+      .filter({ hasText: 'Keep the result titles on one line.' })
+      .count(),
+    1,
+  );
+  await page.evaluate(() => {
+    window.sessionFixture.holdSend = true;
+  });
   await input.fill('Let Escape close search.');
   await input.press('Enter');
   await page.waitForFunction(() => !!window.sessionFixture.release);
   await input.fill('And restore focus to the search button.');
-  await page.evaluate(() => { window.sessionFixture.holdSend = false; window.sessionFixture.release(); });
+  await page.evaluate(() => {
+    window.sessionFixture.holdSend = false;
+    window.sessionFixture.release();
+  });
   await page.getByRole('button', { name: 'Send', exact: true }).waitFor();
-  await page.waitForFunction(() => window.sessionFixture.calls.some(c => c.command === 'live_session_draft' && c.text === 'And restore focus to the search button.'));
+  await page.waitForFunction(() =>
+    window.sessionFixture.calls.some(
+      (c) =>
+        c.command === 'live_session_draft' && c.text === 'And restore focus to the search button.',
+    ),
+  );
   assert.equal(await input.inputValue(), 'And restore focus to the search button.');
   await input.press('Enter');
   await page.waitForFunction(() => document.querySelector('textarea').value === '');
@@ -102,21 +126,31 @@ try {
   await page.evaluate(() => window.sessionFixture.theme('light'));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.screenshot({ path: `${output}/session-960-light.png` });
-  await page.evaluate(() => window.sessionFixture.run({ status: 'review', result: 'Search now keeps each title on one line. Escape closes the panel and restores focus.\n\nChecked keyboard navigation and the focused search tests.' }));
+  await page.evaluate(() =>
+    window.sessionFixture.run({
+      status: 'review',
+      result:
+        'Search now keeps each title on one line. Escape closes the panel and restores focus.\n\nChecked keyboard navigation and the focused search tests.',
+    }),
+  );
   await page.getByRole('button', { name: 'Review changes', exact: true }).click();
   await page.getByText('1 files · Checks passed').waitFor();
-  const calls = await page.evaluate(() => window.sessionFixture.calls.map(c => c.command));
+  const calls = await page.evaluate(() => window.sessionFixture.calls.map((c) => c.command));
   assert.ok(calls.lastIndexOf('live_session_action') < calls.lastIndexOf('live_session_review'));
   await page.goto(`${url}/?compact`, { waitUntil: 'domcontentloaded' });
   await page.setViewportSize({ width: 440, height: 620 });
   const pin = page.getByRole('button', { name: 'Always on top', exact: true });
   await pin.click();
   assert.equal(await pin.getAttribute('aria-pressed'), 'true');
-  await page.evaluate(() => { window.sessionFixture.failPin = true; });
+  await page.evaluate(() => {
+    window.sessionFixture.failPin = true;
+  });
   await pin.click();
   await page.getByText('Pin could not be saved.', { exact: false }).waitFor();
   assert.equal(await pin.getAttribute('aria-pressed'), 'true');
-  await page.evaluate(() => { window.sessionFixture.failPin = false; });
+  await page.evaluate(() => {
+    window.sessionFixture.failPin = false;
+  });
   await pin.click();
   await page.screenshot({ path: `${output}/window-440-dark.png` });
   await page.getByRole('button', { name: 'Collapse conversation' }).click();
@@ -133,11 +167,21 @@ try {
   assert.ok(inputBox.y + inputBox.height <= 320);
   await pin.focus();
   await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Return to main window');
+  assert.equal(
+    await page.evaluate(() => document.activeElement.getAttribute('aria-label')),
+    'Return to main window',
+  );
   await page.getByRole('button', { name: 'Close window', exact: true }).click();
+  await page.waitForFunction(() =>
+    window.sessionFixture.calls.some((c) => c.command === 'plugin:window|close'),
+  );
   const closeCalls = await page.evaluate(() => window.sessionFixture.calls);
-  assert.ok(closeCalls.some(c => c.command === 'plugin:window|close'));
-  assert.ok(!closeCalls.some(c => c.command === 'task_stop'));
+  assert.ok(closeCalls.some((c) => c.command === 'plugin:window|close'));
+  assert.ok(!closeCalls.some((c) => c.command === 'task_stop'));
   assert.deepEqual(errors, []);
-  console.log(`Live-session browser checks passed. Screenshots: ${output}. Browser fixtures only; no native tasks launched.`);
-} finally { await browser.close(); }
+  console.log(
+    `Live-session browser checks passed. Screenshots: ${output}. Browser fixtures only; no native tasks launched.`,
+  );
+} finally {
+  await browser.close();
+}

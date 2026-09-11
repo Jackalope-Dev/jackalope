@@ -340,7 +340,7 @@ export function LiveSessionView({
         </div>
         {expanded && (
           <aside className="live-work" id="live-session-work">
-            <div className="live-tabs" role="group" aria-label="Session details">
+            <fieldset className="live-tabs" aria-label="Session details">
               {(['work', 'changes', 'preview'] as const).map((value) => (
                 <Button
                   key={value}
@@ -360,7 +360,7 @@ export function LiveSessionView({
                   {value === 'work' ? 'Work' : value === 'changes' ? 'Changes' : 'Preview'}
                 </Button>
               ))}
-            </div>
+            </fieldset>
             {tab === 'work' && (
               <>
                 <div className="live-work-list">

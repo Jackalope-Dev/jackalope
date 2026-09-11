@@ -186,25 +186,20 @@ fn attach_run(root: &std::path::Path, service: &mut LiveSessions, id: &str, run:
     )
     .unwrap();
     service
-        .update(|ledger| SelfSession::add(ledger, id, &run.id))
+        .update(|ledger| {
+            let session = LiveSessions::session(ledger, id)?;
+            session.paused = true;
+            session.batches.push(SessionBatch {
+                run_id: run.id.clone(),
+                message_ids: vec![],
+                prompt: String::new(),
+                previous_run_id: None,
+                error: None,
+                settled: false,
+            });
+            Ok(())
+        })
         .unwrap();
-}
-
-struct SelfSession;
-impl SelfSession {
-    fn add(ledger: &mut Ledger, id: &str, run_id: &str) -> Result<(), String> {
-        let session = LiveSessions::session(ledger, id)?;
-        session.paused = true;
-        session.batches.push(SessionBatch {
-            run_id: run_id.into(),
-            message_ids: vec![],
-            prompt: String::new(),
-            previous_run_id: None,
-            error: None,
-            settled: false,
-        });
-        Ok(())
-    }
 }
 
 #[test]

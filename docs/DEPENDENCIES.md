@@ -208,6 +208,8 @@ embedded axe-core notices; see [BROWSER-AUTOMATION.md](BROWSER-AUTOMATION.md).
 | jiti | 2.7.0 | MIT |
 | jose | 6.2.12 | MIT |
 | kleur | 4.1.5 | MIT |
+| lefthook | 2.1.12 | MIT |
+| lefthook-windows-x64 | 2.1.12 | MIT |
 | lightningcss | 1.32.0, 1.33.0 | MPL-2.0 |
 | lightningcss-win32-x64-msvc | 1.32.0, 1.33.0 | MPL-2.0 |
 | longest-streak | 3.1.0 | MIT |

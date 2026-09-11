@@ -1,5 +1,17 @@
 [
   {
+    "id": "live-sessions",
+    "date": "2026-09-11",
+    "status": "In development",
+    "title": "Keep the ideas coming",
+    "description": "Capture quick changes in a running conversation while your agent works.",
+    "items": [
+      "Live sessions save messages and drafts, process ordered batches in an isolated workspace, and keep results together for review.",
+      "Pop out a compact session window and pin it above other apps. Review cumulative changes as a saved patch."
+    ],
+    "note": "In development. Installed-provider and native-window validation remain in progress."
+  },
+  {
     "id": "let-the-task-choose-its-approach",
     "date": "2026-09-11",
     "status": "In development",

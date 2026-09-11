@@ -4,6 +4,8 @@
   "private": true,
   "description": "Jackalope - Ultra-performant desktop shell and harness for agentic workflows",
   "scripts": {
+    "prepare": "node scripts/git-hooks.mjs install",
+    "hooks:install": "node scripts/git-hooks.mjs install",
     "dev": "pnpm --filter @jackalope/desktop dev",
     "build": "pnpm --filter @jackalope/desktop --filter @jackalope/website build",
     "tauri": "pnpm --filter @jackalope/desktop tauri",
@@ -14,6 +16,7 @@
     "typecheck": "pnpm --filter @jackalope/ui --filter @jackalope/desktop --filter @jackalope/website typecheck",
     "test": "pnpm test:release && pnpm --filter @jackalope/desktop --filter @jackalope/server test",
     "test:release": "node --test \"scripts/release/*.test.mjs\"",
+    "test:hooks": "node --test scripts/git-hooks.test.mjs",
     "dev:website": "pnpm --filter @jackalope/website dev",
     "build:website": "pnpm --filter @jackalope/website build",
     "verify": "node scripts/verify.mjs",
@@ -46,6 +49,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
     "agent-browser": "0.37.1",
+    "lefthook": "2.1.12",
     "playwright-core": "1.63.0"
   },
   "engines": {

@@ -7,6 +7,10 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 ## Desktop workspace
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
+- Live sessions capture short messages while work runs, batch them in order in one
+  isolated workspace, and retain drafts, results and cumulative patch exports. Sessions
+  can pop out into a compact window with an always-on-top pin. Dispatch pauses after
+  failures or restart; installed-provider and native-window acceptance remain open.
 - Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity adapters with
   [provider-specific capabilities](AGENT-SUPPORT.md).
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded

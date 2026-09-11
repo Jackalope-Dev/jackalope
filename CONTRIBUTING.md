@@ -78,6 +78,27 @@ pnpm verify
 pnpm check:secrets
 ```
 
+`pnpm install` installs the pinned Lefthook Git hooks locally; run `pnpm hooks:install`
+to reinstall them. CI and production-only installs skip hook installation. Existing
+local pre-commit/pre-push hooks are preserved beside the installed hooks as
+`.before-lefthook` and run first, including their original arguments and pre-push input.
+An existing `core.hooksPath` requires manual integration instead of being overwritten.
+
+Pre-commit checks staged whitespace and runs Biome on staged JavaScript, TypeScript,
+JSON, CSS and GraphQL content. It reads the index, preserves partial staging, and
+does not format, stage or stash files. This gate is intended to take seconds.
+Pre-push runs `pnpm verify` followed by `pnpm check:secrets`; allow minutes for the
+full gate, especially after native changes or a cold Cargo build. TypeScript runs
+early so type failures stop before native compilation. Check timings are printed.
+Use `pnpm exec lefthook run pre-push` to exercise the checks without publishing.
+
+Actual pushes require a clean checkout and refs pointing to its current commit,
+so unstaged fixes cannot make a broken commit appear verified. No automatic stash
+or commit is performed. The manual hook command can check work in progress.
+Keep the CI checks required for integration. Local verification does not
+include CI's Linux/macOS desktop, browser, keyring and packaging checks, and a
+Windows pass cannot establish that those platform-specific checks pass.
+
 `verify` runs Biome, local documentation links, release-script tests, generated server bindings, server
 typecheck/tests/dry-run build, shared UI typecheck/gallery build, desktop JavaScript tests, Rust formatting/native
 unit tests and frontend production builds. Install [Gitleaks 8.30.1](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1) to run the
