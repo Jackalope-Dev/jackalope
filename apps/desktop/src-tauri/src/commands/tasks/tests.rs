@@ -760,9 +760,17 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
         .unwrap()
         .contains("--model test-model"));
     let delivered = std::fs::read_to_string(folder.join("input.txt")).unwrap();
-    assert!(delivered.starts_with("Fixture only"));
+    // The prompt is ordered so the invariant preamble can stay cached across tasks and the
+    // task itself reads last. Keep both ends pinned: a reorder that buries the task, or that
+    // lets per-task text ahead of the preamble, silently costs cache hits or instruction focus.
+    assert!(delivered.starts_with("Jackalope task context:"));
     assert!(delivered.contains(super::delegation::INSTRUCTIONS));
     assert!(delivered.contains("Leave changes uncommitted"));
+    assert!(delivered.trim_end().ends_with("Fixture only"));
+    assert!(
+        delivered.find("Leave changes uncommitted") < delivered.find("Fixture only"),
+        "the task must follow the invariant preamble"
+    );
     policy.enabled_agents.insert("custom-fixture".into(), false);
     std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
     let mut blocked = request;

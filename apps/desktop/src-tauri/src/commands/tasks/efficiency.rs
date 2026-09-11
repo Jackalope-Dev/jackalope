@@ -11,9 +11,24 @@ pub struct Efficiency {
     pub verification_delivered_bytes: u64,
     pub tool_calls: std::collections::BTreeMap<String, u64>,
     pub tool_observations_truncated: bool,
+    /// Workspace-relative paths this attempt opened or edited, taken only from known path
+    /// arguments. Tool arguments are otherwise never stored; these feed the repository map
+    /// of a later task in the same project, so it can rank the area that was worked in.
+    pub touched_paths: std::collections::BTreeSet<String>,
     #[serde(skip)]
     seen_tools: std::collections::HashSet<String>,
 }
+
+/// Argument names the supported CLIs use for a file the agent reads or edits.
+const PATH_KEYS: &[&str] = &[
+    "file_path",
+    "filePath",
+    "path",
+    "target_file",
+    "notebook_path",
+    "new_path",
+];
+const MAX_TOUCHED_PATHS: usize = 200;
 
 impl Efficiency {
     fn tool(&mut self, id: &str, name: &str) {
@@ -34,6 +49,30 @@ impl Efficiency {
         *self.tool_calls.entry(name).or_default() += 1;
     }
 
+    /// Records a path argument, normalized to a workspace-relative form. Absolute paths and
+    /// parent traversals are dropped rather than stored, so nothing outside the project is kept.
+    fn touched(&mut self, input: &serde_json::Value) {
+        if self.touched_paths.len() >= MAX_TOUCHED_PATHS {
+            return;
+        }
+        for key in PATH_KEYS {
+            let Some(raw) = input[*key].as_str() else {
+                continue;
+            };
+            let path = raw.replace('\\', "/");
+            let path = path.trim_start_matches("./");
+            if path.is_empty()
+                || path.len() > 200
+                || path.starts_with('/')
+                || path.starts_with("..")
+                || path.chars().nth(1) == Some(':')
+            {
+                continue;
+            }
+            self.touched_paths.insert(path.to_owned());
+        }
+    }
+
     pub fn observe(&mut self, event: &serde_json::Value, adapter: &str) {
         if adapter == "codex" && event["type"] == "item.completed" {
             let item = &event["item"];
@@ -46,6 +85,10 @@ impl Efficiency {
                 ]
                 .contains(&kind)
                 {
+                    self.touched(item);
+                    for change in item["changes"].as_array().into_iter().flatten() {
+                        self.touched(change);
+                    }
                     let name = if kind == "mcp_tool_call" {
                         format!(
                             "{}:{}",
@@ -64,6 +107,7 @@ impl Efficiency {
                 if block["type"] == "tool_use" {
                     if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
                         self.tool(id, name);
+                        self.touched(&block["input"]);
                     }
                 }
             }
@@ -93,5 +137,36 @@ mod tests {
         assert!(!saved.contains("seen_tools"));
         let restored: Efficiency = serde_json::from_str("{}").unwrap();
         assert_eq!(restored.launches, 0);
+    }
+
+    #[test]
+    fn records_workspace_paths_only_and_never_content_or_locations_outside_the_project() {
+        let mut metrics = Efficiency::default();
+        for (index, input) in [
+            serde_json::json!({"file_path":"src/lib/usage.ts","content":"never store"}),
+            serde_json::json!({"target_file":".\\apps\\desktop\\src\\App.tsx"}),
+            serde_json::json!({"path":"/etc/passwd"}),
+            serde_json::json!({"path":"C:/Users/someone/.ssh/id_rsa"}),
+            serde_json::json!({"path":"../../outside.ts"}),
+            serde_json::json!({"command":"grep -r token ."}),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            metrics.observe(
+                &serde_json::json!({"type":"assistant","message":{"content":[
+                    {"type":"tool_use","id":format!("call-{index}"),"name":"read_file","input":input}
+                ]}}),
+                "grok",
+            );
+        }
+        assert_eq!(
+            metrics.touched_paths.iter().cloned().collect::<Vec<_>>(),
+            ["apps/desktop/src/App.tsx", "src/lib/usage.ts"]
+        );
+        let saved = serde_json::to_string(&metrics).unwrap();
+        assert!(!saved.contains("never store"));
+        assert!(!saved.contains("passwd"));
+        assert!(!saved.contains("id_rsa"));
     }
 }

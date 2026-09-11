@@ -11,11 +11,15 @@ const value = (name, fallback) =>
 const cases = value('--case', suite.cases.map((c) => c.id).join(',')).split(',');
 const modes = value('--modes', 'single,serial,staged').split(',');
 const repeats = Number(value('--repeat', '3'));
+// Arms of the repository-map comparison: '--repo-map=on,off' interleaves them so one suite measures
+// whether the injected map changes tokens and oracle success, not just whether it is present.
+const maps = value('--repo-map', 'on').split(',');
 const seconds = Number(value('--seconds', '300'));
 const tokens = Number(value('--tokens', '1000000'));
 if (
   cases.some((id) => !suite.cases.some((c) => c.id === id)) ||
   modes.some((m) => !['single', 'serial', 'staged'].includes(m)) ||
+  maps.some((m) => !['on', 'off'].includes(m)) ||
   !Number.isInteger(repeats) ||
   repeats < 1 ||
   repeats > 10 ||
@@ -26,10 +30,10 @@ if (
   tokens < 1000 ||
   tokens > 1000000
 )
-  throw new Error('Invalid evaluation case, mode, repeats or budgets.');
+  throw new Error('Invalid evaluation case, mode, repository-map arm, repeats or budgets.');
 if (!args.includes('--execute')) {
   console.log(
-    `Plan: ${cases.join(', ')}; ${modes.join(', ')}; ${repeats} repetitions; ${seconds}s and ${tokens} observed tokens per run. Add --execute to use your installed Codex account. Token reporting is not a hard spending limit.`,
+    `Plan: ${cases.join(', ')}; ${modes.join(', ')}; repository map ${maps.join(', ')}; ${repeats} repetitions; ${seconds}s and ${tokens} observed tokens per run. Add --execute to use your installed Codex account. Token reporting is not a hard spending limit.`,
   );
   process.exit(0);
 }
@@ -91,62 +95,79 @@ for (const id of cases)
       ...modes.slice(repetition % modes.length),
       ...modes.slice(0, repetition % modes.length),
     ];
-    for (const mode of order) {
-      console.log(`Evaluating ${id} / ${mode} / repetition ${repetition + 1}`);
-      const receipt = await new Promise((resolve, reject) => {
-        const child = spawn(
-          nativeBinary,
-          [
-            'commands::coordination::evaluation_trial::installed_execution_evaluation',
-            '--ignored',
-            '--exact',
-            '--nocapture',
-          ],
-          {
-            cwd: root,
-            windowsHide: true,
-            env: {
-              ...process.env,
-              JACKALOPE_EVAL_CASE: id,
-              JACKALOPE_EVAL_MODE: mode,
-              JACKALOPE_EVAL_SECONDS: String(seconds),
-              JACKALOPE_EVAL_TOKENS: String(tokens),
+    for (const mode of order)
+      for (const map of maps) {
+        console.log(`Evaluating ${id} / ${mode} / map ${map} / repetition ${repetition + 1}`);
+        const receipt = await new Promise((resolve, reject) => {
+          const child = spawn(
+            nativeBinary,
+            [
+              'commands::coordination::evaluation_trial::installed_execution_evaluation',
+              '--ignored',
+              '--exact',
+              '--nocapture',
+            ],
+            {
+              cwd: root,
+              windowsHide: true,
+              env: {
+                ...process.env,
+                JACKALOPE_EVAL_CASE: id,
+                JACKALOPE_EVAL_MODE: mode,
+                JACKALOPE_EVAL_SECONDS: String(seconds),
+                JACKALOPE_EVAL_TOKENS: String(tokens),
+                JACKALOPE_REPO_MAP: map,
+              },
+              stdio: ['ignore', 'pipe', 'pipe'],
             },
-            stdio: ['ignore', 'pipe', 'pipe'],
-          },
+          );
+          let text = '';
+          child.stdout.on('data', (chunk) => {
+            const part = chunk.toString();
+            process.stdout.write(part);
+            text = (text + part).slice(-100000);
+          });
+          child.stderr.on('data', (chunk) => process.stderr.write(chunk));
+          child.on('error', reject);
+          child.on('exit', (code) => {
+            const filename = /Evaluation receipt: ([^\r\n]+)/.exec(text)?.[1];
+            if (code !== 0 || !filename)
+              reject(
+                new Error(`Evaluation failed (${code}); inspect the retained native profile.`),
+              );
+            else resolve(filename);
+          });
+        });
+        const report = JSON.parse(await readFile(receipt, 'utf8'));
+        const reported = report.runs.every((r) => r.usage.reported);
+        const sum = (read) => report.runs.reduce((n, r) => n + read(r.usage), 0);
+        receipts.push({
+          case: id,
+          mode,
+          repoMap: map,
+          repetition: repetition + 1,
+          receipt,
+          elapsedMs: report.elapsedMs,
+          oraclePassed: report.oracle?.success ?? false,
+          budgetStopped: report.budgetStopped,
+          reportedTokens: reported ? sum((u) => u.input + u.output) : null,
+          // Cumulative tokens scale with turn count, so the comparable figures are the context
+          // the provider read as new, the output produced, and how many calls it took.
+          freshInputTokens: reported ? sum((u) => u.input - u.cacheRead - u.cacheWrite) : null,
+          cachedInputTokens: reported ? sum((u) => u.cacheRead) : null,
+          outputTokens: reported ? sum((u) => u.output) : null,
+          modelCalls:
+            report.runs.reduce((n, r) => n + (r.usageObservations?.length ?? 0), 0) || null,
+          toolCalls:
+            report.runs.reduce(
+              (n, r) => n + Object.values(r.efficiency?.toolCalls ?? {}).reduce((a, b) => a + b, 0),
+              0,
+            ) || null,
+        });
+        await writeFile(
+          path.join(output, 'comparison.json'),
+          `${JSON.stringify({ version: 1, receipts, acceptance: 'Human review remains unmeasured; oracle success is not acceptance.' }, null, 2)}\n`,
         );
-        let text = '';
-        child.stdout.on('data', (chunk) => {
-          const part = chunk.toString();
-          process.stdout.write(part);
-          text = (text + part).slice(-100000);
-        });
-        child.stderr.on('data', (chunk) => process.stderr.write(chunk));
-        child.on('error', reject);
-        child.on('exit', (code) => {
-          const filename = /Evaluation receipt: ([^\r\n]+)/.exec(text)?.[1];
-          if (code !== 0 || !filename)
-            reject(new Error(`Evaluation failed (${code}); inspect the retained native profile.`));
-          else resolve(filename);
-        });
-      });
-      const report = JSON.parse(await readFile(receipt, 'utf8'));
-      receipts.push({
-        case: id,
-        mode,
-        repetition: repetition + 1,
-        receipt,
-        elapsedMs: report.elapsedMs,
-        oraclePassed: report.oracle?.success ?? false,
-        budgetStopped: report.budgetStopped,
-        reportedTokens: report.runs.every((r) => r.usage.reported)
-          ? report.runs.reduce((n, r) => n + r.usage.input + r.usage.output, 0)
-          : null,
-      });
-      await writeFile(
-        path.join(output, 'comparison.json'),
-        `${JSON.stringify({ version: 1, receipts, acceptance: 'Human review remains unmeasured; oracle success is not acceptance.' }, null, 2)}\n`,
-      );
-    }
+      }
   }
 console.log(`Comparison: ${path.join(output, 'comparison.json')}`);

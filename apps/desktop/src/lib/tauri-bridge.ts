@@ -12,9 +12,18 @@ export interface WorktreeEntry {
     /** Blocked only by recoverable content — archive-and-remove is available. */
     recoverable?: boolean;
     missing?: boolean;
-    generated_paths?: string[];
+    /** Ignored paths cleanup deletes along with the worktree. */
+    discarded_paths?: string[];
     content_merged?: boolean;
   } | null;
+}
+
+/** A folder left behind in .worktrees/ that Git no longer registers. */
+export interface WorktreeOrphan {
+  name: string;
+  path: string;
+  entries: number;
+  blocked_reason: string | null;
 }
 
 export interface SystemInfo {
@@ -112,6 +121,22 @@ export async function pruneWorktrees(repoPath: string): Promise<number> {
   if (!isTauriEnvironment()) throw new Error('Open the desktop app to prune worktrees.');
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<number>('git_prune_worktrees', { repoPath });
+}
+
+export async function listWorktreeOrphans(repoPath: string): Promise<WorktreeOrphan[]> {
+  if (!isTauriEnvironment()) return [];
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<WorktreeOrphan[]>('git_list_worktree_orphans', { repoPath });
+}
+
+export async function removeWorktreeOrphan(
+  repoPath: string,
+  folder: WorktreeOrphan,
+): Promise<void> {
+  if (!isTauriEnvironment()) throw new Error('Open the desktop app to remove leftover folders.');
+  if (folder.blocked_reason) throw new Error(folder.blocked_reason);
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('git_remove_worktree_orphan', { repoPath, folderPath: folder.path });
 }
 
 export async function createWorktree(

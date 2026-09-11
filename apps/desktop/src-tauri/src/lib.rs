@@ -143,6 +143,8 @@ pub fn run() {
             commands::worktree_cleanup::git_cleanup_worktree,
             commands::worktree_cleanup::git_archive_worktree,
             commands::worktree_cleanup::git_prune_worktrees,
+            commands::worktree_cleanup::git_list_worktree_orphans,
+            commands::worktree_cleanup::git_remove_worktree_orphan,
             commands::release::app_diagnostics,
             commands::community::app_community_settings,
             commands::community::app_community_configure,

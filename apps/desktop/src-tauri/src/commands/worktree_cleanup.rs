@@ -31,6 +31,19 @@ pub struct CleanupStatus {
     pub content_merged: bool,
 }
 
+/// A folder sitting in `.worktrees/` that Git no longer registers as a worktree:
+/// the leftovers of a removed or interrupted one. Git never reports these, so
+/// nothing else in the app can see them.
+#[derive(Clone, Debug, Serialize)]
+pub struct OrphanFolder {
+    pub name: String,
+    pub path: String,
+    /// Top-level entries inside, so an empty leftover reads as empty.
+    pub entries: usize,
+    /// Set when the folder must be reviewed by hand instead of deleted.
+    pub blocked_reason: Option<String>,
+}
+
 /// Cap on the untracked content an archive will copy before bailing out.
 const ARCHIVE_MAX_BYTES: u64 = 512 * 1024 * 1024;
 const ARCHIVE_MAX_FILES: usize = 20_000;
@@ -203,10 +216,27 @@ fn ignored_location(root: &Path, name: &str) -> Option<PathBuf> {
     Some(root.join(relative))
 }
 
+/// Dependency and build trees a package manager or compiler rewrites wholesale.
+/// The scan below does not descend into them: their contents are restored from a
+/// manifest, and third-party fixtures there otherwise trip every name check.
+fn regenerable_tree(name: &str) -> bool {
+    matches!(
+        name,
+        "node_modules" | ".pnpm-store" | ".yarn" | "vendor" | "target"
+    )
+}
+
 /// Names that carry secrets or local data rather than regenerable output. Ignored
 /// content matching these is never deleted; the worktree is kept until it moves out.
 fn sensitive_name(filename: &str) -> bool {
     let filename = filename.to_ascii_lowercase();
+    // Committed templates such as .env.example carry placeholders, not secrets.
+    if [".example", ".sample", ".template"]
+        .iter()
+        .any(|suffix| filename.ends_with(suffix))
+    {
+        return false;
+    }
     matches!(
         filename.as_str(),
         ".git"
@@ -258,11 +288,14 @@ fn preserved_content(
     if is_link(&metadata) {
         return Ok(None);
     }
+    let name = start
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if regenerable_tree(&name) {
+        return Ok(None);
+    }
     if !metadata.is_dir() {
-        let name = start
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_default();
         return if sensitive_name(&name) {
             Ok(Some(relative(start)?))
         } else {
@@ -279,7 +312,11 @@ fn preserved_content(
                     "Ignored content is too large to inspect safely; review it manually.".into(),
                 );
             }
-            if sensitive_name(&entry.file_name().to_string_lossy()) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if regenerable_tree(&name) {
+                continue;
+            }
+            if sensitive_name(&name) {
                 return Ok(Some(relative(&entry.path())?));
             }
             // Dependency links are removed as links; never follow them outside the worktree.
@@ -866,6 +903,90 @@ fn archive(
     Ok(archive_root.to_string_lossy().into_owned())
 }
 
+/// The `.worktrees/` folders Git does not register. `.archive` and other
+/// dot-folders are Jackalope's own storage and are never listed.
+fn orphans(repo_path: &str, runs: &[TaskRun]) -> Result<Vec<OrphanFolder>, String> {
+    let repo = canonical(repo_path)?;
+    let parent = repo.join(".worktrees");
+    if !parent.is_dir() {
+        return Ok(Vec::new());
+    }
+    let parent = canonical(&parent.to_string_lossy())?;
+    if !parent.starts_with(&repo) {
+        return Err("The .worktrees directory resolves outside this project.".into());
+    }
+    let registered: Vec<PathBuf> = list_worktrees(repo_path)?
+        .iter()
+        .filter_map(|entry| canonical(&entry.path).ok())
+        .collect();
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(&parent).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with('.') {
+            continue;
+        }
+        let metadata = std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
+        if !metadata.is_dir() || is_link(&metadata) {
+            continue;
+        }
+        let Ok(path) = canonical(&entry.path().to_string_lossy()) else {
+            continue;
+        };
+        if path.parent() != Some(parent.as_path())
+            || registered.iter().any(|other| other.starts_with(&path))
+            || repo.starts_with(&path)
+        {
+            continue;
+        }
+        let mut blocked = if path.join(".git").exists() {
+            Some("Still a Git checkout, so it is kept. Inspect and remove it with Git.".to_string())
+        } else {
+            super::previews::ensure_idle(&entry.path().to_string_lossy())
+                .and_then(|()| super::verification::ensure_idle(&entry.path().to_string_lossy()))
+                .err()
+        };
+        for run in runs.iter().filter(|run| {
+            ["starting", "running", "stopping", "interrupted"].contains(&run.status.as_str())
+        }) {
+            let workspace = task_workspace(Path::new(&run.workspace))?;
+            if workspace.starts_with(&path) || path.starts_with(&workspace) {
+                blocked = Some("In use by an active or interrupted task.".to_string());
+            }
+        }
+        if blocked.is_none() {
+            let mut budget = 200_000usize;
+            blocked = preserved_content(&parent, &path, &mut budget)?
+                .map(|found| format!("Holds secrets or local data: {found}. Move it out first."));
+        }
+        found.push(OrphanFolder {
+            name,
+            entries: std::fs::read_dir(&path)
+                .map_err(|e| e.to_string())?
+                .filter(|entry| entry.is_ok())
+                .count(),
+            path: entry.path().to_string_lossy().into_owned(),
+            blocked_reason: blocked,
+        });
+    }
+    found.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(found)
+}
+
+/// Delete one leftover `.worktrees/` folder after re-checking it is still a
+/// leftover. Nothing Git registers, and nothing holding secrets, is touched.
+fn remove_orphan(repo_path: &str, folder_path: &str, runs: &[TaskRun]) -> Result<(), String> {
+    let target = canonical(folder_path)?;
+    let folder = orphans(repo_path, runs)?
+        .into_iter()
+        .find(|orphan| canonical(&orphan.path).is_ok_and(|path| path == target))
+        .ok_or("This folder is no longer a leftover worktree folder. Refresh the list.")?;
+    if let Some(reason) = folder.blocked_reason {
+        return Err(reason);
+    }
+    std::fs::remove_dir_all(&target).map_err(|e| format!("Cannot remove {}: {e}. Close terminals, development servers or file viewers using this folder, then retry.", target.display()))
+}
+
 /// Drop Git's registration for worktrees whose folder is already gone.
 fn prune(repo_path: &str) -> Result<usize, String> {
     let before = list_worktrees(repo_path)?.len();
@@ -881,6 +1002,36 @@ pub async fn git_prune_worktrees(repo_path: String) -> Result<usize, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = super::integration::execution_guard()?;
         prune(&repo_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn git_list_worktree_orphans(
+    repo_path: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<Vec<OrphanFolder>, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let runs = runtime.integration_runs()?;
+        orphans(&repo_path, &runs)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn git_remove_worktree_orphan(
+    repo_path: String,
+    folder_path: String,
+    state: State<'_, TaskRuntime>,
+) -> Result<(), String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = super::integration::execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        remove_orphan(&repo_path, &folder_path, &runs)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -1134,7 +1285,7 @@ mod tests {
     }
 
     #[test]
-    fn merged_generated_folders_are_removed_without_force_and_branches_are_kept() {
+    fn merged_ignored_output_is_removed_without_force_and_branches_are_kept() {
         let f = Fixture::new("main");
         fs::write(
             f.worktree.join(".gitignore"),
@@ -1152,7 +1303,7 @@ mod tests {
         let entry = f.entry();
         let status = entry.cleanup.as_ref().unwrap();
         assert!(status.blocked_reason.is_none());
-        assert_eq!(status.generated_paths.len(), 3);
+        assert_eq!(status.discarded_paths.len(), 3);
         assert!(!status.recoverable);
         f.remove(&entry, &[]).unwrap();
         assert!(!f.worktree.exists());
@@ -1160,12 +1311,12 @@ mod tests {
     }
 
     #[test]
-    fn local_config_and_unknown_ignored_content_cannot_be_cleaned_or_archived() {
+    fn ignored_secrets_and_local_data_cannot_be_cleaned_or_archived() {
         for name in [
             ".env",
-            "ignored/notes.txt",
             "dist/.env.local",
             "dist/state.sqlite",
+            "ignored/keys/id.pem",
         ] {
             let f = Fixture::new("main");
             fs::write(f.worktree.join(".gitignore"), ".env\nignored/\ndist/\n").unwrap();
@@ -1179,11 +1330,14 @@ mod tests {
             let entry = f.entry();
             let status = entry.cleanup.as_ref().unwrap();
             assert!(!status.recoverable, "{name}");
-            assert!(status
-                .blocked_reason
-                .as_ref()
-                .unwrap()
-                .contains("preserving"));
+            assert!(
+                status
+                    .blocked_reason
+                    .as_ref()
+                    .unwrap()
+                    .contains("secrets or local data"),
+                "{name}"
+            );
             assert!(f.remove(&before, &[]).is_err(), "{name}");
             assert!(
                 archive(
@@ -1202,25 +1356,47 @@ mod tests {
     }
 
     #[test]
-    fn generated_names_require_ignore_rules_and_a_project_manifest() {
-        for ignored in [false, true] {
-            let f = Fixture::new("main");
-            if ignored {
-                fs::write(f.worktree.join(".gitignore"), "dist/\n").unwrap();
-                f.commit(&f.worktree, "ignore output\n");
-                git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
-            } else {
-                fs::write(f.worktree.join("package.json"), "{}").unwrap();
-                f.commit(&f.worktree, "project\n");
-                git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
-            }
-            fs::create_dir(f.worktree.join("dist")).unwrap();
-            fs::write(f.worktree.join("dist/notes.txt"), "keep").unwrap();
-            let entry = f.entry();
-            assert!(entry.cleanup.as_ref().unwrap().generated_paths.is_empty());
-            assert!(f.remove(&entry, &[]).is_err());
-            assert!(f.worktree.join("dist/notes.txt").exists());
-        }
+    /// Ignored build output, caches and logs are disposable whatever they are
+    /// named; only the secret and local-data scan keeps a worktree.
+    fn plain_ignored_files_and_folders_are_discarded_on_cleanup() {
+        let f = Fixture::new("main");
+        fs::write(f.worktree.join(".gitignore"), "ignored/\nout/\n*.log\n").unwrap();
+        f.commit(&f.worktree, "ignore output\n");
+        git(&f.repo, &["merge", "--ff-only", "feature"]).unwrap();
+        fs::create_dir_all(f.worktree.join("ignored/nested")).unwrap();
+        fs::write(f.worktree.join("ignored/nested/keep.txt"), "generated").unwrap();
+        // A placeholder template, and a third-party fixture inside a dependency
+        // tree, are both regenerable and must not keep the worktree.
+        fs::write(f.worktree.join("ignored/.env.example"), "TOKEN=").unwrap();
+        fs::create_dir_all(f.worktree.join("ignored/node_modules/pkg")).unwrap();
+        fs::write(
+            f.worktree.join("ignored/node_modules/pkg/test.pem"),
+            "fixture",
+        )
+        .unwrap();
+        fs::create_dir(f.worktree.join("out")).unwrap();
+        fs::write(f.worktree.join("out/bundle.js"), "generated").unwrap();
+        fs::write(f.worktree.join("install.log"), "generated").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert_eq!(status.blocked_reason, None);
+        assert!(!status.recoverable);
+        assert_eq!(status.discarded_paths.len(), 3);
+        f.remove(&entry, &[]).unwrap();
+        assert!(!f.worktree.exists());
+    }
+
+    #[test]
+    fn untracked_content_git_does_not_ignore_is_never_discarded() {
+        let f = Fixture::new("main");
+        fs::create_dir(f.worktree.join("dist")).unwrap();
+        fs::write(f.worktree.join("dist/notes.txt"), "keep").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert!(status.discarded_paths.is_empty());
+        assert!(status.blocked_reason.is_some());
+        assert!(f.remove(&entry, &[]).is_err());
+        assert!(f.worktree.join("dist/notes.txt").exists());
     }
 
     #[test]
@@ -1252,7 +1428,6 @@ mod tests {
             "staged",
             "untracked",
             "ignored",
-            "ignored-directory",
             "untracked-directory",
             "assume-unchanged",
             "skip-worktree",
@@ -1262,14 +1437,9 @@ mod tests {
             match kind {
                 "untracked" => fs::write(f.worktree.join("new.txt"), "keep").unwrap(),
                 "ignored" => fs::write(f.worktree.join(".env"), "keep").unwrap(),
-                "ignored-directory" | "untracked-directory" => {
-                    let directory = if kind == "ignored-directory" {
-                        "ignored"
-                    } else {
-                        "new"
-                    };
-                    fs::create_dir_all(f.worktree.join(directory).join("nested")).unwrap();
-                    fs::write(f.worktree.join(directory).join("nested/keep.txt"), "keep").unwrap();
+                "untracked-directory" => {
+                    fs::create_dir_all(f.worktree.join("new").join("nested")).unwrap();
+                    fs::write(f.worktree.join("new/nested/keep.txt"), "keep").unwrap();
                 }
                 _ => {
                     fs::write(f.worktree.join("file.txt"), "keep").unwrap();
@@ -1302,6 +1472,51 @@ mod tests {
             assert!(f.remove(&before, &[]).is_err(), "{kind}");
             assert!(f.worktree.exists());
         }
+    }
+
+    #[test]
+    fn leftover_worktree_folders_are_listed_and_removed_but_live_ones_are_not() {
+        let f = Fixture::new("main");
+        let parent = f.repo.join(".worktrees");
+        for name in ["leftover", "holds-secrets", "checkout", ".archive"] {
+            fs::create_dir_all(parent.join(name)).unwrap();
+        }
+        fs::write(parent.join("leftover/bundle.js"), "generated").unwrap();
+        fs::write(parent.join("holds-secrets/.env"), "TOKEN=1").unwrap();
+        fs::create_dir(parent.join("checkout/.git")).unwrap();
+        git(
+            &f.repo,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "live",
+                parent.join("live").to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        let repo = f.repo.to_str().unwrap();
+        let found = orphans(repo, &[]).unwrap();
+        let names: Vec<&str> = found.iter().map(|o| o.name.as_str()).collect();
+        assert_eq!(names, ["checkout", "holds-secrets", "leftover"]);
+        assert_eq!(found[2].blocked_reason, None);
+        assert_eq!(found[2].entries, 1);
+        assert!(found[0].blocked_reason.as_ref().unwrap().contains("Git"));
+        assert!(found[1]
+            .blocked_reason
+            .as_ref()
+            .unwrap()
+            .contains("secrets or local data"));
+        for blocked in ["holds-secrets", "checkout"] {
+            let path = parent.join(blocked);
+            assert!(remove_orphan(repo, path.to_str().unwrap(), &[]).is_err());
+            assert!(path.exists());
+        }
+        assert!(remove_orphan(repo, parent.join("live").to_str().unwrap(), &[]).is_err());
+        assert!(parent.join("live").exists());
+        remove_orphan(repo, parent.join("leftover").to_str().unwrap(), &[]).unwrap();
+        assert!(!parent.join("leftover").exists());
+        assert!(parent.join(".archive").exists());
     }
 
     #[test]

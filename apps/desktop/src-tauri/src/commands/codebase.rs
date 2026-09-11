@@ -14,6 +14,8 @@ const MAX_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
 
+pub(crate) mod map;
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodebaseFile {

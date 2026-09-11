@@ -132,6 +132,20 @@
 .worktree-notice {
   margin-bottom: 24px;
 }
+.worktree-leftovers {
+  margin-top: var(--workspace-section-gap, 32px);
+  padding-top: var(--workspace-section-gap, 32px);
+  border-top: 1px solid var(--color-border);
+}
+.worktree-leftovers h2 {
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+.worktree-leftovers h3 {
+  font-size: var(--text-base);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
 .worktree-cleanup-toolbar {
   display: flex;
   align-items: center;

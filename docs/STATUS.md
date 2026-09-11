@@ -58,6 +58,13 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   checks file edits and session continuation before connecting a local account.
 - App-wide usage trends, project/agent/task breakdowns, measured routing overhead
   and usage by saved outcome, with missing reports and helper usage kept explicit.
+  Usage separates context a provider read as new from cached re-reads, and reports
+  model calls and average context, because cumulative tokens track turn count rather
+  than work done. Per-message usage is recorded for Claude, Grok and OpenCode.
+- Task launches carry a bounded repository map from static analysis, seeded by the
+  paths recent attempts in the project touched, so a worker starts from the relevant
+  files instead of searching for them. Token effect is not yet measured on real work;
+  `pnpm evaluate:execution --repo-map=on,off` is the comparison.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
 
 ## Services and distribution

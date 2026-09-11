@@ -1,5 +1,10 @@
 use super::*;
 
+/// Warm-start budget: how many recent attempts in a project contribute touched paths, and
+/// how many paths the repository map may be seeded with.
+const RECENT_TOUCHED_ATTEMPTS: usize = 3;
+const RECENT_TOUCHED_PATHS: usize = 60;
+
 /// Launch the agent, retrying a transient failure (an antivirus or indexer lock
 /// on the executable, `ETXTBSY` just after a write) a bounded number of times.
 /// A missing executable is not retried. Returns the child and the attempt count.
@@ -553,12 +558,27 @@ impl TaskRuntime {
                 &serde_json::json!({"mcpServers":project_mcp}).to_string(),
             ]);
         }
-        let mut input = format!("{}\n\nJackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n", req.prompt);
+        // Ordered cheapest-to-reuse first: text that never varies, then text that is stable for
+        // this project, then this task. Every model call re-sends the whole prefix, so the
+        // invariant part stays byte-identical across tasks and the task itself reads last.
+        let mut input = String::from("Jackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n");
         let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
         input.push_str(super::delegation::INSTRUCTIONS);
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
         input.push_str("\nJackalope manages commits and attribution. Leave changes uncommitted. End your result with: Commit message: <imperative summary of the actual changes>.\n");
         if req.previous_run_id.is_none() {
+            // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
+            // run with and without it is otherwise identical and the difference is measurable.
+            if !std::env::var("JACKALOPE_REPO_MAP").is_ok_and(|value| value == "off") {
+                if let Some(map) = crate::commands::codebase::map::task_map(
+                    Path::new(&workspace),
+                    &req.prompt,
+                    &self.recent_touched_paths(&req),
+                    crate::commands::codebase::map::DEFAULT_BUDGET,
+                ) {
+                    input.push_str(&map);
+                }
+            }
             input.push_str(&req.context_receipt.text());
 
             if let Some(change) = &req.monitor_change {
@@ -595,6 +615,7 @@ impl TaskRuntime {
                 ]);
             }
         }
+        input.push_str(&format!("\nTask:\n{}\n", req.prompt));
         if adapter == "grok" {
             std::fs::write(self.directory.join(format!("{id}.prompt")), &input)
                 .map_err(|e| e.to_string())?;
@@ -949,6 +970,37 @@ impl TaskRuntime {
         }
         crate::commands::harness::resolve_user_prompt(prompt_id, answer.trim());
         Ok(true)
+    }
+
+    /// Paths recent attempts in this project actually opened or edited. A new task in the same
+    /// area starts from where the last one worked instead of searching for it again.
+    fn recent_touched_paths(&self, req: &RunRequest) -> Vec<String> {
+        let Ok(inner) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let mut recent: Vec<&TaskRun> = inner
+            .runs
+            .values()
+            .filter(|run| {
+                run.project_id == req.project_id
+                    && run.project_path == req.project_path
+                    && run.id != req.id
+                    && !run.efficiency.touched_paths.is_empty()
+            })
+            .collect();
+        recent.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        let mut paths = Vec::new();
+        for run in recent.into_iter().take(RECENT_TOUCHED_ATTEMPTS) {
+            for path in &run.efficiency.touched_paths {
+                if paths.len() >= RECENT_TOUCHED_PATHS {
+                    return paths;
+                }
+                if !paths.contains(path) {
+                    paths.push(path.clone());
+                }
+            }
+        }
+        paths
     }
 
     pub fn integration_runs(&self) -> Result<Vec<TaskRun>, String> {

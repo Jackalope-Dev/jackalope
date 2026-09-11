@@ -195,6 +195,14 @@ task journals; continuations reuse that original context. Native schedules can
 check Git content before dispatch and retain inspectable change receipts without
 model calls. See [PROJECT-KNOWLEDGE.md](PROJECT-KNOWLEDGE.md) for usage and limits.
 
+The launcher also injects a bounded repository map built by `codebase.rs` static
+analysis: file names and resolved imports for the files a task's own words and the
+paths recent attempts touched rank highest. It costs no model calls, is capped well
+below the prompt budget and is presented as a starting point, not an authoritative
+file list. `JACKALOPE_REPO_MAP=off` removes it for comparison runs. The launch prompt
+is ordered invariant text, then project-stable text, then the task, so the prefix a
+provider can serve from cache stays byte-identical between tasks.
+
 pnpm verify is the local/CI gate. JavaScript tests exercise derived state, contracts
 and persistence. Rust tests use disposable repositories/profiles, with opt-in
 provider/browser trials separate. Worker tests use local workerd/D1/R2. Rendered
