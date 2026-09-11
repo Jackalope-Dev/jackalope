@@ -952,6 +952,14 @@ setInterval(()=>{},1000);
                 request.prompt = "Wait forever".into();
             }
         }
+        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+        while Arc::strong_count(&runtime._owner) > 1 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "Kimi fixture worker did not release history ownership after stopping"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
         drop(runtime);
         let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         assert_eq!(runtime.integration_runs().unwrap().len(), 3);
