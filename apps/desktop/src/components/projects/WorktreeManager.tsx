@@ -37,11 +37,6 @@ function discarded(worktrees: WorktreeEntry[]): string[] {
   return [...new Set(worktrees.flatMap((wt) => wt.cleanup?.discarded_paths ?? []))].sort();
 }
 
-function discardList(worktrees: WorktreeEntry[]): string {
-  const paths = discarded(worktrees);
-  return paths.length ? ` Ignored paths deleted with them: ${paths.join(', ')}.` : '';
-}
-
 /**
  * What a confirm is about to remove, and which step it is on once it runs:
  * removing several worktrees is slow enough to look stalled without it.
@@ -50,31 +45,58 @@ function RemovalPlan({
   names = [],
   paths = [],
   progress,
+  busy = false,
+  busyNote,
+  isFolder = false,
 }: {
   names?: string[];
   paths?: string[];
-  progress: string;
+  progress?: string;
+  busy?: boolean;
+  busyNote?: string;
+  isFolder?: boolean;
 }) {
-  if (names.length < 2 && !paths.length && !progress) return null;
+  if (busy) {
+    return (
+      <div className="cleanup-plan-busy" role="status" aria-live="polite">
+        <LoadingState label={progress || 'Cleaning up…'} compact />
+        <p className="task-muted text-xs">
+          {busyNote || 'Removing files and Git branches. This may take a moment…'}
+        </p>
+      </div>
+    );
+  }
+
+  if (names.length < 2 && !paths.length) return null;
+
+  const Icon = isFolder ? FolderX : GitBranch;
+
   return (
     <div className="cleanup-plan">
       {names.length > 1 && (
-        <ul className="cleanup-plan-list">
-          {names.map((name) => (
-            <li key={name}>{name}</li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-1.5">
+          <p className="cleanup-plan-heading">
+            {isFolder ? 'Folders' : 'Worktrees'} to remove ({names.length}):
+          </p>
+          <ul className="cleanup-plan-list">
+            {names.map((name) => (
+              <li key={name} className="cleanup-plan-item font-mono text-xs">
+                <Icon
+                  size={14}
+                  className="shrink-0 text-[var(--color-text-muted)]"
+                  aria-hidden="true"
+                />
+                <span className="truncate">{name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {paths.length > 0 && (
         <details className="cleanup-plan-note">
           <summary>Ignored files deleted too ({paths.length})</summary>
-          <p>{paths.join(', ')}</p>
+          <p className="font-mono text-xs break-all">{paths.join(', ')}</p>
         </details>
-      )}
-      {progress && (
-        <p className="cleanup-plan-progress" role="status">
-          {progress}
-        </p>
       )}
     </div>
   );
@@ -367,7 +389,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
             </Select>
             <ConfirmAction
               title={`Clean up ${ready.length} ready worktrees?`}
-              description={`Removes merged worktrees without local work to preserve. Local branches are removed; task history is kept. Each folder is checked again before removal. Worktrees: ${ready.map((wt) => wt.branch || wt.path).join(', ')}.${discardList(ready)}`}
+              description="Removes merged worktrees and local branches. Task history is kept."
               label="Clean up ready"
               busyLabel="Cleaning up…"
               onConfirm={cleanupMerged}
@@ -378,11 +400,14 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 </Button>
               }
             >
-              <RemovalPlan
-                names={ready.map((wt) => wt.branch || wt.path)}
-                paths={discarded(ready)}
-                progress={progress}
-              />
+              {({ busy }) => (
+                <RemovalPlan
+                  busy={busy}
+                  names={ready.map((wt) => wt.branch || wt.path)}
+                  paths={discarded(ready)}
+                  progress={progress}
+                />
+              )}
             </ConfirmAction>
             {missing.length > 0 && (
               <Button
@@ -493,8 +518,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 {(wt.cleanup?.merged || wt.cleanup?.content_merged) &&
                   !wt.cleanup.blocked_reason && (
                     <ConfirmAction
-                      title="Remove this worktree and its branch?"
-                      description={`Its work is already in ${wt.cleanup.target_branch}. The folder and the local branch are removed; task history is kept. The folder is checked again before removal.${discardList([wt])}`}
+                      title={`Clean up ${wt.branch || 'worktree'}?`}
+                      description={`Removes this worktree folder and local branch. Changes are already merged into ${wt.cleanup.target_branch}.`}
                       label="Remove worktree & branch"
                       busyLabel="Removing…"
                       onConfirm={() => cleanup(wt)}
@@ -511,13 +536,20 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         </Button>
                       }
                     >
-                      <RemovalPlan paths={discarded([wt])} progress={progress} />
+                      {({ busy }) => (
+                        <RemovalPlan
+                          busy={busy}
+                          paths={discarded([wt])}
+                          progress={progress}
+                          busyNote={`Removing ${wt.branch || wt.path}. This may take a moment…`}
+                        />
+                      )}
                     </ConfirmAction>
                   )}
                 {wt.cleanup?.recoverable && (
                   <ConfirmAction
-                    title="Archive and remove this worktree?"
-                    description="Its commits, uncommitted changes and untracked files are saved to .worktrees/.archive first. Ignored build output and dependencies are discarded, never archived. The folder is then removed and any jackalope/ branch deleted. Restore later with git from the saved bundle."
+                    title={`Archive and remove ${wt.branch || 'worktree'}?`}
+                    description="Saves uncommitted work to .worktrees/.archive, then removes the folder and branch."
                     label="Archive & remove"
                     busyLabel="Archiving…"
                     onConfirm={() => archive(wt)}
@@ -533,7 +565,15 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         Archive &amp; remove
                       </Button>
                     }
-                  />
+                  >
+                    {({ busy }) => (
+                      <RemovalPlan
+                        busy={busy}
+                        progress={progress}
+                        busyNote="Archiving uncommitted work and removing folder. This may take a moment…"
+                      />
+                    )}
+                  </ConfirmAction>
                 )}
                 <Button
                   variant="ghost"
@@ -561,7 +601,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 {leftover.length > 0 && (
                   <ConfirmAction
                     title={`Delete ${leftover.length} leftover ${leftover.length === 1 ? 'folder' : 'folders'}?`}
-                    description={`These folders in .worktrees/ are not registered worktrees, so Git holds nothing from them and nothing can be restored. Deleting them removes their files for good: ${leftover.map((folder) => folder.name).join(', ')}.`}
+                    description="These folders in .worktrees/ are no longer tracked by Git. Deleting them cannot be undone."
                     label="Delete leftover folders"
                     busyLabel="Deleting…"
                     onConfirm={() => removeLeftover(leftover)}
@@ -571,7 +611,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                         Delete leftover folders ({leftover.length})
                       </Button>
                     }
-                  />
+                  >
+                    {({ busy }) => (
+                      <RemovalPlan
+                        busy={busy}
+                        names={leftover.map((folder) => folder.name)}
+                        progress={progress}
+                        busyNote="Deleting leftover folders. This may take a moment…"
+                        isFolder
+                      />
+                    )}
+                  </ConfirmAction>
                 )}
                 <p className="task-muted">
                   Unregistered folders in .worktrees/ that are no longer tracked by Git.
@@ -602,7 +652,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                     {!folder.blocked_reason && (
                       <ConfirmAction
                         title={`Delete ${folder.name}?`}
-                        description="This folder in .worktrees/ is not a registered worktree, so Git holds nothing from it and nothing can be restored. Its files are deleted for good."
+                        description="This folder in .worktrees/ is not tracked by Git. Deleting it cannot be undone."
                         label="Delete folder"
                         busyLabel="Deleting…"
                         onConfirm={() => removeLeftover([folder])}
@@ -616,7 +666,16 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                             Delete folder
                           </Button>
                         }
-                      />
+                      >
+                        {({ busy }) => (
+                          <RemovalPlan
+                            busy={busy}
+                            progress={progress}
+                            busyNote={`Deleting ${folder.name}. This may take a moment…`}
+                            isFolder
+                          />
+                        )}
+                      </ConfirmAction>
                     )}
                     <Button
                       variant="ghost"
