@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Project } from './projectStore';
 
-export type OnboardingStep = 'project' | 'agent' | 'theme' | 'task';
+export type OnboardingStep = 'project' | 'agent' | 'behavior' | 'theme' | 'task';
 export type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
 
 interface OnboardingState {
@@ -69,8 +69,8 @@ export const useOnboardingStore = create<OnboardingState>()(
           pendingProject: value.pendingProject ?? null,
           firstTask: value.firstTask ?? null,
           step:
-            (value.step !== 'theme' || value.pendingProject) &&
-            ['project', 'agent', 'theme', 'task'].includes(value.step ?? '')
+            ((value.step !== 'theme' && value.step !== 'behavior') || value.pendingProject) &&
+            ['project', 'agent', 'behavior', 'theme', 'task'].includes(value.step ?? '')
               ? (value.step as OnboardingStep)
               : 'project',
         };

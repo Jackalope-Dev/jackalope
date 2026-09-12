@@ -2,13 +2,13 @@ import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useAgentGaze } from '../../hooks/useAgentGaze';
 import { sessionCommand } from '../../lib/live-session';
 import type { RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
@@ -23,6 +23,9 @@ export function SessionStart({
   const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [isFocused, setIsFocused] = useState(true);
+  const markRef = useRef<HTMLDivElement>(null);
+  const gaze = useAgentGaze(markRef, { text, isFocused });
   const input = useRef<HTMLTextAreaElement>(null);
   const latest = useRef(text);
   const mounted = useRef(true);
@@ -89,8 +92,8 @@ export function SessionStart({
   };
   return (
     <div className="live-start">
-      <div className="live-start-mark" aria-hidden="true">
-        <AgentCharacter provider={project?.preferences?.preferredRunner || 'auto'} />
+      <div className="live-start-mark" aria-hidden="true" ref={markRef}>
+        <AgentCharacter provider={project?.preferences?.preferredRunner || 'auto'} gaze={gaze} />
       </div>
       <span className="live-start-label">New chat</span>
       <h2>{project?.name ?? 'Choose a project'}</h2>
@@ -110,6 +113,8 @@ export function SessionStart({
             maxLength={12000}
             value={text}
             onChange={(event) => setText(event.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
@@ -128,16 +133,6 @@ export function SessionStart({
               Send
             </Button>
           </div>
-          <p className="live-start-footnote">
-            Looking for existing work?{' '}
-            <button
-              type="button"
-              className="live-link-button"
-              onClick={() => navigateWorkspace('kanban')}
-            >
-              Go to Tasks &rarr;
-            </button>
-          </p>
         </form>
       ) : (
         <Button variant="outline" onClick={onOpenProject}>

@@ -23,12 +23,10 @@ export function WorkspaceReadiness({
   project,
   path = project.path,
   expanded = false,
-  mode = 'inspect',
 }: {
   project: Project;
   path?: string;
   expanded?: boolean;
-  mode?: 'inspect' | 'setup';
 }) {
   const [result, setResult] = useState<Readiness | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +45,7 @@ export function WorkspaceReadiness({
     }
   };
   useEffect(() => {
-    if (mode !== 'setup' && !expanded) return;
+    if (!expanded) return;
     let alive = true;
     if (!isTauriEnvironment()) return undefined;
     setBusy(true);
@@ -65,49 +63,10 @@ export function WorkspaceReadiness({
     return () => {
       alive = false;
     };
-  }, [mode, expanded, path]);
-  const savedCheck = project.preferences?.verifyCommand;
+  }, [expanded, path]);
   const savedPrepare = project.preferences?.prepareCommand;
   const savedVerify = project.preferences?.verifyCommand;
   const savedPreview = project.preferences?.previewCommand;
-  if (mode === 'setup') {
-    return (
-      <div className="space-y-3">
-        <p className="task-muted">
-          {savedCheck
-            ? `After tasks finish, we will run ${savedCheck}.`
-            : 'Choose how Jackalope should check finished work. You can change this later in Project settings.'}
-        </p>
-        {busy && (
-          <p role="status" className="task-muted">
-            Looking for a test command…
-          </p>
-        )}
-        {result?.verifyCommand && !savedCheck && (
-          <>
-            <p>
-              Suggested check: <code>{result.verifyCommand}</code>
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                useProjectStore.getState().updateProjectPreferences(project.id, {
-                  verifyCommand: result.verifyCommand ?? undefined,
-                  autoVerify: true,
-                });
-                setSaved('This check will run after future tasks finish.');
-              }}
-            >
-              Use this check after tasks finish
-            </Button>
-          </>
-        )}
-        {saved && <p role="status">{saved}</p>}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      </div>
-    );
-  }
   return (
     <Disclosure className="my-4" open={expanded || undefined}>
       <DisclosureSummary className="min-h-11 py-3">Workspace readiness</DisclosureSummary>

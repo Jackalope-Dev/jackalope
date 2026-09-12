@@ -124,8 +124,10 @@ export function FeaturePlanner({
           disabled={busy || submitting || !!planning || draft.added}
           className="space-y-3 mt-5"
         >
-          <label className="block" htmlFor="feature-goal">
-            What should this feature accomplish?
+          <div>
+            <label className="task-label block mb-1.5" htmlFor="feature-goal">
+              What should this feature accomplish?
+            </label>
             <Textarea
               id="feature-goal"
               className="task-input w-full"
@@ -134,9 +136,11 @@ export function FeaturePlanner({
               value={draft.goal}
               onChange={(e) => update({ goal: e.target.value })}
             />
-          </label>
-          <label className="block" htmlFor="feature-agent">
-            Assistant
+          </div>
+          <div>
+            <label className="task-label block mb-1.5" htmlFor="feature-agent">
+              Assistant
+            </label>
             <Select
               id="feature-agent"
               value={draft.agent}
@@ -149,7 +153,7 @@ export function FeaturePlanner({
                 </SelectItem>
               ))}
             </Select>
-          </label>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button
               disabled={
@@ -293,8 +297,10 @@ export function FeaturePlanner({
               className="border-t border-[var(--color-border)] pt-4 space-y-3"
             >
               <div className="grid sm:grid-cols-2 gap-3">
-                <label className="block" htmlFor={`feature-title-${step.key}`}>
-                  Task {index + 1}
+                <div>
+                  <label className="task-label block mb-1.5" htmlFor={`feature-title-${step.key}`}>
+                    Task {index + 1}
+                  </label>
                   <Input
                     id={`feature-title-${step.key}`}
                     className="task-input w-full"
@@ -302,9 +308,11 @@ export function FeaturePlanner({
                     value={step.title}
                     onChange={(e) => change(index, { title: e.target.value })}
                   />
-                </label>
-                <label className="block" htmlFor={`feature-agent-${step.key}`}>
-                  Assigned agent
+                </div>
+                <div>
+                  <label className="task-label block mb-1.5" htmlFor={`feature-agent-${step.key}`}>
+                    Assigned agent
+                  </label>
                   <Select
                     id={`feature-agent-${step.key}`}
                     value={step.agent || draft.agent}
@@ -317,10 +325,15 @@ export function FeaturePlanner({
                       </SelectItem>
                     ))}
                   </Select>
-                </label>
+                </div>
               </div>
-              <label className="block" htmlFor={`feature-instruction-${step.key}`}>
-                Instructions
+              <div>
+                <label
+                  className="task-label block mb-1.5"
+                  htmlFor={`feature-instruction-${step.key}`}
+                >
+                  Instructions
+                </label>
                 <Textarea
                   id={`feature-instruction-${step.key}`}
                   className="task-input w-full"
@@ -329,9 +342,11 @@ export function FeaturePlanner({
                   value={step.prompt}
                   onChange={(e) => change(index, { prompt: e.target.value })}
                 />
-              </label>
-              <label className="block" htmlFor={`feature-scopes-${step.key}`}>
-                Files or folders (comma separated)
+              </div>
+              <div>
+                <label className="task-label block mb-1.5" htmlFor={`feature-scopes-${step.key}`}>
+                  Files or folders (comma separated)
+                </label>
                 <Input
                   id={`feature-scopes-${step.key}`}
                   className="task-input w-full"
@@ -340,7 +355,7 @@ export function FeaturePlanner({
                     change(index, { scopes: e.target.value.split(',').map((s) => s.trim()) })
                   }
                 />
-              </label>
+              </div>
               <fieldset>
                 <legend>
                   {draft.stagedDependencies

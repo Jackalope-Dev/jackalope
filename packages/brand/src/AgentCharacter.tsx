@@ -1,4 +1,10 @@
+import { useRef } from 'react';
 import './agent-character.css';
+
+export interface AgentGaze {
+  x: number;
+  y: number;
+}
 
 const silhouettes: Record<string, string> = {
   codex:
@@ -14,11 +20,32 @@ const silhouettes: Record<string, string> = {
 export function AgentCharacter({
   provider,
   state = 'idle',
+  gaze,
 }: {
   provider: string;
   state?: 'idle' | 'working' | 'waiting';
+  gaze?: AgentGaze;
 }) {
   const silhouette = silhouettes[provider] ?? silhouettes.codex;
+  const blinkDelayRef = useRef<string | undefined>(undefined);
+  if (blinkDelayRef.current === undefined) {
+    blinkDelayRef.current = `${(Math.random() * 4).toFixed(2)}s`;
+  }
+
+  const clampedX = gaze ? Math.max(-1, Math.min(1, gaze.x)) : 0;
+  const clampedY = gaze ? Math.max(-1, Math.min(1, gaze.y)) : 0;
+
+  const eyeDx = gaze ? Number((clampedX * 8.5).toFixed(2)) : 0;
+  const eyeDy = gaze ? Number((clampedY * 6).toFixed(2)) : 0;
+  const headRotate = gaze ? Number((clampedX * 5.5).toFixed(2)) : 0;
+  const headDx = gaze ? Number((clampedX * 3.5).toFixed(2)) : 0;
+  const headDy = gaze ? Number((clampedY * 3).toFixed(2)) : 0;
+
+  const headTransform = gaze
+    ? `translate(${headDx}px, ${headDy}px) rotate(${headRotate}deg)`
+    : undefined;
+  const gazeTransform = gaze ? `translate(${eyeDx}px, ${eyeDy}px)` : undefined;
+
   return (
     <svg
       className="brand-agent-character"
@@ -27,19 +54,34 @@ export function AgentCharacter({
       fill="none"
       aria-hidden="true"
     >
-      {[4, 3, 2, 1].map((layer) => (
-        <path
-          key={layer}
-          d={silhouette}
-          transform={`translate(${layer * 3} ${layer * 1.5})`}
-          className="brand-agent-echo"
-        />
-      ))}
-      <path d={silhouette} fill="currentColor" />
-      {provider === 'grok' && <path d="M12 57C26 54 51 33 64 20" className="brand-agent-orbit" />}
-      <g className="brand-agent-face" strokeLinecap="round" strokeWidth="3.5">
-        <path d={state === 'working' ? 'M29 39h4m12 0h4' : 'M31 37v4m16-4v4'} />
-        {state === 'waiting' && <path d="M45 30l5-2" strokeWidth="2" />}
+      <g
+        className="brand-agent-head"
+        style={headTransform ? { transform: headTransform } : undefined}
+      >
+        {[4, 3, 2, 1].map((layer) => (
+          <path
+            key={layer}
+            d={silhouette}
+            transform={`translate(${layer * 3} ${layer * 1.5})`}
+            className="brand-agent-echo"
+          />
+        ))}
+        <path d={silhouette} fill="currentColor" />
+        {provider === 'grok' && <path d="M12 57C26 54 51 33 64 20" className="brand-agent-orbit" />}
+        <g
+          className="brand-agent-gaze"
+          style={gazeTransform ? { transform: gazeTransform } : undefined}
+        >
+          <g
+            className="brand-agent-face"
+            strokeLinecap="round"
+            strokeWidth="3.5"
+            style={{ animationDelay: blinkDelayRef.current }}
+          >
+            <path d={state === 'working' ? 'M29 39h4m12 0h4' : 'M31 37v4m16-4v4'} />
+            {state === 'waiting' && <path d="M45 30l5-2" strokeWidth="2" />}
+          </g>
+        </g>
       </g>
     </svg>
   );

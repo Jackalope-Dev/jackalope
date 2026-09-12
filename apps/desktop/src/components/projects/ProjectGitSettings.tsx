@@ -90,7 +90,7 @@ export function ProjectGitSettings({
       <WorkspaceSectionHeading
         titleId={`${id}-title`}
         title="Commits and cleanup"
-        description="Jackalope saves a checkpoint when a task succeeds and suggests its commit message. Review the result, then merge. Jackalope creates one commit and can remove the finished worktree and branch."
+        description="Set commit author attribution, checkpointing, and branch cleanup."
       />
       {policy ? (
         <>
@@ -137,10 +137,6 @@ export function ProjectGitSettings({
                 />
               </label>
             </div>
-            <p className="task-muted text-sm">
-              Starts with your Git identity. Use the email associated with your account, including a
-              private commit email if preferred. These settings stay local to this repository.
-            </p>
             <div className="flex items-center justify-between gap-4 min-h-11 mt-2">
               <span className="text-sm">Save checkpoints after successful tasks</span>
               <Switch

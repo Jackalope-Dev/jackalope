@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { sessionWork } from '../../lib/live-session';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import type { Project } from '../../stores/projectStore';
-import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
@@ -45,33 +44,6 @@ export function LiveSessions({
     .sort((a, b) => a.group - b.group || b.activity - a.activity);
   return (
     <section className="live-hub" aria-label="Chat">
-      <header className="live-hub-heading">
-        <div>
-          <h1>Chat</h1>
-          <p className="live-hub-prompt">
-            Looking for existing work?{' '}
-            <button
-              type="button"
-              className="live-link-button"
-              onClick={() => navigateWorkspace('kanban')}
-            >
-              Go to Tasks &rarr;
-            </button>
-          </p>
-        </div>
-        {items.length > 0 && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              select(null);
-              setFresh((value) => value + 1);
-            }}
-          >
-            <Plus size={16} />
-            New chat
-          </Button>
-        )}
-      </header>
       <div className="live-hub-body" data-has-history={items.length > 0}>
         <div className="live-hub-canvas">
           {session ? (
@@ -94,6 +66,20 @@ export function LiveSessions({
         </div>
         {items.length > 0 && (
           <nav className="live-history" aria-label="Chats">
+            <div className="live-history-action">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-center"
+                onClick={() => {
+                  select(null);
+                  setFresh((value) => value + 1);
+                }}
+              >
+                <Plus size={15} />
+                New chat
+              </Button>
+            </div>
             {['Needs attention', 'In progress', 'Recent', 'Finished'].map((label, group) => {
               const members = items.filter((item) => item.group === group);
               return (

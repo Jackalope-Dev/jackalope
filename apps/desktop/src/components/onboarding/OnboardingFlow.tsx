@@ -1,11 +1,9 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
-import { Badge, Disclosure, DisclosureSummary, Input, RefreshIcon, Textarea } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, Input, RefreshIcon, Textarea } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
   Check,
-  ChevronDown,
-  ChevronUp,
   Copy,
   ExternalLink,
   FolderOpen,
@@ -30,7 +28,6 @@ import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ProjectGitSettings } from '../projects/ProjectGitSettings';
-import { WorkspaceReadiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
@@ -41,6 +38,7 @@ import './onboarding.css';
 const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agents' },
+  { id: 'behavior', label: 'Behavior' },
   { id: 'theme', label: 'Appearance' },
   { id: 'task', label: 'First task' },
 ];
@@ -49,6 +47,9 @@ const setupTips: Record<OnboardingStep, string[]> = {
   agent: [
     'This preference belongs to this project. Other projects keep their own agent choices.',
     'Add agents, supported accounts and models later in Settings → Agents.',
+  ],
+  behavior: [
+    'Set commit author attribution, checkpointing, and branch cleanup for this repository.',
   ],
   theme: [
     'Keep the app theme or give this project its own colors. Your choices are saved when setup finishes.',
@@ -90,8 +91,6 @@ export function OnboardingFlow({
   const [allowedAgents, setAllowedAgents] = useState<string[] | null>(
     project?.preferences?.allowedAgents ?? null,
   );
-  const [showAllAgents, setShowAllAgents] = useState(false);
-  const [commitOpen, setCommitOpen] = useState(true);
   const [working, setBusy] = useState(false);
   const [nodding, setNodding] = useState(false);
   const pendingAdvance = useRef<(() => void) | null>(null);
@@ -306,14 +305,22 @@ export function OnboardingFlow({
               </Button>
             )}
           </div>
-          <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
+          <h2
+            id="onboarding-heading"
+            ref={heading}
+            data-step={step}
+            tabIndex={-1}
+            className={step === 'behavior' ? 'sr-only' : undefined}
+          >
             {step === 'project'
               ? 'Choose a project'
               : step === 'agent'
                 ? 'Choose agents for this project'
-                : step === 'theme'
-                  ? 'Choose this project’s appearance'
-                  : 'Describe your first task'}
+                : step === 'behavior'
+                  ? 'Commits and cleanup'
+                  : step === 'theme'
+                    ? 'Choose this project’s appearance'
+                    : 'Describe your first task'}
           </h2>
           {step === 'project' && (
             <>
@@ -485,11 +492,8 @@ export function OnboardingFlow({
                 Start with one available agent. You can add agents and change project defaults
                 later.
               </p>
-              <fieldset className="onboarding-runner-list" aria-label="Choose your project agent">
-                {(showAllAgents
-                  ? detectedAgents
-                  : detectedAgents.filter((item) => item.id === recommendedId)
-                ).map((item) => {
+              {(() => {
+                const renderAgentCard = (item: (typeof detectedAgents)[number]) => {
                   const adapter =
                     config.customAgents.find((custom) => custom.id === item.id)?.adapter ?? item.id;
                   const meta = getAgentMetadata(item.id);
@@ -524,14 +528,12 @@ export function OnboardingFlow({
                             <small>{item.detail || 'Installed'}</small>
                           </div>
                         </button>
-                        {showAllAgents && (
-                          <Switch
-                            label={`Use ${item.name} in this project`}
-                            checked={projectEnabled(item.id)}
-                            disabled={busy}
-                            onCheckedChange={(checked) => toggleAgent(item.id, checked)}
-                          />
-                        )}
+                        <Switch
+                          label={`Use ${item.name} in this project`}
+                          checked={projectEnabled(item.id)}
+                          disabled={busy}
+                          onCheckedChange={(checked) => toggleAgent(item.id, checked)}
+                        />
                       </div>
                       {projectEnabled(item.id) && (
                         <OnboardingAgentAccount
@@ -554,64 +556,114 @@ export function OnboardingFlow({
                       )}
                     </div>
                   );
-                })}
-                {!detectedAgents.length && (
-                  <p className="task-muted" role="status">
-                    {execution.discovering
-                      ? 'Looking for installed agents…'
-                      : 'No agents found yet. Install and sign in to your preferred agent, then re-scan agents.'}
-                  </p>
-                )}
-              </fieldset>
-              {detectedAgents.length > 1 && (
-                <div className="onboarding-agents-toggle">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="onboarding-toggle-agents-btn"
-                    onClick={() => setShowAllAgents((value) => !value)}
-                  >
-                    {showAllAgents ? (
-                      <>
-                        <ChevronUp size={16} aria-hidden="true" />
-                        <span>Show recommended agent only</span>
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown size={16} aria-hidden="true" />
-                        <span>Choose another agent</span>
-                        <Badge variant="accent">{detectedAgents.length} detected</Badge>
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-              <div className="onboarding-local-agent">
-                <LocalAiSetup
-                  compact
-                  projectSetup
-                  onConnected={(profileId) => {
-                    setAgent('opencode');
-                    const nextAllowed =
-                      allowedAgents === null ? null : [...new Set([...allowedAgents, 'opencode'])];
-                    setAllowedAgents(nextAllowed);
-                    if (project) {
-                      onboarding.stageProject({
-                        ...project,
-                        preferences: {
-                          ...project.preferences,
-                          preferredRunner: 'opencode',
-                          allowedAgents: nextAllowed ?? undefined,
-                          agentAccounts: {
-                            ...project.preferences?.agentAccounts,
-                            opencode: profileId,
-                          },
-                        },
-                      });
-                    }
-                  }}
-                />
-              </div>
+                };
+
+                const localAi = (
+                  <div className="onboarding-local-agent">
+                    <LocalAiSetup
+                      compact
+                      projectSetup
+                      onConnected={(profileId) => {
+                        setAgent('opencode');
+                        const nextAllowed =
+                          allowedAgents === null
+                            ? null
+                            : [...new Set([...allowedAgents, 'opencode'])];
+                        setAllowedAgents(nextAllowed);
+                        if (project) {
+                          onboarding.stageProject({
+                            ...project,
+                            preferences: {
+                              ...project.preferences,
+                              preferredRunner: 'opencode',
+                              allowedAgents: nextAllowed ?? undefined,
+                              agentAccounts: {
+                                ...project.preferences?.agentAccounts,
+                                opencode: profileId,
+                              },
+                            },
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                );
+
+                const installCatalog = installableAgents.length > 0 && (
+                  <Disclosure className="onboarding-install-catalog">
+                    <DisclosureSummary>
+                      Install other supported agents ({installableAgents.length} available)
+                    </DisclosureSummary>
+                    <div className="onboarding-catalog-grid">
+                      {installableAgents.map((b) => (
+                        <div key={b.id} className="onboarding-catalog-card">
+                          <div className="onboarding-catalog-head">
+                            <div className="flex items-center gap-2.5">
+                              <AgentAvatar provider={b.id} size="xs" />
+                              <div>
+                                <strong>{b.name}</strong>
+                                <span className="onboarding-vendor">{b.vendor}</span>
+                              </div>
+                            </div>
+                            <a
+                              href={b.installUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="onboarding-catalog-link"
+                              title={`Open ${b.name} docs`}
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                          <p className="onboarding-catalog-desc">{b.description}</p>
+                          {b.installCommand &&
+                            (() => {
+                              const instCmd = b.installCommand;
+                              return (
+                                <div className="onboarding-command-box">
+                                  <code>{instCmd}</code>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => copyToClipboard(instCmd)}
+                                  >
+                                    {copiedCommand === instCmd ? (
+                                      <Check size={13} />
+                                    ) : (
+                                      <Copy size={13} />
+                                    )}
+                                    {copiedCommand === instCmd ? 'Copied' : 'Copy'}
+                                  </Button>
+                                </div>
+                              );
+                            })()}
+                        </div>
+                      ))}
+                    </div>
+                  </Disclosure>
+                );
+
+                return (
+                  <>
+                    <fieldset
+                      className="onboarding-runner-list"
+                      aria-label="Choose your project agent"
+                    >
+                      {detectedAgents.map(renderAgentCard)}
+                      {!detectedAgents.length && (
+                        <p className="task-muted" role="status">
+                          {execution.discovering
+                            ? 'Looking for installed agents…'
+                            : 'No agents found yet. Install and sign in to your preferred agent, then re-scan agents.'}
+                        </p>
+                      )}
+                    </fieldset>
+                    {localAi}
+                    {installCatalog}
+                  </>
+                );
+              })()}
               {!execution.runners.some(
                 (item) => item.available && available(item.id) && projectEnabled(item.id),
               ) && (
@@ -620,20 +672,6 @@ export function OnboardingFlow({
                 </p>
               )}
               {execution.error && <InlineNotice tone="error">{execution.error}</InlineNotice>}
-              {project && (
-                <Disclosure
-                  open={commitOpen}
-                  onToggle={(event) => setCommitOpen(event.currentTarget.open)}
-                >
-                  <DisclosureSummary>Advanced · Git ownership and commits</DisclosureSummary>
-                  <ProjectGitSettings
-                    key={project.path}
-                    projectPath={project.path}
-                    onDraftChange={setCommitPolicy}
-                    disabled={busy}
-                  />
-                </Disclosure>
-              )}
 
               {runner && !runner.signedIn && runner.available && !accounts[runnerAdapter]?.view && (
                 <div className="onboarding-signin-tip">
@@ -664,61 +702,6 @@ export function OnboardingFlow({
                 </div>
               )}
 
-              {installableAgents.length > 0 && (
-                <Disclosure className="onboarding-install-catalog">
-                  <DisclosureSummary>
-                    Install other supported agents ({installableAgents.length} available)
-                  </DisclosureSummary>
-                  <div className="onboarding-catalog-grid">
-                    {installableAgents.map((b) => (
-                      <div key={b.id} className="onboarding-catalog-card">
-                        <div className="onboarding-catalog-head">
-                          <div className="flex items-center gap-2.5">
-                            <AgentAvatar provider={b.id} size="xs" />
-                            <div>
-                              <strong>{b.name}</strong>
-                              <span className="onboarding-vendor">{b.vendor}</span>
-                            </div>
-                          </div>
-                          <a
-                            href={b.installUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="onboarding-catalog-link"
-                            title={`Open ${b.name} docs`}
-                          >
-                            <ExternalLink size={14} />
-                          </a>
-                        </div>
-                        <p className="onboarding-catalog-desc">{b.description}</p>
-                        {b.installCommand &&
-                          (() => {
-                            const instCmd = b.installCommand;
-                            return (
-                              <div className="onboarding-command-box">
-                                <code>{instCmd}</code>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => copyToClipboard(instCmd)}
-                                >
-                                  {copiedCommand === instCmd ? (
-                                    <Check size={13} />
-                                  ) : (
-                                    <Copy size={13} />
-                                  )}
-                                  {copiedCommand === instCmd ? 'Copied' : 'Copy'}
-                                </Button>
-                              </div>
-                            );
-                          })()}
-                      </div>
-                    ))}
-                  </div>
-                </Disclosure>
-              )}
-
               <div className="onboarding-actions">
                 <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('project')}>
                   <ArrowLeft size={16} />
@@ -728,7 +711,6 @@ export function OnboardingFlow({
                   disabled={
                     busy ||
                     execution.discovering ||
-                    !commitPolicy ||
                     invalidAccounts ||
                     !runner?.available ||
                     !available(agent) ||
@@ -736,9 +718,7 @@ export function OnboardingFlow({
                   }
                   onClick={() =>
                     void attempt(async () => {
-                      if (!project || !commitPolicy) return;
-                      await projectGitPolicy(project.path, commitPolicy);
-                      setThemePreview(undefined);
+                      if (!project) return;
                       onboarding.stageProject(
                         {
                           ...project,
@@ -750,6 +730,39 @@ export function OnboardingFlow({
                         },
                         draft,
                       );
+                      advance(() => onboarding.go('behavior'));
+                    })
+                  }
+                >
+                  Continue
+                  <ArrowRight size={16} />
+                </Button>
+              </div>
+            </>
+          )}
+          {step === 'behavior' && project && (
+            <>
+              <div className="onboarding-behavior-section">
+                <ProjectGitSettings
+                  key={project.path}
+                  projectPath={project.path}
+                  onDraftChange={setCommitPolicy}
+                  disabled={busy}
+                />
+              </div>
+
+              <div className="onboarding-actions">
+                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('agent')}>
+                  <ArrowLeft size={16} />
+                  Back
+                </Button>
+                <Button
+                  disabled={busy || !commitPolicy}
+                  onClick={() =>
+                    void attempt(async () => {
+                      if (!commitPolicy) return;
+                      await projectGitPolicy(project.path, commitPolicy);
+                      setThemePreview(undefined);
                       advance(() => onboarding.go('theme'));
                     })
                   }
@@ -769,7 +782,7 @@ export function OnboardingFlow({
               onPreview={setThemePreview}
               onBack={() => {
                 setThemePreview(undefined);
-                onboarding.go('agent');
+                onboarding.go('behavior');
               }}
               onContinue={(theme) => {
                 onboarding.stageProject(
@@ -806,18 +819,6 @@ export function OnboardingFlow({
                   onboarding.setFirstTask(event.target.value);
                 }}
               />
-              {project && <WorkspaceReadiness project={project} mode="setup" />}
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() => {
-                  onboarding.setFirstTask(
-                    'Explore this repository and explain its architecture, how to run it, and a useful first improvement. Do not edit files or commit changes.',
-                  );
-                }}
-              >
-                Start with a codebase walkthrough
-              </Button>
               <div className="onboarding-actions">
                 <Button
                   variant="ghost"

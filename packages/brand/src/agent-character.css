@@ -12,16 +12,32 @@
 }
 .brand-agent-face {
   stroke: var(--color-surface);
+  transform-origin: 39px 39px;
+  transform-box: view-box;
+  animation: brand-agent-blink 5.2s ease-in-out infinite;
 }
 .brand-agent-orbit {
   stroke: var(--color-surface);
   stroke-width: 1.25;
+}
+.brand-agent-head {
+  transform-origin: 44px 44px;
+  transform-box: view-box;
+  transition: transform 140ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+.brand-agent-gaze {
+  transform-origin: 39px 39px;
+  transform-box: view-box;
+  transition: transform 80ms cubic-bezier(0.2, 0, 0.2, 1);
 }
 .brand-agent-character[data-state="waiting"] {
   transform: rotate(-6deg);
 }
 .brand-agent-character[data-state="working"] {
   animation: brand-agent-working 2.8s ease-in-out infinite;
+}
+.brand-agent-character[data-state="working"] .brand-agent-face {
+  animation: none;
 }
 @keyframes brand-agent-working {
   0%,
@@ -32,8 +48,20 @@
     transform: translateY(-2px);
   }
 }
+@keyframes brand-agent-blink {
+  0%,
+  93%,
+  97%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.08);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .brand-agent-character[data-state="working"] {
+  .brand-agent-character[data-state="working"],
+  .brand-agent-face {
     animation: none;
   }
 }

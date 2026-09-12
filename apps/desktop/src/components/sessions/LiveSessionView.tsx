@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useAgentGaze } from '../../hooks/useAgentGaze';
 import {
   type LiveSession,
   type SessionReview,
@@ -76,6 +77,8 @@ export function LiveSessionView({
   const reviewAttempt = useRef('');
   const transcript = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
+  const mascotRef = useRef<HTMLSpanElement>(null);
+  const mascotGaze = useAgentGaze(mascotRef);
   const refresh = () => useLiveSessionStore.getState().refresh(session.id);
   const act = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -195,10 +198,11 @@ export function LiveSessionView({
             <ArrowLeft size={18} />
           </Button>
         )}
-        <span className="live-mascot" aria-hidden="true">
+        <span className="live-mascot" aria-hidden="true" ref={mascotRef}>
           <AgentCharacter
             provider={provider}
             state={questions.length ? 'waiting' : active ? 'working' : 'idle'}
+            gaze={mascotGaze}
           />
         </span>
         <div className="live-title" data-tauri-drag-region={detached || undefined}>

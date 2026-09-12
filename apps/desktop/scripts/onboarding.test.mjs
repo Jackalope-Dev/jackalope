@@ -57,7 +57,7 @@ test('adding a project clears previous setup context', () => {
   assert.equal(store.getState().projectId, null);
 });
 test('old account and theme steps migrate to project setup', async () => {
-  for (const step of ['account', 'theme']) {
+  for (const step of ['account', 'behavior', 'theme']) {
     values.set(
       'jackalope-onboarding-v1',
       JSON.stringify({ state: { status: 'active', step }, version: 0 }),

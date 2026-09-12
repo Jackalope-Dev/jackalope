@@ -103,11 +103,3 @@
 .theme-editor .color-field {
   height: clamp(7rem, 17vh, 9rem);
 }
-.onboarding-content .theme-color-controls {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 24px;
-}
-.onboarding-content .theme-color-controls > div {
-  gap: 12px;
-}

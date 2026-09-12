@@ -1,6 +1,5 @@
 import {
   type ColorHarmony,
-  hexToHsl,
   hslToHex,
   PRESET_THEMES,
   paletteColors,
@@ -8,9 +7,8 @@ import {
   type ThemePalette,
   themeTokens,
 } from '@jackalope/brand/theme';
-import { Input } from '@jackalope/ui';
 import { Check, Clock3, Moon, Sun } from 'lucide-react';
-import { type PointerEvent, useEffect, useId, useState } from 'react';
+import { type PointerEvent, useId } from 'react';
 import './theme-editor.css';
 
 export function ThemeEditor({
@@ -21,11 +19,7 @@ export function ThemeEditor({
   onChange: (theme: ThemePalette) => void;
 }) {
   const colors = paletteColors(value);
-  const primaryHex = colors[0].hex;
-  const [hex, setHex] = useState(primaryHex);
   const inputId = useId();
-  useEffect(() => setHex(primaryHex), [primaryHex]);
-  const validHex = /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(hex);
   const harmony = value.harmony ?? 'single';
   const appearance =
     value.appearance === 'automatic' ? 'Auto' : value.isDark === false ? 'Light' : 'Dark';
@@ -143,7 +137,7 @@ export function ThemeEditor({
   );
   const colorControls = (
     <div className="theme-color-controls">
-      <label className="block text-xs space-y-2">
+      <label className="block text-xs space-y-1.5">
         <span className="flex justify-between">
           <span>Atmosphere</span>
           <span className="text-[var(--color-text-muted)]">
@@ -160,33 +154,6 @@ export function ThemeEditor({
           className="theme-range w-full"
         />
       </label>
-      <div className="flex justify-between items-center text-xs">
-        <label htmlFor={inputId} className="text-[var(--color-text-secondary)]">
-          Exact color
-        </label>
-        <Input
-          id={inputId}
-          aria-invalid={!validHex}
-          value={hex}
-          spellCheck={false}
-          maxLength={7}
-          onChange={(event) => {
-            const next = event.target.value;
-            setHex(next);
-            if (/^#[\da-f]{6}$/i.test(next)) {
-              const { h, s, l } = hexToHsl(next);
-              custom(h, s, l);
-            }
-          }}
-          onBlur={() => {
-            if (validHex) {
-              const { h, s, l } = hexToHsl(hex);
-              custom(h, s, l);
-            } else setHex(primaryHex);
-          }}
-          className="w-24 rounded-lg bg-[var(--color-surface-sunken)] px-3 py-2 text-center font-mono text-[var(--color-text-primary)]"
-        />
-      </div>
     </div>
   );
 
