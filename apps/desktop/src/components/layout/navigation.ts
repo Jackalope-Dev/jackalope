@@ -59,7 +59,7 @@ export const WORKSPACE_VIEWS = [
     label: 'Connections',
     description: 'Install and configure MCP tools.',
     icon: Plug,
-    group: 'connections',
+    group: 'agents',
     primary: false,
   },
   {
@@ -67,15 +67,15 @@ export const WORKSPACE_VIEWS = [
     label: 'Marketplace',
     description: 'MCP: discover and install tools and services.',
     icon: Plug,
-    group: 'connections',
+    group: 'agents',
     primary: false,
   },
   {
     id: 'usage',
-    label: 'Usage',
-    description: 'Understand consumption and account capacity.',
+    label: 'Usage & quota',
+    description: 'Agents: account limits, token usage and performance insights.',
     icon: ChartNoAxesColumn,
-    group: 'usage',
+    group: 'agents',
     primary: false,
   },
   {
@@ -161,6 +161,15 @@ export const WORKSPACE_VIEWS = [
 ] as const;
 export type ActiveTab = (typeof WORKSPACE_VIEWS)[number]['id'];
 export const DEFAULT_WORKSPACE_TAB: ActiveTab = 'live-sessions';
+export const AGENT_VIEWS = [
+  { id: 'agents', label: 'Runners' },
+  { id: 'usage', label: 'Usage & quota' },
+  { id: 'mcps', label: 'MCP tools' },
+] as const;
+export const MCP_VIEWS = [
+  { id: 'mcps', label: 'Connections' },
+  { id: 'mcp-marketplace', label: 'Marketplace' },
+] as const;
 export const USAGE_VIEWS = [
   { id: 'tokens', label: 'Tokens & usage' },
   { id: 'analytics', label: 'Performance & insights' },

@@ -216,7 +216,7 @@ export function UsageDashboard({
   return (
     <WorkspacePage className="usage-page workspace-sections">
       <WorkspaceHeading
-        title={view === 'analytics' ? 'Performance & insights' : 'Usage'}
+        title={view === 'analytics' ? 'Performance & insights' : 'Usage & quota'}
         description={
           view === 'tokens'
             ? 'Your account limits, token activity and the work behind them.'

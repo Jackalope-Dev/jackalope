@@ -37,7 +37,8 @@ invalidate the displayed snapshot and never launch tasks or alter branch monitor
 Project readiness uses isolated gix metadata reads with Git fallback. Review rendering
 uses Pierre Diffs and task-result rendering uses Streamdown; neither owns integration
 approval or native execution. See [dependency integration contracts](DEPENDENCY-INTEGRATIONS.md).
-Shell selects Tasks, Project, Agents, MCP or Usage. Zustand stores keep
+Shell selects Tasks, Project or Agents. Agents groups runners, usage and quota,
+and MCP connections and marketplace. Zustand stores keep
 selection, drafts and preferences; they do not establish that native work ran.
 
 ~~~text

@@ -33,7 +33,9 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
 import {
   type ActiveTab,
+  AGENT_VIEWS,
   DEFAULT_WORKSPACE_TAB,
+  MCP_VIEWS,
   type ProjectSettingsDestination,
   USAGE_VIEWS,
   type UsageView,
@@ -414,6 +416,20 @@ export function Shell({
         className="workspace-canvas"
         aria-label={view.label}
       >
+        {view.group === 'agents' && (
+          <WorkspaceSubnavigation
+            label="Agents views"
+            items={AGENT_VIEWS}
+            value={
+              activeTab === 'agent-settings'
+                ? 'agents'
+                : activeTab === 'mcp-marketplace'
+                  ? 'mcps'
+                  : activeTab
+            }
+            onChange={navigate}
+          />
+        )}
         {view.group !== 'settings' &&
           view.group !== 'agents' &&
           WORKSPACE_VIEWS.filter((item) => item.group === view.group).length > 1 && (
@@ -450,6 +466,14 @@ export function Shell({
             items={USAGE_VIEWS}
             value={usageView}
             onChange={setUsageView}
+          />
+        )}
+        {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
+          <WorkspaceSubnavigation
+            label="MCP views"
+            items={MCP_VIEWS}
+            value={activeTab}
+            onChange={navigate}
           />
         )}
         <PageErrorBoundary

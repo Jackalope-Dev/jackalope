@@ -16,7 +16,7 @@ import { returnToProject } from '../../lib/project-return';
 import { queueSnapshot } from '../../lib/queue';
 import { nativeTask } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
+import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -106,13 +106,14 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 {project.description && (
                   <span className="text-[var(--color-text-secondary)]">{project.description}</span>
                 )}
-                <span
+                <button
+                  type="button"
                   className="project-path-pill"
                   title="Click to copy path"
                   onClick={() => void navigator.clipboard.writeText(project.path)}
                 >
                   {project.path}
-                </span>
+                </button>
               </div>
             }
             action={
