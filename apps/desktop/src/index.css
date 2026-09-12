@@ -81,6 +81,11 @@
   }
 }
 
+.text-muted,
+.task-muted {
+  color: var(--color-text-secondary);
+}
+
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);

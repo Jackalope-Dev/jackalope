@@ -1,0 +1,215 @@
+/* Project Overview - Derived from Jackalope tokens and UI guidelines */
+
+.project-heading-description {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+}
+
+.project-path-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-secondary);
+  max-width: 100%;
+}
+
+.project-path-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.project-path-pill:hover .project-path-actions {
+  opacity: 1;
+}
+
+.project-path-pill .ui-button {
+  height: 16px;
+  width: 16px;
+  min-width: 16px;
+  padding: 0;
+  font-size: 0;
+  gap: 0;
+  border-radius: 3px;
+  color: var(--color-text-secondary);
+}
+
+.project-path-pill .ui-button:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.project-path-pill .ui-button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.project-path-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.project-path-action:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.project-path-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 4-Card Status Overview Grid */
+.project-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: var(--workspace-section-heading-gap, 16px);
+}
+
+.project-stat-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  transition: border-color 140ms ease;
+  min-height: 140px;
+  color: var(--color-text-primary);
+}
+
+.project-stat-card:hover {
+  border-color: var(--color-border);
+}
+
+.project-stat-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+.project-stat-value-text {
+  display: block;
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-stat-desc {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.project-stat-footer {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-secondary);
+}
+
+/* Command Setup 3-Grid */
+.project-commands-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 14px;
+}
+
+.project-command-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-command-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.project-command-name {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.project-command-code {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle);
+  overflow-wrap: anywhere;
+}
+
+.project-command-code.is-empty {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+/* Recent Deliveries */
+.project-delivery-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.project-delivery-row:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+}
