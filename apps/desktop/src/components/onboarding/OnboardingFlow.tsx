@@ -1,9 +1,11 @@
 import { applyThemeTokens, type ThemePalette } from '@jackalope/brand/theme';
-import { Disclosure, DisclosureSummary, Input, RefreshIcon, Textarea } from '@jackalope/ui';
+import { Badge, Disclosure, DisclosureSummary, Input, RefreshIcon, Textarea } from '@jackalope/ui';
 import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
+  ChevronUp,
   Copy,
   ExternalLink,
   FolderOpen,
@@ -22,6 +24,7 @@ import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
+import { AgentAvatar } from '../agents/AgentAvatar';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
@@ -88,6 +91,7 @@ export function OnboardingFlow({
     project?.preferences?.allowedAgents ?? null,
   );
   const [showAllAgents, setShowAllAgents] = useState(false);
+  const [commitOpen, setCommitOpen] = useState(true);
   const [working, setBusy] = useState(false);
   const [nodding, setNodding] = useState(false);
   const pendingAdvance = useRef<(() => void) | null>(null);
@@ -506,6 +510,7 @@ export function OnboardingFlow({
                           <span className="onboarding-radio">
                             {agent === item.id && <Check size={14} />}
                           </span>
+                          <AgentAvatar provider={adapter} size="sm" />
                           <div className="onboarding-runner-info">
                             <div className="onboarding-runner-header">
                               <strong>{item.name}</strong>
@@ -559,11 +564,27 @@ export function OnboardingFlow({
                 )}
               </fieldset>
               {detectedAgents.length > 1 && (
-                <Button variant="ghost" onClick={() => setShowAllAgents((value) => !value)}>
-                  {showAllAgents
-                    ? 'Show recommended agent'
-                    : `Choose another agent (${detectedAgents.length})`}
-                </Button>
+                <div className="onboarding-agents-toggle">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="onboarding-toggle-agents-btn"
+                    onClick={() => setShowAllAgents((value) => !value)}
+                  >
+                    {showAllAgents ? (
+                      <>
+                        <ChevronUp size={16} aria-hidden="true" />
+                        <span>Show recommended agent only</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={16} aria-hidden="true" />
+                        <span>Choose another agent</span>
+                        <Badge variant="accent">{detectedAgents.length} detected</Badge>
+                      </>
+                    )}
+                  </Button>
+                </div>
               )}
               <div className="onboarding-local-agent">
                 <LocalAiSetup
@@ -600,7 +621,10 @@ export function OnboardingFlow({
               )}
               {execution.error && <InlineNotice tone="error">{execution.error}</InlineNotice>}
               {project && (
-                <Disclosure>
+                <Disclosure
+                  open={commitOpen}
+                  onToggle={(event) => setCommitOpen(event.currentTarget.open)}
+                >
                   <DisclosureSummary>Advanced · Git ownership and commits</DisclosureSummary>
                   <ProjectGitSettings
                     key={project.path}
@@ -610,11 +634,6 @@ export function OnboardingFlow({
                   />
                 </Disclosure>
               )}
-              <p className="onboarding-note">
-                Add more agents, supported accounts and models in <strong>Settings → Agents</strong>
-                . Choose the agents and accounts each project uses in{' '}
-                <strong>Project settings</strong>.
-              </p>
 
               {runner && !runner.signedIn && runner.available && !accounts[runnerAdapter]?.view && (
                 <div className="onboarding-signin-tip">
@@ -654,9 +673,12 @@ export function OnboardingFlow({
                     {installableAgents.map((b) => (
                       <div key={b.id} className="onboarding-catalog-card">
                         <div className="onboarding-catalog-head">
-                          <div>
-                            <strong>{b.name}</strong>
-                            <span className="onboarding-vendor">{b.vendor}</span>
+                          <div className="flex items-center gap-2.5">
+                            <AgentAvatar provider={b.id} size="xs" />
+                            <div>
+                              <strong>{b.name}</strong>
+                              <span className="onboarding-vendor">{b.vendor}</span>
+                            </div>
                           </div>
                           <a
                             href={b.installUrl}
@@ -760,9 +782,17 @@ export function OnboardingFlow({
           )}
           {step === 'task' && (
             <>
-              <p className="onboarding-description">
-                {runner?.name ?? 'Your agent'} · <strong>{project?.name}</strong>
-              </p>
+              <div className="flex items-center gap-3 my-4">
+                {runner && <AgentAvatar provider={runnerAdapter} size="sm" />}
+                <div>
+                  <strong className="block text-sm text-[var(--color-text-primary)]">
+                    {runner?.name ?? 'Your agent'}
+                  </strong>
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    {project?.name}
+                  </span>
+                </div>
+              </div>
               <label htmlFor="onboarding-prompt" className="task-label">
                 Your first task (optional)
               </label>

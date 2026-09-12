@@ -177,12 +177,8 @@ export function ProjectGitSettings({
               Save commit settings
             </Button>
           )}
-          {dirty && (
-            <p className="task-muted text-sm mt-2">
-              {onDraftChange
-                ? 'Continue saves these choices for this repository.'
-                : 'Save to apply these choices.'}
-            </p>
+          {dirty && !onDraftChange && (
+            <p className="task-muted text-sm mt-2">Save to apply these choices.</p>
           )}
         </>
       ) : (

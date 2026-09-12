@@ -219,6 +219,26 @@
 .onboarding-local-agent {
   margin: 24px 0;
 }
+.onboarding-agents-toggle {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+}
+.onboarding-toggle-agents-btn {
+  height: auto;
+  min-height: 42px;
+  padding: 8px 16px;
+  gap: 10px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  transition: all 150ms ease;
+}
+.onboarding-toggle-agents-btn:hover {
+  border-color: var(--color-accent);
+  background: var(--color-surface-elevated);
+}
 .onboarding-agent-choice {
   display: flex;
   align-items: center;
