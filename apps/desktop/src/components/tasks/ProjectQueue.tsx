@@ -186,14 +186,9 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
             <ListPlus size={16} />
             Add work
           </Button>
-          <button
-            type="button"
-            className="task-link"
-            disabled={!desktop}
-            onClick={() => setImporting(true)}
-          >
+          <Button variant="ghost" disabled={!desktop} onClick={() => setImporting(true)}>
             Import a plan
-          </button>
+          </Button>
         </div>
       </div>
       {planningFeature && (
@@ -344,15 +339,10 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
               <ListPlus size={28} />
               <h2>Start with independent pieces</h2>
               <p className="task-muted">Assign agents, files and dependencies to each task.</p>
-              <button
-                type="button"
-                className="task-link"
-                disabled={!desktop}
-                onClick={() => setAdding(true)}
-              >
+              <Button disabled={!desktop} onClick={() => setAdding(true)}>
+                <ListPlus size={16} />
                 Add the first task
-                <ArrowRight size={15} />
-              </button>
+              </Button>
             </div>
           ) : (
             items
@@ -397,55 +387,51 @@ export function ProjectQueue({ project, onBack }: { project: Project; onBack: ()
                       </Disclosure>
                       <div className="queue-item-actions">
                         {run ? (
-                          <button
-                            type="button"
-                            className="task-link"
-                            onClick={() => select(run.id)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => select(run.id)}>
                             {isActive(run) ? 'Follow work' : 'Read result'}
                             <ArrowRight size={13} />
-                          </button>
+                          </Button>
                         ) : (
                           !item.runId && (
-                            <button
-                              type="button"
-                              className="task-link"
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               disabled={busy}
                               onClick={() => void act('queue_cancel', { id: item.id })}
                             >
                               Remove from plan
-                            </button>
+                            </Button>
                           )
                         )}
                         {phase === 'attention' && (
-                          <button
-                            type="button"
-                            className="task-link"
+                          <Button
+                            variant="outline"
+                            size="sm"
                             disabled={busy}
                             onClick={() => void act('queue_release', { id: item.id, retry: true })}
                           >
                             Retry in a new worktree
-                          </button>
+                          </Button>
                         )}
                         {item.runId && (!run || !isActive(run)) && phase !== 'merged' && (
-                          <button
-                            type="button"
-                            className="task-link"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             disabled={busy}
                             onClick={() => void act('queue_release', { id: item.id, retry: false })}
                           >
                             Abandon & release scope
-                          </button>
+                          </Button>
                         )}
                         {run && isActive(run) && (
-                          <button
-                            type="button"
-                            className="task-link"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             disabled={busy}
                             onClick={() => void act('task_stop', { id: run.id })}
                           >
                             Stop agent
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>

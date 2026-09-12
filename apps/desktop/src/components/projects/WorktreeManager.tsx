@@ -32,10 +32,52 @@ import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 
-/** Spell out the ignored paths cleanup deletes, so a confirm never hides them. */
+/** Ignored paths cleanup deletes, so a confirm never hides them. */
+function discarded(worktrees: WorktreeEntry[]): string[] {
+  return [...new Set(worktrees.flatMap((wt) => wt.cleanup?.discarded_paths ?? []))].sort();
+}
+
 function discardList(worktrees: WorktreeEntry[]): string {
-  const paths = [...new Set(worktrees.flatMap((wt) => wt.cleanup?.discarded_paths ?? []))].sort();
+  const paths = discarded(worktrees);
   return paths.length ? ` Ignored paths deleted with them: ${paths.join(', ')}.` : '';
+}
+
+/**
+ * What a confirm is about to remove, and which step it is on once it runs:
+ * removing several worktrees is slow enough to look stalled without it.
+ */
+function RemovalPlan({
+  names = [],
+  paths = [],
+  progress,
+}: {
+  names?: string[];
+  paths?: string[];
+  progress: string;
+}) {
+  if (names.length < 2 && !paths.length && !progress) return null;
+  return (
+    <div className="cleanup-plan">
+      {names.length > 1 && (
+        <ul className="cleanup-plan-list">
+          {names.map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+      )}
+      {paths.length > 0 && (
+        <details className="cleanup-plan-note">
+          <summary>Ignored files deleted too ({paths.length})</summary>
+          <p>{paths.join(', ')}</p>
+        </details>
+      )}
+      {progress && (
+        <p className="cleanup-plan-progress" role="status">
+          {progress}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }) {
@@ -57,6 +99,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const [feedback, setFeedback] = useState('');
   const [target, setTarget] = useState('auto');
   const [removing, setRemoving] = useState<string | null>(null);
+  const [progress, setProgress] = useState('');
   const pending = busy || removing !== null;
   const refreshing = loading || checkingWorktrees;
   const worktrees = (project?.worktrees ?? []).filter(
@@ -120,21 +163,23 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
   const cleanup = async (worktree: WorktreeEntry) => {
     if (pending || !project) return;
     const id = project.id;
+    const name = worktree.branch || worktree.path;
     setRemoving(worktree.path);
     setError('');
     setFeedback('');
+    setProgress(`Removing ${name}…`);
     try {
       await cleanupWorktree(project.path, worktree);
-      if (projectId.current === id) {
-        setFeedback(
-          `Removed ${worktree.branch || worktree.path}. Local branch removed. Task history kept.`,
-        );
-      }
+      if (projectId.current === id) setFeedback(`Removed ${name}.`);
     } catch (cause) {
       if (projectId.current === id)
         setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      if (projectId.current === id) await refresh();
+      if (projectId.current === id) {
+        setProgress('Rechecking the other worktrees…');
+        await refresh();
+      }
+      setProgress('');
       setRemoving(null);
     }
   };
@@ -144,13 +189,17 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     setRemoving(worktree.path);
     setError('');
     setFeedback('');
+    setProgress(`Saving ${worktree.branch || worktree.path} to the archive…`);
     try {
       const location = await archiveWorktree(project.path, worktree);
-      if (projectId.current === id)
-        setFeedback(`Archived to ${location}, then removed the worktree.`);
+      if (projectId.current === id) setFeedback(`Archived to ${location}, then removed it.`);
     } finally {
       // The confirm dialog surfaces any error; just refresh the list either way.
-      if (projectId.current === id) await refresh();
+      if (projectId.current === id) {
+        setProgress('Rechecking the other worktrees…');
+        await refresh();
+      }
+      setProgress('');
       setRemoving(null);
     }
   };
@@ -164,7 +213,10 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     let removed = 0;
     try {
       const failures: string[] = [];
-      for (const worktree of candidates) {
+      for (const [index, worktree] of candidates.entries()) {
+        setProgress(
+          `Removing ${worktree.branch || worktree.path}… (${index + 1} of ${candidates.length})`,
+        );
         try {
           await cleanupWorktree(project.path, worktree);
           removed++;
@@ -178,11 +230,11 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
         setError(`Cleanup stopped. ${cause instanceof Error ? cause.message : String(cause)}`);
     } finally {
       if (projectId.current === id) {
-        setFeedback(
-          `Removed ${removed} of ${candidates.length} worktrees. Local branches removed. Task history kept.`,
-        );
+        setFeedback(`Removed ${removed} of ${candidates.length} worktrees.`);
+        setProgress('Rechecking the remaining worktrees…');
         await refresh();
       }
+      setProgress('');
       setBusy(false);
     }
   };
@@ -197,8 +249,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
       if (projectId.current === id)
         setFeedback(
           dropped > 0
-            ? `Removed ${dropped} missing worktree ${dropped === 1 ? 'entry' : 'entries'}. No folders or branches were deleted.`
-            : 'No missing worktree entries to remove.',
+            ? `Removed ${dropped} missing ${dropped === 1 ? 'entry' : 'entries'}. No folders or branches were deleted.`
+            : 'No missing entries to remove.',
         );
     } catch (cause) {
       if (projectId.current === id)
@@ -216,7 +268,8 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     setFeedback('');
     let removed = 0;
     const failures: string[] = [];
-    for (const folder of folders) {
+    for (const [index, folder] of folders.entries()) {
+      setProgress(`Deleting ${folder.name}… (${index + 1} of ${folders.length})`);
       try {
         await removeWorktreeOrphan(project.path, folder);
         removed++;
@@ -227,10 +280,12 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
     if (projectId.current === id) {
       if (failures.length) setError(failures.join('\n'));
       setFeedback(
-        `Removed ${removed} of ${folders.length} leftover ${folders.length === 1 ? 'folder' : 'folders'}. No worktrees or branches were touched.`,
+        `Deleted ${removed} of ${folders.length} leftover ${folders.length === 1 ? 'folder' : 'folders'}.`,
       );
+      setProgress('Rechecking the project folder…');
       await refresh();
     }
+    setProgress('');
     setBusy(false);
   };
   const copy = async (path: string) => {
@@ -322,7 +377,13 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   Clean up ready ({ready.length})
                 </Button>
               }
-            />
+            >
+              <RemovalPlan
+                names={ready.map((wt) => wt.branch || wt.path)}
+                paths={discarded(ready)}
+                progress={progress}
+              />
+            </ConfirmAction>
             {missing.length > 0 && (
               <Button
                 variant="outline"
@@ -332,12 +393,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                 Remove missing entries ({missing.length})
               </Button>
             )}
-            <p className="task-muted">
-              Ready means Git confirms the committed, staged and local work is in the target.
-              Ignored build output and dependencies are deleted with the folder; ignored files that
-              hold secrets or local data, and active tasks, keep a worktree. One failed folder does
-              not stop the rest.
-            </p>
+            <p className="task-muted">Clean up merged worktrees with no uncommitted changes.</p>
           </div>
           {creating && (
             <form
@@ -454,7 +510,9 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                           Remove worktree &amp; branch
                         </Button>
                       }
-                    />
+                    >
+                      <RemovalPlan paths={discarded([wt])} progress={progress} />
+                    </ConfirmAction>
                   )}
                 {wt.cleanup?.recoverable && (
                   <ConfirmAction
@@ -516,9 +574,7 @@ export function WorktreeManager({ onOpenProject }: { onOpenProject: () => void }
                   />
                 )}
                 <p className="task-muted">
-                  Folders in .worktrees/ that Git no longer registers as worktrees — what a removed
-                  or interrupted worktree leaves behind. Nothing in them is under version control,
-                  so deleting one cannot be undone.
+                  Unregistered folders in .worktrees/ that are no longer tracked by Git.
                 </p>
               </div>
               {orphans.map((folder) => (

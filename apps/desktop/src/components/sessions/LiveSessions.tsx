@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { sessionWork } from '../../lib/live-session';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import type { Project } from '../../stores/projectStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
@@ -45,7 +46,19 @@ export function LiveSessions({
   return (
     <section className="live-hub" aria-label="Chat">
       <header className="live-hub-heading">
-        <h1>Chat</h1>
+        <div>
+          <h1>Chat</h1>
+          <p className="live-hub-prompt">
+            Looking for existing work?{' '}
+            <button
+              type="button"
+              className="live-link-button"
+              onClick={() => navigateWorkspace('kanban')}
+            >
+              Go to Tasks &rarr;
+            </button>
+          </p>
+        </div>
         {items.length > 0 && (
           <Button
             variant="ghost"

@@ -191,7 +191,7 @@ export function McpWorkspace({
             title={activeTab === 'configured' ? 'MCP connections' : 'MCP marketplace'}
             description={
               activeTab === 'marketplace'
-                ? 'Third-party tools are not provided or audited by Jackalope. Use at your own risk; Jackalope is not responsible for their safety, reliability or data handling.'
+                ? 'Discover and connect MCP servers to extend your agents’ capabilities.'
                 : undefined
             }
             action={

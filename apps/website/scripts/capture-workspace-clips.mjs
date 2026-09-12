@@ -45,7 +45,7 @@ try {
         } else {
           await page
             .getByRole('navigation', { name: 'tasks views', exact: true })
-            .getByRole('button', { name: 'Inbox', exact: true })
+            .getByRole('button', { name: 'Tasks', exact: true })
             .click();
           await page.getByRole('button', { name: 'Board', exact: true }).click();
         }

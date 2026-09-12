@@ -298,15 +298,16 @@ export function RunnerConnections({
                       </p>
                     )}
                     {taskToOpen && (
-                      <button
-                        className="agent-task-link"
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="agent-task-action"
                         onClick={() => onRun(taskToOpen)}
                       >
                         {waitingRun ? 'Respond to task' : working ? 'View task' : 'Review task'}
                         <ArrowRight size={14} />
-                        <span>{taskToOpen.projectName}</span>
-                      </button>
+                        <span className="task-muted text-xs">({taskToOpen.projectName})</span>
+                      </Button>
                     )}
                   </div>
                   <div className="agent-roster-action">

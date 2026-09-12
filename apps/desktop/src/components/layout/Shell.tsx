@@ -427,7 +427,7 @@ export function Shell({
                   item.id === 'live-sessions'
                     ? 'Chat'
                     : item.id === 'kanban'
-                      ? 'Inbox'
+                      ? 'Tasks'
                       : item.id === 'project-overview'
                         ? 'Overview'
                         : item.id === 'topology'

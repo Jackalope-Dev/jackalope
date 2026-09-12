@@ -4,7 +4,7 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
-import { FolderOpen, Radio, Workflow } from 'lucide-react';
+import { FolderOpen, ListTodo, Radio, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queueSnapshot } from '../../lib/queue';
 import { collectWorkspaceWork, type WorkItem } from '../../lib/task-collection';
@@ -179,9 +179,31 @@ export function TaskWorkspace({
             : 'What do you want to accomplish?'
         }
         description={
-          runs.length || ideas.length || sessions.length
-            ? undefined
-            : 'Describe what to build, fix, or explore.'
+          runs.length || ideas.length || sessions.length ? (
+            project ? (
+              <span>
+                Looking for tasks to work on?{' '}
+                <button
+                  type="button"
+                  className="task-inline-link"
+                  onClick={() => navigateWorkspace('repo-todos')}
+                >
+                  Explore Repo TODOs &rarr;
+                </button>
+              </span>
+            ) : undefined
+          ) : (
+            <span>
+              Describe what to build, fix, or explore, or{' '}
+              <button
+                type="button"
+                className="task-inline-link"
+                onClick={() => navigateWorkspace('repo-todos')}
+              >
+                find tasks in Repo TODOs &rarr;
+              </button>
+            </span>
+          )
         }
         action={
           <div className="task-home-actions">
@@ -195,8 +217,26 @@ export function TaskWorkspace({
               <Radio size={16} />
               Open Chat
             </Button>
+            {project && (
+              <Button variant="ghost" onClick={() => navigateWorkspace('repo-todos')}>
+                <ListTodo size={16} />
+                Repo TODOs
+              </Button>
+            )}
             {!!(needsInput || ready) && (
-              <a className="task-attention-link" href="#task-work">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setView({
+                    ...view,
+                    filter: needsInput ? 'attention' : 'review',
+                  });
+                  document
+                    .querySelector('.task-collection')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              >
                 {[
                   needsInput
                     ? `${needsInput} ${needsInput === 1 ? 'needs' : 'need'} attention`
@@ -205,7 +245,7 @@ export function TaskWorkspace({
                 ]
                   .filter(Boolean)
                   .join(' · ')}
-              </a>
+              </Button>
             )}
             {project && (
               <Button variant="ghost" onClick={() => setParallel(true)}>
@@ -273,14 +313,22 @@ export function TaskWorkspace({
               description={
                 archived
                   ? 'Tasks you archive will appear here.'
-                  : 'Describe a change above, or start a Live conversation.'
+                  : 'Describe a change above, or browse repository TODOs to find tasks.'
               }
               action={
-                projectFilter !== 'all' ? (
-                  <Button variant="outline" onClick={() => setScope('all')}>
-                    Show all projects
-                  </Button>
-                ) : undefined
+                <div className="flex items-center gap-2">
+                  {projectFilter !== 'all' && (
+                    <Button variant="outline" onClick={() => setScope('all')}>
+                      Show all projects
+                    </Button>
+                  )}
+                  {!archived && (
+                    <Button variant="outline" onClick={() => navigateWorkspace('repo-todos')}>
+                      <ListTodo size={16} />
+                      Browse Repo TODOs
+                    </Button>
+                  )}
+                </div>
               }
             />
           }

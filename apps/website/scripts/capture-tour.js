@@ -4,7 +4,7 @@ async function _captureTour(page) {
   await page.getByRole('button', { name: 'Tasks', exact: true }).click();
   await page
     .getByRole('navigation', { name: 'tasks views', exact: true })
-    .getByRole('button', { name: 'Inbox', exact: true })
+    .getByRole('button', { name: 'Tasks', exact: true })
     .click();
   const allTasks = page.getByRole('button', { name: 'All tasks', exact: true });
   if (await allTasks.isVisible()) await allTasks.click();

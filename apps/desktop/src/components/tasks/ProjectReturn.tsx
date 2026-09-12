@@ -1,21 +1,20 @@
-import { Disclosure, DisclosureSummary } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
-import { openKnowledgeTask, useKnowledge } from '../../lib/knowledge';
+import { Badge, Panel } from '@jackalope/ui';
+import { ArrowRight, Play } from 'lucide-react';
 import { nextAction, returnToProject } from '../../lib/project-return';
-import { nativeTask, type TaskRun } from '../../lib/task-runtime';
+import type { TaskRun } from '../../lib/task-runtime';
 import { taskTitle } from '../../lib/task-title';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import type { Project } from '../../stores/projectStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
-import type { Readiness } from './WorkspaceReadiness';
 
 export function ProjectReturn({
   project,
   runs,
   integratedIds,
   onOpen,
-  expanded = false,
 }: {
   project: Project;
   runs: TaskRun[];
@@ -24,94 +23,63 @@ export function ProjectReturn({
   expanded?: boolean;
 }) {
   const unfinished = returnToProject(runs, project.id, integratedIds);
-  const { entries, error: knowledgeError } = useKnowledge(project.id, project.path);
-  const [snapshot, setSnapshot] = useState<Readiness | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let alive = true;
-    if (isTauriEnvironment())
-      void nativeTask<Readiness>('project_readiness', { path: project.path })
-        .then((value) => {
-          if (alive) setSnapshot(value);
-        })
-        .catch((cause) => {
-          if (alive) setError(String(cause));
-        });
-    return () => {
-      alive = false;
-    };
-  }, [project.path]);
-  if (!unfinished.length && !entries.length) return null;
+
+  if (!unfinished.length) {
+    return (
+      <Panel className="p-6 text-center">
+        <p className="font-semibold text-base mb-1">All caught up</p>
+        <p className="task-muted text-sm mb-4">
+          No active tasks in this project. Start a new task to build, fix, or explore.
+        </p>
+        <Button
+          onClick={() => {
+            useLiveSessionStore.getState().select(null);
+            useProjectStore.getState().selectProject(project.id);
+            navigateWorkspace('live-sessions');
+          }}
+        >
+          <Play size={16} />
+          Start new task
+        </Button>
+      </Panel>
+    );
+  }
+
   return (
-    <Disclosure className="project-return my-5" open={expanded || undefined}>
-      <DisclosureSummary className="min-h-11 py-3 font-medium">
-        Pick up in {project.name} · {unfinished.length} unfinished
-      </DisclosureSummary>
-      <div className="space-y-3">
-        {unfinished.slice(0, 3).map((run) => (
-          <div key={run.id} className="flex flex-wrap justify-between gap-3 items-center">
-            <div className="min-w-0">
-              <p className="font-medium break-words">{taskTitle(run.prompt)}</p>
-              <p className="task-muted">{nextAction(run)}</p>
+    <div className="space-y-3">
+      {unfinished.slice(0, 3).map((run) => (
+        <Panel key={run.id} className="p-4 flex flex-wrap justify-between gap-3 items-center">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <p className="font-medium text-base break-words">{taskTitle(run.prompt)}</p>
+              <Badge variant={run.status === 'review' ? 'warning' : 'outline'}>
+                {nextAction(run)}
+              </Badge>
             </div>
-            <Button variant="outline" onClick={() => onOpen(run.id)}>
-              Open task
-            </Button>
+            <p className="task-muted text-xs">Started {new Date(run.startedAt).toLocaleString()}</p>
           </div>
-        ))}
-        {unfinished.length > 3 && (
-          <p className="task-muted">
-            {unfinished.length - 3} more unfinished tasks are in project work.
+          <Button onClick={() => onOpen(run.id)}>Resume task</Button>
+        </Panel>
+      ))}
+      {unfinished.length > 3 && (
+        <div className="flex justify-between items-center pt-1">
+          <p className="task-muted text-xs">
+            {unfinished.length - 3} more active task{unfinished.length - 3 > 1 ? 's' : ''} in your
+            task backlog.
           </p>
-        )}
-        {!!entries.filter((e) => e.enabled && e.kind === 'memory').length && (
-          <Disclosure>
-            <DisclosureSummary className="min-h-11 py-3">Project decisions</DisclosureSummary>
-            {entries
-              .filter((e) => e.enabled && e.kind === 'memory')
-              .slice(0, 5)
-              .map((entry) => (
-                <div key={entry.id} className="py-2">
-                  <p className="font-medium">{entry.title}</p>
-                  <p className="whitespace-pre-wrap break-words">{entry.content}</p>
-                  <p className="task-muted">
-                    Saved {new Date(entry.updatedAt).toLocaleDateString()}
-                    {entry.sourceHead && snapshot && snapshot.head !== entry.sourceHead
-                      ? ' · Project revision changed; check whether this still applies.'
-                      : ''}
-                  </p>
-                  {entry.sourceRunId && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => openKnowledgeTask(project.id, entry.sourceRunId as string)}
-                    >
-                      Open source task
-                    </Button>
-                  )}
-                </div>
-              ))}
-            <Button variant="ghost" onClick={() => navigateWorkspace('project-knowledge')}>
-              Review saved knowledge
-            </Button>
-          </Disclosure>
-        )}
-        {snapshot?.recentChanges && (
-          <Disclosure>
-            <DisclosureSummary className="min-h-11 py-3">Recent local commits</DisclosureSummary>
-            <pre className="task-input whitespace-pre-wrap break-words">
-              {snapshot.recentChanges}
-            </pre>
-            <p className="task-muted">
-              Local snapshot when this view opened. No remote fetch was made.
-            </p>
-          </Disclosure>
-        )}
-        {(error || knowledgeError) && (
-          <p role="status" className="task-muted">
-            Some project context is unavailable: {error || knowledgeError}
-          </p>
-        )}
-      </div>
-    </Disclosure>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              useWorkViewStore.getState().setScope('project');
+              navigateWorkspace('kanban');
+            }}
+          >
+            View all in Tasks
+            <ArrowRight size={14} className="ml-1" />
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

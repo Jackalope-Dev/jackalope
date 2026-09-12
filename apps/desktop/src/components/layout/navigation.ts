@@ -24,8 +24,8 @@ export const WORKSPACE_VIEWS = [
   },
   {
     id: 'kanban',
-    label: 'Inbox',
-    description: 'Inbox: plan, review and archive work.',
+    label: 'Tasks',
+    description: 'Tasks: plan, review and archive work.',
     icon: ListTodo,
     group: 'tasks',
     primary: false,

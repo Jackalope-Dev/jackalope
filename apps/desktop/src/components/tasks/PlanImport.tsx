@@ -290,9 +290,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
               instructions concrete enough to review the result.
             </p>
             <Disclosure className="mt-4 text-sm">
-              <DisclosureSummary className="task-link cursor-pointer">
-                Show the export format
-              </DisclosureSummary>
+              <DisclosureSummary>Show the export format</DisclosureSummary>
               <pre className="task-muted text-xs mt-3 overflow-x-auto whitespace-pre-wrap break-words">
                 {example}
               </pre>
@@ -330,9 +328,7 @@ function PlanImportDialog({ project, onAdded, onClose, enabled }: Props) {
                       : 'No dependencies'}
                   </p>
                   <Disclosure className="mt-2 text-xs">
-                    <DisclosureSummary className="task-link cursor-pointer">
-                      Read instructions
-                    </DisclosureSummary>
+                    <DisclosureSummary>Read instructions</DisclosureSummary>
                     <p className="task-muted mt-2 whitespace-pre-wrap break-words">{item.prompt}</p>
                   </Disclosure>
                 </li>

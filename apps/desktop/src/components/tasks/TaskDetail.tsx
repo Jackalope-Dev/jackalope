@@ -763,10 +763,9 @@ export function TaskDetail({
                     Failed calls: {run.mcpUsage.failures}
                   </p>
                   <p className="task-muted">
-                    {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB of tool definitions
-                    returned across searches. Full catalog:{' '}
-                    {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB. These are schema bytes, not
-                    billed tokens or measured savings.
+                    {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB tool definitions
+                    returned across searches (catalog size:{' '}
+                    {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB).
                   </p>
                 </Disclosure>
               )}

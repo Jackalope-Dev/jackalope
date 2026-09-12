@@ -8,6 +8,7 @@ import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project } from '../../stores/projectStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
@@ -127,6 +128,16 @@ export function SessionStart({
               Send
             </Button>
           </div>
+          <p className="live-start-footnote">
+            Looking for existing work?{' '}
+            <button
+              type="button"
+              className="live-link-button"
+              onClick={() => navigateWorkspace('kanban')}
+            >
+              Go to Tasks &rarr;
+            </button>
+          </p>
         </form>
       ) : (
         <Button variant="outline" onClick={onOpenProject}>

@@ -67,6 +67,9 @@ export function WorkspaceReadiness({
     };
   }, [mode, expanded, path]);
   const savedCheck = project.preferences?.verifyCommand;
+  const savedPrepare = project.preferences?.prepareCommand;
+  const savedVerify = project.preferences?.verifyCommand;
+  const savedPreview = project.preferences?.previewCommand;
   if (mode === 'setup') {
     return (
       <div className="space-y-3">
@@ -141,38 +144,42 @@ export function WorkspaceReadiness({
                 tools.
               </InlineNotice>
             )}
-            {result.prepareCommand && (
+            {savedPrepare ? (
+              <p>
+                Preparation: <code>{savedPrepare}</code>
+              </p>
+            ) : result.prepareCommand ? (
               <div className="space-y-2">
                 <p>
                   Suggested preparation: <code>{result.prepareCommand}</code>
                 </p>
                 <Button
                   type="button"
+                  size="sm"
                   variant="outline"
                   onClick={() => {
                     useProjectStore.getState().updateProjectPreferences(project.id, {
                       prepareCommand: result.prepareCommand ?? undefined,
                     });
-                    setSaved(
-                      'Preparation saved for future tasks. Existing attempts keep their original setup.',
-                    );
+                    setSaved('Preparation saved for future tasks.');
                   }}
                 >
                   Use this preparation command
                 </Button>
-                <p className="task-muted">
-                  Saving authorizes this command in future task workspaces; package installation can
-                  execute repository and dependency scripts.
-                </p>
               </div>
-            )}
-            {result.verifyCommand && (
+            ) : null}
+            {savedVerify ? (
+              <p>
+                Verification check: <code>{savedVerify}</code>
+              </p>
+            ) : result.verifyCommand ? (
               <div className="space-y-2">
                 <p>
                   Suggested check: <code>{result.verifyCommand}</code>
                 </p>
                 <Button
                   type="button"
+                  size="sm"
                   variant="outline"
                   onClick={() => {
                     useProjectStore.getState().updateProjectPreferences(project.id, {
@@ -185,28 +192,31 @@ export function WorkspaceReadiness({
                   Use this check after tasks finish
                 </Button>
               </div>
-            )}
-            {result.previewCommand && (
+            ) : null}
+            {savedPreview ? (
+              <p>
+                Preview: <code>{savedPreview}</code>
+              </p>
+            ) : result.previewCommand ? (
               <div className="space-y-2">
                 <p>
                   Suggested preview: <code>{result.previewCommand}</code>
                 </p>
                 <Button
                   type="button"
+                  size="sm"
                   variant="outline"
                   onClick={() => {
                     useProjectStore.getState().updateProjectPreferences(project.id, {
                       previewCommand: result.previewCommand ?? undefined,
                     });
-                    setSaved(
-                      'Preview command saved. Start it from a task when you want to try the result.',
-                    );
+                    setSaved('Preview command saved.');
                   }}
                 >
                   Use this preview command
                 </Button>
               </div>
-            )}
+            ) : null}
             {!!result.changes && (
               <Disclosure>
                 <DisclosureSummary className="min-h-11 py-3">

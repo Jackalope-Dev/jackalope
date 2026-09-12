@@ -106,28 +106,10 @@
 .agent-presence[data-attention] {
   color: var(--color-warning);
 }
-.agent-task-link {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  min-height: 44px;
-  color: var(--color-accent-ink);
-  font-size: var(--text-sm);
-  text-align: left;
-}
-.agent-task-link span {
-  color: var(--color-text-muted);
-}
-.agent-workspace-note {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-.agent-workspace-note button {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  vertical-align: middle;
+.agent-task-action {
+  justify-content: flex-start;
+  padding-left: 0;
+  margin-top: 4px;
 }
 @media (max-width: 700px) {
   .agent-roster-row {

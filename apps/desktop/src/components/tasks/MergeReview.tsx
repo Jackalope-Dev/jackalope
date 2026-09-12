@@ -179,14 +179,14 @@ export function MergeReview({
                       {run.agent} · {run.branch} → {mergeDestination(run, project)}
                     </small>
                   </span>
-                  <button
-                    type="button"
-                    className="task-link"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => useExecutionStore.getState().select(run.id)}
                   >
                     Read result
                     <ArrowRight size={13} />
-                  </button>
+                  </Button>
                 </label>
               ))}
             </>

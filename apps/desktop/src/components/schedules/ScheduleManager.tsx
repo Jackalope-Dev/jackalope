@@ -288,8 +288,7 @@ export function ScheduleManager(props: {
                       : 'Run agent only when committed content changes.'}
                   </p>
                   <p>
-                    {localChecks ?? 0} local checks · {quietChecks ?? 0} quiet checks. Checks use
-                    zero model tokens.
+                    {localChecks ?? 0} local checks · {quietChecks ?? 0} quiet checks
                   </p>
                 </div>
               )}
