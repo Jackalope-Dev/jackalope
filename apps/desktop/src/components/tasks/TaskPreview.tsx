@@ -1,5 +1,6 @@
 import { Disclosure, DisclosureSummary, Input, Textarea } from '@jackalope/ui';
 import { useEffect, useRef, useState } from 'react';
+import { previewUrl } from '../../lib/preview-url';
 import { nativeTask, type ScreenshotArtifact, type TaskRun } from '../../lib/task-runtime';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useProjectStore } from '../../stores/projectStore';
@@ -60,7 +61,7 @@ export function TaskPreview({
     },
     [],
   );
-  const url = preview ? `http://127.0.0.1:${preview.port}${address}` : '';
+  const url = preview ? previewUrl(preview.port, address) : null;
   useEffect(() => {
     let alive = true;
     let loading = false;
@@ -154,7 +155,7 @@ export function TaskPreview({
               Start preview
             </Button>
           )}
-          {preview?.ready && (
+          {preview?.ready && url && (
             <Button variant="outline" onClick={() => void act(() => openExternalUrl(url))}>
               Open in browser
             </Button>
@@ -213,16 +214,22 @@ export function TaskPreview({
           </Button>
         </div>
       </Disclosure>
-      {preview?.ready && (
+      {preview?.ready && !url && (
+        <InlineNotice tone="error">
+          The preview address is unavailable. Stop and restart the preview.
+        </InlineNotice>
+      )}
+      {preview?.ready && url && (
         <>
           <form
             className="flex flex-wrap items-end gap-2"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!route.startsWith('/') || route.startsWith('//') || /[\\\r\n]/.test(route)) {
+              if (!previewUrl(preview.port, route)) {
                 setError('Use a local path beginning with /, such as /dashboard.');
                 return;
               }
+              setError('');
               setAddress(route);
               setLoaded(false);
               setReload((value) => value + 1);
