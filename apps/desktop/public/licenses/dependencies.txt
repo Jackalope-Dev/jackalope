@@ -2155,7 +2155,7 @@ regex-automata 0.4.18 (LICENSE-APACHE)
 regex-syntax 0.8.11 (LICENSE-APACHE)
 rustc_version 0.4.1 (LICENSE-APACHE)
 rustix 1.1.4 (LICENSE-APACHE)
-rustls 0.23.43 (LICENSE-APACHE)
+rustls 0.23.45 (LICENSE-APACHE)
 rustls-native-certs 0.8.4 (LICENSE-APACHE)
 scopeguard 1.2.0 (LICENSE-APACHE)
 secret-service 4.0.0 (LICENSE-APACHE)
@@ -11159,7 +11159,7 @@ THE SOFTWARE.
 ============================================================
 
 hyper-rustls 0.27.9 (LICENSE-ISC)
-rustls 0.23.43 (LICENSE-ISC)
+rustls 0.23.45 (LICENSE-ISC)
 rustls-native-certs 0.8.4 (LICENSE-ISC)
 
 ISC License (ISC)
@@ -11181,7 +11181,7 @@ THIS SOFTWARE.
 ============================================================
 
 hyper-rustls 0.27.9 (LICENSE-MIT)
-rustls 0.23.43 (LICENSE-MIT)
+rustls 0.23.45 (LICENSE-MIT)
 rustls-native-certs 0.8.4 (LICENSE-MIT)
 
 Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>
