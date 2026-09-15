@@ -6,6 +6,7 @@
 
 [![Verify platforms](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml)
 [![Security checks](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml)
+[![Sponsor Jackalope on GitHub](https://img.shields.io/badge/GitHub-Sponsor_Jackalope-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Jackalope-Dev)
 [![Support Jackalope on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Jackalope-FF6433?logo=kofi&logoColor=white)](https://ko-fi.com/jackalope_digital)
 
 A desktop workspace for coding agents. Bring your installed agents and existing
