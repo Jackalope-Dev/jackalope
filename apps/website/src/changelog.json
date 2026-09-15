@@ -1,5 +1,16 @@
 [
   {
+    "id": "desktop-waitlist-progress",
+    "date": "2026-09-15",
+    "status": "In development",
+    "title": "Your waitlist, in the desktop app",
+    "description": "Connect before early access to see your place and bring friends along.",
+    "items": [
+      "Track your position, verified referrals and earned priority, with a link and message ready to copy.",
+      "Stay connected across restarts, explore the app tour, and continue when your access is approved."
+    ]
+  },
+  {
     "id": "review-merge-and-clean-up-in-one-place",
     "date": "2026-09-11",
     "status": "In development",

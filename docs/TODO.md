@@ -88,6 +88,9 @@ release dates.
 
 ## Account access and optional services
 
+- [ ] Validate waitlist desktop pairing, restart, referral progress, sharing, offline
+  recovery and transition to approved access with the deployed service and installed app.
+
 - [ ] Validate required account access in development and release builds, including
   reconnect, revocation, offline expiry and saved-work recovery.
 

@@ -50,6 +50,7 @@ function call(path: string, method = 'GET', body?: unknown, token?: string, brow
     new Request(`https://api.jackalope.dev${path}`, {
       method,
       headers: {
+        'x-jackalope-waitlist': '1',
         ...(body ? { 'content-type': 'application/json' } : {}),
         ...(token
           ? browser
@@ -337,12 +338,12 @@ it('turning sync off preserves the saved copy; deleting the member cascades to t
       .first(),
   ).toBeNull();
 });
-it('verified waitlist pairing reports waiting without issuing device or sync access', async () => {
+async function waitlistDevice() {
   const owner = await member();
   await env.DB.prepare(
-    "UPDATE access_members SET status='waiting',waitlist_verified_at=? WHERE id=?",
+    "UPDATE access_members SET status='waiting',verified_at=NULL,waitlist_verified_at=?,waitlist_joined_at=?,referral_count=2 WHERE id=?",
   )
-    .bind(Date.now(), owner.id)
+    .bind(Date.now(), Date.now(), owner.id)
     .run();
   const session = randomToken();
   await env.DB.prepare(
@@ -364,14 +365,125 @@ it('verified waitlist pairing reports waiting without issuing device or sync acc
     bindings,
   );
   expect(response.status).toBe(200);
+  return { owner, session, flow };
+}
+it('verified waitlist devices retain live rank and referral progress without approved capabilities', async () => {
+  const { owner, flow } = await waitlistDevice();
   const poll = await call('/v1/desktop/exchange', 'POST', undefined, flow.secret);
-  expect(poll.status).toBe(202);
-  expect(await poll.json()).toEqual({ status: 'waiting' });
-  expect((await call('/v1/desktop/me', 'GET', undefined, flow.secret)).status).toBe(401);
+  expect(poll.status).toBe(200);
+  const connected = await poll.json<{ id: string; expiresAt: number }>();
+  expect(connected).toMatchObject({
+    status: 'waiting',
+    waitlist: { position: 1, referrals: 2, priorityDays: 2, pending: 0 },
+  });
+  expect(connected.expiresAt).toBeGreaterThan(Date.now() + 89 * 86400000);
+  expect(await (await call('/v1/desktop/exchange', 'POST', undefined, flow.secret)).json()).toEqual(
+    connected,
+  );
+  await env.DB.prepare('DELETE FROM access_device_links WHERE hash=?')
+    .bind(await tokenHash(flow.secret))
+    .run();
+  await env.DB.prepare('UPDATE access_members SET referral_count=3 WHERE id=?')
+    .bind(owner.id)
+    .run();
+  const me = await (await call('/v1/desktop/me', 'GET', undefined, flow.secret)).json();
+  expect(me).toMatchObject({
+    id: connected.id,
+    status: 'waiting',
+    waitlist: { position: 1, referrals: 3, priorityDays: 3 },
+  });
+  expect(JSON.stringify(me)).not.toContain(flow.secret);
+  expect(JSON.stringify(me)).not.toContain(flow.verification);
+  expect(
+    await env.DB.prepare('SELECT first_desktop_at FROM access_members WHERE id=?')
+      .bind(owner.id)
+      .first('first_desktop_at'),
+  ).toBeNull();
+  expect((await call('/v1/desktop/me', 'GET', undefined, flow.secret, true)).status).toBe(403);
+  expect((await call('/v1/desktop/referrals', 'GET', undefined, flow.secret)).status).toBe(401);
+  expect((await call('/v1/desktop/feedback', 'POST', {}, flow.secret)).status).toBe(401);
   expect((await call('/v1/desktop/settings', 'GET', undefined, flow.secret)).status).toBe(401);
   expect(
     (await call('/v1/desktop/settings/consent', 'POST', { enabled: true }, flow.secret)).status,
   ).toBe(401);
+  await env.DB.prepare("UPDATE access_members SET status='approved' WHERE id=?")
+    .bind(owner.id)
+    .run();
+  expect(await (await call('/v1/desktop/me', 'GET', undefined, flow.secret)).json()).toMatchObject({
+    status: 'approved',
+    id: connected.id,
+  });
+  expect(
+    await env.DB.prepare('SELECT first_desktop_at FROM access_members WHERE id=?')
+      .bind(owner.id)
+      .first('first_desktop_at'),
+  ).toEqual(expect.any(Number));
+  expect((await call('/v1/desktop/referrals', 'GET', undefined, flow.secret)).status).toBe(200);
+  expect((await call('/v1/desktop/settings', 'GET', undefined, flow.secret)).status).toBe(403);
+  await enableSync(flow.secret);
+  expect((await call('/v1/desktop/settings', 'GET', undefined, flow.secret)).status).toBe(200);
+  await env.DB.prepare("UPDATE access_members SET status='revoked' WHERE id=?")
+    .bind(owner.id)
+    .run();
+  expect((await call('/v1/desktop/me', 'GET', undefined, flow.secret)).status).toBe(401);
+});
+it('keeps older clients on the temporary waiting response', async () => {
+  const { flow } = await waitlistDevice();
+  const response = await worker.fetch(
+    new Request('https://api.jackalope.dev/v1/desktop/exchange', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${flow.secret}` },
+    }),
+    bindings,
+  );
+  expect(response.status).toBe(202);
+  expect(await response.json()).toEqual({ status: 'waiting' });
+  expect(await env.DB.prepare('SELECT count(*) AS total FROM access_devices').first('total')).toBe(
+    0,
+  );
+});
+it('waitlist device management is owner-scoped and supports disconnect, expiry and revocation', async () => {
+  const { owner, session, flow } = await waitlistDevice();
+  const stranger = await waitlistDevice();
+  const view = await (await call('/v1/desktop/exchange', 'POST', undefined, flow.secret)).json<{
+    id: string;
+  }>();
+  const browser = (path: string, token: string, body?: unknown) =>
+    worker.fetch(
+      new Request(`https://api.jackalope.dev/v1/access/waitlist/${path}`, {
+        method: body ? 'POST' : 'GET',
+        headers: {
+          origin: 'https://jackalope.dev',
+          'content-type': 'application/json',
+          cookie: `__Host-jackalope-waitlist=${token}`,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      }),
+      bindings,
+    );
+  expect(await (await browser('devices', session)).json()).toMatchObject([{ id: view.id }]);
+  expect(await (await browser('devices', stranger.session)).json()).toEqual([]);
+  await browser('desktop/revoke', stranger.session, { id: view.id });
+  expect((await call('/v1/desktop/me', 'GET', undefined, flow.secret)).status).toBe(200);
+  await browser('desktop/revoke', session, { id: view.id });
+  expect((await call('/v1/desktop/me', 'GET', undefined, flow.secret)).status).toBe(401);
+  expect((await call('/v1/desktop/exchange', 'POST', undefined, flow.secret)).status).toBe(410);
+  const expired = await waitlistDevice();
+  await call('/v1/desktop/exchange', 'POST', undefined, expired.flow.secret);
+  await env.DB.prepare('UPDATE access_devices SET expires_at=? WHERE member_id=?')
+    .bind(Date.now() - 1, expired.owner.id)
+    .run();
+  expect((await call('/v1/desktop/me', 'GET', undefined, expired.flow.secret)).status).toBe(401);
+  await call('/v1/desktop/exchange', 'POST', undefined, stranger.flow.secret);
+  await env.DB.prepare("UPDATE access_members SET status='revoked' WHERE id=?")
+    .bind(stranger.owner.id)
+    .run();
+  expect((await call('/v1/desktop/me', 'GET', undefined, stranger.flow.secret)).status).toBe(401);
+  expect(
+    await env.DB.prepare('SELECT count(*) AS total FROM access_devices WHERE member_id=?')
+      .bind(owner.id)
+      .first('total'),
+  ).toBe(0);
 });
 it('requires browser approval and native proof; retrying a lost exchange response creates one revocable device', async () => {
   const owner = await member();

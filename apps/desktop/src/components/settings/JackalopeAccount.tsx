@@ -5,6 +5,7 @@ import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useReferralStore } from '../../stores/referralStore';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
+import { WaitlistAccount, type WaitlistProgress } from '../account/WaitlistAccount';
 import { Button } from '../ui/button';
 import { FeedbackPreferences } from './FeedbackPreferences';
 
@@ -14,12 +15,14 @@ export interface AccountStatus {
     | 'disconnected'
     | 'pending'
     | 'waiting'
+    | 'waiting-offline'
     | 'connected'
     | 'offline'
     | 'expired';
   email: string | null;
   userCode: string | null;
   expiresAt: number | null;
+  waitlist?: WaitlistProgress | null;
 }
 export function JackalopeAccount({
   presentation = 'settings',
@@ -35,6 +38,7 @@ export function JackalopeAccount({
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const mounted = useRef(false);
+  const pollInterval = account?.waitlist ? 60000 : 5000;
   useEffect(() => {
     mounted.current = true;
     if (!isTauriEnvironment())
@@ -52,7 +56,7 @@ export function JackalopeAccount({
     };
   }, []);
   useEffect(() => {
-    if (!['pending', 'waiting'].includes(account?.state ?? '') || error) return;
+    if (!['pending', 'waiting', 'waiting-offline'].includes(account?.state ?? '') || error) return;
     let canceled = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
@@ -65,14 +69,14 @@ export function JackalopeAccount({
             setError('Could not check the connection. Your local projects are still available.');
         }
       }
-      if (!canceled) timer = setTimeout(poll, 5000);
+      if (!canceled) timer = setTimeout(poll, pollInterval);
     };
-    timer = setTimeout(poll, 5000);
+    timer = setTimeout(poll, pollInterval);
     return () => {
       canceled = true;
       clearTimeout(timer);
     };
-  }, [account?.state, error]);
+  }, [account?.state, pollInterval, error]);
   async function act(command: string, refresh = true) {
     if (pending.current) return;
     pending.current = true;
@@ -100,6 +104,8 @@ export function JackalopeAccount({
   }, [account, onStatus]);
   const connected = account?.state === 'connected' || account?.state === 'offline';
   const welcome = presentation === 'welcome';
+  const waiting =
+    (account?.state === 'waiting' || account?.state === 'waiting-offline') && !!account.waitlist;
   return (
     <div className={welcome ? 'access-account' : 'space-y-6'}>
       {presentation === 'settings' && (
@@ -119,7 +125,14 @@ export function JackalopeAccount({
           </p>
         </div>
       )}
-      {(account?.state === 'pending' || account?.state === 'waiting') && (
+      {waiting && account?.waitlist && (
+        <WaitlistAccount
+          email={account.email}
+          progress={account.waitlist}
+          offline={account.state === 'waiting-offline'}
+        />
+      )}
+      {(account?.state === 'pending' || (account?.state === 'waiting' && !waiting)) && (
         <div className={welcome ? 'access-pairing' : 'space-y-4'}>
           <p role="status">
             {account.state === 'waiting'
@@ -150,7 +163,7 @@ export function JackalopeAccount({
             {welcome && !busy && <ExternalLinkIcon size={20} aria-hidden="true" />}
           </Button>
         )}
-        {(account?.state === 'pending' || account?.state === 'waiting') && (
+        {(account?.state === 'pending' || (account?.state === 'waiting' && !waiting)) && (
           <>
             <Button disabled={busy} onClick={() => void act('app_account_open_browser', false)}>
               Open browser
@@ -161,6 +174,33 @@ export function JackalopeAccount({
               onClick={() => void act('app_account_disconnect')}
             >
               Cancel connection
+            </Button>
+          </>
+        )}
+        {waiting && (
+          <>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => void act('app_account_status')}
+              loading={busy}
+              loadingLabel="Checking…"
+            >
+              Refresh status
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => void act('app_account_open_browser', false)}
+            >
+              Manage waitlist on website
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => void act('app_account_disconnect')}
+            >
+              Disconnect this desktop
             </Button>
           </>
         )}

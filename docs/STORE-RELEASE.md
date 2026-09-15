@@ -46,6 +46,9 @@ $env:STORE_WEBVIEW2_PATH = 'C:\path\to\extracted-fixed-runtime'
 Submission builds use release optimization, require real identity inputs and a
 Microsoft-signed WebView2 runtime, and include the runtime in the package.
 Supply the extracted runtime directory itself, containing `msedgewebview2.exe`.
+Packaging temporarily stages it as `src-tauri/WebView2` for Tauri compilation,
+then removes that staging copy. An existing directory at that path is preserved
+and stops the build.
 Keep this pinned runtime current with security releases and test each update.
 The app version must have three numeric parts; the Store package adds the reserved
 fourth component `.0`. A build receipt is not Store certification or installation
@@ -172,6 +175,11 @@ starting an attempt. Saved results, export/recovery, stopping work and existing
 processes remain available. This is beta admission control, not tamper-proof DRM
 against someone modifying a local binary or running a separately built client.
 See [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) for approval and credential storage.
+
+Store discovery and installation do not grant early access. Verified waitlist
+members can connect to view queue position, referral progress and sharing, and
+follow website/tour links while waiting. Describe the early-access requirement in
+the listing; installed acceptance must cover both waiting and approved accounts.
 
 ## Remaining acceptance
 

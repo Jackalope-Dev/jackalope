@@ -3,7 +3,7 @@ import { ArrowRight, Check, Copy, LogOut, Share2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessRequestError, accessMessage, accessOrigin, accessRequest } from './access-api';
 import { BrandMark } from './BrandMark';
-import { DesktopConnection } from './DesktopConnection';
+import { ConnectedDesktops, DesktopConnection } from './DesktopConnection';
 import { type Preferences, WaitlistQuestions } from './WaitlistPreferences';
 import './access.css';
 import './waitlist.css';
@@ -372,6 +372,7 @@ export function WaitlistPage() {
           </p>
         </Panel>
       )}
+      {place?.status === 'waiting' && <ConnectedDesktops waiting />}
     </main>
   );
 }

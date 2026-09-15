@@ -121,7 +121,10 @@ pub async fn app_settings_sync(
         conflict: false,
     };
     let mut saved = state.read()?;
-    if saved.as_ref().is_none_or(|r| r.email.is_none()) {
+    if saved
+        .as_ref()
+        .is_none_or(|r| r.email.is_none() || r.waitlist.is_some())
+    {
         view.available = endpoints(&app).is_ok();
         if view.available {
             view.enabled = read_choice(&state)?.enabled;

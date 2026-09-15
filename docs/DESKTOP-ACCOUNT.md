@@ -1,7 +1,7 @@
 # Desktop account connection
 
-Settings → Jackalope account connects an approved early-access membership to this
-desktop. All builds, including local development builds, require an approved
+The welcome screen and Settings → Jackalope account connect verified waitlist
+members and approved early-access members to this desktop. All builds, including local development builds, require an approved
 account for new native tasks and terminals, with a bounded 72-hour offline lease.
 Saved work and running tasks remain accessible. There is no development bypass.
 See [STORE-RELEASE.md](STORE-RELEASE.md) for enforcement and distribution.
@@ -27,18 +27,38 @@ installed connection, expiry and revocation flows still require acceptance.
    share link and acceptance, download and connection milestones. Sharing is always
    user initiated; email invitation management opens the authenticated website.
 
+Waitlist members follow the browser's waitlist sign-in link, verify their email,
+and confirm the matching desktop code. Their connection persists across restarts
+for the device credential's lifetime. Desktop shows their current queue position,
+verified and pending referrals, earned priority, and copyable referral link and
+share message. Each verified referral earns one day of priority using the same
+server calculation as the website. An unavailable position stays unknown; offline
+progress is labeled with its last successful check time and never grants access.
+The welcome screen also links to the website and app tour before sign-in.
+
+Waitlist connections check for approval every minute and support manual refresh.
+An approved membership with previously verified email can continue without pairing
+again. Settings sync honors the saved preference after approval; waitlist connections
+cannot sync settings, submit member feedback, or use Instant Access Passes. Native
+execution still requires the approved account lease. Users can disconnect in the
+app or revoke their devices from the website's waitlist page.
+
 ## Trust and storage
 
 - The native process generates a random credential. Only its SHA-256 challenge is
   registered at `/v1/desktop/start`; a separate random approval token goes to the
   browser in a fragment. The browser removes the fragment and retains only this
   pending, ten-minute approval context in tab session storage, never a device credential.
-- Browser approval requires the existing approved, verified member session and
+- Browser approval requires the existing approved member session or verified waitlist session and
   exact allowed Origin. A checkbox confirms the matching code. Native endpoints
   reject browser Origin headers and do not accept website session cookies.
 - `/v1/desktop/exchange` requires native possession of the credential and explicit
   browser approval. Exchange atomically creates one device record; retries with the
   same secret recover a lost response. Consumed approval links cannot connect again.
+- Clients advertise persistent waitlist support with `X-Jackalope-Waitlist: 1`.
+  Older clients retain the temporary `202 waiting` response. Persistent waitlist
+  devices can read account progress and manage their device name/metadata; approved
+  API capabilities require approved membership and a previously verified email.
 - Server storage contains credential hashes, member association, random device ID,
   connection/expiry timestamps and short-lived pairing state. A member can have ten
   active devices. Device credentials expire after 90 days; pairing expires after ten
@@ -101,5 +121,6 @@ the same API. Do not expose these overrides as editable renderer settings.
 Before release, record a real invited-user trial: sign in in a separate browser
 tab, compare codes, approve, restart the desktop, verify identity, cancel an unused
 request, expire one, disconnect locally and revoke another connection on the website.
-Exercise offline recovery and revoked membership. Local D1/HTTP fixtures and native
+Also exercise waitlist pairing, restart, live referral progress, clipboard failure,
+approval without re-pairing, offline recovery and revoked membership. Local D1/HTTP fixtures and native
 DPAPI tests are narrower than this deployed/installed acceptance.

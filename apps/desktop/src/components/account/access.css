@@ -239,6 +239,15 @@
 .access-footer {
   margin: 24px auto 0;
 }
+.access-learn-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.access-learn-links > button {
+  min-height: 44px;
+}
 .access-footer > p,
 .access-caption {
   color: var(--color-text-muted);
@@ -323,4 +332,15 @@
   padding: 12px 24px;
   border-bottom: 1px solid var(--color-border);
   font-size: 14px;
+}
+
+.access-welcome:has(.desktop-waitlist) .access-connection {
+  width: 100%;
+}
+.access-welcome:has(.desktop-waitlist) .access-intro .access-mark,
+.access-welcome:has(.desktop-waitlist) .access-intro > p {
+  display: none;
+}
+.access-welcome:has(.desktop-waitlist) .access-intro h1 {
+  font-size: var(--text-xl);
 }

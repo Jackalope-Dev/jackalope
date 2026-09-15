@@ -117,6 +117,18 @@ export async function waitlistStatus(request: Request, env: Env, now = Date.now(
       preferences: string | null;
     }>();
   if (!member) throw new ServiceError(401, 'access_sign_in_required');
+  return {
+    email: member.email,
+    status: member.status,
+    ...(await waitlistProgress(env, member)),
+    preferences: parsePreferences(member.preferences),
+  };
+}
+
+export async function waitlistProgress(
+  env: Env,
+  member: { id: string; status: string; referral_count: number; share_code: string },
+) {
   const rank =
     member.status === 'waiting'
       ? await env.DB.prepare(`SELECT position FROM (${waitlistRankSql}) WHERE id=?`)
@@ -129,14 +141,11 @@ export async function waitlistStatus(request: Request, env: Env, now = Date.now(
     .bind(member.id)
     .first<{ count: number }>();
   return {
-    email: member.email,
-    status: member.status,
     position: rank?.position ?? null,
     referrals: member.referral_count,
     pending: pending?.count ?? 0,
     priorityDays: member.referral_count,
     shareUrl: `${env.ACCESS_WEB_ORIGIN}/?ref=${member.share_code}`,
-    preferences: parsePreferences(member.preferences),
   };
 }
 

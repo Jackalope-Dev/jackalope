@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { deliverFeedback } from '../feedback-mail';
 import { randomToken } from './crypto';
-import { browserDeviceAction } from './devices';
+import { browserDeviceAction, connectedDevices } from './devices';
 import { feedbackResponse } from './feedback';
 import { campaignSchema, preferencesSchema, savePreferences } from './insights';
 import { deliverAccessMail } from './mail';
@@ -229,6 +229,11 @@ export async function accessRoutes(
         ),
       );
     }
+    if (request.method === 'GET' && path === '/v1/access/waitlist/devices') {
+      const waiting = await waitingMember(request, env);
+      if (!waiting) throw new AccessError(401, 'access_sign_in_required');
+      return json(await connectedDevices(env, waiting.id));
+    }
     const member = await sessionMember(request, env);
     if (!member) throw new AccessError(401, 'access_sign_in_required');
     if (request.method === 'POST' && path.startsWith('/v1/access/desktop/'))
@@ -241,15 +246,7 @@ export async function accessRoutes(
         ),
       );
     if (request.method === 'GET' && path === '/v1/access/devices')
-      return json(
-        (
-          await env.DB.prepare(
-            'SELECT id,name,created_at AS createdAt,expires_at AS expiresAt,app_version AS appVersion,platform,build_kind AS buildKind,profile_kind AS profileKind,last_seen_at AS lastSeenAt,settings_checked_at AS settingsCheckedAt,settings_sync AS settingsSync FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY coalesce(last_seen_at,created_at) DESC,id LIMIT 10',
-          )
-            .bind(member.id, Date.now())
-            .all()
-        ).results,
-      );
+      return json(await connectedDevices(env, member.id));
     if (request.method === 'GET' && path === '/v1/access/me') {
       const store = storeUrl(env);
       const key = installerKey(env);

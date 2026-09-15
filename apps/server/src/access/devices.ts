@@ -3,13 +3,26 @@ import { randomToken, tokenHash } from './crypto';
 import { memberFeedback } from './feedback';
 import { AccessError, invitations, type Member, tokenSchema } from './service';
 import { settingsRoute } from './settings';
+import { waitlistProgress } from './waitlist';
 
 const lifetime = 90 * 86400000;
+export async function connectedDevices(env: Env, memberId: string) {
+  return (
+    await env.DB.prepare(
+      'SELECT id,name,created_at AS createdAt,expires_at AS expiresAt,app_version AS appVersion,platform,build_kind AS buildKind,profile_kind AS profileKind,last_seen_at AS lastSeenAt,settings_checked_at AS settingsCheckedAt,settings_sync AS settingsSync FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY coalesce(last_seen_at,created_at) DESC,id LIMIT 10',
+    )
+      .bind(memberId, Date.now())
+      .all()
+  ).results;
+}
 export async function deviceMember(env: Env, hash: string, now = Date.now()) {
+  return accountDevice(env, hash, now, false);
+}
+async function accountDevice(env: Env, hash: string, now: number, includeWaiting = true) {
   return env.DB.prepare(
-    "SELECT d.id,d.name AS deviceName,d.app_version AS appVersion,d.platform,d.build_kind AS buildKind,d.profile_kind AS profileKind,d.expires_at AS expiresAt,m.id AS memberId,m.email FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL",
+    "SELECT d.id,d.name AS deviceName,d.app_version AS appVersion,d.platform,d.build_kind AS buildKind,d.profile_kind AS profileKind,d.expires_at AS expiresAt,m.id AS memberId,m.email,m.status,m.share_code,m.referral_count FROM access_devices d JOIN access_members m ON m.id=d.member_id WHERE d.hash=? AND d.expires_at>? AND ((m.status='approved' AND (m.verified_at IS NOT NULL OR m.waitlist_verified_at IS NOT NULL)) OR (?=1 AND m.status='waiting' AND m.waitlist_verified_at IS NOT NULL))",
   )
-    .bind(hash, now)
+    .bind(hash, now, includeWaiting ? 1 : 0)
     .first<{
       id: string;
       deviceName: string | null;
@@ -20,7 +33,30 @@ export async function deviceMember(env: Env, hash: string, now = Date.now()) {
       expiresAt: number;
       memberId: string;
       email: string;
+      status: 'approved' | 'waiting';
+      share_code: string;
+      referral_count: number;
     }>();
+}
+
+async function accountView(
+  env: Env,
+  member: NonNullable<Awaited<ReturnType<typeof accountDevice>>>,
+) {
+  if (member.status === 'approved') {
+    await env.DB.prepare(
+      "UPDATE access_members SET first_desktop_at=coalesce(first_desktop_at,?) WHERE id=? AND status='approved' AND (verified_at IS NOT NULL OR waitlist_verified_at IS NOT NULL)",
+    )
+      .bind(Date.now(), member.memberId)
+      .run();
+  }
+  return {
+    ...publicDevice(member),
+    status: member.status,
+    ...(member.status === 'waiting'
+      ? { waitlist: await waitlistProgress(env, { ...member, id: member.memberId }) }
+      : {}),
+  };
 }
 
 function publicDevice(member: NonNullable<Awaited<ReturnType<typeof deviceMember>>>) {
@@ -78,7 +114,7 @@ export async function deviceRoutes(
     if (!token) throw new AccessError(401, 'device_sign_in_required');
     const hash = await tokenHash(token);
     if (url.pathname === '/v1/desktop/metadata' && request.method === 'POST') {
-      const member = await deviceMember(env, hash, now);
+      const member = await accountDevice(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
       const metadata = z
         .strictObject({
@@ -107,7 +143,7 @@ export async function deviceRoutes(
       return json({ success: true });
     }
     if (url.pathname === '/v1/desktop/name' && request.method === 'POST') {
-      const member = await deviceMember(env, hash, now);
+      const member = await accountDevice(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
       const { name } = z
         .strictObject({
@@ -169,12 +205,12 @@ export async function deviceRoutes(
       return json({ success: true });
     }
     if (request.method === 'GET' && url.pathname === '/v1/desktop/me') {
-      const member = await deviceMember(env, hash, now);
+      const member = await accountDevice(env, hash, now);
       if (!member) throw new AccessError(401, 'device_sign_in_required');
       await env.DB.prepare('UPDATE access_devices SET last_seen_at=? WHERE id=? AND member_id=?')
         .bind(now, member.id, member.memberId)
         .run();
-      return json({ ...publicDevice(member), status: 'approved' });
+      return json(await accountView(env, member));
     }
     if (request.method === 'GET' && url.pathname === '/v1/desktop/referrals') {
       const device = await deviceMember(env, hash, now);
@@ -188,8 +224,8 @@ export async function deviceRoutes(
     if (request.method !== 'POST' || url.pathname !== '/v1/desktop/exchange')
       throw new AccessError(404, 'not_found');
     // The native client keeps this secret, so a lost exchange response can be retried safely.
-    const existing = await deviceMember(env, hash, now);
-    if (existing) return json({ ...publicDevice(existing), status: 'approved' });
+    const existing = await accountDevice(env, hash, now);
+    if (existing) return json(await accountView(env, existing));
     const link = await env.DB.prepare(
       'SELECT member_id,polled_at FROM access_device_links WHERE hash=? AND expires_at>? AND used_at IS NULL',
     )
@@ -204,26 +240,25 @@ export async function deviceRoutes(
       .run();
     if (claimed.meta.changes !== 1) throw new AccessError(429, 'slow_down');
     if (!link.member_id) return json({ status: 'pending' }, 202);
-    const waiting = await env.DB.prepare(
-      "SELECT id FROM access_members WHERE id=? AND status='waiting' AND waitlist_verified_at IS NOT NULL",
-    )
-      .bind(link.member_id)
-      .first();
-    if (waiting) return json({ status: 'waiting' }, 202);
+    if (request.headers.get('x-jackalope-waitlist') !== '1') {
+      const waiting = await env.DB.prepare(
+        "SELECT id FROM access_members WHERE id=? AND status='waiting' AND waitlist_verified_at IS NOT NULL",
+      )
+        .bind(link.member_id)
+        .first();
+      if (waiting) return json({ status: 'waiting' }, 202);
+    }
     await env.DB.batch([
       env.DB.prepare(
-        "INSERT INTO access_devices(id,hash,member_id,created_at,expires_at) SELECT ?,l.hash,l.member_id,?,? FROM access_device_links l JOIN access_members m ON m.id=l.member_id WHERE l.hash=? AND l.used_at IS NULL AND l.expires_at>? AND m.status='approved' AND m.verified_at IS NOT NULL ON CONFLICT(hash) DO NOTHING",
+        "INSERT INTO access_devices(id,hash,member_id,created_at,expires_at) SELECT ?,l.hash,l.member_id,?,? FROM access_device_links l JOIN access_members m ON m.id=l.member_id WHERE l.hash=? AND l.used_at IS NULL AND l.expires_at>? AND ((m.status='approved' AND (m.verified_at IS NOT NULL OR m.waitlist_verified_at IS NOT NULL)) OR (m.status='waiting' AND m.waitlist_verified_at IS NOT NULL)) ON CONFLICT(hash) DO NOTHING",
       ).bind(crypto.randomUUID(), now, now + lifetime, hash, now),
       env.DB.prepare(
         'UPDATE access_device_links SET used_at=? WHERE hash=? AND EXISTS(SELECT 1 FROM access_devices WHERE hash=?)',
       ).bind(now, hash, hash),
-      env.DB.prepare(
-        'UPDATE access_members SET first_desktop_at=coalesce(first_desktop_at,?) WHERE id=(SELECT member_id FROM access_devices WHERE hash=?)',
-      ).bind(now, hash),
     ]);
-    const connected = await deviceMember(env, hash, now);
+    const connected = await accountDevice(env, hash, now);
     if (!connected) throw new AccessError(410, 'device_link_expired');
-    return json({ ...publicDevice(connected), status: 'approved' });
+    return json(await accountView(env, connected));
   } catch (error) {
     if (error instanceof AccessError) return json({ error: error.code }, error.status);
     if (error instanceof z.ZodError) return json({ error: 'invalid_request' }, 400);
@@ -242,7 +277,6 @@ export async function browserDeviceAction(
 ) {
   const now = Date.now();
   if (action === 'revoke') {
-    if (waiting) throw new AccessError(403, 'access_not_approved');
     const { id } = z.strictObject({ id: z.uuid() }).parse(body);
     await env.DB.batch([
       env.DB.prepare(

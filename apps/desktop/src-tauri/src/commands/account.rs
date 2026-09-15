@@ -9,6 +9,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_shell::ShellExt;
 pub mod feedback;
 pub mod settings_sync;
+mod waitlist;
 
 fn sha256_hex(value: &str) -> String {
     Sha256::digest(value.as_bytes())
@@ -58,6 +59,8 @@ struct SavedAccount {
     #[serde(default)]
     verified_at: i64,
     #[serde(default)]
+    waitlist: Option<waitlist::WaitlistView>,
+    #[serde(default)]
     feedback: feedback::LocalFeedback,
     #[serde(default)]
     settings_sync: bool,
@@ -73,6 +76,7 @@ pub struct AccountStatus {
     email: Option<String>,
     user_code: Option<String>,
     expires_at: Option<i64>,
+    waitlist: Option<waitlist::WaitlistView>,
 }
 #[derive(Deserialize)]
 struct ReferralResponse {
@@ -125,6 +129,7 @@ fn status(state: &'static str, record: Option<&SavedAccount>) -> AccountStatus {
             .filter(|r| r.email.is_none())
             .map(|r| r.user_code.clone()),
         expires_at: record.map(|r| r.expires_at),
+        waitlist: record.and_then(|r| r.waitlist.clone()),
     }
 }
 fn endpoints(app: &AppHandle) -> Result<(reqwest::Url, reqwest::Url), String> {
@@ -218,10 +223,12 @@ async fn request(
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|_| "Account connection is unavailable.")?;
-    let mut builder = client.request(
-        method,
-        api.join(path).map_err(|_| "Invalid account service.")?,
-    );
+    let mut builder = client
+        .request(
+            method,
+            api.join(path).map_err(|_| "Invalid account service.")?,
+        )
+        .header("x-jackalope-waitlist", "1");
     if let Some(secret) = secret {
         builder = builder.bearer_auth(secret);
     }
@@ -330,7 +337,7 @@ impl AccountService {
             self.access.revoke();
             return Ok(status("unavailable", None));
         }
-        let (api, _) = endpoints(app)?;
+        let (api, web) = endpoints(app)?;
         let Some(mut record) = self.read()? else {
             self.access.revoke();
             return Ok(status("disconnected", None));
@@ -349,7 +356,9 @@ impl AccountService {
             ));
         }
         // Only a previous server verification can authorize a bounded offline lease.
-        if !self.restored.swap(true, Ordering::SeqCst) {
+        if record.waitlist.is_some() {
+            self.access.revoke();
+        } else if !self.restored.swap(true, Ordering::SeqCst) {
             self.access.update(record.verified_at, record.expires_at);
         }
         match request(
@@ -363,17 +372,23 @@ impl AccountService {
         {
             Ok((200, data))
                 if data["email"].as_str() == record.email.as_deref()
-                    && data["status"] == "approved"
+                    && matches!(data["status"].as_str(), Some("approved" | "waiting"))
                     && data["expiresAt"]
                         .as_i64()
                         .is_some_and(|expiry| expiry > now) =>
             {
-                record.verified_at = chrono::Utc::now().timestamp_millis();
-                record.expires_at = data["expiresAt"].as_i64().unwrap();
+                let next = match waitlist::accept(&mut record, &data, &web, now) {
+                    Ok(next) => next,
+                    Err(error) => {
+                        record.verified_at = 0;
+                        self.save(&record)?;
+                        return Err(error);
+                    }
+                };
                 self.save(&record)?;
                 self.access.update(record.verified_at, record.expires_at);
                 sync_device_name(&api, &record.secret, &data).await;
-                Ok(status("connected", Some(&record)))
+                Ok(status(next, Some(&record)))
             }
             Ok((401, _)) => {
                 self.access.revoke();
@@ -386,7 +401,14 @@ impl AccountService {
                 self.save(&record)?;
                 Err("The account service returned an invalid approval. Please retry.".into())
             }
-            _ => Ok(status("offline", Some(&record))),
+            _ => Ok(status(
+                if record.waitlist.is_some() {
+                    "waiting-offline"
+                } else {
+                    "offline"
+                },
+                Some(&record),
+            )),
         }
     }
 }
@@ -458,6 +480,7 @@ pub async fn app_account_connect(
         expires_at,
         email: None,
         verified_at: 0,
+        waitlist: None,
         feedback: feedback::LocalFeedback::default(),
         settings_sync: sync_choice.enabled,
         settings_sync_pending: false,
@@ -480,7 +503,9 @@ pub async fn app_account_open_browser(
     let (api, web) = endpoints(&app)?;
     let record = state.read()?.ok_or("Start a connection first.")?;
     bound(&record, &api)?;
-    let path = if record.email.is_some() {
+    let path = if record.waitlist.is_some() {
+        "/waitlist/".to_string()
+    } else if record.email.is_some() {
         "/access/".to_string()
     } else {
         format!("/access/#desktop={}", record.verification)
@@ -507,7 +532,7 @@ pub async fn app_account_referrals(
         .read()?
         .ok_or("Connect your Jackalope account to view invitations.")?;
     bound(&record, &api)?;
-    if record.email.is_none() {
+    if record.email.is_none() || record.waitlist.is_some() {
         return Err("Finish connecting your Jackalope account to view invitations.".into());
     }
     let (code, data) = request(
@@ -559,7 +584,7 @@ pub async fn app_account_poll(
     state: State<'_, AccountService>,
 ) -> Result<AccountStatus, String> {
     let _guard = state.operation.lock().await;
-    let (api, _) = endpoints(&app)?;
+    let (api, web) = endpoints(&app)?;
     let Some(mut record) = state.read()? else {
         return Ok(status("disconnected", None));
     };
@@ -588,28 +613,16 @@ pub async fn app_account_poll(
             Ok(status("expired", None))
         }
         200 => {
-            if data["status"] != "approved" {
-                return Err("Invalid account approval.".into());
-            }
-            record.email = Some(
-                data["email"]
-                    .as_str()
-                    .filter(|s| s.len() <= 254 && s.contains('@'))
-                    .ok_or("Invalid account response.")?
-                    .to_string(),
-            );
-            record.expires_at = data["expiresAt"]
-                .as_i64()
-                .filter(|expiry| *expiry > chrono::Utc::now().timestamp_millis())
-                .ok_or("Invalid account expiry.")?;
-            record.verified_at = chrono::Utc::now().timestamp_millis();
-            record.verification.clear();
-            record.user_code.clear();
-            record.settings_sync_pending = record.settings_sync;
+            let next = waitlist::accept(
+                &mut record,
+                &data,
+                &web,
+                chrono::Utc::now().timestamp_millis(),
+            )?;
             state.save(&record)?;
             state.access.update(record.verified_at, record.expires_at);
             sync_device_name(&api, &record.secret, &data).await;
-            Ok(status("connected", Some(&record)))
+            Ok(status(next, Some(&record)))
         }
         _ => Err(failure(code)),
     }
@@ -687,6 +700,7 @@ mod tests {
             expires_at: 1,
             email: None,
             verified_at: 0,
+            waitlist: None,
             feedback: feedback::LocalFeedback::default(),
             settings_sync: false,
             settings_sync_pending: false,
@@ -708,6 +722,7 @@ mod tests {
             expires_at: 1,
             email: None,
             verified_at: 0,
+            waitlist: None,
             feedback: feedback::LocalFeedback::default(),
             settings_sync: false,
             settings_sync_pending: false,

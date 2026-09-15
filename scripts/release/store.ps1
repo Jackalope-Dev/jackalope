@@ -8,6 +8,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$runtimeBuildPath = Join-Path $repoRoot 'apps/desktop/src-tauri/WebView2'
+$runtimeStaged = $false
 function Run-Checked([scriptblock]$Command) {
     & $Command
     if ($LASTEXITCODE -ne 0) { throw 'Store build command failed.' }
@@ -53,7 +55,15 @@ try {
         plugins = @{ updater = @{ pubkey = ''; endpoints = @() }; jackalope = @{ channel = $Channel } }
     }
     if ($Mode -eq 'rehearsal') { $config.identifier = 'dev.jackalope.store.rehearsal' }
-    if ($WebViewRuntimePath) { $config.bundle.windows = @{ webviewInstallMode = @{ type = 'fixedRuntime'; path = 'WebView2' } } }
+    if ($WebViewRuntimePath) {
+        if (Test-Path -LiteralPath $runtimeBuildPath) { throw 'Remove or relocate the existing src-tauri/WebView2 directory before packaging.' }
+        New-Item -ItemType Directory -Path $runtimeBuildPath | Out-Null
+        $runtimeStaged = $true
+        Get-ChildItem -LiteralPath $WebViewRuntimePath -Force | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $runtimeBuildPath -Recurse -Force
+        }
+        $config.bundle.windows = @{ webviewInstallMode = @{ type = 'fixedRuntime'; path = 'WebView2' } }
+    }
     $configPath = Join-Path $output 'tauri.store.json'
     $config | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding utf8
     $buildOptions = @(if ($Mode -eq 'rehearsal') { '--debug' })
@@ -88,4 +98,13 @@ try {
     if ($env:GITHUB_OUTPUT) { "directory=$output" >> $env:GITHUB_OUTPUT }
     Write-Output "Unsigned MSIX and receipt: $output"
     Write-Output 'No application was installed or submitted. Microsoft signs approved Store submissions.'
-} finally { Pop-Location }
+} finally {
+    try {
+        if ($runtimeStaged) {
+            $expectedRuntimePath = [IO.Path]::GetFullPath((Join-Path $repoRoot 'apps/desktop/src-tauri/WebView2'))
+            $resolvedRuntimePath = (Resolve-Path -LiteralPath $runtimeBuildPath).Path
+            if ($resolvedRuntimePath -ne $expectedRuntimePath) { throw 'Refusing to remove an unexpected WebView2 directory.' }
+            Remove-Item -LiteralPath $resolvedRuntimePath -Recurse -Force
+        }
+    } finally { Pop-Location }
+}

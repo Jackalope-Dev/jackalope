@@ -15,6 +15,12 @@ export const roadmapStages = [
     link: { label: 'Explore agent compatibility', href: '/agents/' },
     items: [
       {
+        title: 'Your place before early access.',
+        summary: 'Waitlist progress and referral sharing in the desktop app.',
+        detail:
+          'Verified waitlist members can connect the app, check their position, copy their referral link and share message, and explore the website and app tour. Connections survive restarts and detect approval. Running tasks still requires approved access; deployed and installed checks remain in progress.',
+      },
+      {
         title: 'From request to a result you can inspect.',
         summary: 'Shared work discovery, local previews, and a clear delivery handoff.',
         detail:

@@ -11,6 +11,7 @@ target/
 src-tauri/target/
 **/gen/schemas/
 apps/desktop/src-tauri/resources/agent-browser/agent-browser*
+/apps/desktop/src-tauri/WebView2/
 *.pdb
 
 # Build outputs

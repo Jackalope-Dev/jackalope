@@ -148,7 +148,7 @@ export function DesktopConnection({
       setDone(
         action === 'approve'
           ? waiting
-            ? 'Your verified waitlist status was shared with this desktop. Early access still needs approval.'
+            ? 'Return to Jackalope to see your waitlist position and referral link. Early access still needs approval.'
             : 'Desktop approved. Return to Jackalope to finish connecting.'
           : 'Connection canceled. This desktop has not been connected.',
       );
@@ -189,16 +189,20 @@ export function DesktopConnection({
       {!signedIn ? (
         <div>
           <p>
-            Sign in below using your invited email. If the email opens another tab, return here to
-            approve the connection.
+            {waiting
+              ? 'Sign in below using your waitlist email.'
+              : 'Accepted members can sign in below using their invited email.'}{' '}
+            If the email opens another tab, return here to confirm the connection.
           </p>
-          <p>
-            Still on the waitlist?{' '}
-            <a className="text-link" href="/waitlist/">
-              Verify your waitlist email
-            </a>{' '}
-            to share your acceptance status with the app.
-          </p>
+          {!waiting && (
+            <p>
+              Still on the waitlist?{' '}
+              <a className="text-link" href="/waitlist/">
+                Sign in to your waitlist
+              </a>{' '}
+              to see your position and referral link in the app.
+            </p>
+          )}
         </div>
       ) : (
         <>
@@ -282,7 +286,7 @@ interface Device {
   settingsCheckedAt?: number | null;
   settingsSync?: number;
 }
-export function ConnectedDesktops() {
+export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -293,7 +297,11 @@ export function ConnectedDesktops() {
     const controller = new AbortController();
     request.current = controller;
     try {
-      const next = await accessRequest<Device[]>('devices', undefined, controller.signal);
+      const next = await accessRequest<Device[]>(
+        `${waiting ? 'waitlist/' : ''}devices`,
+        undefined,
+        controller.signal,
+      );
       if (!controller.signal.aborted) {
         setDevices(next);
         setError('');
@@ -303,7 +311,7 @@ export function ConnectedDesktops() {
     } finally {
       if (request.current === controller) request.current = null;
     }
-  }, []);
+  }, [waiting]);
   useEffect(() => {
     void load();
     const refresh = () => {
@@ -325,7 +333,7 @@ export function ConnectedDesktops() {
     if (busy) return;
     setBusy(id);
     try {
-      await accessRequest('desktop/revoke', { id });
+      await accessRequest(`${waiting ? 'waitlist/' : ''}desktop/revoke`, { id });
       setConfirm('');
       await load();
     } catch (cause) {
@@ -338,9 +346,9 @@ export function ConnectedDesktops() {
     <Panel variant="plain" className="access-card connected-desktops">
       <h2>Connected desktops</h2>
       <p className="connected-desktops-description">
-        Each app profile has its own connection. Development and test profiles can appear with the
-        same computer name. Settings sync carries appearance and notification preferences; projects
-        and task history stay in the local profile.
+        {waiting
+          ? 'These desktops can view your waitlist progress. Running tasks and syncing settings require approved access.'
+          : 'Each app profile has its own connection. Development and test profiles can appear with the same computer name. Settings sync carries appearance and notification preferences; projects and task history stay in the local profile.'}
       </p>
       {devices?.length === 0 && <p>No desktops connected.</p>}
       {devices === null && !error && <p role="status">Reading connected desktops…</p>}

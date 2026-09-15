@@ -4,7 +4,7 @@ import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -167,6 +167,9 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
               <EchoMark animated={false} className="access-mark" />
               <h1 id="access-heading">Welcome to Jackalope.</h1>
               <p>Connect your account to check early access.</p>
+              <p>
+                Already on the waitlist? Connect to see your place and share your referral link.
+              </p>
             </header>
             <Disclosure className="access-privacy">
               <DisclosureSummary>
@@ -205,6 +208,20 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
               )}
             </div>
             <footer className="access-footer">
+              <div className="access-learn-links">
+                <Button
+                  variant="ghost"
+                  onClick={() => void openExternalUrl('https://jackalope.dev/tour/')}
+                >
+                  Watch the app tour
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => void openExternalUrl('https://jackalope.dev/')}
+                >
+                  About Jackalope
+                </Button>
+              </div>
               {hasProjects && (
                 <Button
                   variant="ghost"

@@ -69,6 +69,11 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 
 ## Services and distribution
 
+Verified waitlist members can connect the desktop to see their queue position,
+referral progress and share link, with website and tour links before approval.
+Connections persist across restarts and detect approval; offline progress remains
+labeled and cannot authorize execution. Installed and deployed acceptance remain open.
+
 New execution requires approved account access in every desktop build. Previously
 verified accounts retain bounded offline access; saved work remains reviewable after
 expiry. Feedback, reporting and settings sync have separate controls. See

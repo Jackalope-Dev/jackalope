@@ -196,7 +196,7 @@ pub async fn app_account_feedback(
         .ok_or("Connect your Jackalope account first.")?;
     bound(&record, &api)?;
     let now = chrono::Utc::now().timestamp_millis();
-    if record.email.is_none() || record.expires_at <= now {
+    if record.email.is_none() || record.waitlist.is_some() || record.expires_at <= now {
         return Err("Connect your Jackalope account first.".into());
     }
     let mut claimed = false;

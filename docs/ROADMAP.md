@@ -10,6 +10,11 @@ aligned with this guide when capabilities or priorities change.
 
 ## Built: the local workspace
 
+Verified waitlist members can connect the desktop, track their queue position and
+referrals, copy their share link and explore the website and tour. Connections
+persist and detect approval; native execution remains approval-gated. Deployed
+and installed acceptance are still required.
+
 Work discovery unifies tasks and chats with explicit project scope, remembered
 views and task/project command search. Tasks opens Chat first; Inbox holds the work
 list. Work rows show each agent's character, live or next-action status and who is
