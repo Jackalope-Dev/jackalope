@@ -585,6 +585,35 @@ mod tests {
         (runtime, root, id)
     }
 
+    fn remove_fixture(root: std::path::PathBuf) {
+        let root = dunce::canonicalize(root).unwrap();
+        let temporary = dunce::canonicalize(std::env::temp_dir()).unwrap();
+        assert_eq!(root.parent(), Some(temporary.as_path()));
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("jackalope-preview-test-"));
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            match std::fs::remove_dir_all(&root) {
+                Ok(()) => return,
+                // Windows can retain a child's working-directory handle after termination.
+                Err(error)
+                    if cfg!(windows)
+                        && error.raw_os_error() == Some(32)
+                        && std::time::Instant::now() < deadline =>
+                {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(error) => panic!(
+                    "Could not remove preview fixture {}: {error}",
+                    root.display()
+                ),
+            }
+        }
+    }
+
     #[tokio::test]
     #[ignore = "Runs a disposable local web server and the bundled browser for preview evidence"]
     async fn real_preview_capture_preserves_evidence_and_ownership() {
@@ -635,13 +664,7 @@ mod tests {
         .await
         .is_err());
         drop(runtime);
-        assert_eq!(root.parent(), Some(std::env::temp_dir().as_path()));
-        assert!(root
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .starts_with("jackalope-preview-test-"));
-        std::fs::remove_dir_all(root).unwrap();
+        remove_fixture(root);
     }
 
     #[test]
@@ -691,14 +714,6 @@ mod tests {
             .iter()
             .any(|line| line.contains("PREVIEW_TEST")));
         drop(runtime);
-        if root.parent() == Some(std::env::temp_dir().as_path())
-            && root
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .starts_with("jackalope-preview-test-")
-        {
-            std::fs::remove_dir_all(root).unwrap();
-        }
+        remove_fixture(root);
     }
 }
