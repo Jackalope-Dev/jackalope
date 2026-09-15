@@ -18,7 +18,7 @@ export const roadmapStages = [
         title: 'Your place before early access.',
         summary: 'Waitlist progress and referral sharing in the desktop app.',
         detail:
-          'Verified waitlist members can connect the app, check their position, copy their referral link and share message, and explore the website and app tour. Connections survive restarts and detect approval. Running tasks still requires approved access; deployed and installed checks remain in progress.',
+          'Verified waitlist members can connect the app, check their position, copy their referral link and share message, and explore the website and app tour. Connections survive restarts and detect approval. The download page shows desktop platform availability and guides accepted members and friends through email confirmation. Running tasks still requires approved access; deployed and installed checks remain in progress.',
       },
       {
         title: 'From request to a result you can inspect.',

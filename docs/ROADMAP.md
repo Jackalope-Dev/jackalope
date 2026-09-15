@@ -10,6 +10,10 @@ aligned with this guide when capabilities or priorities change.
 
 ## Built: the local workspace
 
+The website download page brings desktop platform availability, waitlist signup
+and friend-pass guidance together. Acceptance emails open its confirmation flow;
+unpublished platforms stay Coming soon. Release and delivery acceptance remain open.
+
 Verified waitlist members can connect the desktop, track their queue position and
 referrals, copy their share link and explore the website and tour. Connections
 persist and detect approval; native execution remains approval-gated. Deployed

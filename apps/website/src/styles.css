@@ -933,8 +933,10 @@ h1 span {
 
 @media (max-width: 1050px) {
   .desktop-nav {
-    gap: 20px;
-    font-size: 12px;
+    display: none;
+  }
+  .mobile-menu {
+    display: inline-grid;
   }
   .header-inner {
     gap: 16px;

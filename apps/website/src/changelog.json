@@ -1,5 +1,17 @@
 [
   {
+    "id": "desktop-download-page",
+    "date": "2026-09-15",
+    "status": "In development",
+    "title": "A home for desktop downloads.",
+    "description": "Find your platform and a clear path into Jackalope early access.",
+    "items": [
+      "The download page brings Windows, macOS, and Linux availability together, with your likely platform first.",
+      "Acceptance and friend-pass emails lead to the download page, with email confirmation before sign-in."
+    ],
+    "note": "Downloads remain coming soon until each platform release is available."
+  },
+  {
     "id": "desktop-waitlist-progress",
     "date": "2026-09-15",
     "status": "In development",

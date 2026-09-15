@@ -21,16 +21,23 @@ import { WaitlistButton } from './Signup';
 import './download.css';
 
 const platformIcons = { windows: Monitor, macos: Command, linux: Terminal };
+interface DownloadMember {
+  email: string;
+  download?: { kind?: 'store' } | null;
+}
 
 export function DownloadPage({ downloads = desktopDownloads }: { downloads?: PlatformDownload[] }) {
   const [platform, setPlatform] = useState<DesktopPlatform | null>(null);
-  const [email, setEmail] = useState('');
+  const [member, setMember] = useState<DownloadMember | null>(null);
+  const email = member?.email ?? '';
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const accountRequest = useRef<AbortController | null>(null);
   const confirmation = useRef<HTMLHeadingElement>(null);
+  const accessHeading = useRef<HTMLHeadingElement>(null);
+  const focusAccess = useRef(false);
   useEffect(() => {
     const browser = navigator as Navigator & { userAgentData?: { platform?: string } };
     setPlatform(
@@ -58,9 +65,9 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
     const controller = new AbortController();
     accountRequest.current = controller;
     if (accessOrigin) {
-      void accessRequest<{ email: string }>('me', undefined, controller.signal)
+      void accessRequest<DownloadMember>('me', undefined, controller.signal)
         .then((member) => {
-          if (!controller.signal.aborted) setEmail(member.email);
+          if (!controller.signal.aborted) setMember(member);
         })
         .catch(() => undefined);
     }
@@ -72,6 +79,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
   useEffect(() => {
     if (token) confirmation.current?.focus({ preventScroll: true });
   }, [token]);
+  useEffect(() => {
+    if (member && !token && focusAccess.current) {
+      accessHeading.current?.focus();
+      focusAccess.current = false;
+    }
+  }, [member, token]);
   async function accept() {
     if (pending.current) return;
     pending.current = true;
@@ -80,12 +93,13 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
     accountRequest.current = controller;
     setBusy(true);
     setError('');
-    setEmail('');
+    setMember(null);
     try {
       await accessRequest('accept', { token }, controller.signal);
       setToken('');
-      const member = await accessRequest<{ email: string }>('me', undefined, controller.signal);
-      setEmail(member.email);
+      const member = await accessRequest<DownloadMember>('me', undefined, controller.signal);
+      focusAccess.current = true;
+      setMember(member);
     } catch (failure) {
       if (controller.signal.aborted) return;
       if (failure instanceof AccessRequestError && failure.code === 'link_expired') setToken('');
@@ -164,7 +178,14 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
               <p>{option.detail}</p>
               <div className="download-platform-action">
                 {option.url ? (
-                  <a className="button button-primary" href={option.url}>
+                  <a
+                    className="button button-primary"
+                    href={
+                      option.store && member?.download?.kind === 'store'
+                        ? `${accessOrigin}/v1/access/download`
+                        : option.url
+                    }
+                  >
                     {option.store ? 'Get it from Microsoft Store' : `Download for ${option.name}`}{' '}
                     <ArrowDownToLine size={17} />
                   </a>
@@ -186,12 +207,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
         <div className="download-access-copy">
           <Ticket size={23} strokeWidth={1.5} aria-hidden="true" />
           <div>
-            <h2 id="download-access-title">
+            <h2 id="download-access-title" ref={accessHeading} tabIndex={-1}>
               {email && !token ? 'Your early access is approved.' : 'An invitation to get started.'}
             </h2>
             <p>
               {email && !token
-                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) ? 'Choose your platform above to get started.' : 'We’ll email you when a download is ready.'}`
+                ? `You’re signed in as ${email}. ${downloads.some((option) => option.url) ? 'Choose your platform above to get started.' : 'Downloads are coming soon. Your early access is ready when they arrive.'}`
                 : 'Jackalope is in early access. You’ll need to be accepted from the waitlist or claim a friend’s Instant Access Pass to start using the app.'}
             </p>
             {email && !token ? (

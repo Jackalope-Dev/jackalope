@@ -122,6 +122,9 @@ release dates.
 
 ## Platform releases
 
+- [ ] Enable each website download only after its release is available; verify the
+  acceptance-email confirmation flow and Store handoff against the deployed site.
+
 - [ ] Run native CI and accept macOS/Linux credential storage, GUI-launched CLI
   discovery, process/PTY/browser behavior and trial packaging. Keep WSL/Xvfb fixtures separate from installed desktop acceptance.
 - [ ] Run macOS helper compilation/guard CI and native desktop-control acceptance

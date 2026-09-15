@@ -88,13 +88,34 @@ They are embedded in static output and must never contain secrets.
 | --- | --- |
 | `VITE_ACCESS_API` | Optional early-access service URL. |
 | `VITE_WINDOWS_DOWNLOAD_URL` | Verified, published HTTPS Windows x64 installer URL. |
-| `VITE_RELEASE_VERSION` | Matching version, required with a download URL. |
+| `VITE_WINDOWS_STORE_URL` | Usable Microsoft Store product URL; takes precedence over the Windows installer. |
+| `VITE_MACOS_DOWNLOAD_URL` | Verified, published HTTPS macOS download URL. |
+| `VITE_LINUX_DOWNLOAD_URL` | Verified, published HTTPS Linux download URL. |
+| `VITE_RELEASE_VERSION` | Matching version, required with an installer URL; not required for the Store. |
 | `VITE_SITE_URL` | Optional HTTPS origin for canonical, social and discovery URLs. |
+
+The public `/download/` page lists all three desktop platforms. A platform without
+a configured URL shows Coming soon. Browser platform hints only reorder the options;
+mobile devices and unknown platforms keep the neutral ordering. Visiting the page
+never starts a download or opens a Store link automatically.
+
+Approval and direct-invitation emails link to `/download/#token=...`. The page removes
+the token from the address bar and requires an explicit confirmation before exchanging
+it for the existing account session. Expired links offer the account sign-in route.
+The ordinary account and waitlist email links keep their existing destinations.
+Approved members use the authenticated Store download endpoint when configured,
+preserving download milestones; public visitors use the configured listing link.
 
 Without a configured download the site offers the waitlist. Enable a download only
 after the relevant [release gates](../../docs/RELEASE.md). The build rejects insecure
 or incomplete download configuration. Update the privacy notice whenever hosting,
 tracking, storage or email behavior changes.
+
+Run `node apps/website/scripts/verify-download.mjs` from the repository root against
+a website preview with `VITE_ACCESS_API=https://download-fixture.example.test`.
+Set `JACKALOPE_TEST_URL` to the preview origin. The browser check intercepts account
+requests with fixtures and covers platform ordering, themes, narrow layouts, signup
+focus and email confirmation; it does not send emails or establish live delivery.
 
 ## Hosting
 

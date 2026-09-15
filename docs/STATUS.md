@@ -69,6 +69,11 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 
 ## Services and distribution
 
+The website download page lists Windows, macOS and Linux availability, prioritizes
+the visitor's likely desktop platform and explains waitlist approval and friend
+passes. Acceptance emails lead through explicit email confirmation on that page.
+Unconfigured platforms remain Coming soon; page visits never start a download.
+
 Verified waitlist members can connect the desktop to see their queue position,
 referral progress and share link, with website and tour links before approval.
 Connections persist across restarts and detect approval; offline progress remains

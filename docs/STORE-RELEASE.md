@@ -137,10 +137,14 @@ the existing administration flow and send the Store link to each invited batch.
 After installed acceptance, configure private server `ACCESS_STORE_URL` with the
 exact Microsoft product link (`https://apps.microsoft.com/detail/<id>` or
 `https://www.microsoft.com/store/apps/<id>`). The admin page reports the Store link
-as configured; approved members' download action redirects there without an R2
+as configured; the authenticated download endpoint redirects there without an R2
 installer. This is configuration readiness, not a live Store availability probe.
 The link takes precedence over `ACCESS_INSTALLER_KEY`. Keep it blank until usable.
-The existing approval email points to the member hub and requires no email change.
+The website's `/download/` page separately uses `VITE_WINDOWS_STORE_URL` for public
+availability. Keep that value blank until the listing is usable by the intended
+audience; a reserved product ID or successful package build is not availability.
+Approval emails point to `/download/`, where members confirm their email and see
+platform availability.
 Pass `STAGING_ACCESS_STORE_URL` / `PRODUCTION_ACCESS_STORE_URL` through deployment
 configuration, or include `ACCESS_STORE_URL` in the private community configuration.
 

@@ -13,6 +13,12 @@ installed connection, expiry and revocation flows still require acceptance.
 
 ## User flow
 
+Approval and direct-invitation emails open the website download page. The recipient
+explicitly confirms the email link before an account session is created. The page
+shows platform availability, waitlist signup and friend-pass guidance; confirming
+access does not imply that a build is available. Account sign-in and waitlist
+verification emails retain their existing routes.
+
 1. Connect account opens the website in the system browser. The app displays a code.
 2. The user signs in with the existing email magic link or uses their browser session.
    A link opened in another tab can complete sign-in; return to the approval tab.
