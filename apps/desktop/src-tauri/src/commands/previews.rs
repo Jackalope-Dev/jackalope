@@ -96,8 +96,11 @@ fn preview_status(id: String) -> Result<Option<PreviewView>, String> {
 }
 
 fn http_ready(port: u16) -> bool {
+    http_ready_with_timeout(port, Duration::from_millis(300))
+}
+
+fn http_ready_with_timeout(port: u16, timeout: Duration) -> bool {
     let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-    let timeout = Duration::from_millis(300);
     let Ok(mut stream) = TcpStream::connect_timeout(&address, timeout) else {
         return false;
     };
@@ -106,25 +109,42 @@ fn http_ready(port: u16) -> bool {
     {
         return false;
     }
-    if write!(
-        stream,
-        "GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
-    )
-    .is_err()
-    {
+    let request = format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    if stream.write_all(request.as_bytes()).is_err() {
         return false;
     }
+    let deadline = std::time::Instant::now() + timeout;
+    successful_http_response(|buffer| {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return Err(std::io::ErrorKind::TimedOut.into());
+        }
+        stream.set_read_timeout(Some(remaining))?;
+        stream.read(buffer)
+    })
+}
+
+fn successful_http_response(mut read: impl FnMut(&mut [u8]) -> std::io::Result<usize>) -> bool {
     let mut buffer = [0u8; 128];
-    let Ok(count) = stream.read(&mut buffer) else {
-        return false;
-    };
-    let status = String::from_utf8_lossy(&buffer[..count]);
-    status.starts_with("HTTP/1.")
-        && status
-            .split_whitespace()
-            .nth(1)
-            .and_then(|code| code.parse::<u16>().ok())
-            .is_some_and(|code| (200..400).contains(&code))
+    let mut count = 0;
+    while count < buffer.len() {
+        match read(&mut buffer[count..]) {
+            Ok(0) => return false,
+            Ok(read) => count += read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return false,
+        }
+        if let Some(end) = buffer[..count].iter().position(|byte| *byte == b'\n') {
+            let status = String::from_utf8_lossy(&buffer[..end]);
+            return status.starts_with("HTTP/1.")
+                && status
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|code| code.parse::<u16>().ok())
+                    .is_some_and(|code| (200..400).contains(&code));
+        }
+    }
+    false
 }
 
 #[tauri::command]
@@ -459,10 +479,69 @@ fn stop_preview(runtime: &TaskRuntime, id: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn readiness_handles_fragmented_status_lines() {
+        for (response, expected) in [
+            ("HTTP/1.1 200 OK\r\n", true),
+            ("HTTP/1.0 302 Found\r\n", true),
+            ("HTTP/1.1 503 Unavailable\r\n", false),
+        ] {
+            for split in 1..response.len() {
+                let (first, rest) = response.as_bytes().split_at(split);
+                let mut reader = first.chain(rest);
+                assert_eq!(
+                    successful_http_response(|buffer| reader.read(buffer)),
+                    expected,
+                    "response {response:?}, split at {split}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn readiness_rejects_incomplete_oversized_and_failed_reads() {
+        for response in ["", "HTTP/1.1 200 OK", "not HTTP\r\n"] {
+            let mut reader = response.as_bytes();
+            assert!(!successful_http_response(|buffer| reader.read(buffer)));
+        }
+        let response = format!("HTTP/1.1 200 {}\r\n", "x".repeat(128));
+        let mut reader = response.as_bytes();
+        assert!(!successful_http_response(|buffer| reader.read(buffer)));
+        for kind in [
+            std::io::ErrorKind::TimedOut,
+            std::io::ErrorKind::WouldBlock,
+            std::io::ErrorKind::ConnectionReset,
+        ] {
+            let mut prefix = "HTTP/1.1 200".as_bytes();
+            assert!(!successful_http_response(|buffer| {
+                if prefix.is_empty() {
+                    Err(kind.into())
+                } else {
+                    prefix.read(buffer)
+                }
+            }));
+        }
+    }
+
+    #[test]
+    fn readiness_retries_interrupted_reads_and_stops_at_the_status_line() {
+        let mut calls = 0;
+        assert!(successful_http_response(|buffer| {
+            calls += 1;
+            match calls {
+                1 => Err(std::io::ErrorKind::Interrupted.into()),
+                2 => "HTTP/1.1 204 No Content\r\n".as_bytes().read(buffer),
+                _ => panic!("Read past the complete status line"),
+            }
+        }));
+    }
+
     #[test]
     fn readiness_requires_a_successful_http_response() {
         for (response, expected) in [
             ("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", true),
+            ("HTTP/1.0 302 Found\r\nContent-Length: 0\r\n\r\n", true),
             ("HTTP/1.1 503 Unavailable\r\n\r\n", false),
             ("not HTTP", false),
         ] {
@@ -471,14 +550,22 @@ mod tests {
             let server = std::thread::spawn(move || {
                 let (mut client, _) = listener.accept().unwrap();
                 client
-                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .set_read_timeout(Some(Duration::from_secs(5)))
                     .unwrap();
-                let mut request = [0; 512];
-                let _ = client.read(&mut request);
+                client
+                    .set_write_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let request = format!(
+                    "GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+                );
+                let mut received = vec![0; request.len()];
+                client.read_exact(&mut received).unwrap();
+                assert_eq!(received, request.as_bytes());
                 client.write_all(response.as_bytes()).unwrap();
             });
-            assert_eq!(http_ready(port), expected);
+            let ready = http_ready_with_timeout(port, Duration::from_secs(5));
             server.join().unwrap();
+            assert_eq!(ready, expected, "response {response:?}");
         }
     }
     fn fixture() -> (TaskRuntime, std::path::PathBuf, String) {
