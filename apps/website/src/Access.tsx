@@ -253,15 +253,8 @@ export function AccessPage() {
             <div>
               <h2>Make room for your first task.</h2>
               {member.download ? (
-                <a
-                  className="button button-primary button-download"
-                  href={`${accessOrigin}/v1/access/download`}
-                >
-                  <span className="access-progress-copy">
-                    {member.download.kind === 'store'
-                      ? 'Get it from Microsoft Store'
-                      : 'Download for Windows'}
-                  </span>
+                <a className="button button-primary button-download" href="/download/">
+                  <span className="access-progress-copy">Download Jackalope</span>
                   <ArrowDownToLine size={18} />
                 </a>
               ) : (
@@ -270,6 +263,9 @@ export function AccessPage() {
                   <div>
                     <strong>No download available yet</strong>
                     <p>Your access is approved. We’ll email you when your download is ready.</p>
+                    <a className="text-link" href="/download/">
+                      See platform availability <ArrowRight size={16} />
+                    </a>
                   </div>
                 </div>
               )}

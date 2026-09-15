@@ -424,6 +424,31 @@ it('offers an approved member a Store link without a private installer and still
     expect((await request('download', undefined, session)).status).toBe(404);
   }
 });
+it('routes acceptance emails through download confirmation while preserving account and waitlist sign-ins', () => {
+  const token = 'a'.repeat(64);
+  for (const kind of ['welcome', 'invite'] as const) {
+    const content = accessEmail(
+      { kind, to: 'reader@example.com', token },
+      bindings.ACCESS_WEB_ORIGIN,
+    );
+    expect(content.body).toContain(`https://jackalope.dev/download/#token=${token}`);
+    expect(content.text).toContain(`https://jackalope.dev/download/#token=${token}`);
+    expect(content.body).not.toContain('?token=');
+  }
+  const login = accessEmail(
+    { kind: 'login', to: 'reader@example.com', token },
+    bindings.ACCESS_WEB_ORIGIN,
+  );
+  expect(login.body).toContain(`/access/#token=${token}`);
+  const passes = accessEmail(
+    { kind: 'passes_ready', to: 'reader@example.com', total: 5 },
+    bindings.ACCESS_WEB_ORIGIN,
+  );
+  expect(passes.body).toContain('https://jackalope.dev/download/');
+  expect(passes.text).toContain('View downloads: https://jackalope.dev/download/');
+  expect(passes.body).toContain('/access/#invitations');
+});
+
 it('queues branded transactional mail once with encrypted tokens and retries provider failures', async () => {
   const person = await member('person@example.com');
   await approve(bindings, person.id);
@@ -431,7 +456,7 @@ it('queues branded transactional mail once with encrypted tokens and retries pro
   const row = await env.DB.prepare('SELECT payload FROM access_mail').first<{ payload: string }>();
   expect(row?.payload).not.toContain(message.token);
   const rendered = accessEmail(message, bindings.ACCESS_WEB_ORIGIN);
-  expect(rendered.body).toContain('/access/#token=');
+  expect(rendered.body).toContain('/download/#token=');
   expect(rendered.body).toContain('Jackalope Digital LLC');
   let sends = 0;
   const send = (async () => {

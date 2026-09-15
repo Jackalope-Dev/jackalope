@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
 import { BrandMark } from './BrandMark';
 import { tour } from './content';
+import { DownloadPage } from './Download';
+import { downloadsAvailable } from './download-config';
 import { FeedbackPage } from './Feedback';
 import { Footer } from './Footer';
 import { JournalPage } from './Journal';
@@ -23,15 +25,14 @@ import { setInitialVideoVolume } from './video-volume';
 import { WaitlistPage } from './Waitlist';
 import './knowledge.css';
 
-const downloadUrl = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL?.trim();
 const version = import.meta.env.VITE_RELEASE_VERSION?.trim();
 
 function DownloadButton({ compact = false }: { compact?: boolean }) {
-  if (!downloadUrl) return <WaitlistButton compact={compact} />;
+  if (!downloadsAvailable) return <WaitlistButton compact={compact} />;
   return (
     <a
       className={`button button-primary button-download ${compact ? 'button-compact' : ''}`}
-      href="/#download"
+      href="/download/"
     >
       <span>Get Jackalope</span>
       <ArrowDownToLine size={16} />
@@ -81,8 +82,8 @@ const faqs = [
   ],
   [
     'Can I download Jackalope now?',
-    downloadUrl
-      ? 'The Windows release is available below. Bring a local Git project and a supported, signed-in coding agent.'
+    downloadsAvailable
+      ? 'Visit the download page for available platforms. Early access requires waitlist approval or a claimed Instant Access Pass.'
       : 'Public downloads are not open yet. Join the waitlist and we’ll email you when access is ready.',
   ],
   [
@@ -138,6 +139,9 @@ export function App({ path = '/' }: { path?: string }) {
             <a href="/blog/" aria-current={path.startsWith('/blog/') ? 'page' : undefined}>
               Field notes
             </a>
+            <a href="/download/" aria-current={path === '/download/' ? 'page' : undefined}>
+              Download
+            </a>
           </nav>
           <div className="header-actions">
             {path !== '/access/' && (
@@ -153,7 +157,7 @@ export function App({ path = '/' }: { path?: string }) {
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </IconButton>
-            {path === '/access/' || path === '/feedback/' ? (
+            {path === '/access/' || path === '/feedback/' || path === '/download/' ? (
               <a className="text-link" href="/tour/">
                 Take a look around <ArrowRight size={15} />
               </a>
@@ -181,6 +185,7 @@ export function App({ path = '/' }: { path?: string }) {
                     Switch to {dark ? 'light' : 'dark'} appearance
                   </Menu.Item>
                   {[
+                    ['Download Jackalope', '/download/'],
                     ['Your waitlist place', '/waitlist/'],
                     ['Member access', '/access/'],
                     ['Compare workflows', '/compare/'],
@@ -209,13 +214,13 @@ export function App({ path = '/' }: { path?: string }) {
 
       {home ? (
         <LandingPage
-          available={Boolean(downloadUrl)}
+          available={downloadsAvailable}
           releaseVersion={version}
           action={<DownloadButton />}
           downloadAction={
-            downloadUrl ? (
-              <a className="button button-primary button-download" href={downloadUrl}>
-                Download for Windows <ArrowDownToLine size={18} />
+            downloadsAvailable ? (
+              <a className="button button-primary button-download" href="/download/">
+                Choose your platform <ArrowDownToLine size={18} />
               </a>
             ) : (
               <Signup />
@@ -233,7 +238,9 @@ export function App({ path = '/' }: { path?: string }) {
           faqs={faqs}
         />
       ) : path === '/tour/' ? (
-        <TourPage dark={dark} available={Boolean(downloadUrl)} />
+        <TourPage dark={dark} available={downloadsAvailable} />
+      ) : path === '/download/' ? (
+        <DownloadPage />
       ) : path === '/feedback/' ? (
         <FeedbackPage />
       ) : path === '/waitlist/' ? (
@@ -255,6 +262,7 @@ export function App({ path = '/' }: { path?: string }) {
       {![
         '/',
         '/tour/',
+        '/download/',
         '/privacy/',
         '/terms/',
         '/access/',

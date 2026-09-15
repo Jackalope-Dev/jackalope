@@ -653,13 +653,18 @@ export function LandingPage({
               <h2 id="download-title">{available ? 'Download Jackalope.' : 'Get early access.'}</h2>
               <p>
                 {available
-                  ? 'Install Jackalope for Windows and connect your coding agents.'
+                  ? 'Choose your platform, then sign in with your approved early-access account.'
                   : 'We’ll email you when access opens.'}
               </p>
               {downloadAction}
               {available && (
-                <p className="availability">Windows x64 · {releaseVersion ?? 'Available now'}</p>
+                <p className="availability">
+                  {releaseVersion ? `Version ${releaseVersion} · Early access` : 'Early access'}
+                </p>
               )}
+              <a className="text-link" href="/download/">
+                See platform availability <ArrowRight size={16} />
+              </a>
             </div>
             <BrandMark className="finale-mark" />
           </div>

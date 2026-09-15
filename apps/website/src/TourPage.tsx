@@ -211,11 +211,13 @@ export function TourPage({ dark, available }: { dark: boolean; available: boolea
               </div>
               <p className="tour-availability">
                 {available ? (
-                  <a href="/#download">
+                  <a href="/download/">
                     Explore available downloads <ArrowRight size={14} />
                   </a>
                 ) : (
-                  'Coming soon. Join the waitlist for early access.'
+                  <a href="/download/">
+                    Coming soon. See platform availability <ArrowRight size={14} />
+                  </a>
                 )}
               </p>
             </div>

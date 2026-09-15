@@ -176,6 +176,12 @@ export const pages: SitePage[] = [
       'Run coding agents in parallel Git worktrees. Match project guidance, automate checks, explore code dependencies, and review changes in one desktop workspace.',
   },
   {
+    path: '/download/',
+    title: 'Download Jackalope for Windows, macOS & Linux',
+    description:
+      'Find Jackalope desktop downloads and platform availability. Join the waitlist or claim a friend’s Instant Access Pass for early access.',
+  },
+  {
     path: '/tour/',
     title: 'Jackalope app tour: Tasks, coding agents & code review',
     description: tour.description,

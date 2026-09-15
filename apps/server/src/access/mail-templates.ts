@@ -46,8 +46,8 @@ export function accessEmail(mail: Mail, origin: string) {
       subject: 'You’re in. Welcome to Jackalope',
       title: 'You’re in.',
       intro:
-        'Your early access is ready. Find setup steps and available downloads in your account.',
-      action: 'Open my account',
+        'Your early access is approved. Confirm your email, then check download availability for your computer.',
+      action: 'Get Jackalope',
       detail:
         'You also have five Instant Access Passes to share. Each lets one person skip the waitlist after verifying their email.',
       stamp: 'Early access / Welcome',
@@ -59,7 +59,7 @@ export function accessEmail(mail: Mail, origin: string) {
         'You’ve been invited to Jackalope. Verify your email to claim a pass while one is available.',
       action: 'Claim my pass',
       detail:
-        'Your pass skips the waitlist. Once you’re in, you’ll get five passes to share. Downloads appear in your account when available.',
+        'Your pass skips the waitlist. Once you’re in, you’ll get five passes to share. Choose your platform on the download page when a release is available.',
       stamp: 'Instant access pass / Admit one',
     },
     login: {
@@ -84,8 +84,7 @@ export function accessEmail(mail: Mail, origin: string) {
       title: 'Your passes are ready.',
       intro: `You now have early access and ${total} Instant Access ${total === 1 ? 'Pass' : 'Passes'} to share.`,
       action: 'See my passes',
-      detail:
-        'Each pass lets one person skip the waitlist after verifying their email. Setup steps and downloads appear in your account when available.',
+      detail: 'Each pass lets one person skip the waitlist after verifying their email.',
       stamp: 'Instant access / Pass it on',
     },
     pass_claimed: {
@@ -110,11 +109,13 @@ export function accessEmail(mail: Mail, origin: string) {
       ? `${origin}/feedback/#token=${mail.token}`
       : mail.kind === 'waitlist'
         ? `${origin}/waitlist/${mail.token ? `#token=${mail.token}` : ''}`
-        : 'token' in mail
-          ? `${origin}/access/#token=${mail.token}`
-          : mail.kind === 'referral'
-            ? `${origin}/waitlist/`
-            : `${origin}/access/#invitations`;
+        : mail.kind === 'welcome' || mail.kind === 'invite'
+          ? `${origin}/download/#token=${mail.token}`
+          : 'token' in mail
+            ? `${origin}/access/#token=${mail.token}`
+            : mail.kind === 'referral'
+              ? `${origin}/waitlist/`
+              : `${origin}/access/#invitations`;
   const expiry =
     mail.kind === 'invite' || mail.kind === 'welcome'
       ? 'This link expires in 7 days. Keep it private. You can request a new one on the website.'
@@ -132,11 +133,13 @@ export function accessEmail(mail: Mail, origin: string) {
       ? `You opted in to feedback emails. We won’t send reminders. <a href="${escapeHtml(origin)}/feedback/#unsubscribe=${escapeHtml(mail.token)}" style="color:inherit">Stop feedback emails</a>.`
       : footer;
   const address = EMAIL_COMPANY.postalAddress;
+  const downloadLink = mail.kind === 'passes_ready' ? `${origin}/download/` : '';
   const text = [
     copy.title,
     copy.intro,
     `${copy.action}: ${link}`,
     copy.detail,
+    downloadLink ? `View downloads: ${downloadLink}` : '',
     expiry,
     footer,
     `${EMAIL_COMPANY.legalName}${address ? ` · ${address}` : ''} · ${EMAIL_COMPANY.companySite}\nPrivacy: ${origin}/privacy/`,
@@ -155,6 +158,7 @@ export function accessEmail(mail: Mail, origin: string) {
 <p style="margin:0;font-size:17px;line-height:1.75;color:${c.muted}">${escapeHtml(copy.intro)}</p>
 ${callout(copy.stamp, copy.action, link)}
 ${copy.detail ? `<p style="margin:0;font-size:15px;line-height:1.8;color:${c.muted}">${escapeHtml(copy.detail)}</p>` : ''}
+${downloadLink ? `<p style="margin:16px 0 0;font-size:15px;line-height:1.8"><a href="${escapeHtml(downloadLink)}" style="color:${c.ink};text-decoration:underline">View downloads</a></p>` : ''}
 ${expiry ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.7;color:${c.faint}">${escapeHtml(expiry)}</p>` : ''}`,
       footer: footerHtml,
     }),

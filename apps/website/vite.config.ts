@@ -6,10 +6,12 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 import changelog from './src/changelog.json' with { type: 'json' };
 import { normalizePath, siteOrigin } from './src/content.ts';
+import { platformDownloads } from './src/platform-downloads.ts';
 import { discoveryFiles, pageHtml, routes } from './src/seo.ts';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
+  platformDownloads(env);
   const download = env.VITE_WINDOWS_DOWNLOAD_URL;
   const site = new URL(env.VITE_SITE_URL || siteOrigin);
   if (
@@ -42,15 +44,6 @@ export default defineConfig(({ mode }) => {
     'icon-128.png': renderIcon(128),
     'icon-256.png': renderIcon(256),
   };
-  if (download) {
-    const url = new URL(download);
-    if (url.protocol !== 'https:' || url.username || url.password) {
-      throw new Error('VITE_WINDOWS_DOWNLOAD_URL must be a public HTTPS URL without credentials.');
-    }
-    if (!env.VITE_RELEASE_VERSION?.trim()) {
-      throw new Error('Set VITE_RELEASE_VERSION when configuring a download.');
-    }
-  }
   return {
     plugins: [
       react(),

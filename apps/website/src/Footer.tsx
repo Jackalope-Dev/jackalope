@@ -5,6 +5,7 @@ const groups = [
   {
     title: 'Product',
     links: [
+      ['Download Jackalope', '/download/'],
       ['App tour', '/tour/'],
       ['Compare workflows', '/compare/'],
       ['Parallel agents', '/parallel-coding-agents/'],
