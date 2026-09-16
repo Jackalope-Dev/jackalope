@@ -40,7 +40,10 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
  case 'live_session_snapshot': return {sessions:useLiveSessionStore.getState().sessions,runs:useLiveSessionStore.getState().runs,error:null};
  case 'knowledge_list': return [];
  case 'knowledge_preview': return {entries:[],bytes:0,reasons:{}};
- case 'queue_snapshot': return {items:[],mergedRunIds:[],running:[],paused:true};
+ case 'queue_snapshot': return {items:[],managedTasks:[],messages:[],enabledProjects:[],concurrency:3,bridgeUrl:null,bridgeError:null,mergedRunIds:[]};
+ case 'task_strategy_assess': return {id:'fixture-assessment',sourceHead:'base',strategy:'single',parallelAvailable:false,reason:'This fixture continues with one lead.',createdAt:new Date().toISOString(),cached:false,decision:{version:1,kind:'task_strategy',requestedMode:'deterministic',provider:'local_rules',policyRevision:1,modelCallAttempted:false,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:true}}};
+ case 'task_strategy_history': return [];
+ case 'task_strategy_cancel': return;
  case 'task_usefulness': if(args.useful!==undefined)rating={useful:args.useful,reviewMinutes:args.reviewMinutes};return rating;
  case 'task_review_progress': if(args.seenTree)seen=true;return {tree:'tree',diff:seen?'':patch,files:seen?[]:['src/search.tsx'],viewedAt:seen?'2026-09-16T12:00:00Z':null,note:seen?'Changes since your saved review position.':'All current changes.'};
  case 'integration_plans': return plan?[plan]:[];

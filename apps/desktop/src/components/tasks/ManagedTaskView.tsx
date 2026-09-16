@@ -60,11 +60,10 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const selectionKey = work.steps.flatMap(({ run }) => (run ? [run.id] : [])).join(',');
   const reviewRunIds = useMemo(() => selectionKey.split(',').filter(Boolean), [selectionKey]);
   const detail = work.work.find((run) => run.id === detailId);
-  const combinedId = work.combined?.id;
   useEffect(() => {
-    if (work.failed || (task.started && !combinedId)) setDetailsOpen(true);
+    if (work.failed) setDetailsOpen(true);
     else if (work.ready) setDetailsOpen(false);
-  }, [work.failed, work.ready, task.started, combinedId]);
+  }, [work.failed, work.ready]);
   const refreshAll = async () => {
     await refresh();
     await useExecutionStore.getState().refresh();
@@ -143,7 +142,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     ...(task.assessment.cached ? [] : decisionUsageEntries(task.assessment.decision)),
   ]);
   const openDetails = (run: TaskRun) => {
-    if (run.id === work.combined?.id) {
+    if (run.id === work.combined?.id && !isActive(run)) {
       setDetailId(null);
       setResultTab('result');
       return;
@@ -177,6 +176,15 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     setResultTab('result');
     requestAnimationFrame(() => document.getElementById('managed-result-correction')?.focus());
   };
+  const showAssignments = task.started && (!work.combined || work.active.length > 0);
+  const assignments = (
+    <ManagedAssignments
+      work={work}
+      busy={busy}
+      onDetails={openDetails}
+      onRetry={(id) => void act(() => queueCommand('queue_release', { id, retry: true }))}
+    />
+  );
   return (
     <WorkspacePage className="managed-task workspace-stack">
       <Button
@@ -278,6 +286,12 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
       {work.questions.map(({ run, prompt }) => (
         <UserPromptCard key={prompt.id} runId={run.id} prompt={prompt} active />
       ))}
+      {showAssignments && (
+        <section className="workspace-section workspace-stack" aria-label="Assignments">
+          <WorkspaceSectionHeading title="Assignments" />
+          {assignments}
+        </section>
+      )}
       {!task.started && (
         <section className="workspace-section workspace-stack" aria-label="Proposed work">
           <WorkspaceSectionHeading title="Proposed work" />
@@ -445,7 +459,9 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
       <Disclosure
         className="managed-details"
         open={detailsOpen}
-        onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+        onToggle={(event) => {
+          if (event.target === event.currentTarget) setDetailsOpen(event.currentTarget.open);
+        }}
       >
         <DisclosureSummary>Task details</DisclosureSummary>
         <DisclosureBody>
@@ -462,58 +478,10 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
               )}
             </DisclosureBody>
           </Disclosure>
-          {task.started && (
-            <Disclosure open={work.failed || !work.combined || undefined}>
+          {task.started && !showAssignments && (
+            <Disclosure open={work.failed || undefined}>
               <DisclosureSummary>Work details</DisclosureSummary>
-              <DisclosureBody>
-                <section aria-label="Work in this task">
-                  {work.steps.map(({ item, run }) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-wrap justify-between gap-3 border-b border-[var(--color-border)] py-3"
-                    >
-                      <div>
-                        <strong>{item.title}</strong>
-                        <p className="task-muted">
-                          {item.error ||
-                            (run
-                              ? isActive(run)
-                                ? (run.progress?.label ?? 'Working')
-                                : run.verificationError ||
-                                  run.error ||
-                                  (run.verification?.result.success ? 'Checks passed' : run.status)
-                              : work.paused
-                                ? 'Paused'
-                                : item.dependencies.length
-                                  ? 'Waiting for verified dependencies'
-                                  : 'Waiting for capacity')}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {run && (
-                          <Button variant="ghost" onClick={() => openDetails(run)}>
-                            Details
-                          </Button>
-                        )}
-                        {(item.error || (run && ['failed', 'stopped'].includes(run.status))) &&
-                          !work.active.length && (
-                            <Button
-                              variant="outline"
-                              disabled={busy}
-                              onClick={() =>
-                                void act(() =>
-                                  queueCommand('queue_release', { id: item.id, retry: true }),
-                                )
-                              }
-                            >
-                              Retry assignment
-                            </Button>
-                          )}
-                      </div>
-                    </div>
-                  ))}
-                </section>
-              </DisclosureBody>
+              <DisclosureBody>{assignments}</DisclosureBody>
             </Disclosure>
           )}
           {detail && (
@@ -689,5 +657,56 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         </DisclosureBody>
       </Disclosure>
     </WorkspacePage>
+  );
+}
+
+function ManagedAssignments({
+  work,
+  busy,
+  onDetails,
+  onRetry,
+}: {
+  work: ReturnType<typeof managedTaskWork>;
+  busy: boolean;
+  onDetails: (run: TaskRun) => void;
+  onRetry: (id: string) => void;
+}) {
+  return (
+    <section aria-label="Work in this task">
+      {work.steps.map(({ item, run }) => (
+        <div key={item.id} className="managed-assignment">
+          <div>
+            <strong>{item.title}</strong>
+            <p className="task-muted">
+              {item.error ||
+                (run
+                  ? isActive(run)
+                    ? (run.progress?.label ?? 'Working')
+                    : run.verificationError ||
+                      run.error ||
+                      (run.verification?.result.success ? 'Checks passed' : run.status)
+                  : work.paused
+                    ? 'Paused'
+                    : item.dependencies.length
+                      ? 'Waiting for verified dependencies'
+                      : 'Waiting for capacity')}
+            </p>
+          </div>
+          <div className="managed-task-actions">
+            {run && (
+              <Button variant="ghost" onClick={() => onDetails(run)}>
+                Details
+              </Button>
+            )}
+            {(item.error || (run && ['failed', 'stopped'].includes(run.status))) &&
+              !work.active.length && (
+                <Button variant="outline" disabled={busy} onClick={() => onRetry(item.id)}>
+                  Retry assignment
+                </Button>
+              )}
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }

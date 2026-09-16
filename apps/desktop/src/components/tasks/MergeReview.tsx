@@ -406,6 +406,7 @@ export function MergeReview({
               <nav aria-label="Changed files">
                 <button
                   className={!file ? 'selected' : ''}
+                  aria-current={!file ? 'page' : undefined}
                   type="button"
                   onClick={() => setFile('')}
                 >
@@ -414,6 +415,7 @@ export function MergeReview({
                 {plan.files.map((name) => (
                   <button
                     className={file === name ? 'selected' : ''}
+                    aria-current={file === name ? 'page' : undefined}
                     type="button"
                     key={name}
                     onClick={() => setFile(name)}
@@ -507,6 +509,11 @@ export function MergeReview({
               onClick={() => {
                 setPlan(p);
                 setFile('');
+                if (managedTitle) {
+                  const savedMessage = p.commitMessage ?? managedTitle;
+                  setMessage(savedMessage);
+                  setPreparedMessage(savedMessage);
+                }
               }}
             >
               {p.runIds.length} tasks · {new Date(p.createdAt).toLocaleString()}

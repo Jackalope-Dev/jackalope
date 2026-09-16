@@ -207,9 +207,13 @@ try {
                   masterHead: '12345678',
                   status: 'ready',
                   sources: [],
-                  files: ['feature.txt'],
-                  patch:
-                    'diff --git a/feature.txt b/feature.txt\nnew file mode 100644\n--- /dev/null\n+++ b/feature.txt\n@@ -0,0 +1 @@\n+Combined feature\n',
+                  files: f.reviewFiles ?? ['feature.txt'],
+                  patch: (f.reviewFiles ?? ['feature.txt'])
+                    .map(
+                      (file) =>
+                        `diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1 @@\n+Combined feature\n`,
+                    )
+                    .join(''),
                   conflicts: [],
                   commitMessage: args.commitMessage,
                   commitPolicy: {
@@ -297,8 +301,16 @@ try {
       });
       await start.press('Enter');
       await page.getByRole('button', { name: 'Pause dispatch' }).waitFor();
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-working.png`,
+        fullPage: true,
+      });
       await page.getByRole('button', { name: 'Stop task' }).click();
       await page.getByRole('button', { name: 'Retry assignment' }).waitFor();
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-stopped.png`,
+        fullPage: true,
+      });
       await page.getByText('All attempts (2)', { exact: true }).click();
       await page.getByText('All attempts (2)', { exact: true }).click();
       await page.evaluate(() => {
@@ -350,6 +362,7 @@ try {
       await taskDetails.press('Enter');
       await page.getByText('Request and approach', { exact: true }).waitFor();
       await taskDetails.press('Enter');
+      await review.focus();
       await page.screenshot({
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-result.png`,
         fullPage: true,
@@ -408,6 +421,28 @@ try {
       );
       await commitDetails.click();
       await apply.focus();
+      if ((width === 1280 && !dark) || (width === 540 && dark)) {
+        await page.evaluate(() => {
+          window.fixture.reviewFiles = [
+            'feature.txt',
+            'src/components/settings/AccountPreferences.tsx',
+            'src/server/feature-handler.ts',
+          ];
+        });
+        await page.getByRole('button', { name: 'Refresh changes', exact: true }).click();
+        const files = page.getByRole('navigation', { name: 'Changed files' });
+        const selectedFile = files.getByRole('button', {
+          name: 'src/components/settings/AccountPreferences.tsx',
+          exact: true,
+        });
+        await selectedFile.click();
+        assert.equal(await selectedFile.getAttribute('aria-current'), 'page');
+        await page.screenshot({
+          path: `${output}/${width}-${dark ? 'dark' : 'light'}-files.png`,
+          fullPage: true,
+        });
+        await apply.focus();
+      }
       await apply.press('Enter');
       await page.getByText('Integrated into main', { exact: true }).waitFor();
       assert.equal(
