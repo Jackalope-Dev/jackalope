@@ -1,6 +1,6 @@
 import { EchoMark, EchoWordmark } from '@jackalope/brand/echo';
 import { PRESET_THEMES } from '@jackalope/brand/theme';
-import { Disclosure, DisclosureSummary, ExternalLinkIcon, Tabs } from '@jackalope/ui';
+import { Disclosure, DisclosureSummary, DiscordIcon, ExternalLinkIcon, Tabs } from '@jackalope/ui';
 import {
   ArrowDown,
   ArrowRight,
@@ -18,6 +18,7 @@ import { AgentSupport } from './AgentSupport';
 import { BrandMark } from './BrandMark';
 import type { EditorialCover } from './blog-types';
 import { ConnectedWorkspace } from './ConnectedWorkspace';
+import { DISCORD_URL } from './community';
 import { tour } from './content';
 import { EditorialArt } from './EditorialArt';
 import { WorkspaceClip } from './WorkspaceClip';
@@ -437,6 +438,13 @@ export function LandingPage({
                   Windows x64 · {releaseVersion ?? 'Available now'}
                 </span>
               )}
+              <a className="hero-community" href={DISCORD_URL}>
+                <DiscordIcon size={15} />
+                <span>
+                  Building with agents? <strong>Join the Discord</strong>
+                </span>
+                <ArrowRight size={14} />
+              </a>
             </div>
           </div>
           <div className="hero-visual">

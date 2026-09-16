@@ -61,6 +61,46 @@
   display: block;
   margin-top: 20px;
 }
+.hero-community {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  margin-top: 16px;
+  padding: 0 16px 0 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+.hero-community strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+.hero-community > .ui-icon:first-child {
+  color: #5865f2;
+}
+.hero-community:hover {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.hero-community > svg:last-child {
+  transition: transform 160ms ease;
+}
+.hero-community:hover > svg:last-child {
+  transform: translateX(2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-community,
+  .hero-community > svg:last-child {
+    transition: none;
+  }
+}
 .landing-story .hero-visual {
   align-self: center;
   padding-block: 40px;

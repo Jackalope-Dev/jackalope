@@ -147,6 +147,11 @@
   opacity: 1;
 }
 
+.settings-community-link {
+  margin-top: auto;
+  font-size: var(--text-xs);
+}
+
 /* Settings Content Panel */
 .settings-content {
   flex: 1;

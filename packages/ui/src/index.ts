@@ -4,6 +4,7 @@ export {
   Trigger as DialogTrigger,
 } from '@radix-ui/react-dialog';
 export * from './Badge';
+export * from './BrandIcons';
 export { Button, type ButtonProps } from './Button';
 export * from './Checkbox';
 export * from './ConfirmDialog';

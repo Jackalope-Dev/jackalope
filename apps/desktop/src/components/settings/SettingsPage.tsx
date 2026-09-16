@@ -1,8 +1,9 @@
-import { Input, SearchField } from '@jackalope/ui';
+import { DiscordIcon, Input, SearchField } from '@jackalope/ui';
 
 import { useEffect, useRef, useState } from 'react';
+import { DISCORD_URL } from '../../lib/community';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -105,7 +106,7 @@ export function SettingsPage({
         Privacy: 'marketplace MCP network telemetry crash reporting',
         Project: 'repository name path agent instructions verification command',
         'Updates & support':
-          'version automatic install release notes help feedback diagnostics report',
+          'version automatic install release notes help feedback diagnostics report community discord',
         'Data & reset':
           'export clipboard erase delete nuke reset first time setup history local data',
       }[c],
@@ -226,6 +227,14 @@ export function SettingsPage({
               {c}
             </button>
           ))}
+          <button
+            type="button"
+            className="settings-nav-item settings-community-link"
+            onClick={() => void openExternalUrl(DISCORD_URL)}
+          >
+            <DiscordIcon />
+            Join the Discord
+          </button>
         </nav>
         <div className="settings-content">
           {!visible.length && <p>No settings match “{query}”.</p>}
