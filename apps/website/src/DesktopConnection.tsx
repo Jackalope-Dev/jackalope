@@ -1,7 +1,14 @@
 import { EchoMark } from '@jackalope/brand/echo';
-import { Button, Checkbox, Panel } from '@jackalope/ui';
+import {
+  Button,
+  Checkbox,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  Panel,
+} from '@jackalope/ui';
 import { Check, Monitor } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { accessMessage, accessRequest } from './access-api';
 
 const storageKey = 'jackalope-desktop-approval';
@@ -286,6 +293,44 @@ interface Device {
   settingsCheckedAt?: number | null;
   settingsSync?: number;
 }
+
+function groupDevices(devices: Device[]) {
+  const groups = new Map<string, Device[]>();
+  for (const device of devices) {
+    const name = device.name?.trim().toLowerCase();
+    const key = name ? JSON.stringify([name, device.platform || null]) : device.id;
+    const group = groups.get(key);
+    if (group) group.push(device);
+    else groups.set(key, [device]);
+  }
+  return [...groups.entries()];
+}
+
+function DesktopGroup({ devices, children }: { devices: Device[]; children: ReactNode }) {
+  if (devices.length === 1) return children;
+  return (
+    <Disclosure className="desktop-device-group">
+      <DisclosureSummary>
+        <span className="desktop-device-group-label">
+          <strong className="desktop-device-name">
+            <Monitor size={18} /> {devices[0].name}
+          </strong>
+          <span className="desktop-device-group-count">
+            {devices.length} connections with this name
+          </span>
+        </span>
+      </DisclosureSummary>
+      <DisclosureBody>
+        <p>
+          These connections report the same computer name and platform. Review each profile before
+          disconnecting it.
+        </p>
+        {children}
+      </DisclosureBody>
+    </Disclosure>
+  );
+}
+
 export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [error, setError] = useState('');
@@ -352,111 +397,119 @@ export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
       </p>
       {devices?.length === 0 && <p>No desktops connected.</p>}
       {devices === null && !error && <p role="status">Reading connected desktops…</p>}
-      {devices?.map((device) => (
-        <div key={device.id} className="desktop-device-row">
-          <div>
-            <strong className="desktop-device-name">
-              <Monitor size={18} />
-              {device.name || `Desktop ${device.id.slice(0, 8)}`}
-            </strong>
-            <p>Connected {new Date(device.createdAt).toLocaleString()}</p>
-            <dl className="desktop-device-details">
+      {groupDevices(devices ?? []).map(([key, group]) => (
+        <DesktopGroup key={key} devices={group}>
+          {group.map((device) => (
+            <div key={device.id} className="desktop-device-row">
               <div>
-                <dt>App</dt>
-                <dd>
-                  {device.appVersion ? `Jackalope ${device.appVersion}` : 'Version not reported'}
-                  {device.buildKind === 'development'
-                    ? ' · Development build'
-                    : device.buildKind === 'release'
-                      ? ' · Release build'
-                      : ''}
-                </dd>
+                <strong className="desktop-device-name">
+                  {group.length === 1 && <Monitor size={18} />}
+                  {group.length > 1
+                    ? `Connection ${device.id.slice(0, 8)}`
+                    : device.name || `Desktop ${device.id.slice(0, 8)}`}
+                </strong>
+                <p>Connected {new Date(device.createdAt).toLocaleString()}</p>
+                <dl className="desktop-device-details">
+                  <div>
+                    <dt>App</dt>
+                    <dd>
+                      {device.appVersion
+                        ? `Jackalope ${device.appVersion}`
+                        : 'Version not reported'}
+                      {device.buildKind === 'development'
+                        ? ' · Development build'
+                        : device.buildKind === 'release'
+                          ? ' · Release build'
+                          : ''}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Platform</dt>
+                    <dd>
+                      {device.platform
+                        ? { windows: 'Windows', macos: 'macOS', linux: 'Linux' }[device.platform]
+                        : 'Not reported'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Profile</dt>
+                    <dd>
+                      {device.profileKind === 'isolated'
+                        ? 'Isolated test profile'
+                        : device.profileKind === 'default'
+                          ? 'Default profile'
+                          : 'Not reported'}{' '}
+                      · Connection {device.id.slice(0, 8)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Last account check</dt>
+                    <dd>
+                      {device.lastSeenAt
+                        ? new Date(device.lastSeenAt).toLocaleString()
+                        : 'Not recorded yet'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Settings sync</dt>
+                    <dd>
+                      {device.settingsSync === 1
+                        ? 'Enabled'
+                        : device.settingsSync === 0
+                          ? 'Off'
+                          : 'Not reported'}
+                      {device.settingsCheckedAt
+                        ? ` · Last checked ${new Date(device.settingsCheckedAt).toLocaleString()}`
+                        : ' · No check recorded yet'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Connection expires</dt>
+                    <dd>{new Date(device.expiresAt).toLocaleString()}</dd>
+                  </div>
+                </dl>
               </div>
-              <div>
-                <dt>Platform</dt>
-                <dd>
-                  {device.platform
-                    ? { windows: 'Windows', macos: 'macOS', linux: 'Linux' }[device.platform]
-                    : 'Not reported'}
-                </dd>
+              <div className="desktop-device-actions">
+                <div className="desktop-connection-actions">
+                  <Button
+                    variant="ghost"
+                    className={`button button-compact ${confirm === device.id ? 'button-primary' : 'button-quiet desktop-disconnect'}`}
+                    type="button"
+                    disabled={!!busy}
+                    aria-describedby={confirm === device.id ? `disconnect-${device.id}` : undefined}
+                    onClick={() =>
+                      confirm === device.id ? void revoke(device.id) : setConfirm(device.id)
+                    }
+                    loading={busy === device.id}
+                    loadingLabel="Disconnecting…"
+                  >
+                    {confirm === device.id ? 'Confirm disconnect' : 'Disconnect'}
+                  </Button>
+                  {confirm === device.id && (
+                    <Button
+                      variant="ghost"
+                      className="button button-compact button-quiet"
+                      type="button"
+                      disabled={!!busy}
+                      onClick={(event) => {
+                        setConfirm('');
+                        event.currentTarget.parentElement?.querySelector('button')?.focus();
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+                {confirm === device.id && (
+                  <p id={`disconnect-${device.id}`}>
+                    Disconnect this profile’s account access? Local projects and agent accounts are
+                    kept.
+                  </p>
+                )}
               </div>
-              <div>
-                <dt>Profile</dt>
-                <dd>
-                  {device.profileKind === 'isolated'
-                    ? 'Isolated test profile'
-                    : device.profileKind === 'default'
-                      ? 'Default profile'
-                      : 'Not reported'}{' '}
-                  · Connection {device.id.slice(0, 8)}
-                </dd>
-              </div>
-              <div>
-                <dt>Last account check</dt>
-                <dd>
-                  {device.lastSeenAt
-                    ? new Date(device.lastSeenAt).toLocaleString()
-                    : 'Not recorded yet'}
-                </dd>
-              </div>
-              <div>
-                <dt>Settings sync</dt>
-                <dd>
-                  {device.settingsSync === 1
-                    ? 'Enabled'
-                    : device.settingsSync === 0
-                      ? 'Off'
-                      : 'Not reported'}
-                  {device.settingsCheckedAt
-                    ? ` · Last checked ${new Date(device.settingsCheckedAt).toLocaleString()}`
-                    : ' · No check recorded yet'}
-                </dd>
-              </div>
-              <div>
-                <dt>Connection expires</dt>
-                <dd>{new Date(device.expiresAt).toLocaleString()}</dd>
-              </div>
-            </dl>
-          </div>
-          <div className="desktop-device-actions">
-            <div className="desktop-connection-actions">
-              <Button
-                variant="ghost"
-                className={`button button-compact ${confirm === device.id ? 'button-primary' : 'button-quiet desktop-disconnect'}`}
-                type="button"
-                disabled={!!busy}
-                aria-describedby={confirm === device.id ? `disconnect-${device.id}` : undefined}
-                onClick={() =>
-                  confirm === device.id ? void revoke(device.id) : setConfirm(device.id)
-                }
-                loading={busy === device.id}
-                loadingLabel="Disconnecting…"
-              >
-                {confirm === device.id ? 'Confirm disconnect' : 'Disconnect'}
-              </Button>
-              {confirm === device.id && (
-                <Button
-                  variant="ghost"
-                  className="button button-compact button-quiet"
-                  type="button"
-                  disabled={!!busy}
-                  onClick={(event) => {
-                    setConfirm('');
-                    event.currentTarget.parentElement?.querySelector('button')?.focus();
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
             </div>
-            {confirm === device.id && (
-              <p id={`disconnect-${device.id}`}>
-                Disconnect this profile’s account access? Local projects and agent accounts are
-                kept.
-              </p>
-            )}
-          </div>
-        </div>
+          ))}
+        </DesktopGroup>
       ))}
       {error && (
         <p className="access-alert" role="alert">

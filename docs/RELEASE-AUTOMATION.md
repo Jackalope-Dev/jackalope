@@ -1,84 +1,142 @@
 # Release automation
 
-Use [RELEASE.md](RELEASE.md) for installed acceptance,
-[SERVER-LAUNCH.md](SERVER-LAUNCH.md) for service operations, and the checked-in
-[workflows](../.github/workflows) and [release scripts](../scripts/release) for
-exact inputs. This document does not record live account configuration.
+This is the maintainer entry point for direct desktop releases. GitHub Actions
+builds and verifies candidates; CrabNebula hosts installers, release history and
+beta/stable update feeds. See [signing setup](CRABNEBULA-RELEASE.md),
+[installed acceptance](RELEASE.md) and [platform requirements](CROSS-PLATFORM-RELEASES.md).
+These instructions describe the workflow, not live enrollment or release acceptance.
 
-## Build, acceptance and publication
+## Branches and version preparation
 
-Rehearsals are unsigned trials, not distributable releases. Candidates require
-reviewed source, matching versions, ready release notes and the signing inputs
-required by their channel. Receipts identify source state, configuration and
-artifact hashes. Accept the exact candidate before publication; do not substitute
-different bytes under the same version.
+`beta` supplies the beta channel; `master` supplies stable. Merge reviewed changes
+into beta for testing, then integrate the tested changes into master for stable.
+Keep fixes flowing between the branches through reviewed merges. There is no
+separate stable branch. Each published channel version is immutable.
 
-- The direct installer path separates candidate preparation from manual R2
-  publication. Publication validates artifacts before updating a channel manifest.
-- The [cloud path](CRABNEBULA-RELEASE.md) supports Windows x64 preparation and
-  unpublished drafts. Its rehearsal workflow does not publish releases.
-- The [Store path](STORE-RELEASE.md) supports MSIX packaging and gated submission.
-  Submission is not certification or proof of installed updates.
-
-Retain detailed receipts privately and investigate uncertain remote writes before
-retrying. Do not delete pending drafts or overwrite releases to make a retry pass.
-
-## Configuration and trust
-
-Keep signing/publication switches disabled until their acceptance gates pass.
-Configure credentials in CI secrets; public variable names and verification keys
-are safe to document, secret values are not.
-
-Windows publisher signing and Tauri updater signing are separate. Preserve the
-updater key trusted by installed clients and maintain a secure recovery backup.
-Never regenerate it simply because CI fails. Store updates follow the Store's
-delivery model rather than the direct installer's controls.
-
-Use narrowly scoped credentials and protected release environments. Anyone able
-to alter trusted release workflows must be trusted with their credentials.
-Review permissions and public-repository triggers before allowing untrusted
-branches or pull requests to run release jobs.
-
-Website/service deployment is separate from desktop publication. Choose one
-controller per Worker. Keep optional Actions deployments disabled when another
-controller owns the environment. Deployment hooks are credentials.
-
-## GitHub protections
-
-Inspect repository protections with an authenticated maintainer's GitHub CLI:
+From a clean release branch, prepare the next version:
 
 ```powershell
-node scripts/security/github.mjs --repo OWNER/REPOSITORY --reviewer MAINTAINER_LOGIN
+pnpm release:prepare patch
+# Or: pnpm release:prepare minor, major, or an explicit higher version.
 ```
 
-Replace the placeholders with the target repository and its release reviewer.
-For a public repository containing the reviewed protection script, add `--apply` to
-configure branch checks and review, release-environment approval, immutable Action
-references, read-only default workflow tokens, external-contributor workflow
-approval, secret scanning and private vulnerability reporting. The command never
-changes visibility or enables individual release workflows. GitHub plan restrictions
-can prevent these protections on private repositories.
+The command updates root/desktop package versions, Tauri configuration and the
+native package/lock entry, and creates `releases/VERSION.md`. It does not stage,
+commit, push or create a tag. Review the version diff, replace the note placeholders,
+set an appropriate date and `Status: ready`, run `pnpm verify`, then commit and push.
+Versioning is explicit; ordinary commits do not silently bump or publish versions.
+Only numeric `major.minor.patch` versions are supported. Beta/stable are separate
+channels, not version suffixes. A new beta iteration needs a higher numeric version;
+the same tested version can subsequently be built for stable.
 
-The single-maintainer policy permits administrator branch bypass and manual
-approval of one's own deployment. Other writers require a reviewed pull request;
-release jobs still require an explicit environment approval. Revisit those
-exceptions when adding maintainers. Check the configured check names after CI
-actually runs and keep them aligned with the workflow jobs.
+## Build and release
 
-Store signing keys, publication tokens and deployment hooks in the corresponding
-`cloud-beta`, `cloud-stable`, `store-beta` or `store-stable` environment. Provision
-credentials from private storage and verify the environment secret names. When
-migrating repository-level secrets, remove those copies after verification.
-GitHub cannot export an existing secret value.
-Keep release workflows disabled until credentials, branch restrictions and
-reviewers have been checked. Credential-consuming steps receive only the inputs
-they need; dependency installation and test steps must not receive those secrets.
+**Cloud release** runs on release-note/root-package changes pushed to beta or master
+when `CLOUD_RELEASE_ENABLED=true`. Draft notes skip automatic releases. Manual runs
+are also available. Automatic runs skip versions whose channel tag already exists;
+use publication recovery for an interrupted tagged attempt. Manual runs
+select rehearsal, candidate, draft or publish; the selected branch determines the
+channel. The optional Windows-only selection supports initial installer testing.
 
-## Required evidence
+The configured matrix builds Windows x64 NSIS, macOS Apple Silicon and Intel DMGs
+plus app updater archives, and Linux x64 AppImage. AppImage is the supported Linux
+in-app update path; OS-managed package upgrades and Store updates are separate.
+Every candidate runs repository verification and native account-access tests.
+Signing credentials are passed only to signing/build steps, not dependency installation
+or test steps. Every platform supplies a receipt with source, version, channel,
+configuration and artifact hashes. Candidate artifacts are retained for 30 days.
 
-Checks must actually execute and pass; an empty, skipped or blocked run is not
-evidence. Verify candidate hashes, publisher signatures and updater signatures,
-then test clean installation, real execution, saved-data recovery and an
-older-to-newer update in an isolated profile. Validate service readiness and
-downloaded bytes independently. Keep deployment state and receipts outside public
-source. See [platform requirements](CROSS-PLATFORM-RELEASES.md).
+A publication job runs only after every selected build succeeds. It checks the
+complete target set, shared source/notes/updater key, Windows publisher signature,
+all required source checks, remote asset bytes and platform/signature metadata.
+It then reserves `beta-vVERSION` or `stable-vVERSION` at the exact source commit,
+publishes the complete Cloud draft, and checks each public update feed and its bytes.
+Tags are not moved or deleted. A reserved tag alone does not prove publication.
+CrabNebula is the release catalog; this workflow does not create GitHub Releases.
+
+Beta builds/publication use the `cloud-beta` environment without a manual approval.
+This environment also supplies shared signing credentials to stable candidate jobs
+and permits only beta/master. Stable publication uses `cloud-stable`, restricted to
+master and requiring the release owner's approval. This puts the stable approval
+after all builds, rather than before each platform build.
+
+To publish an already tested candidate or draft, run **Publish Cloud candidate**
+from its original branch and enter its successful Cloud release run ID. This
+checks run provenance, branch ancestry and all artifact receipts, and reuses the
+original bytes. Do not rebuild a draft to promote it. Beta-to-stable uses a stable
+candidate build because the packaged default channel changes; inspect that candidate.
+
+## Enablement and first update test
+
+Keep these repository variables disabled until their prerequisites pass:
+
+| Variable | Purpose |
+| --- | --- |
+| `RELEASE_DISTRIBUTION=cloud` | Select the Cloud path; legacy R2 workflows require `legacy` and remain disabled |
+| `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the default contains all four matrix targets |
+| `CLOUD_SIGNING_READY` | Windows Azure signing is configured |
+| `APPLE_SIGNING_READY` | Developer ID signing and notarization are configured |
+| `CLOUD_DRAFT_UPLOAD_ENABLED` | Permit validated candidates to be uploaded |
+| `CLOUD_PUBLISH_ENABLED` | Permit publication, including manually dispatched beta trials |
+| `CLOUD_ACCEPTED_TARGETS` | JSON array of targets with completed installed acceptance; must exactly match a normal publication's target set |
+| `CLOUD_BETA_TEST_TARGETS` | Explicit initial update-trial target set; permits manual beta publication before older-to-newer acceptance, never stable or automatic publication |
+| `CLOUD_RELEASE_ENABLED` | Enable publication triggered by a ready release commit |
+
+Target names are `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64` and
+`linux-x86_64`. Empty acceptance/trial arrays permit no publication. For a
+Windows-only initial trial, select Windows-only candidates and configure the
+intended/trial target arrays to `["windows-x86_64"]`. Expand the intended and
+accepted sets together after the remaining platforms pass their installed checks.
+
+First validate a signed candidate and authenticated unpublished draft. Then allow
+manual beta trial publication and test two increasing versions with the same app
+identity/updater key. Record clean installation, real execution, saved-data recovery,
+account lifecycle and older-to-newer update behavior privately. After acceptance,
+set the accepted target list, clear the temporary beta trial list, and enable the
+automatic trigger. Beta asset URLs are public; account approval still gates execution.
+See the [installed update procedure](CRABNEBULA-RELEASE.md#test-an-installed-update).
+
+## Recovery
+
+If publication fails, retain the successful build artifacts and rerun only failed
+jobs. Alternatively promote a successful candidate/draft run. Do not rerun successful
+build jobs: signing/notarization can change bytes while leaving the version unchanged.
+
+Retries identify the existing channel/version and compare the source/artifact digest
+in its notes before writing. Existing assets must match metadata and downloaded
+hashes; missing assets can be uploaded. A lost publish response is reconciled by
+reading remote status. Foreign drafts, extra assets, changed bytes, moved tags and
+newer channel versions stop publication. An uncertain remote state requires operator
+inspection, not deletion or overwrite. Preserve candidates outside expiring Actions
+artifacts if a trial will exceed retention. Publish a higher-version fix for a bad
+release; never repoint an existing version to replacement bytes.
+
+## GitHub configuration
+
+```powershell
+pnpm release:setup
+pnpm release:setup --apply
+```
+
+The first command audits; `--apply` configures the release branches/protections,
+branch-scoped environments, default-off missing gates and immutable tag rules,
+and disables the two legacy R2 workflows. It creates beta from current remote master
+only when beta does not exist. Existing enablement flags and secrets are preserved.
+The command does not change visibility, commit code or deploy a release.
+
+Both branches require current Windows/Linux/macOS/security checks, reviewed PRs for
+ordinary writers and resolved conversations; force pushes and branch deletion are
+blocked. The single-maintainer policy retains administrator branch bypass and permits
+approval of one's own stable deployment. Publication independently requires successful
+source checks even when a branch administrator bypassed merge checks. Revisit review
+exceptions when adding maintainers. Workflow actions are pinned and tokens default
+to read-only access. Do not give untrusted code access to release environments.
+
+## Website and services
+
+Desktop publication does not deploy the server or automatically advertise unaccepted
+platforms. Keep one deployment controller per Worker; leave optional Actions deployment
+disabled when Cloudflare Git builds own it. Website download variables must identify
+accepted Cloud artifacts; review any Store URL override before changing distribution.
+The legacy website synchronization script reads the R2 feed and must not be used as
+a Cloud catalog synchronizer. See [server operations](SERVER-LAUNCH.md).

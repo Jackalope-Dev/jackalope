@@ -413,6 +413,9 @@ export function AccessPage() {
                     </Button>
                   )}
                   <a
+                    className="ui-button"
+                    data-variant="ghost"
+                    data-size="md"
                     aria-disabled={member.remaining === 0}
                     tabIndex={member.remaining ? undefined : -1}
                     onClick={(event) => {

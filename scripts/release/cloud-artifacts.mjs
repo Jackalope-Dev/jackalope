@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertVersions, channel, readNotes, root, sha256, version } from './catalog.mjs';
+import { cloudAssets, cloudFiles, targets } from './cloud-targets.mjs';
 import { application, cloudConfig } from './crabnebula-config.mjs';
 
 export function validateCloudReceipt(receipt, { requireCandidate = false } = {}) {
@@ -11,8 +12,13 @@ export function validateCloudReceipt(receipt, { requireCandidate = false } = {})
   if (
     receipt.schemaVersion !== 1 ||
     receipt.application !== application ||
-    receipt.target !== 'windows-x86_64' ||
-    receipt.distribution !== 'nsis'
+    !targets.includes(receipt.target) ||
+    receipt.distribution !==
+      (receipt.target.startsWith('windows-')
+        ? 'nsis'
+        : receipt.target.startsWith('darwin-')
+          ? 'dmg'
+          : 'appimage')
   )
     throw new Error('Unsupported Cloud receipt');
   if (
@@ -29,16 +35,17 @@ export function validateCloudReceipt(receipt, { requireCandidate = false } = {})
     throw new Error('Only clean publisher-signed candidates may be uploaded');
   if (receipt.publicSigned !== (receipt.mode === 'candidate'))
     throw new Error('Inconsistent signing receipt');
-  const name = receipt.mode === 'candidate' ? 'Jackalope' : 'Jackalope Rehearsal';
-  const installer = `${name}_${receipt.version}_x64-setup.exe`;
-  const expected = [installer, `${installer}.sig`, 'tauri.cloud.json', 'notes.md'];
+  const assets = cloudAssets(receipt.target, receipt.version, receipt.mode);
+  const installer = assets[0].name;
+  const signature = `${assets.find((asset) => asset.updatePlatform).name}.sig`;
+  const expected = cloudFiles(receipt.target, receipt.version, receipt.mode);
   if (
     !receipt.files ||
     Object.keys(receipt.files).length !== expected.length ||
     expected.some((name) => !/^[a-f0-9]{64}$/.test(receipt.files[name]))
   )
     throw new Error('Invalid artifact names or checksums');
-  return { installer, signature: `${installer}.sig` };
+  return { installer, signature, assets };
 }
 
 export async function validateCloudFiles(directory, options) {
@@ -56,6 +63,7 @@ export async function validateCloudFiles(directory, options) {
     channel: receipt.channel,
     publicKey: config.plugins?.updater?.pubkey,
     signScript: config.bundle?.windows?.signCommand?.args?.[3],
+    target: receipt.target,
   });
   if (JSON.stringify(config) !== JSON.stringify(expected))
     throw new Error('Release configuration changed');

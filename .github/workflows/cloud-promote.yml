@@ -1,0 +1,64 @@
+name: Publish Cloud candidate
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Cloud release candidate/draft run ID; preserves original artifact bytes
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: cloud-release-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Jackalope-Dev/jackalope' && (github.ref_name == 'master' || github.ref_name == 'beta')
+    runs-on: windows-2022
+    timeout-minutes: 60
+    environment: cloud-${{ github.ref_name == 'master' && 'stable' || 'beta' }}
+    permissions:
+      contents: write
+      actions: read
+      checks: read
+    env:
+      RELEASE_CHANNEL: ${{ github.ref_name == 'master' && 'stable' || 'beta' }}
+      CLOUD_RELEASE_TARGETS: ${{ vars.CLOUD_RELEASE_TARGETS }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - name: Check candidate provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.run_id }}
+        run: node scripts/release/cloud-provenance.mjs
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: cloud-candidate-*
+          path: output/cloud-candidates
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - shell: pwsh
+        run: ./scripts/release/cloud-tools.ps1
+      - name: Publish verified candidates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CN_API_KEY: ${{ secrets.CN_API_KEY }}
+          CLOUD_DRAFT_UPLOAD_ENABLED: ${{ vars.CLOUD_DRAFT_UPLOAD_ENABLED }}
+          CLOUD_PUBLISH_ENABLED: ${{ vars.CLOUD_PUBLISH_ENABLED }}
+          CLOUD_ACCEPTED_TARGETS: ${{ vars.CLOUD_ACCEPTED_TARGETS }}
+          CLOUD_BETA_TEST_TARGETS: ${{ vars.CLOUD_BETA_TEST_TARGETS }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node scripts/release/cloud-publish.mjs output/cloud-candidates publish
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: cloud-publication-${{ github.run_attempt }}
+          path: |
+            output/cloud-candidates/cloud-release.json
+            output/cloud-candidates/cloud-notes.md
+          if-no-files-found: ignore

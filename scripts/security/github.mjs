@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { requiredChecks } from '../release/source-checks.mjs';
 
 const args = process.argv.slice(2);
 const value = (name) => args[args.indexOf(name) + 1];
@@ -19,6 +20,15 @@ const api = (route, method = 'GET', body) => {
   return result.stdout.trim() ? JSON.parse(result.stdout) : null;
 };
 const prefix = `repos/${repo}`;
+const list = (route, property) => {
+  const items = [];
+  for (let page = 1; ; page++) {
+    const response = api(`${route}?per_page=100&page=${page}`);
+    const batch = property ? response[property] : response;
+    items.push(...batch);
+    if (batch.length < 100) return items;
+  }
+};
 const repository = api(prefix);
 if (!args.includes('--apply')) {
   console.log(
@@ -28,6 +38,13 @@ if (!args.includes('--apply')) {
         visibility: repository.visibility,
         actions: api(`${prefix}/actions/permissions`),
         branch: api(`${prefix}/branches/${repository.default_branch}`).protected,
+        branches: api(`${prefix}/branches`).map(({ name, protected: protectedBranch }) => ({
+          name,
+          protected: protectedBranch,
+        })),
+        releaseVariables: list(`${prefix}/actions/variables`, 'variables').filter(({ name }) =>
+          /^(CLOUD_|APPLE_SIGNING_READY|RELEASE_DISTRIBUTION)/.test(name),
+        ),
         environments: api(`${prefix}/environments`).environments.map(
           ({ name, protection_rules }) => ({ name, protection_rules }),
         ),
@@ -43,6 +60,36 @@ if (repository.visibility !== 'public')
     'Keep the repository private until reviewed source is pushed. GitHub requires an eligible paid plan or public visibility for these protection rules; this command does not change visibility.',
   );
 const user = api(`users/${reviewer}`);
+for (const workflow of ['desktop-release.yml', 'publish-release.yml']) {
+  if (api(`${prefix}/actions/workflows/${workflow}`).state === 'active')
+    api(`${prefix}/actions/workflows/${workflow}/disable`, 'PUT');
+}
+const variables = list(`${prefix}/actions/variables`, 'variables');
+for (const [name, value] of Object.entries({
+  CLOUD_RELEASE_ENABLED: 'false',
+  CLOUD_PUBLISH_ENABLED: 'false',
+  CLOUD_DRAFT_UPLOAD_ENABLED: 'false',
+  CLOUD_SIGNING_READY: 'false',
+  APPLE_SIGNING_READY: 'false',
+  CLOUD_RELEASE_TARGETS: '["windows-x86_64","darwin-aarch64","darwin-x86_64","linux-x86_64"]',
+  CLOUD_ACCEPTED_TARGETS: '[]',
+  CLOUD_BETA_TEST_TARGETS: '[]',
+})) {
+  if (!variables.some((variable) => variable.name === name))
+    api(`${prefix}/actions/variables`, 'POST', { name, value });
+}
+const distribution = variables.find(({ name }) => name === 'RELEASE_DISTRIBUTION');
+api(
+  `${prefix}/actions/variables${distribution ? '/RELEASE_DISTRIBUTION' : ''}`,
+  distribution ? 'PATCH' : 'POST',
+  { name: 'RELEASE_DISTRIBUTION', value: 'cloud' },
+);
+const branches = api(`${prefix}/branches`);
+if (!branches.some(({ name }) => name === 'beta'))
+  api(`${prefix}/git/refs`, 'POST', {
+    ref: 'refs/heads/beta',
+    sha: api(`${prefix}/branches/${repository.default_branch}`).commit.sha,
+  });
 const actions = api(`${prefix}/actions/permissions`);
 api(`${prefix}/actions/permissions`, 'PUT', {
   enabled: actions.enabled,
@@ -65,41 +112,77 @@ api(prefix, 'PATCH', {
     secret_scanning_push_protection: { status: 'enabled' },
   },
 });
-api(`${prefix}/branches/${repository.default_branch}/protection`, 'PUT', {
-  required_status_checks: {
-    strict: true,
-    contexts: [
-      'verify',
-      'dependencies',
-      'codeql',
-      'secrets',
-      'Verify ubuntu-22.04',
-      'Verify ubuntu-24.04',
-      'Verify macos-15',
-      'Verify macos-15-intel',
-    ],
-  },
-  enforce_admins: false,
-  required_pull_request_reviews: {
-    dismiss_stale_reviews: true,
-    require_code_owner_reviews: true,
-    required_approving_review_count: 1,
-  },
-  restrictions: null,
-  required_conversation_resolution: true,
-  allow_force_pushes: false,
-  allow_deletions: false,
-});
+for (const branch of new Set([repository.default_branch, 'beta']))
+  api(`${prefix}/branches/${branch}/protection`, 'PUT', {
+    required_status_checks: {
+      strict: true,
+      contexts: requiredChecks,
+    },
+    enforce_admins: false,
+    required_pull_request_reviews: {
+      dismiss_stale_reviews: true,
+      require_code_owner_reviews: true,
+      required_approving_review_count: 1,
+    },
+    restrictions: null,
+    required_conversation_resolution: true,
+    allow_force_pushes: false,
+    allow_deletions: false,
+  });
 for (const name of ['cloud-beta', 'cloud-stable', 'store-beta', 'store-stable']) {
   const previous = api(`${prefix}/environments/${name}`);
   api(`${prefix}/environments/${name}`, 'PUT', {
     wait_timer:
       previous.protection_rules.find((rule) => rule.type === 'wait_timer')?.wait_timer ?? 0,
     prevent_self_review: false,
-    reviewers: [{ type: 'User', id: user.id }],
+    reviewers: name === 'cloud-beta' ? [] : [{ type: 'User', id: user.id }],
     deployment_branch_policy: previous.deployment_branch_policy,
   });
+  if (name.startsWith('cloud-')) {
+    api(`${prefix}/environments/${name}`, 'PUT', {
+      wait_timer: 0,
+      prevent_self_review: false,
+      reviewers: name === 'cloud-beta' ? [] : [{ type: 'User', id: user.id }],
+      deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+    });
+    const allowed =
+      name === 'cloud-beta' ? ['beta', repository.default_branch] : [repository.default_branch];
+    const policies = api(
+      `${prefix}/environments/${name}/deployment-branch-policies`,
+    ).branch_policies;
+    for (const policy of policies) {
+      if (policy.type !== 'branch' || !allowed.includes(policy.name))
+        api(`${prefix}/environments/${name}/deployment-branch-policies/${policy.id}`, 'DELETE');
+    }
+    for (const branch of allowed) {
+      if (!policies.some((policy) => policy.type === 'branch' && policy.name === branch))
+        api(`${prefix}/environments/${name}/deployment-branch-policies`, 'POST', {
+          name: branch,
+          type: 'branch',
+        });
+    }
+  }
 }
+const tagRules = api(`${prefix}/rulesets`).find((rule) => rule.name === 'Protect release tags');
+if (!tagRules)
+  api(`${prefix}/rulesets`, 'POST', {
+    name: 'Protect release tags',
+    target: 'tag',
+    enforcement: 'active',
+    conditions: {
+      ref_name: {
+        include: [
+          'refs/tags/beta-v*',
+          'refs/tags/stable-v*',
+          'refs/tags/store-beta/v*',
+          'refs/tags/store-stable/v*',
+        ],
+        exclude: [],
+      },
+    },
+    rules: [{ type: 'update' }, { type: 'deletion' }],
+    bypass_actors: [],
+  });
 console.log(
-  'Repository protections applied. Verify environment-scoped secrets before enabling release workflows.',
+  'Release branches and protections configured; legacy publishers disabled. Existing enablement flags preserved. Verify signing and installed acceptance before enabling Cloud publication.',
 );

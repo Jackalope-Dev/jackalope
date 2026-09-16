@@ -87,7 +87,10 @@ expiry. Feedback, reporting and settings sync have separate controls. See
 The website provides setup and workflow guides, compatibility tables, sample-workspace
 media and account flows. Its content is shared with bundled native help through
 `packages/knowledge`. Build and release tooling covers Windows installers, optional
-Microsoft Store distribution and unpublished cloud candidates.
+Microsoft Store distribution and cross-platform Cloud candidates. Branch-based
+beta/stable publication checks complete artifact sets, source checks, signing and
+installed-acceptance configuration; live signing and installed upgrades remain
+release acceptance work. See [release automation](RELEASE-AUTOMATION.md).
 
 The private admin console groups access management, audience preferences, product-note
 drafts, service setup, aggregate usage and feedback, with overview links for onboarding

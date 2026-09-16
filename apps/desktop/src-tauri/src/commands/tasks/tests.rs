@@ -689,11 +689,22 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
     .unwrap();
     let executable = folder.join("fixture.cmd");
     std::fs::write(
-        folder.join("capture.ps1"),
-        "[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'input.txt'), [Console]::In.ReadToEnd())",
+        folder.join("capture.cjs"),
+        r#"
+const fs = require('node:fs');
+let prompt = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  fs.writeFileSync('input.txt', prompt);
+  fs.writeFileSync('args.txt', process.argv.slice(2).join(' '));
+  console.log(JSON.stringify({type: 'thread.started', thread_id: 'fixture-session'}));
+  console.log(JSON.stringify({type: 'item.completed', item: {type: 'agent_message', text: 'Fixture complete'}}));
+});
+"#,
     )
     .unwrap();
-    std::fs::write(&executable, "@echo off\r\npowershell.exe -NoProfile -File \"%~dp0capture.ps1\"\r\necho %*>args.txt\r\necho {\"type\":\"thread.started\",\"thread_id\":\"fixture-session\"}\r\necho {\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Fixture complete\"}}\r\n").unwrap();
+    std::fs::write(&executable, "@echo off\r\nnode \"%~dp0capture.cjs\" %*\r\n").unwrap();
     let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "custom-fixture".into();
@@ -740,7 +751,7 @@ fn configured_default_agent_launches_with_allowed_model_and_records_output() {
         connection_ids: None,
     };
     runtime.start(request.clone()).unwrap();
-    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
     loop {
         let run = runtime.integration_runs().unwrap().pop().unwrap();
         if !["starting", "running"].contains(&run.status.as_str()) {

@@ -7,6 +7,7 @@ fn fixture() -> (PathBuf, LiveSessions, String) {
     std::fs::create_dir_all(&repo).unwrap();
     for args in [
         vec!["init", "-b", "main"],
+        vec!["config", "core.autocrlf", "false"],
         vec![
             "-c",
             "user.name=Fixture",
@@ -353,6 +354,8 @@ fn patch_export_preserves_the_index_and_includes_new_binary_files_without_a_comm
         &root,
         &[
             "clone",
+            "--config",
+            "core.autocrlf=false",
             "--no-hardlinks",
             repo.to_str().unwrap(),
             target.to_str().unwrap(),

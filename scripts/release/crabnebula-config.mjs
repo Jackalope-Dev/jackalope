@@ -10,7 +10,9 @@ export function isCloudEndpoint(value, channel) {
   return new URL(value).href === new URL(cloudEndpoint(channel)).href;
 }
 
-export function cloudConfig({ mode, channel, publicKey, signScript }) {
+export function cloudConfig({ mode, channel, publicKey, signScript, target = 'windows-x86_64' }) {
+  if (!['windows-x86_64', 'darwin-aarch64', 'darwin-x86_64', 'linux-x86_64'].includes(target))
+    throw new Error('Unsupported Cloud target');
   if (!['rehearsal', 'candidate'].includes(mode)) throw new Error('Unknown build mode');
   const endpoint = cloudEndpoint(channel);
   if (!publicKey || !/^[A-Za-z0-9+/]+={0,2}$/.test(publicKey))
@@ -41,13 +43,20 @@ export function cloudConfig({ mode, channel, publicKey, signScript }) {
       },
     },
   };
-  if (!preview) {
+  if (!preview && target === 'windows-x86_64') {
     if (!signScript || /["\r\n]/.test(signScript)) throw new Error('Invalid signing script path');
     config.bundle.windows = {
       signCommand: {
         cmd: 'pwsh',
         args: ['-NoProfile', '-NonInteractive', '-File', signScript, '%1'],
       },
+    };
+  }
+  if (target.startsWith('darwin-')) {
+    config.bundle.macOS = {
+      hardenedRuntime: true,
+      entitlements: 'entitlements.plist',
+      ...(preview ? { signingIdentity: '-' } : {}),
     };
   }
   return config;

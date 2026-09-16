@@ -5,6 +5,12 @@ It covers the first release, subsequent updates, validation, publication, and
 failure recovery. Read [STATUS.md](STATUS.md), [TODO.md](TODO.md), and
 [BACKEND.md](BACKEND.md) first.
 
+Use [release automation](RELEASE-AUTOMATION.md) as the entry point for the active
+Cloud beta/stable process and [Cloud signing](CRABNEBULA-RELEASE.md) for Azure/Apple
+setup. The local EXE/MSI and static-manifest commands below describe the retained
+legacy R2 path; do not combine that publisher with Cloud. The installed-app and
+failure-recovery acceptance procedures apply to both paths.
+
 ## 1. Scope, authority, and present state
 
 This guide covers Windows x64 NSIS and MSI distribution. Use
@@ -139,6 +145,11 @@ and clear its secret variables afterward. For Windows certificate setup follow
 and the selected provider's current instructions.
 
 ## 5. Version and prepare the source
+
+For the Cloud process, run `pnpm release:prepare patch` (or minor, major, an
+explicit higher version) and review the synchronized files and generated notes.
+It leaves all changes uncommitted. The manual steps below also describe what
+must remain synchronized when working on the legacy path.
 
 Update these files together, preserving surrounding formatting:
 

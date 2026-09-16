@@ -79,7 +79,7 @@ export const roadmapStages = [
         title: 'Ready for your everyday machine.',
         summary: 'Installation, updates, and recovery of saved work.',
         detail:
-          'We’re preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Window control includes macOS, Linux X11, and Ubuntu’s GNOME 46 Wayland desktop through an optional extension. Other Wayland desktops remain unsupported. Device testing, signed installation, and upgrades still need acceptance; public downloads are not open yet.',
+          'We’re preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Window control includes macOS, Linux X11, and Ubuntu’s GNOME 46 Wayland desktop through an optional extension. Other Wayland desktops remain unsupported. Beta and stable release automation is prepared for testing. Device testing, signed installation, and upgrades still need acceptance; public downloads are not open yet.',
       },
       {
         title: 'The small things that earn trust.',

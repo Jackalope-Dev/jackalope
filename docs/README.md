@@ -40,5 +40,5 @@ maintained behavior, a repeatable workflow or a reusable template. Follow the
 
 - [Windows releases](RELEASE.md), [release automation](RELEASE-AUTOMATION.md)
 - [Platform requirements](CROSS-PLATFORM-RELEASES.md)
-- [Cloud candidates](CRABNEBULA-RELEASE.md), [Microsoft Store](STORE-RELEASE.md)
+- [Cloud signing and updates](CRABNEBULA-RELEASE.md), [Microsoft Store](STORE-RELEASE.md)
 - [Blank release record](releases/RELEASE-RECORD-TEMPLATE.md); keep completed records privately

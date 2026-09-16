@@ -6,9 +6,12 @@ agent acceptance pass. Windows rehearsals do not establish acceptance on another
 
 ## Distribution tooling
 
-The [cloud tooling](CRABNEBULA-RELEASE.md) implements Windows x64 NSIS preparation,
-publisher/updater signing gates and unpublished drafts. The unified multi-platform
-publication workflow remains planned. The [Store path](STORE-RELEASE.md) provides
+The [cloud tooling](CRABNEBULA-RELEASE.md) implements Windows x64 NSIS, macOS
+Apple Silicon/Intel DMG and updater archives, and Linux x64 AppImage candidates.
+The [release workflow](RELEASE-AUTOMATION.md) checks the complete target set before
+publishing a channel, with signing, source-check and installed-acceptance gates.
+Native signed builds and installed upgrades still need platform acceptance.
+The [Store path](STORE-RELEASE.md) provides
 separate MSIX packaging and submission as an optional additional channel.
 
 Accept the exact candidate's clean installation, real execution, account lifecycle,

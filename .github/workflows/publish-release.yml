@@ -24,7 +24,7 @@ concurrency:
 jobs:
   publish:
     environment: cloud-${{ inputs.channel }}
-    if: github.repository == 'Jackalope-Dev/jackalope' && github.ref == 'refs/heads/master' && vars.RELEASE_PUBLISH_ENABLED == 'true'
+    if: github.repository == 'Jackalope-Dev/jackalope' && github.ref == 'refs/heads/master' && vars.RELEASE_DISTRIBUTION == 'legacy' && vars.RELEASE_PUBLISH_ENABLED == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     env:

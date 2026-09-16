@@ -122,6 +122,11 @@ release dates.
 
 ## Platform releases
 
+- [ ] Validate the cross-platform Cloud pipeline with real Azure/Apple credentials,
+  authenticated draft read-back, retry recovery and installed beta updates before
+  enabling automatic publication. Keep signing/setup gates and platform acceptance
+  distinct; follow [release automation](RELEASE-AUTOMATION.md).
+
 - [ ] Enable each website download only after its release is available; verify the
   acceptance-email confirmation flow and Store handoff against the deployed site.
 

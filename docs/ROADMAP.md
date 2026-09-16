@@ -91,7 +91,9 @@ Cross-platform discovery, browser, process cleanup, credential storage and notif
 hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11
 window-control helpers and a GNOME 46 Wayland extension are implemented for validation.
-Installed acceptance remains in progress. Signing/distribution are separate follow-ups,
+Installed acceptance remains in progress. Cross-platform signing and branch-based
+release automation are implemented for validation; live signing, publication and
+installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
 retained. Other compositors and GNOME versions remain unsupported.
 
