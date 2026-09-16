@@ -1,9 +1,6 @@
 .managed-journey {
-  margin: 24px 0;
-  padding: 24px;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  background: var(--color-surface);
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 .managed-journey-steps {
   display: grid;
@@ -12,22 +9,30 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  max-width: 720px;
 }
 .managed-journey-steps li {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   min-width: 0;
 }
+.managed-journey-steps li:not(:last-child)::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  margin-inline: 4px;
+  background: var(--color-border-subtle);
+}
 .managed-step-number {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  border: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
   border-radius: 50%;
 }
 .managed-journey-steps [aria-current="step"] {
@@ -35,30 +40,85 @@
   font-weight: 600;
 }
 .managed-journey-steps [aria-current="step"] .managed-step-number {
-  border-color: var(--color-accent-ink);
-  outline: 2px solid var(--color-surface);
-  box-shadow: 0 0 0 3px var(--color-border);
+  background: var(--color-accent-subtle);
 }
 .managed-journey-steps [data-complete] .managed-step-number {
   color: var(--color-success);
 }
 .managed-journey-description {
-  margin-top: 20px;
+  margin: 12px 0 0;
   max-width: 72ch;
   color: var(--color-text-secondary);
-  line-height: 1.7;
+  line-height: 1.5;
   font-size: var(--text-sm);
 }
-.managed-result {
-  margin: 24px 0;
+.managed-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.managed-plan > .ui-disclosure {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.managed-plan > .ui-disclosure > .ui-disclosure-summary {
+  padding-block: 14px;
+}
+.managed-plan-number {
+  min-width: 24px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.managed-plan-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+.managed-plan-start p {
+  flex: 1;
+  min-width: min(100%, 320px);
+  max-width: 68ch;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.managed-details {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 8px;
 }
 .managed-result-body {
-  padding: 24px 0;
+  display: grid;
+  gap: 16px;
+  padding-block: 16px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.managed-merge-review .merge-preview {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.managed-merge-review .merge-patch-layout {
+  margin-top: 0;
+}
+.merge-patch-layout[data-single-file] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.managed-commit-details {
+  margin-top: 12px;
+}
+.managed-merge-review .merge-approval {
+  margin-top: 12px;
+  gap: 12px;
+}
+.managed-merge-review .merge-approval > p {
+  flex-basis: 100%;
+  min-width: 0;
+}
 .managed-followup {
-  margin: 24px 0;
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 20px;
   display: grid;
   gap: 12px;
 }
@@ -80,14 +140,27 @@
   font-size: var(--text-sm);
 }
 @media (max-width: 640px) {
-  .managed-journey {
-    padding: 18px 14px;
-  }
   .managed-journey-steps {
     gap: 8px;
   }
   .managed-journey-steps li {
     flex-direction: column;
     gap: 8px;
+  }
+  .managed-journey-steps li::after {
+    display: none;
+  }
+  .managed-task .merge-patch-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .managed-task .merge-patch-layout nav {
+    display: flex;
+    flex-wrap: wrap;
+    max-height: 144px;
+    gap: 4px;
+  }
+  .managed-task .merge-patch-layout nav button {
+    width: auto;
+    min-height: 44px;
   }
 }

@@ -253,8 +253,12 @@ fn shape(snapshot: &CodebaseSnapshot) -> String {
 }
 
 /// Builds the map text, or `None` when the scan fails or nothing in the tree matches.
-#[cfg(test)]
-fn task_map(root: &Path, task: &str, recent_paths: &[String], budget: usize) -> Option<String> {
+pub(crate) fn task_map(
+    root: &Path,
+    task: &str,
+    recent_paths: &[String],
+    budget: usize,
+) -> Option<String> {
     prepare_task_map(root, task, recent_paths, budget).map(|(text, _)| text)
 }
 

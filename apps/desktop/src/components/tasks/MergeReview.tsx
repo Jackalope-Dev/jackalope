@@ -1,5 +1,5 @@
-import { Checkbox, Disclosure, DisclosureSummary } from '@jackalope/ui';
-import { ArrowRight, Check, GitMerge, GitPullRequest } from 'lucide-react';
+import { Checkbox, Disclosure, DisclosureBody, DisclosureSummary, FormField } from '@jackalope/ui';
+import { ArrowRight, Check, GitMerge, GitPullRequest, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { IntegrationPlan, QueueItem } from '../../lib/queue';
 import { applyIntegration, integrationPlans, prepareIntegration } from '../../lib/queue';
@@ -12,6 +12,7 @@ import type { Project } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
+import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { DiffPreview } from './DiffPreview';
 import './project-queue.css';
 export function MergeReview({
@@ -48,6 +49,8 @@ export function MergeReview({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState(managedTitle ?? '');
+  const [preparedMessage, setPreparedMessage] = useState(managedTitle ?? '');
+  const [applying, setApplying] = useState(false);
   const [cleanup, setCleanup] = useState(true);
   const preparedSelection = useRef('');
   const normalizePath = (path: string) =>
@@ -84,7 +87,8 @@ export function MergeReview({
     plan &&
     (plan.status === 'applied' ||
       plan.status === 'applying' ||
-      plan.runIds.every((id) => candidateIds.includes(id)));
+      ((!managedTitle || message === preparedMessage) &&
+        plan.runIds.every((id) => candidateIds.includes(id))));
   const load = useCallback(async () => {
     if (isTauriEnvironment()) {
       const next = await integrationPlans();
@@ -113,6 +117,7 @@ export function MergeReview({
     try {
       const next = await prepareIntegration(chosen, message);
       setPlan(next);
+      setPreparedMessage(message);
       setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
       setFile('');
       await load();
@@ -125,6 +130,7 @@ export function MergeReview({
   const apply = async () => {
     if (!plan) return;
     setBusy(true);
+    setApplying(true);
     setError('');
     try {
       setPlan(await applyIntegration(plan.id, cleanup));
@@ -135,6 +141,7 @@ export function MergeReview({
       setError(String(error));
     } finally {
       setBusy(false);
+      setApplying(false);
     }
   };
 
@@ -152,25 +159,52 @@ export function MergeReview({
 
   const applied = plan?.status === 'applied';
   const cleaned = !!plan?.cleanupResults?.some((result) => result.removed);
+  const previousPlans = plans.filter(
+    (previous) =>
+      normalizePath(previous.projectPath) === normalizePath(project.path) &&
+      (!managedTitle ||
+        (previous.id !== plan?.id &&
+          previous.runIds.length === onlyRunIds?.length &&
+          onlyRunIds.every((id) => previous.runIds.includes(id)))),
+  );
   return (
-    <div className="merge-review" id="task-merge">
-      <div className="queue-section-heading">
-        <div>
-          <h2>
-            {managedTitle
-              ? 'Review and apply'
-              : onlyRunId
-                ? `Merge into ${destination}`
-                : 'Review & merge'}
-          </h2>
-          {onlyRunId && (
-            <p className="task-muted mt-2">
-              Review the change, merge it into {destination}, then remove this workspace.
-            </p>
-          )}
+    <div className={`merge-review${managedTitle ? ' managed-merge-review' : ''}`} id="task-merge">
+      {managedTitle ? (
+        <WorkspaceSectionHeading
+          title={applied ? `Integrated into ${plan.targetBranch}` : 'Combined changes'}
+          description={
+            plan
+              ? `${plan.files.length} ${plan.files.length === 1 ? 'file' : 'files'} · ${plan.targetBranch}`
+              : undefined
+          }
+          action={
+            candidates.length > 0 && (
+              <Button
+                variant="ghost"
+                disabled={busy || !completeSelection}
+                onClick={() => void prepare()}
+                loading={busy && !applying}
+                loadingLabel="Preparing…"
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+                Refresh changes
+              </Button>
+            )
+          }
+        />
+      ) : (
+        <div className="queue-section-heading">
+          <div>
+            <h2>{onlyRunId ? `Merge into ${destination}` : 'Review & merge'}</h2>
+            {onlyRunId && (
+              <p className="task-muted mt-2">
+                Review the change, merge it into {destination}, then remove this workspace.
+              </p>
+            )}
+          </div>
+          <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />
         </div>
-        <GitPullRequest size={26} className="text-[var(--color-accent-ink)]" />
-      </div>
+      )}
       {onlyRunId && (
         <ol className="merge-lifecycle">
           <li data-complete={!!plan || undefined}>Review the change</li>
@@ -225,41 +259,41 @@ export function MergeReview({
               ))}
             </>
           )}
-          <Disclosure open={!managedTitle || undefined} className="mt-4">
-            <DisclosureSummary>Commit details</DisclosureSummary>
-            <label htmlFor={messageId} className="task-label block mt-5">
-              Commit message
-              <Input
-                id={messageId}
-                value={message}
-                maxLength={4000}
-                disabled={busy}
-                placeholder={
-                  managedTitle ??
-                  (chosen.length === 1 ? titleFor(chosen[0]) : 'Complete selected tasks')
-                }
-                onChange={(event) => {
-                  setMessage(event.target.value);
-                  setPlan(null);
-                }}
-              />
-            </label>
-          </Disclosure>
-          <Button
-            variant={managedTitle ? 'ghost' : undefined}
-            className="mt-5"
-            disabled={busy || !chosen.length || !completeSelection}
-            onClick={() => void prepare()}
-            loading={busy}
-            loadingLabel="Preparing…"
-          >
-            {managedTitle
-              ? 'Refresh combined changes'
-              : onlyRunId
-                ? `Preview merge into ${destination}`
-                : `Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
-            <GitMerge size={15} />
-          </Button>
+          {!managedTitle && (
+            <>
+              <Disclosure open className="mt-4">
+                <DisclosureSummary>Commit details</DisclosureSummary>
+                <label htmlFor={messageId} className="task-label block mt-5">
+                  Commit message
+                  <Input
+                    id={messageId}
+                    value={message}
+                    maxLength={4000}
+                    disabled={busy}
+                    placeholder={
+                      chosen.length === 1 ? titleFor(chosen[0]) : 'Complete selected tasks'
+                    }
+                    onChange={(event) => {
+                      setMessage(event.target.value);
+                      setPlan(null);
+                    }}
+                  />
+                </label>
+              </Disclosure>
+              <Button
+                className="mt-5"
+                disabled={busy || !chosen.length || !completeSelection}
+                onClick={() => void prepare()}
+                loading={busy}
+                loadingLabel="Preparing…"
+              >
+                {onlyRunId
+                  ? `Preview merge into ${destination}`
+                  : `Preview ${chosen.length || ''} ${chosen.length === 1 ? 'task' : 'tasks'} together`}
+                <GitMerge size={15} />
+              </Button>
+            </>
+          )}
         </>
       ) : !plan ? (
         <p className="task-muted py-5">
@@ -269,39 +303,42 @@ export function MergeReview({
         </p>
       ) : null}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
+      {managedTitle && !plan && busy && (
+        <p className="task-muted" role="status">
+          Preparing the combined changes…
+        </p>
+      )}
       {plan && (
         <section className="merge-preview" aria-label="Combined change review">
-          <div className="queue-section-heading">
-            <div>
-              <p className="task-eyebrow">
-                {plan.status === 'applied'
-                  ? `Integrated into ${plan.targetBranch}`
-                  : plan.status === 'conflicted'
-                    ? 'Conflicts need attention'
-                    : managedTitle
-                      ? 'Combined changes'
+          {!managedTitle && (
+            <div className="queue-section-heading">
+              <div>
+                <p className="task-eyebrow">
+                  {plan.status === 'applied'
+                    ? `Integrated into ${plan.targetBranch}`
+                    : plan.status === 'conflicted'
+                      ? 'Conflicts need attention'
                       : 'Review this integration'}
-              </p>
-              <h3>
-                {managedTitle
-                  ? 'Apply this result'
-                  : `${plan.runIds.length} ${plan.runIds.length === 1 ? 'task' : 'tasks'}`}{' '}
-                → {plan.targetBranch}
-              </h3>
-              <p className="task-muted mt-2">
-                {plan.files.length} {plan.files.length === 1 ? 'file' : 'files'} · starting at{' '}
-                {plan.masterHead.slice(0, 8)}
-              </p>
-              {!managedTitle && (
-                <ul className="task-muted mt-2">
-                  {plan.runIds.map((id) => (
-                    <li key={id}>{titleFor(id)}</li>
-                  ))}
-                </ul>
-              )}
+                </p>
+                <h3>
+                  {`${plan.runIds.length} ${plan.runIds.length === 1 ? 'task' : 'tasks'}`} →{' '}
+                  {plan.targetBranch}
+                </h3>
+                <p className="task-muted mt-2">
+                  {plan.files.length} {plan.files.length === 1 ? 'file' : 'files'} · starting at{' '}
+                  {plan.masterHead.slice(0, 8)}
+                </p>
+                {!managedTitle && (
+                  <ul className="task-muted mt-2">
+                    {plan.runIds.map((id) => (
+                      <li key={id}>{titleFor(id)}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {plan.status === 'applied' && <Check size={24} />}
             </div>
-            {plan.status === 'applied' && <Check size={24} />}
-          </div>
+          )}
           {plan.commitMessage && !managedTitle && (
             <div className="my-4">
               <p className="task-label">Commit preview</p>
@@ -355,34 +392,80 @@ export function MergeReview({
           )}
           {!planEligible && (
             <InlineNotice>
-              A selected task changed or was integrated elsewhere. Prepare a fresh review before
-              merging.
+              {managedTitle && message !== preparedMessage
+                ? 'Commit details changed. Refresh changes to update this review.'
+                : 'A selected task changed or was integrated elsewhere. Prepare a fresh review before merging.'}
             </InlineNotice>
           )}
 
-          <div className="merge-patch-layout">
-            <nav aria-label="Changed files">
-              <button className={!file ? 'selected' : ''} type="button" onClick={() => setFile('')}>
-                All changes
-              </button>
-              {plan.files.map((name) => (
+          <div
+            className="merge-patch-layout"
+            data-single-file={(!!managedTitle && plan.files.length <= 1) || undefined}
+          >
+            {(!managedTitle || plan.files.length > 1) && (
+              <nav aria-label="Changed files">
                 <button
-                  className={file === name ? 'selected' : ''}
+                  className={!file ? 'selected' : ''}
                   type="button"
-                  key={name}
-                  onClick={() => setFile(name)}
+                  onClick={() => setFile('')}
                 >
-                  {name}
+                  All changes
                 </button>
-              ))}
-            </nav>
+                {plan.files.map((name) => (
+                  <button
+                    className={file === name ? 'selected' : ''}
+                    type="button"
+                    key={name}
+                    onClick={() => setFile(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </nav>
+            )}
             <DiffPreview patch={plan.patch} file={file} />
           </div>
+          {managedTitle && (
+            <Disclosure className="managed-commit-details">
+              <DisclosureSummary>Commit details</DisclosureSummary>
+              <DisclosureBody>
+                {!applied && (
+                  <FormField label="Commit message">
+                    <Input
+                      id={messageId}
+                      value={message}
+                      maxLength={4000}
+                      disabled={busy}
+                      onChange={(event) => setMessage(event.target.value)}
+                    />
+                  </FormField>
+                )}
+                {plan.commitMessage && (applied || message === preparedMessage) && (
+                  <div>
+                    <p className="task-muted">Commit preview</p>
+                    <pre className="whitespace-pre-wrap break-words task-muted mt-2">
+                      {plan.commitMessage}
+                    </pre>
+                  </div>
+                )}
+                <p className="task-muted">
+                  Attribution:{' '}
+                  {plan.commitPolicy?.attribution === 'agent'
+                    ? 'Agents'
+                    : plan.commitPolicy?.name
+                      ? `${plan.commitPolicy.name} <${plan.commitPolicy.email}>`
+                      : 'Project commit settings'}
+                  {' · '}Starting at {plan.masterHead.slice(0, 8)}
+                </p>
+              </DisclosureBody>
+            </Disclosure>
+          )}
           {planEligible && ['ready', 'applying'].includes(plan.status) && (
             <div className="merge-approval">
               <p className="task-muted">
-                Creates one commit on {plan.targetBranch}. That checkout must be clean, and the
-                reviewed files must still match. Publishing remains a separate step.
+                {managedTitle
+                  ? `Creates one local commit on ${plan.targetBranch}. Nothing is published.`
+                  : `Creates one commit on ${plan.targetBranch}. That checkout must be clean, and the reviewed files must still match. Publishing remains a separate step.`}
               </p>
               <label className="flex items-center gap-3 min-h-11">
                 <Checkbox
@@ -398,7 +481,7 @@ export function MergeReview({
                 disabled={busy}
                 onClick={() => void apply()}
                 loading={busy}
-                loadingLabel="Merging…"
+                loadingLabel={managedTitle ? 'Applying…' : 'Merging…'}
               >
                 {managedTitle
                   ? `Apply changes to ${plan.targetBranch}`
@@ -411,35 +494,25 @@ export function MergeReview({
           )}
         </section>
       )}
-      {plans.filter(
-        (p) =>
-          p.projectPath.replaceAll('\\', '/').toLowerCase() ===
-          project.path.replaceAll('\\', '/').toLowerCase(),
-      ).length > 0 && (
+      {previousPlans.length > 0 && (
         <Disclosure className="mt-7">
           <DisclosureSummary className="task-summary">
             Previous integration reviews
           </DisclosureSummary>
-          {plans
-            .filter(
-              (p) =>
-                p.projectPath.replaceAll('\\', '/').toLowerCase() ===
-                project.path.replaceAll('\\', '/').toLowerCase(),
-            )
-            .map((p) => (
-              <button
-                type="button"
-                className="queue-history"
-                key={p.id}
-                onClick={() => {
-                  setPlan(p);
-                  setFile('');
-                }}
-              >
-                {p.runIds.length} tasks · {new Date(p.createdAt).toLocaleString()}
-                <span>{p.status === 'applied' ? 'Merged' : p.status}</span>
-              </button>
-            ))}
+          {previousPlans.map((p) => (
+            <button
+              type="button"
+              className="queue-history"
+              key={p.id}
+              onClick={() => {
+                setPlan(p);
+                setFile('');
+              }}
+            >
+              {p.runIds.length} tasks · {new Date(p.createdAt).toLocaleString()}
+              <span>{p.status === 'applied' ? 'Merged' : p.status}</span>
+            </button>
+          ))}
         </Disclosure>
       )}
     </div>

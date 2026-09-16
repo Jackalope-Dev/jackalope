@@ -189,7 +189,7 @@ export function managedTaskProgress(task: ManagedTask, work: ReturnType<typeof m
           : work.failed
             ? (task.error ?? 'Your work is saved. Open the affected step for the next action.')
             : work.ready
-              ? 'The complete result is ready. Review the changes, try the preview, then apply them when you’re happy.'
+              ? 'Review the result and preview before applying changes.'
               : work.combining
                 ? 'Jackalope is bringing the changes together and checking that they work as a whole.'
                 : task.started
@@ -197,7 +197,7 @@ export function managedTaskProgress(task: ManagedTask, work: ReturnType<typeof m
                     ? 'Your work is saved. Resume when you’re ready.'
                     : `${finished} of ${work.assignments.length} assignments checked. Jackalope handles dependencies and combines the results.`
                   : work.status === 'Review plan'
-                    ? 'Review the proposed approach. Jackalope will manage assignments, checks and up to two repair attempts.'
+                    ? 'Review the approach before work starts.'
                     : 'Jackalope is finding a practical approach and identifying work that can happen together.';
   return { stage, description, finished };
 }
