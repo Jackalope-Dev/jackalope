@@ -593,12 +593,20 @@ impl TaskRuntime {
         use crate::commands::decisions::{
             self, DecisionKind, DecisionMode, DecisionPolicy, DecisionProvider, DecisionReceipt,
         };
-        let decision_policy = decisions::policy(self, &req.project_id).unwrap_or(DecisionPolicy {
+        let policy_result = decisions::policy(self, &req.project_id);
+        let policy_error = policy_result
+            .as_ref()
+            .err()
+            .map(|_| "Decision preferences could not be read; local rules were used.".to_string());
+        if let Some(error) = &policy_error {
+            self.update_checked(&req.id, |run| activity(run, error))?;
+        }
+        let decision_policy = policy_result.unwrap_or(DecisionPolicy {
             mode: DecisionMode::Deterministic,
             revision: 0,
         });
         let mode = decision_policy.mode;
-        let mut routers = if mode == crate::commands::jev::RoutingMode::Agent {
+        let mut routers = if mode == DecisionMode::Agent {
             self.routing_candidates(req, &policy, true)?
         } else {
             vec![]
@@ -612,7 +620,7 @@ impl TaskRuntime {
         let single = candidates.len() == 1;
         let router = if single { None } else { routers.first() };
         let observations = evidence::evidence(&self.integration_runs()?, req);
-        let jev_output = if single || mode != crate::commands::jev::RoutingMode::Jev {
+        let jev_output = if single || mode != DecisionMode::Jev {
             None
         } else {
             self.jev_route(req, &run, &candidates, observations.clone())?
@@ -622,7 +630,7 @@ impl TaskRuntime {
         let deterministic = !single
             && !used_jev
             && router.is_none()
-            && (mode != crate::commands::jev::RoutingMode::Agent || history.fallbacks.is_empty());
+            && (mode != DecisionMode::Agent || history.fallbacks.is_empty());
         let prompt = prompt::build(req, &run, &candidates, observations, &history);
         let output = if used_jev {
             jev_output
@@ -659,9 +667,9 @@ impl TaskRuntime {
         } else if deterministic {
             rank_by_capacity(
                 &candidates,
-                if mode == crate::commands::jev::RoutingMode::Deterministic {
+                if mode == DecisionMode::Deterministic {
                     "Local rules selected an eligible worker using project preference, current capacity and active workload. No routing model was consulted."
-                } else if mode == crate::commands::jev::RoutingMode::Jev {
+                } else if mode == DecisionMode::Jev {
                     "Jev did not make a usable selection. Local rules selected an eligible worker without an additional paid routing call."
                 } else {
                     "The default orchestrator had no eligible account, model or quota, so no routing model was consulted. Selected the highest-capacity eligible option."
@@ -750,16 +758,22 @@ impl TaskRuntime {
                 requested_mode: mode,
                 provider: if used_jev {
                     DecisionProvider::Jev
-                } else if router.is_some() {
+                } else if router.is_some() && !fallback {
                     decision_policy.provider()
                 } else {
                     DecisionProvider::LocalRules
                 },
                 policy_revision: decision_policy.revision,
+                model_call_attempted: selected
+                    .routing
+                    .as_ref()
+                    .is_some_and(|current| current.attempts.len() > history.attempts.len()),
                 concentration: None,
-                fallback_reason: (mode == DecisionMode::Jev && !used_jev && !single).then(|| {
-                    "Jev did not provide a usable assessment; local rules selected the worker."
-                        .into()
+                fallback_reason: policy_error.or_else(|| {
+                    (mode == DecisionMode::Jev && !used_jev && !single).then(|| {
+                        "Jev did not provide a usable assessment; local rules selected the worker."
+                            .into()
+                    })
                 }),
                 usage: output
                     .as_ref()

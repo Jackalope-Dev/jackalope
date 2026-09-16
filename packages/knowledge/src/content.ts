@@ -348,8 +348,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'routing-subprocess',
         question: 'How does automatic agent selection work?',
         paragraphs: [
-          'Automatic tasks ask your configured default agent to choose among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
-          'Jackalope validates the returned choice and saves its reason. Routing consumes provider usage. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity runs as a worker. Explicit assignments remain available.',
+          'Settings → Decisions chooses local rules, agent-powered reasoning, or Jev-assisted decisions. Projects inherit the app default unless you override it. Automatic tasks select among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
+          'Local rules use preferences and current capacity without a model call. Agent-powered routing uses your default agent. Optional Jev uses your TypeSafe key and may reduce routing cost and latency; savings are not guaranteed. Jackalope validates the decision and saves its reason and any reported usage. Jev uncertainty or service errors use local rules without an extra paid agent call. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity runs as a worker. Explicit assignments remain available.',
         ],
       },
       {
@@ -987,7 +987,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Try it: improve one empty state',
         paragraphs: [
           'Tasks opens Chat. Send a message to start a conversation, or open Inbox or New task for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
-          'Project setup focuses on choosing a repository, an agent, and a first task. Inspect workspace readiness before starting; suggested commands are not run until you authorize work. Git behavior and project appearance can be customized from the final step.',
+          'Project setup focuses on choosing a repository, an agent, a decision method, and a first task. Inspect workspace readiness before starting; suggested commands are not run until you authorize work. Git behavior and project appearance can be customized from the final step.',
           'Chat offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {

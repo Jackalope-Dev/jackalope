@@ -3,6 +3,7 @@ use super::*;
 use serde_json::{json, Value};
 
 pub struct StrategyEvaluation {
+    pub model_call_attempted: bool,
     pub choice: Option<StrategyChoice>,
     pub concentration: Option<f64>,
     pub usage: Usage,
@@ -16,9 +17,23 @@ pub async fn assess_strategy(
     state: &Value,
     canceled: impl Fn() -> bool,
 ) -> Result<StrategyEvaluation, String> {
-    let key = jev::key_for_routing(runtime, project_id)?.ok_or("Jev decisions are not enabled.")?;
-    let value = jev::evaluate(&key, &strategy_request(state), canceled).await?;
-    Ok(strategy_result(&value))
+    if canceled() { return Ok(abstain("Decision assessment was canceled.".into(), false)); }
+    let payload = strategy_request(state);
+    if let Err(error) = jev::check_request_size(&payload) { return Ok(abstain(error, false)); }
+    let key = match jev::key_for_routing(runtime, project_id) {
+        Ok(Some(key)) => key,
+        Ok(None) => return Ok(abstain("Jev decisions are not enabled for this project.".into(), false)),
+        Err(error) => return Ok(abstain(error, false)),
+    };
+    if canceled() { return Ok(abstain("Decision assessment was canceled.".into(), false)); }
+    Ok(match jev::evaluate(&key, &payload, canceled).await {
+        Ok(value) => strategy_result(&value),
+        Err(error) => abstain(error, true),
+    })
+}
+
+fn abstain(reason: String, attempted: bool) -> StrategyEvaluation {
+    StrategyEvaluation { model_call_attempted: attempted, choice: None, concentration: None, usage: Usage::default(), fallback_reason: Some(reason) }
 }
 
 fn strategy_request(state: &Value) -> Value {
@@ -51,6 +66,7 @@ fn strategy_result(value: &Value) -> StrategyEvaluation {
         None
     };
     StrategyEvaluation {
+        model_call_attempted: true,
         choice,
         concentration,
         usage: jev::usage(value),

@@ -10,6 +10,7 @@ export interface DecisionReceipt {
   requestedMode: DecisionMode;
   provider: DecisionProvider;
   policyRevision: number;
+  modelCallAttempted?: boolean;
   concentration: number | null;
   fallbackReason: string | null;
   usage: RunUsage;

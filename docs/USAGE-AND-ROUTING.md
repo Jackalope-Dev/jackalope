@@ -19,6 +19,52 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for task ownership and
 
 ## Current routing contract
 
+Settings → Decisions selects an app default and optional project overrides. Project
+onboarding includes the same choice. Existing installations retain agent-powered
+routing. Local rules use project preference, capacity and active workload without
+a model call. Agent-powered routing uses the configured default agent. Jev-assisted
+routing uses a separately billed TypeSafe API key saved on this device. Explicit
+assignments, continuations and a single eligible worker avoid selection calls.
+
+`commands/decisions` owns versioned decision kinds, provider selection, project policy
+and receipts; policy storage, contracts and strategy classification have separate
+modules. `jev` owns TypeSafe transport, response validation and key management.
+Worker eligibility, ranking and launch authorization stay in `tasks/routing`.
+New decision consumers must resolve the project policy, define a typed domain input
+and validated output, retain the policy revision and actual provider, record usage
+even when abstaining, and leave execution authorization to their native owner.
+Decision receipts are explanatory copies; provider attempts own usage accounting.
+
+Jev receives the complete task, selected saved context, acceptance criteria,
+coordination instructions, verification command, handoff reasons, relevant recorded
+outcomes and eligible worker capability metadata. Account credentials and private
+bridge tokens are excluded. Independent Score questions assess reasoning fit and
+Noul questions assess required tool support in one request. Code validates the
+distributions, gates uncertain answers and ranks suitable candidates with local
+preference/capacity tie breaks. A separate Choice contract supports execution-strategy
+advice; it cannot generate a plan or authorize execution. These follow TypeSafe's
+[state](https://docs.typesafe.ai/concepts/state),
+[Score](https://docs.typesafe.ai/primitives/score) and
+[Noul](https://docs.typesafe.ai/primitives/noul) contracts.
+
+The current Jev gates (0.75 distribution concentration, at least 0.9 tool support,
+reasoning score at least 2/3) are provisional and need held-out task calibration.
+Concentration is not a calibrated probability of task success. Unknown, malformed,
+unavailable or oversized decisions fall back to local rules without another paid
+decision call. The native request budget is 64 candidates and 256 KiB; larger inputs
+fall back whole rather than silently dropping candidates or task requirements.
+Requests use a fixed HTTPS endpoint, no redirects/retries, an eight-second timeout,
+bounded responses and cancellation. Key checks make one small billable request.
+
+Jev routing attempts appear in task/project usage with reported input/output tokens,
+including usable reports from rejected assessments. Estimated cost uses the
+[published rate](https://typesafe.ai/blog/introducing-system-one-models-and-jev) of
+$0.042 per million input tokens and free output. This is not an invoice or measured
+savings. Connection checks have separate device-wide cumulative usage, with missing
+reports explicit. The quota panel links to TypeSafe; remaining balance, limits and
+reset times are unavailable through the integration. Installed API acceptance,
+real-task cost/latency comparisons and native macOS/Linux credential checks remain open.
+
 `tasks/routing.rs` owns automatic selection and up to three quota handoffs.
 `tasks/routing/process.rs` runs a bounded, cancellable routing-only subprocess
 outside coordinator/execution locks. The default agent sees the task, frozen project

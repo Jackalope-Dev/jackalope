@@ -61,6 +61,22 @@ identity can change the credentials used by its continuations: use a new profile
 for a different identity. Deleting an account deliberately blocks later uses of
 that saved profile instead of silently falling back to another account.
 
+## Device-owned API keys
+
+Jackalope-owned keys use Windows DPAPI, macOS Keychain or Linux Secret Service.
+Missing or locked credential services fail explicitly; there is no plaintext fallback.
+Jev keys are entered in a transient password field, passed once through native IPC,
+and never returned to the renderer, settings sync, exports or task history. Native
+requests send the key only as a sensitive HTTPS Authorization header to TypeSafe.
+Connection status is a prior check, not proof of current credit or authorization.
+Replacing the key keeps decision preferences; removing it switches Jev defaults and
+project overrides to local rules. The connection is shared by projects on this device.
+
+Detected environment-key previews reveal at most the final four characters of long
+keys; short keys are fully masked. CLI-owned sign-in/configuration remains under the
+provider's storage contract. Jackalope-owned MCP configuration is protected separately;
+see [MCP discovery](MCP-DISCOVERY.md).
+
 ## Verification
 
 Automated regression coverage and isolated native trials are described in

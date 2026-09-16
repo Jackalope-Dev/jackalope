@@ -39,12 +39,16 @@ applied receipts prevent further dispatch into the integrated workspace. A new c
 carry forward the result. Optional batch and estimated-cost thresholds pause later work;
 they cannot cap provider billing. Installed acceptance and independent task planning remain open.
 
-Three default project-setup steps, optional Git/appearance settings, cross-project
+Four default project-setup steps, optional Git/appearance settings, cross-project
 attention on Chat, remembered task sections and changes since the last review are implemented.
 Issue, PR-feedback, CI-repair and dependency-update starters prepare editable requests;
 GitHub evidence is read-only. Lesson receipts explain selection, and optional local
 usefulness ratings and review minutes feed a report with explicit history coverage.
 Real daily-use and quality improvements still require observed trials.
+
+Jackalope Decisions provides project-scoped local rules, agent-powered decisions and
+optional Jev-assisted routing with protected device keys and visible usage. Jev
+quality/cost calibration and installed cross-platform acceptance remain in progress.
 
 Optional local-agent setup includes hardware guidance, download choices and a real
 file/session check before connecting OpenCode to Ollama. Model-free help retrieval

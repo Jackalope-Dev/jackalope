@@ -55,7 +55,7 @@ fn request(
             "acceptance": run.contract.text(), "workers": workers, "recordedOutcomes": observations,
             "coordinationInstructions": req.coordination.as_ref().map(|context| &context.instructions),
             "verificationCommand": req.verify_command,
-            "previousHandoffs": run.routing.as_ref().map(|history| history.handoffs.iter().map(|handoff| json!({"agent":handoff.agent,"model":handoff.model,"reason":handoff.failure.message})).collect::<Vec<_>>()).unwrap_or_default(),
+            "previousHandoffs": run.routing.as_ref().map(|history| history.handoffs.iter().map(|handoff| json!({"agent":handoff.agent,"model":handoff.model,"reason":"Provider quota exhausted", "modelOnly":handoff.failure.model_only})).collect::<Vec<_>>()).unwrap_or_default(),
         },
         "questions": questions,
     })
@@ -110,7 +110,7 @@ impl TaskRuntime {
             Ok(None) => return Ok(None),
             Ok(Some(key)) => key,
             Err(_) => {
-                self.update_checked(&req.id, |run| activity(run, "Jev settings or its saved key are unavailable. Using local routing rules; reconnect Jev in Settings → Routing."))?;
+                self.update_checked(&req.id, |run| activity(run, "Jev settings or its saved key are unavailable. Using local routing rules; reconnect Jev in Settings → Decisions."))?;
                 return Ok(None);
             }
         };
@@ -118,14 +118,22 @@ impl TaskRuntime {
             self.update_checked(&req.id, |run| activity(run, "The eligible worker list exceeds Jackalope's Jev request budget. Using local routing rules with every eligible worker."))?;
             return Ok(None);
         }
+        let payload = request(req, run, candidates, observations);
+        if let Err(error) = jev::check_request_size(&payload) {
+            self.update_checked(&req.id, |run| {
+                activity(
+                    run,
+                    &format!("{error} Using local routing rules without dropping context."),
+                )
+            })?;
+            return Ok(None);
+        }
         self.update_checked(&req.id, |run| {
             activity(run, "Jev is choosing an eligible agent and model.")
         })?;
-        let response = tauri::async_runtime::block_on(jev::evaluate(
-            &key,
-            &request(req, run, candidates, observations),
-            || !self.is_running(&req.id),
-        ));
+        let response = tauri::async_runtime::block_on(jev::evaluate(&key, &payload, || {
+            !self.is_running(&req.id)
+        }));
         let mut output = TaskRun::default();
         output.model = Some(jev::MODEL.into());
         let result = response.and_then(|value| {

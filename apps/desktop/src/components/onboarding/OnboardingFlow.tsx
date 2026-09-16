@@ -256,7 +256,7 @@ export function OnboardingFlow({
         const current = await routingSettings.read(project?.id);
         if (onboarding.routingMode === 'jev' && !current.connected)
           throw new Error('Reconnect Jev or choose another decision method before continuing.');
-        if (current.mode !== onboarding.routingMode)
+        if (current.projectMode !== onboarding.routingMode)
           await routingSettings.setMode(onboarding.routingMode, current.revision, project?.id);
       } catch (error) {
         onboarding.go('routing');

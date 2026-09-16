@@ -71,7 +71,7 @@ has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
-The default project flow is project → agent → first task. Optional Git behavior and
+The default project flow is project → agent → decisions → first task. Optional Git behavior and
 project appearance open from the final step; saved older setup steps remain usable.
 Workspace setup suggestions are provisional until entry and must not run commands.
 

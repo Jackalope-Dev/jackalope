@@ -19,7 +19,7 @@ release dates.
   pending-message guards, unavailable cost and batch-limit pauses. Independent native
   task planning remains separate from the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
-  defaults and explicit overrides, including cancellation and restart. Cover the three
+  defaults and explicit overrides, including cancellation and restart. Cover the four
   default project-setup steps, optional Git/appearance settings and readiness suggestions.
 - [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users
   and real repositories. Measure first useful result, useful completed work, review/correction
@@ -37,6 +37,11 @@ release dates.
   task switching and large wrapped patches on each supported native platform.
 
 ## Agents and task execution
+
+- [ ] Calibrate Jev decision thresholds on held-out tasks and compare end-to-end cost,
+  latency and outcomes with local rules and agent routing. Validate real API usage,
+  quota errors, cancellation, project inheritance and credential replace/remove on
+  Windows, macOS Keychain and Linux Secret Service, including locked services.
 
 - [ ] Run the implemented direct-CLI and effort [quality trials](AGENT-QUALITY.md)
   on representative repository-derived suites across providers with independent

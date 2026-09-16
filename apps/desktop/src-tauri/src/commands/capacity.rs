@@ -364,7 +364,9 @@ pub async fn capacity_snapshot(
         )
     })
     .collect();
-    if let Some(record) = super::jev::capacity_record(&runtime) { records.push(record); }
+    if let Some(record) = super::jev::capacity_record(&runtime) {
+        records.push(record);
+    }
     Ok(records)
 }
 

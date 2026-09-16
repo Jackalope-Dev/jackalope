@@ -136,3 +136,88 @@ async fn cancellation_drops_a_pending_request_and_size_limits_are_enforced() {
         .contains("size limit"));
     task.abort();
 }
+
+#[test]
+fn scores_and_nouls_reject_incomplete_or_inconsistent_answers() {
+    let answer = json!({"type":"score","score":1.3,"confidence":0.54,"probabilities":{"0":0,"1":0.7,"2":0.3}});
+    assert_eq!(validate_score(&answer, 3).unwrap(), (1.3, 0.54));
+    for patch in [
+        json!({"score":2}),
+        json!({"confidence":-1}),
+        json!({"probabilities":{"0":0,"1":0.7}}),
+        json!({"probabilities":{"0":0,"1":1.3,"2":-0.3}}),
+    ] {
+        let mut value = answer.clone();
+        value
+            .as_object_mut()
+            .unwrap()
+            .extend(patch.as_object().unwrap().clone());
+        assert!(validate_score(&value, 3).is_err());
+    }
+    assert!(validate_score(&answer, 0).is_err());
+    assert_eq!(
+        validate_noul(&json!({"type":"noul","noul":0.99})).unwrap(),
+        0.99
+    );
+    for value in [
+        json!({"type":"noul","noul":2}),
+        json!({"type":"noul","noul":null}),
+        json!({"type":"choice","noul":1}),
+    ] {
+        assert!(validate_noul(&value).is_err());
+    }
+}
+
+#[tokio::test]
+async fn redirects_are_not_followed_and_json_responses_are_read() {
+    let (endpoint, task) = server(
+        Router::new()
+            .route(
+                "/v1/systemone",
+                post(|| async { axum::response::Redirect::temporary("/unexpected") }),
+            )
+            .route(
+                "/unexpected",
+                post(|| async {
+                    panic!("credentials followed a redirect");
+                    #[allow(unreachable_code)]
+                    "unexpected"
+                }),
+            ),
+    )
+    .await;
+    assert!(evaluate_at(&endpoint, "fixture-key", &json!({}), || false)
+        .await
+        .unwrap_err()
+        .contains("unavailable"));
+    task.abort();
+    let (endpoint, task) = server(Router::new().route(
+        "/v1/systemone",
+        post(|| async {
+            axum::Json(json!({"model": MODEL, "usage":{"input_tokens":5,"output_tokens":1}}))
+        }),
+    ))
+    .await;
+    let value = evaluate_at(&endpoint, "fixture-key", &json!({}), || false)
+        .await
+        .unwrap();
+    assert_eq!(usage(&value).input, 5);
+    task.abort();
+}
+
+#[cfg(windows)]
+#[test]
+fn unreadable_saved_keys_allow_recovery_without_returning_secret_material() {
+    let path = std::env::temp_dir().join(format!("jev-corrupt-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&path).unwrap();
+    std::fs::write(path.join("api-key.bin"), b"fixture-private-corrupt-data").unwrap();
+    let status = status(&path, None).unwrap();
+    assert!(!status.connected);
+    assert!(status.has_key);
+    assert!(status.storage_error.is_some());
+    assert!(!serde_json::to_string(&status)
+        .unwrap()
+        .contains("fixture-private-corrupt-data"));
+    account_storage::remove(&path.join("api-key.bin")).unwrap();
+    std::fs::remove_dir(path).unwrap();
+}

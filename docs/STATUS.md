@@ -44,6 +44,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   [provider-specific capabilities](AGENT-SUPPORT.md).
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
+  Jackalope Decisions offers local rules, agent-powered or optional Jev-assisted
+  routing, with project overrides and protected device keys. Jev usage is reported;
+  live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.
 - Durable ownership handoffs, explicit interface agreements and changed-file scope
@@ -80,7 +83,7 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   files instead of searching for them. Token effect is not yet measured on real work;
   `pnpm evaluate:execution --repo-map=on,off` is the comparison.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
-  Project setup defaults to project, agent and first-task steps; Git behavior and project
+  Project setup defaults to project, agent, decisions and first-task steps; Git behavior and project
   appearance remain optional, with workspace setup suggestions before the first task.
 - Optional local usefulness ratings and reported review minutes feed a seven-day workflow
   report in Usage. Coverage is loaded history, with missing ratings/time explicit; copying

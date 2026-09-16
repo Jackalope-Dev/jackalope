@@ -68,6 +68,17 @@ Tool schemas/results may still appear in activity reported by the agent.
 
 ## Management and measurement
 
+Jackalope-owned global/project `mcp_servers.json` files use the same native protected
+storage as device keys: Windows DPAPI, macOS Keychain or Linux Secret Service.
+Valid legacy plaintext objects and existing Jackalope backup files migrate on read
+or save; invalid files are preserved with an error. There is no plaintext fallback
+when secure storage is unavailable. The configuration limit is 1 MiB. Save/rollback
+preserves the protected format and selected tools still receive their credentials.
+Third-party CLI configuration and delivery formats remain provider-owned and may
+contain plaintext credentials; use environment references where the client supports
+them. Configuration parse errors omit source snippets that could contain keys.
+
+
 Configured-connection search also matches the last checked tool names and
 descriptions. Expand a connection's tool list to inspect matches. A successful
 check describes that observation, not persistent connection health.

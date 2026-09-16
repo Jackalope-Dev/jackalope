@@ -229,6 +229,17 @@ pub(crate) async fn evaluate(
     evaluate_at(ENDPOINT, key, payload, canceled).await
 }
 
+pub(crate) fn check_request_size(payload: &Value) -> Result<(), String> {
+    if serde_json::to_vec(payload)
+        .map_err(|_| "Could not prepare Jev decisions.")?
+        .len()
+        > MAX_BYTES
+    {
+        return Err("This context is too large for Jev decisions.".into());
+    }
+    Ok(())
+}
+
 async fn evaluate_at(
     endpoint: &str,
     key: &str,

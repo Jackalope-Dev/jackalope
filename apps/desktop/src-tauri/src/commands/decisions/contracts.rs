@@ -57,6 +57,8 @@ pub struct DecisionReceipt {
     pub requested_mode: DecisionMode,
     pub provider: DecisionProvider,
     pub policy_revision: u64,
+    #[serde(default)]
+    pub model_call_attempted: bool,
     pub concentration: Option<f64>,
     pub fallback_reason: Option<String>,
     pub usage: Usage,

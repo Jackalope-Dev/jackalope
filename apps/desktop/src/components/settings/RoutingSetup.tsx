@@ -397,6 +397,16 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
           {settings.projectMode
             ? 'This project overrides the app default.'
             : 'This project inherits the app default.'}
+          {!settings.projectMode && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={saving || !ready}
+              onClick={() => void save()}
+            >
+              Keep this choice for this project
+            </Button>
+          )}
           {settings.projectMode && (
             <Button
               variant="ghost"

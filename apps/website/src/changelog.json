@@ -1,5 +1,17 @@
 [
   {
+    "id": "choose-how-jackalope-makes-decisions",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Choose how Jackalope makes decisions.",
+    "description": "Project preferences bring local rules, agent reasoning, and optional Jev-assisted routing into one guided setup.",
+    "items": [
+      "Compare decision methods during onboarding or in app and project settings.",
+      "Connect a TypeSafe API key using native protected storage, with local-rule fallback and visible Jev usage."
+    ],
+    "note": "In development. Real-provider cost and quality comparisons and installed cross-platform acceptance remain open."
+  },
+  {
     "id": "updates-through-microsoft-store",
     "date": "2026-09-16",
     "status": "In development",
