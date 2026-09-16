@@ -211,7 +211,7 @@ try {
                   patch:
                     'diff --git a/feature.txt b/feature.txt\nnew file mode 100644\n--- /dev/null\n+++ b/feature.txt\n@@ -0,0 +1 @@\n+Combined feature\n',
                   conflicts: [],
-                  commitMessage: 'Complete feature',
+                  commitMessage: args.commitMessage,
                   commitPolicy: {
                     attribution: 'user',
                     name: 'Fixture',
@@ -233,8 +233,14 @@ try {
                 return f.integration;
               }
               if (command === 'task_plan_review_time') return;
-              if (command === 'knowledge_list' || command === 'integration_plans')
-                return f.integration ? [f.integration] : [];
+              if (command === 'integration_plans')
+                return f.integration
+                  ? [
+                      f.integration,
+                      { ...f.integration, id: 'other-task-plan', runIds: ['other-task'] },
+                    ]
+                  : [];
+              if (command === 'knowledge_list') return [];
               return null;
             },
           };
@@ -256,7 +262,7 @@ try {
       const f=window.fixture;const project={id:'fixture',name:'Fixture project',path:'C:/fixture',gitBranch:'main',worktrees:[],preferences:{verifyCommand:'node check.mjs',autoVerify:true}};useProjectStore.setState({projects:[project],activeProjectId:'fixture'});
       f.sync=()=>{useExecutionStore.setState({runs:structuredClone(f.runs),refresh:async()=>{},select:()=>{}});useManagedTaskStore.setState({queue:structuredClone(f.queue),refresh:async()=>f.sync()});};f.sync();
       const {ManagedTaskView}=await import('/src/components/tasks/ManagedTaskView.tsx');const {useTaskAssessment,TaskAssessmentNotice}=await import('/src/components/tasks/useTaskAssessment.tsx');const {DecisionUsage,useTaskDecisionUsage}=await import('/src/components/tasks/DecisionUsage.tsx');
-      function App(){const assessment=useTaskAssessment();const decisionUsage=useTaskDecisionUsage();const selected=useManagedTaskStore(s=>s.selectedId);const task=useManagedTaskStore(s=>s.queue.managedTasks[0]);const [error,setError]=React.useState('');const act=fn=>fn().catch(e=>setError(String(e)));return React.createElement('main',{style:{maxWidth:1100,margin:'auto',padding:24}},selected?React.createElement(ManagedTaskView,{task,onBack:()=>useManagedTaskStore.getState().select(null)}):React.createElement(React.Fragment,null,React.createElement('h1',null,'Start a task'),React.createElement('button',{onClick:()=>act(()=>assessment.assess(f.request,f.request.prompt))},'Assess fixture'),React.createElement(TaskAssessmentNotice,{assessment:assessment.assessment,busy:assessment.busy,onCancel:()=>act(assessment.cancel),onSingle:()=>{},onPlan:()=>act(()=>assessment.create(f.request,f.request.prompt))}),React.createElement('p',{role:'status'},error)),React.createElement(DecisionUsage,{...decisionUsage,projectId:'fixture'}));}
+      function App(){const assessment=useTaskAssessment();const decisionUsage=useTaskDecisionUsage();const selected=useManagedTaskStore(s=>s.selectedId);const task=useManagedTaskStore(s=>s.queue.managedTasks[0]);const [error,setError]=React.useState('');const act=fn=>fn().catch(e=>setError(String(e)));return React.createElement('main',{style:{maxWidth:1100,width:'100%',margin:'auto'}},selected?React.createElement(ManagedTaskView,{task,onBack:()=>useManagedTaskStore.getState().select(null)}):React.createElement(React.Fragment,null,React.createElement('h1',null,'Start a task'),React.createElement('button',{onClick:()=>act(()=>assessment.assess(f.request,f.request.prompt))},'Assess fixture'),React.createElement(TaskAssessmentNotice,{assessment:assessment.assessment,busy:assessment.busy,onCancel:()=>act(assessment.cancel),onSingle:()=>{},onPlan:()=>act(()=>assessment.create(f.request,f.request.prompt))}),React.createElement('p',{role:'status'},error)),!selected&&React.createElement(DecisionUsage,{...decisionUsage,projectId:'fixture'}));}
       ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
       </script></body></html>`,
         }),
@@ -334,10 +340,16 @@ try {
         f.task.delivery.readyAt = new Date().toISOString();
         f.sync();
       });
-      const review = page.getByRole('button', { name: 'Review combined changes' });
+      const review = page.getByRole('button', { name: 'Review changes', exact: true });
       await review.waitFor();
       assert.equal(await page.getByRole('navigation', { name: 'Task result' }).count(), 1);
       await page.getByText('The API and UI now work together.', { exact: false }).waitFor();
+      const taskDetails = page.locator('.managed-details > summary');
+      await page.waitForFunction(() => !document.querySelector('.managed-details').open);
+      await taskDetails.focus();
+      await taskDetails.press('Enter');
+      await page.getByText('Request and approach', { exact: true }).waitFor();
+      await taskDetails.press('Enter');
       await page.screenshot({
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-result.png`,
         fullPage: true,
@@ -346,9 +358,26 @@ try {
       await page.getByRole('heading', { name: 'Try result', exact: true }).waitFor();
       await review.focus();
       await review.press('Enter');
+      assert.equal(await review.count(), 0);
+      assert.equal(
+        await page
+          .getByRole('button', { name: 'Review', exact: true })
+          .evaluate((el) => el === document.activeElement),
+        true,
+      );
       const apply = page.getByRole('button', { name: 'Apply changes to main', exact: true });
       await apply.waitFor();
       await page.getByText('Combined feature', { exact: false }).first().waitFor();
+      assert.equal(await page.getByRole('navigation', { name: 'Changed files' }).count(), 0);
+      assert.equal(
+        await page.getByText('Previous integration reviews', { exact: true }).count(),
+        0,
+      );
+      const diffTop = (await page.locator('.merge-patch-layout').boundingBox()).y;
+      assert.ok(
+        diffTop < (width === 960 ? 640 : 840),
+        'The diff should begin in the first viewport',
+      );
       assert.equal(
         await page.evaluate(
           () => window.fixture.calls.filter((call) => call.command === 'integration_apply').length,
@@ -360,6 +389,24 @@ try {
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-review.png`,
         fullPage: true,
       });
+      const commitDetails = page.getByText('Commit details', { exact: true });
+      await commitDetails.click();
+      const commitMessage = page.getByRole('textbox', { name: 'Commit message', exact: true });
+      await commitMessage.fill('Complete API and UI');
+      assert.equal(await apply.count(), 0, 'An edited commit requires a fresh review');
+      assert.equal(
+        await commitMessage.isVisible(),
+        true,
+        'Editing must retain the field and focus',
+      );
+      await page.getByText('Combined feature', { exact: false }).first().waitFor();
+      await page.getByRole('button', { name: 'Refresh changes', exact: true }).click();
+      await apply.waitFor();
+      assert.equal(
+        await page.evaluate(() => window.fixture.integration.commitMessage),
+        'Complete API and UI',
+      );
+      await commitDetails.click();
       await apply.focus();
       await apply.press('Enter');
       await page.getByText('Integrated into main', { exact: true }).waitFor();

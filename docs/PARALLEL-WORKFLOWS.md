@@ -109,12 +109,12 @@ attempts; interrupted process ownership retains the runtime's recovery requireme
 Restart leaves dispatch paused. Failed assignments can be retried before downstream
 work starts; once dependent snapshots exist, corrections belong in the final combined
 result. A changed target branch blocks further dispatch and requires reassessment.
-**Review combined changes** uses guarded integration. Project automatic merge and
+**Review changes** uses guarded integration. Project automatic merge and
 reconciliation policies exclude these managed tasks; managed integration and repair
 belong to the reviewed task lifecycle and never automatically apply to the target.
 
-The task shows Plan, Work, Check and Review, with Result, Changes and checks, and
-Preview together. Worker details and all attempts remain expandable. New plans collect
+The task shows Plan, Work, Check and Review, with Result, Review and Preview together.
+Task details groups the request, assignments, attempts and usage. New plans collect
 assignment outcomes into the final result for snapshot-bound human review. Applying
 requires the complete task, current sources, saved checks and outcome acceptance;
 cleanup follows the explicit apply choice. Preview feedback continues the combined

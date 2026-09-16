@@ -7,7 +7,7 @@ import {
   Textarea,
 } from '@jackalope/ui';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { decisionUsageEntries } from '../../lib/decision-usage';
 import type { FeatureStep } from '../../lib/feature-plan';
 import {
@@ -55,6 +55,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const [correction, setCorrection] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [resultTab, setResultTab] = useState<'result' | 'changes' | 'preview'>('result');
+  const resultRef = useRef<HTMLElement>(null);
   const previewRunning = useManagedPreview(work.combined?.id, work.ready && !work.integrated);
   const selectionKey = work.steps.flatMap(({ run }) => (run ? [run.id] : [])).join(',');
   const reviewRunIds = useMemo(() => selectionKey.split(',').filter(Boolean), [selectionKey]);
@@ -242,6 +243,11 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                 onClick={() => {
                   setDetailId(null);
                   setResultTab('changes');
+                  requestAnimationFrame(() =>
+                    resultRef.current
+                      ?.querySelector<HTMLButtonElement>('[aria-current="page"]')
+                      ?.focus(),
+                  );
                   void act(() => managedTaskCommand('action', { id: task.id, action: 'pause' }));
                 }}
               >
@@ -343,7 +349,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         </section>
       )}
       {work.combined && !isActive(work.combined) && (
-        <section className="managed-result" aria-label="Complete task result">
+        <section ref={resultRef} className="managed-result" aria-label="Complete task result">
           <WorkspaceSubnavigation
             label="Task result"
             value={resultTab}
