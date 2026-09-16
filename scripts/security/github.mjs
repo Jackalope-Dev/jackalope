@@ -106,12 +106,14 @@ api(
   distribution ? 'PATCH' : 'POST',
   { name: 'RELEASE_DISTRIBUTION', value: 'store' },
 );
-const branches = api(`${prefix}/branches`);
-if (!branches.some(({ name }) => name === 'beta'))
-  api(`${prefix}/git/refs`, 'POST', {
-    ref: 'refs/heads/beta',
-    sha: api(`${prefix}/branches/${repository.default_branch}`).commit.sha,
-  });
+const branches = list(`${prefix}/branches`);
+for (const branch of ['beta', 'stable']) {
+  if (!branches.some(({ name }) => name === branch))
+    api(`${prefix}/git/refs`, 'POST', {
+      ref: `refs/heads/${branch}`,
+      sha: api(`${prefix}/branches/${repository.default_branch}`).commit.sha,
+    });
+}
 const actions = api(`${prefix}/actions/permissions`);
 api(`${prefix}/actions/permissions`, 'PUT', {
   enabled: actions.enabled,
@@ -134,7 +136,7 @@ api(prefix, 'PATCH', {
     secret_scanning_push_protection: { status: 'enabled' },
   },
 });
-for (const branch of new Set([repository.default_branch, 'beta']))
+for (const branch of new Set([repository.default_branch, 'beta', 'stable']))
   api(`${prefix}/branches/${branch}/protection`, 'PUT', {
     required_status_checks: {
       strict: true,
@@ -161,11 +163,7 @@ for (const name of ['cloud-beta', 'cloud-stable', 'store-beta', 'store-stable'])
     deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
   });
   const allowed =
-    name === 'cloud-beta'
-      ? ['beta', repository.default_branch]
-      : name === 'store-beta'
-        ? ['beta']
-        : [repository.default_branch];
+    name === 'cloud-beta' ? ['beta', 'stable'] : name === 'store-beta' ? ['beta'] : ['stable'];
   const policies = api(`${prefix}/environments/${name}/deployment-branch-policies`).branch_policies;
   for (const policy of policies) {
     if (policy.type !== 'branch' || !allowed.includes(policy.name))

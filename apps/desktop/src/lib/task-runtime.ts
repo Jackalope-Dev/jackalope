@@ -61,6 +61,7 @@ export interface TaskRun {
       recordedAt: string;
     }[];
     decisions: {
+      assessment?: import('./decisions').DecisionReceipt | null;
       orchestrator: string;
       orchestratorModel: string | null;
       orchestratorAccount: string;

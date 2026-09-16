@@ -24,6 +24,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { PrivacySettings } from './PrivacySettings';
 import { ReferralSettings } from './ReferralSettings';
 import { ReleaseSupport } from './ReleaseSupport';
+import { RoutingPreferences } from './RoutingSetup';
 import { Setting, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
@@ -41,6 +42,7 @@ const categories = [
   'Invitations',
   'Appearance',
   'Agents',
+  'Decisions',
   'Privacy',
   'Project',
   'Updates & support',
@@ -71,7 +73,7 @@ export function SettingsPage({
   const project = projects.find((project) => project.id === selectedProjectId);
   const scopedCategories =
     scope === 'project'
-      ? categories.filter((c) => ['Project', 'Appearance', 'Agents'].includes(c))
+      ? categories.filter((c) => ['Project', 'Appearance', 'Agents', 'Decisions'].includes(c))
       : categories.filter((c) => c !== 'Project');
   const [category, setCategory] = useState<SettingsCategory>(
     initialCategory ?? (initialScope === 'project' ? 'Project' : 'General'),
@@ -99,6 +101,7 @@ export function SettingsPage({
         Appearance: 'theme color light dark atmosphere picker toolbar',
         Agents:
           'default models available detected allowed restrict cli command executable configuration',
+        Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
         Privacy: 'marketplace MCP network telemetry crash reporting',
         Project: 'repository name path agent instructions verification command',
         'Updates & support':
@@ -239,6 +242,12 @@ export function SettingsPage({
               )}
               {c === 'Invitations' && (
                 <ReferralSettings onAccount={() => setCategory('Jackalope account')} />
+              )}
+              {c === 'Decisions' && (
+                <RoutingPreferences
+                  key={scope === 'project' ? project?.id : 'app'}
+                  projectId={scope === 'project' ? project?.id : undefined}
+                />
               )}
               {c === 'General' && (
                 <>

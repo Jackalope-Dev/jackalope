@@ -7,13 +7,17 @@ Use [RELEASE-AUTOMATION.md](RELEASE-AUTOMATION.md) for publication and
 
 ## Release channels
 
-Maintain `beta` for testing and `master` for stable releases. Update beta from the
-reviewed source revision intended for testing.
-Beta pushes run verification and a disposable-key rehearsal. Run **Desktop release**
-manually on beta with channel beta/mode candidate for a signed candidate; stable
-candidates run on master with channel stable. Publish through the separate workflow
-on master. It verifies the candidate's branch, source SHA, signatures and receipt.
-Rehearsals cannot be published. Promotion requires a stable build with stable metadata.
+Keep ongoing development on `master`, prereleases on `beta` and production releases
+on `stable`. Use the [release-cut process](RELEASE-AUTOMATION.md#branches-and-version-preparation)
+to select snapshots without interrupting development. Ready release commits trigger
+**Store release** for Windows and **Cloud release** for Mac/Linux when their gates
+are enabled. Rehearsals cannot be published. Beta-to-stable promotion requires a
+stable build with stable metadata and a higher numeric version.
+
+Store builds receive updates through Microsoft Store; tester flight enrollment
+controls beta delivery. The feed configuration and channel selector below apply to
+direct installers only, with the endpoint examples describing the legacy R2 path.
+Use [Cloud configuration](CRABNEBULA-RELEASE.md) for active Mac/Linux release feeds.
 
 Both feeds use the same trusted updater key and app identity. Numeric versions must
 increase: a user leaving beta waits until the stable feed offers a higher version.

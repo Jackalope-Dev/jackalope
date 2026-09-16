@@ -39,6 +39,7 @@ maintained behavior, a repeatable workflow or a reusable template. Follow the
 ## Release engineering
 
 - [Windows releases](RELEASE.md), [release automation](RELEASE-AUTOMATION.md)
+- [Release preparation skill](../.agents/skills/jackalope-release/SKILL.md)
 - [Platform requirements](CROSS-PLATFORM-RELEASES.md)
 - [Cloud signing and updates](CRABNEBULA-RELEASE.md), [Microsoft Store](STORE-RELEASE.md)
 - [Blank release record](releases/RELEASE-RECORD-TEMPLATE.md); keep completed records privately

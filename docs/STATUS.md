@@ -108,7 +108,7 @@ media and account flows. Its content is shared with bundled native help through
 `packages/knowledge`. Build and release tooling uses Windows Store MSIX and macOS/Linux Cloud candidates.
 Store builds offer in-app update checks and user-initiated installation through
 Microsoft Store; Store-managed background delivery remains independent. Branch-based
-beta/stable publication checks complete artifact sets, source checks, signing and
+beta/stable publication is separate from master development and checks complete artifact sets, source checks, signing and
 installed-acceptance configuration; live signing and installed upgrades remain
 release acceptance work. See [release automation](RELEASE-AUTOMATION.md).
 

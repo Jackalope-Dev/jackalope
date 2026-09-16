@@ -295,7 +295,8 @@ export function McpConnectionForm({
           {legacy ? (
             <p className="task-muted">
               Editing the existing {scope} client configuration. Existing agent sessions need a
-              restart.
+              restart. This client controls credential storage; use environment-variable references
+              for secrets where it supports them.
             </p>
           ) : (
             <>
@@ -324,6 +325,11 @@ export function McpConnectionForm({
                 {scope === 'global'
                   ? 'Available to new Jackalope tasks in every project.'
                   : 'Available to new tasks in this project only.'}
+              </p>
+              <p className="task-muted">
+                Jackalope protects this saved configuration with your operating system’s credential
+                storage. Selected agents and tools receive the credentials they need when a task
+                runs.
               </p>
               <h3>Agents</h3>
               <div className="mcp-scope-options">

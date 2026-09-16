@@ -147,8 +147,9 @@ and the selected provider's current instructions.
 
 ## 5. Version and prepare the source
 
-For the Cloud process, run `pnpm release:prepare patch` (or minor, major, an
-explicit higher version) and review the synchronized files and generated notes.
+For Store and Cloud, use `pnpm release:cut beta patch` or a stable cut from the
+tested beta snapshot as described in [release automation](RELEASE-AUTOMATION.md).
+Review the synchronized files and generated notes.
 It leaves all changes uncommitted. The manual steps below also describe what
 must remain synchronized when working on the legacy path.
 

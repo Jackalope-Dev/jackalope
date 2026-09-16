@@ -15,6 +15,7 @@ use std::{
 static CONFIG_LOCK: Mutex<()> = Mutex::new(());
 
 mod delivery;
+mod storage;
 pub(super) use delivery::{acp_servers, opencode_config};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,19 +104,32 @@ fn config_path(scope: &str) -> Result<PathBuf, String> {
 }
 
 fn read_config(path: &Path) -> Result<(String, Value), String> {
-    let text = match fs::read_to_string(path) {
-        Ok(text) => text,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("{}: {e}", path.display())),
+    let text = if storage::owned(path) {
+        storage::read(path)?
+    } else {
+        match fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(e) => return Err(format!("{}: {e}", path.display())),
+        }
     };
     let value = if text.is_empty() {
         json!({})
     } else if path.extension().is_some_and(|e| e == "toml") {
-        let parsed: toml::Value =
-            toml::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        let parsed: toml::Value = toml::from_str(&text).map_err(|_| {
+            format!(
+                "Invalid TOML configuration in {}. Check its syntax; the original was preserved.",
+                path.display()
+            )
+        })?;
         serde_json::to_value(parsed).map_err(|e| e.to_string())?
     } else {
-        serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?
+        serde_json::from_str(&text).map_err(|_| {
+            format!(
+                "Invalid JSON configuration in {}. Check its syntax; the original was preserved.",
+                path.display()
+            )
+        })?
     };
     if !value.is_object() {
         return Err(format!(
@@ -244,9 +258,9 @@ fn edit_config(path: &Path, id: &str, value: Option<Value>) -> Result<String, St
         ));
     }
     if key == "mcp_servers" {
-        let mut doc = text
-            .parse::<toml_edit::DocumentMut>()
-            .map_err(|e| e.to_string())?;
+        let mut doc = text.parse::<toml_edit::DocumentMut>().map_err(|_| {
+            "Invalid MCP TOML configuration. Check its syntax; the original was preserved."
+        })?;
         if doc.get(key).is_none() {
             doc[key] = toml_edit::Item::Table(toml_edit::Table::new());
         }
@@ -277,6 +291,9 @@ fn edit_config(path: &Path, id: &str, value: Option<Value>) -> Result<String, St
 }
 
 fn write_config(path: &Path, text: &str) -> Result<(), String> {
+    if storage::owned(path) {
+        return storage::write(path, text);
+    }
     fs::create_dir_all(path.parent().ok_or("Invalid config path")?).map_err(|e| e.to_string())?;
     let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
     fs::write(&temporary, text).map_err(|e| e.to_string())?;
@@ -386,8 +403,10 @@ fn apply_writes(writes: Vec<(PathBuf, Option<String>, String)>) -> Result<(), St
             let mut errors = vec![error];
             for (path, original, _) in writes[..index].iter().rev() {
                 let result = match original {
-                    Some(text) => fs::write(path, text),
-                    None => fs::remove_file(path),
+                    Some(text) if storage::owned(path) => storage::write(path, text),
+                    Some(text) => fs::write(path, text).map_err(|error| error.to_string()),
+                    None if storage::owned(path) => super::account_storage::remove(path),
+                    None => fs::remove_file(path).map_err(|error| error.to_string()),
                 };
                 if let Err(e) = result {
                     errors.push(format!("Rollback failed for {}: {e}", path.display()));
@@ -440,7 +459,7 @@ pub async fn mcp_save_server(server: McpServerConfig) -> Result<(), String> {
             }
         }
         let original = if path.exists() {
-            Some(fs::read_to_string(&path).map_err(|e| e.to_string())?)
+            Some(read_config(&path)?.0)
         } else {
             None
         };

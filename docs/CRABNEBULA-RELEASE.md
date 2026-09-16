@@ -97,7 +97,7 @@ read-back before enabling publication; fixture tests do not establish vendor acc
 
 ## Run a rehearsal
 
-Dispatch **Cloud release** with `mode=rehearsal` from beta or master. It retains
+Dispatch **Cloud release** with `mode=rehearsal` from beta or stable. It retains
 artifacts without upload/publication. For a local Windows rehearsal:
 
 ```powershell

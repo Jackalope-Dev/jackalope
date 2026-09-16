@@ -16,6 +16,7 @@
     "typecheck": "pnpm --filter @jackalope/ui --filter @jackalope/desktop --filter @jackalope/website typecheck",
     "test": "pnpm test:release && pnpm --filter @jackalope/desktop --filter @jackalope/server test",
     "test:release": "node --test \"scripts/release/*.test.mjs\"",
+    "release:cut": "node scripts/release/cut-release.mjs",
     "release:prepare": "node scripts/release/prepare-release.mjs",
     "release:setup": "node scripts/security/github.mjs --repo Jackalope-Dev/jackalope --reviewer Ghosts",
     "test:hooks": "node --test scripts/git-hooks.test.mjs",

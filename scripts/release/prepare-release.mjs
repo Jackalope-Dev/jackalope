@@ -16,15 +16,42 @@ export function nextVersion(current, bump) {
   return version(parts.join('.'));
 }
 
+export const gitAt =
+  (directory) =>
+  (...args) =>
+    execFileSync('git', args, { cwd: directory, encoding: 'utf8', windowsHide: true }).trim();
+
+export function versionFloor(git, current) {
+  let highest = version(current);
+  const consider = (value) => {
+    if (compare(value, highest) > 0) highest = value;
+  };
+  for (const branch of ['master', 'beta', 'stable']) {
+    const ref = `refs/remotes/origin/${branch}`;
+    if (git('for-each-ref', '--format=%(refname)', ref))
+      consider(JSON.parse(git('show', `${ref}:package.json`)).version);
+  }
+  for (const tag of git('tag', '--list').split('\n')) {
+    const match = /^(?:(?:beta|stable)-v|store-(?:beta|stable)\/v)(\d+\.\d+\.\d+)$/.exec(tag);
+    if (match) consider(version(match[1]));
+  }
+  return highest;
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.length !== 3)
-    throw new Error('Usage: pnpm release:prepare patch|minor|major|VERSION');
-  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-  if (!['master', 'beta'].includes(git('branch', '--show-current')))
-    throw new Error('Prepare releases on master (stable) or beta');
-  if (git('status', '--porcelain', '--untracked-files=normal'))
+  const [bump, merged, ...extra] = process.argv.slice(2);
+  if (!bump || (merged && merged !== '--merged') || extra.length)
+    throw new Error('Usage: pnpm release:prepare patch|minor|major|VERSION [--merged]');
+  const git = gitAt(root);
+  if (!/^(beta|stable|release\/(beta|stable)\/[^/]+)$/.test(git('branch', '--show-current')))
+    throw new Error('Prepare releases on beta, stable or a release/channel/version branch');
+  if (merged) {
+    git('rev-parse', '--verify', 'MERGE_HEAD');
+    if (git('diff', '--name-only', '--diff-filter=U'))
+      throw new Error('Resolve and stage merge conflicts before preparing the release');
+  } else if (git('status', '--porcelain', '--untracked-files=normal'))
     throw new Error('Review and commit existing changes before preparing a release');
   const current = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')).version;
   await assertVersions(current);
-  await prepare(nextVersion(current, process.argv[2]));
+  await prepare(nextVersion(versionFloor(git, current), bump));
 }

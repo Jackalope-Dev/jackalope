@@ -25,6 +25,7 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { AgentMetricsDashboard } from './AgentMetricsDashboard';
 import { CapacityPanel } from './CapacityPanel';
+import { JevConnectionUsage } from './JevConnectionUsage';
 import { tokenLabel, UsageInsights } from './UsageInsights';
 import { WorkflowReport } from './WorkflowReport';
 export function UsageDashboard({
@@ -258,6 +259,7 @@ export function UsageDashboard({
       ) : (
         <div className="workspace-sections">
           <CapacityPanel />
+          <JevConnectionUsage />
           <section className="workspace-section workspace-stack" aria-label="Task usage">
             <WorkspaceSectionHeading
               title="Task usage"

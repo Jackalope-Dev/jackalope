@@ -5,13 +5,13 @@ import { pathToFileURL } from 'node:url';
 import { assertVersions, readNotes, root } from './catalog.mjs';
 
 export function storePlan(env, inputs, notes) {
-  if (!['beta', 'master'].includes(env.GITHUB_REF_NAME))
-    throw new Error('Store releases require the beta or master branch');
+  if (!['beta', 'stable'].includes(env.GITHUB_REF_NAME))
+    throw new Error('Store releases require the beta or stable branch');
   const automatic = env.GITHUB_EVENT_NAME === 'push';
   const mode = automatic ? 'submission' : inputs.mode;
   if (!['rehearsal', 'candidate', 'submission'].includes(mode))
     throw new Error('Unknown Store release mode');
-  const channel = env.GITHUB_REF_NAME === 'master' ? 'stable' : 'beta';
+  const channel = env.GITHUB_REF_NAME === 'stable' ? 'stable' : 'beta';
   const enabled =
     !automatic || (env.STORE_AUTOMATION_ENABLED === 'true' && !/^Status: draft\r?$/m.test(notes));
   if (enabled && mode === 'submission') {

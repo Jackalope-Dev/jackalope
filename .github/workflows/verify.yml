@@ -2,7 +2,7 @@ name: Verify platforms
 on:
   pull_request:
   push:
-    branches: [master, main, beta]
+    branches: [master, main, beta, stable]
   workflow_dispatch:
 permissions:
   contents: read

@@ -29,7 +29,7 @@ Evergreen runtime and cannot establish clean-machine acceptance.
 The **Store release** workflow defaults to a manually dispatched rehearsal.
 Rehearsals verify and package without publication. Candidate mode builds real-identity
 release packages without submitting; submission mode also calls the Store API.
-Select beta or master as the workflow branch; that selects beta or stable delivery.
+Select beta or stable as the workflow branch; that selects beta or stable delivery.
 
 For a submission, enroll at [Store developer registration](https://storedeveloper.microsoft.com/)
 and reserve an MSIX product. Copy the exact package name, publisher identity and
@@ -95,7 +95,7 @@ One-time setup:
 6. Complete the installed update checks below. Set `STORE_ACCEPTED=true`, clear
    `STORE_BETA_TEST_ENABLED`, and enable `STORE_AUTOMATION_ENABLED=true`.
 
-Ready release commits pushed to beta or master automatically build and submit after
+Ready release commits pushed to beta or stable automatically build and submit after
 verification. Beta targets the configured flight; stable targets the base product,
 preserving its audience and listings, and requires `store-stable` approval after
 packaging. Both retain approved-account access while this preview is underway;

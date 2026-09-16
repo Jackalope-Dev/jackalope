@@ -28,6 +28,7 @@ window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebvie
   return {head:'abcdef',branch:'main',changes:'',recentChanges:'',prepareCommand:'pnpm install',verifyCommand:'pnpm test',previewCommand:'pnpm dev',dependenciesMissing:true,missingConfiguration:[],notes:[]};
  }
  if(command==='project_git_policy')return args.policy||{attribution:'agent',name:'Fixture',email:'fixture@example.invalid',cleanupAfterMerge:true,autoCheckpoint:true};
+ if(command==='routing_settings')return {mode:'agent',defaultMode:'agent',projectMode:null,connected:false,hasKey:false,checkedAt:null,storageError:null,revision:0};
  if(command==='queue_snapshot')return {items:[],mergedRunIds:[]};
  return null;
 }};
@@ -55,9 +56,11 @@ try {
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByText('Step 2 of 3', { exact: true }).waitFor();
+  await page.getByText('Step 2 of 4', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 3 of 3', { exact: true }).waitFor();
+  await page.getByText('Step 3 of 4', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByText('Step 4 of 4', { exact: true }).waitFor();
   await page.getByText('Workspace readiness', { exact: true }).click();
   await page.getByRole('button', { name: 'Inspect workspace setup', exact: true }).click();
   await page.getByText('Workspace inspection unavailable.', { exact: false }).waitFor();
@@ -76,9 +79,9 @@ try {
     'pnpm test',
   );
   await page.getByRole('button', { name: 'Customize Git behavior and appearance' }).click();
-  await page.getByText('Step 3 of 5', { exact: true }).waitFor();
+  await page.getByText('Step 4 of 6', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 4 of 5', { exact: true }).waitFor();
+  await page.getByText('Step 5 of 6', { exact: true }).waitFor();
   const before = await page.evaluate(() =>
     document.documentElement.style.getPropertyValue('--accent-h'),
   );
@@ -89,7 +92,6 @@ try {
     before,
   );
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   assert.equal(await prompt.inputValue(), 'Fix the empty search state and verify keyboard access.');
   await page.reload({ waitUntil: 'domcontentloaded' });
   assert.equal(await prompt.inputValue(), 'Fix the empty search state and verify keyboard access.');
@@ -170,7 +172,7 @@ try {
   await page.getByText('Working tree clean', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'Project onboarding browser checks passed: three default steps, optional customization, readiness retry, provisional settings, draft restoration, theme rollback, keyboard and narrow layouts. No native tasks launched.',
+    'Project onboarding browser checks passed: four default steps, optional customization, readiness retry, provisional settings, draft restoration, theme rollback, keyboard and narrow layouts. No native tasks launched.',
   );
 } finally {
   await browser.close();

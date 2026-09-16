@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { RoutingMode } from '../lib/routing-settings';
 import type { Project } from './projectStore';
 
-export type OnboardingStep = 'project' | 'agent' | 'behavior' | 'theme' | 'task';
+export type OnboardingStep = 'project' | 'agent' | 'routing' | 'behavior' | 'theme' | 'task';
 export type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
 
 interface OnboardingState {
@@ -11,6 +12,8 @@ interface OnboardingState {
   projectId: string | null;
   pendingProject: Project | null;
   firstTask: string | null;
+  routingMode: RoutingMode | null;
+  setRoutingMode: (mode: RoutingMode) => void;
   initialize: (hasProjects: boolean) => void;
   begin: (projectId?: string) => void;
   selectProject: (projectId: string) => void;
@@ -28,6 +31,8 @@ export const useOnboardingStore = create<OnboardingState>()(
       projectId: null,
       pendingProject: null,
       firstTask: null,
+      routingMode: null,
+      setRoutingMode: (routingMode) => set({ routingMode }),
       initialize: (hasProjects) => {
         if (get().status === 'new')
           set({ status: hasProjects ? 'complete' : 'active', step: 'project' });
@@ -39,6 +44,7 @@ export const useOnboardingStore = create<OnboardingState>()(
           projectId: projectId ?? null,
           pendingProject: null,
           firstTask: null,
+          routingMode: null,
         }),
       selectProject: (projectId) =>
         set((state) => ({
@@ -55,7 +61,13 @@ export const useOnboardingStore = create<OnboardingState>()(
       setFirstTask: (firstTask) => set({ firstTask }),
       go: (step) => set({ step }),
       finish: () =>
-        set({ status: 'complete', pendingProject: null, firstTask: null, projectId: null }),
+        set({
+          status: 'complete',
+          pendingProject: null,
+          firstTask: null,
+          projectId: null,
+          routingMode: null,
+        }),
     }),
     {
       name: 'jackalope-onboarding-v1',
@@ -68,9 +80,15 @@ export const useOnboardingStore = create<OnboardingState>()(
           ...value,
           pendingProject: value.pendingProject ?? null,
           firstTask: value.firstTask ?? null,
+          routingMode:
+            value.routingMode === 'agent' ||
+            value.routingMode === 'jev' ||
+            value.routingMode === 'deterministic'
+              ? value.routingMode
+              : null,
           step:
             ((value.step !== 'theme' && value.step !== 'behavior') || value.pendingProject) &&
-            ['project', 'agent', 'behavior', 'theme', 'task'].includes(value.step ?? '')
+            ['project', 'agent', 'routing', 'behavior', 'theme', 'task'].includes(value.step ?? '')
               ? (value.step as OnboardingStep)
               : 'project',
         };

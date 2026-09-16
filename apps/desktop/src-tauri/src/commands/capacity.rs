@@ -347,7 +347,7 @@ pub async fn capacity_snapshot(
         ));
         cache.checked = Some(Instant::now());
     }
-    Ok([
+    let mut records: Vec<_> = [
         ("codex", &cache.codex),
         ("claude", &cache.claude),
         ("grok", &cache.grok),
@@ -363,7 +363,9 @@ pub async fn capacity_snapshot(
             Utc::now().timestamp(),
         )
     })
-    .collect())
+    .collect();
+    if let Some(record) = super::jev::capacity_record(&runtime) { records.push(record); }
+    Ok(records)
 }
 
 #[cfg(test)]

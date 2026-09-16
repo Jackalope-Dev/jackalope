@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: vars.RELEASE_DISTRIBUTION == 'legacy' && ((github.ref == 'refs/heads/master' && inputs.channel == 'stable') || (github.ref == 'refs/heads/beta' && (github.event_name == 'push' || inputs.channel == 'beta')))
+    if: vars.RELEASE_DISTRIBUTION == 'legacy' && ((github.ref == 'refs/heads/stable' && inputs.channel == 'stable') || (github.ref == 'refs/heads/beta' && (github.event_name == 'push' || inputs.channel == 'beta')))
     runs-on: windows-latest
     environment: cloud-${{ inputs.channel || 'beta' }}
     timeout-minutes: 60

@@ -28,14 +28,16 @@ pub struct DetectedKey {
 }
 
 pub fn mask_key(val: &str) -> String {
-    let len = val.len();
-    if len >= 12 {
-        let prefix = &val[..std::cmp::min(7, len)];
-        let suffix = &val[len - 4..];
-        format!("{prefix}...{suffix}")
-    } else if len >= 4 {
-        let prefix = &val[..2];
-        format!("{prefix}...***")
+    if val.chars().count() >= 12 {
+        let suffix: String = val
+            .chars()
+            .rev()
+            .take(4)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        format!("••••{suffix}")
     } else {
         "***".to_string()
     }
@@ -245,12 +247,12 @@ mod tests {
     fn mask_key_produces_safe_previews() {
         let long_key = "sk-ant-api03-abcdefghijklmnop1234";
         let masked = mask_key(long_key);
-        assert_eq!(masked, "sk-ant-...1234");
+        assert_eq!(masked, "••••1234");
         assert!(!masked.contains("abcdefghijklmnop"));
 
         let short_key = "short";
         let masked_short = mask_key(short_key);
-        assert_eq!(masked_short, "sh...***");
+        assert_eq!(masked_short, "***");
 
         let tiny = "abc";
         assert_eq!(mask_key(tiny), "***");

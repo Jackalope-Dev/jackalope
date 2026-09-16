@@ -10,11 +10,15 @@ test('Store candidates follow the release branch without enabling submission', (
     mode: 'candidate',
   });
   assert.equal(
-    storePlan({ ...base, GITHUB_REF_NAME: 'master' }, { mode: 'candidate' }, '').channel,
+    storePlan({ ...base, GITHUB_REF_NAME: 'stable' }, { mode: 'candidate' }, '').channel,
     'stable',
   );
   assert.throws(
     () => storePlan({ ...base, GITHUB_REF_NAME: 'feature' }, { mode: 'candidate' }, ''),
+    /branch/,
+  );
+  assert.throws(
+    () => storePlan({ ...base, GITHUB_REF_NAME: 'master' }, { mode: 'submission' }, ''),
     /branch/,
   );
 });
@@ -37,7 +41,7 @@ test('initial Store trial cannot enable stable or automatic submission', () => {
   const env = { ...base, STORE_SUBMISSION_ENABLED: 'true', STORE_BETA_TEST_ENABLED: 'true' };
   assert.equal(storePlan(env, { mode: 'submission' }, '').enabled, true);
   assert.throws(
-    () => storePlan({ ...env, GITHUB_REF_NAME: 'master' }, { mode: 'submission' }, ''),
+    () => storePlan({ ...env, GITHUB_REF_NAME: 'stable' }, { mode: 'submission' }, ''),
     /acceptance/,
   );
   assert.throws(

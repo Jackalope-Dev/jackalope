@@ -7,8 +7,8 @@ import { releaseTargets } from './cloud-publish.mjs';
 const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
 const automatic = process.env.GITHUB_EVENT_NAME === 'push';
 const branch = process.env.GITHUB_REF_NAME;
-if (!['master', 'beta'].includes(branch)) throw new Error('Cloud releases require master or beta');
-const channel = branch === 'master' ? 'stable' : 'beta';
+if (!['stable', 'beta'].includes(branch)) throw new Error('Cloud releases require stable or beta');
+const channel = branch === 'stable' ? 'stable' : 'beta';
 const mode = automatic ? 'publish' : event.inputs?.mode;
 if (!['rehearsal', 'candidate', 'draft', 'publish'].includes(mode))
   throw new Error('Unknown release mode');

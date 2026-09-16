@@ -1,8 +1,7 @@
 name: Cloud release
 on:
   push:
-    branches: [master, beta]
-    paths: ['releases/**', 'package.json']
+    branches: [stable, beta]
   workflow_dispatch:
     inputs:
       mode:

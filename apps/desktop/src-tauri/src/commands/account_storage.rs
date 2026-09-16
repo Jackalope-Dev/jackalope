@@ -1,6 +1,8 @@
 #[cfg(windows)]
 use std::path::Path;
 
+const MAX_SECRET_BYTES: usize = 1024 * 1024;
+
 #[cfg(windows)]
 fn transform(bytes: &[u8], protect: bool) -> Result<Vec<u8>, String> {
     use windows_sys::Win32::{Foundation::LocalFree, Security::Cryptography::*};
@@ -57,11 +59,18 @@ pub(super) fn read(path: &Path) -> Result<Option<Vec<u8>>, String> {
     use std::io::Read;
     let bytes = std::fs::File::open(path).and_then(|file| {
         let mut bytes = Vec::new();
-        file.take(16385).read_to_end(&mut bytes)?;
+        file.take((MAX_SECRET_BYTES + 4097) as u64)
+            .read_to_end(&mut bytes)?;
         Ok(bytes)
     });
     match bytes {
-        Ok(bytes) if bytes.len() <= 16384 => transform(&bytes, false).map(Some),
+        Ok(bytes) if bytes.len() <= MAX_SECRET_BYTES + 4096 => {
+            let plain = transform(&bytes, false)?;
+            if plain.len() > MAX_SECRET_BYTES {
+                return Err("The secure account record is too large.".into());
+            }
+            Ok(Some(plain))
+        }
         Ok(_) => Err("The secure account record is invalid.".into()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(_) => Err("The secure account record could not be read.".into()),
@@ -72,6 +81,9 @@ pub(super) use keychain::{read, remove, write};
 
 #[cfg(windows)]
 pub(super) fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if bytes.len() > MAX_SECRET_BYTES {
+        return Err("The secure account record is too large.".into());
+    }
     super::history::write_atomic(path, &transform(bytes, true)?)
         .map_err(|_| "The account could not be saved securely. Try connecting again.".into())
 }

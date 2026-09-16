@@ -110,6 +110,17 @@ mod tests {
             let _ = tx.send(unavailable);
         })
         .unwrap();
+        std::fs::write(root.join("source.ts"), "export const revision = -1;").unwrap();
+        assert!(!rx.recv_timeout(Duration::from_secs(5)).unwrap());
+        // Drain registration and initial-write events before asserting generated writes stay quiet.
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while let Ok(unavailable) = rx.recv_timeout(Duration::from_millis(700)) {
+            assert!(!unavailable);
+            assert!(
+                std::time::Instant::now() < deadline,
+                "Watcher did not settle"
+            );
+        }
         std::fs::write(root.join("target/ignored.js"), "generated").unwrap();
         assert!(rx.recv_timeout(Duration::from_millis(700)).is_err());
         for revision in 0..20 {

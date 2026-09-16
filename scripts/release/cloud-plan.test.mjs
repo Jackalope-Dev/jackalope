@@ -56,10 +56,11 @@ test('workflow planning maps release branches, isolates rehearsals and fails bef
   assert.match(trial.outputs, /targets=\["windows-x86_64"\]/);
   const stable = await execute(
     { mode: 'rehearsal', targets: 'configured' },
-    { GITHUB_REF_NAME: 'master' },
+    { GITHUB_REF_NAME: 'stable' },
   );
   assert.equal(stable.status, 0, stable.stderr);
   assert.match(stable.outputs, /channel=stable/);
+  assert.notEqual((await execute({ mode: 'publish' }, { GITHUB_REF_NAME: 'master' })).status, 0);
   assert.notEqual(
     (await execute({ mode: 'rehearsal' }, { GITHUB_REF_NAME: 'untrusted' })).status,
     0,

@@ -1,9 +1,10 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Badge, Panel, RefreshIcon } from '@jackalope/ui';
+import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -11,7 +12,8 @@ import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 
-const agentName = (agent: string) => getAgentMetadata(agent)?.name ?? agent;
+const agentName = (agent: string) =>
+  agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
 function windowName(window: CapacityWindow) {
   if (window.window === 'weekly') return 'Weekly allowance';
   if (window.window === 'monthly') return 'Monthly allowance';
@@ -157,7 +159,11 @@ export function CapacityPanel() {
               <Panel className="capacity-card" key={record.agent}>
                 <header className="capacity-card-head">
                   <span className="capacity-agent-mark" aria-hidden="true">
-                    <AgentCharacter provider={record.agent} />
+                    {record.agent === 'jev' ? (
+                      <Zap size={24} />
+                    ) : (
+                      <AgentCharacter provider={record.agent} />
+                    )}
                   </span>
                   <div className="capacity-card-identity">
                     <h3>{name}</h3>
@@ -213,6 +219,15 @@ export function CapacityPanel() {
                       {record.status === 'notInstalled' ? 'Not installed' : 'Balance unavailable'}
                     </p>
                     <p className="capacity-detail">{record.detail}</p>
+                    {record.agent === 'jev' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void openExternalUrl('https://console.typesafe.ai')}
+                      >
+                        Open TypeSafe account
+                      </Button>
+                    )}
                   </div>
                 )}
               </Panel>

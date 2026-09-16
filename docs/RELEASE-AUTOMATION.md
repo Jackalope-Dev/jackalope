@@ -9,28 +9,73 @@ These instructions describe the workflow, not live enrollment or release accepta
 
 ## Branches and version preparation
 
-`beta` supplies the beta channel; `master` supplies stable. Merge reviewed changes
-into beta for testing, then integrate the tested changes into master for stable.
-Keep fixes flowing between the branches through reviewed merges. There is no
-separate stable branch. Each published channel version is immutable.
+`master` is ongoing development and never triggers desktop publication. `beta`
+feeds prereleases; `stable` feeds production releases. CI runs on all three branches.
+Keep committing and pushing development to master while a beta or stable candidate
+is being tested. Release branches advance only when a maintainer delivers a reviewed
+release cut; they do not automatically follow master.
 
-From a clean release branch, prepare the next version:
+Prepare a release from the repository root:
 
 ```powershell
-pnpm release:prepare patch
-# Or: pnpm release:prepare minor, major, or an explicit higher version.
+pnpm release:cut beta patch
+# Later, promote the beta snapshot to stable:
+pnpm release:cut stable patch
+# Select an earlier tested beta snapshot explicitly:
+pnpm release:cut stable patch store-beta/v0.1.1
 ```
 
-The command updates root/desktop package versions, Tauri configuration and the
-native package/lock entry, and creates `releases/VERSION.md`. It does not stage,
-commit, push or create a tag. Review the version diff, replace the note placeholders,
-set an appropriate date and `Status: ready`, run `pnpm verify`, then commit and push.
-Versioning is explicit; ordinary commits do not silently bump or publish versions.
-Only numeric `major.minor.patch` versions are supported. Beta/stable are separate
-channels, not version suffixes. A new beta iteration needs a higher numeric version;
-the same tested version can subsequently be built for Cloud stable. Store beta
-testers need a higher stable version to move from their installed flight package;
-use a new patch version when promoting tested changes to master.
+The beta default source is fetched `origin/master`; stable defaults to fetched
+`origin/beta`. An optional source branch, tag or SHA must belong to fetched master,
+beta or stable history. Prefer the exact tested beta SHA/tag if beta has advanced.
+A release cut fetches origin and tags, creates `.worktrees/release-CHANNEL-VERSION`
+on `release/CHANNEL/VERSION` from the destination branch, and merges the selected
+source with `--no-commit --no-ff`. The starting development checkout can have local
+work: only committed source enters the cut. Both source and destination SHAs are
+printed for review. The destination branch and remote remain unchanged.
+
+The command chooses the next patch, minor, major or explicit version above all
+fetched channel/development versions and reserved Cloud/Store tags. It updates the
+root/desktop package versions, Tauri configuration and native package/lock entry,
+and creates draft `releases/VERSION.md`. Numeric `major.minor.patch` versions are
+shared across platforms; beta/stable are channels, not version suffixes. Stable
+gets a new version so installed Store beta packages can upgrade to stable.
+Finish reviewing and pushing one release cut before preparing the next channel's
+cut: an uncommitted local preparation does not reserve a version for other checkouts.
+
+In the printed worktree:
+
+1. Review the merged source and version changes. Replace release-note placeholders,
+   use an appropriate date and set `Status: ready`.
+2. Run `pnpm install --frozen-lockfile`, `pnpm verify` and `pnpm check:secrets`.
+3. Commit the reviewed result yourself, including the merge and version changes.
+4. Push `HEAD:beta` or `HEAD:stable` as an administrator, or push the preparation
+   branch and open a PR to that release branch. Use a merge commit for release-cut
+   PRs to retain source ancestry. A destination that advanced requires reconciliation
+   and fresh verification; never force push it.
+5. Follow **Store release** and **Cloud release** in Actions. Approve stable publication
+   after the builds and required checks complete. Store certification finishes separately.
+
+The helper never commits, pushes or creates release tags. Git stages the source
+merge; version edits and notes still need inclusion in the maintainer's commit.
+If a merge conflicts, it leaves the isolated worktree for resolution and prints
+`pnpm release:prepare VERSION --merged`. Resolve and stage conflicts first, preserving
+both branches' code and a consistent existing version across the five version files,
+then run that command to apply the new version. It requires a pending resolved merge.
+Do not rerun `release:cut` into an existing preparation branch/worktree.
+
+For a hotfix, cut from `origin/stable`, make only the needed fix in that worktree,
+and follow the same review and verification process. Merge reviewed release fixes
+back into master and beta, including version metadata, before the next cut. This
+keeps fixes and ancestry flowing forward and reduces later version conflicts.
+For an already clean release branch, `git fetch origin --prune --tags` followed by
+`pnpm release:prepare patch` prepares only the version and notes. It refuses master.
+Ordinary commits never silently bump versions. Publication workflows create immutable
+channel/version tags only after their source and artifact checks pass.
+
+Agents can use the repository [release skill](../.agents/skills/jackalope-release/SKILL.md)
+for requests such as “prepare the next beta from master” or “promote this tested beta
+SHA to stable.” It follows the same commands and leaves commits to the maintainer.
 
 ## Windows Store releases
 
@@ -39,8 +84,8 @@ Set `RELEASE_DISTRIBUTION=store` and configure Cloud targets to
 this mode. Existing EXE tooling remains available for separately configured direct
 distribution; it is not needed for Windows Store signing or updates.
 
-**Store release** follows the same ready release-note/root-package pushes as Cloud:
-`beta` selects the tester flight and `master` selects the base Store product. Manual
+**Store release** follows the same release-branch pushes as Cloud:
+`beta` selects the tester flight and `stable` selects the base Store product. Manual
 runs select rehearsal, candidate or submission; the branch determines the channel.
 Candidate mode builds the real-identity unsigned MSIX and upload archive without
 submitting. Microsoft signs the certified package. Stable approval occurs after
@@ -67,15 +112,16 @@ submitted for certification, not yet published. See [Store setup and acceptance]
 
 ## Cloud build and release
 
-**Cloud release** runs on release-note/root-package changes pushed to beta or master
+**Cloud release** runs on pushes to beta or stable
 when `CLOUD_RELEASE_ENABLED=true`. Draft notes skip automatic releases. Manual runs
 are also available. Automatic runs skip versions whose channel tag already exists;
 use publication recovery for an interrupted tagged attempt. Manual runs
 select rehearsal, candidate, draft or publish; the selected branch determines the
 channel. The optional Windows-only selection supports initial installer testing.
 
-The configured matrix builds Windows x64 NSIS, macOS Apple Silicon and Intel DMGs
-plus app updater archives, and Linux x64 AppImage. AppImage is the supported Linux
+The default Cloud matrix builds macOS Apple Silicon and Intel DMGs plus app
+updater archives, and Linux x64 AppImage. Windows x64 NSIS remains available only
+for separately configured direct distribution with `RELEASE_DISTRIBUTION=cloud`. AppImage is the supported Linux
 in-app update path; OS-managed package upgrades and Store updates are separate.
 Every candidate runs repository verification and native account-access tests.
 Signing credentials are passed only to signing/build steps, not dependency installation
@@ -92,8 +138,8 @@ CrabNebula is the release catalog; this workflow does not create GitHub Releases
 
 Beta builds/publication use the `cloud-beta` environment without a manual approval.
 This environment also supplies shared signing credentials to stable candidate jobs
-and permits only beta/master. Stable publication uses `cloud-stable`, restricted to
-master and requiring the release owner's approval. This puts the stable approval
+and permits only beta/stable. Stable publication uses `cloud-stable`, restricted to
+stable and requiring the release owner's approval. This puts the stable approval
 after all builds, rather than before each platform build.
 
 To publish an already tested candidate or draft, run **Publish Cloud candidate**
@@ -108,9 +154,9 @@ Keep these repository variables disabled until their prerequisites pass:
 
 | Variable | Purpose |
 | --- | --- |
-| `RELEASE_DISTRIBUTION=cloud` | Select the Cloud path; legacy R2 workflows require `legacy` and remain disabled |
+| `RELEASE_DISTRIBUTION=store` | Windows uses Store; Cloud handles Mac/Linux. `cloud` additionally permits direct Windows EXE builds. Legacy R2 requires `legacy` and remains disabled |
 | `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the Store configuration contains the three Mac/Linux targets |
-| `CLOUD_SIGNING_READY` | Windows Azure signing is configured |
+| `CLOUD_SIGNING_READY` | Optional direct Windows Azure signing is configured; unnecessary for Store/Mac/Linux |
 | `APPLE_SIGNING_READY` | Developer ID signing and notarization are configured |
 | `CLOUD_DRAFT_UPLOAD_ENABLED` | Permit validated candidates to be uploaded |
 | `CLOUD_PUBLISH_ENABLED` | Permit publication, including manually dispatched beta trials |
@@ -119,10 +165,10 @@ Keep these repository variables disabled until their prerequisites pass:
 | `CLOUD_RELEASE_ENABLED` | Enable publication triggered by a ready release commit |
 
 Target names are `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64` and
-`linux-x86_64`. Empty acceptance/trial arrays permit no publication. For a
-Windows-only initial trial, select Windows-only candidates and configure the
-intended/trial target arrays to `["windows-x86_64"]`. Expand the intended and
-accepted sets together after the remaining platforms pass their installed checks.
+`linux-x86_64`. Empty acceptance/trial arrays permit no publication. For an initial
+Cloud trial, configure the intended/trial arrays to the Mac/Linux targets being tested and select configured candidates. Windows Store trials use
+the separate Store flags above. Expand the intended and accepted Cloud sets
+together after the remaining platforms pass their installed checks.
 
 First validate a signed candidate and authenticated unpublished draft. Then allow
 manual beta trial publication and test two increasing versions with the same app
@@ -157,11 +203,15 @@ pnpm release:setup --apply
 The first command audits; `--apply` configures the release branches/protections,
 branch-scoped environments, default-off missing gates and immutable tag rules,
 and disables the two legacy R2 workflows. It selects Store Windows distribution,
-removes Windows from Cloud target/acceptance lists and preserves Unix target choices. It creates beta from current remote master
-only when beta does not exist. Existing enablement flags and secrets are preserved.
-The command does not change visibility, commit code or deploy a release.
+removes Windows from Cloud target/acceptance lists and preserves Unix target choices. It creates missing beta/stable branches from current remote master; existing branches
+are never reset. Bootstrap branches are not evidence of a tested release. Existing enablement flags and secrets are preserved.
+The command does not change visibility or commit code. For initial migration, keep
+publication gates off, commit/push the new workflows to master, apply setup, then
+prepare the first beta cut. Ensure beta and stable receive the new workflow files
+before enabling automation. Missing gates default off; existing true gates are not
+silently disabled by setup.
 
-Both branches require current Windows/Linux/macOS/security checks, reviewed PRs for
+All three branches require current Windows/Linux/macOS/security checks, reviewed PRs for
 ordinary writers and resolved conversations; force pushes and branch deletion are
 blocked. The single-maintainer policy retains administrator branch bypass and permits
 approval of one's own stable deployment. Publication independently requires successful
