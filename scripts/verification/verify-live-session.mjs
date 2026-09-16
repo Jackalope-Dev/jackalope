@@ -101,6 +101,13 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (
+      message.type() === 'error' &&
+      /same key|In HTML|cannot contain a nested/.test(message.text())
+    )
+      errors.push(message.text());
+  });
   page.setDefaultTimeout(15000);
   await page.route('**/src/main.tsx*', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: fixture }),

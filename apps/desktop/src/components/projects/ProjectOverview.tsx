@@ -125,7 +125,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
           <WorkspaceHeading
             title={project.name}
             description={
-              <div className="project-heading-description">
+              <span className="project-heading-description">
                 {project.description && (
                   <span className="text-[var(--color-text-secondary)]">{project.description}</span>
                 )}
@@ -137,7 +137,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 >
                   {project.path}
                 </button>
-              </div>
+              </span>
             }
             action={
               <div className="flex items-center gap-1.5 flex-wrap">
