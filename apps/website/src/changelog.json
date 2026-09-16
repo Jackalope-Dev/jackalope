@@ -1,5 +1,30 @@
 [
   {
+    "id": "updates-through-microsoft-store",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Updates through Microsoft Store.",
+    "description": "Windows update controls use Microsoft Store delivery.",
+    "items": [
+      "Check for and install Store updates from Jackalope while keeping active work protected."
+    ],
+    "note": "Store certification and installed update testing remain in progress."
+  },
+  {
+    "id": "from-a-chat-to-a-reviewed-change",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "From a chat to a reviewed change",
+    "description": "A more complete local workflow for starting, reviewing and returning to useful work.",
+    "items": [
+      "Review, verify and explicitly merge a paused chat, with recovery receipts and a handoff into the next change.",
+      "Reach a first-task draft through simpler project setup, and find work waiting across projects.",
+      "Compare changes since your last review, inspect lesson selection and prepare editable GitHub or dependency workflow requests.",
+      "Set batch and estimated-cost pause thresholds, and track usefulness and review effort in a local report."
+    ],
+    "note": "Implemented for prerelease validation. Installed-provider, platform and daily-use acceptance remain in progress."
+  },
+  {
     "id": "desktop-download-page",
     "date": "2026-09-15",
     "status": "In development",

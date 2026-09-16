@@ -43,7 +43,7 @@ if (!args.includes('--apply')) {
           protected: protectedBranch,
         })),
         releaseVariables: list(`${prefix}/actions/variables`, 'variables').filter(({ name }) =>
-          /^(CLOUD_|APPLE_SIGNING_READY|RELEASE_DISTRIBUTION)/.test(name),
+          /^(CLOUD_|STORE_|APPLE_SIGNING_READY|RELEASE_DISTRIBUTION)/.test(name),
         ),
         environments: api(`${prefix}/environments`).environments.map(
           ({ name, protection_rules }) => ({ name, protection_rules }),
@@ -66,23 +66,45 @@ for (const workflow of ['desktop-release.yml', 'publish-release.yml']) {
 }
 const variables = list(`${prefix}/actions/variables`, 'variables');
 for (const [name, value] of Object.entries({
+  STORE_AUTOMATION_ENABLED: 'false',
+  STORE_SUBMISSION_ENABLED: 'false',
+  STORE_ACCEPTED: 'false',
+  STORE_BETA_TEST_ENABLED: 'false',
   CLOUD_RELEASE_ENABLED: 'false',
   CLOUD_PUBLISH_ENABLED: 'false',
   CLOUD_DRAFT_UPLOAD_ENABLED: 'false',
   CLOUD_SIGNING_READY: 'false',
   APPLE_SIGNING_READY: 'false',
-  CLOUD_RELEASE_TARGETS: '["windows-x86_64","darwin-aarch64","darwin-x86_64","linux-x86_64"]',
+  CLOUD_RELEASE_TARGETS: '["darwin-aarch64","darwin-x86_64","linux-x86_64"]',
   CLOUD_ACCEPTED_TARGETS: '[]',
   CLOUD_BETA_TEST_TARGETS: '[]',
 })) {
   if (!variables.some((variable) => variable.name === name))
     api(`${prefix}/actions/variables`, 'POST', { name, value });
 }
+const cloudTargets = variables.find(({ name }) => name === 'CLOUD_RELEASE_TARGETS');
+if (cloudTargets) {
+  const unix = JSON.parse(cloudTargets.value).filter((target) => target !== 'windows-x86_64');
+  api(`${prefix}/actions/variables/CLOUD_RELEASE_TARGETS`, 'PATCH', {
+    name: 'CLOUD_RELEASE_TARGETS',
+    value: JSON.stringify(unix.length ? unix : ['darwin-aarch64', 'darwin-x86_64', 'linux-x86_64']),
+  });
+}
+for (const name of ['CLOUD_ACCEPTED_TARGETS', 'CLOUD_BETA_TEST_TARGETS']) {
+  const previous = variables.find((variable) => variable.name === name);
+  if (previous)
+    api(`${prefix}/actions/variables/${name}`, 'PATCH', {
+      name,
+      value: JSON.stringify(
+        JSON.parse(previous.value).filter((target) => target !== 'windows-x86_64'),
+      ),
+    });
+}
 const distribution = variables.find(({ name }) => name === 'RELEASE_DISTRIBUTION');
 api(
   `${prefix}/actions/variables${distribution ? '/RELEASE_DISTRIBUTION' : ''}`,
   distribution ? 'PATCH' : 'POST',
-  { name: 'RELEASE_DISTRIBUTION', value: 'cloud' },
+  { name: 'RELEASE_DISTRIBUTION', value: 'store' },
 );
 const branches = api(`${prefix}/branches`);
 if (!branches.some(({ name }) => name === 'beta'))
@@ -135,32 +157,26 @@ for (const name of ['cloud-beta', 'cloud-stable', 'store-beta', 'store-stable'])
     wait_timer:
       previous.protection_rules.find((rule) => rule.type === 'wait_timer')?.wait_timer ?? 0,
     prevent_self_review: false,
-    reviewers: name === 'cloud-beta' ? [] : [{ type: 'User', id: user.id }],
-    deployment_branch_policy: previous.deployment_branch_policy,
+    reviewers: name.endsWith('-beta') ? [] : [{ type: 'User', id: user.id }],
+    deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
   });
-  if (name.startsWith('cloud-')) {
-    api(`${prefix}/environments/${name}`, 'PUT', {
-      wait_timer: 0,
-      prevent_self_review: false,
-      reviewers: name === 'cloud-beta' ? [] : [{ type: 'User', id: user.id }],
-      deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
-    });
-    const allowed =
-      name === 'cloud-beta' ? ['beta', repository.default_branch] : [repository.default_branch];
-    const policies = api(
-      `${prefix}/environments/${name}/deployment-branch-policies`,
-    ).branch_policies;
-    for (const policy of policies) {
-      if (policy.type !== 'branch' || !allowed.includes(policy.name))
-        api(`${prefix}/environments/${name}/deployment-branch-policies/${policy.id}`, 'DELETE');
-    }
-    for (const branch of allowed) {
-      if (!policies.some((policy) => policy.type === 'branch' && policy.name === branch))
-        api(`${prefix}/environments/${name}/deployment-branch-policies`, 'POST', {
-          name: branch,
-          type: 'branch',
-        });
-    }
+  const allowed =
+    name === 'cloud-beta'
+      ? ['beta', repository.default_branch]
+      : name === 'store-beta'
+        ? ['beta']
+        : [repository.default_branch];
+  const policies = api(`${prefix}/environments/${name}/deployment-branch-policies`).branch_policies;
+  for (const policy of policies) {
+    if (policy.type !== 'branch' || !allowed.includes(policy.name))
+      api(`${prefix}/environments/${name}/deployment-branch-policies/${policy.id}`, 'DELETE');
+  }
+  for (const branch of allowed) {
+    if (!policies.some((policy) => policy.type === 'branch' && policy.name === branch))
+      api(`${prefix}/environments/${name}/deployment-branch-policies`, 'POST', {
+        name: branch,
+        type: 'branch',
+      });
   }
 }
 const tagRules = api(`${prefix}/rulesets`).find((rule) => rule.name === 'Protect release tags');
@@ -184,5 +200,5 @@ if (!tagRules)
     bypass_actors: [],
   });
 console.log(
-  'Release branches and protections configured; legacy publishers disabled. Existing enablement flags preserved. Verify signing and installed acceptance before enabling Cloud publication.',
+  'Release branches and protections configured for Windows Store and Mac/Linux Cloud releases. Existing enablement flags preserved; enable publication only after installed acceptance.',
 );

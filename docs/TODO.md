@@ -14,11 +14,16 @@ release dates.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window
-  drafts, pin/dock/close, paused dispatch, preview, cumulative patch review and restart.
-  Extend sessions to independent task planning and guarded integration after validating
-  the shared-workspace batch flow.
+  drafts, pin/dock/close, paused dispatch, preview, cumulative and incremental review,
+  guarded merge/cleanup, post-merge handoff and restart. Check stale review refusal,
+  pending-message guards, unavailable cost and batch-limit pauses. Independent native
+  task planning remains separate from the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
-  defaults and explicit overrides, including cancellation and restart.
+  defaults and explicit overrides, including cancellation and restart. Cover the three
+  default project-setup steps, optional Git/appearance settings and readiness suggestions.
+- [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users
+  and real repositories. Measure first useful result, useful completed work, review/correction
+  effort, repeat use and recovery; keep self-reported ratings and loaded-history coverage explicit.
 - [ ] Check keyboard and screen-reader access, narrow layouts, title-bar controls,
   themes, reduced motion and appearance preview rollback. Include agent characters in installed-app checks.
 - [ ] Validate helper actions, notifications and external links in installed builds,
@@ -84,7 +89,10 @@ release dates.
   Keep reported, estimated, stale and unavailable data distinct.
 - [ ] Evaluate protocol and credential-store migrations against real providers
   while preserving existing adapters and encrypted saved data.
-- [ ] Add guarded GitHub issue, pull-request and CI integration.
+- [ ] Validate read-only GitHub issue, unresolved review-thread and CI imports with
+  authenticated installed CLIs, including enterprise hosts, pagination and stale heads.
+  Validate editable workflow drafts and preserve explicit authorization for remote writes.
+  Broader remote publication, review-thread resolution and proactive proposals remain open.
 
 ## Account access and optional services
 
@@ -122,9 +130,11 @@ release dates.
 
 ## Platform releases
 
-- [ ] Validate the cross-platform Cloud pipeline with real Azure/Apple credentials,
+- [ ] Validate Store submission/flight delivery and the Mac/Linux Cloud pipeline with real
+  Partner Center/Apple credentials,
   authenticated draft read-back, retry recovery and installed beta updates before
-  enabling automatic publication. Keep signing/setup gates and platform acceptance
+  enabling automatic publication. Include Store cancellation, active-task blocking,
+  reopened version and saved-work continuity. Keep signing/setup gates and platform acceptance
   distinct; follow [release automation](RELEASE-AUTOMATION.md).
 
 - [ ] Enable each website download only after its release is available; verify the

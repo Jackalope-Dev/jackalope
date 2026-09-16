@@ -23,14 +23,21 @@ import { isActive, nativeTask, respondToPrompt, type TaskRun } from '../../lib/t
 import { taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
-import { TaskDelivery } from '../tasks/TaskDelivery';
+import { MergeReview } from '../tasks/MergeReview';
+import { ProjectVerification } from '../tasks/ProjectVerification';
+import { ReviewProgress } from '../tasks/ReviewProgress';
+import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
 import { TaskPreview } from '../tasks/TaskPreview';
+import { TaskUsefulness } from '../tasks/TaskUsefulness';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Tooltip } from '../ui/Tooltip';
 import { SessionComposer } from './SessionComposer';
+import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
 import './live-session.css';
 
@@ -51,9 +58,29 @@ export function LiveSessionView({
   initialDetailsOpen?: boolean;
 }) {
   const { active, latest, pending, questions, status } = sessionWork(session, runs);
+  const project = useProjectStore((state) =>
+    state.projects.find((item) => item.id === session.request.projectId),
+  );
+  const integrated = !!session.integratedRunId;
+  const nextChat = (text: string) => {
+    if (detached)
+      throw new Error(
+        'Return to the main window to prepare a new chat. Your merged result remains available here.',
+      );
+    const key = `jackalope-live-start:${session.request.projectId}`;
+    const existing = localStorage.getItem(key)?.trim();
+    localStorage.setItem(key, existing ? `${existing}\n\n${text}` : text);
+    useLiveSessionStore.getState().select(null);
+  };
   const [expanded, setExpanded] = useState(initialDetailsOpen);
   const [collapsed, setCollapsed] = useState(false);
-  const [tab, setTab] = useState<'work' | 'changes' | 'preview' | 'delivery'>('work');
+  const [tab, setTab] = useState(() => {
+    const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
+    return ['work', 'changes', 'preview', 'delivery'].includes(saved) ? saved : 'work';
+  });
+  useEffect(() => {
+    useWorkViewStore.getState().remember(`session:${session.id}`, tab);
+  }, [session.id, tab]);
   const [addition, setAddition] = useState<{
     text: string;
     revision: number;
@@ -118,7 +145,7 @@ export function LiveSessionView({
   const showReview = () => {
     setExpanded(true);
     setTab('changes');
-    if (!latest || active) return;
+    if (!latest || active || integrated) return;
     void act(async () => {
       await sessionCommand('action', { id: session.id, action: 'pause' });
       reviewAttempt.current = `${latest.id}:${latest.status}:true`;
@@ -387,7 +414,7 @@ export function LiveSessionView({
                     if (value === 'changes') showReview();
                     else {
                       setTab(value);
-                      if (value === 'preview')
+                      if (value === 'preview' && !integrated)
                         void act(() =>
                           sessionCommand('action', { id: session.id, action: 'pause' }),
                         );
@@ -441,7 +468,7 @@ export function LiveSessionView({
                 <div className="live-work-actions">
                   <Button
                     variant="outline"
-                    disabled={busy}
+                    disabled={busy || integrated}
                     onClick={() =>
                       void act(() =>
                         sessionCommand('action', {
@@ -451,11 +478,13 @@ export function LiveSessionView({
                       )
                     }
                   >
-                    {session.closed
-                      ? 'Reopen session'
-                      : session.paused
-                        ? 'Resume queue'
-                        : 'Pause queue'}
+                    {integrated
+                      ? 'Integrated'
+                      : session.closed
+                        ? 'Reopen session'
+                        : session.paused
+                          ? 'Resume queue'
+                          : 'Pause queue'}
                   </Button>
                   {active && (
                     <Button
@@ -497,9 +526,33 @@ export function LiveSessionView({
                     </Button>
                   )}
                 </div>
+                {!integrated && (
+                  <SessionLimits
+                    key={JSON.stringify(session.limits)}
+                    initial={session.limits}
+                    onSave={async (limits) => {
+                      await sessionCommand('limits', { id: session.id, limits });
+                      await refresh();
+                    }}
+                  />
+                )}
+                {integrated && latest && !detached && (
+                  <Button
+                    onClick={() => {
+                      try {
+                        nextChat(deliveryHandoff(latest, true, 'the next change'));
+                      } catch (cause) {
+                        setError(String(cause));
+                      }
+                    }}
+                  >
+                    Continue in a new chat
+                  </Button>
+                )}
               </>
             )}
             {tab === 'changes' &&
+              !integrated &&
               (active ? (
                 <p className="live-muted">Finish or stop work to review the current changes.</p>
               ) : review ? (
@@ -512,16 +565,57 @@ export function LiveSessionView({
                     <CopyButton text={review.patchPath} label="Copy patch path" />
                   </div>
                   <p className="live-muted">Dispatch paused. Changes remain uncommitted.</p>
+                  {latest && <ReviewProgress key={latest.id} runId={latest.id} />}
                   {review.note && <p className="live-muted">{review.note}</p>}
                   <Suspense fallback={<p>Loading diff…</p>}>
                     <RichDiff patch={review.diff} />
                   </Suspense>
                 </>
+              ) : latest ? (
+                <Button variant="outline" disabled={busy} onClick={showReview}>
+                  Load current changes
+                </Button>
               ) : (
-                <p className="live-muted">{latest ? 'Loading changes…' : 'No changes yet.'}</p>
+                <p className="live-muted">No changes yet.</p>
+              ))}
+            {tab === 'changes' && latest && !active && !integrated && (
+              <ProjectVerification
+                run={latest}
+                command={project?.preferences?.verifyCommand}
+                onCorrect={(text) => {
+                  void append(text).catch((cause) => setError(String(cause)));
+                }}
+              />
+            )}
+            {tab === 'changes' && latest && !active && (
+              <TaskUsefulness key={`usefulness:${latest.id}`} runId={latest.id} />
+            )}
+            {tab === 'changes' &&
+              latest &&
+              !active &&
+              project &&
+              (session.paused || integrated) &&
+              (pending ? (
+                <InlineNotice>
+                  Run or cancel queued messages before merging this session.
+                </InlineNotice>
+              ) : (
+                <MergeReview
+                  key={`merge:${latest.id}`}
+                  project={project}
+                  runs={runs}
+                  items={[]}
+                  merged={session.integratedRunId ? [session.integratedRunId] : []}
+                  onlyRunId={latest.id}
+                  onChanged={refresh}
+                />
               ))}
             {tab === 'preview' &&
-              (latest && !active ? (
+              (integrated ? (
+                <p className="live-muted">
+                  This result is integrated. Continue in a new chat to preview further changes.
+                </p>
+              ) : latest && !active ? (
                 <TaskPreview run={latest} onFeedback={session.closed ? undefined : append} />
               ) : (
                 <p className="live-muted">
@@ -533,7 +627,12 @@ export function LiveSessionView({
             {tab === 'delivery' &&
               (latest && !active ? (
                 <>
-                  <TaskDelivery run={latest} onReview={showReview} onHandoff={append} />
+                  <TaskDelivery
+                    run={latest}
+                    integrated={integrated}
+                    onReview={showReview}
+                    onHandoff={integrated ? nextChat : append}
+                  />
                   <TaskLearning run={latest} allowSave />
                 </>
               ) : (

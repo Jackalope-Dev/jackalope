@@ -3,14 +3,18 @@ import { Textarea } from '@jackalope/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
-import { sessionCommand } from '../../lib/live-session';
+import type { ContextSelection } from '../../lib/knowledge';
+import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-session';
 import type { RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project } from '../../stores/projectStore';
+import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { SessionLimits } from './SessionLimits';
+import { WorkflowStarter } from './WorkflowStarter';
 
 export function SessionStart({
   project,
@@ -21,7 +25,39 @@ export function SessionStart({
 }) {
   const draftKey = `jackalope-live-start:${project?.id ?? 'none'}`;
   const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
+  const [context, setContext] = useState<ContextSelection>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`${draftKey}:context`) ?? '{}');
+      return {
+        memoryOff: saved?.memoryOff === true,
+        excludedMemoryIds: Array.isArray(saved?.excludedMemoryIds)
+          ? saved.excludedMemoryIds.filter((id: unknown) => typeof id === 'string')
+          : [],
+      };
+    } catch {
+      return {};
+    }
+  });
   const [busy, setBusy] = useState(false);
+  const [limits, setLimits] = useState<Limits>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`${draftKey}:limits`) ?? '{}');
+      return {
+        maxBatches:
+          Number.isInteger(saved?.maxBatches) && saved.maxBatches > 0 && saved.maxBatches <= 1000
+            ? saved.maxBatches
+            : null,
+        pauseAtEstimatedUsd:
+          typeof saved?.pauseAtEstimatedUsd === 'number' &&
+          saved.pauseAtEstimatedUsd > 0 &&
+          saved.pauseAtEstimatedUsd <= 100000
+            ? saved.pauseAtEstimatedUsd
+            : null,
+      };
+    } catch {
+      return { maxBatches: null, pauseAtEstimatedUsd: null };
+    }
+  });
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState(true);
   const markRef = useRef<HTMLDivElement>(null);
@@ -43,13 +79,21 @@ export function SessionStart({
     try {
       if (text) localStorage.setItem(draftKey, text);
       else localStorage.removeItem(draftKey);
+      localStorage.setItem(`${draftKey}:context`, JSON.stringify(context));
+      localStorage.setItem(`${draftKey}:limits`, JSON.stringify(limits));
     } catch {
       setError('This draft could not be saved. Keep this page open until sending succeeds.');
     }
-  }, [draftKey, text]);
+  }, [draftKey, text, context, limits]);
   const send = async () => {
     const value = text.trim();
     if (!project || !value || sending.current) return;
+    if (new TextEncoder().encode(value).length > 12000) {
+      setError(
+        'This request is too long. Shorten it to 12,000 UTF-8 bytes before sending. Your draft is preserved.',
+      );
+      return;
+    }
     if (!pending.current || pending.current.text !== value)
       pending.current = { id: crypto.randomUUID(), messageId: crypto.randomUUID(), text: value };
     const attempt = pending.current;
@@ -72,16 +116,19 @@ export function SessionStart({
         verifyCommand: project.preferences?.verifyCommand,
         prepareCommand: project.preferences?.prepareCommand,
         autoVerify: project.preferences?.autoVerify ?? true,
+        contextSelection: context,
       };
       await sessionCommand('create', {
         id: attempt.id,
         request,
         firstMessage: { id: attempt.messageId, text: value },
+        limits,
       });
       await useLiveSessionStore.getState().refresh(attempt.id);
       const next = latest.current.trim() === value ? '' : latest.current;
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);
       localStorage.removeItem(draftKey);
+      localStorage.removeItem(`${draftKey}:context`);
       if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
     } catch (cause) {
       if (mounted.current) setError(String(cause));
@@ -133,6 +180,22 @@ export function SessionStart({
               Send
             </Button>
           </div>
+          <TaskKnowledge
+            projectId={project.id}
+            projectPath={project.path}
+            prompt={text}
+            selection={context}
+            onChange={setContext}
+            allowWorkflows={false}
+          />
+          <WorkflowStarter
+            projectPath={project.path}
+            onDraft={(prompt) => {
+              setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
+              input.current?.focus();
+            }}
+          />
+          <SessionLimits initial={limits} onSave={setLimits} />
         </form>
       ) : (
         <Button variant="outline" onClick={onOpenProject}>

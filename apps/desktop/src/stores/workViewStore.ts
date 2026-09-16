@@ -10,6 +10,8 @@ export const defaultWorkView: WorkView = { filter: 'all', layout: 'list', query:
 interface WorkViewState {
   scope: 'all' | 'project';
   views: Record<string, WorkView>;
+  reading: Record<string, string>;
+  remember: (id: string, section: string) => void;
   request: { id: string; section: string; revision: number } | null;
   setScope: (scope: 'all' | 'project') => void;
   setView: (key: string, view: WorkView) => void;
@@ -20,6 +22,15 @@ export const useWorkViewStore = create<WorkViewState>()(
     (set) => ({
       scope: 'project',
       views: {},
+      reading: {},
+      remember: (id, section) =>
+        set((state) => ({
+          reading: Object.fromEntries(
+            [...Object.entries(state.reading).filter(([key]) => key !== id), [id, section]].slice(
+              -100,
+            ),
+          ),
+        })),
       request: null,
       setScope: (scope) => set({ scope }),
       setView: (key, view) => set((state) => ({ views: { ...state.views, [key]: view } })),
@@ -28,6 +39,9 @@ export const useWorkViewStore = create<WorkViewState>()(
           request: { id, section, revision: (state.request?.revision ?? 0) + 1 },
         })),
     }),
-    { name: 'jackalope-work-views', partialize: ({ scope, views }) => ({ scope, views }) },
+    {
+      name: 'jackalope-work-views',
+      partialize: ({ scope, views, reading }) => ({ scope, views, reading }),
+    },
   ),
 );

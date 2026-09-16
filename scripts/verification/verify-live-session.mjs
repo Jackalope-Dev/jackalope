@@ -12,6 +12,7 @@ import { LiveSessionView } from '/src/components/sessions/LiveSessionView.tsx';
 import { LiveSessions } from '/src/components/sessions/LiveSessions.tsx';
 import { WORKSPACE_VIEWS } from '/src/components/layout/navigation.ts';
 import { useLiveSessionStore } from '/src/stores/liveSessionStore.ts';
+import { useProjectStore } from '/src/stores/projectStore.ts';
 import { applyThemeTokens, DEFAULT_THEME } from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
@@ -19,6 +20,12 @@ import '/src/components/tasks/core-workflow.css';
 import '/src/components/ui/experience.css';
 const run = {id:'run',taskId:'run',liveSessionId:'session',projectId:'atlas',projectName:'Atlas',projectPath:'C:/Projects/atlas',workspace:'C:/Projects/atlas-session',branch:'session/search',targetBranch:'main',baseHead:'base',agent:'codex',account:'Personal',model:'Example',prompt:'Improve search',status:'running',startedAt:'2026-09-11T12:00:00Z',endedAt:null,sessionId:'provider-session',result:'',activity:[],diagnostics:[],prompts:[],error:null,persistenceError:null,exitCode:null,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:false}};
 const session = {id:'session',title:'Search walkthrough',request:{projectId:'atlas',projectName:'Atlas',projectPath:run.projectPath,agent:'codex'},createdAt:run.startedAt,updatedAt:run.startedAt,paused:false,closed:false,pinned:false,draft:{text:'',revision:0},error:null,messages:[{id:'first',text:'The search results need more room.',createdAt:run.startedAt,runId:'run',canceled:false}],batches:[{runId:'run',messageIds:['first'],previousRunId:null,error:null,settled:false}]};
+const project = {id:'atlas',name:'Atlas',path:run.projectPath,gitBranch:'main'};
+useProjectStore.setState({projects:[project],selectedProjectId:'atlas'});
+const patch = 'diff --git a/src/search.tsx b/src/search.tsx\\n--- a/src/search.tsx\\n+++ b/src/search.tsx\\n@@ -1 +1 @@\\n-narrow\\n+roomy\\n';
+let plan = null;
+let rating = null;
+let seen = false;
 const f = window.sessionFixture = {
  calls:[], failSend:false, holdSend:false, failPin:false, failCreate:false, holdCreate:false, release:null,
  navigation: WORKSPACE_VIEWS,
@@ -31,6 +38,16 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
  const s = useLiveSessionStore.getState().sessions[0];
  switch(command) {
  case 'live_session_snapshot': return {sessions:useLiveSessionStore.getState().sessions,runs:useLiveSessionStore.getState().runs,error:null};
+ case 'knowledge_list': return [];
+ case 'knowledge_preview': return {entries:[],bytes:0,reasons:{}};
+ case 'queue_snapshot': return {items:[],mergedRunIds:[],running:[],paused:true};
+ case 'task_usefulness': if(args.useful!==undefined)rating={useful:args.useful,reviewMinutes:args.reviewMinutes};return rating;
+ case 'task_review_progress': if(args.seenTree)seen=true;return {tree:'tree',diff:seen?'':patch,files:seen?[]:['src/search.tsx'],viewedAt:seen?'2026-09-16T12:00:00Z':null,note:seen?'Changes since your saved review position.':'All current changes.'};
+ case 'integration_plans': return plan?[plan]:[];
+ case 'integration_prepare': plan={id:'plan',runIds:args.runIds,projectPath:run.projectPath,targetBranch:'main',status:'ready',files:['src/search.tsx'],masterHead:'baseline',patch,conflicts:[],commitMessage:args.commitMessage||'Improve search',commitPolicy:{attribution:'agent',cleanupAfterMerge:true}};return plan;
+ case 'integration_apply': plan={...plan,status:'applied',cleanupResults:[{workspace:run.workspace,removed:true}]};f.update({integratedRunId:'run',closed:true,paused:true});return plan;
+ case 'project_github_context': return {title:'Fix search',url:'https://github.com/example/atlas/issues/42',text:'External issue body.',truncated:false};
+ case 'live_session_limits': f.update({limits:args.limits});return;
  case 'live_session_create': {
   if(f.failCreate) throw new Error('The session could not be saved.');
   if(f.holdCreate) await new Promise(resolve=>{f.release=resolve});
@@ -195,6 +212,11 @@ try {
   );
   await page.evaluate(() => window.sessionFixture.releaseStop());
   await page.waitForFunction(() => document.querySelector('textarea').value === '');
+  await page.waitForFunction(() =>
+    window.sessionFixture.calls.some(
+      (call) => call.command === 'live_session_action' && call.action === 'resume',
+    ),
+  );
   assert.deepEqual(
     await page.evaluate(() =>
       window.sessionFixture.calls
@@ -351,10 +373,32 @@ try {
   assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
   await page.getByRole('button', { name: 'New chat', exact: true }).click();
   assert.equal(await input.inputValue(), 'A separate draft');
+  await page.getByText('Start from a repeatable workflow', { exact: true }).click();
+  await page.getByLabel('Issue number', { exact: true }).fill('42');
+  await page.getByRole('button', { name: 'Prepare task draft' }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('textarea').value.includes('External issue body.'),
+  );
+  assert.ok((await input.inputValue()).startsWith('A separate draft'));
+  assert.ok((await input.inputValue()).includes("user's explicit authorization"));
+  await page.getByText('Start from a repeatable workflow', { exact: true }).click();
+  await page.getByText('Session limits', { exact: true }).click();
+  await page.getByLabel('Pause after this many batches').fill('3');
+  await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).fill('5');
+  await page.getByRole('button', { name: 'Save limits' }).click();
+  await page.getByText('Limits saved.', { exact: true }).waitFor();
+  assert.deepEqual(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('jackalope-live-start:atlas:limits')),
+    ),
+    { maxBatches: 3, pauseAtEstimatedUsd: 5 },
+  );
+  await page.getByText('Session limits · 3 batches', { exact: true }).click();
+  await page.getByRole('region', { name: 'Work across all projects' }).waitFor();
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));
   await page.waitForFunction(
-    () => getComputedStyle(document.querySelector('h1')).color === 'rgb(30, 30, 36)',
+    () => getComputedStyle(document.querySelector('.live-start h2')).color === 'rgb(30, 30, 36)',
   );
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
@@ -365,6 +409,38 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   const startBox = await input.boundingBox();
   assert.ok(startBox.y + startBox.height <= 700);
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    window.sessionFixture.run({ status: 'review', endedAt: '2026-09-16T12:00:00Z' });
+    window.sessionFixture.update({
+      paused: true,
+      batches: [{ runId: 'run', messageIds: ['first'], settled: true }],
+    });
+  });
+  await page.getByRole('button', { name: 'Review changes', exact: true }).click();
+  await page.getByRole('button', { name: 'Changes since my last review' }).click();
+  await page.getByText('All current changes.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Mark these changes seen' }).click();
+  await page.getByText('No changes since this review position.', { exact: true }).waitFor();
+  await page.getByText('Track result usefulness', { exact: true }).click();
+  await page.getByLabel('Minutes spent reviewing and correcting (optional)').fill('4');
+  await page.getByRole('button', { name: 'Useful result', exact: true }).click();
+  await page.getByText('Your rating is saved.', { exact: true }).waitFor();
+  await page.getByText('Track result usefulness', { exact: true }).click();
+  await page.getByRole('button', { name: 'Preview merge into main', exact: true }).click();
+  await page.getByRole('button', { name: 'Merge into main and clean up', exact: true }).waitFor();
+  await page.screenshot({ path: `${output}/review-1280-dark.png` });
+  await page.getByRole('button', { name: 'Merge into main and clean up', exact: true }).click();
+  await page.getByText('Integrated into main', { exact: true }).waitFor();
+  assert.equal(await input.isDisabled(), true);
+  await page.getByRole('button', { name: 'Activity', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue in a new chat', exact: true }).click();
+  assert.ok(
+    await page.evaluate(() =>
+      localStorage.getItem('jackalope-live-start:atlas').includes('A separate draft'),
+    ),
+  );
   assert.deepEqual(errors, []);
   console.log(
     `Live-session browser checks passed. Screenshots: ${output}. Browser fixtures only; no native tasks launched.`,

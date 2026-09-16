@@ -1,5 +1,5 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type Project, useProjectStore } from '../../stores/projectStore';
@@ -23,47 +23,46 @@ export function WorkspaceReadiness({
   project,
   path = project.path,
   expanded = false,
+  onPreferencesChange,
 }: {
   project: Project;
   path?: string;
   expanded?: boolean;
+  onPreferencesChange?: (preferences: NonNullable<Project['preferences']>) => void;
 }) {
   const [result, setResult] = useState<Readiness | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
-  const inspect = async () => {
+  const request = useRef(0);
+  const savePreferences = (preferences: NonNullable<Project['preferences']>) => {
+    if (onPreferencesChange) onPreferencesChange(preferences);
+    else useProjectStore.getState().updateProjectPreferences(project.id, preferences);
+  };
+  const inspect = useCallback(async () => {
     if (!isTauriEnvironment()) return;
+    const version = ++request.current;
     setBusy(true);
     setError('');
     try {
-      setResult(await nativeTask<Readiness>('project_readiness', { path }));
+      const value = await nativeTask<Readiness>('project_readiness', { path });
+      if (version === request.current) setResult(value);
     } catch (cause) {
-      setError(String(cause));
+      if (version === request.current) setError(String(cause));
     } finally {
-      setBusy(false);
+      if (version === request.current) setBusy(false);
     }
-  };
+  }, [path]);
   useEffect(() => {
-    if (!expanded) return;
-    let alive = true;
-    if (!isTauriEnvironment()) return undefined;
-    setBusy(true);
+    setResult(null);
+    setSaved('');
     setError('');
-    void nativeTask<Readiness>('project_readiness', { path })
-      .then((value) => {
-        if (alive) setResult(value);
-      })
-      .catch((cause) => {
-        if (alive) setError(String(cause));
-      })
-      .finally(() => {
-        if (alive) setBusy(false);
-      });
+    setBusy(false);
+    if (expanded) void inspect();
     return () => {
-      alive = false;
+      request.current++;
     };
-  }, [expanded, path]);
+  }, [expanded, inspect]);
   const savedPrepare = project.preferences?.prepareCommand;
   const savedVerify = project.preferences?.verifyCommand;
   const savedPreview = project.preferences?.previewCommand;
@@ -117,7 +116,7 @@ export function WorkspaceReadiness({
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    useProjectStore.getState().updateProjectPreferences(project.id, {
+                    savePreferences({
                       prepareCommand: result.prepareCommand ?? undefined,
                     });
                     setSaved('Preparation saved for future tasks.');
@@ -141,7 +140,7 @@ export function WorkspaceReadiness({
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    useProjectStore.getState().updateProjectPreferences(project.id, {
+                    savePreferences({
                       verifyCommand: result.verifyCommand ?? undefined,
                       autoVerify: true,
                     });
@@ -166,7 +165,7 @@ export function WorkspaceReadiness({
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    useProjectStore.getState().updateProjectPreferences(project.id, {
+                    savePreferences({
                       previewCommand: result.previewCommand ?? undefined,
                     });
                     setSaved('Preview command saved.');

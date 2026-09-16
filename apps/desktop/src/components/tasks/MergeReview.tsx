@@ -13,6 +13,7 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { DiffPreview } from './DiffPreview';
+import './project-queue.css';
 export function MergeReview({
   project,
   runs,

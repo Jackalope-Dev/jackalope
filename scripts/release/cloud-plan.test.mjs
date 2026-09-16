@@ -72,6 +72,20 @@ test('workflow planning maps release branches, isolates rehearsals and fails bef
     { CLOUD_SIGNING_READY: 'true' },
   );
   assert.match(mac.stderr, /Complete Apple setup/);
+  const store = await execute(
+    { mode: 'candidate', targets: 'configured' },
+    {
+      RELEASE_DISTRIBUTION: 'store',
+      APPLE_SIGNING_READY: 'true',
+    },
+  );
+  assert.equal(store.status, 0, store.stderr);
+  assert.match(store.outputs, /targets=\["darwin-aarch64"\]/);
+  const direct = await execute(
+    { mode: 'candidate', targets: 'windows' },
+    { RELEASE_DISTRIBUTION: 'store' },
+  );
+  assert.match(direct.stderr, /Windows releases use Microsoft Store/);
   const disabled = await execute({}, { GITHUB_EVENT_NAME: 'push' });
   assert.equal(disabled.status, 0, disabled.stderr);
   assert.match(disabled.outputs, /enabled=false/);

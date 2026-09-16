@@ -40,6 +40,7 @@ export interface ContextSelection {
   memoryOff?: boolean;
 }
 export interface ContextReceipt {
+  reasons?: Record<string, string>;
   entries: KnowledgeEntry[];
   bytes: number;
 }

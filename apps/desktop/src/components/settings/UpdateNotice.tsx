@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
-import { useUpdateStore } from '../../stores/updateStore';
+import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { returnToCompanion, useCompanionNotices } from '../mascot/useCompanionNotices';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { UpdateSettings } from './UpdateSettings';
@@ -24,7 +24,7 @@ export function UpdateNotice() {
       document.removeEventListener('visibilitychange', check);
     };
   }, [update.load]);
-  const version = update.release?.availableVersion;
+  const version = availableUpdateId(update.release);
   useCompanionNotices(
     'update',
     update.error
@@ -44,7 +44,9 @@ export function UpdateNotice() {
               id: `update:${version}`,
               title: update.installing
                 ? 'Updating Jackalope…'
-                : `Jackalope ${version} is available`,
+                : update.release?.storeManaged
+                  ? 'A Jackalope update is available'
+                  : `Jackalope ${version} is available`,
               detail: 'Ready to install when your work is saved.',
               kind: 'info',
               actionLabel: 'Review update',

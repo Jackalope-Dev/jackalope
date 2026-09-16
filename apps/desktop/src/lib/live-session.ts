@@ -20,6 +20,8 @@ export interface SessionDraft {
   revision: number;
 }
 export interface LiveSession {
+  limits?: SessionLimits;
+  integratedRunId?: string | null;
   id: string;
   title: string;
   request: RunRequest;
@@ -32,6 +34,10 @@ export interface LiveSession {
   batches: SessionBatch[];
   draft: SessionDraft;
   error: string | null;
+}
+export interface SessionLimits {
+  maxBatches: number | null;
+  pauseAtEstimatedUsd: number | null;
 }
 export interface SessionSnapshot {
   sessions: LiveSession[];
@@ -76,22 +82,24 @@ export function sessionWork(session: LiveSession, runs: TaskRun[]) {
   ).length;
   const questions = active?.prompts?.filter((prompt) => prompt.status === 'pending') ?? [];
   const failed = latest && !isActive(latest) && sessionRunNeedsAttention(latest);
-  const status = session.closed
-    ? 'Finished'
-    : questions.length
-      ? 'Needs input'
-      : active?.finishing
-        ? 'Checking'
-        : active
-          ? 'Working'
-          : session.error || failed
-            ? 'Needs attention'
-            : session.paused
-              ? 'Paused'
-              : pending
-                ? 'Queued'
-                : latest
-                  ? 'Ready to review'
-                  : 'Ready';
+  const status = session.integratedRunId
+    ? 'Integrated'
+    : session.closed
+      ? 'Finished'
+      : questions.length
+        ? 'Needs input'
+        : active?.finishing
+          ? 'Checking'
+          : active
+            ? 'Working'
+            : session.error || failed
+              ? 'Needs attention'
+              : session.paused
+                ? 'Paused'
+                : pending
+                  ? 'Queued'
+                  : latest
+                    ? 'Ready to review'
+                    : 'Ready';
   return { work, latest, active, pending, questions, status };
 }

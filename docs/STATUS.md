@@ -12,6 +12,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   each agent's character, live or next-action status and who is working now. Task and
   project command search covers both.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
+- Chat's start page surfaces attention, review and active work across projects. Task
+  and session sections remember where the user was reading. Project readiness distinguishes
+  unavailable inspection from a clean checkout.
 - Result views prioritize unanswered questions, recovery and failed checks. Isolated
   work keeps review, merge into the target branch and workspace cleanup on the Review
   tab. Conversation, review, preview and delivery share vocabulary and reusable result
@@ -28,6 +31,15 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   starts a session from the first message and groups history automatically.
   Sessions can pop out into a compact window with an always-on-top pin. Dispatch pauses after
   failures or restart; installed-provider and native-window acceptance remain open.
+- Paused sessions can review, check and explicitly merge their latest batch through
+  the existing guarded integration path. Queued messages must run or be canceled first.
+  Applied receipts close execution in the old session, including after restart; a new
+  chat can carry the delivery handoff forward. Review positions compare subsequent file
+  snapshots without accepting changes. Source/target drift still requires a fresh merge review.
+- Chat offers editable issue, PR-review, CI-repair and dependency-update starters.
+  GitHub evidence uses the installed authenticated CLI and remains read-only; excerpts
+  are labeled. Optional batch and estimated-cost limits pause subsequent batches, with
+  unknown cost blocking further dispatch when a cost threshold is set. These are not billing caps.
 - Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity adapters with
   [provider-specific capabilities](AGENT-SUPPORT.md).
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
@@ -46,7 +58,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - Individual and bulk task archiving with undo and restore, preserving results and workspaces.
   Durable incremental task saves, bounded concurrent history loading, recovery
   exports and [archive management](HISTORY-RECOVERY.md).
-- Project guidance, editable lessons, codebase maps and task outcome insights.
+- Project guidance, editable lessons, codebase maps and task outcome insights. Context
+  previews and saved receipts explain lesson selection with revision/source evidence;
+  Chat supports per-request lesson opt-outs.
 - MCP connections, task-owned Chromium sessions and scoped desktop-window grants.
 - Codex/Claude effort requests, focused isolated-task coordination, verification
   timeout alignment, usage attribution
@@ -66,6 +80,11 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   files instead of searching for them. Token effect is not yet measured on real work;
   `pnpm evaluate:execution --repo-map=on,off` is the comparison.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
+  Project setup defaults to project, agent and first-task steps; Git behavior and project
+  appearance remain optional, with workspace setup suggestions before the first task.
+- Optional local usefulness ratings and reported review minutes feed a seven-day workflow
+  report in Usage. Coverage is loaded history, with missing ratings/time explicit; copying
+  the aggregate report is a user action. This does not establish product retention or quality gains.
 
 ## Services and distribution
 
@@ -86,8 +105,9 @@ expiry. Feedback, reporting and settings sync have separate controls. See
 
 The website provides setup and workflow guides, compatibility tables, sample-workspace
 media and account flows. Its content is shared with bundled native help through
-`packages/knowledge`. Build and release tooling covers Windows installers, optional
-Microsoft Store distribution and cross-platform Cloud candidates. Branch-based
+`packages/knowledge`. Build and release tooling uses Windows Store MSIX and macOS/Linux Cloud candidates.
+Store builds offer in-app update checks and user-initiated installation through
+Microsoft Store; Store-managed background delivery remains independent. Branch-based
 beta/stable publication checks complete artifact sets, source checks, signing and
 installed-acceptance configuration; live signing and installed upgrades remain
 release acceptance work. See [release automation](RELEASE-AUTOMATION.md).
@@ -119,6 +139,6 @@ update acceptance remain platform-specific requirements. Real-model quality and
 lesson/routing improvements require matched trials and independent review. Automated
 checks do not establish service delivery or installed-app acceptance.
 
-Remote execution, monetary budgets and team collaboration remain future work. Use
+Remote execution, enforced monetary budgets and team collaboration remain future work. Use
 the [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) for development and redistribution.

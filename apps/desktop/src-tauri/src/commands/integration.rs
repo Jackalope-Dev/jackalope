@@ -894,6 +894,7 @@ fn reachable_run_ids(plans: Vec<IntegrationPlan>, runs: &[TaskRun]) -> Result<Ve
 
 #[tauri::command]
 pub async fn integration_prepare(
+    sessions: State<'_, super::live_sessions::LiveSessions>,
     coordinator: State<'_, super::coordination::Coordinator>,
     state: State<'_, TaskRuntime>,
     run_ids: Vec<String>,
@@ -901,7 +902,9 @@ pub async fn integration_prepare(
 ) -> Result<IntegrationPlan, String> {
     let runtime = state.inner().clone();
     let coordinator = coordinator.inner().clone();
+    let sessions = sessions.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let _sessions = sessions.integration_guard(&run_ids)?;
         coordinator.guarded_integration(&run_ids, |audits| {
             let plan = prepare_with_message(
                 &runtime.integration_directory(),
@@ -926,6 +929,7 @@ pub async fn integration_prepare(
 
 #[tauri::command]
 pub async fn integration_apply(
+    sessions: State<'_, super::live_sessions::LiveSessions>,
     coordinator: State<'_, super::coordination::Coordinator>,
     state: State<'_, TaskRuntime>,
     plan_id: String,
@@ -933,8 +937,11 @@ pub async fn integration_apply(
 ) -> Result<IntegrationPlan, String> {
     let runtime = state.inner().clone();
     let coordinator = coordinator.inner().clone();
+    let sessions = sessions.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let directory = runtime.integration_directory();
+        let ids = load(&directory, &plan_id)?.run_ids;
+        let _sessions = sessions.integration_guard(&ids)?;
         {
             let _guard = execution_guard()?;
             let runs = runtime.integration_runs()?;

@@ -3094,6 +3094,9 @@ dependencies = [
  "tree-sitter-rust",
  "tree-sitter-typescript",
  "uuid",
+ "windows 0.61.3",
+ "windows-collections 0.2.0",
+ "windows-future 0.2.1",
  "windows-sys 0.61.2",
  "zbus 5.19.0",
 ]

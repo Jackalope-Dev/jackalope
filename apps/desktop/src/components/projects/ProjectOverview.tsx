@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Terminal,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { returnToProject } from '../../lib/project-return';
 import { queueSnapshot } from '../../lib/queue';
 import { nativeTask } from '../../lib/task-runtime';
@@ -38,21 +38,27 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
   );
   const runs = useExecutionStore((state) => state.runs);
   const [integrated, setIntegrated] = useState<string[]>([]);
-  const [readiness, setReadiness] = useState<Readiness | null>(null);
+  const [readinessResult, setReadiness] = useState<{ path: string; value: Readiness } | null>(null);
+  const readiness = readinessResult?.path === project?.path ? readinessResult?.value : null;
+  const readinessRequest = useRef(0);
+  const [readinessError, setReadinessError] = useState('');
   const [busyReadiness, setBusyReadiness] = useState(false);
   const [error, setError] = useState('');
   const [savedNotice, setSavedNotice] = useState('');
 
   const fetchReadiness = useCallback(async (path: string) => {
     if (!isTauriEnvironment()) return;
+    const request = ++readinessRequest.current;
     setBusyReadiness(true);
+    setReadiness(null);
+    setReadinessError('');
     try {
       const data = await nativeTask<Readiness>('project_readiness', { path });
-      setReadiness(data);
-    } catch {
-      // Readiness is best-effort for overview cards
+      if (request === readinessRequest.current) setReadiness({ path, value: data });
+    } catch (cause) {
+      if (request === readinessRequest.current) setReadinessError(String(cause));
     } finally {
-      setBusyReadiness(false);
+      if (request === readinessRequest.current) setBusyReadiness(false);
     }
   }, []);
 
@@ -76,6 +82,9 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     if (project?.path) {
       void fetchReadiness(project.path);
     }
+    return () => {
+      readinessRequest.current++;
+    };
   }, [project?.path, fetchReadiness]);
 
   const unfinished = project ? returnToProject(runs, project.id, integrated) : [];
@@ -94,6 +103,20 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
     <WorkspacePage>
       {error && (
         <InlineNotice tone="error">Integration receipts could not be loaded. {error}</InlineNotice>
+      )}
+      {readinessError && (
+        <InlineNotice tone="error">
+          Repository status is unavailable. {readinessError}
+          {project && (
+            <Button
+              variant="outline"
+              disabled={busyReadiness}
+              onClick={() => void fetchReadiness(project.path)}
+            >
+              Retry repository check
+            </Button>
+          )}
+        </InlineNotice>
       )}
 
       {project ? (
@@ -162,7 +185,11 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                   </span>
                 }
                 description={
-                  readiness?.changes ? (
+                  !readiness ? (
+                    <span className="project-stat-desc">
+                      {busyReadiness ? 'Checking repository…' : 'Repository status unavailable'}
+                    </span>
+                  ) : readiness.changes ? (
                     <span className="text-amber-500 font-medium">Uncommitted changes</span>
                   ) : (
                     <span className="project-stat-desc">Working tree clean</span>
@@ -173,7 +200,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 {readiness?.head ? (
                   <span className="font-mono">commit {readiness.head.slice(0, 7)}</span>
                 ) : (
-                  <span>Repository tracked</span>
+                  <span>{readiness ? 'Repository tracked' : 'Status not yet verified'}</span>
                 )}
               </div>
             </Panel>
@@ -198,7 +225,9 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 description={
                   <span className="project-stat-desc">
                     {savedVerify
-                      ? 'Runs after task execution'
+                      ? project.preferences?.autoVerify
+                        ? 'Runs after task execution'
+                        : 'Available for manual checks'
                       : readiness?.verifyCommand
                         ? 'Suggested check available'
                         : 'Set up in project settings'}
@@ -284,15 +313,23 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                 }
                 value={
                   <span className="project-stat-value-text">
-                    {readiness?.dependenciesMissing
-                      ? 'Missing deps'
-                      : readiness?.missingConfiguration?.length
-                        ? 'Missing config'
-                        : 'Environment ready'}
+                    {!readiness
+                      ? busyReadiness
+                        ? 'Checking setup…'
+                        : 'Setup unavailable'
+                      : readiness.dependenciesMissing
+                        ? 'Missing deps'
+                        : readiness?.missingConfiguration?.length
+                          ? 'Missing config'
+                          : 'Setup inspected'}
                   </span>
                 }
                 description={
-                  readiness?.dependenciesMissing ? (
+                  !readiness ? (
+                    <span className="project-stat-desc">
+                      Inspect the workspace before running work
+                    </span>
+                  ) : readiness.dependenciesMissing ? (
                     <span className="text-amber-500 font-medium">node_modules not found</span>
                   ) : readiness?.missingConfiguration?.length ? (
                     <span className="text-amber-500 font-medium">
@@ -300,7 +337,7 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
                       {readiness.missingConfiguration.length > 1 ? 's' : ''}
                     </span>
                   ) : (
-                    <span className="project-stat-desc">Ready for agent execution</span>
+                    <span className="project-stat-desc">No missing setup detected</span>
                   )
                 }
               />

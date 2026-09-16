@@ -51,7 +51,7 @@ gix = { version = "=0.87.1", default-features = false, features = ["sha1", "sha2
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 beta-access = []
-store = ["beta-access"]
+store = ["beta-access", "dep:windows", "dep:windows-future", "dep:windows-collections"]
 
 [dev-dependencies]
 keyring = "=3.6.3"
@@ -60,6 +60,9 @@ keyring = "=3.6.3"
 glib = { path = "../../../patches/glib" }
 
 [target.'cfg(windows)'.dependencies]
+windows = { version = "0.61.3", optional = true, features = ["ApplicationModel", "Services_Store", "Win32_UI_Shell"] }
+windows-collections = { version = "0.2.0", optional = true }
+windows-future = { version = "0.2.1", optional = true }
 tauri-winrt-notification = "0.8.1"
 windows-sys = { version = "0.61", features = ["Win32_Storage_Packaging_Appx", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_Threading"] }
 

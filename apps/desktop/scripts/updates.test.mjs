@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createUpdateStore, UPDATE_INTERVAL } from '../src/stores/updateStore.ts';
+import {
+  availableUpdateId,
+  createUpdateStore,
+  UPDATE_INTERVAL,
+} from '../src/stores/updateStore.ts';
 
 test('switching channels clears a previously offered update and preserves the selected channel for installation', async () => {
   let channel = 'stable',
@@ -176,4 +180,59 @@ test('install sends only the reviewed version, exposes progress, prevents double
   assert.equal(f.store.getState().installing, false);
   assert.equal(f.store.getState().progress, null);
   assert.match(f.store.getState().error, /Signature rejected/);
+});
+
+test('Store checks offer an update without inventing a version and retain native delivery', async () => {
+  let installed;
+  let channels = 0;
+  const release = {
+    currentVersion: '0.1.0',
+    configured: true,
+    storeManaged: true,
+    storeUpdateAvailable: false,
+    availableVersion: null,
+    channel: 'beta',
+    betaAvailable: false,
+    notes: null,
+  };
+  const f = fixture({
+    status: async (check) => ({ ...release, storeUpdateAvailable: check }),
+    setChannel: async () => {
+      channels++;
+    },
+    install: async (version, progress, channel) => {
+      installed = { version, channel };
+      progress({ phase: 'installing', downloaded: 100, total: 100 });
+    },
+  });
+  await f.store.getState().check(true);
+  assert.equal(availableUpdateId(f.store.getState().release), 'store');
+  assert.equal(f.store.getState().release.availableVersion, null);
+  f.store.getState().dismiss();
+  assert.equal(f.store.getState().dismissedVersion, 'store');
+  await f.store.getState().setChannel('stable');
+  assert.equal(channels, 0);
+  await f.store.getState().install();
+  assert.deepEqual(installed, { version: 'store', channel: 'beta' });
+  assert.equal(f.store.getState().installed, true);
+  assert.equal(availableUpdateId(f.store.getState().release), null);
+});
+
+test('Store cancellation leaves the update retryable and never claims completion', async () => {
+  const f = fixture({
+    status: async () => ({
+      configured: true,
+      storeManaged: true,
+      storeUpdateAvailable: true,
+      channel: 'stable',
+    }),
+    install: async () => {
+      throw new Error('Store update was canceled');
+    },
+  });
+  await f.store.getState().check();
+  await f.store.getState().install();
+  assert.equal(f.store.getState().installed, false);
+  assert.equal(availableUpdateId(f.store.getState().release), 'store');
+  assert.match(f.store.getState().error, /canceled/);
 });

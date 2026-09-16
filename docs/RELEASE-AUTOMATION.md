@@ -1,8 +1,9 @@
 # Release automation
 
-This is the maintainer entry point for direct desktop releases. GitHub Actions
-builds and verifies candidates; CrabNebula hosts installers, release history and
-beta/stable update feeds. See [signing setup](CRABNEBULA-RELEASE.md),
+This is the maintainer entry point for desktop releases. Windows uses Microsoft
+Store MSIX; macOS and Linux use CrabNebula installers and update feeds. GitHub Actions
+builds and verifies both delivery paths from the same version and release notes.
+Azure signing is not required for the Store path. See [signing setup](CRABNEBULA-RELEASE.md),
 [installed acceptance](RELEASE.md) and [platform requirements](CROSS-PLATFORM-RELEASES.md).
 These instructions describe the workflow, not live enrollment or release acceptance.
 
@@ -27,9 +28,44 @@ set an appropriate date and `Status: ready`, run `pnpm verify`, then commit and 
 Versioning is explicit; ordinary commits do not silently bump or publish versions.
 Only numeric `major.minor.patch` versions are supported. Beta/stable are separate
 channels, not version suffixes. A new beta iteration needs a higher numeric version;
-the same tested version can subsequently be built for stable.
+the same tested version can subsequently be built for Cloud stable. Store beta
+testers need a higher stable version to move from their installed flight package;
+use a new patch version when promoting tested changes to master.
 
-## Build and release
+## Windows Store releases
+
+Set `RELEASE_DISTRIBUTION=store` and configure Cloud targets to
+`["darwin-aarch64","darwin-x86_64","linux-x86_64"]`. Cloud builds exclude Windows in
+this mode. Existing EXE tooling remains available for separately configured direct
+distribution; it is not needed for Windows Store signing or updates.
+
+**Store release** follows the same ready release-note/root-package pushes as Cloud:
+`beta` selects the tester flight and `master` selects the base Store product. Manual
+runs select rehearsal, candidate or submission; the branch determines the channel.
+Candidate mode builds the real-identity unsigned MSIX and upload archive without
+submitting. Microsoft signs the certified package. Stable approval occurs after
+packaging, in `store-stable`; beta submission uses `store-beta` without a reviewer.
+Neither environment allows feature branches or release tags to access its secrets.
+
+`STORE_SUBMISSION_ENABLED=true` permits submissions after Partner Center setup.
+Before installed acceptance, `STORE_BETA_TEST_ENABLED=true` permits only manual beta
+submissions for the two-version trial. `STORE_ACCEPTED=true` permits stable and
+automatic submission; set it only after installed checks pass. Finally enable
+`STORE_AUTOMATION_ENABLED=true` and clear the temporary beta trial flag. All four
+flags default off. A ready release commit then starts both Store and Cloud workflows.
+Their certification/publication completes independently; this is not an atomic
+cross-platform rollout.
+
+Submission checks the package/archive hashes, exact source/channel, ready notes and
+required source CI checks before reserving `store-beta/vVERSION` or
+`store-stable/vVERSION` and calling Partner Center. Automatic runs skip reserved
+versions. Retained artifacts include `upload.zip`, the MSIX and receipts for 30 days.
+After a failure, rerun only the failed submission job to reuse the original bytes.
+A pending or uncertain Partner Center submission stops retries for inspection;
+never delete it or move a release tag to force a retry. A successful workflow means
+submitted for certification, not yet published. See [Store setup and acceptance](STORE-RELEASE.md).
+
+## Cloud build and release
 
 **Cloud release** runs on release-note/root-package changes pushed to beta or master
 when `CLOUD_RELEASE_ENABLED=true`. Draft notes skip automatic releases. Manual runs
@@ -73,7 +109,7 @@ Keep these repository variables disabled until their prerequisites pass:
 | Variable | Purpose |
 | --- | --- |
 | `RELEASE_DISTRIBUTION=cloud` | Select the Cloud path; legacy R2 workflows require `legacy` and remain disabled |
-| `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the default contains all four matrix targets |
+| `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the Store configuration contains the three Mac/Linux targets |
 | `CLOUD_SIGNING_READY` | Windows Azure signing is configured |
 | `APPLE_SIGNING_READY` | Developer ID signing and notarization are configured |
 | `CLOUD_DRAFT_UPLOAD_ENABLED` | Permit validated candidates to be uploaded |
@@ -120,7 +156,8 @@ pnpm release:setup --apply
 
 The first command audits; `--apply` configures the release branches/protections,
 branch-scoped environments, default-off missing gates and immutable tag rules,
-and disables the two legacy R2 workflows. It creates beta from current remote master
+and disables the two legacy R2 workflows. It selects Store Windows distribution,
+removes Windows from Cloud target/acceptance lists and preserves Unix target choices. It creates beta from current remote master
 only when beta does not exist. Existing enablement flags and secrets are preserved.
 The command does not change visibility, commit code or deploy a release.
 
@@ -136,7 +173,7 @@ to read-only access. Do not give untrusted code access to release environments.
 
 Desktop publication does not deploy the server or automatically advertise unaccepted
 platforms. Keep one deployment controller per Worker; leave optional Actions deployment
-disabled when Cloudflare Git builds own it. Website download variables must identify
-accepted Cloud artifacts; review any Store URL override before changing distribution.
+disabled when Cloudflare Git builds own it. Set `VITE_WINDOWS_STORE_URL` and server `ACCESS_STORE_URL` to the accepted Store
+product link. Website Mac/Linux download variables must identify accepted Cloud artifacts; review any Store URL override before changing distribution.
 The legacy website synchronization script reads the R2 feed and must not be used as
 a Cloud catalog synchronizer. See [server operations](SERVER-LAUNCH.md).

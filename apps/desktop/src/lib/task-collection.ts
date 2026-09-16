@@ -92,7 +92,9 @@ export function collectWorkspaceWork(
               ? 'working'
               : session.closed
                 ? 'finished'
-                : 'review',
+                : work.latest
+                  ? 'review'
+                  : 'ideas',
         run: work.latest,
         session,
         archiveBlocked: 'Chat sessions stay together. Open Chat to finish or resume it.',

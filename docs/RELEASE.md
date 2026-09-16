@@ -6,8 +6,9 @@ failure recovery. Read [STATUS.md](STATUS.md), [TODO.md](TODO.md), and
 [BACKEND.md](BACKEND.md) first.
 
 Use [release automation](RELEASE-AUTOMATION.md) as the entry point for the active
-Cloud beta/stable process and [Cloud signing](CRABNEBULA-RELEASE.md) for Azure/Apple
-setup. The local EXE/MSI and static-manifest commands below describe the retained
+Windows Store and Mac/Linux Cloud beta/stable process. See [Store setup](STORE-RELEASE.md)
+for Windows signing and update acceptance, and [Cloud signing](CRABNEBULA-RELEASE.md)
+for Apple setup and optional direct Windows distribution. The local EXE/MSI and static-manifest commands below describe the retained
 legacy R2 path; do not combine that publisher with Cloud. The installed-app and
 failure-recovery acceptance procedures apply to both paths.
 

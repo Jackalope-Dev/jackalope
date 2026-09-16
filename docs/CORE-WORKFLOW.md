@@ -31,6 +31,13 @@ work rows; command search also finds projects, tasks, sessions and current-task 
 Parallel planning remains inside Inbox with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
+Chat's start page shows loaded work across projects, prioritizing attention and review.
+Its links select the relevant project or open the all-project Inbox. The last task or
+session section persists across navigation. Project setup defaults to project, agent
+and first task; Git behavior and appearance can be customized from the last step.
+Workspace inspection can suggest preparation, checks and preview commands without
+executing them. Failed or pending inspection never establishes a clean checkout.
+
 Task detail keeps the assigned agent, recorded progress and next action together.
 Conversation contains the original request, earlier exchanges, agent response and latest screenshot. Review groups outcomes,
 workspace changes, project checks, agent evidence and integration; Activity keeps
@@ -111,6 +118,12 @@ snapshots, check requirements, conflict handling and receipt recovery. Mark revi
 still only records a review. Merging does not push. Source cleanup follows the merge
 choice and defaults on. Integrated work continues through a new task based on the
 updated target, with the earlier result attached.
+
+Paused Chat sessions use the same integration controls for their latest batch after
+queued messages are run or canceled. Applied receipts block reopening or sending into
+the old workspace. Optional review positions show changes since an explicitly marked
+tree; they never replace whole-result verification or acceptance. Local usefulness
+ratings and optional review minutes feed the Usage report, independently of Git state.
 
 Make recurring opens the existing schedule editor with the task's original intent,
 project and agent. Timing presets supplement custom cron input. New schedules start

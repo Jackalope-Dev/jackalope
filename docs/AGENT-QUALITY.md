@@ -176,3 +176,30 @@ usage. Insufficient or mixed historical evidence is not a learned specialty.
 
 Provider configuration references: [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference)
 and [Claude model effort](https://code.claude.com/docs/en/model-config#adjust-effort-level).
+
+## Daily-use pilot
+
+Use a consenting cohort of ten developers spanning first-time and experienced agent
+users, on their own representative repositories, for at least one normal work week.
+Record the installed build, platform, provider/account configuration and existing
+workflow before beginning. Keep private task content and detailed observations outside
+tracked source. Recruitment, contact and sharing require the participant's consent.
+
+Observe project setup through the first independently judged useful change, a correction
+after failed checks, return to unfinished work, and explicit local integration. Include
+an interrupted attempt and recovery using disposable data. Record completion, detours,
+scope/account mistakes, lost drafts, duplicate execution and unrecovered failures.
+Compare review/correction time and useful finished work with the participant's usual
+workflow on comparable tasks; preserve failures and missing usage, not only successes.
+
+Ask participants to rate results and optionally record review minutes. The local Usage
+report supplies a limited aggregate they can choose to copy; it omits archived/unloaded
+history and does not measure app visits or elapsed setup time. Collect observed first-
+useful timing and voluntary repeat-use days separately. Distinguish testing attendance
+from choosing to use the app again. Report medians, ranges, cohort denominators and
+missing observations alongside user-reported outcomes. Decide acceptance criteria before
+the trial and have someone other than the implementing agent review the outcomes.
+
+Installed reliability, usefulness and retention remain separate acceptance decisions.
+Browser fixtures, provider exits, local ratings or a small pilot alone cannot establish
+production reliability, broad quality gains or platform release acceptance.

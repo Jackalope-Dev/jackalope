@@ -60,6 +60,8 @@ pub struct ContextSelection {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextReceipt {
+    #[serde(default)]
+    pub reasons: std::collections::BTreeMap<String, String>,
     pub entries: Vec<KnowledgeEntry>,
     pub bytes: usize,
 }
@@ -358,6 +360,21 @@ fn select(
                 .take(3)
                 .map(|(_, e)| e),
         );
+    }
+    for entry in &receipt.entries {
+        let reason = if entry.kind == KnowledgeKind::Workflow {
+            "Workflow explicitly selected for this task.".into()
+        } else {
+            let query = words(prompt);
+            let phrases: Vec<_> = entry
+                .keywords
+                .iter()
+                .filter(|phrase| query.contains(&words(phrase)))
+                .cloned()
+                .collect();
+            format!("Request matched: {}.", phrases.join(", "))
+        };
+        receipt.reasons.insert(entry.id.clone(), reason);
     }
     receipt.bytes = receipt.text().len();
     Ok(receipt)

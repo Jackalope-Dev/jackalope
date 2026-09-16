@@ -88,7 +88,10 @@ export function TaskDetail({
   const [acting, setActing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
-  const [tab, setTab] = useState('result');
+  const [tab, setTab] = useState(useWorkViewStore.getState().reading[run.taskId] ?? 'result');
+  useEffect(() => {
+    useWorkViewStore.getState().remember(run.taskId, tab);
+  }, [run.taskId, tab]);
   useEffect(() => {
     if (workRequest?.id !== run.id) return;
     const section = workRequest.section;

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { sessionWork } from '../../lib/live-session';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import type { Project } from '../../stores/projectStore';
+import { DailyWork } from '../tasks/DailyWork';
 import { Button } from '../ui/button';
 import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
@@ -56,6 +57,7 @@ export function LiveSessions({
           ) : (
             <>
               <SessionRecovery />
+              <DailyWork />
               <SessionStart
                 key={`${project?.id}:${fresh}`}
                 project={project}

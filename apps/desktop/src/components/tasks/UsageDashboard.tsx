@@ -26,6 +26,7 @@ import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { AgentMetricsDashboard } from './AgentMetricsDashboard';
 import { CapacityPanel } from './CapacityPanel';
 import { tokenLabel, UsageInsights } from './UsageInsights';
+import { WorkflowReport } from './WorkflowReport';
 export function UsageDashboard({
   view = 'tokens',
   onTask,
@@ -238,6 +239,7 @@ export function UsageDashboard({
         }
       />
 
+      <WorkflowReport />
       {view === 'analytics' ? (
         <>
           {loading && <p role="status">Loading saved task history…</p>}

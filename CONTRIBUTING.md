@@ -71,6 +71,20 @@ pnpm --filter @jackalope/server test
 pnpm test:release
 ```
 
+With the desktop development server running, exercise the project setup and Chat
+review flows in an isolated Edge browser context:
+
+```powershell
+$env:JACKALOPE_PREVIEW_URL = 'http://127.0.0.1:5173'
+node scripts/verification/verify-project-onboarding.mjs
+node scripts/verification/verify-live-session.mjs
+```
+
+These scripts render actual components with explicit native-service fixtures.
+They cover drafts, readiness races, optional setup, review, merge handoffs, limits,
+keyboard access and responsive themes. Screenshots go to ignored `output/playwright/`;
+they do not prove provider execution or installed-app acceptance.
+
 Run the full verification gate before submitting changes:
 
 ```powershell

@@ -987,6 +987,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Try it: improve one empty state',
         paragraphs: [
           'Tasks opens Chat. Send a message to start a conversation, or open Inbox or New task for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
+          'Project setup focuses on choosing a repository, an agent, and a first task. Inspect workspace readiness before starting; suggested commands are not run until you authorize work. Git behavior and project appearance can be customized from the final step.',
+          'Chat offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {
           title: 'Example task brief',
@@ -1013,6 +1015,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Choose Try result after work stops. Detect or enter your project’s local preview command, review it, and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
           'Use the embedded page or open it in your browser. Describe what should change and add it to your follow-up. Capture screenshot and page details opens a fresh browser and lets you attach a screenshot, page element and errors. That fresh capture does not copy the embedded page’s sign-in or unsaved interactions.',
           'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Chat also lets you queue messages or explicitly stop current work and send.',
+          'On Chat’s start page, pick up work waiting across your projects. Session limits can pause later batches after a batch count or an estimated dollar threshold. A running batch can exceed the threshold, and missing cost reports pause further work when a cost limit is set. This is not a provider billing cap.',
         ],
       },
       {
@@ -1038,6 +1041,8 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Open the result and review changes file by file in the unified or side-by-side diff. Compare the patch with your requested outcome, including accidental changes outside the scope.',
           'Read the saved command output and checks. Confirm they ran in the intended checkout and exercised the changed behavior. A successful build does not establish that a browser flow or native application worked.',
           'For worktree tasks, Review & merge prepares the combined patch and checks integration preconditions. Review that combined result before merging it into the target branch.',
+          'Chat uses the same guarded merge path for its latest batch. Pause dispatch and run or cancel queued messages before preparing the merge. After integration, continue in a new chat to work from the updated target branch.',
+          'Changes since my last review compares the current files with a review position you explicitly saved. Marking them seen does not accept changes or replace checks. You can optionally rate usefulness and report review minutes; Usage summarizes these locally and offers an aggregate report to copy.',
         ],
         links: [
           {

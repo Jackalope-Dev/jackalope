@@ -28,6 +28,7 @@ import { ResizeHandles } from '../layout/ResizeHandles';
 import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ProjectGitSettings } from '../projects/ProjectGitSettings';
+import { WorkspaceReadiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
@@ -35,7 +36,7 @@ import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { ProjectThemeStep } from './ProjectThemeStep';
 import './onboarding.css';
 
-const steps: { id: OnboardingStep; label: string }[] = [
+const allSteps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agents' },
   { id: 'behavior', label: 'Behavior' },
@@ -108,6 +109,9 @@ export function OnboardingFlow({
   const tipIndex = useRef(0);
   const desktop = isTauriEnvironment();
   const step = !project ? 'project' : onboarding.step;
+  const steps = allSteps.filter(
+    (item) => step === 'behavior' || step === 'theme' || !['behavior', 'theme'].includes(item.id),
+  );
   const index = steps.findIndex((item) => item.id === step);
   const draft =
     onboarding.firstTask ?? (project ? (execution.drafts[project.id]?.prompt ?? '') : '');
@@ -730,7 +734,7 @@ export function OnboardingFlow({
                         },
                         draft,
                       );
-                      advance(() => onboarding.go('behavior'));
+                      advance(() => onboarding.go('task'));
                     })
                   }
                 >
@@ -795,6 +799,21 @@ export function OnboardingFlow({
           )}
           {step === 'task' && (
             <>
+              {project && (
+                <WorkspaceReadiness
+                  key={project.id}
+                  project={project}
+                  onPreferencesChange={(preferences) =>
+                    onboarding.stageProject(
+                      { ...project, preferences: { ...project.preferences, ...preferences } },
+                      draft,
+                    )
+                  }
+                />
+              )}
+              <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('behavior')}>
+                Customize Git behavior and appearance
+              </Button>
               <div className="flex items-center gap-3 my-4">
                 {runner && <AgentAvatar provider={runnerAdapter} size="sm" />}
                 <div>
@@ -825,7 +844,7 @@ export function OnboardingFlow({
                   disabled={busy}
                   onClick={() => {
                     setThemePreview(undefined);
-                    onboarding.go('theme');
+                    onboarding.go('agent');
                   }}
                 >
                   <ArrowLeft size={16} />

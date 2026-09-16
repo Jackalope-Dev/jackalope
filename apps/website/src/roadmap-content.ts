@@ -30,7 +30,13 @@ export const roadmapStages = [
         title: 'Keep the ideas coming.',
         summary: 'A running conversation with a compact window you can pin.',
         detail:
-          'Open Chat and send a message to start. Sessions name themselves and keep history organized while processing your messages in one isolated workspace. Follow agent results, pause upcoming work, and review a combined patch. Pop the conversation into its own window and pin it above other apps. Drafts and messages persist; sessions pause after restart. Installed-provider and window validation remain in progress. Independent task planning and guarded integration are follow-up work.',
+          'Open Chat and send a message to start. Sessions keep your messages in one isolated workspace. Pause work, review the changes, run checks, and explicitly merge the latest result into your target branch. Queued messages must run or be canceled first. Saved integration receipts prevent work from restarting in the old workspace; continue in a new chat with the result attached. Pop out and pin conversations, preserve drafts, and pause later batches at optional batch or estimated-cost thresholds. Those thresholds are not billing caps. Installed-provider and window validation remain in progress.',
+      },
+      {
+        title: 'A clearer path through daily work.',
+        summary: 'Faster project setup, review checkpoints, and reusable task starters.',
+        detail:
+          'Project setup focuses on a project, an agent, and your first task. Git behavior and appearance remain optional. Chat surfaces work waiting across projects, and results remember the section you were reading. Compare changes since your last review, inspect why lessons were included, and prepare editable issue, PR-feedback, CI-repair, or dependency-update requests. GitHub imports are read-only. Optional local usefulness ratings and review minutes feed a report you can choose to copy. Installed testing and observed daily-use trials remain open.',
       },
       {
         title: 'Your agents. One workspace.',
@@ -79,7 +85,7 @@ export const roadmapStages = [
         title: 'Ready for your everyday machine.',
         summary: 'Installation, updates, and recovery of saved work.',
         detail:
-          'We’re preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Window control includes macOS, Linux X11, and Ubuntu’s GNOME 46 Wayland desktop through an optional extension. Other Wayland desktops remain unsupported. Beta and stable release automation is prepared for testing. Device testing, signed installation, and upgrades still need acceptance; public downloads are not open yet.',
+          'We’re preparing for macOS, Windows, and Linux, with agent detection, browsers, secure account storage, task notifications, and process cleanup ready for native testing. Account connections and settings sync are enabled across platforms. Window control includes macOS, Linux X11, and Ubuntu’s GNOME 46 Wayland desktop through an optional extension. Other Wayland desktops remain unsupported. Beta and stable release automation uses Microsoft Store for Windows and direct downloads for Mac and Linux. In-app Store update controls are prepared for testing. Device testing, signed installation, and upgrades still need acceptance; public downloads are not open yet.',
       },
       {
         title: 'The small things that earn trust.',
@@ -107,16 +113,16 @@ export const roadmapStages = [
           'Gemini CLI, Aider, and Goose execution protocols are on the backlog. Account setup and model discovery do not yet mean those agents can run tasks. We also plan richer questions, permissions, and account controls for supported providers.',
       },
       {
-        title: 'From an issue to a reviewed change.',
-        summary: 'GitHub pull requests, CI checks, and issue intake.',
+        title: 'Carry reviewed work further.',
+        summary: 'Deeper GitHub delivery and opt-in suggestions.',
         detail:
-          'We plan guarded GitHub workflows that bring issues, review, and CI evidence closer to the task. Deeper repository understanding and opt-in proactive proposals should help you choose the next useful action, with approval kept explicit.',
+          'Build on read-only issue, review, and CI imports with guarded publication and review actions. Deeper repository understanding and opt-in proactive proposals should help you choose the next useful action, with destinations and authorization kept explicit.',
       },
       {
         title: 'A clearer picture of your limits.',
         summary: 'Richer usage coverage, measured budgets, and routing guidance.',
         detail:
-          'Build on current capacity-aware routing, Codex/Claude effort requests, and usage attribution with broader provider reporting and monetary budgets. Direct-CLI comparisons and offline routing evaluations are implemented; representative independent review remains open. Reported, estimated, stale, and unavailable usage should remain distinct. Recovery and failover will need clear ownership so unfinished work is never silently replayed.',
+          'Build on current capacity-aware routing, session pause thresholds, Codex/Claude effort requests, and usage attribution with broader provider reporting and enforced monetary budgets. Direct-CLI comparisons and offline routing evaluations are implemented; representative independent review remains open. Reported, estimated, stale, and unavailable usage should remain distinct. Recovery and failover will need clear ownership so unfinished work is never silently replayed.',
       },
     ],
   },

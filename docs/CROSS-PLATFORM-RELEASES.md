@@ -12,7 +12,9 @@ The [release workflow](RELEASE-AUTOMATION.md) checks the complete target set bef
 publishing a channel, with signing, source-check and installed-acceptance gates.
 Native signed builds and installed upgrades still need platform acceptance.
 The [Store path](STORE-RELEASE.md) provides
-separate MSIX packaging and submission as an optional additional channel.
+MSIX packaging, branch-based submission and Store-backed in-app update controls
+as the primary Windows channel. Cloud targets are macOS and Linux; direct EXE
+distribution is optional and requires separate publisher signing.
 
 Accept the exact candidate's clean installation, real execution, account lifecycle,
 saved-data recovery and older-to-newer update before distribution. An MSIX build

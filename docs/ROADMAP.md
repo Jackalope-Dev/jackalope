@@ -34,7 +34,17 @@ Live sessions start from a message in Chat, name themselves and group
 history automatically. They capture messages during execution and process ordered
 batches in a shared isolated worktree. A compact detachable window, always-on-top
 pin, persistent drafts, agent results and cumulative patch exports are implemented. Sessions pause
-after restart; installed acceptance and independent task planning remain open.
+after restart. Paused sessions use guarded review, verification, merge and cleanup;
+applied receipts prevent further dispatch into the integrated workspace. A new chat can
+carry forward the result. Optional batch and estimated-cost thresholds pause later work;
+they cannot cap provider billing. Installed acceptance and independent task planning remain open.
+
+Three default project-setup steps, optional Git/appearance settings, cross-project
+attention on Chat, remembered task sections and changes since the last review are implemented.
+Issue, PR-feedback, CI-repair and dependency-update starters prepare editable requests;
+GitHub evidence is read-only. Lesson receipts explain selection, and optional local
+usefulness ratings and review minutes feed a report with explicit history coverage.
+Real daily-use and quality improvements still require observed trials.
 
 Optional local-agent setup includes hardware guidance, download choices and a real
 file/session check before connecting OpenCode to Ollama. Model-free help retrieval
@@ -92,15 +102,16 @@ hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11
 window-control helpers and a GNOME 46 Wayland extension are implemented for validation.
 Installed acceptance remains in progress. Cross-platform signing and branch-based
-release automation are implemented for validation; live signing, publication and
+release automation use Windows Store and Mac/Linux Cloud candidates. In-app Store
+update checks and installation are implemented for validation; live signing, publication and
 installed upgrades remain acceptance work,
 with Ubuntu 24.04/GNOME 46 the first Wayland acceptance target and X11 compatibility
 retained. Other compositors and GNOME versions remain unsupported.
 
 ## Up next: broader workflows
 
-Extend agent execution support, GitHub issue/review/CI integration, repository
-understanding and usage reporting. Develop measured budgets and inspectable
+Extend agent execution support, explicitly authorized GitHub publication and review
+actions, repository understanding and usage reporting. Develop enforced monetary budgets and inspectable
 routing guidance. Proactive proposals require opt-in scope, bounded cost and
 explicit approval. Recovery must preserve ownership and never silently replay
 unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).

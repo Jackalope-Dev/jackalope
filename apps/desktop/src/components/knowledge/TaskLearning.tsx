@@ -42,6 +42,13 @@ export function TaskLearning({ run, allowSave = false }: { run: TaskRun; allowSa
                 {entry.title} · Revision {entry.revision}
               </h3>
               <p className="whitespace-pre-wrap break-words mt-2">{entry.content}</p>
+              {context.reasons?.[entry.id] && (
+                <p className="task-muted">{context.reasons[entry.id]}</p>
+              )}
+              <p className="task-muted">
+                Saved {new Date(entry.updatedAt).toLocaleDateString()}
+                {entry.sourceHead ? ` · repository ${entry.sourceHead.slice(0, 8)}` : ''}
+              </p>
             </div>
           ))}
         </section>

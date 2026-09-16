@@ -7,7 +7,9 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { CrossModelReviewPanel } from './CrossModelReviewPanel';
 import { PatchPreview } from './PatchPreview';
 import { ProjectVerification } from './ProjectVerification';
+import { ReviewProgress } from './ReviewProgress';
 import { TaskImpact } from './TaskImpact';
+import { TaskUsefulness } from './TaskUsefulness';
 
 export function ResultReview({
   run,
@@ -71,6 +73,7 @@ export function ResultReview({
       )}
       {review && (
         <div className="mt-4">
+          <ReviewProgress key={`progress:${run.id}`} runId={run.id} />
           <p className="task-muted text-xs mb-4">{review.note}</p>
           {review.files.length ? (
             <ul className="task-files">
@@ -95,6 +98,7 @@ export function ResultReview({
             <CrossModelReviewPanel run={run} files={review.files} diff={review.diff} />
           )}
           {review.diff && <PatchPreview key={review.diff} patch={review.diff} />}
+          <TaskUsefulness key={`usefulness:${run.id}`} runId={run.id} />
         </div>
       )}
     </div>

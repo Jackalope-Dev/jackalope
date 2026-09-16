@@ -29,11 +29,28 @@ Never edit the session journal while its profile is running. Reload saved sessio
 after resolving a storage error; failed loads preserve the original file.
 
 Review and preview pause dispatch. A running preview holds further writes to its
-workspace. **Changes** exports a cumulative binary-capable patch from the original
+workspace. **Review** exports a cumulative binary-capable patch from the original
 base without committing or changing the index. A check applies only to the exact
-exported tree. The workspace and saved patch remain available for review and manual
-integration. Live sessions currently serialize batches; independent native task
-planning and automatic integration are not part of this flow.
+exported tree. Run or cancel queued messages before preparing a merge. The latest
+batch uses the same source/target snapshots, verification requirements and explicit
+merge/cleanup controls as isolated tasks. The session gate encloses coordinator →
+execution guard → runtime locking so a new batch cannot race integration. Applied
+native receipts close the session for execution, including after restart. Continue
+in a new chat to prepare the next change; existing drafts are preserved.
+
+**Changes since my last review** compares the current tree to an explicitly saved
+review position. Marking changes seen does not accept them or replace checks. Files
+changed since the displayed snapshot cannot be marked seen without refreshing.
+If Git has removed the earlier snapshot, the view falls back to all current changes.
+
+Before sending a new chat, optional workflow starters prepare editable issue, PR-review,
+CI-repair or dependency-update requests. GitHub CLI reads use the selected repository;
+imported evidence is bounded and labeled when incomplete. No remote write is performed.
+Optional session limits cap the number of batches or pause at a reported cost estimate.
+They only block the next batch; a running batch can exceed the threshold. Missing cost
+for any batch or routing work pauses further dispatch when a cost threshold is set.
+Changing limits does not resume work. Live sessions still serialize batches;
+independent native task planning and automatic integration are separate capabilities.
 
 ### Parallel task queues
 
