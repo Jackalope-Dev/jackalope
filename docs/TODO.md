@@ -55,6 +55,8 @@ release dates.
 - [ ] Validate [local setup](LOCAL-AI.md) with real models in the packaged app:
   hardware/memory requirements, current installers, download cancellation/resume,
   account selection and continued tasks. Check macOS/Linux and enterprise configuration.
+  Include optional title-model memory pressure and quality, warm-helper cancellation,
+  idle cleanup, account/configuration changes and matched cold/warm latency.
 - [ ] Measure documentation round trips, provider tokens and routing quality on matched
   tasks after context/prompt changes. Keep all eligible models and quality-first selection.
 

@@ -39,6 +39,10 @@ can still incur substantial DOM/layout work.
 - Output readers release the runtime lock while waiting for disk writes. Admission
   barriers wait for queued writes and reject unsaved history. Questions, lifecycle
   transitions and integration still use synchronous durable checkpoints.
+- Streaming saves project only adapter output and verification progress fields;
+  they do not clone or serialize immutable task context on each event. A failed
+  checkpoint forces the next save to retry the complete record. Size limits,
+  ordered acknowledgments and full snapshots at checkpoints remain enforced.
 - Recovery retains complete journal entries before a damaged tail and preserves
   the original damaged file. It never silently replays a task. Legacy snapshots,
   archive retention, recovery exports and failed-save warnings remain supported.

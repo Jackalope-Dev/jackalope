@@ -126,6 +126,7 @@ impl TaskRuntime {
     }
 
     pub fn stop_all(&self) {
+        self.warm_helpers.clear();
         let ids: Vec<_> = self
             .inner
             .lock()
@@ -186,7 +187,9 @@ impl TaskRuntime {
         previous: Option<TaskRun>,
     ) -> Result<(), String> {
         self.stage(id, Some("preparation"));
-        self.prepare_workspace(id, req, previous.clone())?;
+        self.timed(id, "workspace", || {
+            self.prepare_workspace(id, req, previous.clone())
+        })?;
         self.update(id, |run| run.progress = None);
         let mut request = req.clone();
         let mut resume = previous;
@@ -207,7 +210,7 @@ impl TaskRuntime {
                         1,
                     ))
                 });
-                self.route(&mut request)?;
+                self.timed(id, "routing", || self.route(&mut request))?;
             }
             self.stage(id, Some("execution"));
             self.update(id, |run| {
@@ -562,6 +565,7 @@ impl TaskRuntime {
         // this project, then this task. Every model call re-sends the whole prefix, so the
         // invariant part stays byte-identical across tasks and the task itself reads last.
         let mut input = String::from("Jackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n");
+        input.push_str(super::efficiency::INSTRUCTIONS);
         let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
         input.push_str(super::delegation::INSTRUCTIONS);
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
@@ -570,12 +574,19 @@ impl TaskRuntime {
             // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
             // run with and without it is otherwise identical and the difference is measurable.
             if !std::env::var("JACKALOPE_REPO_MAP").is_ok_and(|value| value == "off") {
-                if let Some(map) = crate::commands::codebase::map::task_map(
+                let started = std::time::Instant::now();
+                let map = crate::commands::codebase::map::prepare_task_map(
                     Path::new(&workspace),
                     &req.prompt,
                     &self.recent_touched_paths(&req),
                     crate::commands::codebase::map::DEFAULT_BUDGET,
-                ) {
+                );
+                self.update_checked(id, |run| {
+                    run.efficiency.timing("repositoryMap", started.elapsed());
+                    run.efficiency.repository_map_cache_hits +=
+                        u64::from(map.as_ref().is_some_and(|(_, hit)| *hit));
+                })?;
+                if let Some((map, _)) = map {
                     input.push_str(&map);
                 }
             }
@@ -677,7 +688,10 @@ impl TaskRuntime {
                     .into(),
             );
         }
-        let (mut child, spawn_attempts) = spawn_agent(&mut cmd, &req.agent)?;
+        let launched = std::time::Instant::now();
+        let spawned = spawn_agent(&mut cmd, &req.agent);
+        let spawn_elapsed = launched.elapsed();
+        let (mut child, spawn_attempts) = spawned?;
         let tree = match crate::commands::process_control::ProcessTree::attach(&child) {
             Ok(tree) => tree,
             Err(error) => {
@@ -693,6 +707,7 @@ impl TaskRuntime {
         inner.processes.insert(id.into(), process.clone());
         drop(inner);
         self.update_checked(id, |r| {
+            r.efficiency.timing("processSpawn", spawn_elapsed);
             r.process_contained = cfg!(windows);
             if r.status == "starting" {
                 r.status = "running".into();
@@ -740,8 +755,15 @@ impl TaskRuntime {
                             *reader_probe.lock().unwrap() = (update["active"] == true)
                                 .then(|| (std::time::Instant::now(), update["afterTurn"] == true));
                         } else {
-                            let _ =
-                                runtime.update_output(&event_id, |run| kimi::consume(run, update));
+                            let _ = runtime.update_output(&event_id, |run| {
+                                if matches!(
+                                    update["sessionUpdate"].as_str(),
+                                    Some("agent_message_chunk" | "tool_call")
+                                ) {
+                                    run.efficiency.first_activity(launched.elapsed());
+                                }
+                                kimi::consume(run, update);
+                            });
                         }
                     },
                     |params| kimi::permission(&runtime, &event_id, params),
@@ -760,6 +782,9 @@ impl TaskRuntime {
                 1_000_000,
                 |line, truncated| {
                     let _ = runtime.update_output(&event_id, |r| {
+                    if !truncated && super::efficiency::useful_event(&line, &output_adapter) {
+                        r.efficiency.first_activity(launched.elapsed());
+                    }
                     if truncated {
                         activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
                         if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }

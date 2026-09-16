@@ -1,5 +1,18 @@
 [
   {
+    "id": "less-repeated-work-between-request-and-result",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Less repeated work between request and result",
+    "description": "Task startup, repository context, and durable output handling now do less repeated work, with more detailed performance measurements.",
+    "items": [
+      "Account checks can run concurrently, and equivalent agent/model choices can skip an unnecessary routing call.",
+      "Repository maps include symbol locations and related tests; required verification remains part of task guidance.",
+      "Local setup offers a separately checked title model, and managed local helpers can reuse short-lived authenticated servers."
+    ],
+    "note": "Implemented in source. Installed performance and representative model-quality acceptance remain in progress."
+  },
+  {
     "id": "jev-fallback-preference",
     "date": "2026-09-16",
     "status": "In development",

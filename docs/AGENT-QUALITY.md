@@ -30,6 +30,15 @@ provider's own GUI.
 - Routing receives the task, outcome contract and selected knowledge without the
   worker's bridge protocol manual. Different agents/models still use the existing
   validated router; unknown defaults are not assumed equivalent.
+- Workers batch independent reads/searches where supported, reuse established
+  context and keep progress concise. Repository-required checks remain mandatory;
+  changes, failures and unresolved concerns justify additional verification.
+- Repository maps rank file paths and bounded Tree-sitter declarations, include
+  related test names and task-referenced file locations, and remain limited to
+  6 KB. Cached lines are advisory and must be verified before edits. Scans share
+  a lock per repository/commit, allowing unrelated repositories to scan independently.
+  Account capacity reads share in-flight refreshes and use at most four concurrent
+  reads, preserving candidate order and final policy/quota reservation checks.
 - `computer_verify` omits recognized passing-test lines only from long successful
   responses, preserving diagnostics and stderr. Failed output remains intact within
   the existing capture limit. `verification_output` (HTTP `/v1/computer/output`)
@@ -79,6 +88,15 @@ and divide by oracle successes. Cached input is reported separately and must not
 added to input again. These tokens are not a subscription-quota or dollar estimate.
 The elapsed and reported-token limits are cancellation controls, not hard spending
 caps. Human acceptance and review time remain unmeasured.
+
+Summaries include elapsed p50/p95, measurement coverage and total milliseconds per
+oracle success, retaining failures in the numerator. Native receipts additionally
+record workspace preparation, routing, capacity, repository-map and process-spawn
+durations, the first useful worker event after process launch, avoided routing
+calls, map cache hits and reused helper servers. Timings can overlap (capacity is
+inside routing); do not sum them into end-to-end time. Missing phases and older
+records remain unknown rather than zero. Small fixture samples do not establish
+production tail latency or unchanged quality on real projects.
 
 
 ## Effort, direct harness comparisons and routing evidence

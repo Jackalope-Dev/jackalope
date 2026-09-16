@@ -108,6 +108,39 @@ test('quality totals include failed attempts and keep missing usage unknown', ()
   );
 });
 
+test('quality latency includes failures and reports partial measurements without inventing zeros', () => {
+  const summary = qualitySummary([
+    {
+      variant: 'after',
+      oraclePassed: true,
+      elapsedMs: 100,
+      efficiency: { firstActivityMs: 10, timings: { capacity: { totalMs: 5 } } },
+    },
+    {
+      variant: 'after',
+      oraclePassed: false,
+      elapsedMs: 300,
+      efficiency: { firstActivityMs: 30, timings: { capacity: { totalMs: 15 } } },
+    },
+    { variant: 'after', oraclePassed: true, elapsedMs: null },
+  ]).after;
+  assert.deepEqual(summary.elapsedMs, { coverage: 2, total: null, p50: 100, p95: 300 });
+  assert.equal(summary.msPerOracleSuccess, null);
+  assert.deepEqual(summary.firstActivityMs, { coverage: 2, total: null, p50: 10, p95: 30 });
+  assert.deepEqual(summary.timings.capacity, { coverage: 2, total: null, p50: 5, p95: 15 });
+  const complete = qualitySummary([
+    { variant: 'after', oraclePassed: true, elapsedMs: 100 },
+    { variant: 'after', oraclePassed: false, elapsedMs: 300 },
+  ]).after;
+  assert.equal(complete.msPerOracleSuccess, 400);
+  assert.deepEqual(qualitySummary([]).after.elapsedMs, {
+    coverage: 0,
+    total: null,
+    p50: null,
+    p95: null,
+  });
+});
+
 test('quality oracles reject initial defects, accept solutions, and detect unrelated edits', () => {
   for (const fixture of qualityCases) {
     const root = mkdtempSync(path.join(tmpdir(), 'jackalope-quality-oracle-'));

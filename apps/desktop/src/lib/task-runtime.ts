@@ -24,6 +24,11 @@ export interface TaskRun {
   effort?: import('./task-effort').TaskEffort | null;
   reasoningEffort?: string | null;
   efficiency?: {
+    timings?: Record<string, { calls: number; totalMs: number; maxMs: number }>;
+    firstActivityMs?: number | null;
+    routingCallsAvoided?: number;
+    warmProviderHits?: number;
+    repositoryMapCacheHits?: number;
     toolCalls?: Record<string, number>;
     toolObservationsTruncated?: boolean;
     launchPromptBytes: number;

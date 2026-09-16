@@ -65,6 +65,12 @@ Optional local-agent setup includes hardware guidance, download choices and a re
 file/session check before connecting OpenCode to Ollama. Model-free help retrieval
 and compact routing inputs preserve all eligible choices. See [local AI](LOCAL-AI.md)
 for setup and context-selection behavior; real-model and installed acceptance remain open.
+Optional installed title models have separate checks. Managed local helpers can
+reuse bounded authenticated servers; worker task credentials remain isolated.
+Concurrent capacity reads, equivalent-model account selection, symbol-aware
+repository maps and lighter durable output saves reduce repeated setup work.
+Latency receipts preserve failures and missing measurements; installed performance
+and representative quality acceptance remain in progress.
 
 Kimi Code joins the native adapters with accounts, models, permissions, structured
 questions, continuation, task tokens, membership capacity, routing and Ask Jackalope.

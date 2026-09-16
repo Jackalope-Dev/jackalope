@@ -96,7 +96,8 @@ struct Cached {
     snapshot: Arc<CodebaseSnapshot>,
 }
 
-static CACHE: OnceLock<Mutex<HashMap<String, Cached>>> = OnceLock::new();
+type Entry = Arc<Mutex<Option<Cached>>>;
+static CACHE: OnceLock<Mutex<HashMap<String, Entry>>> = OnceLock::new();
 
 /// Identifies the content a scan would see, so unrelated checkouts stay separate but every
 /// worktree of one repository at one commit shares a single scan.
@@ -105,8 +106,8 @@ static CACHE: OnceLock<Mutex<HashMap<String, Cached>>> = OnceLock::new();
 /// pay for a full scan of a tree that was already analyzed. `--git-common-dir` is shared by a
 /// repository and all of its worktrees, and `HEAD` distinguishes the commits they sit on;
 /// together they identify the tracked content. Uncommitted edits are not in the key: the map
-/// is file names and imports offered as a starting point, so a file added since the commit is
-/// a miss the worker resolves by searching, not a wrong answer. A checkout that is not a
+/// offers paths, declarations and imports as hints to verify, so a file added since the commit
+/// is a miss the worker resolves by searching. A checkout that is not a
 /// repository falls back to its own path.
 fn fingerprint(root: &Path) -> String {
     let git = |args: &[&str]| -> Option<String> {
@@ -132,36 +133,42 @@ fn fingerprint(root: &Path) -> String {
     }
 }
 
-/// Scans `root`, reusing a recent snapshot when one is cached. The scan runs inside the
-/// cache lock so a second launch waits for the first result rather than repeating the work.
+#[cfg(test)]
 fn snapshot(root: &Path) -> Option<Arc<CodebaseSnapshot>> {
-    let key = fingerprint(root);
-    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    cached_snapshot(root).map(|(snapshot, _)| snapshot)
+}
+
+fn cache_entry(cache: &Mutex<HashMap<String, Entry>>, key: String) -> Option<Entry> {
     let mut guard = cache.lock().ok()?;
     if let Some(entry) = guard.get(&key) {
+        return Some(entry.clone());
+    }
+    if guard.len() >= CACHE_ENTRIES {
+        guard.retain(|_, entry| Arc::strong_count(entry) > 1);
+    }
+    let entry = Arc::new(Mutex::new(None));
+    if guard.len() < CACHE_ENTRIES {
+        guard.insert(key, entry.clone());
+    }
+    Some(entry)
+}
+
+fn cached_snapshot(root: &Path) -> Option<(Arc<CodebaseSnapshot>, bool)> {
+    let key = fingerprint(root);
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let entry = cache_entry(cache, key)?;
+    let mut guard = entry.lock().ok()?;
+    if let Some(entry) = guard.as_ref() {
         if entry.at.elapsed() < CACHE_TTL {
-            return Some(entry.snapshot.clone());
+            return Some((entry.snapshot.clone(), true));
         }
     }
     let fresh = Arc::new(scan(root).ok()?);
-    guard.retain(|_, entry| entry.at.elapsed() < CACHE_TTL);
-    if guard.len() >= CACHE_ENTRIES {
-        if let Some(oldest) = guard
-            .iter()
-            .min_by_key(|(_, entry)| entry.at)
-            .map(|(key, _)| key.clone())
-        {
-            guard.remove(&oldest);
-        }
-    }
-    guard.insert(
-        key,
-        Cached {
-            at: Instant::now(),
-            snapshot: fresh.clone(),
-        },
-    );
-    Some(fresh)
+    *guard = Some(Cached {
+        at: Instant::now(),
+        snapshot: fresh.clone(),
+    });
+    Some((fresh, false))
 }
 
 /// Splits an identifier into lowercase words across camelCase, kebab-case and snake_case.
@@ -246,17 +253,22 @@ fn shape(snapshot: &CodebaseSnapshot) -> String {
 }
 
 /// Builds the map text, or `None` when the scan fails or nothing in the tree matches.
-pub(crate) fn task_map(
+#[cfg(test)]
+fn task_map(root: &Path, task: &str, recent_paths: &[String], budget: usize) -> Option<String> {
+    prepare_task_map(root, task, recent_paths, budget).map(|(text, _)| text)
+}
+
+pub(crate) fn prepare_task_map(
     root: &Path,
     task: &str,
     recent_paths: &[String],
     budget: usize,
-) -> Option<String> {
+) -> Option<(String, bool)> {
     let keys = keywords(task);
     if keys.is_empty() {
         return None;
     }
-    let snapshot = snapshot(root)?;
+    let (snapshot, cache_hit) = cached_snapshot(root)?;
     let recent: BTreeSet<String> = recent_paths.iter().cloned().collect();
 
     let mut imports: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
@@ -271,7 +283,19 @@ pub(crate) fn task_map(
     let mut ranked: Vec<(u32, &str)> = snapshot
         .files
         .iter()
-        .map(|file| (score(&file.path, &keys, &recent), file.path.as_str()))
+        .map(|file| {
+            let symbol_score = file
+                .symbols
+                .iter()
+                .map(|symbol| score(&symbol.name, &keys, &BTreeSet::new()))
+                .max()
+                .unwrap_or(0);
+            let explicit = task.contains(&file.path);
+            (
+                score(&file.path, &keys, &recent) + symbol_score * 2 + u32::from(explicit) * 100,
+                file.path.as_str(),
+            )
+        })
         .filter(|(total, _)| *total > 0)
         .collect();
     if ranked.is_empty() {
@@ -284,6 +308,31 @@ pub(crate) fn task_map(
     for (_, path) in ranked.iter().take(SEEDS) {
         if seen.insert(path) {
             selected.push(path);
+        }
+    }
+    let stems: BTreeSet<_> = selected
+        .iter()
+        .filter_map(|path| {
+            Path::new(path)
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .map(str::to_owned)
+        })
+        .collect();
+    for file in &snapshot.files {
+        let name = Path::new(&file.path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        let test = name.contains(".test.") || name.contains(".spec.") || name.ends_with("_test.rs");
+        if test
+            && stems.iter().any(|stem| {
+                name.starts_with(&format!("{stem}.")) || name == format!("{stem}_test.rs")
+            })
+            && selected.len() < MAX_ENTRIES
+            && seen.insert(&file.path)
+        {
+            selected.push(&file.path);
         }
     }
     // One hop through the resolved import graph: the files a likely match reaches, and the
@@ -327,7 +376,7 @@ pub(crate) fn task_map(
         .collect();
 
     let mut text = format!(
-        "\n\nJackalope repository map. Static analysis of this workspace, not a model summary: file names and resolved imports only. It is a starting point, not a complete or authoritative list. Read a file before changing it, and search normally for anything absent.\nProject areas by file count: {}.\nFiles related to this task:\n",
+        "\n\nJackalope repository map. Static file names, declarations, related tests and resolved imports. Cached line numbers may drift with local edits. This is a starting point, not a complete or authoritative list. Read a file before changing it, and search normally for anything absent.\nProject areas by file count: {}.\nFiles related to this task:\n",
         shape(&snapshot)
     );
     let mut rendered = 0;
@@ -340,6 +389,31 @@ pub(crate) fn task_map(
             }
         }
         entry.push('\n');
+        if let Some(file) = snapshot.files.iter().find(|file| &file.path == path) {
+            let mut symbols: Vec<_> = file.symbols.iter().collect();
+            symbols.sort_by_key(|symbol| {
+                std::cmp::Reverse(score(&symbol.name, &keys, &BTreeSet::new()))
+            });
+            for symbol in symbols.into_iter().take(3) {
+                entry.push_str(&format!(
+                    "  {} {}:{}\n",
+                    symbol.kind, symbol.name, symbol.line
+                ));
+            }
+            let prefix = format!("{path}:");
+            if let Some((_, rest)) = task.split_once(&prefix) {
+                let number: String = rest
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .take(9)
+                    .collect();
+                if let Ok(line) = number.parse::<usize>() {
+                    if line > 0 && file.lines.is_some_and(|count| line <= count) {
+                        entry.push_str(&format!("  task references {path}:{line}\n"));
+                    }
+                }
+            }
+        }
         for (label, edges) in [
             ("imports", imports.get(path)),
             ("used by", used_by.get(path)),
@@ -368,18 +442,57 @@ pub(crate) fn task_map(
         return None;
     }
     if rendered < selected.len() {
-        text.push_str(&format!(
+        let omitted = format!(
             "\n{} further related files were omitted to keep this map small.\n",
             selected.len() - rendered
-        ));
+        );
+        if text.len() + omitted.len() <= budget {
+            text.push_str(&omitted);
+        }
     }
-    Some(text)
+    Some((text, cache_hit))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn independent_repository_locks_do_not_block_each_other() {
+        let cache = Mutex::new(HashMap::new());
+        let a = cache_entry(&cache, "a".into()).unwrap();
+        let held = a.lock().unwrap();
+        let b = cache_entry(&cache, "b".into()).unwrap();
+        assert!(b.try_lock().is_ok());
+        assert!(Arc::ptr_eq(&a, &cache_entry(&cache, "a".into()).unwrap()));
+        drop(held);
+    }
+
+    #[test]
+    fn symbols_find_opaque_files_and_include_tests_and_error_locations() {
+        let f = Fixture::new();
+        f.write(
+            "src/a.ts",
+            "export function computeInvoice() {}\nexport const unrelated = 1;\n",
+        );
+        f.write("src/a.test.ts", "test('invoice', () => {});");
+        let map = task_map(
+            &f.0,
+            "Fix computeInvoice at src/a.ts:2",
+            &[],
+            DEFAULT_BUDGET,
+        )
+        .unwrap();
+        assert!(map.contains("function computeInvoice:1"), "{map}");
+        assert!(map.contains("src/a.test.ts"), "{map}");
+        assert!(map.contains("task references src/a.ts:2"), "{map}");
+        for budget in [1, 350, 450, 500, 650, 800, 1000, DEFAULT_BUDGET] {
+            assert!(
+                task_map(&f.0, "computeInvoice", &[], budget).is_none_or(|map| map.len() <= budget)
+            );
+        }
+    }
 
     #[test]
     fn splits_identifiers_and_drops_template_headings() {

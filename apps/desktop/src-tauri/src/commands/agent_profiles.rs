@@ -368,7 +368,7 @@ pub fn apply_binding(
         ] {
             command.env(name, binding.directory.join(folder));
         }
-        if let Some(model) = local_model(binding)? {
+        if let Some(verification) = local_verification(binding)? {
             let mut configuration = command
                 .get_envs()
                 .find(|(name, _)| *name == "OPENCODE_CONFIG_CONTENT")
@@ -381,7 +381,7 @@ pub fn apply_binding(
             if !configuration.is_object() {
                 return Err("Invalid OpenCode process configuration.".into());
             }
-            for (key, value) in super::local_ai::config(&model)
+            for (key, value) in super::local_ai::verified_config(&verification)
                 .as_object()
                 .ok_or("Invalid local configuration")?
             {
@@ -408,6 +408,12 @@ pub fn apply_binding(
 }
 
 pub(in crate::commands) fn local_model(binding: &AccountBinding) -> Result<Option<String>, String> {
+    local_verification(binding).map(|verification| verification.map(|verified| verified.model))
+}
+
+fn local_verification(
+    binding: &AccountBinding,
+) -> Result<Option<super::local_ai::Verification>, String> {
     if binding.adapter != "opencode" || binding.profile_id.is_none() {
         return Ok(None);
     }
@@ -418,7 +424,7 @@ pub(in crate::commands) fn local_model(binding: &AccountBinding) -> Result<Optio
     let verification: super::local_ai::Verification =
         serde_json::from_slice(&super::history::read_bounded(&path, 4096)?)
             .map_err(|_| "Local model settings are unreadable. Run local setup again.")?;
-    Ok(Some(verification.model))
+    Ok(Some(verification))
 }
 
 pub(in crate::commands) fn create_local(
@@ -444,7 +450,7 @@ pub(in crate::commands) fn create_local(
     fs::create_dir_all(directory.join("config/opencode")).map_err(|e| e.to_string())?;
     super::history::write_atomic(
         &directory.join("config/opencode/opencode.json"),
-        &serde_json::to_vec_pretty(&super::local_ai::config(&verification.model))
+        &serde_json::to_vec_pretty(&super::local_ai::verified_config(verification))
             .map_err(|e| e.to_string())?,
     )?;
     super::history::write_atomic(
@@ -806,6 +812,7 @@ mod tests {
     fn local_profiles_preserve_other_accounts_and_process_permissions() {
         let root = temp_root();
         let verification = super::super::local_ai::Verification {
+            helper: None,
             model: "qwen3.5:4b".into(),
             digest: "base".into(),
             inference_digest: "prepared".into(),

@@ -21,6 +21,7 @@ mod storage;
 #[cfg(test)]
 mod tests;
 pub(super) mod timing;
+mod warm_opencode;
 
 pub(super) use events::consume_adapter_event;
 use events::*;
@@ -64,6 +65,7 @@ pub struct TaskRuntime {
     directory: PathBuf,
     // Drop joins the writer before releasing the profile lock below.
     writer: journal::Writer,
+    warm_helpers: Arc<warm_opencode::Pool>,
     _owner: Arc<super::file_lock::FileLock>,
 }
 

@@ -25,10 +25,14 @@ pub(crate) struct Preferences {
 
 impl Preferences {
     pub fn effective_fallback(&self, project: Option<&str>) -> JevFallback {
-        project
-            .and_then(|id| self.project_jev_fallbacks.get(id))
-            .copied()
-            .unwrap_or(self.jev_fallback)
+        match project {
+            Some(id) if self.project_modes.contains_key(id) => self
+                .project_jev_fallbacks
+                .get(id)
+                .copied()
+                .unwrap_or_default(),
+            _ => self.jev_fallback,
+        }
     }
 
     pub fn effective(&self, project: Option<&str>) -> DecisionMode {
@@ -118,6 +122,20 @@ pub(crate) fn check_revision(value: &Preferences, expected: u64) -> Result<(), S
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_project_overrides_never_inherit_a_new_paid_fallback() {
+        let mut value: Preferences =
+            serde_json::from_str(r#"{"mode":"jev","project_modes":{"existing":"jev"}}"#).unwrap();
+        value
+            .set_mode(None, Some(DecisionMode::Jev), Some(JevFallback::Agent))
+            .unwrap();
+        assert_eq!(
+            value.effective_fallback(Some("existing")),
+            JevFallback::Local
+        );
+        assert_eq!(value.effective_fallback(Some("new")), JevFallback::Agent);
+    }
+
     #[test]
     fn project_fallback_is_pinned_with_its_method_and_reset_with_inheritance() {
         let mut value = Preferences::default();

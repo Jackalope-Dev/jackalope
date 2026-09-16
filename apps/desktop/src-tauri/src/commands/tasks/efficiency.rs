@@ -1,8 +1,79 @@
 use serde::{Deserialize, Serialize};
 
+pub(super) const INSTRUCTIONS: &str = "\nWork efficiently while preserving correctness: batch independent file reads and searches when the available tools support it; keep dependent operations ordered. Start with the supplied repository map and concrete file, symbol or error references, then broaden the search when evidence requires it. Reuse facts already established in this task and avoid repeating broad repository exploration. Keep progress updates concise. Run the checks required by repository instructions and use Jackalope verification tools when available so their results are saved. After checks pass, repeat or broaden them when subsequent changes, failures or unresolved concerns warrant it. Never trade away required verification or hide uncertainty to finish faster.\n";
+
+pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
+    let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
+        return false;
+    };
+    match adapter {
+        "codex" => {
+            matches!(
+                event["type"].as_str(),
+                Some("item.started" | "item.updated" | "item.completed")
+            ) && matches!(
+                event["item"]["type"].as_str(),
+                Some(
+                    "agent_message"
+                        | "command_execution"
+                        | "mcp_tool_call"
+                        | "file_change"
+                        | "web_search"
+                )
+            )
+        }
+        "claude" | "grok" => {
+            event["type"] == "assistant"
+                && event["message"]["content"]
+                    .as_array()
+                    .is_some_and(|blocks| {
+                        blocks.iter().any(|block| {
+                            matches!(block["type"].as_str(), Some("text" | "tool_use"))
+                        })
+                    })
+        }
+        "opencode" => matches!(event["type"].as_str(), Some("text" | "tool_use")),
+        "antigravity" => {
+            event["event"] == "step_update"
+                && (event["step_update"]["step_type"] == "tool"
+                    || event["step_update"]["text_delta"]
+                        .as_str()
+                        .is_some_and(|text| !text.is_empty()))
+        }
+        _ => false,
+    }
+}
+
+impl super::TaskRuntime {
+    pub(super) fn timed<T>(
+        &self,
+        id: &str,
+        phase: &str,
+        operation: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let started = std::time::Instant::now();
+        let result = operation();
+        let saved = self.update_checked(id, |run| run.efficiency.timing(phase, started.elapsed()));
+        result.and_then(|value| saved.map(|_| value))
+    }
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Timing {
+    pub calls: u64,
+    pub total_ms: u64,
+    pub max_ms: u64,
+}
+
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Efficiency {
+    pub timings: std::collections::BTreeMap<String, Timing>,
+    pub first_activity_ms: Option<u64>,
+    pub routing_calls_avoided: u64,
+    pub warm_provider_hits: u64,
+    pub repository_map_cache_hits: u64,
     pub launch_prompt_bytes: u64,
     pub launches: u64,
     pub verification_calls: u64,
@@ -31,6 +102,17 @@ const PATH_KEYS: &[&str] = &[
 const MAX_TOUCHED_PATHS: usize = 200;
 
 impl Efficiency {
+    pub fn first_activity(&mut self, elapsed: std::time::Duration) {
+        self.first_activity_ms
+            .get_or_insert(elapsed.as_millis().min(u64::MAX as u128) as u64);
+    }
+    pub fn timing(&mut self, phase: &str, elapsed: std::time::Duration) {
+        let milliseconds = elapsed.as_millis().min(u64::MAX as u128) as u64;
+        let timing = self.timings.entry(phase.into()).or_default();
+        timing.calls = timing.calls.saturating_add(1);
+        timing.total_ms = timing.total_ms.saturating_add(milliseconds);
+        timing.max_ms = timing.max_ms.max(milliseconds);
+    }
     fn tool(&mut self, id: &str, name: &str) {
         if self.seen_tools.contains(id) {
             return;
@@ -125,6 +207,24 @@ impl Efficiency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn startup_noise_is_not_first_activity() {
+        assert!(!useful_event(r#"{"type":"thread.started"}"#, "codex"));
+        assert!(!useful_event(r#"{"type":"step_start"}"#, "opencode"));
+        assert!(!useful_event("not json", "claude"));
+        assert!(useful_event(
+            r#"{"type":"item.started","item":{"type":"command_execution"}}"#,
+            "codex"
+        ));
+        assert!(useful_event(
+            r#"{"type":"text","part":{"text":"hello"}}"#,
+            "opencode"
+        ));
+        let mut metrics = Efficiency::default();
+        metrics.first_activity(std::time::Duration::from_millis(12));
+        metrics.first_activity(std::time::Duration::from_millis(30));
+        assert_eq!(metrics.first_activity_ms, Some(12));
+    }
     #[test]
     fn counts_unique_calls_without_storing_arguments_or_double_counting_stream_updates() {
         let mut metrics = Efficiency::default();

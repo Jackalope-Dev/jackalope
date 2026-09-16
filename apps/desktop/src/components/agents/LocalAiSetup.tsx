@@ -1,4 +1,4 @@
-import { IconButton, RefreshIcon } from '@jackalope/ui';
+import { FormField, IconButton, RefreshIcon, Select, SelectItem } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   ArrowLeft,
@@ -26,6 +26,7 @@ import {
   type LocalModel,
   type LocalProgress,
   type LocalVerification,
+  localHelperModels,
   modelFit,
 } from '../../lib/local-ai';
 import { nativeTask } from '../../lib/task-runtime';
@@ -117,6 +118,7 @@ export function LocalAiSteps({
   const [inspection, setInspection] = useState<LocalInspection | null>(preview ?? null);
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState('qwen3.5:4b');
+  const [helperModel, setHelperModel] = useState('');
   const [busy, setBusy] = useState('');
   const [activity, setActivity] = useState<SetupActivity>('inspect');
   const [elapsed, setElapsed] = useState(0);
@@ -211,7 +213,10 @@ export function LocalAiSteps({
     );
   const connect = () =>
     void perform('connect', 'Connecting your local agent…', async () => {
-      const profile = await nativeTask<{ id: string }>('local_ai_connect', { modelId: selected });
+      const profile = await nativeTask<{ id: string }>('local_ai_connect', {
+        modelId: selected,
+        helperModelId: helperModel || null,
+      });
       const config = useAgentConfigStore.getState();
       const options = config.runnerOptions.opencode ?? {
         models: [],
@@ -356,6 +361,7 @@ export function LocalAiSteps({
                   selected={selected === item.id}
                   onSelect={() => {
                     setSelected(item.id);
+                    setHelperModel('');
                     setVerification(null);
                   }}
                 />
@@ -488,6 +494,28 @@ export function LocalAiSteps({
         )}
         {step === 3 && !connected && (
           <>
+            {inspection && (
+              <FormField
+                label="Optional title model"
+                description="Use another installed local model for OpenCode's short background requests. Your coding model keeps its full context. Both models must pass the local check."
+              >
+                <Select
+                  value={helperModel || '__coding_model'}
+                  disabled={!!busy}
+                  onValueChange={(value) => {
+                    setHelperModel(value === '__coding_model' ? '' : value);
+                    setVerification(null);
+                  }}
+                >
+                  <SelectItem value="__coding_model">Use the coding model</SelectItem>
+                  {localHelperModels(inspection, selected).map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FormField>
+            )}
             <p>
               We’ll ask the local agent to create a small test file and continue the same session in
               a disposable folder. Your projects are not used for this check.
@@ -514,7 +542,9 @@ export function LocalAiSteps({
                 disabled={!desktop || !!busy}
                 onClick={() =>
                   void perform('verify', 'Checking your local agent…', async () => {
-                    const result = await withProgress<LocalVerification>('local_ai_verify');
+                    const result = await withProgress<LocalVerification>('local_ai_verify', {
+                      helperModelId: helperModel || null,
+                    });
                     if (active.current) setVerification(result);
                   })
                 }

@@ -14,6 +14,7 @@ use tauri::{ipc::Channel, State};
 
 mod check;
 mod hardware;
+mod helper;
 mod install;
 #[cfg(test)]
 mod tests;
@@ -92,6 +93,8 @@ pub struct Progress {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Verification {
+    #[serde(default)]
+    pub helper: Option<helper::HelperVerification>,
     pub model: String,
     pub digest: String,
     pub inference_digest: String,
@@ -360,9 +363,18 @@ pub(super) fn config(model_id: &str) -> Value {
         "models":{model_id:{"id":inference_model(model_id),"name":model_id,"tool_call":true,"limit":{"context":65536,"output":8192}}}}}})
 }
 
+pub(super) fn verified_config(verification: &Verification) -> Value {
+    let mut config = config(&verification.model);
+    if let Some(helper) = &verification.helper {
+        helper::configure(&mut config, &helper.model);
+    }
+    config
+}
+
 #[tauri::command]
 pub async fn local_ai_verify(
     model_id: String,
+    helper_model_id: Option<String>,
     progress: Channel<Progress>,
     service: State<'_, LocalAi>,
     runtime: State<'_, tasks::TaskRuntime>,
@@ -371,6 +383,21 @@ pub async fn local_ai_verify(
     runtime.access.ensure()?;
     let _operation = service.begin()?;
     *service.verified.lock().map_err(|e| e.to_string())? = None;
+    let helper = if let Some(id) = helper_model_id.as_deref() {
+        if id == model_id {
+            return Err("Choose a different title model, or use the coding model.".into());
+        }
+        progress
+            .send(Progress {
+                phase: "verify".into(),
+                message: "Checking the optional title model…".into(),
+                ..Default::default()
+            })
+            .map_err(|_| "Setup closed.")?;
+        Some(helper::verify(id, service.canceled.clone()).await?)
+    } else {
+        None
+    };
     let expected_digest =
         digest(&tags().await?, &model_id).ok_or("Download this model before checking it.")?;
     let prepare = async {
@@ -391,12 +418,14 @@ pub async fn local_ai_verify(
     let canceled = service.canceled.clone();
     let checks_root = runtime.profiles_root().join("local-checks");
     let checked_model = model_id.clone();
+    let checked_helper = helper.clone();
     let elapsed_ms = tauri::async_runtime::spawn_blocking(move || {
         let directory = check::Directory::create(&checks_root)?;
         let root = directory.path();
         let workspace = root.join("work");
         std::fs::create_dir(&workspace).map_err(|e| e.to_string())?;
         let mut configuration = config(&checked_model);
+        if let Some(helper) = &checked_helper { helper::configure(&mut configuration, &helper.model); }
         configuration["permission"] = json!({"*":"deny","read":"allow","edit":"allow","write":"allow","list":"allow","glob":"allow"});
         let marker = uuid::Uuid::new_v4().to_string();
         let mut session: Option<String> = None;
@@ -434,6 +463,7 @@ pub async fn local_ai_verify(
         Ok(start.elapsed().as_millis() as u64)
     }).await.map_err(|e| e.to_string())??;
     let installed = tags().await?;
+    helper::revalidate(&installed, helper.as_ref())?;
     if digest(&installed, &model_id).as_deref() != Some(&expected_digest)
         || digest(&installed, &inference_model(&model_id)).as_deref()
             != Some(&expected_inference_digest)
@@ -444,6 +474,7 @@ pub async fn local_ai_verify(
         return Err("Local check stopped.".into());
     }
     let verified = Verification {
+        helper,
         model: model_id,
         digest: expected_digest,
         inference_digest: expected_inference_digest,
@@ -457,6 +488,7 @@ pub async fn local_ai_verify(
 #[tauri::command]
 pub async fn local_ai_connect(
     model_id: String,
+    helper_model_id: Option<String>,
     service: State<'_, LocalAi>,
     runtime: State<'_, tasks::TaskRuntime>,
 ) -> Result<agent_profiles::AgentProfile, String> {
@@ -468,9 +500,14 @@ pub async fn local_ai_connect(
         .lock()
         .map_err(|e| e.to_string())?
         .clone()
-        .filter(|v| v.model == model_id)
+        .filter(|v| {
+            v.model == model_id
+                && v.helper.as_ref().map(|helper| helper.model.as_str())
+                    == helper_model_id.as_deref()
+        })
         .ok_or("Check this model before connecting it.")?;
     let installed = tags().await?;
+    helper::revalidate(&installed, verified.helper.as_ref())?;
     if digest(&installed, &model_id).as_deref() != Some(&verified.digest)
         || digest(&installed, &inference_model(&model_id)).as_deref()
             != Some(&verified.inference_digest)
