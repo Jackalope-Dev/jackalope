@@ -38,7 +38,7 @@ jobs:
       - run: pnpm --filter @jackalope/server test
       - run: pnpm --filter @jackalope/server build
   deploy:
-    environment: cloud-${{ inputs.environment == 'production' && 'stable' || 'beta' }}
+    environment: service-${{ inputs.environment == 'production' && 'production' || 'staging' }}
     needs: verify
     if: github.repository == 'Jackalope-Dev/jackalope' && ((github.ref == 'refs/heads/master' && inputs.environment == 'production') || (github.ref == 'refs/heads/beta' && inputs.environment != 'production')) && github.event_name != 'pull_request' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest

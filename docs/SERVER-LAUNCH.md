@@ -10,6 +10,27 @@ Desktop delivery is implemented but contributor builds have no reporting endpoin
 Hosting the service does not activate installed clients. See [BETA-MONITORING.md](BETA-MONITORING.md). Follow [RELEASE.md](RELEASE.md) for installer signing and
 installed-app acceptance, and [BACKEND.md](BACKEND.md) for the later remote backend.
 
+## GitHub deployment environments
+
+The optional Actions deployment jobs use environments separate from desktop releases.
+Run `pnpm release:setup --apply` to configure `service-staging` for beta and
+`service-production` for master. Production deployments and infrastructure preflight
+require maintainer approval; administrators cannot bypass it. These environments must
+not contain Store, Apple or desktop updater signing credentials.
+
+Add `CLOUDFLARE_API_TOKEN` to each service environment, scoped to the intended account
+and resources. Production preflight also uses `CLOUDFLARE_WEBSITE_DEPLOY_HOOK` when
+checking the native website build hook. Keep `CLOUDFLARE_DEPLOY_ENABLED=false` when
+Cloudflare Git builds own deployment. Changing GitHub environments does not change
+those native Cloudflare integrations or their credentials.
+
+When migrating from shared `cloud-beta`/`cloud-stable` environments, enter the service
+credentials again from private operator storage; GitHub does not return existing
+secret values. Confirm the intended service jobs work, then remove obsolete Cloudflare
+credentials from desktop release environments. Keep publication/deployment gates off
+until the corresponding setup and acceptance checks pass. The disabled legacy R2
+publisher has separate credential requirements; do not enable it for Store/Cloud releases.
+
 ## 1. Configure an independent deployment
 
 Use a maintainer-reviewed revision and record these values privately.

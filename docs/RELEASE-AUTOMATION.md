@@ -211,19 +211,39 @@ prepare the first beta cut. Ensure beta and stable receive the new workflow file
 before enabling automation. Missing gates default off; existing true gates are not
 silently disabled by setup.
 
-All three branches require current Windows/Linux/macOS/security checks, reviewed PRs for
-ordinary writers and resolved conversations; force pushes and branch deletion are
-blocked. The single-maintainer policy retains administrator branch bypass and permits
-approval of one's own stable deployment. Publication independently requires successful
-source checks even when a branch administrator bypassed merge checks. Revisit review
-exceptions when adding maintainers. Workflow actions are pinned and tokens default
-to read-only access. Do not give untrusted code access to release environments.
+All three branches restrict updates to the configured maintainer and repository
+administrators. Ordinary writers need reviewed PRs, code-owner approval, resolved
+conversations and current Windows/Linux/macOS/security checks issued by GitHub Actions.
+All files have a code owner; new pushes dismiss stale approvals and require approval
+of the latest push. Administrator branch bypass supports direct maintainer development
+pushes. Separate rulesets forbid force pushes and deletion of these branches, and
+mutation/deletion of release tags, without bypass actors.
+
+Production environments require the configured maintainer's approval with no admin
+deployment bypass; self-approval remains available for a single maintainer. Publication
+independently requires successful source checks even when branch review was bypassed.
+Revisit review exceptions when adding maintainers. Actions are SHA-pinned and limited
+to the approved action repositories in `scripts/security/github-policy.mjs`. Tokens
+default to read-only, cannot approve PRs, and are not retained in checkout credentials.
+External fork PR runs require approval and do not receive release credentials.
+
+The audit includes collaborators, invitations, deploy keys, self-hosted runners,
+branch/check restrictions, environment policies, secret names and organization 2FA
+defaults. It never reads secret values. Separately review GitHub App installations:
+their access is not represented by the human collaborator list, and apps with admin
+permission can change repository settings. Keep organization defaults read-only,
+require 2FA, and grant each integration only the repositories it needs.
 
 ## Website and services
 
 Desktop publication does not deploy the server or automatically advertise unaccepted
 platforms. Keep one deployment controller per Worker; leave optional Actions deployment
-disabled when Cloudflare Git builds own it. Set `VITE_WINDOWS_STORE_URL` and server `ACCESS_STORE_URL` to the accepted Store
+disabled when Cloudflare Git builds own it. Server staging uses `service-staging`
+(beta only); website/server production and infrastructure preflight use
+`service-production` (master only, with approval). These environments do not contain
+desktop signing or publication credentials. Configure their deployment credentials
+following [server operations](SERVER-LAUNCH.md#github-deployment-environments).
+Set `VITE_WINDOWS_STORE_URL` and server `ACCESS_STORE_URL` to the accepted Store
 product link. Website Mac/Linux download variables must identify accepted Cloud artifacts; review any Store URL override before changing distribution.
 The legacy website synchronization script reads the R2 feed and must not be used as
 a Cloud catalog synchronizer. See [server operations](SERVER-LAUNCH.md).

@@ -30,3 +30,20 @@ must never trust a client build or local account flag as proof of access.
 Run `pnpm check:secrets` and `pnpm check:dependencies` when reviewing dependency
 or security changes. See [dependency contracts](docs/DEPENDENCY-INTEGRATIONS.md)
 for the maintained patch and explicit upstream maintenance warnings.
+
+## Repository and release access
+
+Public read access permits forks and pull requests, not official publication.
+Protected branches require maintainer-controlled integration, code-owner review and
+trusted CI checks; release credentials are scoped to branch-restricted environments.
+Production publication requires explicit approval. The configured maintainer retains
+administrator branch bypass for development, while no-bypass rulesets protect branch
+history and release tags. See [release automation](docs/RELEASE-AUTOMATION.md#github-configuration)
+for the repeatable permissions audit and setup command.
+
+Review external PRs before approving their CI runs and before merging executable
+code, dependencies or workflows into a trusted branch. Keep PR checks on GitHub-hosted
+runners without deployment secrets. New actions need explicit allowlisting and full
+commit pins. Adding a collaborator or GitHub App is a separate access decision;
+review its repository selection and write/admin permissions. Organization owners and
+apps with administration access remain trusted to change repository protections.

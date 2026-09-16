@@ -1,5 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { requiredChecks } from '../release/source-checks.mjs';
+import {
+  allowedActions,
+  branchProtection,
+  environmentPolicies,
+  environmentProtection,
+  managedRulesets,
+} from './github-policy.mjs';
 
 const args = process.argv.slice(2);
 const value = (name) => args[args.indexOf(name) + 1];
@@ -31,23 +37,95 @@ const list = (route, property) => {
 };
 const repository = api(prefix);
 if (!args.includes('--apply')) {
+  const actions = api(`${prefix}/actions/permissions`);
+  const branches = list(`${prefix}/branches`);
+  const environments = list(`${prefix}/environments`, 'environments');
+  const optional = (route) => {
+    try {
+      return api(route);
+    } catch (error) {
+      return { unavailable: error.message };
+    }
+  };
+  const organization =
+    repository.owner.type === 'Organization' ? optional(`orgs/${repository.owner.login}`) : null;
+  const installations = organization
+    ? optional(`orgs/${repository.owner.login}/installations?per_page=100`)
+    : null;
   console.log(
     JSON.stringify(
       {
         repository: repo,
         visibility: repository.visibility,
-        actions: api(`${prefix}/actions/permissions`),
-        branch: api(`${prefix}/branches/${repository.default_branch}`).protected,
-        branches: api(`${prefix}/branches`).map(({ name, protected: protectedBranch }) => ({
+        actions,
+        allowedActions:
+          actions.allowed_actions === 'selected'
+            ? api(`${prefix}/actions/permissions/selected-actions`)
+            : null,
+        workflowPermissions: api(`${prefix}/actions/permissions/workflow`),
+        externalContributorApproval: api(
+          `${prefix}/actions/permissions/fork-pr-contributor-approval`,
+        ),
+        security: repository.security_and_analysis,
+        organization: organization && {
+          defaultPermission: organization.default_repository_permission,
+          requiresTwoFactor: organization.two_factor_requirement_enabled,
+          unavailable: organization.unavailable,
+        },
+        organizationApps:
+          installations?.installations?.map((installation) => ({
+            app: installation.app_slug,
+            repositorySelection: installation.repository_selection,
+            permissions: installation.permissions,
+            repositoryAccess:
+              installation.repository_selection === 'all'
+                ? 'included'
+                : 'review selected repositories',
+          })) ?? installations,
+        collaborators: list(`${prefix}/collaborators`).map(({ login, role_name }) => ({
+          login,
+          role: role_name,
+        })),
+        invitations: list(`${prefix}/invitations`).map(({ id, invitee, permissions }) => ({
+          id,
+          login: invitee?.login,
+          permissions,
+        })),
+        deployKeys: list(`${prefix}/keys`).map(({ id, title, read_only }) => ({
+          id,
+          title,
+          readOnly: read_only,
+        })),
+        runners: api(`${prefix}/actions/runners`).runners.map(({ name, os, status }) => ({
+          name,
+          os,
+          status,
+        })),
+        repositorySecrets: list(`${prefix}/actions/secrets`, 'secrets').map(({ name }) => name),
+        branches: branches.map(({ name, protected: protectedBranch }) => ({
           name,
           protected: protectedBranch,
+          protection: protectedBranch ? api(`${prefix}/branches/${name}/protection`) : null,
         })),
+        rulesets: list(`${prefix}/rulesets`).map(({ id }) => api(`${prefix}/rulesets/${id}`)),
         releaseVariables: list(`${prefix}/actions/variables`, 'variables').filter(({ name }) =>
           /^(CLOUD_|STORE_|APPLE_SIGNING_READY|RELEASE_DISTRIBUTION)/.test(name),
         ),
-        environments: api(`${prefix}/environments`).environments.map(
-          ({ name, protection_rules }) => ({ name, protection_rules }),
-        ),
+        environments: environments.map(({ name }) => {
+          const environment = api(`${prefix}/environments/${name}`);
+          return {
+            name,
+            canAdminsBypass: environment.can_admins_bypass,
+            protectionRules: environment.protection_rules,
+            branches: list(
+              `${prefix}/environments/${name}/deployment-branch-policies`,
+              'branch_policies',
+            ),
+            secrets: list(`${prefix}/environments/${name}/secrets`, 'secrets').map(
+              ({ name: secretName }) => secretName,
+            ),
+          };
+        }),
       },
       null,
       2,
@@ -117,9 +195,10 @@ for (const branch of ['beta', 'stable']) {
 const actions = api(`${prefix}/actions/permissions`);
 api(`${prefix}/actions/permissions`, 'PUT', {
   enabled: actions.enabled,
-  allowed_actions: actions.allowed_actions,
+  allowed_actions: 'selected',
   sha_pinning_required: true,
 });
+api(`${prefix}/actions/permissions/selected-actions`, 'PUT', allowedActions);
 api(`${prefix}/actions/permissions/workflow`, 'PUT', {
   default_workflow_permissions: 'read',
   can_approve_pull_request_reviews: false,
@@ -137,33 +216,12 @@ api(prefix, 'PATCH', {
   },
 });
 for (const branch of new Set([repository.default_branch, 'beta', 'stable']))
-  api(`${prefix}/branches/${branch}/protection`, 'PUT', {
-    required_status_checks: {
-      strict: true,
-      contexts: requiredChecks,
-    },
-    enforce_admins: false,
-    required_pull_request_reviews: {
-      dismiss_stale_reviews: true,
-      require_code_owner_reviews: true,
-      required_approving_review_count: 1,
-    },
-    restrictions: null,
-    required_conversation_resolution: true,
-    allow_force_pushes: false,
-    allow_deletions: false,
-  });
-for (const name of ['cloud-beta', 'cloud-stable', 'store-beta', 'store-stable']) {
-  const previous = api(`${prefix}/environments/${name}`);
-  api(`${prefix}/environments/${name}`, 'PUT', {
-    wait_timer:
-      previous.protection_rules.find((rule) => rule.type === 'wait_timer')?.wait_timer ?? 0,
-    prevent_self_review: false,
-    reviewers: name.endsWith('-beta') ? [] : [{ type: 'User', id: user.id }],
-    deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
-  });
-  const allowed =
-    name === 'cloud-beta' ? ['beta', 'stable'] : name === 'store-beta' ? ['beta'] : ['stable'];
+  api(`${prefix}/branches/${branch}/protection`, 'PUT', branchProtection(reviewer));
+const environments = list(`${prefix}/environments`, 'environments');
+for (const [name, policy] of Object.entries(environmentPolicies)) {
+  const previous = environments.find((environment) => environment.name === name);
+  api(`${prefix}/environments/${name}`, 'PUT', environmentProtection(policy, user.id, previous));
+  const allowed = policy.branches;
   const policies = api(`${prefix}/environments/${name}/deployment-branch-policies`).branch_policies;
   for (const policy of policies) {
     if (policy.type !== 'branch' || !allowed.includes(policy.name))
@@ -177,26 +235,11 @@ for (const name of ['cloud-beta', 'cloud-stable', 'store-beta', 'store-stable'])
       });
   }
 }
-const tagRules = api(`${prefix}/rulesets`).find((rule) => rule.name === 'Protect release tags');
-if (!tagRules)
-  api(`${prefix}/rulesets`, 'POST', {
-    name: 'Protect release tags',
-    target: 'tag',
-    enforcement: 'active',
-    conditions: {
-      ref_name: {
-        include: [
-          'refs/tags/beta-v*',
-          'refs/tags/stable-v*',
-          'refs/tags/store-beta/v*',
-          'refs/tags/store-stable/v*',
-        ],
-        exclude: [],
-      },
-    },
-    rules: [{ type: 'update' }, { type: 'deletion' }],
-    bypass_actors: [],
-  });
+const rulesets = list(`${prefix}/rulesets`);
+for (const desired of managedRulesets(repository.default_branch)) {
+  const previous = rulesets.find((rule) => rule.name === desired.name);
+  api(`${prefix}/rulesets${previous ? `/${previous.id}` : ''}`, previous ? 'PUT' : 'POST', desired);
+}
 console.log(
   'Release branches and protections configured for Windows Store and Mac/Linux Cloud releases. Existing enablement flags preserved; enable publication only after installed acceptance.',
 );
