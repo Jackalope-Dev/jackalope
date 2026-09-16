@@ -7,6 +7,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 ## Desktop workspace
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
+- Project setup includes agents, decisions, Git behavior, appearance and an optional
+  first task. Background command detection fills unset preferences without running
+  commands or replacing explicit choices; inspection failure does not block setup.
 - Tasks opens Chat first. Inbox keeps the project-scoped work list that includes chats,
   with remembered filters, compact capture and keyboard row navigation. Work rows show
   each agent's character, live or next-action status and who is working now. Task and

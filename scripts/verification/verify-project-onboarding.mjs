@@ -18,12 +18,12 @@ import { useThemeStore } from '/src/stores/themeStore.ts';
 import '/src/index.css';
 const project={id:'atlas',name:'Atlas',path:'C:/Fixture/atlas',gitBranch:'main',preferences:{preferredRunner:'codex'}};
 const overview=location.search.includes('overview');
-const f=window.setupFixture={calls:[],finished:null,failReadiness:true,pending:{},select:(id)=>useProjectStore.setState({activeProjectId:id}),theme:(isDark)=>useThemeStore.getState().setTheme({...useThemeStore.getState().currentTheme,appearance:'manual',isDark})};
+const f=window.setupFixture={calls:[],finished:null,failReadiness:location.search.includes('unavailable'),pending:{},state:()=>useOnboardingStore.getState(),select:(id)=>useProjectStore.setState({activeProjectId:id}),theme:(isDark)=>useThemeStore.getState().setTheme({...useThemeStore.getState().currentTheme,appearance:'manual',isDark})};
 window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
 window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebview:{label:'main'}},transformCallback:()=>0,invoke:async(command,args={})=>{
  f.calls.push({command,...args});
  if(command==='project_readiness'){
-  if(overview)return new Promise((resolve,reject)=>{f.pending[args.path]={resolve:changes=>resolve({head:'abcdef',branch:'main',changes,recentChanges:'',prepareCommand:null,verifyCommand:null,previewCommand:null,dependenciesMissing:false,missingConfiguration:[],notes:[]}),reject};});
+  if(overview||location.search.includes('deferred'))return new Promise((resolve,reject)=>{f.pending[args.path]={resolve:(changes,defaults={})=>resolve({head:'abcdef',branch:'main',changes,recentChanges:'',prepareCommand:null,verifyCommand:null,previewCommand:null,dependenciesMissing:false,missingConfiguration:[],notes:[],...defaults}),reject};});
   if(f.failReadiness)throw new Error('Workspace inspection unavailable.');
   return {head:'abcdef',branch:'main',changes:'',recentChanges:'',prepareCommand:'pnpm install',verifyCommand:'pnpm test',previewCommand:'pnpm dev',dependenciesMissing:true,missingConfiguration:[],notes:[]};
  }
@@ -56,29 +56,35 @@ try {
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.getByText('Step 2 of 4', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 3 of 4', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.getByText('Step 4 of 4', { exact: true }).waitFor();
-  await page.getByText('Workspace readiness', { exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect workspace setup', exact: true }).click();
-  await page.getByText('Workspace inspection unavailable.', { exact: false }).waitFor();
-  const prompt = page.getByLabel('Your first task (optional)', { exact: true });
-  await prompt.fill('Fix the empty search state and verify keyboard access.');
-  await page.evaluate(() => {
-    window.setupFixture.failReadiness = false;
-  });
-  await page.getByRole('button', { name: 'Inspect workspace setup', exact: true }).click();
-  await page.getByRole('button', { name: 'Use this check after tasks finish' }).click();
-  assert.equal(
-    await page.evaluate(async () => {
-      const { useOnboardingStore } = await import('/src/stores/onboardingStore.ts');
-      return useOnboardingStore.getState().pendingProject.preferences.verifyCommand;
-    }),
-    'pnpm test',
+  await page.getByText('Step 2 of 6', { exact: true }).waitFor();
+  assert.deepEqual(await page.locator('.onboarding-steps li strong').allTextContents(), [
+    'Project',
+    'Agents',
+    'Decisions',
+    'Behavior',
+    'Appearance',
+    'First task',
+  ]);
+  await page.waitForFunction(
+    () => window.setupFixture.state().pendingProject.preferences.previewCommand === 'pnpm dev',
   );
-  await page.getByRole('button', { name: 'Customize Git behavior and appearance' }).click();
+  assert.equal(
+    await page.evaluate(() => window.setupFixture.state().pendingProject.preferences.autoVerify),
+    undefined,
+  );
+  assert.equal(
+    await page.evaluate(
+      () => window.setupFixture.calls.filter((call) => call.command === 'project_readiness').length,
+    ),
+    1,
+  );
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByText('Step 3 of 6', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByText('Step 4 of 6', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByText('Step 3 of 6', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByText('Step 4 of 6', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByText('Step 5 of 6', { exact: true }).waitFor();
@@ -87,11 +93,21 @@ try {
   );
   await page.getByRole('button', { name: 'Mojave Sunset', exact: true }).click();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByText('Step 4 of 6', { exact: true }).waitFor();
   assert.equal(
     await page.evaluate(() => document.documentElement.style.getPropertyValue('--accent-h')),
     before,
   );
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByText('Step 5 of 6', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByText('Step 6 of 6', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Workspace readiness', { exact: true }).count(), 0);
+  const prompt = page.getByLabel('Your first task (optional)', { exact: true });
+  await prompt.fill('Fix the empty search state and verify keyboard access.');
   await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByText('Step 5 of 6', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   assert.equal(await prompt.inputValue(), 'Fix the empty search state and verify keyboard access.');
   await page.reload({ waitUntil: 'domcontentloaded' });
   assert.equal(await prompt.inputValue(), 'Fix the empty search state and verify keyboard access.');
@@ -135,6 +151,18 @@ try {
       await page.screenshot({
         path: `${output}/setup-${width}-${dark ? 'dark' : 'light'}.png`,
       });
+      for (const step of [5, 4]) {
+        await page.getByRole('button', { name: 'Back', exact: true }).click();
+        await page.getByText(`Step ${step} of 6`, { exact: true }).waitFor();
+        assert.equal(await page.locator('.onboarding-steps li').count(), 6);
+        await page.screenshot({
+          path: `${output}/step-${step}-${width}-${dark ? 'dark' : 'light'}.png`,
+        });
+      }
+      for (const step of [5, 6]) {
+        await page.getByRole('button', { name: 'Continue', exact: true }).click();
+        await page.getByText(`Step ${step} of 6`, { exact: true }).waitFor();
+      }
     }
   }
   await page.getByRole('button', { name: 'Review first task', exact: true }).click();
@@ -149,6 +177,94 @@ try {
     ),
     false,
   );
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(`${url}/?deferred`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/atlas']);
+  await page.evaluate(() => {
+    const state = window.setupFixture.state();
+    state.stageProject(
+      {
+        ...state.pendingProject,
+        preferences: {
+          preferredRunner: 'codex',
+          verifyCommand: 'custom check',
+          prepareCommand: '',
+          autoVerify: false,
+        },
+      },
+      'Keep my draft',
+    );
+    window.setupFixture.pending['C:/Fixture/atlas'].resolve('', {
+      prepareCommand: 'pnpm install',
+      verifyCommand: 'pnpm test',
+      previewCommand: 'pnpm dev',
+    });
+  });
+  await page.waitForFunction(
+    () => window.setupFixture.state().pendingProject.preferences.previewCommand === 'pnpm dev',
+  );
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      preferences: window.setupFixture.state().pendingProject.preferences,
+      draft: window.setupFixture.state().firstTask,
+    })),
+    {
+      preferences: {
+        preferredRunner: 'codex',
+        verifyCommand: 'custom check',
+        prepareCommand: '',
+        autoVerify: false,
+        previewCommand: 'pnpm dev',
+      },
+      draft: 'Keep my draft',
+    },
+  );
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/atlas']);
+  await page.evaluate(() => {
+    const state = window.setupFixture.state();
+    state.stageProject(
+      {
+        ...state.pendingProject,
+        id: 'second',
+        path: 'C:/Fixture/second',
+        preferences: { preferredRunner: 'codex' },
+      },
+      'Second draft',
+    );
+  });
+  await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/second']);
+  await page.evaluate(() => {
+    window.setupFixture.pending['C:/Fixture/atlas'].resolve('', { verifyCommand: 'stale check' });
+    window.setupFixture.pending['C:/Fixture/second'].resolve('', {
+      previewCommand: 'second preview',
+    });
+  });
+  await page.waitForFunction(
+    () =>
+      window.setupFixture.state().pendingProject.preferences.previewCommand === 'second preview',
+  );
+  assert.equal(
+    await page.evaluate(() => window.setupFixture.state().pendingProject.preferences.verifyCommand),
+    undefined,
+  );
+  assert.equal(await page.evaluate(() => window.setupFixture.state().firstTask), 'Second draft');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/second']);
+  await page.evaluate(() => {
+    window.setupFixture.state().finish();
+    window.setupFixture.pending['C:/Fixture/second'].resolve('', { verifyCommand: 'late check' });
+  });
+  await page.getByText('Step 1 of 6', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.setupFixture.state().pendingProject), null);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(`${url}/?unavailable`, { waitUntil: 'domcontentloaded' });
+  for (const step of [3, 4, 5, 6]) {
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByText(`Step ${step} of 6`, { exact: true }).waitFor();
+  }
+  await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+  await page.waitForFunction(() => window.setupFixture.finished?.skipped);
   await page.goto(`${url}/?overview`, { waitUntil: 'domcontentloaded' });
   await page.getByText('Checking repository…', { exact: true }).waitFor();
   assert.equal(await page.getByText('Working tree clean', { exact: true }).count(), 0);
@@ -172,7 +288,7 @@ try {
   await page.getByText('Working tree clean', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    'Project onboarding browser checks passed: four default steps, optional customization, readiness retry, provisional settings, draft restoration, theme rollback, keyboard and narrow layouts. No native tasks launched.',
+    'Project onboarding browser checks passed: six visible steps, automatic defaults, explicit overrides, stale inspection responses, unavailable inspection, provisional settings, draft restoration, theme rollback, keyboard and narrow layouts. No native tasks launched.',
   );
 } finally {
   await browser.close();

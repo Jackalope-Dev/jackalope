@@ -993,7 +993,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'Try it: improve one empty state',
         paragraphs: [
           'Tasks opens Chat. Send a message to start a conversation, or open Inbox or New task for a structured brief with effort, agent, and tool choices. For a first task, describe the starting state, desired result, constraints, and how the agent should check it. Replace the example page and commands with ones that exist in your project.',
-          'Project setup focuses on choosing a repository, an agent, a decision method, and a first task. Inspect workspace readiness before starting; suggested commands are not run until you authorize work. Git behavior and project appearance can be customized from the final step.',
+          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Preparation, check, and preview commands are detected in the background without replacing your saved choices. Review or edit them in Project Settings before starting work; setup does not run commands or enable automatic checks.',
           'Chat offers optional starters for GitHub issues, PR feedback, failing CI and dependency updates. GitHub evidence is read through your installed, signed-in CLI. The prepared request stays editable; it does not publish, reply or resolve threads.',
         ],
         codeBox: {

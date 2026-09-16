@@ -19,8 +19,8 @@ release dates.
   pending-message guards, unavailable cost and batch-limit pauses. Independent native
   task planning remains separate from the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
-  defaults and explicit overrides, including cancellation and restart. Cover the four
-  default project-setup steps, optional Git/appearance settings and readiness suggestions.
+  defaults and explicit overrides, including cancellation and restart. Cover all six
+  project-setup steps, appearance rollback and automatic command detection.
 - [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users
   and real repositories. Measure first useful result, useful completed work, review/correction
   effort, repeat use and recovery; keep self-reported ratings and loaded-history coverage explicit.

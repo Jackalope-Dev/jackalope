@@ -36,7 +36,7 @@ export const roadmapStages = [
         title: 'A clearer path through daily work.',
         summary: 'Faster project setup, review checkpoints, and reusable task starters.',
         detail:
-          'Project setup focuses on a project, an agent, a decision method, and your first task. Git behavior and appearance remain optional. Chat surfaces work waiting across projects, and results remember the section you were reading. Compare changes since your last review, inspect why lessons were included, and prepare editable issue, PR-feedback, CI-repair, or dependency-update requests. GitHub imports are read-only. Optional local usefulness ratings and review minutes feed a report you can choose to copy. Installed testing and observed daily-use trials remain open.',
+          'Project setup walks through your repository, agents, decisions, Git behavior, appearance, and an optional first task. Setup detects project commands automatically and preserves your saved choices. Chat surfaces work waiting across projects, and results remember the section you were reading. Compare changes since your last review, inspect why lessons were included, and prepare editable issue, PR-feedback, CI-repair, or dependency-update requests. GitHub imports are read-only. Optional local usefulness ratings and review minutes feed a report you can choose to copy. Installed testing and observed daily-use trials remain open.',
       },
       {
         title: 'Your agents. One workspace.',

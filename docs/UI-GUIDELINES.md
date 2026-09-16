@@ -71,9 +71,12 @@ has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
-The default project flow is project → agent → decisions → first task. Optional Git behavior and
-project appearance open from the final step; saved older setup steps remain usable.
-Workspace setup suggestions are provisional until entry and must not run commands.
+The project flow is project → agents → decisions → behavior → appearance → first task.
+Keep all six steps visible in the progress list. Detect workspace command defaults in
+the background without a manual inspection step. Preserve explicit choices, including
+empty commands, and ignore stale results after changing projects or leaving setup.
+Detected defaults are provisional until entry and must not run commands or enable
+automatic checks. Inspection failure must not block setup.
 
 App appearance/privacy and account access precede the project setup steps.
 Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.

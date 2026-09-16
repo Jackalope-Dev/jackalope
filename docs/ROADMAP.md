@@ -40,8 +40,9 @@ carry forward the result. Optional batch and estimated-cost thresholds pause lat
 they cannot cap provider billing. Installed acceptance remains open; managed task
 planning has a separate reviewed lifecycle.
 
-Four default project-setup steps, optional Git/appearance settings, cross-project
-attention on Chat, remembered task sections and changes since the last review are implemented.
+Six project-setup steps with Git behavior, appearance and automatic command detection
+are implemented, alongside cross-project attention on Chat, remembered task sections
+and changes since the last review.
 Issue, PR-feedback, CI-repair and dependency-update starters prepare editable requests;
 GitHub evidence is read-only. Lesson receipts explain selection, and optional local
 usefulness ratings and review minutes feed a report with explicit history coverage.

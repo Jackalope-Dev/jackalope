@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { builtinAgents, getAgentMetadata } from '../../lib/agent-catalog';
+import { missingProjectDefaults, type ProjectDefaults } from '../../lib/context/project-defaults';
 import { type CommitPolicy, projectGitPolicy } from '../../lib/project-git';
 import { createProject, openProject } from '../../lib/project-setup';
 import { routingSettings } from '../../lib/routing-settings';
@@ -30,7 +31,6 @@ import { TitleBar } from '../layout/TitleBar';
 import { JackalopeMascot } from '../mascot/JackalopeMascot';
 import { ProjectGitSettings } from '../projects/ProjectGitSettings';
 import { RoutingSetup } from '../settings/RoutingSetup';
-import { WorkspaceReadiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Switch } from '../ui/Switch';
@@ -38,7 +38,7 @@ import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { ProjectThemeStep } from './ProjectThemeStep';
 import './onboarding.css';
 
-const allSteps: { id: OnboardingStep; label: string }[] = [
+const steps: { id: OnboardingStep; label: string }[] = [
   { id: 'project', label: 'Project' },
   { id: 'agent', label: 'Agents' },
   { id: 'routing', label: 'Decisions' },
@@ -116,15 +116,37 @@ export function OnboardingFlow({
   const tipIndex = useRef(0);
   const desktop = isTauriEnvironment();
   const step = !project ? 'project' : onboarding.step;
-  const steps = allSteps.filter(
-    (item) => step === 'behavior' || step === 'theme' || !['behavior', 'theme'].includes(item.id),
-  );
   const index = steps.findIndex((item) => item.id === step);
   const draft =
     onboarding.firstTask ?? (project ? (execution.drafts[project.id]?.prompt ?? '') : '');
   const preview =
     step === 'theme' && themePreview ? themePreview : (project?.preferences?.theme ?? appTheme);
   const previewProjectId = project?.id;
+  const projectPath = project?.path;
+  useEffect(() => {
+    if (!desktop || !previewProjectId || !projectPath) return;
+    let canceled = false;
+    void nativeTask<ProjectDefaults>('project_readiness', { path: projectPath })
+      .then((defaults) => {
+        if (canceled) return;
+        const current = useOnboardingStore.getState();
+        if (current.status !== 'active' || current.projectId !== previewProjectId) return;
+        const pending =
+          current.pendingProject ??
+          useProjectStore.getState().projects.find((item) => item.id === previewProjectId);
+        if (!pending || pending.path !== projectPath) return;
+        const missing = missingProjectDefaults(pending.preferences, defaults);
+        if (Object.keys(missing).length)
+          current.stageProject({
+            ...pending,
+            preferences: { ...pending.preferences, ...missing },
+          });
+      })
+      .catch(() => {});
+    return () => {
+      canceled = true;
+    };
+  }, [desktop, previewProjectId, projectPath]);
   useEffect(() => {
     if (!previewProjectId) return;
     useThemeStore.setState({ previewing: true });
@@ -795,7 +817,7 @@ export function OnboardingFlow({
                 </Button>
                 <Button
                   disabled={busy || !routingReady}
-                  onClick={() => advance(() => onboarding.go('task'))}
+                  onClick={() => advance(() => onboarding.go('behavior'))}
                 >
                   Continue
                   <ArrowRight size={16} />
@@ -815,7 +837,7 @@ export function OnboardingFlow({
               </div>
 
               <div className="onboarding-actions">
-                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('task')}>
+                <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('routing')}>
                   <ArrowLeft size={16} />
                   Back
                 </Button>
@@ -858,21 +880,6 @@ export function OnboardingFlow({
           )}
           {step === 'task' && (
             <>
-              {project && (
-                <WorkspaceReadiness
-                  key={project.id}
-                  project={project}
-                  onPreferencesChange={(preferences) =>
-                    onboarding.stageProject(
-                      { ...project, preferences: { ...project.preferences, ...preferences } },
-                      draft,
-                    )
-                  }
-                />
-              )}
-              <Button variant="ghost" disabled={busy} onClick={() => onboarding.go('behavior')}>
-                Customize Git behavior and appearance
-              </Button>
               <div className="flex items-center gap-3 my-4">
                 {runner && <AgentAvatar provider={runnerAdapter} size="sm" />}
                 <div>
@@ -903,7 +910,7 @@ export function OnboardingFlow({
                   disabled={busy}
                   onClick={() => {
                     setThemePreview(undefined);
-                    onboarding.go('routing');
+                    onboarding.go('theme');
                   }}
                 >
                   <ArrowLeft size={16} />

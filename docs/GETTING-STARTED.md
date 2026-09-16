@@ -6,10 +6,11 @@ isolated account in Agents. Each provider's own subscription and permissions
 still apply.
 
 1. Open a Git repository with at least one commit. Choose the agent you want.
-   Project setup leads directly to a first-task draft; Git behavior and appearance
-   are optional customization.
-2. Inspect **Workspace readiness** and select appropriate setup/check commands, or
-   edit them in Project Settings. Choose a committed local target branch.
+   Project setup walks through agents, decisions, Git behavior and appearance
+   before an optional first-task draft.
+2. Setup detects preparation, check and preview commands automatically without
+   running them or replacing saved choices. Review or edit them in Project Settings
+   and choose a committed local target branch.
 3. In **Tasks → Chat**, describe one concrete result. Chat uses a separate workspace.
    Commit any existing changes the agent needs before starting. Optional workflow
    starters import GitHub evidence into a draft; review it before sending.
