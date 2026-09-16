@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 import { assertVersions, channel, readNotes, root, sha256 } from './catalog.mjs';
 import { validateCloudFiles } from './cloud-artifacts.mjs';
 import { cloudAssets, cloudFiles } from './cloud-targets.mjs';
-import { application, cloudConfig } from './crabnebula-config.mjs';
+import { application, clearAppleSigning, cloudConfig } from './crabnebula-config.mjs';
 
 const mode = process.argv[2];
 const selectedChannel = channel(process.argv[3]);
@@ -62,6 +62,7 @@ try {
     if (mac && process.env.APPLE_SIGNING_READY !== 'true')
       throw new Error('Apple signing is not enabled');
   } else {
+    clearAppleSigning(process.env);
     const key = resolve(temporary, 'updater');
     run('pnpm', ['tauri', 'signer', 'generate', '--ci', '--write-keys', key], { stdio: 'pipe' });
     process.env.TAURI_SIGNING_PRIVATE_KEY = await readFile(key, 'utf8');

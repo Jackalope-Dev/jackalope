@@ -1,5 +1,21 @@
 export const application = 'jackalope-digital/jackalope';
 
+export function clearAppleSigning(environment) {
+  for (const name of [
+    'APPLE_CERTIFICATE',
+    'APPLE_CERTIFICATE_PASSWORD',
+    'APPLE_SIGNING_IDENTITY',
+    'APPLE_TEAM_ID',
+    'APPLE_API_KEY',
+    'APPLE_API_ISSUER',
+    'APPLE_API_KEY_PATH',
+    'APPLE_API_PRIVATE_KEY',
+    'APPLE_ID',
+    'APPLE_PASSWORD',
+  ])
+    delete environment[name];
+}
+
 export function cloudEndpoint(channel) {
   if (!['beta', 'stable'].includes(channel)) throw new Error('Unknown release channel');
   return `https://cdn.crabnebula.app/update/${application}/{{target}}-{{arch}}/{{current_version}}?channel=${channel}`;
