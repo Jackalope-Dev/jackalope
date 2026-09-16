@@ -6,6 +6,7 @@
 
 [![Verify platforms](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml)
 [![Security checks](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml)
+[![Join the Jackalope Discord](https://img.shields.io/badge/Discord-Join_the_community-5865F2?logo=discord&logoColor=white)](https://discord.gg/pDfJTGFunC)
 [![Sponsor Jackalope on GitHub](https://img.shields.io/badge/GitHub-Sponsor_Jackalope-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Jackalope-Dev)
 [![Support Jackalope on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Jackalope-FF6433?logo=kofi&logoColor=white)](https://ko-fi.com/jackalope_digital)
 
@@ -86,7 +87,8 @@ before enabling signups or publishing a build.
 
 [Report a bug, request a feature or flag a documentation issue](https://github.com/Jackalope-Dev/jackalope/issues/new/choose),
 ask a question in [GitHub Discussions](https://github.com/Jackalope-Dev/jackalope/discussions),
-or send a focused pull request. You can also join the
+or send a focused pull request. For quick questions and to share workflows, join us on
+[Discord](https://discord.gg/pDfJTGFunC) or in the
 [Reddit community](https://www.reddit.com/r/JackalopeDev/).
 Please follow our [community guidelines](CODE_OF_CONDUCT.md).
 For private support, email [contact@jackalope.dev](mailto:contact@jackalope.dev).
