@@ -1,5 +1,18 @@
 [
   {
+    "id": "reviewed-task-planning",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Review the approach, then follow one task",
+    "description": "Task assessments and reviewed plans keep related work together under one parent.",
+    "items": [
+      "Use project Decisions preferences to assess focused work, investigation or planning, with local fast paths and reused assessments.",
+      "Review scoped assignments before starting. Follow planning, worker attempts, usage and combined verification in one task, then explicitly integrate the result.",
+      "Assessment usage includes calls that never launch work and counts reused decisions once."
+    ],
+    "note": "Installed-provider acceptance and held-out cost and quality comparisons remain in progress."
+  },
+  {
     "id": "choose-how-jackalope-makes-decisions",
     "date": "2026-09-16",
     "status": "In development",

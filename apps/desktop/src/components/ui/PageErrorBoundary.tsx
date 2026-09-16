@@ -1,16 +1,22 @@
 import { ErrorState } from '@jackalope/ui';
 import { Component, type ReactNode } from 'react';
+import type { Feature } from '../../lib/telemetry';
+import { telemetry } from '../../lib/telemetry-client';
 import { Button } from './button';
 import { WorkspacePage } from './WorkspacePage';
 
 export class PageErrorBoundary extends Component<
-  { children: ReactNode; onBack?: () => void },
+  { children: ReactNode; onBack?: () => void; feature?: Feature },
   { failed: boolean }
 > {
   state = { failed: false };
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  componentDidCatch() {
+    telemetry.track({ name: 'app_error', code: 'ui_render_error', feature: this.props.feature });
   }
 
   render() {

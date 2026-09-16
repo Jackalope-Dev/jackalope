@@ -48,13 +48,37 @@ Builds and the GitHub server deployment job for the same environment.
 
 ## What monitoring means
 
-The dashboard reports app opens, task status transitions, feature-view visits and
-fixed error categories, filtered by receipt day, binary version and binary channel.
-OS is another aggregate dimension. It helps find release regressions and frequently
-used surfaces. It cannot measure unique people, individual retention, conversion
-funnels, exact crash-free rates, or all native failures. Feature visits are not proof
-of successful use. Public ingestion cannot authenticate an open-source client;
-rate limits and quotas reduce abuse but do not make counts authoritative.
+The dashboard separates app opens, view visits, operation results, observed task
+states and fixed error categories. Filter by receipt day, binary version, binary
+channel and OS when comparing releases. Task states include an allowlisted agent
+and task/Chat workflow; older reports retain unknown dimensions.
+
+Operation results cover task launch/retry/stop, verification, outcome review,
+previews, recovery, Chat, queues, integration, schedules, knowledge, MCP connections,
+worktrees, agent setup and Ask Jackalope. The closed command inventory lives in
+`apps/desktop/src/lib/telemetry.ts`; `operation-telemetry.ts` maps explicit commands
+and semantic results. Polling and draft autosaves are excluded. Accepted means a
+native acknowledgement: a queued message or accepted launch has not necessarily
+finished execution. Failed checks/probes, blocked integration, canceled recovery
+dialogs and applied merges with incomplete cleanup have distinct results.
+
+Error categories distinguish history read/write, discovery, checkpoint,
+verification execution, failed checks, updates, task failures, page rendering,
+unhandled JavaScript errors/rejections and failed operations. Operation errors carry
+the fixed operation name; caught page-rendering errors carry the fixed page category.
+These are triage signals, not exception traces or evidence that every failed task
+is an application bug. One failure can contribute to both task/error and operation
+counts; do not sum them as independent incidents.
+
+Use operation results to compare activity and failures among participating clients.
+Use view visits to identify discoverability, and task states to distinguish agents
+and workflows needing investigation. Inspect voluntarily submitted feedback to
+reproduce problems. Reports cannot measure unique people, individual retention,
+per-user conversion funnels, exact crash-free rates, latency or all native failures.
+Do not divide independent task transitions into a completion rate: observation can
+miss intermediate states, starts/completions can fall in different receipt windows,
+and opted-out/offline clients are absent. Public ingestion cannot authenticate an
+open-source client; rate limits and quotas do not make counts authoritative.
 
 Before any upload, desktop onboarding presents the usage-sharing disclosure.
 Usage defaults on with a one-click continue-without-sharing choice, as recorded in
@@ -63,7 +87,14 @@ are authoritative. Turning sharing off clears the in-memory queue and cancels na
 requests; already transmitted bytes cannot be recalled. Error categories have a
 separate control under usage sharing. There is no disk spool or replay of old history.
 The queue holds up to 50 events, sends up to 50 at once and retries twice with backoff.
-Local execution never waits for the network. Short sessions or outages may lose counts.
+Each event retains its own retry budget when new events join a retrying batch.
+Local execution never waits for the network. Hiding a window requests a best-effort
+flush; short sessions, queue overflow, process exits and outages may lose counts.
+Initial/restored history is not replayed as new work. Task observation belongs to
+the main window; Chat popouts report their own operations without another app-open
+event. Privacy changes notify all open windows and native preferences gate delivery.
+Operation outcome counts, including failed results, are usage; the additional
+diagnostic error categories require the separate error-sharing choice.
 
 No installation/account/device IDs, prompts, code, paths, command output, raw errors
 or stacks are accepted. The server atomically increments daily totals and saves only
@@ -109,7 +140,9 @@ links open the matching people filters. Account totals exclude revoked access; d
 connection is a first-sign-in milestone, not current activity or task completion.
 The shared navigation separates people, audience preferences, product-note drafts,
 service setup, usage and feedback. Usage provides 7/30-day filters, daily UTC app-open
-counts and channel/version comparisons. The paginated feedback inbox supports
+counts, operation outcomes, task states by agent/workflow and channel/version/OS
+comparisons. Partial results are labeled and must not be used as complete totals.
+The paginated feedback inbox supports
 new/reviewing/planned/closed states. Refresh controls update each view explicitly.
 Writes require a same-origin request in addition to the verified JWT. Responses are
 uncached, framed pages are blocked, and submitted text is never rendered as HTML.
@@ -146,6 +179,10 @@ in all of them. Do not forward private reports into public issues automatically.
 
 - Apply all pending service migrations to staging, then validate `/readyz` schema 2,
   quotas and cron.
+- Deploy ingestion/dashboard schema extensions before a desktop that emits them.
+  Existing v2 clients remain accepted; an older server rejects an entire batch
+  containing an unknown event or field. The operation/task dimensions use the
+  existing aggregate table and need no additional migration.
 - Configure Access issuer/audience/owner. Test owner login, another account, expired
   sessions and direct alternate-host requests; only the owner may read or change data.
 - Onboard a sender, enable a verified recipient, and submit one deliberate test report.
@@ -154,6 +191,11 @@ in all of them. Do not forward private reports into public issues automatically.
 - With an isolated installed beta, inspect traffic before disclosure, after opt-out,
   after restart and during outages. Confirm no content/identifiers and correct installed
   channel. Test feedback with telemetry disabled and an uncertain acknowledgement.
+- In that installed trial, compare a known sequence of task launch, failed check,
+  Chat send, merge and cleanup results with dashboard counts. Retry an identical
+  batch, restore old history and open a Chat popout; none should duplicate task
+  starts. Change privacy choices while both windows are open. Include native
+  process termination separately; renderer observations are not a crash collector.
 - Install a signed stable → beta update, switch back and wait for a higher stable
   version. Test both installer formats, tampered signatures and active-task guards.
 - Configure budget alerts, service health checks and quota/expiry backlog monitoring.

@@ -21,7 +21,9 @@ export function MergeReview({
   merged,
   onChanged,
   onlyRunId,
+  onlyRunIds,
 }: {
+  onlyRunIds?: string[];
   onlyRunId?: string;
   project: Project;
   runs: TaskRun[];
@@ -37,7 +39,7 @@ export function MergeReview({
     );
     return item?.title ?? (run ? taskTitle(run.prompt) : id);
   };
-  const [selected, setSelected] = useState<string[]>(onlyRunId ? [onlyRunId] : []);
+  const [selected, setSelected] = useState<string[]>(onlyRunIds ?? (onlyRunId ? [onlyRunId] : []));
   const [plans, setPlans] = useState<IntegrationPlan[]>([]);
   const [plan, setPlan] = useState<IntegrationPlan | null>(null);
   const [file, setFile] = useState('');
@@ -50,6 +52,7 @@ export function MergeReview({
   const candidates = runs.filter(
     (r) =>
       (!onlyRunId || r.id === onlyRunId) &&
+      (!onlyRunIds || onlyRunIds.includes(r.id)) &&
       r.projectId === project.id &&
       ['review', 'reviewed'].includes(r.status) &&
       r.workspace &&

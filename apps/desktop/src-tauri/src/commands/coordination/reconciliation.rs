@@ -242,6 +242,7 @@ impl Coordinator {
                 .iter()
                 .filter(|r| {
                     r.project_id == policy.project_id
+                        && !super::managed::owns_run(&inner.ledger, runs, r)
                         && ["review", "reviewed"].contains(&r.status.as_str())
                         && !merged.contains(&r.id)
                         && !runs

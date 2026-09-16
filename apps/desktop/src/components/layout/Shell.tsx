@@ -6,10 +6,11 @@ import { captureDraftForProject } from '../../lib/capture-draft';
 import { shortcutLabel } from '../../lib/platform-shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
-import { telemetry } from '../../stores/communityStore';
+import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -152,25 +153,24 @@ export function Shell({
   }, []);
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('General');
   const [settingsProjectId, setSettingsProjectId] = useState<string>();
-  useEffect(() => {
-    const feature: Partial<Record<ActiveTab, Feature>> = {
-      kanban: 'tasks',
-      'live-sessions': 'tasks',
-      topology: 'codebase',
-      agents: 'agents',
-      mcps: 'connections',
-      'mcp-marketplace': 'connections',
-      usage: 'usage',
-      browser: 'browser',
-      schedules: 'schedules',
-      worktrees: 'worktrees',
-    };
-    const selected = feature[activeTab];
-    if (selected) telemetry.track({ name: 'feature_used', feature: selected });
-  }, [activeTab]);
-  useEffect(() => {
-    if (activeTab === 'preferences') telemetry.track({ name: 'feature_used', feature: 'settings' });
-  }, [activeTab]);
+  const features: Partial<Record<ActiveTab, Feature>> = {
+    kanban: 'tasks',
+    'live-sessions': 'chat',
+    'project-overview': 'project',
+    'project-knowledge': 'knowledge',
+    'project-settings': 'settings',
+    'agent-settings': 'agents',
+    preferences: 'settings',
+    topology: 'codebase',
+    agents: 'agents',
+    mcps: 'connections',
+    'mcp-marketplace': 'connections',
+    usage: 'usage',
+    browser: 'browser',
+    schedules: 'schedules',
+    worktrees: 'worktrees',
+  };
+  useFeatureTelemetry(features[activeTab]);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [removingProject, setRemovingProject] = useState<Project | null>(null);
   // Keep the command palette mounted after first use so close transitions can finish.
@@ -202,6 +202,7 @@ export function Shell({
   const [composerFocus, setComposerFocus] = useState(0);
   const focusComposer = useCallback(() => {
     setCapture(null);
+    useManagedTaskStore.getState().select(null);
     useExecutionStore.getState().select(null);
     setActiveTab('kanban');
     setComposerFocus((value) => value + 1);
@@ -477,6 +478,7 @@ export function Shell({
           />
         )}
         <PageErrorBoundary
+          feature={features[activeTab]}
           key={`${activeTab}:${activeProjectId}:${settingsCategory}`}
           onBack={
             activeTab === DEFAULT_WORKSPACE_TAB

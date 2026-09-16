@@ -1,7 +1,7 @@
 import { Disclosure, DisclosureSummary, Input } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FolderOpen, X } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
 import { planningDraft } from '../../lib/planning';
@@ -10,6 +10,7 @@ import { assemblePrompt, PROMPT_VERSION } from '../../lib/skills/context-assembl
 import { resolveTaskGuidelines } from '../../lib/skills/task-context';
 import { ideaStageLabels } from '../../lib/task-collection';
 import { effortPrompt } from '../../lib/task-effort';
+import type { RunRequest } from '../../lib/task-runtime';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
@@ -20,6 +21,7 @@ import {
   useProjectStore,
 } from '../../stores/projectStore';
 import { type TaskStatus, useTaskStore } from '../../stores/taskStore';
+import { navigateWorkspace } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { ConfirmAction } from '../ui/ConfirmAction';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -27,6 +29,7 @@ import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { ProjectSetup } from './ProjectSetup';
 import { TaskComposer } from './TaskComposer';
+import { TaskAssessmentNotice, useTaskAssessment } from './useTaskAssessment';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 
 // The tools panel pulls in the agent, connection and project editors; load it
@@ -51,6 +54,9 @@ export function CaptureTask({
   compact?: boolean;
 }) {
   const focus = useDialogFocus();
+  const assessment = useTaskAssessment();
+  const launching = useRef(false);
+  const [launchingPlan, setLaunchingPlan] = useState(false);
   const { projects, activeProjectId, selectProject } = useProjectStore();
   const { drafts, draft, runners, start, submitting, discover, discovering } = useExecutionStore();
   const idea = useTaskStore((state) => state.tasks.find((task) => task.id === ideaId));
@@ -172,7 +178,10 @@ export function CaptureTask({
   useEffect(() => {
     if (agent) draft(key, { agent, model: undefined });
   }, [agent, key, draft]);
-  const update = (value: Partial<typeof current>) => draft(key, { ...current, ...value });
+  const update = (value: Partial<typeof current>) => {
+    assessment.clear();
+    draft(key, { ...current, ...value });
+  };
   const skills = resolveTaskGuidelines(current.prompt, current.skills, project?.preferences);
   const assembled = assemblePrompt({
     rawPrompt: current.prompt.trim(),
@@ -234,11 +243,12 @@ export function CaptureTask({
       return { drafts: next };
     });
   };
-  const launch = async () => {
+  const launch = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
     if (
       !project ||
       !runner?.available ||
       submitting ||
+      launching.current ||
       !desktop ||
       loadedProject !== `${project.id}:${toolRevision}` ||
       connectionError ||
@@ -249,8 +259,11 @@ export function CaptureTask({
     )
       return;
     setError('');
+    launching.current = true;
+    setLaunchingPlan(true);
     try {
-      const id = await start({
+      const request: RunRequest = {
+        id: crypto.randomUUID(),
         projectId: project.id,
         projectName: project.name,
         projectPath: project.path,
@@ -266,13 +279,30 @@ export function CaptureTask({
         isolated: current.isolated,
         connectionIds: current.connectionIds,
         contextSelection: current.contextSelection,
-      });
+      };
+      if (choice === 'assess') {
+        const result = await assessment.assess(request, current.prompt.trim());
+        if (result.strategy !== 'single') return;
+      }
+      if (choice === 'plan') {
+        const parentId = await assessment.create(request, current.prompt.trim());
+        saveIdea(parentId);
+        clear();
+        selectProject(project.id);
+        onStarted();
+        navigateWorkspace('live-sessions');
+        return;
+      }
+      const id = await start(request);
       saveIdea(id);
       clear();
       selectProject(project.id);
       onStarted();
     } catch (cause) {
       setError(String(cause));
+    } finally {
+      launching.current = false;
+      setLaunchingPlan(false);
     }
   };
   const content = (
@@ -359,7 +389,7 @@ export function CaptureTask({
         automaticAgent={runners.find((r) => r.id === defaultAgent)?.name}
         runner={runner}
         allowedRunners={allowed}
-        submitting={submitting}
+        submitting={submitting || launchingPlan}
         desktop={
           desktop &&
           !!project &&
@@ -382,7 +412,7 @@ export function CaptureTask({
           })
         }
         onChange={update}
-        onLaunch={launch}
+        onLaunch={() => launch()}
         onSave={() => {
           saveIdea();
           clear();
@@ -392,6 +422,13 @@ export function CaptureTask({
           }
           onClose();
         }}
+      />
+      <TaskAssessmentNotice
+        assessment={assessment.assessment}
+        busy={assessment.busy}
+        onCancel={() => void assessment.cancel()}
+        onSingle={() => void launch('single')}
+        onPlan={() => void launch('plan')}
       />
       {idea && (
         <Disclosure className="mt-4">

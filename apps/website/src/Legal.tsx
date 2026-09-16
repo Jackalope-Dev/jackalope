@@ -153,8 +153,11 @@ const privacy: Section[] = [
           In builds with reporting enabled, Jackalope presents a privacy choice before sending usage
           reports. You can continue without sharing, or change your choice in Settings → Privacy.
           Reports contain app version, operating system, release channel, and allowlisted app-open,
-          task-outcome, feature-use, and optional error-category events. They include a random event
-          ID to avoid counting retries twice, not an installation or account ID.
+          task-state, page-visit, operation-outcome, and optional error-category events. Task states
+          include a fixed agent type and task or Chat workflow; operation outcomes include failed
+          requests and checks. Error categories can include a fixed operation or page name. Reports
+          include a random event ID to avoid counting retries twice, not an installation or account
+          ID.
         </p>
         <p>
           These reports do not include prompts, code, file paths, command output, error messages, or

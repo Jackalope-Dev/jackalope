@@ -294,7 +294,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'concurrency-collisions',
         question: 'How does Jackalope coordinate parallel work?',
         paragraphs: [
+          'New tasks can recommend focused work, investigation, or a reviewed plan using the project’s Decisions preference. Create a plan uses your selected development agent and its normal capacity. Review the concrete assignments before starting; one parent keeps planning, worker attempts, usage, and the combined result together.',
           'Parallel plans record task scopes, dependencies, and a concurrency limit. The coordinator reserves work before launching an agent; dependencies wait for the changes they need to be integrated.',
+          'Managed plans pass verified predecessor snapshots to dependent assignments and add a combined review when multiple assignments are needed. Pause dispatch holds pending work; Stop task also stops active attempts. Restart leaves dispatch paused, and applying the combined changes remains explicit.',
           'Retries can use a fresh worktree. Interrupted work retains its history and ownership information instead of being silently relaunched. Pause stops new dispatch; use Stop for an active task.',
         ],
       },
@@ -350,6 +352,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Settings → Decisions chooses local rules, agent-powered reasoning, or Jev-assisted decisions. Projects inherit the app default unless you override it. Automatic tasks select among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
           'Local rules use preferences and current capacity without a model call. Agent-powered routing uses your default agent. Optional Jev uses your TypeSafe key and may reduce routing cost and latency; savings are not guaranteed. Jackalope validates the decision and saves its reason and any reported usage. Jev uncertainty or service errors use local rules without an extra paid agent call. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity runs as a worker. Explicit assignments remain available.',
+          'Task assessments use the same project preference. Local fast paths and unchanged recent requests avoid model calls; other eligible requests make at most one bounded assessment. Jev classifies the approach but cannot generate or authorize a plan. Usage lists assessment calls separately, including calls that never launched a task, and counts reused assessments once. Real-provider cost and quality comparisons remain open.',
         ],
       },
       {

@@ -51,6 +51,12 @@ export const roadmapStages = [
           'Local setup guides you through your computer’s requirements, OpenCode and Ollama installation, and an optional model download. A file edit and session check must pass before connection. Jackalope bundles no model weights. Help retrieves relevant documentation locally, while routing keeps every eligible model in consideration. Real-model quality, token savings, and installed setup still need validation.',
       },
       {
+        title: 'One request, a reviewed approach.',
+        summary: 'Project decision preferences guide task assessment and planning.',
+        detail:
+          'New tasks can recommend focused work, investigation, or a reviewed plan. Local fast paths and reused assessments avoid extra model calls. Creating a plan uses your selected development agent and its normal capacity; Jev classifies the approach. Review assignments before starting, follow related work under one task, and explicitly integrate the combined result. Usage retains assessment calls even when work never starts. Installed-provider testing and cost/quality calibration remain in progress.',
+      },
+      {
         title: 'Room to work in parallel.',
         summary: 'Useful delegation, separate worktrees, and shared context.',
         detail:

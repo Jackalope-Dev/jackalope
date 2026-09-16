@@ -95,8 +95,42 @@ pub(super) fn ready_items(
         .items
         .iter()
         .filter(|item| {
-            inner.enabled.contains(&item.project_id)
-                && !item.canceled
+            (if let Some(task) = inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .find(|task| Some(&task.id) == item.feature_id.as_ref())
+            {
+                inner
+                    .enabled
+                    .contains(&super::managed::dispatch_key(&task.id))
+                    && !inner
+                        .ledger
+                        .items
+                        .iter()
+                        .filter(|other| other.feature_id == item.feature_id)
+                        .any(|other| {
+                            other.error.is_some()
+                                || other.canceled
+                                || other.run_id.as_ref().is_some_and(|id| {
+                                    runs.iter().find(|run| &run.id == id).is_none_or(|run| {
+                                        !active(&run.status)
+                                            && (!matches!(
+                                                run.status.as_str(),
+                                                "review" | "reviewed"
+                                            ) || run.error.is_some()
+                                                || run.persistence_error.is_some()
+                                                || run.dependency_invalidated
+                                                || run.verification_error.is_some()
+                                                || run.verification.as_ref().is_none_or(|check| {
+                                                    !check.result.success || check.tree.is_none()
+                                                }))
+                                    })
+                                })
+                        })
+            } else {
+                inner.enabled.contains(&item.project_id)
+            }) && !item.canceled
                 && item.run_id.is_none()
                 && item.error.is_none()
         })

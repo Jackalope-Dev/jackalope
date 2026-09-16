@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope/ui';
 import { ChartNoAxesColumn, Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { countedTaskDecisions } from '../../lib/decision-usage';
 import { taskTitle } from '../../lib/task-title';
 import { usageEntries } from '../../lib/usage-entries';
 import {
@@ -25,6 +26,7 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
 import { AgentMetricsDashboard } from './AgentMetricsDashboard';
 import { CapacityPanel } from './CapacityPanel';
+import { DecisionUsage, useTaskDecisionUsage } from './DecisionUsage';
 import { JevConnectionUsage } from './JevConnectionUsage';
 import { tokenLabel, UsageInsights } from './UsageInsights';
 import { WorkflowReport } from './WorkflowReport';
@@ -45,6 +47,7 @@ export function UsageDashboard({
   const [agent, setAgent] = useState('all');
   const [ledger, setLedger] = useState<'tasks' | 'calls'>('tasks');
   const [date, setDate] = useState<string | null>(null);
+  const decisionUsage = useTaskDecisionUsage(view === 'tokens');
   const helper = useHelperStore((s) => s.view);
   const helperError = useHelperStore((s) => s.syncError);
   const refreshHelper = useHelperStore((s) => s.refresh);
@@ -65,6 +68,10 @@ export function UsageDashboard({
     ...runs.map((r) => [r.projectId, r.projectName] as const),
   ]);
   const cutoff = usageCutoff(period);
+  const showAssessments = agent === 'all' && account === 'all';
+  const assessments = showAssessments
+    ? countedTaskDecisions(decisionUsage.records, project === 'all' ? undefined : project, cutoff)
+    : [];
   const filtered = useMemo(
     () =>
       entries.filter(
@@ -154,8 +161,16 @@ export function UsageDashboard({
         [
           JSON.stringify(
             {
-              schema: 4,
+              schema: 5,
               filters: { project, agent, account, period },
+              taskAssessments: showAssessments
+                ? {
+                    coverage:
+                      'Project and period scoped; includes calls that did not launch work; distinct from task execution and worker routing',
+                    error: decisionUsage.error || undefined,
+                    assessments: decisionUsage.error ? [] : assessments,
+                  }
+                : undefined,
               taskActivity: {
                 total: insights.total,
                 routing: insights.routing,
@@ -230,7 +245,10 @@ export function UsageDashboard({
               variant="outline"
               onClick={exportUsage}
               disabled={
-                loading || Boolean(historyError) || (!filtered.length && !helper.turns.length)
+                loading ||
+                Boolean(historyError) ||
+                (showAssessments && decisionUsage.loading) ||
+                (!filtered.length && !helper.turns.length && !assessments.length)
               }
             >
               <Download size={18} />
@@ -384,6 +402,13 @@ export function UsageDashboard({
               </InlineNotice>
             )}
           </section>
+          {showAssessments && (
+            <DecisionUsage
+              {...decisionUsage}
+              projectId={project === 'all' ? undefined : project}
+              cutoff={cutoff}
+            />
+          )}
           <section className="workspace-section workspace-stack" aria-label="Usage details">
             {!loading && !historyError && filtered.length > 0 && (
               <WorkspaceSectionHeading

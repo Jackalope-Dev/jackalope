@@ -37,7 +37,8 @@ pin, persistent drafts, agent results and cumulative patch exports are implement
 after restart. Paused sessions use guarded review, verification, merge and cleanup;
 applied receipts prevent further dispatch into the integrated workspace. A new chat can
 carry forward the result. Optional batch and estimated-cost thresholds pause later work;
-they cannot cap provider billing. Installed acceptance and independent task planning remain open.
+they cannot cap provider billing. Installed acceptance remains open; managed task
+planning has a separate reviewed lifecycle.
 
 Four default project-setup steps, optional Git/appearance settings, cross-project
 attention on Chat, remembered task sections and changes since the last review are implemented.
@@ -49,6 +50,13 @@ Real daily-use and quality improvements still require observed trials.
 Jackalope Decisions provides project-scoped local rules, agent-powered decisions and
 optional Jev-assisted routing with protected device keys and visible usage. Jev
 quality/cost calibration and installed cross-platform acceptance remain in progress.
+
+Task submission can assess focused work, investigation or a reviewed plan using
+the project's Decisions preference. Plans keep scoped assignments, retained attempts
+and usage under one parent. Multiple assignments receive combined verification;
+users review before starting and explicitly integrate the result. Local fast paths
+and cached assessments avoid repeated model calls. Installed-provider acceptance
+and held-out cost/quality comparisons remain open.
 
 Optional local-agent setup includes hardware guidance, download choices and a real
 file/session check before connecting OpenCode to Ollama. Model-free help retrieval
@@ -75,9 +83,9 @@ agreements and changed-file scope reviews gate dependent work and integration. O
 agent reconciliation and verified local merges keep source worktrees and recovery receipts. Repeated [execution evaluations](EXECUTION-EVALUATION.md)
 and installed acceptance are required before claiming throughput or quality gains.
 
-Lead-agent instructions assess delegation automatically using available provider
-subagent tools, with sequential fallback and combined-result responsibility. Task
-capture has no split control. Provider execution and quality acceptance remain open.
+Requests continuing with one lead can delegate through available provider subagent
+tools, with sequential fallback and combined-result responsibility. Provider execution
+and quality acceptance remain open.
 
 Process-scoped model effort requests for Codex/Claude, usage attribution and direct-CLI
 quality comparisons are implemented. Broader independent evaluation and automatic

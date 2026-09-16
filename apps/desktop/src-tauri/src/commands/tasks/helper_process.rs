@@ -13,6 +13,26 @@ pub(in crate::commands) fn run(
     prompt: &str,
     canceled: &AtomicBool,
 ) -> Result<TaskRun, String> {
+    run_bounded(
+        runtime,
+        agent,
+        binding,
+        model,
+        prompt,
+        canceled,
+        Duration::from_secs(120),
+    )
+}
+
+pub(in crate::commands) fn run_bounded(
+    runtime: &TaskRuntime,
+    agent: &str,
+    binding: &AccountBinding,
+    model: Option<&str>,
+    prompt: &str,
+    canceled: &AtomicBool,
+    timeout: Duration,
+) -> Result<TaskRun, String> {
     runtime.access.ensure()?;
     let policy = runtime.policy()?;
     let (adapter, executable) = policy.resolve(agent)?;
@@ -73,7 +93,7 @@ pub(in crate::commands) fn run(
         if canceled.load(Ordering::SeqCst) {
             break Err("Stopped.".into());
         }
-        if started.elapsed() > Duration::from_secs(120) {
+        if started.elapsed() > timeout.min(Duration::from_secs(120)) {
             break Err("The agent timed out. Check its account and try again.".into());
         }
         std::thread::sleep(Duration::from_millis(50));

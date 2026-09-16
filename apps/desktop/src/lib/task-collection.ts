@@ -1,6 +1,8 @@
 import type { TaskTicket } from '../stores/taskStore.ts';
 import { taskAgents } from './agent-provider.ts';
 import { type LiveSession, sessionWork } from './live-session.ts';
+import { type ManagedTask, managedTaskWork } from './managed-task.ts';
+import type { QueueView } from './queue.ts';
 import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
 import { taskNextAction } from './task-workflow.ts';
@@ -29,7 +31,27 @@ export interface WorkItem {
   idea?: TaskTicket;
   run?: TaskRun;
   session?: LiveSession;
+  managed?: ManagedTask;
   archiveBlocked?: string;
+}
+
+export function selectedManagedTask(
+  queue: QueueView,
+  runs: TaskRun[],
+  taskId: string | null,
+  runId: string | null,
+  projectId: string | null = null,
+) {
+  const task = queue.managedTasks?.find(
+    (task) => task.id === taskId && (projectId === null || task.request.projectId === projectId),
+  );
+  if (!task || !runId) return task;
+  const work = managedTaskWork(task, queue, runs);
+  return task.plannerRunId === runId ||
+    task.runIds.includes(runId) ||
+    work.work.some((run) => run.id === runId)
+    ? task
+    : undefined;
 }
 
 export function workPresence(item: WorkItem): {
@@ -39,25 +61,34 @@ export function workPresence(item: WorkItem): {
 } {
   const run = item.run;
   const pending = !!run?.prompts?.some((prompt) => prompt.status === 'pending');
-  const agents = taskAgents(run, item.session?.request.agent ?? item.idea?.assignedAgent);
+  const agents = taskAgents(
+    run,
+    item.managed?.request.agent ?? item.session?.request.agent ?? item.idea?.assignedAgent,
+  );
   const state = pending
     ? 'waiting'
     : (run && isActive(run)) || item.stage === 'working'
       ? 'working'
       : 'idle';
-  const action = item.session
-    ? pending
-      ? 'Answer question'
-      : item.stage === 'attention'
-        ? 'Inspect session'
-        : item.stage === 'working'
-          ? 'View activity'
-          : 'Open Chat'
-    : run
-      ? item.stage === 'finished'
-        ? 'Open result'
-        : taskNextAction(run)
-      : 'Open idea';
+  const action = item.managed
+    ? item.stage === 'attention'
+      ? 'Inspect task'
+      : item.stage === 'review'
+        ? 'Review task'
+        : 'Open task'
+    : item.session
+      ? pending
+        ? 'Answer question'
+        : item.stage === 'attention'
+          ? 'Inspect session'
+          : item.stage === 'working'
+            ? 'View activity'
+            : 'Open Chat'
+      : run
+        ? item.stage === 'finished'
+          ? 'Open result'
+          : taskNextAction(run)
+        : 'Open idea';
   return { agents, state, action };
 }
 
@@ -68,15 +99,46 @@ export function collectWorkspaceWork(
   sessions: LiveSession[],
   integratedRunIds: string[] = [],
   archived = false,
+  queue?: QueueView,
 ): WorkItem[] {
   const sessionIds = new Set(sessions.map((session) => session.id));
+  const managedWork = (queue?.managedTasks ?? [])
+    .filter((task) => projectId === null || task.request.projectId === projectId)
+    .map((task) => ({ task, work: managedTaskWork(task, queue as QueueView, runs) }));
+  const childIds = new Set(managedWork.flatMap(({ work }) => work.work.map((run) => run.id)));
+  const parentProjects = new Map(managedWork.map(({ task }) => [task.id, task.request.projectId]));
   const items = collectWork(
     projectId,
-    ideas,
-    runs.filter((run) => !run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+    ideas.filter((idea) => !idea.runId || parentProjects.get(idea.runId) !== idea.projectId),
+    runs.filter(
+      (run) => !childIds.has(run.id) && (!run.liveSessionId || !sessionIds.has(run.liveSessionId)),
+    ),
     integratedRunIds,
     archived,
   );
+  if (!archived)
+    for (const { task, work } of managedWork) {
+      items.push({
+        id: `managed:${task.id}`,
+        title: task.title,
+        date: task.createdAt,
+        managed: task,
+        idea: ideas.find(
+          (idea) => idea.runId === task.id && idea.projectId === task.request.projectId,
+        ),
+        stage: work.integrated
+          ? 'finished'
+          : work.questions.length || work.failed || work.status === 'Needs attention'
+            ? 'attention'
+            : work.active.length || work.status === 'Queued'
+              ? 'working'
+              : work.status === 'Paused'
+                ? 'attention'
+                : 'review',
+        run: work.combined ?? work.planner,
+        archiveBlocked: 'This task retains its planning and worker history together.',
+      });
+    }
   if (!archived)
     for (const session of sessions) {
       if (projectId !== null && session.request.projectId !== projectId) continue;

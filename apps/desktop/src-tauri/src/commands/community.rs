@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Mutex, time::Duration};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -148,7 +148,9 @@ pub fn app_community_configure(
         p.telemetry = telemetry;
         p.errors = errors;
     })?;
-    app_community_settings(app, state)
+    let status = app_community_settings(app.clone(), state)?;
+    let _ = app.emit("community-settings-changed", &status);
+    Ok(status)
 }
 #[tauri::command]
 pub fn app_release_channel(
@@ -170,10 +172,107 @@ pub fn app_release_channel(
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(tag = "name", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Metric {
-    AppOpened { id: String },
-    TaskState { id: String, state: TaskState },
-    FeatureUsed { id: String, feature: Feature },
-    AppError { id: String, code: ErrorCode },
+    AppOpened {
+        id: String,
+    },
+    TaskState {
+        id: String,
+        state: TaskState,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<TelemetryAgent>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        workflow: Option<Workflow>,
+    },
+    FeatureUsed {
+        id: String,
+        feature: Feature,
+    },
+    AppError {
+        id: String,
+        code: ErrorCode,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        operation: Option<Operation>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        feature: Option<Feature>,
+    },
+    OperationResult {
+        id: String,
+        operation: Operation,
+        outcome: OperationOutcome,
+    },
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Operation {
+    TaskStart,
+    TaskRetry,
+    TaskStop,
+    TaskVerify,
+    TaskRespondPrompt,
+    TaskOutcomeReview,
+    TaskPreviewStart,
+    TaskPreviewInspect,
+    TaskRetrySave,
+    TaskExportRecovery,
+    TaskImportRecovery,
+    LiveSessionCreate,
+    LiveSessionSend,
+    LiveSessionReview,
+    LiveSessionPause,
+    LiveSessionResume,
+    LiveSessionRetry,
+    LiveSessionFinish,
+    LiveSessionLimits,
+    LiveSessionWindow,
+    QueueAdd,
+    QueueImport,
+    QueueDispatch,
+    IntegrationPrepare,
+    IntegrationApply,
+    ScheduleSave,
+    ScheduleSetEnabled,
+    KnowledgeSave,
+    KnowledgeSearch,
+    McpSaveServer,
+    McpProbeServer,
+    McpAuthenticate,
+    GitCreateWorktree,
+    GitCleanupWorktree,
+    GitArchiveWorktree,
+    AgentProfileCreate,
+    AgentProfileSignIn,
+    LocalAiConnect,
+    HelperSend,
+    HelperAction,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationOutcome {
+    Accepted,
+    Failed,
+    Blocked,
+    Partial,
+    Canceled,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TelemetryAgent {
+    Codex,
+    Claude,
+    Grok,
+    Opencode,
+    Kimi,
+    Antigravity,
+    Gemini,
+    Aider,
+    Goose,
+    Other,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Workflow {
+    Task,
+    Chat,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -190,6 +289,9 @@ pub enum TaskState {
 #[serde(rename_all = "snake_case")]
 pub enum Feature {
     Tasks,
+    Chat,
+    Project,
+    Knowledge,
     Worktrees,
     Agents,
     Usage,
@@ -207,6 +309,13 @@ pub enum ErrorCode {
     VerificationFailed,
     UpdateFailed,
     UiError,
+    UiRejection,
+    UiRenderError,
+    HistoryLoadFailed,
+    AgentDiscoveryFailed,
+    CheckpointFailed,
+    VerificationError,
+    OperationFailed,
     TaskFailed,
 }
 fn valid_id(id: &str) -> bool {
@@ -218,6 +327,7 @@ impl Metric {
             Self::AppOpened { id }
             | Self::TaskState { id, .. }
             | Self::FeatureUsed { id, .. }
+            | Self::OperationResult { id, .. }
             | Self::AppError { id, .. } => id,
         }
     }
@@ -335,6 +445,28 @@ pub async fn app_submit_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn telemetry_contract_round_trips_without_private_dimensions() {
+        let fixtures: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+            "../../../scripts/fixtures/telemetry-events.json"
+        ))
+        .unwrap();
+        for fixture in fixtures {
+            let metric: Metric = serde_json::from_value(fixture.clone()).unwrap();
+            assert!(valid_id(metric.id()));
+            assert_eq!(serde_json::to_value(metric).unwrap(), fixture);
+            let mut private = fixture.clone();
+            private["path"] = "/private/repository".into();
+            assert!(serde_json::from_value::<Metric>(private).is_err());
+        }
+        for private in [
+            serde_json::json!({"name":"operation_result","id":"x","operation":"private_command","outcome":"accepted"}),
+            serde_json::json!({"name":"task_state","id":"x","state":"running","agent":"private_account"}),
+            serde_json::json!({"name":"app_error","id":"x","code":"ui_render_error","feature":"private_project"}),
+        ] {
+            assert!(serde_json::from_value::<Metric>(private).is_err());
+        }
+    }
     #[test]
     fn cloud_update_channels_allow_only_the_exact_trusted_query() {
         let endpoint = "https://cdn.crabnebula.app/update/jackalope-digital/jackalope/{{target}}-{{arch}}/{{current_version}}?channel=beta";

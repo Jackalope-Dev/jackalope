@@ -36,7 +36,8 @@ Configured official builds default telemetry **on**, with an opt-out. Requiremen
 constraint, not a nice-to-have, because Jackalope runs against users' private
 codebases and agent conversations:
 
-- Allowed: fixed feature names, task status transitions, fixed error categories,
+- Allowed: fixed view/operation names and outcomes, task status transitions with
+  allowlisted agent and task/Chat workflow, fixed error categories and page/operation context,
   installed app version, installed channel and OS. Each event gets a random UUID
   for bounded retry deduplication; it is never an installation identifier.
 - Never: installation/account/device IDs, prompts, agent output, source, paths,

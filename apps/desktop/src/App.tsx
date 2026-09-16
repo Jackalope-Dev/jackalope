@@ -9,7 +9,7 @@ import { observeDesktopControlTheme } from './lib/desktop-control-theme';
 import { observeTelemetry } from './lib/observe-telemetry';
 import { commitProjectSetup } from './lib/project-setup';
 import { nativeTask } from './lib/task-runtime';
-import { useCommunityStore } from './stores/communityStore';
+import { observeCommunity } from './stores/communityStore';
 import { observeExecution, useExecutionStore } from './stores/executionStore';
 import { observeFeedbackActivity } from './stores/feedbackStore';
 import { observeNotifications } from './stores/notificationStore';
@@ -28,6 +28,7 @@ export default function App() {
   useEffect(observeSettingsSync, []);
   const [resetError, setResetError] = useState('');
   const [ready, setReady] = useState(!('__JACKALOPE_RESET__' in window));
+  useEffect(() => (ready ? observeCommunity() : undefined), [ready]);
   const [initialTaskAgent, setInitialTaskAgent] = useState<string>();
   const [initialDraftKey, setInitialDraftKey] = useState<string>();
   const [entry, setEntry] = useState<{
@@ -67,7 +68,6 @@ export default function App() {
   }, [ready]);
   useEffect(() => {
     if (ready) {
-      void useCommunityStore.getState().load();
       return observeExecution();
     }
     nativeTask('app_finish_reset')

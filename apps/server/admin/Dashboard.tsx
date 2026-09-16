@@ -21,6 +21,7 @@ import {
   useResource,
 } from './api';
 import { ErrorNotice, Heading, QuickLink, Refresh, SelectField, Table } from './components';
+import { operationCounts, taskCounts } from './metrics';
 
 export function Dashboard() {
   const summary = useResource<Summary>('/admin/api/summary');
@@ -185,8 +186,9 @@ export function Usage() {
   const [days, setDays] = useState('7');
   const [channel, setChannel] = useState('all');
   const [version, setVersion] = useState('');
+  const [os, setOs] = useState('all');
   const request = useResource<Overview>(
-    `/admin/api/overview?${new URLSearchParams({ days, channel, version })}`,
+    `/admin/api/overview?${new URLSearchParams({ days, channel, version, os })}`,
   );
   const data = request.data;
   const metrics = data?.metrics || [];
@@ -207,12 +209,12 @@ export function Usage() {
       row[3] = Number(row[3]) + metric.count;
       totals.set(metric.day, (totals.get(metric.day) || 0) + metric.count);
     }
-    if (metric.name === 'task_state' && metric.dimension === 'starting')
+    if (metric.name === 'task_state' && metric.dimension.split('|')[0] === 'starting')
       row[4] = Number(row[4]) + metric.count;
     if (metric.name === 'app_error') row[5] = Number(row[5]) + metric.count;
     releases.set(key, row);
     if (metric.name === 'feature_used' || metric.name === 'app_error') {
-      const key = `${metric.name === 'app_error' ? 'Error' : 'Feature use'} / ${displayName(metric.dimension)}`;
+      const key = `${metric.name === 'app_error' ? 'Error' : 'View'} / ${metric.dimension.split('|').filter(Boolean).map(displayName).join(' / ')}`;
       events.set(key, (events.get(key) || 0) + metric.count);
     }
   }
@@ -265,6 +267,15 @@ export function Usage() {
             onChange={setVersion}
             options={[['', 'All versions'], ...versions.map((value) => [value, value] as const)]}
           />
+          <SelectField
+            label="Operating system"
+            value={os}
+            onChange={setOs}
+            options={['all', 'windows', 'macos', 'linux'].map((value) => [
+              value,
+              value === 'all' ? 'All operating systems' : audienceLabel(value),
+            ])}
+          />
         </div>
         <ErrorNotice>{request.error}</ErrorNotice>
         <p role="status" className="notice">
@@ -290,8 +301,8 @@ export function Usage() {
           <div className="metric-grid">
             {[
               ['App opens', 'app_opened'],
-              ['Task transitions', 'task_state'],
-              ['Feature uses', 'feature_used'],
+              ['View visits', 'feature_used'],
+              ['Operation results', 'operation_result'],
               ['Reported errors', 'app_error'],
             ].map(([label, name]) => (
               <Stat
@@ -359,9 +370,48 @@ export function Usage() {
             />
           </Panel>
           <Panel className="panel">
-            <h2>Feature use and errors</h2>
+            <h2>Operation results</h2>
+            <p>
+              One result per reported operation. Accepted means the native command acknowledged the
+              request; task starts and queued Chat messages can still fail later. Failed results
+              include rejected requests and failed checks. Partial means a merge applied but cleanup
+              did not finish.
+            </p>
             <Table
-              label="Feature use and errors"
+              label="Operation results"
+              headers={['Operation', 'Accepted', 'Failed', 'Blocked', 'Partial', 'Canceled']}
+              rows={operationCounts(metrics).map((row) => [
+                displayName(row.operation),
+                row.accepted,
+                row.failed,
+                row.blocked,
+                row.partial,
+                row.canceled,
+              ])}
+            />
+          </Panel>
+          <Panel className="panel">
+            <h2>Observed task states</h2>
+            <p>
+              Transitions observed while the main window is loaded. Ready to review is an agent
+              exit, not an accepted outcome or merge. Unknown marks reports from older clients.
+              Counts are not a completion funnel.
+            </p>
+            <Table
+              label="Observed task states"
+              headers={['State', 'Agent', 'Workflow', 'Count']}
+              rows={taskCounts(metrics).map((row) => [
+                row.state === 'review' ? 'Ready to review' : displayName(row.state),
+                displayName(row.agent),
+                displayName(row.workflow),
+                row.count,
+              ])}
+            />
+          </Panel>
+          <Panel className="panel">
+            <h2>View visits and error categories</h2>
+            <Table
+              label="View visits and error categories"
               headers={['Event / category', 'Count']}
               rows={[...events.entries()].sort((a, b) => b[1] - a[1])}
             />

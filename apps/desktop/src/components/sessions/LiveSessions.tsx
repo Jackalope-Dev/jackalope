@@ -10,6 +10,10 @@ import { LiveSessionView } from './LiveSessionView';
 import { SessionRecovery } from './SessionRecovery';
 import { SessionStart } from './SessionStart';
 import './live-session.css';
+import { managedTaskWork } from '../../lib/managed-task';
+import { useExecutionStore } from '../../stores/executionStore';
+import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
+import { ManagedTaskView } from '../tasks/ManagedTaskView';
 
 export function LiveSessions({
   project,
@@ -20,7 +24,14 @@ export function LiveSessions({
 }) {
   const { sessions, runs, selectedId, select, loading } = useLiveSessionStore();
   const [fresh, setFresh] = useState(0);
+  const managed = useManagedTaskStore();
+  const taskRuns = useExecutionStore((state) => state.runs);
+  const managedTasks = (managed.queue.managedTasks ?? []).filter(
+    (task) => !project || task.request.projectId === project.id,
+  );
+  const selectedTask = managedTasks.find((task) => task.id === managed.selectedId);
   useEffect(observeLiveSessions, []);
+  useEffect(observeManagedTasks, []);
   const session = sessions.find(
     (item) => item.id === selectedId && (!project || item.request.projectId === project.id),
   );
@@ -45,9 +56,11 @@ export function LiveSessions({
     .sort((a, b) => a.group - b.group || b.activity - a.activity);
   return (
     <section className="live-hub" aria-label="Chat">
-      <div className="live-hub-body" data-has-history={items.length > 0}>
+      <div className="live-hub-body" data-has-history={items.length > 0 || managedTasks.length > 0}>
         <div className="live-hub-canvas">
-          {session ? (
+          {selectedTask ? (
+            <ManagedTaskView task={selectedTask} onBack={() => managed.select(null)} />
+          ) : session ? (
             <LiveSessionView
               key={session.id}
               session={session}
@@ -66,7 +79,7 @@ export function LiveSessions({
             </>
           )}
         </div>
-        {items.length > 0 && (
+        {(items.length > 0 || managedTasks.length > 0) && (
           <nav className="live-history" aria-label="Chats">
             <div className="live-history-action">
               <Button
@@ -75,6 +88,7 @@ export function LiveSessions({
                 className="w-full justify-center"
                 onClick={() => {
                   select(null);
+                  managed.select(null);
                   setFresh((value) => value + 1);
                 }}
               >
@@ -82,6 +96,30 @@ export function LiveSessions({
                 New chat
               </Button>
             </div>
+            {managedTasks.length > 0 && (
+              <section className="live-history-group">
+                <h2>Planned tasks</h2>
+                {managedTasks.map((task) => (
+                  <button
+                    type="button"
+                    className="live-history-row"
+                    key={task.id}
+                    aria-current={selectedTask?.id === task.id ? 'page' : undefined}
+                    onClick={() => {
+                      select(null);
+                      managed.select(task.id);
+                    }}
+                  >
+                    <span className="live-history-copy">
+                      <strong>{task.title}</strong>
+                      <span className="live-muted">
+                        {managedTaskWork(task, managed.queue, taskRuns).status}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </section>
+            )}
             {['Needs attention', 'In progress', 'Recent', 'Finished'].map((label, group) => {
               const members = items.filter((item) => item.group === group);
               return (
@@ -94,7 +132,10 @@ export function LiveSessions({
                         className="live-history-row"
                         key={item.id}
                         aria-current={item.id === session?.id ? 'page' : undefined}
-                        onClick={() => select(item.id)}
+                        onClick={() => {
+                          managed.select(null);
+                          select(item.id);
+                        }}
                       >
                         <span className="live-mascot" aria-hidden="true">
                           <AgentCharacter

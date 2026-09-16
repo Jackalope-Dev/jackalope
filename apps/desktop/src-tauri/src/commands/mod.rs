@@ -14,6 +14,7 @@ pub mod platform;
 pub mod pty;
 pub mod repo_todos;
 pub mod system;
+pub mod task_strategy;
 pub mod tasks;
 pub mod worktree_cleanup;
 

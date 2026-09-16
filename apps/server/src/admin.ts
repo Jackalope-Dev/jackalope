@@ -79,18 +79,20 @@ export async function adminRoutes(
     const days = Number(url.searchParams.get('days') ?? 7);
     const channel = url.searchParams.get('channel') ?? 'all';
     const version = url.searchParams.get('version') ?? '';
+    const os = url.searchParams.get('os') ?? 'all';
     if (
       ![7, 30].includes(days) ||
       !['all', 'stable', 'beta'].includes(channel) ||
+      !['all', 'windows', 'macos', 'linux'].includes(os) ||
       !/^$|^\d+\.\d+\.\d+$/.test(version) ||
       version.length > 32
     )
       return Response.json({ error: 'invalid_filter' }, { status: 400, headers });
     const since = new Date(Date.now() - (days - 1) * 86400000).toISOString().slice(0, 10);
     const metrics = await env.DB.prepare(
-      "SELECT day,version,channel,os,name,dimension,count FROM metrics WHERE day>=? AND (?='all' OR channel=?) AND (?='' OR version=?) ORDER BY day DESC,version LIMIT 10001",
+      "SELECT day,version,channel,os,name,dimension,count FROM metrics WHERE day>=? AND (?='all' OR channel=?) AND (?='' OR version=?) AND (?='all' OR os=?) ORDER BY day DESC,version LIMIT 10001",
     )
-      .bind(since, channel, channel, version, version)
+      .bind(since, channel, channel, version, version, os, os)
       .all();
     const versions = await env.DB.prepare(
       'SELECT DISTINCT version FROM metrics ORDER BY version DESC LIMIT 100',
@@ -104,7 +106,7 @@ export async function adminRoutes(
         emailEnabled: env.FEEDBACK_EMAIL_ENABLED === 'true',
         retentionDays: env.TELEMETRY_DAYS,
         coverage:
-          'Event counts from participating installations, not unique users, retention, or all crashes. Public ingestion is rate-limited but cannot prove authentic clients.',
+          'Best-effort event counts from participating installations, not unique users, retention, or all crashes. Views are visits; accepted operations are native acknowledgements, not proof of completed agent work. Failed checks and rejected operations are not necessarily app defects. Error categories require separate consent. Public ingestion cannot prove authentic clients.',
       },
       { headers },
     );

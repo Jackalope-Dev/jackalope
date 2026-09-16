@@ -55,9 +55,14 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   [coordination contracts](ORCHESTRATION-CAPABILITIES.md).
 - Repository-aware plans, optional verified predecessor snapshots, dependency-aware
   scheduling, structured coordination reports and workspace verification reservations.
-- Lead-agent guidance automatically assesses useful delegation through available
-  provider subagent tools. Task capture has no split control; unsupported or denied
-  delegation stays sequential. See [agent quality](AGENT-QUALITY.md) for boundaries.
+- New tasks can assess focused work, investigation or a reviewed plan through the
+  project's Decisions preference. Local fast paths and reused assessments avoid model
+  calls. Plans retain one parent, scoped assignments, attempts and usage; multiple
+  assignments receive combined verification. Users review before starting and explicitly
+  integrate the result. Installed-provider and cost/quality acceptance remain open.
+- Requests continuing with one lead can delegate through available provider subagent
+  tools. Unsupported or denied delegation stays sequential. See
+  [agent quality](AGENT-QUALITY.md) for boundaries.
 - Individual and bulk task archiving with undo and restore, preserving results and workspaces.
   Durable incremental task saves, bounded concurrent history loading, recovery
   exports and [archive management](HISTORY-RECOVERY.md).
@@ -119,6 +124,10 @@ The private admin console groups access management, audience preferences, produc
 drafts, service setup, aggregate usage and feedback, with overview links for onboarding
 and email follow-ups. Configuration and connection counts do not establish delivery,
 installation or completed tasks.
+Optional anonymous reporting separates view visits from native operation outcomes,
+observed task states by agent/workflow and fixed diagnostic categories. Release,
+channel and OS filters support aggregate triage; it does not establish unique-user
+retention, complete task funnels or native crash coverage. See [monitoring](BETA-MONITORING.md).
 
 Windows uses DPAPI; macOS uses Keychain; Linux uses Secret Service. Unix discovery,
 process guardians, browser ownership, notifications and tray/Dock behavior have

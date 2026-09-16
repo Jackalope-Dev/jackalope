@@ -38,6 +38,10 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Validate task assessment, stale-cache invalidation, reviewed planning, scoped
+  dispatch, retained usage, pause/stop/restart recovery and explicit final integration
+  with installed providers. Compare complete cost and quality on held-out tasks;
+  preserve serial live-session batch and cost limits.
 - [ ] Calibrate Jev decision thresholds on held-out tasks and compare end-to-end cost,
   latency and outcomes with local rules and agent routing. Validate real API usage,
   quota errors, cancellation, project inheritance and credential replace/remove on
@@ -115,6 +119,8 @@ release dates.
   delivery and installed clients, including retries, suppression and optional
   email enrollment remaining off until selected.
 - [ ] Complete reporting, retention/deletion and installed-channel acceptance.
+  Verify known operation counts, retry deduplication, restored history and privacy
+  changes across the main window and Chat popouts against the deployed dashboard.
 - [ ] Keep builds and automated fixtures reproducible without private credentials;
   document approved account setup for native execution.
 

@@ -86,9 +86,22 @@ A batch contains 1–50 events. Installation IDs are forbidden. No task ID or us
 | Event name | Additional required field and accepted values |
 | --- | --- |
 | `app_opened` | None |
-| `task_state` | `state`: `starting`, `running`, `review`, `reviewed`, `failed`, `stopped`, `interrupted` |
-| `feature_used` | `feature`: `tasks`, `worktrees`, `agents`, `usage`, `codebase`, `settings`, `connections`, `schedules`, `browser`, `queue` |
-| `app_error` | `code`: `history_save_failed`, `verification_failed`, `update_failed`, `ui_error`, `task_failed` |
+| `task_state` | `state`: `starting`, `running`, `review`, `reviewed`, `failed`, `stopped`, `interrupted`; optional `agent` and `workflow` below |
+| `feature_used` | View visit only. `feature`: `tasks`, `chat`, `project`, `knowledge`, `worktrees`, `agents`, `usage`, `codebase`, `settings`, `connections`, `schedules`, `browser`, `queue` |
+| `operation_result` | Allowlisted `operation`; `outcome`: `accepted`, `failed`, `blocked`, `partial`, `canceled` |
+| `app_error` | `code`: `history_save_failed`, `history_load_failed`, `agent_discovery_failed`, `checkpoint_failed`, `verification_error`, `verification_failed`, `update_failed`, `ui_error`, `ui_rejection`, `ui_render_error`, `operation_failed`, `task_failed`; optional allowlisted `operation` or `feature` context |
+
+Task agents are `codex`, `claude`, `grok`, `opencode`, `kimi`, `antigravity`, `gemini`,
+`aider`, `goose` or `other`; workflows are `task` or `chat`. Account labels, model IDs
+and task identifiers remain excluded. The operation inventory is closed in
+[contracts.ts](src/contracts.ts) and mirrored in the desktop/native schemas.
+Accepted operations acknowledge commands, not eventual task success. See
+[monitoring semantics](../../docs/BETA-MONITORING.md) for measurement boundaries.
+
+Extended dimensions are stored as delimiter-separated allowlisted values in the
+existing aggregate column: `operation|outcome`, `state|agent|workflow` and
+`code|operation|feature`. Legacy dimensions remain readable without backfilling.
+Deploy this server contract before emitting new fields from desktop clients.
 
 Schemas reject unknown fields at every nesting level. They intentionally exclude
 durations, timestamps supplied by clients, arbitrary exceptions and crash dumps.

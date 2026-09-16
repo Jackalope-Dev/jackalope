@@ -9,6 +9,7 @@ mod automatic_tests;
 #[cfg(test)]
 mod automatic_trial;
 pub(super) mod inbox;
+pub mod managed;
 mod models;
 use models::Ledger;
 pub use models::{
@@ -595,6 +596,12 @@ pub async fn queue_release(
         .iter()
         .find(|i| i.id == id)
         .ok_or("Task not found")?;
+    if ledger.managed_tasks.iter().any(|task| Some(&task.id) == item.feature_id.as_ref()) {
+        if ledger.items.iter().any(|child| child.dependencies.contains(&id) && child.run_id.is_some()) {
+            return Err("Dependent work already uses this assignment. Follow up on the final combined result instead.".into());
+        }
+        if let Some(feature_id) = &item.feature_id { inner.enabled.remove(&managed::dispatch_key(feature_id)); }
+    }
     if let Some(original) = runs.iter().find(|r| Some(&r.id) == item.run_id.as_ref()) {
         if runs.iter().any(|r| {
             r.task_id == original.task_id && (active(&r.status) || r.status == "interrupted")

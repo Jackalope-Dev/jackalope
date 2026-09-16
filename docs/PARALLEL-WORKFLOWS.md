@@ -52,10 +52,51 @@ for any batch or routing work pauses further dispatch when a cost threshold is s
 Changing limits does not resume work. Live sessions still serialize batches;
 independent native task planning and automatic integration are separate capabilities.
 
+### A planned task from ordinary capture
+
+Submitting a new task or an unlimited new chat assesses whether one lead,
+investigation or parallel work fits the request. The project's **Decisions**
+preference selects local rules, an agent or Jev. Clear small requests and explicit
+restrictions use local rules. Assessment happens on submission, never while typing;
+unchanged requests reuse a short-lived receipt. An unavailable or uncertain model
+assessment falls back locally without another model call. Sessions with batch or
+cost limits retain their existing serial flow.
+
+**Create a plan** or **Investigate and plan** starts a planning attempt using the
+task's selected development agent. The agent receives the complete request and
+checks repository boundaries before proposing one to four assignments. Review
+ownership and dependencies, then choose **Start reviewed plan**. Native validation
+rejects cycles, escaping paths and independent assignments with overlapping scopes.
+A changed planner attempt requires another review. Planning workspaces must remain
+unchanged before implementation starts.
+
+The parent stays together in Chat and Inbox. Expand assignments for their results,
+questions and follow-ups; all attempts and reported usage remain attached. Workers
+inherit the selected agent, account, model, effort and tools. The existing queue
+shares execution capacity and passes verified predecessor snapshots to dependencies.
+Multiple assignments receive a final combined review and project verification;
+a single assignment avoids that extra worker. A saved automatic verification command
+and isolated Git work are required for this flow. Explicit workflow and continuation
+requests keep their existing execution paths.
+
+**Pause dispatch** holds pending assignments. **Stop task** also stops active
+attempts; interrupted process ownership retains the runtime's recovery requirements.
+Restart leaves dispatch paused. Failed assignments can be retried before downstream
+work starts; once dependent snapshots exist, corrections belong in the final combined
+result. A changed target branch blocks further dispatch and requires reassessment.
+**Review combined changes** uses guarded integration. Project automatic merge and
+reconciliation policies exclude these managed tasks.
+
+Assessment receipts record the selected policy and actual provider, including
+reported usage from unsuccessful model assessments and unknown usage when a call
+cannot report it. Local decisions use no model tokens; cached receipts are counted
+once. This is bounded orchestration, not a provider billing cap. Browser fixtures and
+native state tests do not establish installed-provider acceptance or measured savings.
+
 ### Parallel task queues
 
-Ordinary tasks ask their lead agent to delegate useful independent work through
-available provider subagent tools. Users do not choose a split mode. This stays
+Tasks continuing with one lead ask that agent to delegate useful independent work through
+available provider subagent tools. This stays
 within the provider session and does not create native queue entries; see
 [agent quality](AGENT-QUALITY.md) for limits. Explicit feature plans remain available
 for reviewing a queue before dispatch. Unfinished drafts from the former split

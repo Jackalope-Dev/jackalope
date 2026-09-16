@@ -33,7 +33,8 @@ Worker eligibility, ranking and launch authorization stay in `tasks/routing`.
 New decision consumers must resolve the project policy, define a typed domain input
 and validated output, retain the policy revision and actual provider, record usage
 even when abstaining, and leave execution authorization to their native owner.
-Decision receipts are explanatory copies; provider attempts own usage accounting.
+Decision receipts attached to work are explanatory copies; provider attempts and
+immutable assessment records own usage accounting.
 
 Jev receives the complete task, selected saved context, acceptance criteria,
 coordination instructions, verification command, handoff reasons, relevant recorded
@@ -140,11 +141,39 @@ cannot be reconstructed. Connected capacity remains a separate account-wide view
 that may include other applications. Opening Usage and reading capacity do not
 send model prompts. Unreadable task history hides summaries until reload succeeds.
 
-JSON export schema 4 preserves the earlier attempt and usage-breakdown fields and
-adds filters, task/outcome summaries, trends and separately labeled helper data.
+Task assessments have a separate project/period-scoped ledger, including calls that
+never launched work and failed calls with unavailable reports. Immutable receipt IDs
+deduplicate reused assessments. They are excluded from worker and routing totals and
+hidden under agent/account filters because assessment history has no account attribution.
+Jev connection checks remain separate device-wide, all-time setup overhead.
+
+JSON export schema 5 preserves the earlier attempt and usage-breakdown fields,
+filters, task/outcome summaries, trends and helper data, and adds task assessments.
 The export covers the project/account/agent/period scope, not the temporary chart
 bucket inspection. It omits prompts, provider transcripts and account directories.
 Only loaded history is covered; archived or deleted work is not reconstructed.
+
+## Task-strategy decisions
+
+Task submission resolves the project's Decisions policy before implementation.
+Local rules handle fast paths; other eligible requests use at most one bounded
+model assessment. Jev uses Choice to recommend focused work, investigation or
+planning. Failure or uncertainty falls back to local rules without a paid agent
+retry. The complete request, selected context, repository instructions and bounded
+map feed the assessment; oversized context falls back whole. Unchanged requests
+can reuse a ten-minute receipt. Request/settings, policy revision, repository source
+or selected-context changes invalidate reuse. Cancellation retains any reported cost
+but cannot publish a recommendation that starts work.
+
+Create a plan uses the selected development agent, model and account and consumes
+its normal capacity. Native code validates one to four scoped assignments, dependencies
+and ownership; multiple assignments receive a final combined review and verification.
+Users inspect the concrete plan before starting. One parent keeps planning, worker
+attempts, follow-ups and usage together in Chat and Inbox. Dispatch is restricted to
+that parent and restarts paused. Dependencies use verified predecessor snapshots;
+final integration is explicit and project automatic merge excludes managed tasks.
+Existing live-session batch and cost limits retain their serial execution path.
+See [parallel workflows](PARALLEL-WORKFLOWS.md) for recovery and review behavior.
 
 ## Usage interface contracts
 

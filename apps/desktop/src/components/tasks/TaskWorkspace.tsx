@@ -6,12 +6,15 @@ import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
 import { FolderOpen, ListTodo, Radio, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { queueSnapshot } from '../../lib/queue';
-import { collectWorkspaceWork, type WorkItem } from '../../lib/task-collection';
+import {
+  collectWorkspaceWork,
+  selectedManagedTask,
+  type WorkItem,
+} from '../../lib/task-collection';
 import { nativeTask } from '../../lib/task-runtime';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
+import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
@@ -21,6 +24,7 @@ import { Button } from '../ui/button';
 import { EmptyState } from '../ui/EmptyState';
 import { Select, SelectItem } from '../ui/Select';
 import { CaptureTask } from './CaptureTask';
+import { ManagedTaskView } from './ManagedTaskView';
 import { ProjectQueue } from './ProjectQueue';
 import { TaskCollection } from './TaskCollection';
 import { TaskDetail } from './TaskDetail';
@@ -37,6 +41,8 @@ export function TaskWorkspace({
   composerFocus?: number;
 }) {
   const { projects, activeProjectId } = useProjectStore();
+  const managed = useManagedTaskStore();
+  useEffect(observeManagedTasks, []);
   const runs = useExecutionStore((state) => state.runs);
   const sessions = useLiveSessionStore((state) => state.sessions);
   const sessionRuns = useLiveSessionStore((state) => state.runs);
@@ -49,7 +55,7 @@ export function TaskWorkspace({
   const selectedId = useExecutionStore((state) => state.selectedId);
   const select = useExecutionStore((state) => state.select);
   const loading = useExecutionStore((state) => state.loading);
-  const error = useExecutionStore((state) => state.error);
+  const error = useExecutionStore((state) => state.error) || managed.error;
   const ideas = useTaskStore((state) => state.tasks);
   const { scope, setScope, views, setView: saveView } = useWorkViewStore();
   const projectFilter = scope === 'all' ? 'all' : (activeProjectId ?? 'unassigned');
@@ -69,12 +75,16 @@ export function TaskWorkspace({
   const viewKey = `${projectFilter}:${archived ? 'archive' : 'current'}`;
   const view = views[viewKey] ?? defaultWorkView;
   const setView = (value: typeof view) => saveView(viewKey, value);
-  const [integratedIds, setIntegratedIds] = useState<string[]>([]);
+  const integratedIds = managed.queue.mergedRunIds;
   const lastOpened = useRef<string | null>(null);
   const openItem = useCallback(
     (item: WorkItem) => {
       lastOpened.current = item.id;
-      if (item.session) {
+      if (!item.managed) useManagedTaskStore.getState().select(null);
+      if (item.managed) {
+        select(null);
+        useManagedTaskStore.getState().select(item.managed.id);
+      } else if (item.session) {
         useLiveSessionStore.getState().select(item.session.id);
         useProjectStore.getState().selectProject(item.session.request.projectId);
         navigateWorkspace('live-sessions');
@@ -90,25 +100,6 @@ export function TaskWorkspace({
     if (group) group.open = true;
     row?.focus();
   }, [selectedId]);
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let alive = true;
-    const read = () => {
-      void queueSnapshot()
-        .then((queue) => {
-          if (alive) setIntegratedIds(queue.mergedRunIds);
-        })
-        .catch(() => {
-          if (alive) setIntegratedIds([]);
-        });
-    };
-    read();
-    const timer = setInterval(read, 8000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, []);
   const selected = runs.find((run) => run.id === selectedId);
   const project = projects.find(
     (p) => p.id === (projectFilter === 'all' ? activeProjectId : projectFilter),
@@ -122,8 +113,9 @@ export function TaskWorkspace({
         sessions,
         integratedIds,
         archived,
+        managed.queue,
       ),
-    [projectFilter, ideas, allRuns, sessions, integratedIds, archived],
+    [projectFilter, ideas, allRuns, sessions, integratedIds, archived, managed.queue],
   );
   const archiveItems = async (selected: WorkItem[], archive: boolean) => {
     const failures: string[] = [];
@@ -155,6 +147,26 @@ export function TaskWorkspace({
   };
   const needsInput = archived ? 0 : items.filter((item) => item.stage === 'attention').length;
   const ready = archived ? 0 : items.filter((item) => item.stage === 'review').length;
+  const managedTask = selectedManagedTask(
+    managed.queue,
+    allRuns,
+    managed.selectedId,
+    selectedId,
+    projectFilter === 'all' ? null : projectFilter,
+  );
+  useEffect(() => {
+    if (managed.selectedId && !managedTask) useManagedTaskStore.getState().select(null);
+  }, [managed.selectedId, managedTask]);
+  if (managedTask)
+    return (
+      <ManagedTaskView
+        task={managedTask}
+        onBack={() => {
+          managed.select(null);
+          select(null);
+        }}
+      />
+    );
   if (selected)
     return (
       <TaskDetail

@@ -1,4 +1,5 @@
 import { isTauriEnvironment } from './tauri-bridge.ts';
+import { invokeNative } from './telemetry-client.ts';
 
 export interface Runner {
   desktopInstalled?: boolean;
@@ -285,8 +286,7 @@ export async function nativeTask<T>(command: string, args?: Record<string, unkno
     throw new Error(
       'Open the desktop app to connect projects and run agents. This browser preview does not execute work.',
     );
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<T>(command, args);
+  return invokeNative<T>(command, args);
 }
 
 export async function respondToPrompt(

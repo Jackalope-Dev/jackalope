@@ -11,6 +11,7 @@ import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
+import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { SessionLimits } from './SessionLimits';
@@ -24,6 +25,7 @@ export function SessionStart({
   onOpenProject: () => void;
 }) {
   const draftKey = `jackalope-live-start:${project?.id ?? 'none'}`;
+  const assessment = useTaskAssessment();
   const [text, setText] = useState(() => localStorage.getItem(draftKey) ?? '');
   const [context, setContext] = useState<ContextSelection>(() => {
     try {
@@ -85,7 +87,7 @@ export function SessionStart({
       setError('This draft could not be saved. Keep this page open until sending succeeds.');
     }
   }, [draftKey, text, context, limits]);
-  const send = async () => {
+  const send = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
     const value = text.trim();
     if (!project || !value || sending.current) return;
     if (new TextEncoder().encode(value).length > 12000) {
@@ -118,6 +120,16 @@ export function SessionStart({
         autoVerify: project.preferences?.autoVerify ?? true,
         contextSelection: context,
       };
+      if (choice === 'assess' && !limits.maxBatches && !limits.pauseAtEstimatedUsd) {
+        const result = await assessment.assess(request, value);
+        if (result.strategy !== 'single') return;
+      }
+      if (choice === 'plan') {
+        await assessment.create(request, value);
+        localStorage.removeItem(draftKey);
+        localStorage.removeItem(`${draftKey}:context`);
+        return;
+      }
       await sessionCommand('create', {
         id: attempt.id,
         request,
@@ -159,7 +171,10 @@ export function SessionStart({
             rows={4}
             maxLength={12000}
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              assessment.clear();
+              setText(event.target.value);
+            }}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             onKeyDown={(event) => {
@@ -170,6 +185,13 @@ export function SessionStart({
             }}
           />
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          <TaskAssessmentNotice
+            assessment={assessment.assessment}
+            busy={assessment.busy}
+            onCancel={() => void assessment.cancel()}
+            onSingle={() => void send('single')}
+            onPlan={() => void send('plan')}
+          />
           <div className="live-start-actions">
             <Button
               type="submit"
@@ -185,17 +207,27 @@ export function SessionStart({
             projectPath={project.path}
             prompt={text}
             selection={context}
-            onChange={setContext}
+            onChange={(next) => {
+              assessment.clear();
+              setContext(next);
+            }}
             allowWorkflows={false}
           />
           <WorkflowStarter
             projectPath={project.path}
             onDraft={(prompt) => {
+              assessment.clear();
               setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
               input.current?.focus();
             }}
           />
-          <SessionLimits initial={limits} onSave={setLimits} />
+          <SessionLimits
+            initial={limits}
+            onSave={(next) => {
+              assessment.clear();
+              setLimits(next);
+            }}
+          />
         </form>
       ) : (
         <Button variant="outline" onClick={onOpenProject}>

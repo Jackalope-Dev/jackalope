@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { queueSnapshot } from '../../lib/queue';
+import { useEffect, useMemo } from 'react';
 import { collectWorkspaceWork, type WorkItem, workPresence } from '../../lib/task-collection';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
+import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { defaultWorkView, useWorkViewStore } from '../../stores/workViewStore';
@@ -16,30 +15,9 @@ export function DailyWork() {
   const historyError = useExecutionStore((state) => state.historyError);
   const { sessions, runs: sessionRuns, error: sessionError } = useLiveSessionStore();
   const ideas = useTaskStore((state) => state.tasks);
-  const [integrated, setIntegrated] = useState<string[]>([]);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!isTauriEnvironment()) return;
-    let alive = true;
-    const read = () => {
-      void queueSnapshot()
-        .then((queue) => {
-          if (alive) {
-            setIntegrated(queue.mergedRunIds);
-            setError('');
-          }
-        })
-        .catch(() => {
-          if (alive) setError('Delivery status could not be refreshed. Open Inbox to retry.');
-        });
-    };
-    read();
-    const timer = setInterval(read, 8000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, []);
+  const { queue, error } = useManagedTaskStore();
+  const integrated = queue.mergedRunIds;
+  useEffect(observeManagedTasks, []);
   const items = useMemo(
     () =>
       collectWorkspaceWork(
@@ -48,8 +26,10 @@ export function DailyWork() {
         [...new Map([...runs, ...sessionRuns].map((run) => [run.id, run])).values()],
         sessions,
         integrated,
+        false,
+        queue,
       ),
-    [runs, sessionRuns, sessions, ideas, integrated],
+    [runs, sessionRuns, sessions, ideas, integrated, queue],
   );
   const attention = items.filter((item) => item.stage === 'attention');
   const ready = items.filter((item) => item.stage === 'review');
@@ -59,10 +39,16 @@ export function DailyWork() {
     store.setScope('all');
     store.setView('all:current', { ...defaultWorkView, filter });
     useExecutionStore.getState().select(null);
+    useManagedTaskStore.getState().select(null);
     navigateWorkspace('kanban');
   };
   const open = (item: WorkItem) => {
-    if (item.session) {
+    useExecutionStore.getState().select(null);
+    useManagedTaskStore.getState().select(item.managed?.id ?? null);
+    if (item.managed) {
+      useProjectStore.getState().selectProject(item.managed.request.projectId);
+      navigateWorkspace('kanban');
+    } else if (item.session) {
       useProjectStore.getState().selectProject(item.session.request.projectId);
       useLiveSessionStore.getState().select(item.session.id);
       navigateWorkspace('live-sessions');

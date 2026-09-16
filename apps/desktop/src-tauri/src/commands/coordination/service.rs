@@ -10,6 +10,7 @@ impl Coordinator {
         let merged_run_ids = crate::commands::integration::applied_run_ids(&self.runtime)?;
         let inner = self.inner.lock().unwrap();
         Ok(QueueView {
+            managed_tasks: inner.ledger.managed_tasks.clone(),
             assist_policies: inner.ledger.assist_policies.clone(),
             reconciliations: inner.ledger.reconciliations.clone(),
             agreements: inner.ledger.agreements.clone(),
@@ -218,7 +219,14 @@ impl Coordinator {
         }
         self.save(&ledger)?;
         inner.ledger = ledger;
-        inner.enabled.remove(&request.project_id);
+        if !inner
+            .ledger
+            .managed_tasks
+            .iter()
+            .any(|task| Some(&task.id) == request.feature_id.as_ref())
+        {
+            inner.enabled.remove(&request.project_id);
+        }
         Ok(created)
     }
 
@@ -258,6 +266,13 @@ impl Coordinator {
                 .find(|i| i.id == item.id)
                 .unwrap()
                 .run_id = Some(run_id.clone());
+            if let Some(task) = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| Some(&task.id) == item.feature_id.as_ref())
+            {
+                task.run_ids.push(run_id.clone());
+            }
             self.save(&ledger)?;
             inner.ledger = ledger;
             inner
@@ -295,7 +310,29 @@ impl Coordinator {
                     instructions,
                 }),
             };
+            if let Some(task) = inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .find(|task| Some(&task.id) == assigned.feature_id.as_ref())
+            {
+                request.model = task.request.model.clone();
+                request.effort = task.request.effort;
+                request.connection_ids = task.request.connection_ids.clone();
+                request.agent_profile_id = task.request.agent_profile_id.clone();
+            }
             let result = (|| {
+                if let Some(task) = inner
+                    .ledger
+                    .managed_tasks
+                    .iter()
+                    .find(|task| Some(&task.id) == assigned.feature_id.as_ref())
+                {
+                    crate::commands::task_strategy::validate_source(
+                        &task.request,
+                        &task.assessment.source_head,
+                    )?;
+                }
                 if assigned.staged_dependencies && !assigned.dependencies.is_empty() {
                     let ids = assigned
                         .dependencies
@@ -340,6 +377,9 @@ impl Coordinator {
                     .unwrap()
                     .error = Some(error);
                 inner.enabled.remove(&item.project_id);
+                if let Some(id) = &item.feature_id {
+                    inner.enabled.remove(&managed::dispatch_key(id));
+                }
                 self.save(&inner.ledger)?;
             }
         }
@@ -421,7 +461,20 @@ impl Coordinator {
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
         let mut assigned = None;
-        if request.live_session_id.is_some() {
+        if request.previous_run_id.is_some() || request.retry_of.is_some() {
+            super::managed::prepare_followup(
+                &inner.ledger,
+                &self.runtime.integration_runs()?,
+                &mut request,
+            )?;
+        }
+        if request.live_session_id.is_some()
+            || inner
+                .ledger
+                .managed_tasks
+                .iter()
+                .any(|task| task.planner_run_id == request.id)
+        {
             let runs = self.runtime.integration_runs()?;
             if !runs.iter().any(|run| run.id == request.id)
                 && runs
@@ -435,7 +488,11 @@ impl Coordinator {
                 return Err("Session is waiting for execution capacity.".into());
             }
         }
-        if let Some(previous_id) = &request.previous_run_id {
+        if let Some(previous_id) = request
+            .previous_run_id
+            .as_ref()
+            .or(request.retry_of.as_ref())
+        {
             let runs = self.runtime.integration_runs()?;
             if let Some(previous) = runs.iter().find(|r| &r.id == previous_id) {
                 if let Some(item) = inner
@@ -449,6 +506,17 @@ impl Coordinator {
                     })
                     .cloned()
                 {
+                    if inner
+                        .ledger
+                        .managed_tasks
+                        .iter()
+                        .any(|task| Some(&task.id) == item.feature_id.as_ref())
+                        && inner.ledger.items.iter().any(|child| {
+                            child.dependencies.contains(&item.id) && child.run_id.is_some()
+                        })
+                    {
+                        return Err("Dependent work already uses this assignment. Follow up on the final combined result instead.".into());
+                    }
                     if item.canceled {
                         return Err(
                             "This task was abandoned. Add a new task to claim its scope again."

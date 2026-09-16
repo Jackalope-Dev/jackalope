@@ -82,7 +82,7 @@ fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     cmd
 }
 
-fn git(path: &str, args: &[&str]) -> Result<String, String> {
+pub(super) fn git(path: &str, args: &[&str]) -> Result<String, String> {
     let out =
         super::git_command::command(Path::new(path), args, super::git_command::Policy::Inherited)
             .output()
