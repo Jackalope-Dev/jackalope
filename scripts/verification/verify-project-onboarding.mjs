@@ -28,7 +28,7 @@ window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebvie
   return {head:'abcdef',branch:'main',changes:'',recentChanges:'',prepareCommand:'pnpm install',verifyCommand:'pnpm test',previewCommand:'pnpm dev',dependenciesMissing:true,missingConfiguration:[],notes:[]};
  }
  if(command==='project_git_policy')return args.policy||{attribution:'agent',name:'Fixture',email:'fixture@example.invalid',cleanupAfterMerge:true,autoCheckpoint:true};
- if(command==='routing_settings')return {mode:'agent',defaultMode:'agent',projectMode:null,connected:false,hasKey:false,checkedAt:null,storageError:null,revision:0};
+ if(command==='routing_settings')return {mode:'agent',defaultMode:'agent',projectMode:null,jevFallback:'local',connected:false,hasKey:false,checkedAt:null,storageError:null,revision:0};
  if(command==='queue_snapshot')return {items:[],mergedRunIds:[]};
  return null;
 }};

@@ -591,7 +591,8 @@ impl TaskRuntime {
             return Err("No enabled agent, model and account combination has sufficient available quota. Review Agents settings or wait for quota to reset.".into());
         }
         use crate::commands::decisions::{
-            self, DecisionKind, DecisionMode, DecisionPolicy, DecisionProvider, DecisionReceipt,
+            self, DecisionAttempt, DecisionKind, DecisionMode, DecisionPolicy, DecisionProvider,
+            DecisionReceipt,
         };
         let policy_result = decisions::policy(self, &req.project_id);
         let policy_error = policy_result
@@ -603,11 +604,27 @@ impl TaskRuntime {
         }
         let decision_policy = policy_result.unwrap_or(DecisionPolicy {
             mode: DecisionMode::Deterministic,
+            jev_fallback: Default::default(),
             revision: 0,
         });
         let mode = decision_policy.mode;
-        let mut routers = if mode == DecisionMode::Agent {
-            self.routing_candidates(req, &policy, true)?
+        let single = candidates.len() == 1;
+        let observations = evidence::evidence(&self.integration_runs()?, req);
+        let jev_output = if single || mode != DecisionMode::Jev {
+            None
+        } else {
+            self.jev_route(req, &run, &candidates, observations.clone())?
+        };
+        let used_jev = jev_output.is_some();
+        if !self.is_running(&req.id) {
+            return Err("Routing was stopped.".into());
+        }
+        let mut routers = if !single && decision_policy.needs_agent(used_jev, false) {
+            match self.routing_candidates(req, &policy, true) {
+                Ok(candidates) => candidates,
+                Err(_) if mode == DecisionMode::Jev => vec![],
+                Err(error) => return Err(error),
+            }
         } else {
             vec![]
         };
@@ -617,27 +634,19 @@ impl TaskRuntime {
                 .unwrap_or(50.0)
                 .total_cmp(&a.remaining_percent.unwrap_or(50.0))
         });
-        let single = candidates.len() == 1;
-        let router = if single { None } else { routers.first() };
-        let observations = evidence::evidence(&self.integration_runs()?, req);
-        let jev_output = if single || mode != DecisionMode::Jev {
-            None
-        } else {
-            self.jev_route(req, &run, &candidates, observations.clone())?
-        };
-        let used_jev = jev_output.is_some();
-        let router = if used_jev { None } else { router };
-        let deterministic = !single
-            && !used_jev
-            && router.is_none()
-            && (mode != DecisionMode::Agent || history.fallbacks.is_empty());
+        let router = routers.first();
         let prompt = prompt::build(req, &run, &candidates, observations, &history);
         let output = if used_jev {
             jev_output
         } else {
-            router
+            match router
                 .map(|router| self.routing_process(req, router, &prompt))
-                .transpose()?
+                .transpose()
+            {
+                Ok(output) => output,
+                Err(_) if mode == DecisionMode::Jev && self.is_running(&req.id) => None,
+                Err(error) => return Err(error),
+            }
         };
         let mut exhausted = history.handoffs.clone();
         if let (Some(router), Some(failure)) = (
@@ -659,9 +668,18 @@ impl TaskRuntime {
             });
             candidates.retain(|candidate| eligible(candidate, &exhausted));
         }
-        let fallback = output
-            .as_ref()
-            .is_none_or(|output| output.quota_failure.is_some());
+        if candidates.is_empty() {
+            return Err("No eligible worker remains after the routing account exhausted its quota. Progress is preserved.".into());
+        }
+        let fallback = output.as_ref().is_none_or(|output| {
+            output.quota_failure.is_some()
+                || (mode == DecisionMode::Jev && choose(&output.result, &candidates).is_err())
+        });
+        let deterministic = !single
+            && !used_jev
+            && ((mode == DecisionMode::Jev && fallback)
+                || (router.is_none()
+                    && (mode != DecisionMode::Agent || history.fallbacks.is_empty())));
         let (_, mut choice) = if single {
             (&candidates[0], Choice { candidate_id: candidates[0].id.clone(), reason: "Only one eligible agent, model and account; no routing model call was needed.".into(), expected_usage_percent: None, alternatives: vec![] })
         } else if deterministic {
@@ -670,7 +688,7 @@ impl TaskRuntime {
                 if mode == DecisionMode::Deterministic {
                     "Local rules selected an eligible worker using project preference, current capacity and active workload. No routing model was consulted."
                 } else if mode == DecisionMode::Jev {
-                    "Jev did not make a usable selection. Local rules selected an eligible worker without an additional paid routing call."
+                    "Jev and the configured fallback did not return a usable model selection. Local rules selected an eligible worker."
                 } else {
                     "The default orchestrator had no eligible account, model or quota, so no routing model was consulted. Selected the highest-capacity eligible option."
                 },
@@ -751,6 +769,25 @@ impl TaskRuntime {
         if inner.canceled.contains(&req.id) || selected.status != "starting" {
             return Err("Routing was stopped.".into());
         }
+        let attempts: Vec<DecisionAttempt> = selected
+            .routing
+            .as_ref()
+            .map(|current| {
+                current
+                    .attempts
+                    .iter()
+                    .skip(history.attempts.len())
+                    .map(|attempt| DecisionAttempt {
+                        provider: if attempt.agent == "jev" {
+                            DecisionProvider::Jev
+                        } else {
+                            DecisionProvider::Agent
+                        },
+                        usage: attempt.usage.clone(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let decision = RoutingDecision {
             assessment: Some(DecisionReceipt {
                 version: 1,
@@ -759,26 +796,24 @@ impl TaskRuntime {
                 provider: if used_jev {
                     DecisionProvider::Jev
                 } else if router.is_some() && !fallback {
-                    decision_policy.provider()
+                    DecisionProvider::Agent
                 } else {
                     DecisionProvider::LocalRules
                 },
                 policy_revision: decision_policy.revision,
-                model_call_attempted: selected
-                    .routing
-                    .as_ref()
-                    .is_some_and(|current| current.attempts.len() > history.attempts.len()),
+                model_call_attempted: !attempts.is_empty(),
                 concentration: None,
                 fallback_reason: policy_error.or_else(|| {
                     (mode == DecisionMode::Jev && !used_jev && !single).then(|| {
-                        "Jev did not provide a usable assessment; local rules selected the worker."
-                            .into()
+                        if router.is_some() && !fallback {
+                            "Jev did not provide a usable assessment; the configured agent fallback selected the worker."
+                        } else {
+                            "Jev did not provide a usable assessment; local rules selected the worker."
+                        }.into()
                     })
                 }),
-                usage: output
-                    .as_ref()
-                    .map(|output| output.usage.clone())
-                    .unwrap_or_default(),
+                usage: decisions::combined_usage(&attempts),
+                attempts,
             }),
             quota_pools: candidate.quota_pools.clone(),
             orchestrator: if used_jev {
@@ -790,11 +825,15 @@ impl TaskRuntime {
             },
             orchestrator_model: if used_jev {
                 output.as_ref().and_then(|output| output.model.clone())
+            } else if deterministic || single {
+                None
             } else {
                 router.and_then(|router| router.model.clone())
             },
             orchestrator_account: if used_jev {
                 "TypeSafe API key".into()
+            } else if deterministic || single {
+                "Deterministic selection".into()
             } else {
                 router
                     .map(|router| router.account.clone())

@@ -49,12 +49,15 @@ Real daily-use and quality improvements still require observed trials.
 
 Jackalope Decisions provides project-scoped local rules, agent-powered decisions and
 optional Jev-assisted routing with protected device keys and visible usage. Jev
+fallback uses local rules by default or an explicitly selected agent attempt. Jev
 quality/cost calibration and installed cross-platform acceptance remain in progress.
 
 Task submission can assess focused work, investigation or a reviewed plan using
 the project's Decisions preference. Plans keep scoped assignments, retained attempts
-and usage under one parent. Multiple assignments receive combined verification;
-users review before starting and explicitly integrate the result. Local fast paths
+and usage under one parent. New plans combine completed work progressively, resolve
+overlapping changes in isolated workspaces and attempt bounded repairs of failed checks.
+One result keeps preview, combined checks and outcome review together before explicit
+application. Focused review time and elapsed delivery time remain distinct. Local fast paths
 and cached assessments avoid repeated model calls. Installed-provider acceptance
 and held-out cost/quality comparisons remain open.
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { countedTaskDecisions } from '../src/lib/decision-usage.ts';
-import { managedTaskWork } from '../src/lib/managed-task.ts';
+import { managedTaskProgress, managedTaskWork } from '../src/lib/managed-task.ts';
 import { collectWorkspaceWork, selectedManagedTask } from '../src/lib/task-collection.ts';
 import { assessmentKey } from '../src/lib/task-strategy.ts';
 
@@ -126,6 +126,31 @@ test('archived attempts retain integrated status but leave history and usage inc
   assert.deepEqual(new Set(work.missingAttempts), new Set(['plan', 'old', 'new']));
 });
 
+test('unresolved shared decisions prevent final review even when checks pass', () => {
+  const passed = {
+    ...runs[2],
+    status: 'review',
+    verification: { result: { success: true }, tree: 'verified' },
+  };
+  const agreement = {
+    kind: 'interface',
+    taskId: 'step',
+    participants: ['outside'],
+    status: 'rejected',
+    resource: 'API response',
+  };
+  const work = managedTaskWork(task, { ...queue, agreements: [agreement] }, [passed]);
+  assert.equal(work.ready, false);
+  assert.equal(work.status, 'Needs attention');
+  assert.match(managedTaskProgress(task, work).description, /API response/);
+  assert.equal(
+    managedTaskWork(task, { ...queue, agreements: [{ ...agreement, status: 'reconciled' }] }, [
+      passed,
+    ]).ready,
+    true,
+  );
+});
+
 test('decision usage counts failed calls once and excludes no-call fallbacks', () => {
   const entry = {
     id: 'attempt',
@@ -173,4 +198,63 @@ test('assessment identity ignores request IDs but retains all execution settings
       assessmentKey(request, 'intent'),
       assessmentKey({ ...request, ...changed }, 'intent'),
     );
+});
+
+test('delivery distinguishes combining and repairs without showing unfinished work as reviewed', () => {
+  const parent = {
+    ...task,
+    delivery: {
+      finalItem: 'combined',
+      integrationItems: ['combined'],
+      repairs: [{ runId: 'repair' }],
+    },
+  };
+  const deliveryQueue = {
+    ...queue,
+    items: [
+      queue.items[0],
+      { id: 'combined', featureId: 'parent', runId: 'repair', dependencies: ['step'] },
+    ],
+  };
+  const repair = { ...runs[2], id: 'repair', taskId: 'repair' };
+  const work = managedTaskWork(parent, deliveryQueue, [...runs, repair]);
+  assert.equal(work.status, 'Fixing checks');
+  assert.equal(work.combined.id, 'repair');
+  assert.equal(work.ready, false);
+  assert.equal(managedTaskProgress(parent, work).stage, 1);
+  assert.equal(work.assignments.length, 1);
+  const blocked = managedTaskWork(
+    { ...parent, error: 'Repair needs a decision.' },
+    deliveryQueue,
+    runs,
+  );
+  assert.equal(blocked.failed, true);
+});
+
+test('the final result stays stable when intermediate integrations are inserted out of order', () => {
+  const parent = {
+    ...task,
+    delivery: { finalItem: 'final', integrationItems: ['checkpoint', 'final'], repairs: [] },
+  };
+  const passed = (id) => ({
+    ...runs[2],
+    id,
+    taskId: id,
+    status: 'review',
+    verification: { result: { success: true }, tree: id },
+  });
+  const items = ['step', 'final', 'checkpoint'].map((id) => ({
+    id,
+    featureId: 'parent',
+    runId: id,
+    dependencies: [],
+  }));
+  const work = managedTaskWork(parent, { ...queue, items }, [
+    ...runs.slice(0, 2),
+    ...items.map((item) => passed(item.id)),
+  ]);
+  assert.equal(work.combined.id, 'final');
+  assert.equal(work.ready, true);
+  assert.equal(managedTaskProgress(parent, work).stage, 3);
+  assert.equal(work.assignments.length, 1);
 });

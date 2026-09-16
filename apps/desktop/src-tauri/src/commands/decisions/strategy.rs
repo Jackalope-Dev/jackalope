@@ -89,7 +89,7 @@ fn strategy_result(value: &Value) -> StrategyEvaluation {
         usage: jev::usage(value),
         fallback_reason: choice
             .is_none()
-            .then(|| "Jev's strategy assessment was uncertain or invalid; use local rules.".into()),
+            .then(|| "Jev's strategy assessment was uncertain or invalid; the configured fallback applies.".into()),
     }
 }
 

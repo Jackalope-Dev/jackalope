@@ -176,7 +176,8 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
     }
     let mut items = Vec::new();
     for step in proposed {
-        if step.key == "combined-review" || step.key.starts_with("integration-")
+        if step.key == "combined-review"
+            || step.key.starts_with("integration-")
             || step.title.trim().is_empty()
             || step.title.len() > 160
             || step.prompt.trim().is_empty()
@@ -231,6 +232,19 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
     if items.len() == 1 {
         return Ok(items);
     }
+    let mut combined_context = request.context_selection.clone();
+    for item in &mut items {
+        combined_context
+            .outcomes
+            .append(&mut item.context_selection.outcomes);
+    }
+    combined_context.outcomes.sort();
+    combined_context.outcomes.dedup();
+    crate::commands::outcomes::ProcessTemplate {
+        outcomes: combined_context.outcomes.clone(),
+        ..Default::default()
+    }
+    .validate()?;
     items.push(PlanEntry {
         key: "combined-review".into(),
         title: "Review and verify the combined result".into(),
@@ -238,7 +252,7 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
         agent: request.agent.clone(),
         scopes: vec![".".into()],
         depends_on: items.iter().map(|item| item.key.clone()).collect(),
-        context_selection: request.context_selection.clone(),
+        context_selection: combined_context,
     });
     Ok(items)
 }
@@ -445,8 +459,15 @@ impl Coordinator {
                 self.runtime.access.ensure()?;
                 task_strategy::validate_source(&task.request, &task.assessment.source_head)?;
                 let mut ledger = inner.ledger.clone();
-                let saved = ledger.managed_tasks.iter_mut().find(|saved| saved.id == id).unwrap();
-                let delivery = saved.delivery.as_mut().ok_or("This task uses the earlier review flow.")?;
+                let saved = ledger
+                    .managed_tasks
+                    .iter_mut()
+                    .find(|saved| saved.id == id)
+                    .unwrap();
+                let delivery = saved
+                    .delivery
+                    .as_mut()
+                    .ok_or("This task uses the earlier review flow.")?;
                 delivery.repair_limit = delivery.repairs.len() + 1;
                 delivery.interventions += 1;
                 saved.error = None;
@@ -543,17 +564,29 @@ pub async fn task_plan_review_time(
         service.ensure_storage_loaded()?;
         let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
         let mut ledger = inner.ledger.clone();
-        let task = ledger.managed_tasks.iter_mut().find(|task| task.id == id).ok_or("Task not found.")?;
-        let delivery = task.delivery.as_mut().ok_or("This task has no review measurements.")?;
-        if delivery.review_samples.contains(&sample_id) { return Ok(()); }
-        delivery.review_seconds = Some(delivery.review_seconds.unwrap_or(0).saturating_add(seconds));
+        let task = ledger
+            .managed_tasks
+            .iter_mut()
+            .find(|task| task.id == id)
+            .ok_or("Task not found.")?;
+        let delivery = task
+            .delivery
+            .as_mut()
+            .ok_or("This task has no review measurements.")?;
+        if delivery.review_samples.contains(&sample_id) {
+            return Ok(());
+        }
+        delivery.review_seconds =
+            Some(delivery.review_seconds.unwrap_or(0).saturating_add(seconds));
         delivery.review_samples.push(sample_id);
         let excess = delivery.review_samples.len().saturating_sub(1000);
         delivery.review_samples.drain(..excess);
         service.save(&ledger)?;
         inner.ledger = ledger;
         Ok(())
-    }).await.map_err(|error| error.to_string())?
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -722,6 +755,10 @@ mod tests {
             .iter()
             .all(|item| item.prompt.contains("Do not push.") && item.agent == "codex"));
         assert_eq!(plan[2].scopes, vec!["."]);
+        assert_eq!(plan[2].context_selection.outcomes, vec!["API works"]);
+        assert!(plan[..2]
+            .iter()
+            .all(|item| item.context_selection.outcomes.is_empty()));
     }
     #[test]
     fn independent_overlap_and_cycles_are_rejected() {

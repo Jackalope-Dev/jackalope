@@ -1,7 +1,18 @@
 import { characterPaths } from '@jackalope/brand/character';
-import { Button, FormField, Input } from '@jackalope/ui';
+import {
+  Badge,
+  Button,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  FormField,
+  Input,
+  Select,
+  SelectItem,
+} from '@jackalope/ui';
 import { Check, ExternalLink, KeyRound, Route, SlidersHorizontal, Zap } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import type { JevFallback } from '../../lib/decisions';
 import {
   type RoutingMode,
   type RoutingSettings,
@@ -61,6 +72,8 @@ export function RoutingSetup({
   projectId,
   mode,
   onModeChange,
+  jevFallback,
+  onFallbackChange,
   onReadyChange,
   onSettingsChange,
   disabled = false,
@@ -68,6 +81,8 @@ export function RoutingSetup({
   projectId?: string;
   mode: RoutingMode | null;
   onModeChange: (mode: RoutingMode) => void;
+  jevFallback: JevFallback | null;
+  onFallbackChange: (fallback: JevFallback) => void;
   onReadyChange?: (ready: boolean) => void;
   onSettingsChange?: (settings: RoutingSettings) => void;
   disabled?: boolean;
@@ -103,7 +118,11 @@ export function RoutingSetup({
   useEffect(() => {
     if (mode === null && settings) onModeChange(settings.mode);
   }, [mode, settings, onModeChange]);
+  useEffect(() => {
+    if (jevFallback === null && settings) onFallbackChange(settings.jevFallback ?? 'local');
+  }, [jevFallback, settings, onFallbackChange]);
   const selected = mode ?? settings?.mode ?? 'agent';
+  const fallback = jevFallback ?? settings?.jevFallback ?? 'local';
   const ready = !pending && !loading && !!settings && (selected !== 'jev' || settings.connected);
   useEffect(() => {
     onReadyChange?.(ready);
@@ -168,12 +187,10 @@ export function RoutingSetup({
           <SlidersHorizontal size={20} aria-hidden="true" />
           <span className="routing-option-copy">
             <strong>
-              Local rules<span className="routing-option-tag">No decision-model cost</span>
+              <span className="routing-option-title">Local rules</span>
+              <span className="routing-option-tag">No decision-model cost</span>
             </strong>
             <span>Choose using project preferences, available capacity and current workload.</span>
-            <small>
-              Fast and predictable. Does not ask a model to assess the task’s reasoning needs.
-            </small>
           </span>
         </label>
         <label className="routing-option" data-selected={selected === 'agent'}>
@@ -191,13 +208,10 @@ export function RoutingSetup({
           <Route size={20} aria-hidden="true" />
           <span className="routing-option-copy">
             <strong>
-              Agent-powered<span className="routing-option-tag">No extra setup</span>
+              <span className="routing-option-title">Agent-powered</span>
+              <span className="routing-option-tag">Uses agent capacity</span>
             </strong>
             <span>Your default agent reasons through the task and chooses a worker.</span>
-            <small>
-              Uses agent tokens or subscription capacity for routing. Can take longer and cost more
-              per decision.
-            </small>
           </span>
         </label>
         <label className="routing-option" data-selected={selected === 'jev'}>
@@ -214,20 +228,36 @@ export function RoutingSetup({
           <Zap size={20} aria-hidden="true" />
           <span className="routing-option-copy">
             <strong>
-              Jev-assisted<span className="routing-option-tag">Bring your API key</span>
+              <span className="routing-option-title">
+                Jev-assisted <Badge>Beta</Badge>
+              </span>
+              <span className="routing-option-tag">Bring your API key</span>
             </strong>
             <span>
               Use TypeSafe’s decision model to choose a worker, then let your agent do the work.
             </span>
-            <small>
-              Potentially faster, lower-cost decisions. Saves agent capacity when Jev can make the
-              selection.
-            </small>
           </span>
         </label>
       </fieldset>
       {selected === 'jev' && (
         <div className="routing-connection">
+          <FormField
+            label="If Jev is unavailable or uncertain"
+            description={
+              fallback === 'agent'
+                ? 'An extra agent decision uses tokens or subscription capacity.'
+                : 'Local rules take over with no additional decision-model cost.'
+            }
+          >
+            <Select
+              value={fallback}
+              onValueChange={(value) => onFallbackChange(value === 'agent' ? 'agent' : 'local')}
+              disabled={disabled || pending || loading}
+            >
+              <SelectItem value="local">Local (default)</SelectItem>
+              <SelectItem value="agent">Agent-powered</SelectItem>
+            </Select>
+          </FormField>
           <div className="routing-connection-heading">
             <KeyRound size={17} aria-hidden="true" />
             <strong>Your device’s TypeSafe connection</strong>
@@ -297,21 +327,9 @@ export function RoutingSetup({
                   </Button>
                 )}
               </div>
-              <p className="routing-detail">
-                Makes one small, billable connection check. Jackalope stores your key securely on
-                this device and sends it only to TypeSafe for authentication.
-              </p>
+              <p className="routing-detail">Makes one small, billable connection check.</p>
             </form>
           )}
-          <p className="routing-detail">
-            Automatic routing sends task instructions, selected context and eligible worker details
-            to TypeSafe. Jev has separate API billing. If it is uncertain or unavailable, local
-            rules take over without an additional paid decision call.
-          </p>
-          <p className="routing-detail">
-            Routing gains vary by task. Coding, testing and your approval controls stay with your
-            existing agents and Jackalope.
-          </p>
           {settings?.hasKey && (
             <Button
               variant="ghost"
@@ -345,19 +363,42 @@ export function RoutingSetup({
           </Button>
         </InlineNotice>
       )}
-      <p className="routing-footnote">
-        {projectId
-          ? 'Applies to this project. Other projects keep their own decision preferences.'
-          : 'The app default applies to projects without an override.'}{' '}
-        Specific agent choices and continued sessions keep their assigned worker. The TypeSafe key
-        is shared across projects on this device; removing it switches Jev projects to local rules.
-      </p>
+      <Disclosure>
+        <DisclosureSummary>More information</DisclosureSummary>
+        <DisclosureBody className="routing-detail">
+          <p>
+            <strong>Local rules.</strong> Fast and predictable, with no decision-model cost. Does
+            not ask a model to assess the task’s reasoning needs.
+          </p>
+          <p>
+            <strong>Agent-powered.</strong> Uses agent tokens or subscription capacity for routing.
+            Can take longer and cost more per decision.
+          </p>
+          <p>
+            <strong>Jev-assisted.</strong> Potentially faster, lower-cost decisions that save agent
+            capacity. Gains vary by task. Jev has separate API billing and receives task
+            instructions, selected context and eligible worker details. If it is uncertain or
+            unavailable, your chosen fallback takes over. Agent-powered fallback makes one
+            additional decision attempt; local rules remain available if that attempt fails.
+          </p>
+          <p>
+            Jackalope stores your TypeSafe key securely on this device and sends it only to TypeSafe
+            for authentication. The key is shared across projects on this device; removing it
+            switches Jev projects to local rules.
+          </p>
+          <p>
+            Specific agent choices and continued sessions keep their assigned worker. Coding,
+            testing and your approval controls stay with your existing agents and Jackalope.
+          </p>
+        </DisclosureBody>
+      </Disclosure>
     </div>
   );
 }
 
 export function RoutingPreferences({ projectId }: { projectId?: string }) {
   const [mode, setMode] = useState<RoutingMode | null>(null);
+  const [jevFallback, setJevFallback] = useState<JevFallback | null>(null);
   const [settings, setSettings] = useState<RoutingSettings | null>(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -369,7 +410,9 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
     setError('');
     setMessage('');
     try {
-      setSettings(await routingSettings.setMode(mode, settings.revision, projectId));
+      setSettings(
+        await routingSettings.setMode(mode, settings.revision, projectId, jevFallback ?? 'local'),
+      );
       setMessage('Routing preference saved.');
     } catch (error) {
       setError(String(error));
@@ -383,6 +426,12 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
         projectId={projectId}
         key={settings?.revision}
         mode={mode}
+        jevFallback={jevFallback}
+        onFallbackChange={(value) => {
+          setJevFallback(value);
+          setMessage('');
+          setError('');
+        }}
         onModeChange={(value) => {
           setMode(value);
           setMessage('');
@@ -420,6 +469,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
                   .then((value) => {
                     setSettings(value);
                     setMode(value.mode);
+                    setJevFallback(value.jevFallback);
                     setMessage('Using the app default.');
                   })
                   .catch((error) => setError(String(error)))
@@ -432,7 +482,7 @@ export function RoutingPreferences({ projectId }: { projectId?: string }) {
         </div>
       )}
       <Button
-        disabled={!ready || mode === settings?.mode}
+        disabled={!ready || (mode === settings?.mode && jevFallback === settings?.jevFallback)}
         loading={saving}
         loadingLabel="Saving…"
         onClick={() => void save()}

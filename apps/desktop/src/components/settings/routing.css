@@ -99,20 +99,21 @@
 }
 .routing-option-copy strong {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex-wrap: wrap;
   gap: 6px 10px;
   color: var(--color-text-primary);
   font-weight: 600;
 }
+.routing-option-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 .routing-option-tag {
   font-size: var(--text-xs);
   font-weight: 400;
   color: var(--color-text-muted);
-}
-.routing-option-copy small {
-  font-size: var(--text-xs);
-  line-height: 1.6;
 }
 .routing-connection {
   display: grid;
@@ -136,17 +137,13 @@
 .routing-key-actions {
   margin-top: 12px;
 }
-.routing-detail,
-.routing-footnote {
+.routing-detail {
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
   line-height: 1.65;
 }
 .routing-connection form > .routing-detail {
   margin-top: 10px;
-}
-.routing-footnote {
-  color: var(--color-text-muted);
 }
 .routing-preferences {
   display: grid;

@@ -256,8 +256,16 @@ export function OnboardingFlow({
         const current = await routingSettings.read(project?.id);
         if (onboarding.routingMode === 'jev' && !current.connected)
           throw new Error('Reconnect Jev or choose another decision method before continuing.');
-        if (current.projectMode !== onboarding.routingMode)
-          await routingSettings.setMode(onboarding.routingMode, current.revision, project?.id);
+        if (
+          current.projectMode !== onboarding.routingMode ||
+          current.jevFallback !== onboarding.routingFallback
+        )
+          await routingSettings.setMode(
+            onboarding.routingMode,
+            current.revision,
+            project?.id,
+            onboarding.routingFallback ?? 'local',
+          );
       } catch (error) {
         onboarding.go('routing');
         throw error;
@@ -771,9 +779,12 @@ export function OnboardingFlow({
           {step === 'routing' && (
             <>
               <RoutingSetup
+                key={project?.id}
                 projectId={project?.id}
                 mode={onboarding.routingMode}
                 onModeChange={onboarding.setRoutingMode}
+                jevFallback={onboarding.routingFallback}
+                onFallbackChange={onboarding.setRoutingFallback}
                 onReadyChange={setRoutingReady}
                 disabled={busy}
               />

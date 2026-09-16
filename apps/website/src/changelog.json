@@ -1,5 +1,30 @@
 [
   {
+    "id": "jev-fallback-preference",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "Choose a fallback for Jev decisions",
+    "description": "Keep local rules as the default fallback or choose an agent when Jev cannot make a usable decision.",
+    "items": [
+      "Save the fallback with each project decision preference in setup or settings.",
+      "Agent fallback uses normal agent capacity; usage retains both provider attempts, including unavailable reports."
+    ],
+    "note": "Real-provider cost and quality comparisons and installed cross-platform acceptance remain in progress."
+  },
+  {
+    "id": "combined-task-delivery",
+    "date": "2026-09-16",
+    "status": "In development",
+    "title": "One result from parallel work",
+    "description": "Jackalope brings related changes together and keeps integration work inside your task.",
+    "items": [
+      "Follow Plan, Work, Check and Review, then inspect one result, preview and combined diff.",
+      "Combine finished assignments, resolve overlaps in isolated workspaces and attempt bounded repairs when checks fail.",
+      "Review final outcomes before applying changes. Keep worker details, repair usage and review timing available when needed."
+    ],
+    "note": "Installed-provider acceptance and comparative quality testing remain in progress."
+  },
+  {
     "id": "reviewed-task-planning",
     "date": "2026-09-16",
     "status": "In development",

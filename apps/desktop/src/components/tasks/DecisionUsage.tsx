@@ -2,6 +2,7 @@ import { Disclosure, DisclosureBody, DisclosureSummary, Table } from '@jackalope
 import { useEffect, useState } from 'react';
 import {
   countedTaskDecisions,
+  decisionUsageEntries,
   readTaskDecisionUsage,
   type TaskDecisionUsage,
 } from '../../lib/decision-usage';
@@ -51,7 +52,14 @@ export function DecisionUsage({
   cutoff = 0,
 }: ReturnType<typeof useTaskDecisionUsage> & { projectId?: string; cutoff?: number }) {
   const entries = countedTaskDecisions(records, projectId, cutoff);
-  const summary = summarizeUsage(entries.map((entry) => ({ usage: entry.decision.usage })));
+  const calls = entries.flatMap((entry) =>
+    decisionUsageEntries(entry.decision).map((attempt, index) => ({
+      ...entry,
+      attempt,
+      key: `${entry.id}-${index}`,
+    })),
+  );
+  const summary = summarizeUsage(calls.map((entry) => entry.attempt));
   return (
     <section aria-label="Task assessment usage" className="workspace-section workspace-stack">
       <WorkspaceSectionHeading
@@ -69,7 +77,8 @@ export function DecisionUsage({
       ) : (
         <>
           <p>
-            {entries.length} {entries.length === 1 ? 'assessment' : 'assessments'} ·{' '}
+            {entries.length} {entries.length === 1 ? 'assessment' : 'assessments'} · {calls.length}{' '}
+            {calls.length === 1 ? 'model call' : 'model calls'} ·{' '}
             {summary.tokens === null
               ? 'Tokens unavailable'
               : `${summary.tokens.toLocaleString()} reported tokens`}
@@ -93,29 +102,33 @@ export function DecisionUsage({
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((entry) => (
-                    <tr key={entry.id}>
+                  {calls.map((entry) => (
+                    <tr key={entry.key}>
                       <td>{new Date(entry.createdAt).toLocaleString()}</td>
                       <td>
-                        {entry.decision.requestedMode === 'jev' ? 'Jev' : 'Agent'}
+                        {entry.attempt.provider === 'jev' ? 'Jev' : 'Agent'}
+                        {entry.attempt.provider === 'agent' &&
+                        entry.decision.requestedMode === 'jev'
+                          ? ' (fallback)'
+                          : ''}
                         {entry.decision.provider === 'local_rules' ? ' → local fallback' : ''}
                       </td>
                       <td>Task strategy</td>
                       <td>
-                        {entry.decision.usage.reported
+                        {entry.attempt.usage.reported
                           ? (
-                              entry.decision.usage.input + entry.decision.usage.output
+                              entry.attempt.usage.input + entry.attempt.usage.output
                             ).toLocaleString()
                           : 'Unavailable'}
                       </td>
                       <td>
-                        {entry.decision.usage.estimatedCostUsd == null
+                        {entry.attempt.usage.estimatedCostUsd == null
                           ? 'Unavailable'
                           : new Intl.NumberFormat(undefined, {
                               style: 'currency',
                               currency: 'USD',
                               maximumFractionDigits: 6,
-                            }).format(entry.decision.usage.estimatedCostUsd)}
+                            }).format(entry.attempt.usage.estimatedCostUsd)}
                       </td>
                     </tr>
                   ))}

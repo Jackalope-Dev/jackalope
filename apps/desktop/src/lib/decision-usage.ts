@@ -10,6 +10,17 @@ export interface TaskDecisionUsage {
 
 export const readTaskDecisionUsage = () => nativeTask<TaskDecisionUsage[]>('task_strategy_history');
 
+export function decisionUsageEntries(decision: DecisionReceipt) {
+  if (decision.attempts?.length) return decision.attempts;
+  if (decision.modelCallAttempted === false) return [];
+  return [
+    {
+      provider: decision.requestedMode === 'jev' ? ('jev' as const) : ('agent' as const),
+      usage: decision.usage,
+    },
+  ];
+}
+
 export function countedTaskDecisions(records: TaskDecisionUsage[], projectId?: string, cutoff = 0) {
   return [...new Map(records.map((record) => [record.id, record])).values()].filter(
     (record) =>

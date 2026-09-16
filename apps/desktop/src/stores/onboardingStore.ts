@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { JevFallback } from '../lib/decisions';
 import type { RoutingMode } from '../lib/routing-settings';
 import type { Project } from './projectStore';
 
@@ -13,6 +14,8 @@ interface OnboardingState {
   pendingProject: Project | null;
   firstTask: string | null;
   routingMode: RoutingMode | null;
+  routingFallback: JevFallback | null;
+  setRoutingFallback: (fallback: JevFallback) => void;
   setRoutingMode: (mode: RoutingMode) => void;
   initialize: (hasProjects: boolean) => void;
   begin: (projectId?: string) => void;
@@ -32,6 +35,8 @@ export const useOnboardingStore = create<OnboardingState>()(
       pendingProject: null,
       firstTask: null,
       routingMode: null,
+      routingFallback: null,
+      setRoutingFallback: (routingFallback) => set({ routingFallback }),
       setRoutingMode: (routingMode) => set({ routingMode }),
       initialize: (hasProjects) => {
         if (get().status === 'new')
@@ -45,18 +50,23 @@ export const useOnboardingStore = create<OnboardingState>()(
           pendingProject: null,
           firstTask: null,
           routingMode: null,
+          routingFallback: null,
         }),
       selectProject: (projectId) =>
         set((state) => ({
           projectId,
           pendingProject: state.pendingProject?.id === projectId ? state.pendingProject : null,
           firstTask: state.projectId === projectId ? state.firstTask : null,
+          routingMode: state.projectId === projectId ? state.routingMode : null,
+          routingFallback: state.projectId === projectId ? state.routingFallback : null,
         })),
       stageProject: (project, firstTask) =>
         set((state) => ({
           projectId: project.id,
           pendingProject: project,
           firstTask: firstTask ?? (state.projectId === project.id ? state.firstTask : null),
+          routingMode: state.projectId === project.id ? state.routingMode : null,
+          routingFallback: state.projectId === project.id ? state.routingFallback : null,
         })),
       setFirstTask: (firstTask) => set({ firstTask }),
       go: (step) => set({ step }),
@@ -67,6 +77,7 @@ export const useOnboardingStore = create<OnboardingState>()(
           firstTask: null,
           projectId: null,
           routingMode: null,
+          routingFallback: null,
         }),
     }),
     {
@@ -80,6 +91,10 @@ export const useOnboardingStore = create<OnboardingState>()(
           ...value,
           pendingProject: value.pendingProject ?? null,
           firstTask: value.firstTask ?? null,
+          routingFallback:
+            value.routingFallback === 'agent' || value.routingFallback === 'local'
+              ? value.routingFallback
+              : null,
           routingMode:
             value.routingMode === 'agent' ||
             value.routingMode === 'jev' ||

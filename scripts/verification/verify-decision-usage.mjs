@@ -34,10 +34,14 @@ try {
               version: 1,
               kind: 'task_strategy',
               requestedMode: 'jev',
-              provider: 'jev',
+              provider: 'agent',
               policyRevision: 1,
               modelCallAttempted: true,
               usage,
+              attempts: [
+                { provider: 'jev', usage },
+                { provider: 'agent', usage },
+              ],
             },
           };
           window.fixture = { dark, download: null };
@@ -60,6 +64,7 @@ try {
                     decision: {
                       ...record.decision,
                       provider: 'local_rules',
+                      attempts: [],
                       usage: { ...usage, reported: false, estimatedCostUsd: null },
                     },
                   },
@@ -96,6 +101,7 @@ const {UsageDashboard}=await import('/src/components/tasks/UsageDashboard.tsx');
       await page.goto(`${origin}/decision-usage-fixture.html`);
       const assessments = page.getByRole('region', { name: 'Task assessment usage' });
       await assessments.getByText(/2 assessments/).waitFor();
+      assert.match(await assessments.innerText(), /3 model calls/);
       assert.match(await assessments.innerText(), /1 usage reports unavailable/);
       const exportButton = page.getByRole('button', { name: 'Export', exact: true });
       assert.equal(await exportButton.isEnabled(), true, await page.locator('body').innerText());
@@ -121,6 +127,8 @@ const {UsageDashboard}=await import('/src/components/tasks/UsageDashboard.tsx');
         0.0000042,
       );
       await assessments.getByText('Assessment details', { exact: true }).click();
+      await assessments.getByRole('cell', { name: 'Agent (fallback)', exact: true }).waitFor();
+      assert.equal(exported.taskAssessments.assessments[0].decision.attempts.length, 2);
       await page.screenshot({
         path: `${output}/${width}-${dark ? 'dark' : 'light'}.png`,
         fullPage: true,

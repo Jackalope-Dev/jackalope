@@ -263,6 +263,7 @@ impl Coordinator {
             let run_id = Uuid::new_v4().to_string();
             let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
             let mut ledger = inner.ledger.clone();
+            managed_delivery::capture_interfaces(&mut ledger, &item, &run_id);
             ledger
                 .items
                 .iter_mut()
@@ -339,30 +340,36 @@ impl Coordinator {
                 if assigned.staged_dependencies && !assigned.dependencies.is_empty() {
                     let ids = if managed_delivery::is_integration(&inner.ledger, &assigned) {
                         managed_delivery::source_ids(&inner.ledger, &assigned)
-                    } else { assigned
-                        .dependencies
-                        .iter()
-                        .filter_map(|id| {
-                            inner
-                                .ledger
-                                .items
-                                .iter()
-                                .find(|i| &i.id == id)
-                                .and_then(|i| i.run_id.clone())
-                        })
-                        .collect::<Vec<_>>() };
-                    request.dependency_snapshot = if managed_delivery::is_integration(&inner.ledger, &assigned) {
-                        crate::commands::integration::dependencies::reconciliation_input(
-                            &self.runtime.integration_directory(), &runs, &ids, &request.id,
-                        )?
                     } else {
-                        crate::commands::integration::prepare_dependencies(
-                            &self.runtime.integration_directory(),
-                            &runs,
-                            &ids,
-                            &request.id,
-                        )?
+                        assigned
+                            .dependencies
+                            .iter()
+                            .filter_map(|id| {
+                                inner
+                                    .ledger
+                                    .items
+                                    .iter()
+                                    .find(|i| &i.id == id)
+                                    .and_then(|i| i.run_id.clone())
+                            })
+                            .collect::<Vec<_>>()
                     };
+                    request.dependency_snapshot =
+                        if managed_delivery::is_integration(&inner.ledger, &assigned) {
+                            crate::commands::integration::dependencies::reconciliation_input(
+                                &self.runtime.integration_directory(),
+                                &runs,
+                                &ids,
+                                &request.id,
+                            )?
+                        } else {
+                            crate::commands::integration::prepare_dependencies(
+                                &self.runtime.integration_directory(),
+                                &runs,
+                                &ids,
+                                &request.id,
+                            )?
+                        };
                 }
                 if !request.dependency_snapshot.sources.is_empty() {
                     request.coordination.as_mut().unwrap().instructions.push_str(&format!("\nThis workspace includes verified predecessor snapshots, not just the target branch. Inspect these immutable input receipts and perform only your assigned work: {}\n", serde_json::to_string(&request.dependency_snapshot).map_err(|e| e.to_string())?));
@@ -570,6 +577,12 @@ impl Coordinator {
             );
         }
         let token = request.coordination.as_ref().unwrap().token.clone();
+        if let Some(item) = &assigned {
+            let mut ledger = inner.ledger.clone();
+            managed_delivery::capture_interfaces(&mut ledger, item, &request.id);
+            self.save(&ledger)?;
+            inner.ledger = ledger;
+        }
         let result = (|| {
             let snapshot = self.startup(&mut inner, &request, assigned.as_ref())?;
             request
@@ -583,6 +596,22 @@ impl Coordinator {
         })();
         if result.is_err() {
             inner.grants.remove(&token);
+        } else if let Some(task_id) = assigned.as_ref().and_then(|item| item.feature_id.as_ref()) {
+            let mut ledger = inner.ledger.clone();
+            if let Some(task) = ledger
+                .managed_tasks
+                .iter_mut()
+                .find(|task| &task.id == task_id)
+            {
+                task.error = None;
+                if let Some(delivery) = &mut task.delivery {
+                    delivery.interventions += 1;
+                    delivery.repair_limit = delivery.repairs.len() + 2;
+                    delivery.ready_at = None;
+                }
+                self.save(&ledger)?;
+                inner.ledger = ledger;
+            }
         }
         if let Err(error) = self.reconcile_locked(&mut inner) {
             inner.error = Some(error);

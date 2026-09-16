@@ -44,7 +44,7 @@ release dates.
   preserve serial live-session batch and cost limits.
 - [ ] Calibrate Jev decision thresholds on held-out tasks and compare end-to-end cost,
   latency and outcomes with local rules and agent routing. Validate real API usage,
-  quota errors, cancellation, project inheritance and credential replace/remove on
+  quota errors, cancellation, optional agent fallback costs, project inheritance and credential replace/remove on
   Windows, macOS Keychain and Linux Secret Service, including locked services.
 
 - [ ] Run the implemented direct-CLI and effort [quality trials](AGENT-QUALITY.md)
@@ -71,6 +71,11 @@ release dates.
 - [ ] Verify automatic delegation with real providers: independent versus tightly
   coupled work, explicit restrictions, unavailable tools, stop/resume, combined
   verification and reported usage. Compare outcomes before claiming quality gains.
+- [ ] Accept managed integration with real providers: overlapping files, shared contracts,
+  intermediate combinations, failed-check repairs, exhausted limits, previews, final
+  outcome review, stop/restart and changed source/target recovery. Compare focused human
+  review, elapsed delivery time, interventions, total usage and escaped defects against
+  manual worktree integration; fixtures do not establish those gains.
 - [ ] Verify routing, quota handoff, repository planning, outcome/workflow gates and
   coordination with installed agents. Exercise ownership handoffs, rejected interfaces,
   scope review, automatic reconciliation/merge opt-ins and restart recovery in the installed app; measure duplicate work and

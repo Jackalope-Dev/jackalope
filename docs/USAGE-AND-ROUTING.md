@@ -51,8 +51,11 @@ advice; it cannot generate a plan or authorize execution. These follow TypeSafe'
 The current Jev gates (0.75 distribution concentration, at least 0.9 tool support,
 reasoning score at least 2/3) are provisional and need held-out task calibration.
 Concentration is not a calibrated probability of task success. Unknown, malformed,
-unavailable or oversized decisions fall back to local rules without another paid
-decision call. Equivalent agent/model workers share one assessment across their accounts; account
+unavailable or oversized decisions use the saved Jev fallback: Local by default,
+or one Agent-powered attempt when explicitly selected. The agent attempt uses normal
+tokens or subscription capacity; failure returns to local rules. Cancellation never
+starts a fallback call. The method and fallback save together per project; restoring
+the app default restores both. Equivalent agent/model workers share one assessment across their accounts; account
 preference and headroom are compared locally. The native request budget is 64 distinct
 workers and 256 KiB; larger inputs
 fall back whole rather than silently dropping candidates or task requirements.
@@ -156,10 +159,12 @@ Only loaded history is covered; archived or deleted work is not reconstructed.
 ## Task-strategy decisions
 
 Task submission resolves the project's Decisions policy before implementation.
-Local rules handle fast paths; other eligible requests use at most one bounded
-model assessment. Jev uses Choice to recommend focused work, investigation or
-planning. Failure or uncertainty falls back to local rules without a paid agent
-retry. The complete request, selected context, repository instructions and bounded
+Local rules handle fast paths; other eligible requests use one bounded model
+assessment, with at most one additional agent assessment when the Jev fallback is
+explicitly Agent-powered. Jev uses Choice to recommend focused work, investigation
+or planning. Local is the default fallback. Separate provider attempts retain both
+usage reports, including unknown usage, without counting the aggregate receipt again.
+The complete request, selected context, repository instructions and bounded
 map feed the assessment; oversized context falls back whole. Unchanged requests
 can reuse a ten-minute receipt. Request/settings, policy revision, repository source
 or selected-context changes invalidate reuse. Cancellation retains any reported cost

@@ -12,6 +12,7 @@ pub fn policy(runtime: &TaskRuntime, project_id: &str) -> Result<DecisionPolicy,
     let value = settings::read(&settings::directory(runtime))?;
     Ok(DecisionPolicy {
         mode: value.effective(Some(project_id)),
+        jev_fallback: value.effective_fallback(Some(project_id)),
         revision: value.revision,
     })
 }

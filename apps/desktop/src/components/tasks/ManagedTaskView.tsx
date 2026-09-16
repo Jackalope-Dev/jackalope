@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary, Textarea } from '@jackalope/ui';
 import { ArrowLeft } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { decisionUsageEntries } from '../../lib/decision-usage';
 import type { FeatureStep } from '../../lib/feature-plan';
 import {
   type ManagedTask,
@@ -9,7 +10,7 @@ import {
   previewTaskPlan,
 } from '../../lib/managed-task';
 import { queueCommand } from '../../lib/queue';
-import { isActive, type TaskRun } from '../../lib/task-runtime';
+import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { usageEntries } from '../../lib/usage-entries';
 import { summarizeUsage } from '../../lib/usage-insights';
@@ -20,8 +21,14 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
+import { ManagedTaskJourney } from './ManagedTaskJourney';
 import { MergeReview } from './MergeReview';
+import { ProjectVerification } from './ProjectVerification';
+import { TaskOutcomes } from './TaskOutcomes';
+import { TaskPreview } from './TaskPreview';
 import { UserPromptCard } from './UserPromptCard';
+import { useManagedPreview } from './useManagedPreview';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 
@@ -39,6 +46,10 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const [detailId, setDetailId] = useState<string | null>(null);
   const [correction, setCorrection] = useState('');
   const [reviewing, setReviewing] = useState(false);
+  const [resultTab, setResultTab] = useState<'result' | 'changes' | 'preview'>('result');
+  const previewRunning = useManagedPreview(work.combined?.id, work.ready && !work.integrated);
+  const selectionKey = work.steps.flatMap(({ run }) => (run ? [run.id] : [])).join(',');
+  const reviewRunIds = useMemo(() => selectionKey.split(',').filter(Boolean), [selectionKey]);
   const detail = work.work.find((run) => run.id === detailId);
   const refreshAll = async () => {
     await refresh();
@@ -84,21 +95,47 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
       alive = false;
     };
   }, [task.id, task.started, plannerId, plannerStatus]);
+  const selectedResult =
+    detailId ?? (work.combined && !isActive(work.combined) ? work.combined.id : null);
   useEffect(() => {
-    if (detailId) select(detailId);
+    if (selectedResult) select(selectedResult);
     return () => select(null);
-  }, [detailId, select]);
+  }, [selectedResult, select]);
+  const recordReview = !!task.delivery && work.ready && !work.integrated;
+  useEffect(() => {
+    if (!recordReview) return;
+    let seconds = 0;
+    const flush = () => {
+      if (!seconds) return;
+      const value = seconds;
+      seconds = 0;
+      void nativeTask('task_plan_review_time', {
+        id: task.id,
+        sampleId: crypto.randomUUID(),
+        seconds: value,
+      }).catch(() => {});
+    };
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible' && document.hasFocus()) seconds++;
+      if (seconds >= 30) flush();
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+      flush();
+    };
+  }, [recordReview, task.id]);
   const usage = summarizeUsage([
     ...usageEntries(work.work),
-    ...(task.assessment.cached ? [] : [{ usage: task.assessment.decision.usage }]),
+    ...(task.assessment.cached ? [] : decisionUsageEntries(task.assessment.decision)),
   ]);
   const openDetails = (run: TaskRun) => {
     setDetailId(run.id);
     setReviewing(false);
   };
-  const continueRun = async (run: TaskRun) => {
+  const continueRun = async (run: TaskRun, advanceWorkflow = false) => {
     if (!correction.trim()) return;
     await managedTaskCommand('action', { id: task.id, action: 'pause' });
+    if (previewRunning) await nativeTask('task_preview_stop', { id: run.id });
     const id = await start(
       {
         ...task.request,
@@ -107,11 +144,18 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         agentProfileId: run.accountBinding?.profileId ?? '__default',
         previousRunId: run.id,
         prompt: correction.trim(),
+        ...(advanceWorkflow ? { contextSelection: { advanceWorkflow: true } } : {}),
       },
       { background: true },
     );
     setCorrection('');
     setDetailId(id);
+    if (task.started) await managedTaskCommand('action', { id: task.id, action: 'resume' });
+  };
+  const prepareCorrection = (text: string) => {
+    setCorrection(text);
+    setResultTab('result');
+    requestAnimationFrame(() => document.getElementById('managed-result-correction')?.focus());
   };
   return (
     <WorkspacePage className="managed-task">
@@ -133,7 +177,8 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           </span>
         }
       />
-      {(error || queueError || (task.error && !work.planner)) && (
+      <ManagedTaskJourney task={task} work={work} />
+      {(error || queueError || task.error) && (
         <InlineNotice tone="error">{error || queueError || task.error}</InlineNotice>
       )}
       {work.missingAttempts.length > 0 && (
@@ -143,6 +188,16 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         </InlineNotice>
       )}
       <div className="flex flex-wrap gap-2 mb-4">
+        {task.delivery && task.error && !work.active.length && !work.integrated && (
+          <Button
+            disabled={busy}
+            onClick={() =>
+              void act(() => managedTaskCommand('action', { id: task.id, action: 'retry-repair' }))
+            }
+          >
+            Try another repair
+          </Button>
+        )}
         {task.started && !work.integrated && !work.ready && (
           <Button
             variant="outline"
@@ -175,6 +230,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
             onClick={() => {
               setDetailId(null);
               setReviewing(true);
+              setResultTab('changes');
               void act(() => managedTaskCommand('action', { id: task.id, action: 'pause' }));
             }}
           >
@@ -233,8 +289,8 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                 Start reviewed plan
               </Button>
               <p className="task-muted mt-2">
-                Workers inherit this task’s agent, account, model and tools. Dependencies use
-                verified changes; the target branch remains unchanged until review.
+                Jackalope will combine the work, check the result and try up to two repairs if
+                checks fail. You review the complete result before applying changes.
               </p>
             </div>
           )}
@@ -255,52 +311,149 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           )}
         </>
       )}
-      {task.started && (
-        <section aria-label="Work in this task" className="space-y-3">
-          {work.steps.map(({ item, run }) => (
-            <div
-              key={item.id}
-              className="flex flex-wrap justify-between gap-3 border-b border-[var(--color-border)] py-3"
-            >
-              <div>
-                <strong>{item.title}</strong>
-                <p className="task-muted">
-                  {item.error ||
-                    (run
-                      ? isActive(run)
-                        ? (run.progress?.label ?? 'Working')
-                        : run.verificationError ||
-                          run.error ||
-                          (run.verification?.result.success ? 'Checks passed' : run.status)
-                      : work.paused
-                        ? 'Paused'
-                        : item.dependencies.length
-                          ? 'Waiting for verified dependencies'
-                          : 'Waiting for capacity')}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {run && (
-                  <Button variant="ghost" onClick={() => openDetails(run)}>
-                    Details
-                  </Button>
+      {work.combined && !isActive(work.combined) && (
+        <section className="managed-result" aria-label="Complete task result">
+          <WorkspaceSubnavigation
+            label="Task result"
+            value={resultTab}
+            onChange={(tab) => {
+              setResultTab(tab);
+              if (tab === 'changes') setReviewing(true);
+            }}
+            items={[
+              { id: 'result', label: 'Result' },
+              { id: 'changes', label: 'Changes and checks' },
+              ...(!work.integrated ? [{ id: 'preview' as const, label: 'Preview' }] : []),
+            ]}
+          />
+          <div className="managed-result-body">
+            {resultTab === 'result' &&
+              (work.combined.detailsOmitted ? (
+                <p role="status">Loading the combined result…</p>
+              ) : (
+                <Suspense fallback={<p>Loading result…</p>}>
+                  <TaskMarkdown
+                    content={
+                      work.combined.result ||
+                      'Open the checks and work details to inspect this result.'
+                    }
+                    active={false}
+                    onOpenLink={(url) => void openExternalUrl(url)}
+                  />
+                </Suspense>
+              ))}
+            {resultTab === 'changes' && (
+              <>
+                <TaskOutcomes
+                  run={work.combined}
+                  canReview={!work.integrated && !work.active.length}
+                  onCorrect={prepareCorrection}
+                  onAdvance={async () => {
+                    throw new Error('Continue this task through the follow-up below.');
+                  }}
+                />
+                {!work.integrated && (
+                  <Disclosure className="my-4">
+                    <DisclosureSummary>
+                      {work.combined.verification?.result.success
+                        ? 'Combined checks passed'
+                        : 'Checks need attention'}
+                    </DisclosureSummary>
+                    <ProjectVerification run={work.combined} onCorrect={prepareCorrection} />
+                  </Disclosure>
                 )}
-                {(item.error || (run && ['failed', 'stopped'].includes(run.status))) &&
-                  !work.active.length && (
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() =>
-                        void act(() => queueCommand('queue_release', { id: item.id, retry: true }))
-                      }
-                    >
-                      Retry assignment
+                {reviewing && project && (
+                  <MergeReview
+                    key={selectionKey}
+                    project={project}
+                    runs={runs}
+                    items={work.items}
+                    merged={queue.mergedRunIds}
+                    onChanged={refreshAll}
+                    onlyRunIds={reviewRunIds}
+                    managedTitle={task.title}
+                  />
+                )}
+              </>
+            )}
+            {resultTab === 'preview' && !work.integrated && (
+              <TaskPreview run={work.combined} onFeedback={prepareCorrection} />
+            )}
+          </div>
+          {!work.integrated && !work.active.length && (
+            <div className="managed-followup">
+              <label className="task-label" htmlFor="managed-result-correction">
+                What would you like to change?
+              </label>
+              <Textarea
+                id="managed-result-correction"
+                rows={3}
+                maxLength={12000}
+                value={correction}
+                placeholder="Describe the adjustment. Jackalope will update the combined result."
+                onChange={(event) => setCorrection(event.target.value)}
+              />
+              <Button
+                disabled={busy || !correction.trim()}
+                onClick={() => void act(() => continueRun(work.combined as TaskRun))}
+              >
+                {previewRunning ? 'Stop preview and update result' : 'Update result'}
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
+      {task.started && (
+        <Disclosure className="my-5" open={work.failed || undefined}>
+          <DisclosureSummary>Work details</DisclosureSummary>
+          <section aria-label="Work in this task" className="space-y-3">
+            {work.steps.map(({ item, run }) => (
+              <div
+                key={item.id}
+                className="flex flex-wrap justify-between gap-3 border-b border-[var(--color-border)] py-3"
+              >
+                <div>
+                  <strong>{item.title}</strong>
+                  <p className="task-muted">
+                    {item.error ||
+                      (run
+                        ? isActive(run)
+                          ? (run.progress?.label ?? 'Working')
+                          : run.verificationError ||
+                            run.error ||
+                            (run.verification?.result.success ? 'Checks passed' : run.status)
+                        : work.paused
+                          ? 'Paused'
+                          : item.dependencies.length
+                            ? 'Waiting for verified dependencies'
+                            : 'Waiting for capacity')}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {run && (
+                    <Button variant="ghost" onClick={() => openDetails(run)}>
+                      Details
                     </Button>
                   )}
+                  {(item.error || (run && ['failed', 'stopped'].includes(run.status))) &&
+                    !work.active.length && (
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() =>
+                          void act(() =>
+                            queueCommand('queue_release', { id: item.id, retry: true }),
+                          )
+                        }
+                      >
+                        Retry assignment
+                      </Button>
+                    )}
+                </div>
               </div>
-            </div>
-          ))}
-        </section>
+            ))}
+          </section>
+        </Disclosure>
       )}
       {detail && (
         <section aria-label="Assignment details" className="my-5 space-y-3">
@@ -325,64 +478,58 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
             <DisclosureSummary>Activity</DisclosureSummary>
             <pre className="whitespace-pre-wrap break-words">{detail.activity.join('\n')}</pre>
           </Disclosure>
-          {!isActive(detail) && !work.integrated && !work.active.length && (
-            <>
-              {['failed', 'stopped'].includes(detail.status) && detail.id === work.planner?.id && (
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async () => {
-                      await managedTaskCommand('action', { id: task.id, action: 'retry-plan' });
-                      setDetailId(null);
-                    })
-                  }
-                >
-                  Retry planning
-                </Button>
-              )}
-              {['review', 'reviewed'].includes(detail.status) &&
-                (detail.id === work.planner?.id ||
-                  work.steps.some(({ run }) => run?.id === detail.id)) &&
-                (!task.started ||
-                  detail.id === work.combined?.id ||
-                  !work.steps.some(
-                    ({ item }) =>
-                      item.dependencies.includes(
-                        work.steps.find(({ run }) => run?.id === detail.id)?.item.id ?? '',
-                      ) && !!item.runId,
-                  )) && (
-                  <>
-                    <label className="task-label" htmlFor="managed-correction">
-                      Follow up in this task
-                    </label>
-                    <Textarea
-                      id="managed-correction"
-                      rows={3}
-                      maxLength={12000}
-                      value={correction}
-                      onChange={(event) => setCorrection(event.target.value)}
-                    />
+          {!isActive(detail) &&
+            detail.id !== work.combined?.id &&
+            !work.integrated &&
+            !work.active.length && (
+              <>
+                {['failed', 'stopped'].includes(detail.status) &&
+                  detail.id === work.planner?.id && (
                     <Button
-                      disabled={busy || !correction.trim()}
-                      onClick={() => void act(() => continueRun(detail))}
+                      disabled={busy}
+                      onClick={() =>
+                        void act(async () => {
+                          await managedTaskCommand('action', { id: task.id, action: 'retry-plan' });
+                          setDetailId(null);
+                        })
+                      }
                     >
-                      Send follow-up
+                      Retry planning
                     </Button>
-                  </>
-                )}
-            </>
-          )}
+                  )}
+                {['review', 'reviewed'].includes(detail.status) &&
+                  (detail.id === work.planner?.id ||
+                    work.steps.some(({ run }) => run?.id === detail.id)) &&
+                  (!task.started ||
+                    detail.id === work.combined?.id ||
+                    !work.steps.some(
+                      ({ item }) =>
+                        item.dependencies.includes(
+                          work.steps.find(({ run }) => run?.id === detail.id)?.item.id ?? '',
+                        ) && !!item.runId,
+                    )) && (
+                    <>
+                      <label className="task-label" htmlFor="managed-correction">
+                        Follow up in this task
+                      </label>
+                      <Textarea
+                        id="managed-correction"
+                        rows={3}
+                        maxLength={12000}
+                        value={correction}
+                        onChange={(event) => setCorrection(event.target.value)}
+                      />
+                      <Button
+                        disabled={busy || !correction.trim()}
+                        onClick={() => void act(() => continueRun(detail))}
+                      >
+                        Send follow-up
+                      </Button>
+                    </>
+                  )}
+              </>
+            )}
         </section>
-      )}
-      {reviewing && project && (
-        <MergeReview
-          project={project}
-          runs={runs}
-          items={work.items}
-          merged={queue.mergedRunIds}
-          onChanged={refreshAll}
-          onlyRunIds={work.steps.flatMap(({ run }) => (run ? [run.id] : []))}
-        />
       )}
       <Disclosure className="mt-5">
         <DisclosureSummary>All attempts ({work.work.length})</DisclosureSummary>
@@ -395,7 +542,48 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         ))}
       </Disclosure>
       <Disclosure className="mt-5">
-        <DisclosureSummary>Usage across this task</DisclosureSummary>
+        <DisclosureSummary>Time and usage</DisclosureSummary>
+        {task.delivery && (
+          <>
+            <dl className="managed-measurements">
+              <div>
+                <dt>Automatic repairs</dt>
+                <dd>{task.delivery.repairs.length}</dd>
+              </div>
+              <div>
+                <dt>Focused review</dt>
+                <dd>
+                  {task.delivery.reviewSeconds == null
+                    ? 'Not measured yet'
+                    : `${Math.ceil(task.delivery.reviewSeconds / 60)} min`}
+                </dd>
+              </div>
+              <div>
+                <dt>Decisions answered</dt>
+                <dd>
+                  {work.work.reduce(
+                    (count, run) =>
+                      count +
+                      (run.prompts?.filter((prompt) => prompt.status === 'answered').length ?? 0),
+                    0,
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>From work finished to applied</dt>
+                <dd>
+                  {task.delivery.workersFinishedAt && task.delivery.appliedAt
+                    ? `${Math.max(0, Math.ceil((Date.parse(task.delivery.appliedAt) - Date.parse(task.delivery.workersFinishedAt)) / 60000))} min`
+                    : 'Not measured yet'}
+                </dd>
+              </div>
+            </dl>
+            <p className="task-muted">
+              Focused review counts time with this result visible and the window focused. Elapsed
+              delivery time includes waiting.
+            </p>
+          </>
+        )}
         <p>
           {usage.tokens === null
             ? 'Usage unavailable'

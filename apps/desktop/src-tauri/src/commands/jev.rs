@@ -13,6 +13,7 @@ use super::decisions::settings::{
 };
 
 pub use super::decisions::DecisionMode as RoutingMode;
+use super::decisions::JevFallback;
 
 #[derive(Deserialize, Serialize)]
 struct Connection {
@@ -26,6 +27,7 @@ pub struct RoutingSettings {
     mode: RoutingMode,
     default_mode: RoutingMode,
     project_mode: Option<RoutingMode>,
+    jev_fallback: JevFallback,
     connected: bool,
     checked_at: Option<String>,
     revision: u64,
@@ -62,6 +64,7 @@ fn status(path: &Path, project_id: Option<&str>) -> Result<RoutingSettings, Stri
         mode: preferences.effective(project_id),
         default_mode: preferences.mode,
         project_mode: project_id.and_then(|id| preferences.project_modes.get(id).copied()),
+        jev_fallback: preferences.effective_fallback(project_id),
         connected: connection.is_some(),
         checked_at: connection.map(|value| value.checked_at),
         revision: preferences.revision,
@@ -129,6 +132,7 @@ pub fn routing_set_mode(
     mode: Option<RoutingMode>,
     revision: u64,
     project_id: Option<String>,
+    jev_fallback: Option<JevFallback>,
 ) -> Result<RoutingSettings, String> {
     let _guard = SETTINGS_LOCK
         .lock()
@@ -140,7 +144,7 @@ pub fn routing_set_mode(
     if mode == Some(RoutingMode::Jev) && connection(&path)?.is_none() {
         return Err("Connect your Jev API key before using Jev routing.".into());
     }
-    current.set_mode(project_id.as_deref(), mode)?;
+    current.set_mode(project_id.as_deref(), mode, jev_fallback)?;
     save(&path, &mut current)?;
     status(&path, project_id.as_deref())
 }

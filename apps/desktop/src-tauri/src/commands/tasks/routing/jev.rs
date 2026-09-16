@@ -128,12 +128,12 @@ impl TaskRuntime {
             Ok(None) => return Ok(None),
             Ok(Some(key)) => key,
             Err(_) => {
-                self.update_checked(&req.id, |run| activity(run, "Jev settings or its saved key are unavailable. Using local routing rules; reconnect Jev in Settings → Decisions."))?;
+                self.update_checked(&req.id, |run| activity(run, "Jev settings or its saved key are unavailable. Using the configured fallback; reconnect Jev in Settings → Decisions."))?;
                 return Ok(None);
             }
         };
         if assessed_workers(candidates).len() > 64 {
-            self.update_checked(&req.id, |run| activity(run, "The eligible worker list exceeds Jackalope's Jev request budget. Using local routing rules with every eligible worker."))?;
+            self.update_checked(&req.id, |run| activity(run, "The eligible worker list exceeds Jackalope's Jev request budget. Using the configured fallback with every eligible worker."))?;
             return Ok(None);
         }
         let payload = request(req, run, candidates, observations);
@@ -141,7 +141,7 @@ impl TaskRuntime {
             self.update_checked(&req.id, |run| {
                 activity(
                     run,
-                    &format!("{error} Using local routing rules without dropping context."),
+                    &format!("{error} Using the configured fallback without dropping context."),
                 )
             })?;
             return Ok(None);
@@ -195,10 +195,7 @@ impl TaskRuntime {
             }
             Err(error) => {
                 self.update_checked(&req.id, |run| {
-                    activity(
-                        run,
-                        &format!("{error} Falling back to local routing rules."),
-                    )
+                    activity(run, &format!("{error} Using the configured fallback."))
                 })?;
                 Ok(None)
             }

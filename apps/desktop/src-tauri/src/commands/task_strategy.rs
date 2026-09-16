@@ -1,7 +1,8 @@
 use super::{
     agent_profiles,
     decisions::{
-        self, DecisionKind, DecisionMode, DecisionProvider, DecisionReceipt, StrategyChoice,
+        self, DecisionAttempt, DecisionKind, DecisionMode, DecisionProvider, DecisionReceipt,
+        StrategyChoice,
     },
     history,
     tasks::{RunRequest, TaskRuntime, Usage},
@@ -454,6 +455,7 @@ fn assess(
             provider: DecisionProvider::LocalRules,
             policy_revision: policy.revision,
             model_call_attempted: false,
+            attempts: vec![],
             concentration: None,
             fallback_reason: None,
             usage: Usage {
@@ -496,8 +498,8 @@ fn assess(
         {
             assessment.decision.fallback_reason = Some("This request exceeds the bounded assessment context; the complete request stays with the lead.".into());
         } else {
-            assessment.decision.usage = Usage::default();
-            let result = if policy.mode == DecisionMode::Jev {
+            let mut selected_provider = policy.provider();
+            let mut result = if policy.mode == DecisionMode::Jev {
                 match tauri::async_runtime::block_on(decisions::assess_strategy(
                     runtime,
                     &request.project_id,
@@ -505,8 +507,12 @@ fn assess(
                     || canceled.load(Ordering::SeqCst),
                 )) {
                     Ok(value) => {
-                        assessment.decision.model_call_attempted = value.model_call_attempted;
-                        assessment.decision.usage = value.usage;
+                        if value.model_call_attempted {
+                            assessment.decision.attempts.push(DecisionAttempt {
+                                provider: DecisionProvider::Jev,
+                                usage: value.usage,
+                            });
+                        }
                         assessment.decision.concentration = value.concentration;
                         assessment.decision.fallback_reason = value.fallback_reason;
                         Ok(value.choice)
@@ -514,21 +520,34 @@ fn assess(
                     Err(error) => Err(error),
                 }
             } else {
-                agent_assessment(
-                    runtime,
-                    &request,
-                    &context,
-                    &canceled,
-                    &mut assessment.decision.model_call_attempted,
-                )
-                .map(|(choice, usage)| {
-                    assessment.decision.usage = usage;
-                    choice
-                })
+                Ok(None)
             };
+            let jev_usable = matches!(&result, Ok(Some(choice)) if *choice != StrategyChoice::Parallel || allowed);
+            if policy.needs_agent(jev_usable, canceled.load(Ordering::SeqCst)) {
+                if policy.mode == DecisionMode::Jev && assessment.decision.fallback_reason.is_none()
+                {
+                    assessment.decision.fallback_reason = Some("Jev did not provide a usable strategy; the configured agent fallback was requested.".into());
+                }
+                let mut attempted = false;
+                let mut usage = Usage::default();
+                result = agent_assessment(runtime, &request, &context, &canceled, &mut attempted)
+                    .map(|(choice, reported_usage)| {
+                        usage = reported_usage;
+                        choice
+                    });
+                if attempted {
+                    assessment.decision.attempts.push(DecisionAttempt {
+                        provider: DecisionProvider::Agent,
+                        usage,
+                    });
+                }
+                selected_provider = DecisionProvider::Agent;
+            }
+            assessment.decision.model_call_attempted = !assessment.decision.attempts.is_empty();
+            assessment.decision.usage = decisions::combined_usage(&assessment.decision.attempts);
             match result {
                 Ok(Some(choice)) if choice != StrategyChoice::Parallel || allowed => {
-                    assessment.decision.provider = policy.provider();
+                    assessment.decision.provider = selected_provider;
                     assessment.strategy = choice;
                     assessment.reason = match choice {
                         StrategyChoice::Single => "One lead can own this request and verify its result.",

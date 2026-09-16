@@ -223,6 +223,7 @@ impl Coordinator {
         runs: &[TaskRun],
         ids: &[String],
     ) -> Result<(), String> {
+        super::managed_delivery::validate_review(ledger, ids)?;
         let mut reconciled = HashSet::new();
         for resolver in runs
             .iter()

@@ -157,10 +157,7 @@ pub(super) fn ready_items(
         if super::managed_delivery::scope_blocked(&inner.ledger, item, runs) {
             continue;
         }
-        if ancestors(&inner.ledger.items, item)
-            .iter()
-            .any(|id| agreements::interface_block(&inner.ledger, &item.project_id, id).is_some())
-        {
+        if super::managed_delivery::interfaces_blocked(&inner.ledger, item) {
             continue;
         }
         if !item.dependencies.iter().all(|id| {
@@ -195,7 +192,8 @@ pub(super) fn ready_items(
                 && other.project_id == item.project_id
                 && other.run_id.as_ref().is_some_and(|id| !merged.contains(id))
                 && !other.canceled
-                && !(item.feature_id.is_some() && item.feature_id == other.feature_id
+                && !(item.feature_id.is_some()
+                    && item.feature_id == other.feature_id
                     && (super::managed_delivery::is_integration(&inner.ledger, item)
                         || super::managed_delivery::is_integration(&inner.ledger, other)))
                 && !(item.staged_dependencies && predecessors.contains(&other.id))

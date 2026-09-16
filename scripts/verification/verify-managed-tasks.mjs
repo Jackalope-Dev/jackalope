@@ -10,8 +10,8 @@ try {
   for (const width of [1280, 960, 540]) {
     for (const dark of [false, true]) {
       const context = await browser.newContext({
-        viewport: { width, height: 900 },
-        reducedMotion: 'reduce',
+        viewport: { width, height: width === 960 ? 640 : 840 },
+        reducedMotion: dark ? 'reduce' : 'no-preference',
       });
       const page = await context.newPage();
       const errors = [];
@@ -60,6 +60,18 @@ try {
             createdAt: new Date().toISOString(),
             started: false,
             error: null,
+            delivery: {
+              finalItem: 'combined-review',
+              integrationItems: ['combined-review'],
+              checkedItems: [],
+              repairs: [],
+              repairLimit: 2,
+              workersFinishedAt: null,
+              readyAt: null,
+              appliedAt: null,
+              reviewSeconds: null,
+              interventions: 0,
+            },
           };
           const runs = [
             {
@@ -186,7 +198,43 @@ try {
                   },
                 ];
               if (command === 'task_list') return f.runs;
-              if (command === 'knowledge_list' || command === 'integration_list') return [];
+              if (command === 'integration_prepare') {
+                f.integration = {
+                  id: 'combined-plan',
+                  runIds: args.runIds,
+                  projectPath: 'C:/fixture',
+                  targetBranch: 'main',
+                  masterHead: '12345678',
+                  status: 'ready',
+                  sources: [],
+                  files: ['feature.txt'],
+                  patch:
+                    'diff --git a/feature.txt b/feature.txt\nnew file mode 100644\n--- /dev/null\n+++ b/feature.txt\n@@ -0,0 +1 @@\n+Combined feature\n',
+                  conflicts: [],
+                  commitMessage: 'Complete feature',
+                  commitPolicy: {
+                    attribution: 'user',
+                    name: 'Fixture',
+                    email: 'fixture@example.invalid',
+                    cleanupAfterMerge: true,
+                  },
+                  cleanupResults: [],
+                };
+                return f.integration;
+              }
+              if (command === 'integration_apply') {
+                f.integration.status = 'applied';
+                f.integration.cleanupResults = [
+                  { runId: 'combined', removed: args.cleanup, error: null },
+                ];
+                f.queue.mergedRunIds = [...f.integration.runIds];
+                f.task.delivery.appliedAt = new Date().toISOString();
+                f.sync();
+                return f.integration;
+              }
+              if (command === 'task_plan_review_time') return;
+              if (command === 'knowledge_list' || command === 'integration_plans')
+                return f.integration ? [f.integration] : [];
               return null;
             },
           };
@@ -246,6 +294,82 @@ try {
       await page.getByRole('button', { name: 'Stop task' }).click();
       await page.getByRole('button', { name: 'Retry assignment' }).waitFor();
       await page.getByText('All attempts (2)', { exact: true }).click();
+      await page.getByText('All attempts (2)', { exact: true }).click();
+      await page.evaluate(() => {
+        const f = window.fixture;
+        f.queue.items.forEach((item, index) => {
+          const id = index === 0 ? 'worker' : index === 1 ? 'ui-worker' : 'combined';
+          item.runId = id;
+          const run = {
+            ...f.runs[0],
+            id,
+            taskId: id,
+            status: 'review',
+            workspace: `C:/fixture/${id}`,
+            branch: id,
+            targetBranch: 'main',
+            result:
+              'The API and UI now work together. The complete flow and project checks passed.',
+            verifyCommand: 'node check.mjs',
+            endedAt: new Date().toISOString(),
+            verification: {
+              command: 'node check.mjs',
+              checkedAt: new Date().toISOString(),
+              tree: id,
+              result: {
+                success: true,
+                durationMs: 2000,
+                stdout: 'Checks passed',
+                stderr: '',
+                exitCode: 0,
+              },
+            },
+          };
+          const old = f.runs.findIndex((entry) => entry.id === id);
+          if (old >= 0) f.runs[old] = run;
+          else f.runs.push(run);
+          if (!f.task.runIds.includes(id)) f.task.runIds.push(id);
+        });
+        f.task.delivery.workersFinishedAt = new Date(Date.now() - 120000).toISOString();
+        f.task.delivery.readyAt = new Date().toISOString();
+        f.sync();
+      });
+      const review = page.getByRole('button', { name: 'Review combined changes' });
+      await review.waitFor();
+      assert.equal(await page.getByRole('navigation', { name: 'Task result' }).count(), 1);
+      await page.getByText('The API and UI now work together.', { exact: false }).waitFor();
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-result.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: 'Preview', exact: true }).click();
+      await page.getByRole('heading', { name: 'Try result', exact: true }).waitFor();
+      await review.focus();
+      await review.press('Enter');
+      const apply = page.getByRole('button', { name: 'Apply changes to main', exact: true });
+      await apply.waitFor();
+      await page.getByText('Combined feature', { exact: false }).first().waitFor();
+      assert.equal(
+        await page.evaluate(
+          () => window.fixture.calls.filter((call) => call.command === 'integration_apply').length,
+        ),
+        0,
+      );
+      assert.equal(await page.getByText('Select all ready tasks', { exact: true }).count(), 0);
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-review.png`,
+        fullPage: true,
+      });
+      await apply.focus();
+      await apply.press('Enter');
+      await page.getByText('Integrated into main', { exact: true }).waitFor();
+      assert.equal(
+        await page.evaluate(
+          () => window.fixture.calls.filter((call) => call.command === 'integration_apply').length,
+        ),
+        1,
+      );
+      assert.equal(await page.evaluate(() => window.fixture.integration.runIds.length), 3);
       assert.equal(
         await page.locator('body').evaluate((el) => el.scrollWidth > window.innerWidth),
         false,

@@ -1072,6 +1072,97 @@ mod tests {
     }
 
     #[test]
+    fn successive_combined_checks_preserve_resolutions_and_detect_later_source_edits() {
+        let f = Fixture::new();
+        fs::create_dir_all(&f.plans).unwrap();
+        let verify = |run: &mut TaskRun| {
+            let tree = workspace_tree(run, &f.plans).unwrap();
+            run.verify_command = Some("fixture check".into());
+            run.verification = Some(serde_json::from_value(serde_json::json!({"command":"fixture check","checkedAt":"now","tree":tree,"result":{"success":true,"exitCode":0,"stdout":"","stderr":"","durationMs":1,"timedOut":false,"truncated":false}})).unwrap());
+        };
+        let mut a = f.run(11, "shared.txt", "first feature\n");
+        let mut b = f.run(12, "shared.txt", "second feature\n");
+        verify(&mut a);
+        verify(&mut b);
+        let mut runs = vec![a.clone(), b.clone()];
+        let mut ids = vec![a.id.clone(), b.id.clone()];
+        let input =
+            dependencies::reconciliation_input(&f.plans, &runs, &ids, "first-combination").unwrap();
+        let mut combined = f.run(13, "temporary", "");
+        fs::remove_file(Path::new(&combined.workspace).join("temporary")).unwrap();
+        git(
+            Path::new(&combined.workspace),
+            &["reset", "--hard", &input.base],
+        )
+        .unwrap();
+        combined.base_head = input.base.clone();
+        combined.dependency_snapshot = input;
+        fs::write(
+            Path::new(&combined.workspace).join("shared.txt"),
+            "both features\n",
+        )
+        .unwrap();
+        verify(&mut combined);
+        ids.push(combined.id.clone());
+        runs.push(combined.clone());
+        let base =
+            prepare_dependencies(&f.plans, &runs, &[combined.id.clone()], "consumer").unwrap();
+        assert_eq!(
+            git(&f.project, &["show", &format!("{}:shared.txt", base.base)]).unwrap(),
+            "both features"
+        );
+        let mut c = f.run(14, "independent.txt", "third feature\n");
+        verify(&mut c);
+        ids.push(c.id.clone());
+        runs.push(c);
+        let final_input =
+            dependencies::reconciliation_input(&f.plans, &runs, &ids, "final-combination").unwrap();
+        assert_eq!(
+            git(
+                &f.project,
+                &["show", &format!("{}:shared.txt", final_input.base)]
+            )
+            .unwrap(),
+            "both features"
+        );
+        let mut final_run = f.run(15, "temporary", "");
+        fs::remove_file(Path::new(&final_run.workspace).join("temporary")).unwrap();
+        git(
+            Path::new(&final_run.workspace),
+            &["reset", "--hard", &final_input.base],
+        )
+        .unwrap();
+        final_run.base_head = final_input.base.clone();
+        final_run.dependency_snapshot = final_input;
+        verify(&mut final_run);
+        ids.push(final_run.id.clone());
+        runs.push(final_run);
+        let plan = prepare(&f.plans, &runs, &ids).unwrap();
+        assert_eq!(git(&f.project, &["rev-parse", "HEAD"]).unwrap(), f.base);
+        fs::write(
+            Path::new(&a.workspace).join("shared.txt"),
+            "unexpected edit\n",
+        )
+        .unwrap();
+        assert!(apply(&f.plans, &runs, &plan.id).is_err());
+        fs::write(
+            Path::new(&a.workspace).join("shared.txt"),
+            "first feature\n",
+        )
+        .unwrap();
+        assert_eq!(apply(&f.plans, &runs, &plan.id).unwrap().status, "applied");
+        assert_eq!(
+            fs::read_to_string(f.project.join("shared.txt")).unwrap(),
+            "both features\n"
+        );
+        assert_eq!(
+            fs::read_to_string(f.project.join("independent.txt")).unwrap(),
+            "third feature\n"
+        );
+        assert!(Path::new(&combined.workspace).exists());
+    }
+
+    #[test]
     fn reconciliation_preserves_sources_and_requires_fresh_verified_resolution() {
         let f = Fixture::new();
         fs::create_dir_all(&f.plans).unwrap();

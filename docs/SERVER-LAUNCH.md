@@ -14,22 +14,29 @@ installed-app acceptance, and [BACKEND.md](BACKEND.md) for the later remote back
 
 The optional Actions deployment jobs use environments separate from desktop releases.
 Run `pnpm release:setup --apply` to configure `service-staging` for beta and
-`service-production` for master. Production deployments and infrastructure preflight
-require maintainer approval; administrators cannot bypass it. These environments must
+`service-production` for master. Production deployments require maintainer approval;
+administrators cannot bypass it. These environments must
 not contain Store, Apple or desktop updater signing credentials.
 
-Add `CLOUDFLARE_API_TOKEN` to each service environment, scoped to the intended account
-and resources. Production preflight also uses `CLOUDFLARE_WEBSITE_DEPLOY_HOOK` when
-checking the native website build hook. Keep `CLOUDFLARE_DEPLOY_ENABLED=false` when
-Cloudflare Git builds own deployment. Changing GitHub environments does not change
-those native Cloudflare integrations or their credentials.
+When enabling Actions deployments, add `CLOUDFLARE_API_TOKEN` to each service
+environment, scoped to the intended account and resources. Keep
+`CLOUDFLARE_DEPLOY_ENABLED=false` when Cloudflare Git builds own deployment; their
+build tokens stay configured in Cloudflare and need no duplicate GitHub secret.
+Changing GitHub environments does not change those native Cloudflare integrations
+or their credentials.
 
-When migrating from shared `cloud-beta`/`cloud-stable` environments, enter the service
-credentials again from private operator storage; GitHub does not return existing
-secret values. Confirm the intended service jobs work, then remove obsolete Cloudflare
-credentials from desktop release environments. Keep publication/deployment gates off
-until the corresponding setup and acceptance checks pass. The disabled legacy R2
-publisher has separate credential requirements; do not enable it for Store/Cloud releases.
+The launch infrastructure check reads public API readiness and website responses.
+It needs no environment approval, Cloudflare token or deploy hook, and does not
+write to R2 or trigger deployments. These checks do not establish deployment
+permissions, Store certification or installed-app update acceptance.
+
+When moving deployment ownership to Actions from shared `cloud-beta`/`cloud-stable`
+environments, enter the service credentials again from private operator storage;
+GitHub does not return existing secret values. Confirm the intended service jobs
+work, then remove obsolete Cloudflare credentials from desktop release environments.
+Keep publication/deployment gates off until the corresponding setup and acceptance
+checks pass. The disabled legacy R2 publisher separately requires its publication
+token and `CLOUDFLARE_WEBSITE_DEPLOY_HOOK`; do not enable it for Store/Cloud releases.
 
 ## 1. Configure an independent deployment
 

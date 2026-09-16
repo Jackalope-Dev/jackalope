@@ -45,8 +45,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
   Jackalope Decisions offers local rules, agent-powered or optional Jev-assisted
-  routing, with project overrides and protected device keys. Jev usage is reported;
-  live provider calibration and native cross-platform acceptance remain open.
+  routing, with project overrides and protected device keys. Jev fallback defaults to
+  local rules, with an optional agent attempt; both providers retain usage reports.
+  Live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.
 - Durable ownership handoffs, explicit interface agreements and changed-file scope
@@ -58,8 +59,11 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - New tasks can assess focused work, investigation or a reviewed plan through the
   project's Decisions preference. Local fast paths and reused assessments avoid model
   calls. Plans retain one parent, scoped assignments, attempts and usage; multiple
-  assignments receive combined verification. Users review before starting and explicitly
-  integrate the result. Installed-provider and cost/quality acceptance remain open.
+  assignments receive progressive integration checks and a final combined result.
+  New plans retain conflict resolution and bounded verification repairs within the task.
+  Plan, Work, Check and Review lead to one result, preview, combined diff and outcome
+  review before explicit application. Focused review and elapsed integration time remain
+  distinct local measurements. Installed-provider and cost/quality acceptance remain open.
 - Requests continuing with one lead can delegate through available provider subagent
   tools. Unsupported or denied delegation stays sequential. See
   [agent quality](AGENT-QUALITY.md) for boundaries.

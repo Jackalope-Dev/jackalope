@@ -6,13 +6,21 @@ const url = process.env.JACKALOPE_PREVIEW_URL ?? 'http://127.0.0.1:5198';
 const output = 'output/playwright/decisions';
 await mkdir(output, { recursive: true });
 const secret = 'fixture-only-typesafe-credential';
-const config = { mode: 'agent', connected: false, revision: 0, projects: {} };
+const config = {
+  mode: 'agent',
+  jevFallback: 'local',
+  fallbacks: {},
+  connected: false,
+  revision: 0,
+  projects: {},
+};
 let failConnect = true;
 const calls = [];
 const status = (projectId) => ({
   mode: config.projects[projectId] ?? config.mode,
   defaultMode: config.mode,
   projectMode: config.projects[projectId] ?? null,
+  jevFallback: config.fallbacks[projectId] ?? config.jevFallback,
   connected: config.connected,
   hasKey: config.connected,
   revision: config.revision,
@@ -24,12 +32,14 @@ import React from '/node_modules/.vite/deps/react.js';
 import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
 import { RoutingPreferences } from '/src/components/settings/RoutingSetup.tsx';
 import { OnboardingFlow } from '/src/components/onboarding/OnboardingFlow.tsx';
-import { useOnboardingStore } from '/src/stores/onboardingStore.ts';
-import { useProjectStore } from '/src/stores/projectStore.ts';
-import { useExecutionStore } from '/src/stores/executionStore.ts';
-import { useAgentAccountsStore } from '/src/stores/agentAccountsStore.ts';
-import { useThemeStore } from '/src/stores/themeStore.ts';
 import '/src/index.css';
+const source=await fetch('/src/components/onboarding/OnboardingFlow.tsx').then(r=>r.text());
+const module=async(name)=>import(source.split('"').find(url=>url.startsWith('/src/stores/'+name+'.ts'))||'/src/stores/'+name+'.ts');
+const {useOnboardingStore}=await module('onboardingStore');
+const {useProjectStore}=await module('projectStore');
+const {useExecutionStore}=await module('executionStore');
+const {useAgentAccountsStore}=await module('agentAccountsStore');
+const {useThemeStore}=await module('themeStore');
 window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
 window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebview:{label:'main'}},transformCallback:()=>0,invoke:(command,args={})=>window.fixtureInvoke(command,args)};
 window.fixtureTheme=(isDark)=>useThemeStore.getState().setTheme({...useThemeStore.getState().currentTheme,appearance:'manual',isDark});
@@ -38,13 +48,15 @@ useProjectStore.setState({projects:[],activeProjectId:'alpha'});
 useExecutionStore.setState({runners:[{id:'codex',name:'Codex',available:true,signedIn:true,account:'fixture',detail:'Browser fixture only'}],discovering:false});
 useAgentAccountsStore.setState({load:async()=>{}});
 const onboarding=location.search.includes('onboarding');
-if(onboarding)useOnboardingStore.setState({status:'active',step:'routing',projectId:'alpha',pendingProject:project,routingMode:null});
+if(onboarding)useOnboardingStore.setState({status:'active',step:'routing',projectId:'alpha',pendingProject:project,routingMode:null,routingFallback:null});
 const projectId=new URLSearchParams(location.search).get('project')||undefined;
 ReactDOM.createRoot(document.getElementById('root')).render(onboarding?React.createElement(OnboardingFlow,{onFinish:()=>{},onSkip:()=>{}}):React.createElement('div',{style:{padding:'32px',maxWidth:'760px'}},React.createElement('h1',null,'Jackalope Decisions'),React.createElement(RoutingPreferences,{projectId})));
 `;
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
+  page.setDefaultTimeout(15000);
+  page.setDefaultNavigationTimeout(60000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.exposeFunction('fixtureInvoke', async (command, args) => {
@@ -60,9 +72,17 @@ try {
     if (command === 'routing_set_mode') {
       assert.equal(args.revision, config.revision);
       if (args.projectId) {
-        if (args.mode) config.projects[args.projectId] = args.mode;
-        else delete config.projects[args.projectId];
-      } else config.mode = args.mode;
+        if (args.mode) {
+          config.projects[args.projectId] = args.mode;
+          config.fallbacks[args.projectId] = args.jevFallback ?? config.jevFallback;
+        } else {
+          delete config.projects[args.projectId];
+          delete config.fallbacks[args.projectId];
+        }
+      } else {
+        config.mode = args.mode;
+        config.jevFallback = args.jevFallback ?? config.jevFallback;
+      }
       config.revision++;
       return status(args.projectId);
     }
@@ -89,6 +109,15 @@ try {
   await agent.focus();
   await page.keyboard.press('ArrowDown');
   assert.equal(await jev.isChecked(), true);
+  const fallback = page.getByRole('combobox', { name: 'If Jev is unavailable or uncertain' });
+  assert.match(await fallback.innerText(), /Local \(default\)/);
+  const information = page.getByText('More information', { exact: true });
+  await information.focus();
+  await page.keyboard.press('Enter');
+  await page.getByText(/Potentially faster, lower-cost decisions/).waitFor();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.getByText(/Potentially faster, lower-cost decisions/).isVisible(), false);
+  assert.equal(await page.getByText(/Applies to this project/).count(), 0);
   assert.equal(await page.getByRole('button', { name: 'Save routing choice' }).isDisabled(), true);
   const key = page.getByLabel('TypeSafe API key', { exact: true });
   assert.equal(await key.getAttribute('type'), 'password');
@@ -111,6 +140,20 @@ try {
   await page.getByRole('button', { name: 'Save routing choice' }).click();
   await page.getByText('Routing preference saved.', { exact: true }).waitFor();
   assert.equal(config.projects.alpha, 'jev');
+  assert.equal(config.fallbacks.alpha, 'local');
+  await fallback.click();
+  await page.getByRole('option', { name: 'Agent-powered', exact: true }).click();
+  await page
+    .getByText('An extra agent decision uses tokens or subscription capacity.', { exact: true })
+    .waitFor();
+  assert.equal(config.fallbacks.alpha, 'local');
+  await page.getByRole('button', { name: 'Save routing choice' }).click();
+  await page.getByText('Routing preference saved.', { exact: true }).waitFor();
+  assert.equal(config.fallbacks.alpha, 'agent');
+  await page.reload();
+  await fallback.waitFor();
+  assert.match(await fallback.innerText(), /Agent-powered/);
+  assert.equal(await page.getByRole('button', { name: 'Save routing choice' }).isDisabled(), true);
   assert.equal(config.mode, 'agent');
   await page.goto(`${url}/?project=beta`);
   await agent.waitFor();
@@ -122,6 +165,7 @@ try {
   await page.getByRole('button', { name: 'Use app default' }).click();
   await page.getByText('Using the app default.', { exact: true }).waitFor();
   assert.equal(config.projects.beta, undefined);
+  assert.equal(config.fallbacks.beta, undefined);
   await page.goto(`${url}/?project=alpha`);
   await page.getByText('API key connected', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Replace key', exact: true }).click();
@@ -155,6 +199,13 @@ try {
           await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
           false,
         );
+        assert.equal(
+          await page
+            .locator('.routing-option-copy strong')
+            .first()
+            .evaluate((el) => getComputedStyle(el).alignItems),
+          'baseline',
+        );
         await page
           .locator('.onboarding-content')
           .evaluate((node) => {
@@ -164,6 +215,13 @@ try {
         await page.screenshot({
           path: `${output}/${width}-${dark ? 'dark' : 'light'}-${mode}.png`,
         });
+        if (mode === 'jev') {
+          await information.scrollIntoViewIfNeeded();
+          assert.equal(await fallback.isVisible(), true);
+          await page.screenshot({
+            path: `${output}/${width}-${dark ? 'dark' : 'light'}-jev-details.png`,
+          });
+        }
       }
     }
   }

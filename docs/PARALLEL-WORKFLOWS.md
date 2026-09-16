@@ -59,7 +59,9 @@ investigation or parallel work fits the request. The project's **Decisions**
 preference selects local rules, an agent or Jev. Clear small requests and explicit
 restrictions use local rules. Assessment happens on submission, never while typing;
 unchanged requests reuse a short-lived receipt. An unavailable or uncertain model
-assessment falls back locally without another model call. Sessions with batch or
+assessment falls back locally by default. Jev can instead make one agent assessment
+when the project's fallback is explicitly Agent-powered; both calls retain usage.
+Sessions with batch or
 cost limits retain their existing serial flow.
 
 **Create a plan** or **Investigate and plan** starts a planning attempt using the
@@ -70,6 +72,10 @@ rejects cycles, escaping paths and independent assignments with overlapping scop
 A changed planner attempt requires another review. Planning workspaces must remain
 unchanged before implementation starts.
 
+Planning considers integration and review effort, shared contracts, generated files,
+manifests and lockfiles. Shared changes have one owner or an explicit dependency.
+Tightly coupled work stays together; a small request can remain one assignment.
+
 The parent stays together in Chat and Inbox. Expand assignments for their results,
 questions and follow-ups; all attempts and reported usage remain attached. Workers
 inherit the selected agent, account, model, effort and tools. The existing queue
@@ -79,13 +85,46 @@ a single assignment avoids that extra worker. A saved automatic verification com
 and isolated Git work are required for this flow. Explicit workflow and continuation
 requests keep their existing execution paths.
 
+New managed plans combine groups of at least two completed assignments while other
+work continues. Pending consumers receive the checked combination; running workers
+keep their frozen inputs. The combined worker uses a separate worktree, resolves
+overlapping edits and checks the complete result. Native snapshot, process ownership
+and scope guards remain in force, including overlaps with unrelated tasks. Intermediate
+combinations are included in the final source receipt and cannot be applied separately.
+Interface decisions wholly within those assignments can be mediated by the combined
+worker. Their captured revisions, source snapshots, saved verification and a completion
+report for the checked tree must still match. The journal records mediation as reconciled,
+without manufacturing participant acceptance. Decisions involving other tasks remain
+blocked; changed decisions require a fresh continuation.
+
+A successfully completed agent attempt whose saved verification failed can continue
+automatically in its existing workspace. Each reviewed plan or user correction allows
+up to two repair attempts using the bound agent/account. Consumed predecessor snapshots,
+failed or interrupted processes and unavailable history are not automatically retried.
+Exhausted repairs stay in the parent task for a correction or an explicit additional
+attempt. Sources and the target checkout are preserved throughout.
+
 **Pause dispatch** holds pending assignments. **Stop task** also stops active
 attempts; interrupted process ownership retains the runtime's recovery requirements.
 Restart leaves dispatch paused. Failed assignments can be retried before downstream
 work starts; once dependent snapshots exist, corrections belong in the final combined
 result. A changed target branch blocks further dispatch and requires reassessment.
 **Review combined changes** uses guarded integration. Project automatic merge and
-reconciliation policies exclude these managed tasks.
+reconciliation policies exclude these managed tasks; managed integration and repair
+belong to the reviewed task lifecycle and never automatically apply to the target.
+
+The task shows Plan, Work, Check and Review, with Result, Changes and checks, and
+Preview together. Worker details and all attempts remain expandable. New plans collect
+assignment outcomes into the final result for snapshot-bound human review. Applying
+requires the complete task, current sources, saved checks and outcome acceptance;
+cleanup follows the explicit apply choice. Preview feedback continues the combined
+result; a running preview must be stopped before that continuation.
+
+Time and usage retains all worker and repair attempts. Local measurements distinguish
+observed focused review seconds from elapsed time between worker completion and local
+application. Focused review is an observation of a visible, focused result window, not
+proof of human attention. Unknown older measurements remain unavailable. These records
+do not establish reduced review effort or fewer defects without comparative trials.
 
 Assessment receipts record the selected policy and actual provider, including
 reported usage from unsuccessful model assessments and unknown usage when a call
