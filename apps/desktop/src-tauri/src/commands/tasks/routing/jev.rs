@@ -2,6 +2,14 @@ use super::*;
 use crate::commands::jev;
 use serde_json::json;
 
+fn assessed_workers(candidates: &[Candidate]) -> Vec<&Candidate> {
+    let mut seen = std::collections::HashSet::new();
+    candidates
+        .iter()
+        .filter(|candidate| seen.insert((&candidate.agent, &candidate.adapter, &candidate.model)))
+        .collect()
+}
+
 fn request(
     req: &RunRequest,
     run: &TaskRun,
@@ -12,7 +20,8 @@ fn request(
         "../../../../../src/lib/agent-capabilities.json"
     ))
     .expect("checked capability catalog");
-    let workers: Vec<_> = candidates
+    let assessed = assessed_workers(candidates);
+    let workers: Vec<_> = assessed
         .iter()
         .map(|candidate| {
             json!({
@@ -21,7 +30,7 @@ fn request(
             })
         })
         .collect();
-    let questions: serde_json::Map<String, Value> = candidates
+    let questions: serde_json::Map<String, Value> = assessed
         .iter()
         .enumerate()
         .flat_map(|(index, candidate)| {
@@ -63,9 +72,18 @@ fn request(
 
 fn selection(value: &Value, candidates: &[Candidate]) -> Result<Choice, String> {
     let mut ranked = Vec::new();
+    let assessed = assessed_workers(candidates);
     for candidate in candidates {
-        let fit = &value["answers"][format!("fit_{}", candidate.id)];
-        let tools = &value["answers"][format!("tools_{}", candidate.id)];
+        let worker = assessed
+            .iter()
+            .find(|worker| {
+                worker.agent == candidate.agent
+                    && worker.adapter == candidate.adapter
+                    && worker.model == candidate.model
+            })
+            .ok_or("An eligible worker was not assessed.")?;
+        let fit = &value["answers"][format!("fit_{}", worker.id)];
+        let tools = &value["answers"][format!("tools_{}", worker.id)];
         let (score, confidence) = jev::validate_score(fit, 4)?;
         let supported = jev::validate_noul(tools)?;
         // Abstention thresholds need real-task calibration; they are not success guarantees.
@@ -114,7 +132,7 @@ impl TaskRuntime {
                 return Ok(None);
             }
         };
-        if candidates.len() > 64 {
+        if assessed_workers(candidates).len() > 64 {
             self.update_checked(&req.id, |run| activity(run, "The eligible worker list exceeds Jackalope's Jev request budget. Using local routing rules with every eligible worker."))?;
             return Ok(None);
         }
@@ -191,6 +209,17 @@ impl TaskRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn equivalent_workers_share_assessments_but_accounts_keep_independent_headroom() {
+        let first = super::super::tests::candidate("first", "codex", "same-model", Some(20.0));
+        let second = super::super::tests::candidate("second", "codex", "same-model", Some(80.0));
+        let candidates = [first, second];
+        assert_eq!(assessed_workers(&candidates).len(), 1);
+        let answer = json!({"answers":{"fit_first":{"type":"score","score":3,"confidence":0.9,"probabilities":{"0":0,"1":0,"2":0,"3":1}},"tools_first":{"type":"noul","noul":0.99}}});
+        let choice = selection(&answer, &candidates).unwrap();
+        assert_eq!(choice.candidate_id, "second");
+        assert_eq!(choice.alternatives, ["first"]);
+    }
     #[test]
     fn uncertain_or_invalid_assessments_abstain_and_usage_survives() {
         let candidates = vec![

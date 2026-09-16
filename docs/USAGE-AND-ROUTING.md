@@ -51,7 +51,9 @@ The current Jev gates (0.75 distribution concentration, at least 0.9 tool suppor
 reasoning score at least 2/3) are provisional and need held-out task calibration.
 Concentration is not a calibrated probability of task success. Unknown, malformed,
 unavailable or oversized decisions fall back to local rules without another paid
-decision call. The native request budget is 64 candidates and 256 KiB; larger inputs
+decision call. Equivalent agent/model workers share one assessment across their accounts; account
+preference and headroom are compared locally. The native request budget is 64 distinct
+workers and 256 KiB; larger inputs
 fall back whole rather than silently dropping candidates or task requirements.
 Requests use a fixed HTTPS endpoint, no redirects/retries, an eight-second timeout,
 bounded responses and cancellation. Key checks make one small billable request.
