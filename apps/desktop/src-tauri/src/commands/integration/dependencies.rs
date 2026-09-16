@@ -64,6 +64,18 @@ pub fn prepare_dependencies(
     let target = selected[0].target_branch.as_deref().unwrap_or("master");
     let mut combined = git(&project, &["rev-parse", &format!("refs/heads/{target}")])?;
     let mut sources = Vec::<IntegrationSource>::new();
+    if let Some(resolver) = selected.iter().filter(|run| run.dependency_snapshot.reconciles)
+        .max_by_key(|run| run.dependency_snapshot.sources.len()) {
+        validate_dependencies(directory, runs, resolver)?;
+        if resolver.dependency_snapshot.target_head.as_ref() != Some(&combined) {
+            return Err("The target changed after the combined check. Reassess this task before continuing.".into());
+        }
+        let source = snapshot(resolver, directory)?;
+        verified(resolver, &source.tree)?;
+        combined = commit_tree(&project, &source.tree, &[&resolver.base_head], "Jackalope verified combined base")?;
+        sources.extend(resolver.dependency_snapshot.sources.clone());
+        sources.push(source);
+    }
     for run in &selected {
         if run.target_branch.as_deref().unwrap_or("master") != target {
             return Err("Feature predecessors must use the same target branch.".into());
@@ -71,6 +83,7 @@ pub fn prepare_dependencies(
         validate_dependencies(directory, runs, run)?;
         let source = snapshot(run, directory)?;
         verified(run, &source.tree)?;
+        if sources.iter().any(|saved| saved.run_id == run.id) { continue; }
         for ancestor in &run.dependency_snapshot.sources {
             if !sources.iter().any(|s| s.run_id == ancestor.run_id) {
                 sources.push(ancestor.clone());
@@ -128,12 +141,25 @@ pub(in crate::commands) fn reconciliation_input(
     id: &str,
 ) -> Result<DependencySnapshot, String> {
     fs::create_dir_all(directory).map_err(|e| e.to_string())?;
-    let selected = selected_runs(runs, ids)?;
+    let mut selected = selected_runs(runs, ids)?;
+    selected.sort_by_key(|run| run.dependency_snapshot.sources.len());
     let project = canonical(&selected[0].project_path)?;
     let target = selected[0].target_branch.as_deref().unwrap_or("master");
     let target_head = git(&project, &["rev-parse", &format!("refs/heads/{target}")])?;
     let mut combined = target_head.clone();
-    let mut sources = Vec::new();
+    let mut sources = Vec::<IntegrationSource>::new();
+    if let Some(resolver) = selected.iter().filter(|run| run.dependency_snapshot.reconciles)
+        .max_by_key(|run| run.dependency_snapshot.sources.len()) {
+        validate_dependencies(directory, runs, resolver)?;
+        if resolver.dependency_snapshot.target_head.as_ref() != Some(&target_head) {
+            return Err("The target changed after reconciliation. Reassess before combining more work.".into());
+        }
+        let source = snapshot(resolver, directory)?;
+        verified(resolver, &source.tree)?;
+        combined = commit_tree(&project, &source.tree, &[&resolver.base_head], "Jackalope verified combined base")?;
+        sources.extend(resolver.dependency_snapshot.sources.clone());
+        sources.push(source);
+    }
     for run in &selected {
         if run.target_branch.as_deref().unwrap_or("master") != target {
             return Err("Reconcile tasks with the same target branch.".into());
@@ -149,6 +175,7 @@ pub(in crate::commands) fn reconciliation_input(
         }
         let source = snapshot(run, directory)?;
         verified(run, &source.tree)?;
+        if sources.iter().any(|saved| saved.run_id == run.id) { continue; }
         let commit = commit_tree(
             &project,
             &source.tree,

@@ -252,6 +252,9 @@ impl Coordinator {
             self.refresh_scopes_locked(&mut inner)?;
             *self.scope_checked.lock().unwrap() = Some(std::time::Instant::now());
         }
+        if self.deliver_managed_locked(&mut inner, &runs, &merged, &url)? {
+            return Ok(());
+        }
         if self.assist_locked(&mut inner, &runs, &merged, &url)? {
             return Ok(());
         }
@@ -334,7 +337,9 @@ impl Coordinator {
                     )?;
                 }
                 if assigned.staged_dependencies && !assigned.dependencies.is_empty() {
-                    let ids = assigned
+                    let ids = if managed_delivery::is_integration(&inner.ledger, &assigned) {
+                        managed_delivery::source_ids(&inner.ledger, &assigned)
+                    } else { assigned
                         .dependencies
                         .iter()
                         .filter_map(|id| {
@@ -345,14 +350,19 @@ impl Coordinator {
                                 .find(|i| &i.id == id)
                                 .and_then(|i| i.run_id.clone())
                         })
-                        .collect::<Vec<_>>();
-                    request.dependency_snapshot =
+                        .collect::<Vec<_>>() };
+                    request.dependency_snapshot = if managed_delivery::is_integration(&inner.ledger, &assigned) {
+                        crate::commands::integration::dependencies::reconciliation_input(
+                            &self.runtime.integration_directory(), &runs, &ids, &request.id,
+                        )?
+                    } else {
                         crate::commands::integration::prepare_dependencies(
                             &self.runtime.integration_directory(),
                             &runs,
                             &ids,
                             &request.id,
-                        )?;
+                        )?
+                    };
                 }
                 if !request.dependency_snapshot.sources.is_empty() {
                     request.coordination.as_mut().unwrap().instructions.push_str(&format!("\nThis workspace includes verified predecessor snapshots, not just the target branch. Inspect these immutable input receipts and perform only your assigned work: {}\n", serde_json::to_string(&request.dependency_snapshot).map_err(|e| e.to_string())?));

@@ -10,6 +10,7 @@ mod automatic_tests;
 mod automatic_trial;
 pub(super) mod inbox;
 pub mod managed;
+pub(super) mod managed_delivery;
 mod models;
 use models::Ledger;
 pub use models::{

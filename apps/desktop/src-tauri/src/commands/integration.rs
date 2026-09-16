@@ -424,15 +424,8 @@ pub(in crate::commands) fn prepare_with_message(
     let mut preview_target = master;
     let resolution = selected
         .iter()
-        .find(|run| run.dependency_snapshot.reconciles);
-    if selected
-        .iter()
         .filter(|run| run.dependency_snapshot.reconciles)
-        .count()
-        > 1
-    {
-        return Err("Select only one reconciliation result.".into());
-    }
+        .max_by_key(|run| run.dependency_snapshot.sources.len());
     if let Some(resolver) = resolution {
         if resolver.dependency_snapshot.target_head.as_ref() != Some(&plan.master_head)
             || selected.iter().any(|run| {

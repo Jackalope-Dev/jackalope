@@ -249,6 +249,7 @@ pub fn run() {
             commands::coordination::managed::task_plan_preview,
             commands::coordination::managed::task_plan_start,
             commands::coordination::managed::task_plan_action,
+            commands::coordination::managed::task_plan_review_time,
             agent_profile_rename,
             agent_profile_delete,
             agent_profile_set_active,

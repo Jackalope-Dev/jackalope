@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ManagedTask {
+    #[serde(default)]
+    pub delivery: Option<super::managed_delivery::Delivery>,
     pub id: String,
     pub title: String,
     pub request: RunRequest,
@@ -95,7 +97,7 @@ pub(super) fn reconcile_attempts(ledger: &mut Ledger, runs: &[TaskRun]) -> bool 
 }
 
 fn planning_prompt(request: &str) -> String {
-    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–4 assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), and outcomes (reviewable requirements). Preserve the complete request and its constraints. Keep tightly coupled work together, tests with implementation, and shared interface changes in one prerequisite. Independent assignments must have non-overlapping ownership. Do not assume independent work exists. Use one assignment when splitting is not justified. Jackalope will append combined review and verification; do not add your own final review assignment. No agent names or model changes. Each prompt must be self-contained and identify its exact responsibility.\n\nComplete request:\n{request}")
+    format!("Plan this complete request using the repository and its instructions. Read only: do not edit files, install dependencies, commit, launch other agents or implement changes. Return ONLY a JSON array of 1–4 assignments with key, title, prompt, scopes (actual relative repository files/folders), dependsOn (other assignment keys), and outcomes (reviewable requirements). Preserve the complete request and its constraints. Minimize total implementation, integration and human review effort, not just worker duration. Keep tightly coupled work together and tests with implementation. Inspect imports, API contracts, schemas, generated files, manifests and lockfiles: different files do not imply independent work. Give each shared contract and dependency change one owner; put it in a prerequisite and name the contract in consumer instructions. Independent assignments must have non-overlapping ownership. Use parallel investigation or review only when it helps the requested result. Use one assignment when splitting creates more integration work than it saves. Jackalope combines finished work, checks dependencies and appends final review and verification; do not add your own integration assignments. No agent names or model changes. Each prompt must be self-contained and identify its exact responsibility.\n\nComplete request:\n{request}")
 }
 
 pub(super) fn prepare_followup(
@@ -174,7 +176,7 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
     }
     let mut items = Vec::new();
     for step in proposed {
-        if step.key == "combined-review"
+        if step.key == "combined-review" || step.key.starts_with("integration-")
             || step.title.trim().is_empty()
             || step.title.len() > 160
             || step.prompt.trim().is_empty()
@@ -232,7 +234,7 @@ fn parse_plan(text: &str, request: &RunRequest) -> Result<Vec<PlanEntry>, String
     items.push(PlanEntry {
         key: "combined-review".into(),
         title: "Review and verify the combined result".into(),
-        prompt: format!("You own the complete task result. This workspace contains verified snapshots of all implementation assignments. Inspect their changes, resolve inconsistencies within the request, exercise the complete flow and run the saved project check. Report any unresolved requirements and actual checks. Do not launch other agents, commit, merge or push.\n\nComplete request:\n{}", request.prompt),
+        prompt: super::managed_delivery::integration_prompt(&request.prompt, true),
         agent: request.agent.clone(),
         scopes: vec![".".into()],
         depends_on: items.iter().map(|item| item.key.clone()).collect(),
@@ -268,6 +270,7 @@ impl Coordinator {
             return Err("Provide a valid task identifier and a title up to 160 bytes.".into());
         }
         let task = ManagedTask {
+            delivery: Some(Default::default()),
             id: request.id.clone(),
             title: title.trim().into(),
             request: request.clone(),
@@ -388,7 +391,8 @@ impl Coordinator {
             .as_ref()
             .map(|account| [(task.request.agent.clone(), account.clone())].into())
             .unwrap_or_default();
-        self.import(PlanRequest {
+        let count = items.len();
+        let created = self.import(PlanRequest {
             staged_dependencies: true,
             feature: Some(task.title.clone()),
             feature_id: Some(task.id.clone()),
@@ -414,6 +418,12 @@ impl Coordinator {
             .unwrap();
         task.started = true;
         task.error = None;
+        if let Some(delivery) = &mut task.delivery {
+            delivery.final_item = created.last().cloned();
+            if count > 1 {
+                delivery.integration_items = created.last().cloned().into_iter().collect();
+            }
+        }
         self.save(&ledger)?;
         inner.ledger = ledger;
         inner.enabled.insert(dispatch_key(id));
@@ -431,6 +441,19 @@ impl Coordinator {
             .cloned()
             .ok_or("Task not found.")?;
         match action {
+            "retry-repair" => {
+                self.runtime.access.ensure()?;
+                task_strategy::validate_source(&task.request, &task.assessment.source_head)?;
+                let mut ledger = inner.ledger.clone();
+                let saved = ledger.managed_tasks.iter_mut().find(|saved| saved.id == id).unwrap();
+                let delivery = saved.delivery.as_mut().ok_or("This task uses the earlier review flow.")?;
+                delivery.repair_limit = delivery.repairs.len() + 1;
+                delivery.interventions += 1;
+                saved.error = None;
+                self.save(&ledger)?;
+                inner.ledger = ledger;
+                inner.enabled.insert(dispatch_key(id));
+            }
             "retry-plan" => {
                 if task.started {
                     return Err("Implementation has already started.".into());
@@ -499,10 +522,38 @@ impl Coordinator {
                     }
                 }
             }
-            _ => return Err("Choose pause, stop or resume.".into()),
+            _ => return Err("Choose pause, stop, resume or retry-repair.".into()),
         }
         Ok(())
     }
+}
+
+#[tauri::command]
+pub async fn task_plan_review_time(
+    id: String,
+    sample_id: String,
+    seconds: u64,
+    state: State<'_, Coordinator>,
+) -> Result<(), String> {
+    if Uuid::parse_str(&sample_id).is_err() || seconds == 0 || seconds > 60 {
+        return Err("Provide a review observation between one and sixty seconds.".into());
+    }
+    let service = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        service.ensure_storage_loaded()?;
+        let mut inner = service.inner.lock().map_err(|e| e.to_string())?;
+        let mut ledger = inner.ledger.clone();
+        let task = ledger.managed_tasks.iter_mut().find(|task| task.id == id).ok_or("Task not found.")?;
+        let delivery = task.delivery.as_mut().ok_or("This task has no review measurements.")?;
+        if delivery.review_samples.contains(&sample_id) { return Ok(()); }
+        delivery.review_seconds = Some(delivery.review_seconds.unwrap_or(0).saturating_add(seconds));
+        delivery.review_samples.push(sample_id);
+        let excess = delivery.review_samples.len().saturating_sub(1000);
+        delivery.review_samples.drain(..excess);
+        service.save(&ledger)?;
+        inner.ledger = ledger;
+        Ok(())
+    }).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

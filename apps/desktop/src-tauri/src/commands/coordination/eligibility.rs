@@ -104,6 +104,7 @@ pub(super) fn ready_items(
                 inner
                     .enabled
                     .contains(&super::managed::dispatch_key(&task.id))
+                    && task.error.is_none()
                     && !inner
                         .ledger
                         .items
@@ -153,12 +154,7 @@ pub(super) fn ready_items(
             reorder = false;
         }
         let item = pending.pop().unwrap();
-        if inner
-            .ledger
-            .scope_audits
-            .iter()
-            .any(|a| a.project_id == item.project_id && a.blocked())
-        {
+        if super::managed_delivery::scope_blocked(&inner.ledger, item, runs) {
             continue;
         }
         if ancestors(&inner.ledger.items, item)
@@ -199,6 +195,9 @@ pub(super) fn ready_items(
                 && other.project_id == item.project_id
                 && other.run_id.as_ref().is_some_and(|id| !merged.contains(id))
                 && !other.canceled
+                && !(item.feature_id.is_some() && item.feature_id == other.feature_id
+                    && (super::managed_delivery::is_integration(&inner.ledger, item)
+                        || super::managed_delivery::is_integration(&inner.ledger, other)))
                 && !(item.staged_dependencies && predecessors.contains(&other.id))
                 && overlaps(
                     &agreements::effective_scopes(&inner.ledger, item),
@@ -232,7 +231,7 @@ pub(super) fn ready_items(
     reserved.into_iter().cloned().collect()
 }
 
-fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
+pub(super) fn ancestors(items: &[QueueItem], item: &QueueItem) -> HashSet<String> {
     let mut found = HashSet::new();
     let mut pending = item.dependencies.clone();
     while let Some(id) = pending.pop() {
