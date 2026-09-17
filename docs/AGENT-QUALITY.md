@@ -45,7 +45,11 @@ provider's own GUI.
   retrieves the latest saved check by ID in Unicode character ranges. Stored results
   and the review UI retain captured output. Neither operation permits a new command.
 - Codex receives permission to invoke verification only when the task has a saved
-  check. The native guard still rejects missing commands and additional arguments.
+  check. `computer_verify {}` runs that attempt's saved command; `project.verification`
+  exposes the command and automatic-check setting. Launch guidance names the saved
+  check and its native tool so agents can verify without requesting shell approval.
+  Explicit command/args remain compatible only when they exactly match the saved
+  command. The native guard rejects attempts without a saved check and any additions.
 - Permission denials stop the denied action. Independent authorized work may
   continue, with unresolved blockers reported.
 
@@ -89,6 +93,13 @@ added to input again. These tokens are not a subscription-quota or dollar estima
 The elapsed and reported-token limits are cancellation controls, not hard spending
 caps. Human acceptance and review time remain unmeasured.
 
+Add `--require-pass` to `evaluate:quality` or `evaluate:execution` for automated
+validation. This returns a nonzero exit when any requested trial is missing,
+duplicated, incomplete, stopped by a budget, or fails its oracle or process check.
+Receipts are retained, including failed resumed trials. Without the flag, completed
+experiments may contain failures for comparison; a successful driver exit alone
+does not mean the tasks passed. Neither mode establishes human acceptance.
+
 Summaries include elapsed p50/p95, measurement coverage and total milliseconds per
 oracle success, retaining failures in the numerator. Native receipts additionally
 record workspace preparation, routing, capacity, repository-map and process-spawn
@@ -110,8 +121,9 @@ Legacy requests without an effort retain the CLI default. Continuations inherit
 the saved effort unless a caller explicitly supplies another level. Quality-based
 automatic model switching and effort escalation are not enabled.
 
-The Codex bridge waits up to 720 seconds: the saved check can wait 300 seconds
-for a slot, execute for 300 seconds, and complete snapshot/result bookkeeping.
+The Codex bridge timeout covers the saved check's queue, execution and bookkeeping
+budgets. A check can wait 300 seconds for a slot and execute for up to 1,800 seconds,
+with a separate 600-second no-output stall limit.
 The queue and command keep their separate cancellation controls. Extending the
 client timeout does not extend the command's execution limit or authorize another
 command. Stored verification remains available through verification_output.

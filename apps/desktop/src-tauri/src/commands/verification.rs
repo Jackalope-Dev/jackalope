@@ -269,18 +269,7 @@ pub async fn agent_verify(
     run: TaskRun,
     input: super::harness::ComputerVerifyInput,
 ) -> Result<serde_json::Value, String> {
-    let command = run.verify_command.clone().filter(|s| !s.trim().is_empty())
-        .ok_or("No project verification command is authorized. Ask the user to set one in Project Settings, or use your agent's own permitted tools.")?;
-    let requested = std::iter::once(input.command)
-        .chain(input.args)
-        .collect::<Vec<_>>()
-        .join(" ");
-    if requested != command {
-        return Err(
-            "Only this task's saved project verification command is allowed through the bridge."
-                .into(),
-        );
-    }
+    let command = agent_command(run.verify_command.as_deref(), &input)?.to_string();
     tauri::async_runtime::spawn_blocking(move || {
         let guard = super::integration::execution_guard()?;
         if !runtime.is_running(&run.id) {
@@ -312,6 +301,61 @@ pub async fn agent_verify(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+fn agent_command<'a>(
+    saved: Option<&'a str>,
+    input: &super::harness::ComputerVerifyInput,
+) -> Result<&'a str, String> {
+    let command = saved.filter(|s| !s.trim().is_empty())
+        .ok_or("No project verification command is authorized. Ask the user to set one in Project Settings, or use your agent's own permitted tools.")?;
+    if input.command.is_empty() && input.args.is_empty() {
+        return Ok(command);
+    }
+    let requested = std::iter::once(input.command.as_str())
+        .chain(input.args.iter().map(String::as_str))
+        .collect::<Vec<_>>()
+        .join(" ");
+    if requested != command {
+        return Err("Only this task's saved project verification command is allowed through the bridge. Call computer_verify with {} to run it; project.verification.command shows the saved command.".into());
+    }
+    Ok(command)
+}
+
+#[cfg(test)]
+mod agent_command_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn saved_checks_accept_empty_or_matching_requests_without_expanding_authority() {
+        let saved = "node --check \"a b.mjs\" && node --check next.mjs";
+        for input in [
+            json!({}),
+            json!({"command":saved}),
+            json!({"command":"node","args":["--check", "\"a b.mjs\"", "&&", "node", "--check", "next.mjs"]}),
+        ] {
+            assert_eq!(
+                agent_command(Some(saved), &serde_json::from_value(input).unwrap()).unwrap(),
+                saved
+            );
+        }
+        for input in [json!({}), json!({"command":"node","args":["--test"]})] {
+            for saved in [None, Some(""), Some("   ")] {
+                assert!(
+                    agent_command(saved, &serde_json::from_value(input.clone()).unwrap()).is_err()
+                );
+            }
+        }
+        for input in [
+            json!({"args":["--test"]}),
+            json!({"command":" "}),
+            json!({"command":"node","args":["--test"]}),
+            json!({"command":saved,"args":["&&", "echo", "unexpected"]}),
+        ] {
+            assert!(agent_command(Some(saved), &serde_json::from_value(input).unwrap()).is_err());
+        }
+    }
 }
 
 #[tauri::command]

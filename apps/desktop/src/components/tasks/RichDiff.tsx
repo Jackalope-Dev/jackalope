@@ -1,5 +1,6 @@
 import { type FileDiffMetadata, parsePatchFiles } from '@pierre/diffs';
 import { FileDiff, Virtualizer, WorkerPoolContextProvider } from '@pierre/diffs/react';
+import DiffHighlightWorker from '@pierre/diffs/worker/worker.js?worker';
 import { useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { Button } from '../ui/button';
@@ -9,8 +10,7 @@ import './rich-content.css';
 const poolOptions = {
   poolSize: 2,
   totalASTLRUCacheSize: 32,
-  workerFactory: () =>
-    new Worker(new URL('../../lib/diff-highlight.worker.ts', import.meta.url), { type: 'module' }),
+  workerFactory: () => new DiffHighlightWorker(),
 };
 const highlighterOptions = {
   theme: { light: 'github-light', dark: 'github-dark' },
@@ -27,7 +27,9 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
   const immediate = useMemo(() => {
     if (!small) return undefined;
     try {
-      const files = parsePatchFiles(patch, undefined, true).flatMap((entry) => entry.files);
+      const files = parsePatchFiles(patch, crypto.randomUUID(), true).flatMap(
+        (entry) => entry.files,
+      );
       return files.length ? files : undefined;
     } catch {
       return undefined;
@@ -70,45 +72,42 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
   const unmatched = Boolean(!loading && file && !selected?.length);
   const files = unmatched ? parsed : selected;
   return (
-    <div className="rich-diff">
-      <fieldset className="rich-content-toolbar" aria-label="Diff display">
-        <Button variant="outline" aria-pressed={split} onClick={() => setSplit(!split)}>
-          {split ? 'Split view' : 'Unified view'}
-        </Button>
-        <Button variant="outline" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
-          Wrap lines
-        </Button>
-        <Button variant="outline" aria-pressed={raw} onClick={() => setRaw(!raw)}>
-          Original patch
-        </Button>
-      </fieldset>
-      {unmatched && (
-        <InlineNotice>Showing all changes because this file could not be isolated.</InlineNotice>
-      )}
-      {!loading && !parsed && patch && (
-        <InlineNotice>Showing the original patch because it could not be rendered.</InlineNotice>
-      )}
-      {loading && !raw ? (
-        <InlineNotice role="status">Preparing code changes…</InlineNotice>
-      ) : raw || !files ? (
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: The original patch supports keyboard scrolling.
-        <section className="rich-diff-raw" aria-label="Original patch" tabIndex={0}>
-          <pre style={{ whiteSpace: wrap ? 'pre-wrap' : 'pre' }}>
-            {patch || 'No text changes to display.'}
-          </pre>
-        </section>
-      ) : (
-        <section
-          aria-label="Code changes"
-          className="rich-diff-region"
-          ref={(node) => {
-            const viewport = node?.firstElementChild;
-            if (viewport instanceof HTMLElement) viewport.tabIndex = 0;
-          }}
-        >
-          <WorkerPoolContextProvider
-            poolOptions={poolOptions}
-            highlighterOptions={highlighterOptions}
+    <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
+      <div className="rich-diff">
+        <fieldset className="rich-content-toolbar" aria-label="Diff display">
+          <Button variant="outline" aria-pressed={split} onClick={() => setSplit(!split)}>
+            {split ? 'Split view' : 'Unified view'}
+          </Button>
+          <Button variant="outline" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
+            Wrap lines
+          </Button>
+          <Button variant="outline" aria-pressed={raw} onClick={() => setRaw(!raw)}>
+            Original patch
+          </Button>
+        </fieldset>
+        {unmatched && (
+          <InlineNotice>Showing all changes because this file could not be isolated.</InlineNotice>
+        )}
+        {!loading && !parsed && patch && (
+          <InlineNotice>Showing the original patch because it could not be rendered.</InlineNotice>
+        )}
+        {loading && !raw ? (
+          <InlineNotice role="status">Preparing code changes…</InlineNotice>
+        ) : raw || !files ? (
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: The original patch supports keyboard scrolling.
+          <section className="rich-diff-raw" aria-label="Original patch" tabIndex={0}>
+            <pre style={{ whiteSpace: wrap ? 'pre-wrap' : 'pre' }}>
+              {patch || 'No text changes to display.'}
+            </pre>
+          </section>
+        ) : (
+          <section
+            aria-label="Code changes"
+            className="rich-diff-region"
+            ref={(node) => {
+              const viewport = node?.firstElementChild;
+              if (viewport instanceof HTMLElement) viewport.tabIndex = 0;
+            }}
           >
             <Virtualizer
               className="rich-diff-scroll"
@@ -137,7 +136,7 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
                     themeType: scheme,
                     preferredHighlighter: 'shiki-js',
                     unsafeCSS: `
-                      [data-additions-count], [data-deletions-count] { color: var(--diffs-fg); }
+                      [data-additions-count], [data-deletions-count], [data-line-number-content] { color: var(--diffs-fg); }
                       [data-line-type^="change-"] [style*="--diffs-token-light"] {
                         color: light-dark(
                           color-mix(in srgb, var(--diffs-token-light) 75%, black),
@@ -149,9 +148,9 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
                 />
               ))}
             </Virtualizer>
-          </WorkerPoolContextProvider>
-        </section>
-      )}
-    </div>
+          </section>
+        )}
+      </div>
+    </WorkerPoolContextProvider>
   );
 }

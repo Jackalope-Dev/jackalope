@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { requireEvaluationPass } from './readiness.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const suite = JSON.parse(await readFile(new URL('./cases.json', import.meta.url), 'utf8'));
@@ -147,6 +148,8 @@ for (const id of cases)
           repoMap: map,
           repetition: repetition + 1,
           receipt,
+          processExit: 0,
+          completed: report.completed === true,
           elapsedMs: report.elapsedMs,
           oraclePassed: report.oracle?.success ?? false,
           budgetStopped: report.budgetStopped,
@@ -171,3 +174,19 @@ for (const id of cases)
       }
   }
 console.log(`Comparison: ${path.join(output, 'comparison.json')}`);
+if (args.includes('--require-pass'))
+  requireEvaluationPass(
+    receipts,
+    cases.flatMap((id) =>
+      modes.flatMap((mode) =>
+        maps.flatMap((repoMap) =>
+          Array.from({ length: repeats }, (_, index) => ({
+            case: id,
+            mode,
+            repoMap,
+            repetition: index + 1,
+          })),
+        ),
+      ),
+    ),
+  );

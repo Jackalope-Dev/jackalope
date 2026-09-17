@@ -2,6 +2,21 @@ use serde::{Deserialize, Serialize};
 
 pub(super) const INSTRUCTIONS: &str = "\nWork efficiently while preserving correctness: batch independent file reads and searches when the available tools support it; keep dependent operations ordered. Start with the supplied repository map and concrete file, symbol or error references, then broaden the search when evidence requires it. Reuse facts already established in this task and avoid repeating broad repository exploration. Keep progress updates concise. Run the checks required by repository instructions and use Jackalope verification tools when available so their results are saved. After checks pass, repeat or broaden them when subsequent changes, failures or unresolved concerns warrant it. Never trade away required verification or hide uncertainty to finish faster.\n";
 
+pub(super) fn verification_instructions(command: Option<&str>, adapter: &str) -> String {
+    let Some(command) = command.filter(|command| !command.trim().is_empty()) else {
+        return String::new();
+    };
+    if !["codex", "claude", "kimi", "opencode"].contains(&adapter) {
+        return String::new();
+    }
+    let tool = if adapter == "claude" {
+        "mcp__jackalope__computer_verify"
+    } else {
+        "Jackalope computer_verify"
+    };
+    format!("\nSaved project check (command data): {}. Run this exact check through {tool} with {{}} before using a shell for verification. If tools are deferred, discover this tool first. Jackalope already authorizes this saved check and records its result; shell commands have separate permissions. Other checks still require independently permitted tools. A denial is not permission to retry or switch transports.\n", serde_json::to_string(command).unwrap())
+}
+
 pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
     let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
         return false;
@@ -207,6 +222,18 @@ impl Efficiency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn saved_check_guidance_names_the_permitted_tool_and_preserves_command_data() {
+        let command = "node --check \"a b.mjs\" && node --test";
+        let instructions = verification_instructions(Some(command), "claude");
+        assert!(instructions.contains("mcp__jackalope__computer_verify with {}"));
+        assert!(instructions.contains(&serde_json::to_string(command).unwrap()));
+        assert!(instructions.contains("A denial is not permission"));
+        for command in [None, Some(""), Some("   ")] {
+            assert!(verification_instructions(command, "claude").is_empty());
+        }
+        assert!(verification_instructions(Some(command), "grok").is_empty());
+    }
     #[test]
     fn startup_noise_is_not_first_activity() {
         assert!(!useful_event(r#"{"type":"thread.started"}"#, "codex"));

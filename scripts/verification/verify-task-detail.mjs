@@ -283,6 +283,15 @@ try {
     });
   });
   await page.getByText('You’re viewing an earlier attempt.').waitFor();
+  await page.waitForTimeout(1200);
+  assert.equal(
+    await page.evaluate(
+      async () =>
+        (await import('/src/stores/executionStore.ts')).useExecutionStore.getState().selectedId,
+    ),
+    'sample',
+    'Canceling queued follow-ups must not navigate away from the selected attempt on refresh',
+  );
   assert.equal(await page.getByRole('textbox', { name: 'Follow-up instructions' }).count(), 0);
   await page.getByRole('button', { name: 'Open latest result' }).click();
   await page.getByRole('textbox', { name: 'Follow-up instructions' }).waitFor();
@@ -376,7 +385,9 @@ try {
     window.taskFixture.calls.length = 0;
   });
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await page.waitForFunction(() => window.taskFixture.calls.length > 0);
+  await page.waitForFunction(() =>
+    window.taskFixture.calls.some((call) => call.command === 'task_retry'),
+  );
   assert.deepEqual(
     await page.evaluate(() =>
       window.taskFixture.calls

@@ -223,7 +223,7 @@ export function SessionStart({
             ref={input}
             aria-label="Message"
             placeholder="Build, fix, or explore…"
-            rows={4}
+            rows={3}
             maxLength={12000}
             value={text}
             onChange={(event) => {

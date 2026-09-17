@@ -117,6 +117,24 @@ try {
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Search walkthrough' }).waitFor();
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
+  await page.getByLabel('Pause after this many batches').fill('8');
+  await page.getByRole('button', { name: 'Save limits', exact: true }).click();
+  await page.getByText('Limits saved.', { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.sessionFixture.calls.find((call) => call.command === 'live_session_limits').limits
+          .maxBatches,
+    ),
+    8,
+  );
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute('aria-label') === 'Chat options',
+  );
   const input = page.getByRole('textbox', { name: 'Message', exact: true });
   await input.fill('Keep the result titles on one line.');
   await page.evaluate(() => {
@@ -265,6 +283,11 @@ try {
   await page.setViewportSize({ width: 440, height: 620 });
   const pin = page.getByRole('button', { name: 'Always on top', exact: true });
   await pin.click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('button[aria-label="Always on top"]')?.getAttribute('aria-pressed') ===
+      'true',
+  );
   assert.equal(await pin.getAttribute('aria-pressed'), 'true');
   await page.evaluate(() => {
     window.sessionFixture.failPin = true;
@@ -403,6 +426,7 @@ try {
   await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).fill('5');
   await page.getByRole('button', { name: 'Save limits' }).click();
   await page.getByText('Limits saved.', { exact: true }).waitFor();
+  await page.screenshot({ path: `${output}/chat-limits-dark.png` });
   assert.deepEqual(
     await page.evaluate(() =>
       JSON.parse(localStorage.getItem('jackalope-live-start:atlas:limits')),
@@ -419,6 +443,26 @@ try {
     await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).inputValue(),
     '5',
   );
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  const preservedDraft = await input.inputValue();
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Saved project context', exact: true }).click();
+  const memory = page.getByRole('checkbox', { name: 'Use matching project lessons (up to three)' });
+  await memory.uncheck();
+  await page.screenshot({ path: `${output}/chat-context-dark.png` });
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(await input.inputValue(), preservedDraft);
+  assert.equal(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem('jackalope-live-start:atlas:context')).memoryOff,
+    ),
+    true,
+  );
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Saved project context', exact: true }).click();
+  assert.equal(await memory.isChecked(), false);
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByRole('region', { name: 'Work across all projects' }).waitFor();

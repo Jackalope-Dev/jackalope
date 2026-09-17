@@ -9,6 +9,7 @@ import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
 import { qualityCases } from './quality-cases.mjs';
 import { qualitySummary } from './quality-metrics.mjs';
+import { requireEvaluationPass } from './readiness.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
@@ -323,4 +324,17 @@ if (!args.includes('--execute')) {
       }
     }
   console.log(`Quality comparison: ${path.join(output, 'comparison.json')}`);
+  if (args.includes('--require-pass'))
+    requireEvaluationPass(
+      trials,
+      selected.flatMap((id) =>
+        variants.flatMap((variant) =>
+          Array.from({ length: repeat }, (_, index) => ({
+            case: id,
+            variant,
+            repetition: index + 1,
+          })),
+        ),
+      ),
+    );
 }

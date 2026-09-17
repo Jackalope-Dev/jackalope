@@ -1,5 +1,16 @@
 [
   {
+    "id": "faster-code-review-and-more-reliable-checks",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Faster code review and more reliable checks.",
+    "description": "Large diffs open promptly, and agents can run the saved project check without asking you to repeat its command.",
+    "items": [
+      "Code highlighting runs in background workers and stays ready when switching between formatted changes and the original patch.",
+      "Project checks are discoverable by agents and run with the permissions already saved for the task."
+    ]
+  },
+  {
     "id": "task-review-and-followups",
     "date": "2026-09-17",
     "status": "In development",

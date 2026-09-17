@@ -252,7 +252,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Read your assigned task, this project's task owners, work in progress and coordination messages. Check before editing so you can avoid overlapping work.",
+        description = "Read your assigned task, this project's task owners, work in progress, coordination messages and your attempt's saved verification command. Check before editing so you can avoid overlapping work.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn project(
@@ -609,7 +609,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Execute only the saved project verification command with a five-minute timeout in the task directory. Returns exit code, stdout and stderr. Long successful output may omit passing-test lines; use verification_output with check_id to read stored output. Failures remain intact within capture limits.",
+        description = "Run this attempt's saved project check by calling with {}. No command or args are needed; project.verification.command shows the exact saved command. Replacements and extra arguments are rejected. Runs in the task directory with bounded execution, stall and cancellation controls. Returns exit code, stdout and stderr. Long successful output may omit passing-test lines; use verification_output with check_id to read stored output. Failures remain intact within capture limits.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn computer_verify(
@@ -709,6 +709,16 @@ mod tests {
         assert!(names.contains(&"user_response"));
         assert!(names.contains(&"record_validation_step"));
         assert!(names.contains(&"computer_verify"));
+        let verify = tools
+            .iter()
+            .find(|tool| tool.name == "computer_verify")
+            .unwrap();
+        assert!(verify.input_schema.get("required").is_none_or(|required| {
+            !required
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("command"))
+        }));
         assert_eq!(
             names.contains(&"desktop_control"),
             crate::commands::desktop_control::platform::supported()

@@ -609,6 +609,10 @@ impl TaskRuntime {
             cmd.env("JACKALOPE_BRIDGE_URL", &context.endpoint)
                 .env("JACKALOPE_BRIDGE_TOKEN", &context.token);
             input.push_str(&context.instructions);
+            input.push_str(&super::efficiency::verification_instructions(
+                req.verify_command.as_deref(),
+                &adapter,
+            ));
             if ["grok", "antigravity"].contains(&adapter.as_str()) {
                 input.push_str(crate::commands::coordination::http_bootstrap());
             }

@@ -63,7 +63,7 @@ if (production) {
   const html = join(fixtureDirectory, 'performance-fixture.html');
   await writeFile(
     html,
-    '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div><script type="module" src="/scratch/performance-fixture.tsx"></script></body></html>',
+    '<!doctype html><html lang="en"><head><title>Jackalope performance fixture</title><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div><script type="module" src="/scratch/performance-fixture.tsx"></script></body></html>',
   );
   const outDir = resolve(output, 'dist');
   await build({
@@ -78,19 +78,32 @@ if (production) {
     configFile: join(desktop, 'vite.config.ts'),
     build: { outDir },
     preview: {
-      port: 5199,
+      port: 0,
       host: '127.0.0.1',
       strictPort: true,
       headers: { 'Content-Security-Policy': config.app.security.csp },
     },
   });
-  url = 'http://127.0.0.1:5199/scratch/performance-fixture.html';
+  url = `http://127.0.0.1:${preview.httpServer.address().port}/scratch/performance-fixture.html`;
 }
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const errors = [];
 let page;
 try {
   page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
+  await page.addInitScript(() => {
+    window.diffWorkerResponses = [];
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(...args) {
+        super(...args);
+        this.addEventListener('message', ({ data }) => {
+          if (data?.requestType)
+            window.diffWorkerResponses.push({ type: data.type, requestType: data.requestType });
+        });
+      }
+    };
+  });
   page.setDefaultTimeout(30_000);
   page.on('pageerror', (error) => {
     errors.push(error.message);
@@ -113,7 +126,7 @@ try {
   await page.locator('#work-item-idea-999').focus();
   await page.keyboard.press('Enter');
   assert.equal(await page.evaluate(() => window.performanceFixture.opened), 'idea-999');
-  await page.getByRole('textbox', { name: 'Search tasks' }).fill('Searchable history 999');
+  await page.getByRole('searchbox', { name: 'Search tasks' }).fill('Searchable history 999');
   assert.equal(await page.locator('.work-item').count(), 1);
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await page.getByRole('button', { name: 'Board', exact: true }).click();
@@ -143,6 +156,15 @@ try {
   }
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    if (width === 960) {
+      const code = page.getByRole('region', { name: 'typescript code', exact: true });
+      await code.focus();
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction(
+        () => document.querySelector('[data-streamdown="code-block-body"]').scrollLeft > 0,
+      );
+      await code.evaluate((element) => (element.scrollLeft = 0));
+    }
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ reducedMotion: theme === 'light' ? 'reduce' : 'no-preference' });
       await page.evaluate((theme) => window.performanceFixture.theme(theme), theme);
@@ -153,41 +175,116 @@ try {
   await page.evaluate(() => window.performanceFixture.mode('diff'));
   await page.getByRole('region', { name: 'Code changes' }).waitFor();
   const diffControlsReadyMs = performance.now() - diffStart;
+  console.log('Diff controls ready');
+  const waitForDiff = (highlighted = false, text = 'value0') =>
+    page.waitForFunction(
+      ({ highlighted, text }) =>
+        [...document.querySelectorAll('diffs-container')].some((element) => {
+          const code = element.shadowRoot?.querySelector('code');
+          return (
+            code?.textContent?.includes(text) &&
+            (!highlighted || code.querySelector('[style*="--diffs-token-light"]'))
+          );
+        }),
+      { highlighted, text },
+      { timeout: 30_000 },
+    );
+  await waitForDiff();
+  const diffFirstTextMs = performance.now() - diffStart;
+  console.log(`Diff text ready: ${Math.round(diffFirstTextMs)}ms`);
+  await waitForDiff(true);
+  const diffHighlightedMs = performance.now() - diffStart;
+  console.log(`Diff highlighted: ${Math.round(diffHighlightedMs)}ms`);
+  assert.ok(
+    await page.evaluate(() =>
+      window.diffWorkerResponses.some(
+        (response) => response.type === 'success' && response.requestType === 'diff',
+      ),
+    ),
+    'Production diff highlighting must complete in a worker',
+  );
+  const diffInteractionsStart = performance.now();
   await page.getByRole('button', { name: 'Unified view' }).click();
   await page.getByRole('button', { name: 'Wrap lines' }).click();
   await page.getByRole('button', { name: 'Original patch' }).click();
   assert.match(await page.locator('.rich-diff-raw').innerText(), /value9999 = 9999/);
+  const diffReturnStart = performance.now();
   await page.getByRole('button', { name: 'Original patch' }).click();
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll('diffs-container')].some((element) =>
-      element.shadowRoot?.querySelector('code')?.textContent?.includes('value0'),
+  await waitForDiff(true);
+  const diffReturnMs = performance.now() - diffReturnStart;
+  console.log(`Diff restored: ${Math.round(diffReturnMs)}ms`);
+  const diffInteractionsMs = performance.now() - diffInteractionsStart;
+  const renderedDiffLines = await page.evaluate(() =>
+    [...document.querySelectorAll('diffs-container')].reduce(
+      (sum, element) => sum + (element.shadowRoot?.querySelectorAll('[data-line]').length ?? 0),
+      0,
     ),
   );
-  const diffHighlightedMs = performance.now() - diffStart;
+  assert.ok(
+    renderedDiffLines > 0 && renderedDiffLines < 1000,
+    'Large diffs must keep the rendered viewport bounded',
+  );
+  await page.locator('.rich-diff-scroll').focus();
+  await page.keyboard.press('Control+End');
+  await waitForDiff(true, 'value9999');
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const theme of ['light', 'dark']) {
       await page.emulateMedia({ reducedMotion: theme === 'light' ? 'reduce' : 'no-preference' });
       await page.evaluate((theme) => window.performanceFixture.theme(theme), theme);
+      await page.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
       await page.locator('.rich-diff-scroll').focus();
-      await page.keyboard.press('Home');
+      await page.keyboard.press('Control+Home');
+      await waitForDiff(true);
       await page.screenshot({ path: `${output}/diff-${width}-${theme}.png` });
     }
   }
 
+  const diffReopenMs = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.evaluate(() => window.performanceFixture.mode('markdown'));
+    await page.getByRole('region', { name: 'typescript code', exact: true }).waitFor();
+    const reopened = performance.now();
+    await page.evaluate(() => window.performanceFixture.mode('diff'));
+    await waitForDiff(true);
+    assert.equal(
+      await page.locator('.rich-diff-scroll').evaluate((element) => element.scrollTop),
+      0,
+      'Reopening a diff must keep its first line visible after highlighting',
+    );
+    diffReopenMs.push(performance.now() - reopened);
+  }
   const longTasks = await page.evaluate(() => window.performanceFixture.longTasks);
   assert.deepEqual(errors, []);
   const receipt = {
     kind: 'Browser fixtures; no native execution or installed acceptance',
     listReadyMs,
     diffControlsReadyMs,
+    diffFirstTextMs,
     diffHighlightedMs,
+    diffReturnMs,
+    diffInteractionsMs,
+    diffReopenMs,
+    renderedDiffLines,
+    diffWorkerResponses: await page.evaluate(() => window.diffWorkerResponses),
     longTasks,
     errors,
   };
   await writeFile(`${output}/receipt.json`, JSON.stringify(receipt, null, 2));
   console.log(JSON.stringify(receipt, null, 2));
 } catch (error) {
+  console.error(
+    'Diff failure state',
+    await page?.evaluate(() => ({
+      workers: window.diffWorkerResponses,
+      viewport: document.querySelector('.rich-diff-scroll')?.scrollTop,
+      content: [...document.querySelectorAll('diffs-container')].map((element) =>
+        element.shadowRoot?.querySelector('code')?.textContent?.slice(0, 160),
+      ),
+    })),
+  );
   console.error(await page?.locator('body').innerText());
   await page?.screenshot({ path: `${output}/failure.png` });
   throw error;

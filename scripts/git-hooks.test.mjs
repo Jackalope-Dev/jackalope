@@ -24,6 +24,7 @@ function fixture(t) {
   };
   git('init', '--quiet');
   git('config', 'core.autocrlf', 'false');
+  copyFileSync(new URL('../.gitattributes', import.meta.url), join(root, '.gitattributes'));
   copyFileSync(new URL('../biome.json', import.meta.url), join(root, 'biome.json'));
   copyFileSync(new URL('../lefthook.yml', import.meta.url), join(root, 'lefthook.yml'));
   mkdirSync(join(root, 'scripts'));
@@ -75,6 +76,29 @@ test('staged whitespace is checked even for files Biome does not support', (t) =
   const { git, write, hook } = fixture(t);
   write('notes.md', 'text \t\n');
   git('add', 'notes.md');
+  const result = hook('staged');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /trailing whitespace/);
+});
+
+test('patch context preserves tabs without relaxing source whitespace checks', (t) => {
+  const { root, git, write, hook } = fixture(t);
+  mkdirSync(join(root, 'patches'));
+  write('patches/dependency.patch', '@@ -1 +1,2 @@\n \tcontext\n+\taddition\n');
+  git('add', '.gitattributes', 'patches/dependency.patch');
+  assert.equal(hook('staged').status, 0);
+  write('sample.rs', ' \tfn main() {}\n');
+  git('add', 'sample.rs');
+  const result = hook('staged');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /space before tab in indent/);
+});
+
+test('patch files still reject trailing whitespace', (t) => {
+  const { root, git, write, hook } = fixture(t);
+  mkdirSync(join(root, 'patches'));
+  write('patches/dependency.patch', '@@ -1 +1,2 @@\n \tcontext\n+\taddition \n');
+  git('add', '.gitattributes', 'patches/dependency.patch');
   const result = hook('staged');
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /trailing whitespace/);

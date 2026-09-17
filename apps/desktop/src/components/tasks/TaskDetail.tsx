@@ -151,7 +151,13 @@ export function TaskDetail({
             await refresh();
             const state = useExecutionStore.getState();
             const next = latestAttempt(state.runs, run.taskId);
-            if (alive && next && next.id !== run.id && state.selectedId === run.id) {
+            if (
+              alive &&
+              queuedHere.current &&
+              next &&
+              next.id !== run.id &&
+              state.selectedId === run.id
+            ) {
               queuedHere.current = false;
               state.select(next.id);
             }
@@ -349,9 +355,10 @@ export function TaskDetail({
     try {
       await nativeTask('task_followup_action', { id, action });
       if (action === 'resume') queuedHere.current = true;
-      setFollowups(
-        (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ?? [],
-      );
+      const remaining =
+        (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ?? [];
+      if (action === 'cancel' && !remaining.length) queuedHere.current = false;
+      setFollowups(remaining);
     } catch (cause) {
       setError(String(cause));
     } finally {

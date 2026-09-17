@@ -8,6 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { qualityCases } from '../../../scripts/evaluation/quality-cases.mjs';
 import { qualitySummary } from '../../../scripts/evaluation/quality-metrics.mjs';
+import { evaluationReadiness } from '../../../scripts/evaluation/readiness.mjs';
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../src/lib/skills/task-context.ts';
 import { effortPrompt } from '../src/lib/task-effort.ts';
@@ -64,7 +65,7 @@ test('resuming completed trials launches no workers and rejects changed configur
         tokens: 1000,
       }),
     );
-  const run = (model) =>
+  const run = (model, extra = []) =>
     spawnSync(
       process.execPath,
       [
@@ -79,15 +80,67 @@ test('resuming completed trials launches no workers and rejects changed configur
         `--before=${executable}`,
         `--after=${executable}`,
         `--output=${output}`,
+        ...extra,
       ],
       { encoding: 'utf8', windowsHide: true },
     );
   const resumed = run('fixture');
   assert.equal(resumed.status, 0, resumed.stderr);
   assert.equal(readFileSync(comparison, 'utf8'), JSON.stringify(saved));
+  const failed = run('fixture', ['--require-pass']);
+  assert.equal(failed.status, 1, failed.stderr);
+  assert.match(failed.stdout, /oracle did not pass/);
+  assert.equal(readFileSync(comparison, 'utf8'), JSON.stringify(saved));
+  const passed = {
+    ...saved,
+    trials: saved.trials.map((trial) => ({
+      ...trial,
+      receipt: 'retained.json',
+      processExit: 0,
+      status: 'review',
+      budgetStopped: false,
+      oraclePassed: true,
+    })),
+  };
+  writeFileSync(comparison, JSON.stringify(passed));
+  const accepted = run('fixture', ['--require-pass']);
+  assert.equal(accepted.status, 0, accepted.stderr);
   const changed = run('different-model');
   assert.notEqual(changed.status, 0);
   assert.match(changed.stderr, /Resume requires/);
+});
+
+test('readiness requires every requested trial to complete within budget and pass its oracle', () => {
+  const expected = [{ case: 'example', mode: 'staged', repetition: 1 }];
+  const passed = {
+    ...expected[0],
+    receipt: 'receipt.json',
+    processExit: 0,
+    completed: true,
+    budgetStopped: false,
+    oraclePassed: true,
+  };
+  assert.equal(evaluationReadiness([passed], expected).passed, true);
+  for (const change of [
+    { completed: false },
+    { oraclePassed: false },
+    { budgetStopped: true },
+    { budgetStopped: null },
+    { processExit: 1 },
+    { processTimeout: true },
+    { error: 'unreadable receipt' },
+    { launchError: 'provider unavailable' },
+    { receipt: null },
+  ])
+    assert.equal(
+      evaluationReadiness([{ ...passed, ...change }], expected).passed,
+      false,
+      JSON.stringify(change),
+    );
+  assert.equal(evaluationReadiness([], expected).passed, false);
+  assert.equal(evaluationReadiness([passed, passed], expected).passed, false);
+  assert.equal(evaluationReadiness([passed], [{ ...expected[0], repetition: 2 }]).passed, false);
+  assert.equal(evaluationReadiness([], []).passed, false);
 });
 
 test('quality totals include failed attempts and keep missing usage unknown', () => {

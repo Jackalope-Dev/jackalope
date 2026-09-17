@@ -30,6 +30,11 @@ access. Receipts and screenshots go under `output/playwright/`. Browser long-tas
 measurements include fixture actions and remain diagnostic; wrapped large patches
 can still incur substantial DOM/layout work.
 
+Diff timings separate controls, first readable text, syntax highlighting and view
+switches. Production checks require a successful worker highlight, bounded rendered
+line counts and keyboard access to the final line; a main-thread fallback cannot
+silently satisfy worker acceptance. The isolated preview selects an available port.
+
 ## Runtime contracts
 
 - A single ordered writer owns task persistence. Output changes append sequenced
@@ -57,6 +62,11 @@ can still incur substantial DOM/layout work.
   layout is deferred and date formatters are reused.
 - Highlighting retains all bundled languages and the existing GitHub light/dark
   code colors. Workers have view-owned lifetimes and bounded renderer caches.
+  Diff workers are bundled as worker entry points, preserving their message handlers
+  despite package side-effect metadata. Original-patch switches retain the worker
+  pool and parsed-patch cache identity until the diff view closes or content changes.
+  The pinned diff-library patch avoids anchoring an empty file and preserves the
+  top scroll position during initial rendering, highlighting and keyboard Home.
   The JavaScript regex engine works under the existing CSP without eval or WASM
   permissions. Original patches remain accessible if rendering fails.
 

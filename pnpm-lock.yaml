@@ -10,6 +10,9 @@ overrides:
   '@shikijs/transformers': 4.4.3
 
 patchedDependencies:
+  '@pierre/diffs@1.4.1':
+    hash: 98dc046e605241bfc2caa85b6cae6b53291a1210f49fb191387a88048a337907
+    path: patches/@pierre__diffs@1.4.1.patch
   '@streamdown/code@1.1.1':
     hash: 3047bd4e881a0c325944b6b98f8581f900745805ac5e0b572b7ac35a6065821d
     path: patches/@streamdown__code@1.1.1.patch
@@ -44,7 +47,7 @@ importers:
         version: link:../../packages/ui
       '@pierre/diffs':
         specifier: 1.4.1
-        version: 1.4.1(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 1.4.1(patch_hash=98dc046e605241bfc2caa85b6cae6b53291a1210f49fb191387a88048a337907)(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-dialog':
         specifier: ^1.1.6
         version: 1.1.23(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -3216,7 +3219,7 @@ snapshots:
 
   '@oxc-project/types@0.148.0': {}
 
-  '@pierre/diffs@1.4.1(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@pierre/diffs@1.4.1(patch_hash=98dc046e605241bfc2caa85b6cae6b53291a1210f49fb191387a88048a337907)(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@pierre/theme': 2.0.0
       '@pierre/theming': 1.0.1(@pierre/theme@2.0.0)(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(shiki@4.4.3)

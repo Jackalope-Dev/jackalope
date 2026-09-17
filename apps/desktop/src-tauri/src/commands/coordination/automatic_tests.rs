@@ -145,6 +145,49 @@ async fn agent_verification_cannot_add_or_replace_a_saved_command() {
     );
 }
 
+#[tokio::test]
+async fn project_exposes_only_the_authorized_attempts_verification_command() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    f.running("writer-run");
+    f.runtime.update("reader-run", |run| {
+        run.verify_command = Some("node --check one.mjs && node --check two.mjs".into());
+        run.auto_verify = true;
+    });
+    f.runtime.update("writer-run", |run| {
+        run.verify_command = Some("different saved command".into());
+    });
+    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
+        .await
+        .unwrap()
+        .0;
+    assert_eq!(
+        project["verification"]["command"],
+        "node --check one.mjs && node --check two.mjs"
+    );
+    assert_eq!(project["verification"]["automatic"], true);
+    assert_eq!(project["verification"]["arguments"], json!({}));
+    f.runtime
+        .update("reader-run", |run| run.verify_command = None);
+    let project = bridge_project(WebState(f.service.clone()), headers("reader-run"))
+        .await
+        .unwrap()
+        .0;
+    assert!(project["verification"]["command"].is_null());
+    assert!(
+        bridge_project(WebState(f.service.clone()), headers("invalid"))
+            .await
+            .is_err()
+    );
+    f.runtime
+        .update("reader-run", |run| run.status = "review".into());
+    assert!(
+        bridge_project(WebState(f.service.clone()), headers("reader-run"))
+            .await
+            .is_err()
+    );
+}
+
 fn request(previous: Option<&str>) -> RunRequest {
     serde_json::from_value(json!({"id":"next","projectId":"p","projectName":"Fixture","projectPath":"","agent":"codex","isolated":false,"prompt":"Next work","previousRunId":previous})).unwrap()
 }

@@ -61,7 +61,7 @@ try {
       body: '<h1>Local preview fixture</h1><button>Save changes</button>',
     }),
   );
-  await page.goto(url);
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Pick up where you left off', exact: true }).waitFor();
   const passes = page.getByRole('button', { name: '3/5 Trial passes', exact: true });
   await passes.waitFor();
@@ -145,6 +145,19 @@ try {
       );
       await page.locator('.task-home').evaluate((node) => {
         node.scrollTop = 0;
+      });
+      await page.waitForFunction(() => {
+        const canvas = document.querySelector('.task-home');
+        const bounds = canvas.getBoundingClientRect();
+        const color = getComputedStyle(canvas).color;
+        return [...document.querySelectorAll('.work-item-title')].every((node) => {
+          const rect = node.getBoundingClientRect();
+          return (
+            rect.top >= bounds.bottom ||
+            rect.bottom <= bounds.top ||
+            getComputedStyle(node).color === color
+          );
+        });
       });
       assert(
         await rows
