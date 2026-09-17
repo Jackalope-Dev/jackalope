@@ -15,7 +15,7 @@
     "@jackalope/brand": "workspace:*",
     "@jackalope/knowledge": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.6",
-    "lucide-react": "^0.475.0",
+    "lucide-react": "^1.46.0",
     "motion": "^13.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
