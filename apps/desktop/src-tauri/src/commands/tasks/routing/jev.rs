@@ -421,6 +421,7 @@ mod tests {
         )];
         let mut req:RunRequest=serde_json::from_value(json!({"id":"request","projectId":"p","projectName":"P","projectPath":"/fixture","agent":"auto","prompt":"Full request","isolated":true})).unwrap();
         req.coordination = Some(CoordinationContext {
+            managed: false,
             endpoint: "http://private.invalid".into(),
             token: "fixture-bridge-secret".into(),
             instructions: "Only assigned scope.".into(),

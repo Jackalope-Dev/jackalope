@@ -148,6 +148,11 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   context. Source-attributed repair fixtures, multi-turn accounting, model-price
   bounds and randomized human review exports support screening before confirmation.
   Screening can stop between matched repetitions while retaining interrupted attempts.
+  Further opt-in controls cover read-only batches, a lean ordinary-task launch,
+  final native checks, conditional source ranges, content-keyed syntax reuse,
+  bounded delegation planning and shadow Jev assistance. Connection execution no
+  longer holds the shared broker catalog lock during network calls. These changes
+  have separate local and installed-agent screening paths; general savings remain unproven.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup includes project, agents, decisions, behavior, appearance and an optional
   first task. Theme editors open directly; existing saved app/project choices remain compatible.

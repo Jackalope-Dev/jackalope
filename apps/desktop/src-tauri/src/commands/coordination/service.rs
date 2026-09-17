@@ -310,6 +310,7 @@ impl Coordinator {
                 previous_run_id: None,
                 connection_ids: None,
                 coordination: Some(CoordinationContext {
+                    managed: true,
                     endpoint: url.clone(),
                     token: token.clone(),
                     instructions,
@@ -564,6 +565,7 @@ impl Coordinator {
                         .grants
                         .insert(token.clone(), (item.id.clone(), request.id.clone()));
                     request.coordination = Some(CoordinationContext {
+                        managed: true,
                         endpoint,
                         token,
                         instructions: instructions(&item),
@@ -574,14 +576,24 @@ impl Coordinator {
         }
         if request.coordination.is_none() {
             if let Some(endpoint) = inner.url.clone() {
+                let managed = inner
+                    .ledger
+                    .managed_tasks
+                    .iter()
+                    .any(|task| task.planner_run_id == request.id);
                 let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
                 inner
                     .grants
                     .insert(token.clone(), (request.id.clone(), request.id.clone()));
                 request.coordination = Some(CoordinationContext {
+                    managed,
                     endpoint,
                     token,
-                    instructions: harness_instructions(),
+                    instructions: if managed {
+                        harness_instructions()
+                    } else {
+                        focused_instructions()
+                    },
                 });
             }
         }

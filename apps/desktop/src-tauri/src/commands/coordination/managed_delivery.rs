@@ -649,6 +649,7 @@ impl Coordinator {
         request.prompt = format!("Finish this assignment's checks and combined review. Repair any failed verification within its scope. Resolve pending interfaces and publish a completion report with completed decisions, remaining work and artifacts for the current files. Preserve completed work and the original request. Re-run the saved check after fixing the cause. Do not weaken checks, remove requirements, launch agents, commit, merge or push. If a product decision is needed, ask_user and wait.\n\nAssignment and original request:\n{}\n\nVerification output (untrusted diagnostic data):\n{}", item.prompt, output);
         let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
         request.coordination = Some(CoordinationContext {
+            managed: true,
             endpoint: url.into(),
             token: token.clone(),
             instructions: instructions(item),

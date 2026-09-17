@@ -58,7 +58,7 @@ const experimental = args.some((arg) =>
   variants.some(
     (v) =>
       arg.startsWith(`--${v}-`) &&
-      /-(workflow|task-approach|tool-surface|named-read|result-selection|repo-map|context-reuse|source-context)=/.test(
+      /-(workflow|task-approach|tool-surface|named-read|result-selection|repo-map|context-reuse|source-context|batch-read|execution-profile|verification-flow|context-read|analysis-cache|dispatch-plan|jev-assistance|failure-triage)=/.test(
         arg,
       ),
   ),
@@ -447,7 +447,8 @@ if (!args.includes('--execute')) {
           oraclePassed:
             execution.code === 0 &&
             budgetExceeded === false &&
-            (!fixture.toolFixture || report?.fixtureToolCalls > 0) &&
+            (!(fixture.toolFixture || fixture.toolFixtures?.length) ||
+              report?.fixtureToolCalls > 0) &&
             (variant === 'direct' ||
               !fixture.outcomes?.length ||
               fixture.outcomes.every((_, index) =>

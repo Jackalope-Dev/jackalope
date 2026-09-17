@@ -50,6 +50,8 @@ evaluation suites; the public benchmark methodology keeps their scope explicit.
 Source-attributed repair fixtures and separate workflow, source preparation, tool and continuation
 experiments support screening. Human review exports and complete-attempt cost
 accounting support independent confirmation before broader product claims.
+Read-only batches, conditional source reads, syntax reuse, lean launches, bounded
+delegation planning and shadow Jev assistance remain opt-in evaluation capabilities.
 
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)

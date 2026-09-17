@@ -70,7 +70,11 @@ pub(super) fn run(
                 "--mcp-config",
                 &serde_json::json!({"mcpServers":servers}).to_string(),
                 "--allowedTools",
-                "mcp__quality_fixture__fixture_report",
+                &servers
+                    .keys()
+                    .map(|name| format!("mcp__{name}__fixture_report"))
+                    .collect::<Vec<_>>()
+                    .join(","),
             ]);
         }
     }

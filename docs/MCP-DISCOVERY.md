@@ -155,6 +155,19 @@ merges with existing configuration. Verified with the installed CLI and its
 
 ## Verification
 
+The broker serializes execution within each connection while allowing independent
+connections to proceed without holding a shared catalog lock across network waits.
+Schema/allowlist checks, attempt cancellation and account ownership remain in force.
+Usage records connection waits and tool execution separately.
+
+The optional `JACKALOPE_BATCH_READ=on` experiment exposes `read_tools` for up to eight
+independent read-only calls with at most four connections active. Results retain input
+order and per-call errors. Each call can select exact JSON fields or filter/project/count
+array rows through `output.rows`. Missing required fields preserve the original result;
+row outputs include source indices and pagination. Complete selected results remain
+recoverable through `read_tool_result` for the latest sixteen selections in the attempt.
+Batching never authorizes a mutable operation or retries one automatically.
+
 Settings → Decisions includes an off-by-default Jev tool-discovery experiment.
 In Jev mode it can promote strongly relevant tools for ambiguous searches using
 the query, at most 4,000 task characters and 32 descriptions capped at 1,200

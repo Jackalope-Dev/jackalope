@@ -82,6 +82,9 @@ release dates.
   Screen available-tool exposure, exact read-only lookup, explicit source preparation
   and task-scoped/final-phase guidance
   independently; freeze promising settings before new held-out confirmation.
+  Compare bounded multi-connection batches, ordinary-task launch/final checks,
+  repeated source ranges, dirty-file syntax reuse and delegation admission costs.
+  Label shadow Jev false negatives independently before enabling new suppression.
   Require independent original-patch acceptance for quality claims. Counterbalanced
   review-time and correction measurements are separate prerequisites for claiming faster review.
 

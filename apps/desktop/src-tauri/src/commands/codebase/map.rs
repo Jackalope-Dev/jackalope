@@ -181,6 +181,48 @@ fn cached_snapshot(root: &Path) -> Option<(Arc<CodebaseSnapshot>, bool)> {
     Some((fresh, false))
 }
 
+pub(super) fn candidates(root: &Path, query: &str) -> Result<serde_json::Value, String> {
+    let (snapshot, cached) = cached_snapshot(root).ok_or("Repository scan unavailable.")?;
+    let documents: Vec<_> = snapshot
+        .files
+        .iter()
+        .map(|file| {
+            format!(
+                "{} {}",
+                file.path,
+                file.symbols
+                    .iter()
+                    .map(|s| s.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )
+        })
+        .collect();
+    let ranked = crate::commands::retrieval::rank(query, &documents);
+    let mut items = Vec::new();
+    let mut bytes = 0;
+    for (index, score) in ranked.into_iter().take(12) {
+        let file = &snapshot.files[index];
+        let related: Vec<_> = snapshot
+            .references
+            .iter()
+            .filter(|r| r.source == file.path || r.target.as_ref() == Some(&file.path))
+            .take(4)
+            .collect();
+        let symbols: Vec<_> = file.symbols.iter().take(12).collect();
+        let item = serde_json::json!({"id":file.path,"path":file.path,"score":score,"symbols":symbols,"related":related});
+        let size = item.to_string().len();
+        if bytes + size > 16_000 {
+            break;
+        }
+        bytes += size;
+        items.push(item);
+    }
+    Ok(
+        serde_json::json!({"items":items,"cached":cached,"scanTruncated":snapshot.truncated,"partial":true}),
+    )
+}
+
 /// Splits an identifier into lowercase words across camelCase, kebab-case and snake_case.
 /// A split run also keeps its joined form, so `ToDos` matches `todos` in a file name and not
 /// only the fragments `to` and `dos`.

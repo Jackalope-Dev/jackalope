@@ -1,5 +1,7 @@
 use super::tasks::TaskRuntime;
 pub mod assistance;
+#[cfg(test)]
+mod assistance_trial;
 pub mod context;
 mod contracts;
 pub mod discovery;

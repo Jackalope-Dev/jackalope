@@ -178,6 +178,7 @@ pub struct RunRequest {
 
 #[derive(Clone)]
 pub struct CoordinationContext {
+    pub managed: bool,
     pub endpoint: String,
     pub token: String,
     pub instructions: String,

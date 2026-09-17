@@ -1,7 +1,7 @@
 use serde::Serialize;
 use tree_sitter::Node;
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodebaseSymbol {
     pub name: String,

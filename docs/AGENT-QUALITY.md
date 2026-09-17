@@ -425,6 +425,45 @@ Matching cases alone does not establish unchanged quality or a speed improvement
 
 ## Jev decision comparisons
 
+### Local optimization controls
+
+The following native process settings are experimental and default off. Quality
+trials expose matching variant flags such as `--after-batch-read=on`; retained plans
+and resume validation include these settings. Test each change independently before
+combining it. Native agents retain their own tools, permissions and account binding.
+
+The new `read_tools`, `read_context`, `plan_delegation` and deferred coordination
+discovery tools use native MCP with Codex, Claude Code, OpenCode and Kimi. The HTTP
+bridge adapters retain their existing endpoints. Source queries return at most
+twelve ranked files and 16 KB of candidate metadata; source ranges remain bounded
+and independently expandable. These controls are process experiments, not a saved
+user setting or proof of a faster workflow.
+
+| Setting | Behavior |
+| --- | --- |
+| `JACKALOPE_BATCH_READ=on` | Exposes bounded read-only batches across selected connections, with recoverable local row filtering, projection and counts. |
+| `JACKALOPE_EXECUTION_PROFILE=lean` | Shortens ordinary-task native instructions and defers optional coordination schemas. Managed assignments retain full ownership instructions. |
+| `JACKALOPE_VERIFICATION_FLOW=final` | Ordinary tasks with automatic checks rely on the existing final snapshot-bound check instead of a mandatory in-agent check call. Explicit repository/user checks still apply; failed checks remain visible and managed repairs retain their existing limits. |
+| `JACKALOPE_CONTEXT_READ=on` | Exposes bounded source ranges and ranked symbol locations. Previously read block hashes can omit unchanged text; callers must retain that text in context. Explicitly requested blocks are not reranked away. |
+| `JACKALOPE_ANALYSIS_CACHE=on` | Reuses bounded syntax-analysis outputs by source bytes, path and language. Dirty files are reread and changed content invalidates analysis; directory traversal and reference resolution still run. |
+| `JACKALOPE_DISPATCH_PLAN=on` | Exposes a local admission aid for two or three workers, disjoint write scopes, bounded context and explicit overhead/token estimates. It does not launch agents, authorize delegation or enforce provider spending. |
+| `JACKALOPE_JEV_ASSISTANCE=shadow` | Records configured relevance/review assessments without changing selected context or suppressing monitors. Source candidate ranking is shadow-only. Existing Jev settings and credentials are required. |
+| `JACKALOPE_FAILURE_TRIAGE=local` | Uses recorded quota and check-interruption facts before requesting a Jev failure classification. It grants no retry authority. |
+
+`node scripts/evaluation/assistance.mjs receipts.json labels.json report.json`
+compares retained decision receipts with independent labels containing `recordId`,
+`questionId` and boolean `relevant`. Missing decisions retain evidence; false
+negatives and incomplete cost reporting remain explicit. Shadow proposals are never
+reported as actual avoided agent launches or downstream savings.
+
+The ignored native tests `local_optimization_trial` and `local_analysis_cache_trial`
+emit JSON observations for transport concurrency, exact selection, repeated source
+reads and syntax caching without model calls. Their fixtures exclude agent reasoning
+and cannot establish end-to-end savings. `optimization-cases.mjs` supplies separate
+authored repairs and a multi-service investigation for matched installed-agent pilots.
+Multiple `toolFixtures` give both native controls and Jackalope the same independent
+service data. Keep these screening cases separate from held-out confirmation.
+
 For the bounded discovery experiment, generate a suite with
 `node scripts/evaluation/discovery-cases.mjs <suite.json>`. Set
 `JACKALOPE_JEV_SPEC` to its absolute path and `JACKALOPE_JEV_TEST_KEY` in the

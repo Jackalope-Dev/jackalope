@@ -156,7 +156,7 @@ pub async fn evaluate(
         answers: json!({}),
         accounted_elsewhere,
         evidence: json!({"candidates":payload["state"]["workers"].as_array().map(|workers|workers.iter().map(|w|json!({"id":w["id"],"agent":w["agent"],"adapter":w["adapter"],"model":w["model"]})).collect::<Vec<_>>()),
-            "sourceHead":payload["state"]["taskContext"]["repository"]["sourceHead"],"objective":decision_options.objective}),
+            "sourceHead":payload["state"]["taskContext"]["repository"]["sourceHead"],"objective":decision_options.objective,"assistance":payload["state"]["assistance"]}),
         decision: DecisionReceipt {
             evidence: None,
             version: 1,

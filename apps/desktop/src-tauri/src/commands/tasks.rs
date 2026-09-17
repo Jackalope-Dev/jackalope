@@ -1,5 +1,6 @@
 mod antigravity;
 mod delegation;
+pub(crate) mod dispatch_plan;
 mod efficiency;
 pub(super) mod effort;
 pub(in crate::commands) mod events;

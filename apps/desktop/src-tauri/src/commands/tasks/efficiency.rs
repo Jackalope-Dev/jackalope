@@ -110,6 +110,12 @@ pub struct Timing {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Efficiency {
+    pub execution_profile: Option<String>,
+    pub verification_flow: Option<String>,
+    pub native_verification_calls: Option<u64>,
+    pub context_blocks_unchanged: Option<u64>,
+    pub delegation_plans: Option<u64>,
+    pub delegation_plans_admitted: Option<u64>,
     pub prompt_policy_hash: Option<String>,
     pub timings: std::collections::BTreeMap<String, Timing>,
     pub first_activity_ms: Option<u64>,
@@ -148,6 +154,10 @@ const MAX_TOUCHED_PATHS: usize = 200;
 impl Efficiency {
     pub fn for_launch() -> Self {
         Self {
+            native_verification_calls: Some(0),
+            context_blocks_unchanged: Some(0),
+            delegation_plans: Some(0),
+            delegation_plans_admitted: Some(0),
             verification_reuses: Some(0),
             preparation_reuses: Some(0),
             ..Self::default()
@@ -206,6 +216,7 @@ impl Efficiency {
                     "mcp_tool_call",
                     "web_search",
                     "file_change",
+                    "collab_tool_call",
                 ]
                 .contains(&kind)
                 {

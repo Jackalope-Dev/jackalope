@@ -17,6 +17,7 @@ use std::{
 use tokio::sync::{watch, Mutex as AsyncMutex};
 
 type Client = mcp::Connection;
+pub mod batch;
 pub mod results;
 const MAX_TOOLS: usize = 1024;
 const MAX_CATALOG_BYTES: usize = 2_000_000;
@@ -38,6 +39,12 @@ pub struct BrokerUsage {
     pub result_bytes_returned: Option<u64>,
     #[serde(default)]
     pub result_reads: Option<u64>,
+    #[serde(default)]
+    pub batches: Option<u64>,
+    #[serde(default)]
+    pub connection_wait_ms: Option<u64>,
+    #[serde(default)]
+    pub tool_elapsed_ms: Option<u64>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -124,12 +131,13 @@ struct Lease {
     tool: Tool,
 }
 struct Catalog {
-    connections: BTreeMap<String, Connection>,
+    sizes: BTreeMap<String, (usize, usize)>,
     leases: VecDeque<Lease>,
     usage: BrokerUsage,
     results: VecDeque<results::Snapshot>,
 }
 struct Attempt {
+    connections: BTreeMap<String, AsyncMutex<Connection>>,
     catalog: AsyncMutex<Catalog>,
     closed: watch::Sender<bool>,
     workspace: PathBuf,
@@ -196,27 +204,31 @@ impl Broker {
         }
         let (closed, _) = watch::channel(false);
         let attempt = Arc::new(Attempt {
+            connections: connections
+                .into_iter()
+                .map(|config| {
+                    (
+                        config.id.clone(),
+                        AsyncMutex::new(Connection {
+                            config,
+                            client: None,
+                            tools: vec![],
+                            checked: None,
+                            error: None,
+                        }),
+                    )
+                })
+                .collect(),
             catalog: AsyncMutex::new(Catalog {
-                connections: connections
-                    .into_iter()
-                    .map(|config| {
-                        (
-                            config.id.clone(),
-                            Connection {
-                                config,
-                                client: None,
-                                tools: vec![],
-                                checked: None,
-                                error: None,
-                            },
-                        )
-                    })
-                    .collect(),
+                sizes: BTreeMap::new(),
                 leases: VecDeque::new(),
                 usage: BrokerUsage {
                     result_bytes_received: Some(0),
                     result_bytes_returned: Some(0),
                     result_reads: Some(0),
+                    batches: Some(0),
+                    connection_wait_ms: Some(0),
+                    tool_elapsed_ms: Some(0),
                     ..BrokerUsage::default()
                 },
                 results: VecDeque::new(),
@@ -359,25 +371,13 @@ async fn search_catalog(
     context: Option<(&super::tasks::TaskRuntime, &TaskRun)>,
     expose_schema: bool,
 ) -> Result<(Value, BrokerUsage), String> {
-    let mut catalog = attempt.catalog.lock().await;
     if input
         .server
         .as_ref()
-        .is_some_and(|id| !catalog.connections.contains_key(id))
+        .is_some_and(|id| !attempt.connections.contains_key(id))
     {
         return Err("That connection is not selected for this attempt.".into());
     }
-    for (id, connection) in &mut catalog.connections {
-        if input.server.as_ref().is_none_or(|server| server == id)
-            && (input.refresh
-                || connection
-                    .checked
-                    .is_none_or(|time| time.elapsed() > Duration::from_secs(60)))
-        {
-            refresh(connection, attempt).await;
-        }
-    }
-    catalog.usage.searches += 1;
     let terms = words(&input.query);
     let semantic = !terms.is_empty()
         && context.is_some_and(|(runtime, run)| {
@@ -385,10 +385,29 @@ async fn search_catalog(
         });
     let mut matches = Vec::new();
     let mut errors = Vec::new();
-    for (id, connection) in &catalog.connections {
+    for (id, connection) in &attempt.connections {
         if input.server.as_ref().is_some_and(|server| server != id) {
             continue;
         }
+        let mut connection = connection.lock().await;
+        if input.refresh
+            || connection
+                .checked
+                .is_none_or(|time| time.elapsed() > Duration::from_secs(60))
+        {
+            refresh(&mut connection, attempt).await;
+        }
+        attempt.catalog.lock().await.sizes.insert(
+            id.clone(),
+            (
+                connection.tools.len(),
+                connection
+                    .tools
+                    .iter()
+                    .map(|tool| serde_json::to_vec(tool).map_or(0, |v| v.len()))
+                    .sum(),
+            ),
+        );
         if let Some(error) = &connection.error {
             errors.push(json!({"server":id,"error":error}));
             continue;
@@ -438,6 +457,8 @@ async fn search_catalog(
         matches.retain(|(score, _, _)| *score > 0);
     }
     let total = matches.len();
+    let mut catalog = attempt.catalog.lock().await;
+    catalog.usage.searches += 1;
     let mut tools = vec![];
     let mut bytes = 0;
     for (_, server, tool) in matches
@@ -472,13 +493,8 @@ async fn search_catalog(
         };
         tools.push(json!({"handle":handle,"server":server,"operation":if is_read_only(&tool) {"read_tool"} else {"execute_tool"},"tool":tool}));
     }
-    catalog.usage.catalog_tools = catalog.connections.values().map(|c| c.tools.len()).sum();
-    catalog.usage.catalog_bytes = catalog
-        .connections
-        .values()
-        .flat_map(|c| &c.tools)
-        .map(|t| serde_json::to_vec(t).map_or(0, |v| v.len()))
-        .sum();
+    catalog.usage.catalog_tools = catalog.sizes.values().map(|(tools, _)| tools).sum();
+    catalog.usage.catalog_bytes = catalog.sizes.values().map(|(_, bytes)| bytes).sum();
     if expose_schema {
         catalog.usage.schema_bytes_returned += bytes as u64;
     }
@@ -493,7 +509,7 @@ async fn execute_catalog(
     input: ExecuteInput,
     read_only: bool,
 ) -> Result<(CallToolResult, BrokerUsage), String> {
-    let mut catalog = attempt.catalog.lock().await;
+    let catalog = attempt.catalog.lock().await;
     let lease = catalog
         .leases
         .iter()
@@ -501,25 +517,35 @@ async fn execute_catalog(
         .ok_or("Unknown or expired tool handle. Search for the tool first.")?;
     let server = lease.server.clone();
     let expected = lease.tool.clone();
+    drop(catalog);
     if read_only && !is_read_only(&expected) {
         return Err(
             "This tool is not declared read-only. Use execute_tool with the required permissions."
                 .into(),
         );
     }
-    let connection = catalog
+    let connection = attempt
         .connections
-        .get_mut(&server)
+        .get(&server)
         .ok_or("Connection unavailable")?;
+    let waiting = Instant::now();
+    let mut connection = connection.lock().await;
+    let wait_ms = waiting.elapsed().as_millis() as u64;
+    let started = Instant::now();
     // Revalidate the schema and allowlist before every side effect; never replay a failed call.
-    refresh(connection, attempt).await;
+    refresh(&mut connection, attempt).await;
     if connection.error.is_some() {
         return Err(format!(
             "Connection {server} is unavailable. Check its credentials and refresh discovery."
         ));
     }
     if !connection.tools.iter().any(|t| json!(t) == json!(expected)) {
-        catalog.leases.retain(|lease| lease.handle != input.handle);
+        attempt
+            .catalog
+            .lock()
+            .await
+            .leases
+            .retain(|lease| lease.handle != input.handle);
         return Err(
             "The tool definition changed or was removed. Search again and review the new schema."
                 .into(),
@@ -548,6 +574,10 @@ async fn execute_catalog(
             CallToolResult::error(vec![rmcp::model::ContentBlock::text("Tool execution failed or timed out. It may already have taken effect; inspect the external state before retrying.")])
         }
     };
+    drop(connection);
+    let mut catalog = attempt.catalog.lock().await;
+    *catalog.usage.connection_wait_ms.get_or_insert(0) += wait_ms;
+    *catalog.usage.tool_elapsed_ms.get_or_insert(0) += started.elapsed().as_millis() as u64;
     // Older upstream revisions omit this field; our downstream revision requires it.
     result.result_type = Some(rmcp::model::ResultType::COMPLETE);
     catalog.usage.calls += 1;

@@ -14,7 +14,9 @@ const MAX_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
 
+mod analysis_cache;
 pub(crate) mod context_pack;
+pub(crate) mod context_read;
 pub(crate) mod map;
 mod symbols;
 
@@ -29,7 +31,7 @@ pub struct CodebaseFile {
     analyzed: bool,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase")]
 pub struct CodebaseReference {
     source: String,
@@ -623,7 +625,7 @@ pub fn scan(root: &Path) -> Result<CodebaseSnapshot, String> {
                 file.lines = Some(text.lines().count());
                 let parser = parsers.get_mut(key).unwrap();
                 let (mut refs, mut symbols, errors) =
-                    analyze(parser, &file.path, &text, key == "rs");
+                    analysis_cache::analyze(parser, &file.path, &text, key == "rs");
                 if total_symbols + symbols.len() > MAX_REFERENCES {
                     symbols.truncate(MAX_REFERENCES - total_symbols);
                     result.truncated = true;

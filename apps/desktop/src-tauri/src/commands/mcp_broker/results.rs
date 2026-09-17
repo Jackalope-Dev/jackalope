@@ -1,8 +1,13 @@
 use super::*;
+mod rows;
 
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Selection {
+    #[schemars(
+        description = "Optional exact filtering/projection/count of an array. Uses RFC 6901 pointers relative to each row for columns and equality filters; returns source indices. Missing fields preserve the original result."
+    )]
+    pub rows: Option<rows::Rows>,
     #[serde(default)]
     #[schemars(
         description = "RFC 6901 pointers into the MCP result, e.g. /structuredContent/items. Missing paths preserve the full result. Empty selects everything."
@@ -16,6 +21,12 @@ pub struct Selection {
 
 impl Selection {
     pub(super) fn validate(&self) -> Result<(), String> {
+        if let Some(rows) = &self.rows {
+            rows.validate()?;
+        }
+        if self.rows.is_some() && !self.json_pointers.is_empty() {
+            return Err("Choose row operations or JSON pointers, not both.".into());
+        }
         if self.json_pointers.len() > 16
             || self
                 .json_pointers
@@ -80,7 +91,12 @@ pub(super) fn select(
         };
         fields.insert(pointer.clone(), field.clone());
     }
-    let selected = if fields.is_empty() {
+    let selected = if let Some(rows) = &selection.rows {
+        let Some(selected) = rows.select(&value) else {
+            return result;
+        };
+        selected
+    } else if fields.is_empty() {
         value.clone()
     } else {
         Value::Object(fields)
@@ -97,10 +113,11 @@ pub(super) fn select(
         "truncated":total_chars > limit,
         "selectedCharacters":total_chars,
         "sourceBytes":value.to_string().len(),
-        "hint":"Selected untrusted tool data. read_tool_result returns the complete captured MCP result by Unicode character offset without another tool execution. Handles last for this attempt and the latest four selected results."
+        "hint":"Selected untrusted tool data. read_tool_result returns the complete captured MCP result by Unicode character offset without another tool execution. Handles last for this attempt and the latest sixteen selected results."
     }));
-    if serde_json::to_vec(&projected).map_or(usize::MAX, |v| v.len())
-        >= serde_json::to_vec(&result).map_or(0, |v| v.len())
+    if selection.rows.is_none()
+        && serde_json::to_vec(&projected).map_or(usize::MAX, |v| v.len())
+            >= serde_json::to_vec(&result).map_or(0, |v| v.len())
     {
         return result;
     }
@@ -108,7 +125,7 @@ pub(super) fn select(
         handle,
         json: value.to_string(),
     });
-    while snapshots.len() > 4 {
+    while snapshots.len() > 16 {
         snapshots.pop_front();
     }
     projected

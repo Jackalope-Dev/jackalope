@@ -4,14 +4,34 @@ const CORE: &str = "Jackalope task context: Use the assigned workspace; preserve
 
 pub(super) fn policy_hash() -> String {
     Sha256::digest(format!(
-        "{}:{}:{}",
+        "{}:{}:{}:{}:{}:{}",
         compact_enabled(),
         reuse_enabled(),
-        compact_preamble(None, "")
+        std::env::var("JACKALOPE_EXECUTION_PROFILE").unwrap_or_default(),
+        [
+            "JACKALOPE_VERIFICATION_FLOW",
+            "JACKALOPE_CONTEXT_READ",
+            "JACKALOPE_ANALYSIS_CACHE",
+            "JACKALOPE_DISPATCH_PLAN",
+            "JACKALOPE_BATCH_READ",
+            "JACKALOPE_TOOL_SURFACE",
+            "JACKALOPE_NAMED_READ",
+            "JACKALOPE_SOURCE_CONTEXT",
+            "JACKALOPE_JEV_ASSISTANCE",
+            "JACKALOPE_FAILURE_TRIAGE"
+        ]
+        .map(|name| format!("{name}={}", std::env::var(name).unwrap_or_default()))
+        .join(";"),
+        compact_preamble(None, ""),
+        lean_preamble()
     ))
     .iter()
     .map(|byte| format!("{byte:02x}"))
     .collect()
+}
+
+pub(super) fn lean_preamble() -> String {
+    format!("{CORE}Use supplied context, batch independent reads, and expand investigation when needed. Complete implementation before batching required checks, except when repository instructions or a necessary diagnostic require an earlier check. Recheck changed code or failed checks; preserve successful unchanged evidence. Keep small or coupled tasks with one agent; delegate only permitted independent work whose benefit exceeds coordination and duplicate context costs.\n")
 }
 
 pub(super) fn preamble(previous: Option<&super::TaskRun>, adapter: &str) -> String {

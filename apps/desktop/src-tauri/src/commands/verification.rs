@@ -238,7 +238,10 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
             result,
         };
         let _guard = super::integration::execution_guard()?;
-        runtime.update_checked(&run.id, |r| r.verification = Some(verification.clone()))?;
+        runtime.update_checked(&run.id, |r| {
+            r.verification = Some(verification.clone());
+            *r.efficiency.native_verification_calls.get_or_insert(0) += 1;
+        })?;
         Ok(verification)
     })();
     let resume = active && !run.finishing && runtime.is_running(&run.id);
