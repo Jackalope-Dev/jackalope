@@ -79,15 +79,11 @@ test('assemblePrompt supplements prompt additively and preserves original prompt
   assert.ok(result.hasSupplementation);
   assert.equal(result.activeSkillCount, 1);
   assert.equal(result.activeToolCount, 1);
-  assert.ok(result.assembledPrompt.startsWith('Task\nFix auth token race condition\n'));
-  assert.ok(result.assembledPrompt.includes('Relevant guidance'));
-  assert.ok(
-    result.assembledPrompt.includes(
-      'Reproduce behavioral defects with a focused failing check when practical.',
-    ),
-  );
+  assert.ok(result.assembledPrompt.startsWith('### 🎯 Objective\nFix auth token race condition\n'));
+  assert.ok(result.assembledPrompt.includes('Guidelines & Quality Constraints'));
+  assert.ok(result.assembledPrompt.includes('all existing regression tests'));
   assert.ok(result.assembledPrompt.includes('do not create another worktree'));
-  assert.ok(result.assembledPrompt.includes('Selected tools'));
+  assert.ok(result.assembledPrompt.includes('Active Tools & Capabilities'));
   assert.ok(result.assembledPrompt.includes('Scoped Filesystem MCP'));
 });
 

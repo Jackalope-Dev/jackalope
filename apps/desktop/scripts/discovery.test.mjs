@@ -138,8 +138,10 @@ test('repository discovery preserves tasks, conventions, stack and assembled con
   });
 
   assert.ok(assembled.hasSupplementation);
-  assert.ok(assembled.assembledPrompt.startsWith('Task\nBuild the audit log component\n'));
-  assert.ok(assembled.assembledPrompt.includes('Project rules'));
+  assert.ok(
+    assembled.assembledPrompt.startsWith('### 🎯 Objective\nBuild the audit log component\n'),
+  );
+  assert.ok(assembled.assembledPrompt.includes('Project Rules'));
   assert.ok(assembled.assembledPrompt.includes('Active Working User Only'));
   assert.ok(assembled.assembledPrompt.includes('Tech Stack:'));
   assert.ok(assembled.assembledPrompt.includes('React'));
