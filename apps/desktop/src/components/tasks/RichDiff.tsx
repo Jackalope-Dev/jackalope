@@ -72,13 +72,13 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
   return (
     <div className="rich-diff">
       <fieldset className="rich-content-toolbar" aria-label="Diff display">
-        <Button variant="ghost" aria-pressed={split} onClick={() => setSplit(!split)}>
+        <Button variant="outline" aria-pressed={split} onClick={() => setSplit(!split)}>
           {split ? 'Split view' : 'Unified view'}
         </Button>
-        <Button variant="ghost" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
+        <Button variant="outline" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
           Wrap lines
         </Button>
-        <Button variant="ghost" aria-pressed={raw} onClick={() => setRaw(!raw)}>
+        <Button variant="outline" aria-pressed={raw} onClick={() => setRaw(!raw)}>
           Original patch
         </Button>
       </fieldset>
@@ -136,6 +136,8 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
                     theme: { light: 'github-light', dark: 'github-dark' },
                     themeType: scheme,
                     preferredHighlighter: 'shiki-js',
+                    unsafeCSS:
+                      '[data-additions-count], [data-deletions-count] { color: var(--diffs-fg); }',
                   }}
                 />
               ))}

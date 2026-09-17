@@ -1020,7 +1020,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Choose Try result after work stops. Detect or enter your project’s local preview command, review it, and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
           'Use the embedded page or open it in your browser. Describe what should change and add it to your follow-up. Capture screenshot and page details opens a fresh browser and lets you attach a screenshot, page element and errors. That fresh capture does not copy the embedded page’s sign-in or unsaved interactions.',
-          'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Chat also lets you queue messages or explicitly stop current work and send.',
+          'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Running tasks offer Queue follow-up and Stop & send. Queued instructions stay in order, continue in the same workspace and account, and pause after failures or restart. Run or cancel queued follow-ups before merging. Chat also lets you queue messages or explicitly stop current work and send.',
           'On Chat’s start page, pick up work waiting across your projects. Session limits can pause later batches after a batch count or an estimated dollar threshold. A running batch can exceed the threshold, and missing cost reports pause further work when a cost limit is set. This is not a provider billing cap.',
         ],
       },

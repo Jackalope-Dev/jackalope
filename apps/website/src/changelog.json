@@ -1,5 +1,16 @@
 [
   {
+    "id": "task-review-and-followups",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Clearer task review and follow-ups",
+    "description": "Review the output and changes with less clutter, and choose how to send the next instruction.",
+    "items": [
+      "Short task titles, a diff-first review, clearer actions, and more space for results.",
+      "Queue follow-ups or stop current work and send; saved queues pause after failures and restart."
+    ]
+  },
+  {
     "id": "less-repeated-work-between-request-and-result",
     "date": "2026-09-16",
     "status": "In development",

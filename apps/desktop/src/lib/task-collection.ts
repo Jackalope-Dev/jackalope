@@ -206,7 +206,7 @@ export function collectWork(
       if (!!idea.archivedAt !== archived) continue;
       items.push({
         id: idea.id,
-        title: idea.title,
+        title: taskTitle(idea.rawPrompt, idea.title),
         stage: idea.runId ? 'attention' : idea.status === 'done' ? 'finished' : 'ideas',
         date: idea.updatedAt,
         idea,
@@ -220,7 +220,10 @@ export function collectWork(
     const pending = active && run.prompts?.some((prompt) => prompt.status === 'pending');
     items.push({
       id: idea?.id ?? run.taskId,
-      title: idea?.title ?? taskTitle(original.get(run.taskId)?.prompt ?? run.prompt),
+      title: taskTitle(
+        idea?.rawPrompt ?? original.get(run.taskId)?.prompt ?? run.prompt,
+        idea?.title,
+      ),
       stage:
         pending ||
         run.persistenceError ||

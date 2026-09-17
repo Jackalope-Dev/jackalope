@@ -20,8 +20,13 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   unavailable inspection from a clean checkout.
 - Result views prioritize unanswered questions, recovery and failed checks. Isolated
   work keeps review, merge into the target branch and workspace cleanup on the Review
-  tab. Conversation, review, preview and delivery share vocabulary and reusable result
-  tools; task follow-up remains visible while reading. Failed checks can send their
+  tab. Short task titles preserve the full instructions in Details. Result leads with
+  output; Review shows the diff beside checks and evidence, with optional tools disclosed.
+  Preview, activity, details and delivery keep visible actions and a compact follow-up.
+  The work list prioritizes existing tasks, with new capture opened explicitly.
+  Running tasks offer saved
+  queued follow-ups or explicit stop-and-send; queues pause after failures and restart.
+  Failed checks can send their
   output into the follow-up draft. Local previews remember project commands, choose a free
   port, check HTTP readiness and embed a sandboxed loopback page. Fresh isolated browser
   captures attach screenshots, page elements and errors to follow-up drafts; they do not
@@ -102,8 +107,8 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   per-repository locks allow independent scans. Detailed launch timings and latency
   summaries retain failures and missing measurements in quality comparisons.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
-  Project setup defaults to project, agent, decisions and first-task steps; Git behavior and project
-  appearance remain optional, with workspace setup suggestions before the first task.
+  Project setup includes project, agents, decisions, behavior, appearance and an optional
+  first task. Theme editors open directly; existing saved app/project choices remain compatible.
 - Optional local usefulness ratings and reported review minutes feed a seven-day workflow
   report in Usage. Coverage is loaded history, with missing ratings/time explicit; copying
   the aggregate report is a user action. This does not establish product retention or quality gains.

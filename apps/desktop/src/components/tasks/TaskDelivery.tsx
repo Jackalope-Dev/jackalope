@@ -64,18 +64,17 @@ export function TaskDelivery({
     }
   };
   return (
-    <section className="space-y-4" aria-label="Delivery">
+    <section className="task-delivery space-y-4" aria-label="Delivery">
       <h2 className="text-base">Deliver this result</h2>
       <p>
-        {integrated ? 'Changes integrated locally' : 'Work remains in its task workspace'}. Remote
-        publication and deployment are separate steps.
+        {integrated
+          ? 'Merged locally. Choose what to prepare next.'
+          : 'Review and merge the local changes before publishing.'}
       </p>
       <div className="flex flex-wrap gap-2">
-        {onReview && !integrated && (
-          <Button onClick={onReview}>Review changes for integration</Button>
-        )}
+        {onReview && !integrated && <Button onClick={onReview}>Review changes</Button>}
         <Button variant="outline" disabled={busy} onClick={() => void inspect(false)}>
-          Inspect local delivery state
+          Check local status
         </Button>
         <Button
           variant="outline"
@@ -152,8 +151,7 @@ export function TaskDelivery({
       <div className="space-y-2">
         <h3 className="text-base">Prepare the next step</h3>
         <p className="task-muted">
-          Creates a draft with this result and its checks. Review the draft before starting.
-          Publishing actions require approval of the concrete changes and destination.
+          Creates a draft for review. Nothing is published until you approve it.
         </p>
         <div className="flex flex-wrap gap-2">
           {['a pull request', 'CI verification', 'a deployment'].map((goal) => (

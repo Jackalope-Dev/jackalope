@@ -11,6 +11,7 @@ import { resolveTaskGuidelines } from '../../lib/skills/task-context';
 import { ideaStageLabels } from '../../lib/task-collection';
 import { effortPrompt } from '../../lib/task-effort';
 import type { RunRequest } from '../../lib/task-runtime';
+import { taskTitle } from '../../lib/task-title';
 import { isTauriEnvironment, listMcpServers, type McpServerConfig } from '../../lib/tauri-bridge';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { emptyDraft, useExecutionStore } from '../../stores/executionStore';
@@ -199,7 +200,7 @@ export function CaptureTask({
   const saveIdea = (runId?: string) => {
     const value = {
       projectId: project?.id ?? current.projectId ?? '',
-      title: current.title?.trim() || current.prompt.trim().split('\n')[0].slice(0, 160),
+      title: current.title?.trim() || taskTitle(current.prompt),
       status: current.planningStatus ?? 'backlog',
       rawPrompt: current.prompt.trim(),
       refinedPrompt: assembled.hasSupplementation ? assembled.assembledPrompt : undefined,

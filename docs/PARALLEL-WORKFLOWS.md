@@ -134,6 +134,15 @@ native state tests do not establish installed-provider acceptance or measured sa
 
 ### Parallel task queues
 
+Ordinary task results offer **Queue follow-up** while an attempt runs, alongside
+**Stop & send**. Queued instructions are saved natively in order and continue with
+the same workspace, agent and account. Stop & send saves the message before stopping
+the current attempt. The queue waits for process shutdown, finishing writes, verification
+and previews, and pauses after failed work or an app restart. Queued items remain visible
+with Resume and Cancel actions; interrupted launch ownership requires inspection instead
+of automatic replay. Run or cancel pending follow-ups before merging or manually starting
+another continuation. A failed save preserves the draft.
+
 Tasks continuing with one lead ask that agent to delegate useful independent work through
 available provider subagent tools. This stays
 within the provider session and does not create native queue entries; see

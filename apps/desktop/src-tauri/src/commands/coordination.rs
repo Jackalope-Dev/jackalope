@@ -25,6 +25,7 @@ mod browser_trial;
 mod eligibility;
 #[cfg(test)]
 mod evaluation_trial;
+pub mod followups;
 #[cfg(test)]
 mod native_mcp_trial;
 #[cfg(test)]

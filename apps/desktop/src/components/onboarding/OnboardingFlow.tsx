@@ -308,12 +308,6 @@ export function OnboardingFlow({
     <div className="onboarding-shell">
       <ResizeHandles />
       <TitleBar />
-      <header className="onboarding-topbar">
-        <span className="onboarding-wordmark">
-          <img src="/mascot.svg" alt="" />
-          Jackalope
-        </span>
-      </header>
       <main className="onboarding-layout">
         <aside className="onboarding-intro" aria-label="Setup progress">
           <JackalopeMascot

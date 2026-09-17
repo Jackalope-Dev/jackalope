@@ -133,6 +133,8 @@ pub struct CoordinationMessage {
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub(super) struct Ledger {
     #[serde(default)]
+    pub(super) followups: Vec<super::followups::FollowUp>,
+    #[serde(default)]
     pub(super) managed_tasks: Vec<super::managed::ManagedTask>,
     pub(super) items: Vec<QueueItem>,
     pub(super) messages: Vec<CoordinationMessage>,

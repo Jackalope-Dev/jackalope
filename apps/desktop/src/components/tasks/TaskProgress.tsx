@@ -48,19 +48,6 @@ export function TaskProgress({
             {run.agent} · {run.accountBinding?.label || run.account}
             {agents.length > 1 ? ` · ${agents.length} agents on this task` : ''}
           </p>
-          {!active && !integrated && (
-            <p className="task-progress-next">
-              {run.verification?.result.success && run.verification.tree
-                ? decision.section === 'integrate'
-                  ? `Checks passed. Review the change, merge into ${run.targetBranch || 'your project'}, then this workspace can be removed.`
-                  : 'Checks passed for the recorded snapshot.'
-                : run.verificationError || (run.verification && !run.verification.result.success)
-                  ? 'Inspect the check output before accepting these changes.'
-                  : decision.section === 'integrate'
-                    ? `Review the change, merge into ${run.targetBranch || 'your project'}, then this workspace can be removed.`
-                    : 'No passing project checks recorded.'}
-            </p>
-          )}
         </div>
         {action && <div className="task-progress-action">{action}</div>}
       </div>

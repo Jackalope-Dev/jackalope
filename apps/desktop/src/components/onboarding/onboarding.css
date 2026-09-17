@@ -9,24 +9,6 @@
 .onboarding-shell > .app-titlebar {
   margin: 0;
 }
-.onboarding-topbar {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 16px 36px;
-}
-.onboarding-wordmark {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-}
-.onboarding-wordmark img {
-  width: 28px;
-  height: 28px;
-}
 .onboarding-layout {
   display: grid;
   flex: 1;
@@ -41,7 +23,7 @@
   align-items: center;
 }
 .onboarding-intro {
-  padding: 80px 6px 6px;
+  padding: 0 6px 48px;
   margin-inline: -6px;
 }
 .onboarding-intro h1 {
@@ -173,22 +155,17 @@
   background: var(--color-surface);
   box-shadow: 0 -12px 20px var(--color-surface);
   display: flex;
+  width: fit-content;
+  max-width: 100%;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 28px;
+  margin-left: auto;
   flex-wrap: wrap;
 }
 .onboarding-theme-editor {
   width: 100%;
   min-width: 0;
-}
-.onboarding-theme-inherit {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  margin-bottom: 24px;
-  font-size: var(--text-sm);
 }
 .onboarding-runner-list {
   display: grid;
@@ -417,9 +394,6 @@
   .onboarding-intro {
     display: none;
   }
-  .onboarding-topbar {
-    padding: 12px 20px;
-  }
   .onboarding-folder {
     flex-wrap: wrap;
   }
@@ -618,9 +592,6 @@
   margin-top: 4px;
 }
 @media (max-height: 740px) {
-  .onboarding-topbar {
-    padding-block: 8px;
-  }
   .onboarding-content {
     padding: 20px;
   }

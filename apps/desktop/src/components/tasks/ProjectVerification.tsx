@@ -36,15 +36,11 @@ export function ProjectVerification({
     }
   };
   return (
-    <section className="mt-5 space-y-3" aria-label="Project verification">
+    <section className="task-verification" aria-label="Project verification">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-medium">Check your changes</h3>
-          <p className="task-muted mt-1">
-            {selected
-              ? 'Runs in this task’s workspace with a five-minute limit. Install project dependencies first.'
-              : 'Set a verification command in Project Settings to run and record your checks here.'}
-          </p>
+          <h3 className="font-medium">Project checks</h3>
+          {!selected && <p className="task-muted mt-1">Add a check command in Project Settings.</p>}
           {selected && <code className="block text-xs mt-2 break-all">{selected}</code>}
         </div>
         {selected && (
@@ -55,7 +51,7 @@ export function ProjectVerification({
             loading={busy}
             loadingLabel="Checking…"
           >
-            Run checks
+            {check ? 'Run again' : 'Run checks'}
           </Button>
         )}
       </div>
@@ -83,7 +79,7 @@ export function ProjectVerification({
                   ? `Checks failed (exit ${check.result.exitCode ?? 'unknown'}).`
                   : !check.tree
                     ? 'Command passed, but files changed during the check. Run it again.'
-                    : 'Checks passed for the recorded file snapshot.'}
+                    : 'Passed · recorded snapshot'}
           </p>
           <p className="task-muted text-xs">
             {new Date(check.checkedAt).toLocaleString()} ·{' '}
@@ -103,11 +99,11 @@ export function ProjectVerification({
                 );
               }}
             >
-              Send this output as a correction
+              Ask agent to fix
             </Button>
           )}
           <Disclosure>
-            <DisclosureSummary className="task-summary">Read verification output</DisclosureSummary>
+            <DisclosureSummary className="task-summary">Check output</DisclosureSummary>
             {check.result.truncated && (
               <p className="task-muted">Output was shortened to keep this view responsive.</p>
             )}
@@ -119,7 +115,7 @@ export function ProjectVerification({
           </Disclosure>
         </div>
       ) : (
-        <p className="task-muted text-xs">No project checks recorded for this attempt.</p>
+        <p className="task-muted text-xs">Not run yet</p>
       )}
     </section>
   );

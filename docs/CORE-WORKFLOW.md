@@ -33,17 +33,22 @@ contracts; plans stay editable before dispatch.
 
 Chat's start page shows loaded work across projects, prioritizing attention and review.
 Its links select the relevant project or open the all-project Inbox. The last task or
-session section persists across navigation. Project setup defaults to project, agent
-and first task; Git behavior and appearance can be customized from the last step.
+session section persists across navigation. Project setup covers project, agents,
+decisions, behavior, appearance and an optional first task.
 Workspace inspection can suggest preparation, checks and preview commands without
 executing them. Failed or pending inspection never establishes a clean checkout.
 
 Task detail keeps the assigned agent, recorded progress and next action together.
-Conversation contains the original request, earlier exchanges, agent response and latest screenshot. Review groups outcomes,
-workspace changes, project checks, agent evidence and integration; Activity keeps
+Task titles extract a short objective locally without changing the original request;
+deliberately named tasks retain their titles. Existing work takes priority in the list;
+New task opens capture, and secondary actions live in the work actions menu.
+Result contains earlier exchanges, agent response and the latest screenshot. Review
+opens directly to changed files, with project checks, requirements and agent evidence
+alongside. Optional review tools are disclosed, and merge preparation opens explicitly.
+Activity keeps
 searchable agent messages. Details contains account, model, workspace, instructions,
-usage and connection choices. Attempt history stays beside the page navigation.
-Changes load automatically for finished work, including while Review is hidden.
+usage, the original request and connection choices. Attempt history stays beside the page navigation.
+Changes load automatically for finished work; diff rendering waits until Review is visible.
 Long errors keep a concise summary with expandable full details. Copy output and
 Make recurring share the task actions menu. Questions and save recovery remain
 visible above the task sections. Follow-up stays visible while the content scrolls.

@@ -21,6 +21,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { recoveryHandoff } from '../../lib/project-return';
+import type { TaskFollowUp } from '../../lib/task-followups';
 import {
   canRetry,
   isActive,
@@ -86,6 +87,11 @@ export function TaskDetail({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [acting, setActing] = useState(false);
+  const [followups, setFollowups] = useState<TaskFollowUp[]>([]);
+  const [queueError, setQueueError] = useState('');
+  const queueRequest = useRef<{ key: string; id: string } | null>(null);
+  const queuedHere = useRef(false);
+  const [queueing, setQueueing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
   const [tab, setTab] = useState(useWorkViewStore.getState().reading[run.taskId] ?? 'result');
@@ -127,6 +133,43 @@ export function TaskDetail({
     .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
   const latest = latestAttempt(runs, run.taskId);
   const isLatest = latest?.id === run.id;
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let alive = true;
+    let pending = false;
+    const load = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const value = await nativeTask<TaskFollowUp[]>('task_followup_snapshot', {
+          taskId: run.taskId,
+        });
+        if (alive) {
+          setFollowups(value ?? []);
+          setQueueError('');
+          if (queuedHere.current && !value?.length) {
+            await refresh();
+            const state = useExecutionStore.getState();
+            const next = latestAttempt(state.runs, run.taskId);
+            if (alive && next && next.id !== run.id && state.selectedId === run.id) {
+              queuedHere.current = false;
+              state.select(next.id);
+            }
+          }
+        }
+      } catch (cause) {
+        if (alive) setQueueError(String(cause));
+      } finally {
+        pending = false;
+      }
+    };
+    void load();
+    const interval = setInterval(() => void load(), 1000);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, [run.id, run.taskId, refresh]);
   const sourceIdea = useTaskStore((state) =>
     state.tasks.find(
       (idea) =>
@@ -134,7 +177,10 @@ export function TaskDetail({
     ),
   );
   const currentProject = useProjectStore((s) => s.projects.find((p) => p.id === run.projectId));
-  const title = sourceIdea?.title ?? taskTitle(attempts[0]?.prompt ?? run.prompt);
+  const title = taskTitle(
+    sourceIdea?.rawPrompt ?? attempts[0]?.prompt ?? run.prompt,
+    sourceIdea?.title,
+  );
   const pending = run.prompts?.filter((p) => p.status === 'pending') ?? [];
   const isolated =
     !!run.workspace &&
@@ -265,6 +311,55 @@ export function TaskDetail({
       setActing(false);
     }
   };
+  const queueFollowUp = async (interrupt = false) => {
+    if (!reply.trim() || acting || submitting || queueing || !canContinue) return;
+    setQueueing(true);
+    setError('');
+    const prompt = reply.trim();
+    const connectionIds = drafts[key]?.connectionIds;
+    const requestKey = JSON.stringify([run.id, prompt, connectionIds, interrupt]);
+    if (queueRequest.current?.key !== requestKey)
+      queueRequest.current = { key: requestKey, id: crypto.randomUUID() };
+    try {
+      await nativeTask('task_followup_queue', {
+        id: queueRequest.current.id,
+        runId: run.id,
+        prompt,
+        connectionIds: connectionIds ?? null,
+        interrupt,
+      });
+      queuedHere.current = true;
+      if (useExecutionStore.getState().drafts[key]?.prompt.trim() === prompt)
+        draft(key, { prompt: '' });
+      queueRequest.current = null;
+      setFollowups(
+        (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ?? [],
+      );
+      await refresh();
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      setQueueing(false);
+    }
+  };
+  const updateFollowUp = async (id: string, action: 'resume' | 'cancel') => {
+    if (queueing) return;
+    setQueueing(true);
+    setError('');
+    try {
+      await nativeTask('task_followup_action', { id, action });
+      if (action === 'resume') queuedHere.current = true;
+      setFollowups(
+        (await nativeTask<TaskFollowUp[]>('task_followup_snapshot', { taskId: run.taskId })) ?? [],
+      );
+    } catch (cause) {
+      setError(String(cause));
+    } finally {
+      setQueueing(false);
+    }
+  };
+  const sendFollowUp = () =>
+    active || followups.length ? queueFollowUp() : continueTask(previewRunning);
   const openLink = useCallback(async (href: string) => {
     try {
       if (isTauriEnvironment()) {
@@ -305,10 +400,50 @@ export function TaskDetail({
     });
     onCapture(id);
   };
+  const outcomes = !!run.contract?.requirements.length && (
+    <Disclosure className="task-review-section">
+      <DisclosureSummary>Requirements · {run.contract.requirements.length}</DisclosureSummary>
+      <TaskOutcomes
+        key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
+        run={run}
+        canReview={finished && isLatest && !integrated}
+        onCorrect={(prompt) => draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })}
+        onAdvance={async () => {
+          await start({
+            projectId: run.projectId,
+            projectName: run.projectName,
+            projectPath: run.projectPath,
+            agent: run.agent,
+            prompt:
+              'Continue with the next agreed workflow step. Preserve completed work and report evidence for this step.',
+            isolated: false,
+            previousRunId: run.id,
+            contextSelection: { advanceWorkflow: true },
+          });
+        }}
+      />
+    </Disclosure>
+  );
+  const evidence = !!(run.validationSteps?.length || run.screenshots?.length) && (
+    <Disclosure
+      className="task-review-section"
+      open={run.validationSteps?.some((step) => step.status === 'failed') || undefined}
+    >
+      <DisclosureSummary>
+        Agent evidence ·{' '}
+        {run.validationSteps?.filter((step) => step.status === 'failed').length || 0} failed checks
+      </DisclosureSummary>
+      <ValidationJourney
+        runId={run.id}
+        steps={run.validationSteps ?? []}
+        screenshots={run.screenshots ?? []}
+      />
+    </Disclosure>
+  );
   if (run.detailsOmitted)
     return (
       <WorkspacePage className="task-detail" aria-busy="true">
-        <Button variant="ghost" onClick={onBack}>
+        <Button variant="outline" onClick={onBack}>
           <ArrowLeft size={16} />
           All tasks
         </Button>
@@ -319,7 +454,7 @@ export function TaskDetail({
   return (
     <WorkspacePage className="task-detail">
       <div className="task-detail-navigation">
-        <Button variant="ghost" onClick={onBack}>
+        <Button variant="outline" onClick={onBack}>
           <ArrowLeft size={16} />
           All tasks
         </Button>
@@ -340,7 +475,7 @@ export function TaskDetail({
           )}
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button variant="ghost" aria-label="More task actions">
+              <Button variant="outline" aria-label="More task actions">
                 <MoreHorizontal size={20} />
               </Button>
             </Menu.Trigger>
@@ -441,7 +576,7 @@ export function TaskDetail({
       {!isLatest && latest && (
         <div className="task-notice">
           <span>You’re viewing an earlier attempt.</span>
-          <Button variant="ghost" onClick={() => useExecutionStore.getState().select(latest.id)}>
+          <Button variant="outline" onClick={() => useExecutionStore.getState().select(latest.id)}>
             Open latest result
           </Button>
         </div>
@@ -480,7 +615,7 @@ export function TaskDetail({
       <Tabs.Root className="task-working-area" value={tab} onValueChange={setTab}>
         <Tabs.List className="result-tabs" aria-label="Task sections">
           {[
-            { value: 'result', label: 'Conversation' },
+            { value: 'result', label: 'Result' },
             { value: 'changes', label: 'Review' },
             { value: 'preview', label: 'Preview' },
             { value: 'activity', label: 'Activity' },
@@ -494,10 +629,6 @@ export function TaskDetail({
         </Tabs.List>
         <div className="result-canvas">
           <Tabs.Content value="result">
-            <Disclosure className="task-original-request">
-              <DisclosureSummary>Original request</DisclosureSummary>
-              <p className="whitespace-pre-wrap break-words">{attempts[0]?.prompt ?? run.prompt}</p>
-            </Disclosure>
             {attempts
               .filter((attempt) => Date.parse(attempt.startedAt) < Date.parse(run.startedAt))
               .map((attempt, index) => (
@@ -553,42 +684,11 @@ export function TaskDetail({
           </Tabs.Content>
           {((!active && run.workspace) || tab === 'changes') && (
             <Tabs.Content value="changes" forceMount hidden={tab !== 'changes'}>
-              {!!run.contract?.requirements.length && (
-                <div className="task-review-section">
-                  <TaskOutcomes
-                    key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
-                    run={run}
-                    canReview={finished && isLatest && !integrated}
-                    onCorrect={(prompt) =>
-                      draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
-                    }
-                    onAdvance={async () => {
-                      await start({
-                        projectId: run.projectId,
-                        projectName: run.projectName,
-                        projectPath: run.projectPath,
-                        agent: run.agent,
-                        prompt:
-                          'Continue with the next agreed workflow step. Preserve completed work and report evidence for this step.',
-                        isolated: false,
-                        previousRunId: run.id,
-                        contextSelection: { advanceWorkflow: true },
-                      });
-                    }}
-                  />
-                </div>
-              )}
-              <div className="task-review-section">
-                {!!(run.validationSteps?.length || run.screenshots?.length) && (
-                  <ValidationJourney
-                    runId={run.id}
-                    steps={run.validationSteps ?? []}
-                    screenshots={run.screenshots ?? []}
-                  />
-                )}
-              </div>
               {!active && run.workspace && !integrated ? (
                 <ResultReview
+                  visible={tab === 'changes'}
+                  outcomes={outcomes}
+                  evidence={evidence}
                   key={run.id}
                   run={run}
                   onCorrect={
@@ -599,15 +699,21 @@ export function TaskDetail({
                   }
                 />
               ) : (
-                <p className="task-muted">
-                  {integrated
-                    ? 'The reviewed patch and cleanup results are saved in the merge receipt below.'
-                    : active
-                      ? 'Changes become available for review after this attempt stops.'
-                      : 'No workspace was recorded for this attempt. Inspect its result and activity for more detail.'}
-                </p>
+                <>
+                  <div>
+                    {outcomes}
+                    {evidence}
+                  </div>
+                  <p className="task-muted">
+                    {integrated
+                      ? 'The reviewed patch and cleanup results are saved in the merge receipt below.'
+                      : active
+                        ? 'Changes become available for review after this attempt stops.'
+                        : 'No workspace was recorded for this attempt. Inspect its result and activity for more detail.'}
+                  </p>
+                </>
               )}
-              {finished && isLatest && isolated && (
+              {finished && isLatest && isolated && (integrating || integrated) && (
                 <TaskIntegration run={run} onApplied={applied} />
               )}
             </Tabs.Content>
@@ -695,10 +801,18 @@ export function TaskDetail({
                   ))}
                 </Disclosure>
               )}
-              <section className="my-4">
-                <h3 className="text-base font-medium">Instruction for this attempt</h3>
-                <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
-              </section>
+              <Disclosure className="my-4">
+                <DisclosureSummary>Original request</DisclosureSummary>
+                <p className="task-request whitespace-pre-wrap">
+                  {attempts[0]?.prompt ?? run.prompt}
+                </p>
+              </Disclosure>
+              {attempts.length > 1 && (
+                <Disclosure className="my-4">
+                  <DisclosureSummary>Instruction for this attempt</DisclosureSummary>
+                  <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
+                </Disclosure>
+              )}
               {routing && (
                 <section className="my-4" aria-label="Automatic routing">
                   <h3 className="text-base font-medium">Agent selection and handoffs</h3>
@@ -807,7 +921,7 @@ export function TaskDetail({
                   </label>
                 ))}
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => {
                     useProjectStore.getState().selectProject(run.projectId);
                     setToolsOpen(true);
@@ -837,12 +951,51 @@ export function TaskDetail({
       </Tabs.Root>
       {isLatest && (
         <div className="task-next">
-          <h2 className="text-base mb-3">{integrated ? 'Start a follow-up' : 'Follow-up'}</h2>
+          <h2 className="task-followup-heading">
+            {integrated ? 'Start a follow-up' : 'Follow-up'}
+          </h2>
+          {queueError && <InlineNotice tone="error">{queueError}</InlineNotice>}
+          {followups.length > 0 && (
+            <ul className="task-followup-queue" aria-label="Queued follow-ups">
+              {followups.map((item) => (
+                <li key={item.id}>
+                  <p>{item.prompt}</p>
+                  <div className="task-followup-footer">
+                    <p className="task-muted">
+                      {item.error ??
+                        (item.paused
+                          ? 'Queue paused. Resume when ready.'
+                          : 'Queued for the next attempt.')}
+                    </p>
+                    {item.paused && !item.runId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={queueing}
+                        onClick={() => void updateFollowUp(item.id, 'resume')}
+                      >
+                        Resume
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={queueing}
+                      onClick={() => void updateFollowUp(item.id, 'cancel')}
+                    >
+                      Cancel follow-up
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           {canContinue ? (
             <form
+              className="task-followup-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                void continueTask(previewRunning);
+                void sendFollowUp();
               }}
             >
               <Textarea
@@ -861,28 +1014,44 @@ export function TaskDetail({
                     !event.nativeEvent.isComposing
                   ) {
                     event.preventDefault();
-                    void continueTask(previewRunning);
+                    void sendFollowUp();
                   }
                 }}
               />
               <div className="task-followup-footer">
                 <p className="task-muted">
-                  {previewRunning
-                    ? 'Stops the managed preview, saves its logs, then continues in this workspace.'
-                    : active
-                      ? 'Sending stops this attempt and resumes the same session.'
-                      : `Continues with ${run.agent} in the same workspace and account.`}
+                  {followups.length && previewRunning
+                    ? 'Queued follow-ups wait until the managed preview stops.'
+                    : previewRunning
+                      ? 'Stops the managed preview, saves its logs, then continues in this workspace.'
+                      : active
+                        ? 'Queue for the next attempt, or stop current work and send now.'
+                        : `Continues with ${run.agent} in the same workspace and account.`}
                 </p>
+                {active && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={
+                      !reply.trim() || submitting || acting || queueing || run.status === 'stopping'
+                    }
+                    onClick={() => void queueFollowUp(true)}
+                  >
+                    Stop &amp; send
+                  </Button>
+                )}
                 <Button
                   type="submit"
-                  disabled={!reply.trim() || submitting || acting || run.status === 'stopping'}
-                  loading={acting || submitting}
-                  loadingLabel="Continuing…"
+                  disabled={
+                    !reply.trim() || submitting || acting || queueing || run.status === 'stopping'
+                  }
+                  loading={acting || submitting || queueing}
+                  loadingLabel={active || followups.length ? 'Queuing…' : 'Continuing…'}
                 >
-                  {previewRunning
-                    ? 'Stop preview and continue'
-                    : active
-                      ? 'Stop and send'
+                  {active || followups.length
+                    ? 'Queue follow-up'
+                    : previewRunning
+                      ? 'Stop preview and continue'
                       : 'Continue task'}
                   <ArrowRight size={15} />
                 </Button>

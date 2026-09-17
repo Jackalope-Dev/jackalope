@@ -463,6 +463,9 @@ impl Coordinator {
         let service = self.clone();
         std::thread::spawn(move || {
             while service.alive.load(Ordering::Relaxed) {
+                if let Err(error) = service.dispatch_followups() {
+                    service.inner.lock().unwrap().error = Some(error);
+                }
                 if let Err(error) = service.tick() {
                     let mut inner = service.inner.lock().unwrap();
                     inner.error = Some(error);
@@ -473,10 +476,19 @@ impl Coordinator {
         });
     }
 
-    pub fn start_manual(&self, mut request: RunRequest) -> Result<String, String> {
+    pub fn start_manual(&self, request: RunRequest) -> Result<String, String> {
         self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let mut inner = self.inner.lock().unwrap();
+        self.start_manual_locked(&mut inner, request)
+    }
+
+    pub(super) fn start_manual_locked(
+        &self,
+        mut inner: &mut Inner,
+        mut request: RunRequest,
+    ) -> Result<String, String> {
+        self.validate_followup_launch(&inner.ledger, &request)?;
         let mut assigned = None;
         if request.previous_run_id.is_some() || request.retry_of.is_some() {
             super::managed::prepare_followup(

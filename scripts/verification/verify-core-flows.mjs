@@ -56,7 +56,7 @@ try {
     }),
   );
   await page.goto(url);
-  await page.getByRole('heading', { name: 'Chat', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Pick up where you left off', exact: true }).waitFor();
   const taskTabs = page.getByRole('navigation', { name: 'tasks views', exact: true });
   assert.deepEqual(await taskTabs.getByRole('button').allTextContents(), [
     'Chat',
@@ -103,7 +103,7 @@ try {
   await page.getByRole('option', { name: 'All work · every project', exact: true }).click();
   await page.getByRole('searchbox', { name: 'Search tasks', exact: true }).fill('billing');
   await page.reload();
-  await page.getByRole('heading', { name: 'Chat', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Pick up where you left off', exact: true }).waitFor();
   await page
     .getByRole('navigation', { name: 'tasks views', exact: true })
     .getByRole('button', { name: 'Tasks', exact: true })

@@ -88,7 +88,7 @@ export function TaskOutcomes({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-medium">Expected outcomes & evidence</h2>
         {canReview && (
-          <Button variant="ghost" disabled={busy} onClick={() => void refreshTree()}>
+          <Button variant="outline" disabled={busy} onClick={() => void refreshTree()}>
             Refresh file snapshot
           </Button>
         )}
@@ -224,7 +224,7 @@ export function TaskOutcomes({
                 >
                   Needs changes
                 </Button>
-                <Button variant="ghost" disabled={busy} onClick={() => setEditing(null)}>
+                <Button variant="outline" disabled={busy} onClick={() => setEditing(null)}>
                   Cancel
                 </Button>
               </div>

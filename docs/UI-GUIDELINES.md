@@ -36,6 +36,12 @@ Remove repeated instructions, slogans, decorative status labels and normal-state
 footnotes. Preserve accessible names, dialog descriptions and consequential
 information about cost, permissions, data loss, consent and recovery.
 
+Task titles should be short objectives, with original instructions in Details.
+Results lead with output; review leads with the diff and a compact checks area.
+Use outlined buttons for secondary actions, visible selected tabs, and disclosures
+for optional evidence and tools. Keep follow-up compact so the result remains usable
+at 960 by 640. Existing work should be visible before opening new-task capture.
+
 Marketing can be expressive while showing actual product workflows. Keep
 availability and limitations beside the claims they qualify. Avoid invented
 activity, unsupported capability claims and implementation jargon in product copy.
@@ -54,7 +60,8 @@ normal text contrast at least 4.5:1. Selection and status need non-color cues,
 and focus must remain visible in every theme. Use shared Select, input and button
 primitives so opened menus, disabled states and keyboard behavior stay consistent.
 
-App and project appearance share the theme controls. Preserve inheritance,
+App and project appearance share directly available theme controls, without an
+inheritance toggle. Preserve existing saved inheritance,
 saved overrides and automatic light/dark switching. Preview is temporary;
 confirming persists it, while cancellation or leaving an unconfirmed preview
 restores the saved appearance. Invalid color input must not change global styles.

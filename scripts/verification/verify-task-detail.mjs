@@ -27,18 +27,30 @@ const base = {
  usage: { input: 1400, output: 620, cacheRead: 0, cacheWrite: 0, reported: true, estimatedCostUsd: null },
 };
 const f = window.taskFixture = {
- calls: [], failStop: false, integrated: false,
+ calls: [], failStop: false, integrated: false, followups: [],
  theme: appearance => applyThemeTokens({ ...DEFAULT_THEME, isDark: appearance === 'dark' }),
  update: changes => useExecutionStore.setState(s => ({ runs: s.runs.map(r => r.id === s.selectedId ? {...r, ...changes} : r) })),
  scenario: (status, extra = {}) => {
    f.integrated = false;
+   f.followups = [];
    useExecutionStore.setState({ selectedId: 'sample', drafts: {}, runs: [{...base, status, ...extra}] });
  },
 };
 window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
  f.calls.push({command, ...args});
  switch(command) {
-  case 'task_review': return { files: [], diff: '', note: '' };
+  case 'task_followup_snapshot': return structuredClone(f.followups);
+  case 'task_followup_queue':
+   if(f.failStop) throw new Error('Could not save the follow-up. Try again.');
+   if(!f.followups.some(item => item.id === args.id)) f.followups.push({id:args.id,taskId:'task',previousRunId:args.runId,prompt:args.prompt,runId:null,paused:false,error:null});
+   if(args.interrupt) f.update({status:'stopping'});
+   return;
+  case 'task_followup_action':
+   if(args.action==='cancel') f.followups=f.followups.filter(item=>item.id!==args.id);
+   else f.followups=f.followups.map(item=>item.id===args.id?{...item,paused:false,error:null}:item);
+   return;
+  case 'task_review': return { files: ['src/search.ts'], diff: 'diff --git a/src/search.ts b/src/search.ts\\n--- a/src/search.ts\\n+++ b/src/search.ts\\n@@ -1 +1 @@\\n-export const keyboard = false;\\n+export const keyboard = true;\\n', note: 'Changes in this task workspace.' };
+  case 'task_usefulness': return null;
   case 'task_preview_status': return null;
   case 'task_outcome_snapshot': return 'snapshot';
   case 'mcp_list_servers': return [];
@@ -102,7 +114,7 @@ try {
   }
   assert.equal(await page.getByRole('tab').count(), 6);
   const tabs = page.getByRole('tablist', { name: 'Task sections' });
-  await tabs.getByRole('tab', { name: 'Conversation', exact: true }).focus();
+  await tabs.getByRole('tab', { name: 'Result', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   await page
     .locator('[role=tab][data-state=active]')
@@ -120,7 +132,7 @@ try {
     .click();
   await page.getByText('Selection follows the focused result.', { exact: false }).waitFor();
   await page.screenshot({ path: `${output}/activity-1280-dark.png` });
-  await tabs.getByRole('tab', { name: 'Conversation', exact: true }).click();
+  await tabs.getByRole('tab', { name: 'Result', exact: true }).click();
   const menu = page.getByRole('button', { name: 'More task actions' });
   await menu.focus();
   await page.keyboard.press('Enter');
@@ -132,8 +144,8 @@ try {
   const reply = page.getByRole('textbox', { name: 'Follow-up instructions' });
   await reply.fill('Also support Escape to close search.');
   await page.evaluate(() => (window.taskFixture.failStop = true));
-  await page.getByRole('button', { name: 'Stop and send' }).click();
-  await page.getByText('Could not stop the agent. Try again.', { exact: false }).waitFor();
+  await page.getByRole('button', { name: 'Queue follow-up' }).click();
+  await page.getByText('Could not save the follow-up. Try again.', { exact: false }).waitFor();
   assert.equal(await reply.inputValue(), 'Also support Escape to close search.');
   assert.equal(
     await page.evaluate(
@@ -142,14 +154,29 @@ try {
     0,
   );
   await page.evaluate(() => (window.taskFixture.failStop = false));
-  await page.getByRole('button', { name: 'Stop and send' }).click();
-  await page.waitForFunction(() => window.taskFixture.calls.some((c) => c.command === 'continue'));
+  await page.getByRole('button', { name: 'Queue follow-up' }).click();
+  await page.getByRole('list', { name: 'Queued follow-ups' }).waitFor();
   assert.equal(await reply.inputValue(), '');
   const continued = await page.evaluate(() =>
-    window.taskFixture.calls.find((c) => c.command === 'continue'),
+    window.taskFixture.calls.find((c) => c.command === 'task_followup_queue'),
   );
-  assert.equal(continued.previousRunId, 'sample');
+  assert.equal(continued.runId, 'sample');
   assert.equal(continued.prompt, 'Also support Escape to close search.');
+  assert.equal(continued.interrupt, false);
+  const queuedCalls = await page.evaluate(() =>
+    window.taskFixture.calls.filter((c) => c.command === 'task_followup_queue'),
+  );
+  assert.equal(queuedCalls[0].id, queuedCalls[1].id, 'A retry must reuse its message identifier');
+  assert.equal(await page.getByRole('button', { name: 'Stop & send', exact: true }).count(), 1);
+  await page.getByRole('button', { name: 'Cancel follow-up', exact: true }).click();
+  await page.getByRole('list', { name: 'Queued follow-ups' }).waitFor({ state: 'hidden' });
+  await reply.fill('Stop and correct the selected behavior now.');
+  await page.getByRole('button', { name: 'Stop & send', exact: true }).click();
+  await page.waitForFunction(() =>
+    window.taskFixture.calls.some((c) => c.command === 'task_followup_queue' && c.interrupt),
+  );
+  assert.equal(await reply.inputValue(), '');
+  await page.getByRole('button', { name: 'Cancel follow-up', exact: true }).click();
 
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
@@ -172,7 +199,7 @@ try {
             }),
           status,
         );
-        await tabs.getByRole('tab', { name: 'Conversation', exact: true }).click();
+        await tabs.getByRole('tab', { name: 'Result', exact: true }).click();
         if (status === 'review')
           await page.getByText('Search is ready for review.', { exact: true }).waitFor();
         await page.locator('.task-detail').evaluate((el) => (el.scrollTop = 0));
@@ -194,6 +221,31 @@ try {
           );
         await page.screenshot({
           path: `${output}/${status}-${width}-${appearance}.png`,
+        });
+      }
+    }
+  }
+  await page.evaluate(() =>
+    window.taskFixture.scenario('review', { result: 'Keyboard search is ready.' }),
+  );
+  for (const width of [1280, 960, 680]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    for (const appearance of ['light', 'dark']) {
+      await page.evaluate((value) => window.taskFixture.theme(value), appearance);
+      for (const name of ['Result', 'Review', 'Preview', 'Activity', 'Details', 'Delivery']) {
+        await tabs.getByRole('tab', { name, exact: true }).click();
+        if (name === 'Review')
+          await page.getByRole('region', { name: 'Code changes', exact: true }).waitFor();
+        assert(
+          await page.locator('.task-detail').evaluate((el) => el.scrollWidth <= el.clientWidth),
+          'Task section overflows',
+        );
+        assert(
+          await page.locator('.result-canvas').evaluate((el) => el.clientHeight >= 160),
+          'Result has too little space',
+        );
+        await page.screenshot({
+          path: `${output}/section-${name.toLowerCase()}-${width}-${appearance}.png`,
         });
       }
     }
@@ -256,18 +308,20 @@ try {
     }),
   );
   await tabs.getByRole('tab', { name: 'Review', exact: true }).click();
+  await page.getByText('Requirements · 1', { exact: true }).click();
   await page.getByText('Keyboard navigation works', { exact: true }).waitFor();
+  await page.getByText('Agent evidence · 0 failed checks', { exact: true }).click();
   await page.getByText('Search with arrow keys', { exact: true }).waitFor();
   await page.getByText('Automatic checks could not finish:', { exact: false }).waitFor();
   await page.locator('.task-detail').evaluate((el) => (el.scrollTop = 0));
   await page.screenshot({ path: `${output}/review-tools-960-dark.png` });
   await tabs.getByRole('tab', { name: 'Details', exact: true }).click();
   await page.getByText('Example model', { exact: true }).waitFor();
-  await page.getByRole('heading', { name: 'Instruction for this attempt' }).waitFor();
+  await page.getByText('Original request', { exact: true }).click();
   await page.getByText('Example model', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${output}/details-960-dark.png` });
   await page.evaluate(() => window.taskFixture.scenario('starting', { workspace: '' }));
-  await tabs.getByRole('tab', { name: 'Conversation', exact: true }).click();
+  await tabs.getByRole('tab', { name: 'Result', exact: true }).click();
   await page.getByText('Preparing', { exact: true }).waitFor();
 
   // A long step reports the work it is doing instead of a fixed label.
@@ -324,14 +378,20 @@ try {
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await page.waitForFunction(() => window.taskFixture.calls.length > 0);
   assert.deepEqual(
-    await page.evaluate(() => window.taskFixture.calls.map((call) => call.command)),
+    await page.evaluate(() =>
+      window.taskFixture.calls
+        .filter((call) => call.command !== 'task_followup_snapshot')
+        .map((call) => call.command),
+    ),
     ['task_retry'],
     'retry dispatches the native retry command rather than starting an unrelated task',
   );
   // The new attempt is opened and reports its own first step.
   await page.getByText('Preparing the workspace', { exact: true }).first().waitFor();
   assert.equal(
-    await page.evaluate(() => window.taskFixture.calls.at(-1).id),
+    await page.evaluate(
+      () => window.taskFixture.calls.findLast((call) => call.command === 'task_retry').id,
+    ),
     'sample',
     'the retry names the attempt it replaces',
   );
@@ -368,7 +428,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    'Task detail browser fixtures passed: states, themes, responsive layouts, reduced motion, keyboard tabs/menu, activity search, live step progress, setup-failure detail, retry dispatch, error disclosure, history and stop-before-continue recovery. No native tasks launched.',
+    'Task detail browser fixtures passed: states, themes, responsive layouts, reduced motion, keyboard tabs/menu, activity search, live step progress, setup-failure detail, retry dispatch, error disclosure, history, queued follow-ups, failed-save retry and stop-and-send. No native tasks launched.',
   );
 } catch (error) {
   const page = browser.contexts()[0]?.pages()[0];

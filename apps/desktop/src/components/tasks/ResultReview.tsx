@@ -1,11 +1,13 @@
-import { FileDiff } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { FileDiff, RefreshCw } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { Select, SelectItem } from '../ui/Select';
 import { CrossModelReviewPanel } from './CrossModelReviewPanel';
-import { PatchPreview } from './PatchPreview';
+import { DiffPreview } from './DiffPreview';
 import { ProjectVerification } from './ProjectVerification';
 import { ReviewProgress } from './ReviewProgress';
 import { TaskImpact } from './TaskImpact';
@@ -14,13 +16,20 @@ import { TaskUsefulness } from './TaskUsefulness';
 export function ResultReview({
   run,
   onCorrect,
+  outcomes,
+  evidence,
+  visible = true,
 }: {
   run: TaskRun;
   onCorrect?: (prompt: string) => void;
+  outcomes?: ReactNode;
+  evidence?: ReactNode;
+  visible?: boolean;
 }) {
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState('');
   const { projects } = useProjectStore();
   const project = projects.find((p) => p.id === run.projectId);
 
@@ -40,20 +49,21 @@ export function ResultReview({
   }, [load]);
   return (
     <div className="task-review">
-      <div className="flex items-center justify-between gap-3">
+      <div className="task-review-toolbar">
         <h3 className="flex items-center gap-2 font-medium">
           <FileDiff size={16} />
-          Workspace changes
+          Changes{' '}
+          {review ? `· ${review.files.length} ${review.files.length === 1 ? 'file' : 'files'}` : ''}
         </h3>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           disabled={loading}
           onClick={() => void load()}
           loading={loading}
           loadingLabel="Reading…"
         >
-          {review ? 'Refresh changes' : 'Inspect changes'}
+          <RefreshCw size={14} /> Refresh changes
         </Button>
       </div>
       {error && (
@@ -61,46 +71,79 @@ export function ResultReview({
           {error}
         </InlineNotice>
       )}
-      <ProjectVerification
-        run={run}
-        command={project?.preferences?.verifyCommand}
-        onCorrect={onCorrect}
-      />
       {loading && (
         <p role="status" className="task-muted">
           Reading changes from this task’s workspace…
         </p>
       )}
-      {review && (
-        <div className="mt-4">
-          <ReviewProgress key={`progress:${run.id}`} runId={run.id} />
-          <p className="task-muted text-xs mb-4">{review.note}</p>
-          {review.files.length ? (
-            <ul className="task-files">
-              {review.files.map((file) => (
-                <li key={file}>
-                  <FileDiff size={13} />
-                  <span>{file}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="task-muted">No changed files found.</p>
+      <div className="task-review-layout">
+        <section className="task-review-output" aria-label="Changed files">
+          {review && (
+            <>
+              {review.files.length > 1 && (
+                <div className="task-review-file">
+                  <Select
+                    aria-label="Changed file"
+                    value={file || 'all'}
+                    onValueChange={(value) => setFile(value === 'all' ? '' : value)}
+                  >
+                    <SelectItem value="all">All changed files ({review.files.length})</SelectItem>
+                    {review.files.map((path) => (
+                      <SelectItem key={path} value={path}>
+                        {path}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {review.diff ? (
+                visible && (
+                  <DiffPreview key={review.diff} patch={review.diff} file={file || undefined} />
+                )
+              ) : (
+                <p className="task-muted">No text changes to review.</p>
+              )}
+              {!review.diff && review.files.length > 0 && (
+                <ul className="task-files">
+                  {review.files.map((path) => (
+                    <li key={path}>{path}</li>
+                  ))}
+                </ul>
+              )}
+              {review.note && (
+                <Disclosure>
+                  <DisclosureSummary>About these changes</DisclosureSummary>
+                  <p className="task-muted">{review.note}</p>
+                </Disclosure>
+              )}
+            </>
           )}
-          <section aria-label="Affected code">
-            <TaskImpact
-              key={`${run.id}:${JSON.stringify(review.files)}`}
-              run={run}
-              files={review.files}
-            />
-          </section>
-          {review.diff && (
-            <CrossModelReviewPanel run={run} files={review.files} diff={review.diff} />
+        </section>
+        <aside className="task-review-checklist" aria-label="Review checks">
+          <ProjectVerification
+            run={run}
+            command={project?.preferences?.verifyCommand}
+            onCorrect={onCorrect}
+          />
+          {outcomes}
+          {evidence}
+          {review && (
+            <Disclosure className="task-review-tools">
+              <DisclosureSummary>More review tools</DisclosureSummary>
+              <ReviewProgress key={`progress:${run.id}`} runId={run.id} />
+              <TaskImpact
+                key={`${run.id}:${JSON.stringify(review.files)}`}
+                run={run}
+                files={review.files}
+              />
+              {review.diff && (
+                <CrossModelReviewPanel run={run} files={review.files} diff={review.diff} />
+              )}
+              <TaskUsefulness key={`usefulness:${run.id}`} runId={run.id} />
+            </Disclosure>
           )}
-          {review.diff && <PatchPreview key={review.diff} patch={review.diff} />}
-          <TaskUsefulness key={`usefulness:${run.id}`} runId={run.id} />
-        </div>
-      )}
+        </aside>
+      </div>
     </div>
   );
 }

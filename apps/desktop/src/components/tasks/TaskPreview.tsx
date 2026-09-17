@@ -104,7 +104,7 @@ export function TaskPreview({
     <section className="task-preview space-y-3" aria-label="Try result">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base">Try result</h2>
+          <h2 className="text-base">Preview</h2>
           <p className="task-muted" role="status">
             {preview
               ? preview.running
@@ -301,7 +301,7 @@ export function TaskPreview({
                 }
               }}
             >
-              Capture screenshot and page details
+              Capture evidence
             </Button>
             {inspecting && (
               <Button
@@ -320,8 +320,7 @@ export function TaskPreview({
               </Button>
             )}
             <p className="task-muted">
-              Opens this page in a fresh, isolated browser. Captures its screenshot, page elements
-              and browser errors; unsaved interactions and sign-in from this embedded page are not
+              Captures a fresh browser session. Current sign-in and unsaved interactions are not
               copied.
             </p>
           </div>

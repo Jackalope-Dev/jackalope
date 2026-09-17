@@ -4,7 +4,8 @@ import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './core-workflow.css';
-import { FolderOpen, ListTodo, Radio, Workflow } from 'lucide-react';
+import { DropdownMenu as Menu } from '@jackalope/ui';
+import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   collectWorkspaceWork,
@@ -62,8 +63,11 @@ export function TaskWorkspace({
   const [archived, setArchived] = useState(false);
   const [cleanupBusy, setCleanupBusy] = useState(false);
   const [parallel, setParallel] = useState(false);
+  const [composerExpanded, setComposerExpanded] = useState(false);
+  const hasWork = !!(runs.length || ideas.length || sessions.length);
   useEffect(() => {
     if (!composerFocus) return;
+    setComposerExpanded(true);
     setParallel(false);
     const frame = requestAnimationFrame(() => {
       const input = document.getElementById('task-intent');
@@ -191,20 +195,7 @@ export function TaskWorkspace({
             : 'What do you want to accomplish?'
         }
         description={
-          runs.length || ideas.length || sessions.length ? (
-            project ? (
-              <span>
-                Looking for tasks to work on?{' '}
-                <button
-                  type="button"
-                  className="task-inline-link"
-                  onClick={() => navigateWorkspace('repo-todos')}
-                >
-                  Explore Repo TODOs &rarr;
-                </button>
-              </span>
-            ) : undefined
-          ) : (
+          hasWork ? undefined : (
             <span>
               Describe what to build, fix, or explore, or{' '}
               <button
@@ -219,22 +210,6 @@ export function TaskWorkspace({
         }
         action={
           <div className="task-home-actions">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                useLiveSessionStore.getState().select(null);
-                navigateWorkspace('live-sessions');
-              }}
-            >
-              <Radio size={16} />
-              Open Chat
-            </Button>
-            {project && (
-              <Button variant="ghost" onClick={() => navigateWorkspace('repo-todos')}>
-                <ListTodo size={16} />
-                Repo TODOs
-              </Button>
-            )}
             {!!(needsInput || ready) && (
               <Button
                 variant="outline"
@@ -259,16 +234,52 @@ export function TaskWorkspace({
                   .join(' · ')}
               </Button>
             )}
-            {project && (
-              <Button variant="ghost" onClick={() => setParallel(true)}>
-                <Workflow size={16} />
-                Plan feature work
+            {hasWork && (
+              <Button onClick={() => onCapture()}>
+                <Plus size={16} />
+                New task
               </Button>
             )}
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button variant="outline" aria-label="More work actions">
+                  <MoreHorizontal size={18} />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => {
+                      useLiveSessionStore.getState().select(null);
+                      navigateWorkspace('live-sessions');
+                    }}
+                  >
+                    <Radio size={16} />
+                    Open Chat
+                  </Menu.Item>
+                  {project && (
+                    <Menu.Item
+                      className="workspace-menu-item"
+                      onSelect={() => navigateWorkspace('repo-todos')}
+                    >
+                      <ListTodo size={16} />
+                      Repo TODOs
+                    </Menu.Item>
+                  )}
+                  {project && (
+                    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
+                      <Workflow size={16} />
+                      Plan feature work
+                    </Menu.Item>
+                  )}
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu.Root>
           </div>
         }
       />
-      {composerVisible && (
+      {composerVisible && (!hasWork || composerExpanded) && (
         <CaptureTask
           inline
           compact={!!(runs.length || ideas.length || sessions.length)}

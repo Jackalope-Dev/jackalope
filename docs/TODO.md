@@ -11,6 +11,7 @@ release dates.
   preview readiness/cancellation/evidence capture and PR/CI reads in installed WebViews.
   Test first-result, visual correction, failed-check recovery, project return and delivery
   with entry developers and power users; measure completion, detours and scope mistakes.
+  Include concise titles, diff-first review, disclosed evidence, and all task sections.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window
@@ -21,6 +22,8 @@ release dates.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
   defaults and explicit overrides, including cancellation and restart. Cover all six
   project-setup steps, appearance rollback and automatic command detection.
+- [ ] Validate ordinary-task follow-up queues with installed providers, including
+  stop-and-send, restart pauses, failed saves, cancellation and merge guards.
 - [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users
   and real repositories. Measure first useful result, useful completed work, review/correction
   effort, repeat use and recovery; keep self-reported ratings and loaded-history coverage explicit.

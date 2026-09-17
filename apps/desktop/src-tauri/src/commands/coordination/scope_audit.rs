@@ -224,6 +224,14 @@ impl Coordinator {
         ids: &[String],
     ) -> Result<(), String> {
         super::managed_delivery::validate_review(ledger, ids)?;
+        if ledger.followups.iter().any(|followup| {
+            !followup.dispatched
+                && runs
+                    .iter()
+                    .any(|run| ids.contains(&run.id) && run.task_id == followup.task_id)
+        }) {
+            return Err("Run or cancel queued follow-ups before merging this task.".into());
+        }
         let mut reconciled = HashSet::new();
         for resolver in runs
             .iter()

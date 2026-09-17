@@ -1,5 +1,4 @@
 import type { ThemePalette } from '@jackalope/brand/theme';
-import { Checkbox } from '@jackalope/ui';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { ThemeEditor } from '../theme/ThemeEditor';
@@ -20,27 +19,17 @@ export function ProjectThemeStep({
   onBack: () => void;
   onContinue: (theme: ThemePalette | undefined) => void;
 }) {
-  const [inherit, setInherit] = useState(!initialTheme);
+  const [changed, setChanged] = useState(false);
   const [draft, setDraft] = useState(initialTheme ?? appTheme);
   return (
     <>
       <fieldset disabled={busy} className="onboarding-theme-editor">
-        <label className="onboarding-theme-inherit">
-          <Checkbox
-            checked={inherit}
-            onChange={(event) => {
-              setInherit(event.target.checked);
-              onPreview(event.target.checked ? appTheme : draft);
-            }}
-          />
-          Use app theme
-        </label>
         <ThemeEditor
-          value={inherit ? appTheme : draft}
+          value={draft}
           onChange={(theme) => {
             if (busy) return;
             setDraft(theme);
-            setInherit(false);
+            setChanged(true);
             onPreview(theme);
           }}
         />
@@ -50,7 +39,7 @@ export function ProjectThemeStep({
           <ArrowLeft size={16} />
           Back
         </Button>
-        <Button disabled={busy} onClick={() => onContinue(inherit ? undefined : draft)}>
+        <Button disabled={busy} onClick={() => onContinue(changed ? draft : initialTheme)}>
           Continue
           <ArrowRight size={16} />
         </Button>

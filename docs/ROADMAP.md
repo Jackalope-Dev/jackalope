@@ -23,8 +23,11 @@ Work discovery unifies tasks and chats with explicit project scope, remembered
 views and task/project command search. Tasks opens Chat first; Inbox holds the work
 list. Work rows show each agent's character, live or next-action status and who is
 working now. Isolated results keep review, merge into the target branch and workspace
-cleanup together. Project overview surfaces unfinished work and
-local delivery receipts. Task follow-up stays visible through review. Preview setup,
+cleanup together. Concise task titles, output-first results and diff-first review reduce
+navigation and keep checks, evidence and optional tools close to the changes.
+Project overview surfaces unfinished work and
+local delivery receipts. Task follow-up stays visible through review, with a saved queue
+and explicit stop-and-send while work runs. Queues pause after failure or restart. Preview setup,
 HTTP readiness, sandboxed local pages and fresh browser evidence capture are implemented.
 Delivery reads local Git and optional GitHub PR/CI state and prepares editable handoff
 drafts. Remote publication and deployment still require explicit user action; installed
