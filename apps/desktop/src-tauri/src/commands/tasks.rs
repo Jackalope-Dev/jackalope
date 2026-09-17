@@ -21,6 +21,7 @@ mod storage;
 #[cfg(test)]
 mod tests;
 pub(super) mod timing;
+mod tool_activity;
 mod warm_opencode;
 
 pub(super) use events::consume_adapter_event;

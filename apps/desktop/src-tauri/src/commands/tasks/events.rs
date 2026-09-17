@@ -26,7 +26,7 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         activity(run, line);
         return;
     };
-    run.efficiency.observe(&event, adapter);
+    run.efficiency.observe(&event, adapter, &run.workspace);
     let kind = event["type"].as_str().unwrap_or("");
     if let Some(failure) = super::routing::quota_failure(&event) {
         run.quota_failure = Some(failure);
@@ -91,6 +91,17 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
         run.model = Some(model.into());
     }
     match (adapter, kind) {
+        ("codex", "item.started") => {
+            let item = &event["item"];
+            let name = match item["type"].as_str() {
+                Some("command_execution") => "command_execution",
+                Some("mcp_tool_call") => item["tool"].as_str().unwrap_or("tool"),
+                Some("web_search") => "web search",
+                _ => return,
+            };
+            let label = super::tool_activity::label(name, item, &run.workspace);
+            activity(run, &label);
+        }
         ("codex", "item.completed") => {
             let item = &event["item"];
             if item["type"] == "agent_message" {
@@ -100,6 +111,23 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     .chars()
                     .take(120_000)
                     .collect();
+            } else if item["type"] == "file_change" {
+                if item["status"] == "failed" {
+                    activity(run, "File change failed");
+                    return;
+                }
+                for change in item["changes"].as_array().into_iter().flatten().take(20) {
+                    let path = change["path"].as_str().and_then(|path| {
+                        super::tool_activity::workspace_path(path, &run.workspace)
+                    });
+                    activity(
+                        run,
+                        &path.map_or_else(
+                            || "Changed a file".into(),
+                            |path| format!("Changed {path}"),
+                        ),
+                    );
+                }
             } else if let Some(command) = item["command"].as_str() {
                 activity(
                     run,
@@ -148,9 +176,20 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     if let Some(text) = block["text"].as_str() {
                         activity(run, text);
                     }
-                    if let Some(name) = block["name"].as_str() {
-                        activity(run, &format!("Using {name}"));
+                    if block["type"] == "tool_use" {
+                        if let Some(name) = block["name"].as_str() {
+                            let label =
+                                super::tool_activity::label(name, &block["input"], &run.workspace);
+                            activity(run, &label);
+                        }
                     }
+                }
+            }
+        }
+        ("claude" | "grok", "user") => {
+            for block in event["message"]["content"].as_array().into_iter().flatten() {
+                if block["type"] == "tool_result" && block["is_error"] == true {
+                    activity(run, "Tool request failed");
                 }
             }
         }
@@ -205,7 +244,8 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
         "tool_use" => {
             let tool = part["tool"].as_str().unwrap_or("tool");
             let status = part["state"]["status"].as_str().unwrap_or("running");
-            activity(run, &format!("{tool}: {status}"));
+            let label = super::tool_activity::label(tool, &part["state"]["input"], &run.workspace);
+            activity(run, &format!("{label} · {status}"));
         }
         "step_finish" => {
             let tokens = &part["tokens"];

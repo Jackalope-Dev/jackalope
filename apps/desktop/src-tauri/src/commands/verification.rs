@@ -194,6 +194,13 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
     let active = ["starting", "running"].contains(&run.status.as_str());
     let result = (|| {
         runtime.stage(&run.id, Some("verification_wait"));
+        runtime.update(&run.id, |r| {
+            r.progress = Some(StepProgress::new(
+                "verification_wait",
+                "Waiting for project checks",
+                1,
+            ));
+        });
         let _slot = leases::check_slot(|| active && !runtime.is_running(&run.id))?;
         let directory = runtime.integration_directory();
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
@@ -226,6 +233,7 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         Ok(verification)
     })();
     let resume = active && !run.finishing && runtime.is_running(&run.id);
+    runtime.update(&run.id, |r| r.progress = None);
     runtime.stage(&run.id, resume.then_some("execution"));
     result
 }

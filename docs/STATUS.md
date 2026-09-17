@@ -14,6 +14,8 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   with remembered filters, compact capture and keyboard row navigation. Work rows show
   each agent's character, live or next-action status and who is working now. Task and
   project command search covers both.
+  Active task, plan and chat views show recent tool activity, workspace file labels and
+  native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
 - Chat's start page surfaces attention, review and active work across projects. Task
   and session sections remember where the user was reading. Project readiness distinguishes

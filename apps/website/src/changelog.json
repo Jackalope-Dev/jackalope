@@ -1,5 +1,16 @@
 [
   {
+    "id": "see-what-your-agents-are-doing",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "See what your agents are doing.",
+    "description": "Follow active work with file activity and live check output in tasks and chats.",
+    "items": [
+      "Recent activity stays visible without extra model calls.",
+      "Long project checks keep their connection to Claude and OpenCode."
+    ]
+  },
+  {
     "id": "faster-code-review-and-more-reliable-checks",
     "date": "2026-09-17",
     "status": "In development",

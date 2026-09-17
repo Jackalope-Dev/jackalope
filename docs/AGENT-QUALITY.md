@@ -121,12 +121,23 @@ Legacy requests without an effort retain the CLI default. Continuations inherit
 the saved effort unless a caller explicitly supplies another level. Quality-based
 automatic model switching and effort escalation are not enabled.
 
-The Codex bridge timeout covers the saved check's queue, execution and bookkeeping
+The Codex, Claude and OpenCode bridge timeouts cover the saved check's queue, execution and bookkeeping
 budgets. A check can wait 300 seconds for a slot and execute for up to 1,800 seconds,
 with a separate 600-second no-output stall limit.
 The queue and command keep their separate cancellation controls. Extending the
 client timeout does not extend the command's execution limit or authorize another
 command. Stored verification remains available through verification_output.
+Claude and OpenCode receive a per-server timeout only for the Jackalope bridge;
+unrelated connections keep their own limits. Claude uses its documented
+[per-server timeout](https://code.claude.com/docs/en/mcp). Kimi's ACP transport and
+HTTP-only adapters retain their provider-owned tool-request limits.
+
+Active task summaries carry only the last three activity lines, bounded to 240 characters
+each. The UI uses those events and native check output for live progress without model
+narration or repeated diff scans. File-tool labels retain workspace-relative paths only;
+tool arguments and edited content are not added to the activity previews. Full selected
+attempt logs retain their existing capture policy. Tool starts are observations, not proof
+that a file changed or that checks passed.
 
 Isolated manual tasks whose launch snapshot has no peers or pending messages skip
 routine coordination polling and completion messages. The exception does not apply

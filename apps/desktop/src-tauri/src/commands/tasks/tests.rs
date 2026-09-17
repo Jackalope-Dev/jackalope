@@ -93,6 +93,68 @@ fn opencode_stream_tracks_results_sessions_errors_and_deduplicated_step_usage() 
 }
 
 #[test]
+fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
+    for adapter in ["claude", "grok"] {
+        let mut run = sample(adapter);
+        run.workspace = "C:/work".into();
+        consume_event(
+            &mut run,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"edit-1","name":"Edit","input":{"file_path":"C:/work/src/lib.rs","new_string":"private code"}}]}}"#,
+        );
+        assert_eq!(run.activity, ["Editing src/lib.rs"]);
+        assert!(run.efficiency.touched_paths.contains("src/lib.rs"));
+        consume_event(
+            &mut run,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","is_error":true,"content":"private diagnostic"}]}}"#,
+        );
+        assert_eq!(run.activity.last().unwrap(), "Tool request failed");
+        assert!(run.error.is_none());
+        assert!(!run.activity.join(" ").contains("private"));
+    }
+    let mut run = sample("codex");
+    consume_event(
+        &mut run,
+        r#"{"type":"item.started","item":{"type":"command_execution","command":"secret command"}}"#,
+    );
+    assert_eq!(run.activity, ["Running a command"]);
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"file_change","changes":[{"path":"src/a.rs"}]}}"#,
+    );
+    assert_eq!(run.activity.last().unwrap(), "Changed src/a.rs");
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"file_change","status":"failed","changes":[{"path":"src/a.rs"}]}}"#,
+    );
+    assert_eq!(run.activity.last().unwrap(), "File change failed");
+    let mut run = sample("opencode");
+    consume_event(
+        &mut run,
+        r#"{"type":"tool_use","part":{"tool":"read","state":{"status":"running","input":{"filePath":"src/a.rs"}}}}"#,
+    );
+    assert_eq!(run.activity, ["Reading src/a.rs · running"]);
+}
+
+#[test]
+fn active_summaries_keep_only_three_short_activity_previews() {
+    let mut run = sample("claude");
+    run.activity = vec![
+        "old".into(),
+        "Reading src/a.rs\nprivate full output".into(),
+        "Editing src/a.rs".into(),
+        "x".repeat(500),
+    ];
+    let summary = run.summary();
+    assert!(summary.details_omitted);
+    assert_eq!(summary.activity.len(), 3);
+    assert_eq!(summary.activity[0], "Reading src/a.rs");
+    assert_eq!(summary.activity[2].len(), 240);
+    assert_eq!(run.activity.len(), 4);
+    run.status = "review".into();
+    assert!(run.summary().activity.is_empty());
+}
+
+#[test]
 fn antigravity_stream_keeps_attempt_usage_and_requires_a_terminal_result() {
     let mut run = sample("antigravity");
     let mut stream = antigravity::Stream::new(Some("conversation-1".into()));

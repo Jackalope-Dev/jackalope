@@ -29,6 +29,7 @@ release dates.
   effort, repeat use and recovery; keep self-reported ratings and loaded-history coverage explicit.
 - [ ] Check keyboard and screen-reader access, narrow layouts, title-bar controls,
   themes, reduced motion and appearance preview rollback. Include agent characters in installed-app checks.
+  Cover live activity, file labels, queued checks and provider tool failures.
 - [ ] Validate helper actions, notifications and external links in installed builds,
   including Ask context defaults, saved opt-outs and its settings navigation.
 - [ ] Exercise checkpoints, commit attribution, edited merge messages and cleanup

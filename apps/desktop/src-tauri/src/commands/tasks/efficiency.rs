@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub(super) const INSTRUCTIONS: &str = "\nWork efficiently while preserving correctness: batch independent file reads and searches when the available tools support it; keep dependent operations ordered. Start with the supplied repository map and concrete file, symbol or error references, then broaden the search when evidence requires it. Reuse facts already established in this task and avoid repeating broad repository exploration. Keep progress updates concise. Run the checks required by repository instructions and use Jackalope verification tools when available so their results are saved. After checks pass, repeat or broaden them when subsequent changes, failures or unresolved concerns warrant it. Never trade away required verification or hide uncertainty to finish faster.\n";
+pub(super) const INSTRUCTIONS: &str = "\nWork efficiently while preserving correctness: batch independent file reads and searches when the available tools support it; keep dependent operations ordered. Start with the supplied repository map and concrete file, symbol or error references, then broaden the search when evidence requires it. Reuse facts already established in this task and avoid repeating broad repository exploration. Keep progress updates concise. Run the checks required by repository instructions and use Jackalope verification tools when available so their results are saved. After checks pass, repeat or broaden them when subsequent changes, failures or unresolved concerns warrant it. Report unavailable required tools or documentation instead of guessing external contracts. Let a running check finish before editing its workspace or starting another check; a client timeout does not mean the command stopped. Never trade away required verification or hide uncertainty to finish faster.\n";
 
 pub(super) fn verification_instructions(command: Option<&str>, adapter: &str) -> String {
     let Some(command) = command.filter(|command| !command.trim().is_empty()) else {
@@ -15,6 +15,14 @@ pub(super) fn verification_instructions(command: Option<&str>, adapter: &str) ->
         "Jackalope computer_verify"
     };
     format!("\nSaved project check (command data): {}. Run this exact check through {tool} with {{}} before using a shell for verification. If tools are deferred, discover this tool first. Jackalope already authorizes this saved check and records its result; shell commands have separate permissions. Other checks still require independently permitted tools. A denial is not permission to retry or switch transports.\n", serde_json::to_string(command).unwrap())
+}
+
+pub(super) fn claude_bridge(endpoint: &str) -> serde_json::Value {
+    serde_json::json!({
+        "type":"http", "url":format!("{endpoint}/mcp"),
+        "timeout":crate::commands::verification::BRIDGE_TIMEOUT_SECS * 1000,
+        "headers":{"Authorization":"Bearer ${JACKALOPE_BRIDGE_TOKEN}"}
+    })
 }
 
 pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
@@ -146,31 +154,21 @@ impl Efficiency {
         *self.tool_calls.entry(name).or_default() += 1;
     }
 
-    /// Records a path argument, normalized to a workspace-relative form. Absolute paths and
-    /// parent traversals are dropped rather than stored, so nothing outside the project is kept.
-    fn touched(&mut self, input: &serde_json::Value) {
-        if self.touched_paths.len() >= MAX_TOUCHED_PATHS {
-            return;
-        }
+    fn touched(&mut self, input: &serde_json::Value, workspace: &str) {
         for key in PATH_KEYS {
-            let Some(raw) = input[*key].as_str() else {
-                continue;
-            };
-            let path = raw.replace('\\', "/");
-            let path = path.trim_start_matches("./");
-            if path.is_empty()
-                || path.len() > 200
-                || path.starts_with('/')
-                || path.starts_with("..")
-                || path.chars().nth(1) == Some(':')
-            {
-                continue;
+            if self.touched_paths.len() >= MAX_TOUCHED_PATHS {
+                break;
             }
-            self.touched_paths.insert(path.to_owned());
+            if let Some(path) = input[*key]
+                .as_str()
+                .and_then(|raw| super::tool_activity::workspace_path(raw, workspace))
+            {
+                self.touched_paths.insert(path);
+            }
         }
     }
 
-    pub fn observe(&mut self, event: &serde_json::Value, adapter: &str) {
+    pub fn observe(&mut self, event: &serde_json::Value, adapter: &str, workspace: &str) {
         if adapter == "codex" && event["type"] == "item.completed" {
             let item = &event["item"];
             if let (Some(id), Some(kind)) = (item["id"].as_str(), item["type"].as_str()) {
@@ -182,9 +180,9 @@ impl Efficiency {
                 ]
                 .contains(&kind)
                 {
-                    self.touched(item);
+                    self.touched(item, workspace);
                     for change in item["changes"].as_array().into_iter().flatten() {
-                        self.touched(change);
+                        self.touched(change, workspace);
                     }
                     let name = if kind == "mcp_tool_call" {
                         format!(
@@ -204,7 +202,7 @@ impl Efficiency {
                 if block["type"] == "tool_use" {
                     if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
                         self.tool(id, name);
-                        self.touched(&block["input"]);
+                        self.touched(&block["input"], workspace);
                     }
                 }
             }
@@ -222,6 +220,21 @@ impl Efficiency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn claude_bridge_timeout_covers_the_native_check_without_storing_credentials() {
+        let bridge = claude_bridge("http://127.0.0.1:1234");
+        assert_eq!(bridge["url"], "http://127.0.0.1:1234/mcp");
+        assert!(
+            bridge["timeout"].as_u64().unwrap()
+                > (crate::commands::verification::CHECK_TIMEOUT_SECS
+                    + crate::commands::verification::QUEUE_TIMEOUT_SECS)
+                    * 1000
+        );
+        assert_eq!(
+            bridge["headers"]["Authorization"],
+            "Bearer ${JACKALOPE_BRIDGE_TOKEN}"
+        );
+    }
     #[test]
     fn saved_check_guidance_names_the_permitted_tool_and_preserves_command_data() {
         let command = "node --check \"a b.mjs\" && node --test";
@@ -256,8 +269,8 @@ mod tests {
     fn counts_unique_calls_without_storing_arguments_or_double_counting_stream_updates() {
         let mut metrics = Efficiency::default();
         let event = serde_json::json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":"a","name":"Bash","input":{"secret":"never store"}}]}});
-        metrics.observe(&event, "claude");
-        metrics.observe(&event, "claude");
+        metrics.observe(&event, "claude", "");
+        metrics.observe(&event, "claude", "");
         assert_eq!(metrics.tool_calls["Bash"], 1);
         let saved = serde_json::to_string(&metrics).unwrap();
         assert!(!saved.contains("secret"));
@@ -285,6 +298,7 @@ mod tests {
                     {"type":"tool_use","id":format!("call-{index}"),"name":"read_file","input":input}
                 ]}}),
                 "grok",
+                "",
             );
         }
         assert_eq!(

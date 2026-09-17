@@ -78,13 +78,16 @@ pub(in crate::commands) fn opencode_config(
         config["mcp"] = json!({});
     }
     for (name, server) in servers {
-        let entry = if let Some(program) = server["command"].as_str() {
+        let mut entry = if let Some(program) = server["command"].as_str() {
             let mut args = vec![json!(program)];
             args.extend(server["args"].as_array().into_iter().flatten().cloned());
             json!({"type":"local","command":args,"environment":server["env"],"enabled":true})
         } else {
             json!({"type":"remote","url":server["url"],"headers":headers(server,command)?,"enabled":true})
         };
+        if let Some(timeout) = server["timeout"].as_u64() {
+            entry["timeout"] = json!(timeout);
+        }
         config["mcp"][name] = entry;
     }
     Ok(config.to_string())
@@ -98,7 +101,7 @@ mod tests {
     fn project_tools_preserve_arguments_profiles_and_header_credentials() {
         let servers = json!({
             "local": {"command":"node","args":["a path/tool.js"],"env":{"MODE":"read"}},
-            "remote": {"type":"http","url":"https://example.invalid/mcp","bearer_token_env_var":"JACKALOPE_TEST_TOKEN"},
+            "remote": {"type":"http","url":"https://example.invalid/mcp","bearer_token_env_var":"JACKALOPE_TEST_TOKEN","timeout":2220000},
             "legacy": {"type":"sse","url":"https://example.invalid/sse"}
         });
         let servers = servers.as_object().unwrap();
@@ -127,6 +130,8 @@ mod tests {
         assert_eq!(config["model"], "provider/model");
         assert_eq!(config["mcp"]["existing"]["enabled"], false);
         assert_eq!(config["mcp"]["local"]["command"][1], "a path/tool.js");
+        assert_eq!(config["mcp"]["remote"]["timeout"], 2220000);
+        assert!(config["mcp"]["local"].get("timeout").is_none());
         command.env_remove("JACKALOPE_TEST_TOKEN");
         assert!(acp_servers(servers, &command).is_err());
         command.env("OPENCODE_CONFIG_CONTENT", "invalid");

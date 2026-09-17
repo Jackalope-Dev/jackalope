@@ -267,7 +267,24 @@ impl TaskRun {
             session_id: self.session_id.clone(),
             result: Default::default(),
             details_omitted: true,
-            activity: Default::default(),
+            activity: if ["starting", "running", "stopping"].contains(&self.status.as_str()) {
+                self.activity
+                    .iter()
+                    .rev()
+                    .take(3)
+                    .rev()
+                    .map(|text| {
+                        text.lines()
+                            .next()
+                            .unwrap_or_default()
+                            .chars()
+                            .take(240)
+                            .collect()
+                    })
+                    .collect()
+            } else {
+                Default::default()
+            },
             diagnostics: Default::default(),
             error: self.error.clone(),
             persistence_error: self.persistence_error.clone(),

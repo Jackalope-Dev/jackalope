@@ -52,51 +52,6 @@
 .task-progress-action {
   margin-left: auto;
 }
-.task-progress-live {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-top: 1px solid var(--color-border-subtle);
-  padding: 12px 20px;
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  min-width: 0;
-}
-.task-progress-live svg {
-  flex-shrink: 0;
-  color: var(--color-accent-ink);
-  animation: task-progress-spin 1.2s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .task-progress-live svg {
-    animation: none;
-  }
-}
-@keyframes task-progress-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.task-progress-live-step {
-  color: var(--color-text-primary);
-  font-weight: 500;
-  flex-shrink: 0;
-}
-.task-progress-live-detail {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  flex: 1;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: var(--text-xs);
-}
-.task-progress-live-elapsed {
-  margin-left: auto;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
 .task-progress-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -302,14 +257,6 @@
   .task-progress-art {
     width: auto;
     flex-basis: auto;
-  }
-  .task-progress-live {
-    flex-wrap: wrap;
-    padding: 12px 16px;
-  }
-  .task-progress-live-detail {
-    flex-basis: 100%;
-    order: 1;
   }
   .task-progress-steps,
   .task-progress-steps[data-count="4"] {

@@ -31,6 +31,7 @@ import { MergeReview } from '../tasks/MergeReview';
 import { ProjectVerification } from '../tasks/ProjectVerification';
 import { ReviewProgress } from '../tasks/ReviewProgress';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
+import { TaskLiveActivity } from '../tasks/TaskLiveActivity';
 import { TaskPreview } from '../tasks/TaskPreview';
 import { TaskUsefulness } from '../tasks/TaskUsefulness';
 import { Button } from '../ui/button';
@@ -384,7 +385,7 @@ export function LiveSessionView({
                   </div>
                 );
               })}
-              {active && !active.result && (
+              {active && (
                 <div className="live-working">
                   <span className="live-mascot">
                     <AgentCharacter
@@ -392,12 +393,7 @@ export function LiveSessionView({
                       state={questions.length ? 'waiting' : 'working'}
                     />
                   </span>
-                  <span className="live-muted">
-                    {active.finishing
-                      ? 'Checking changes'
-                      : active.progress?.label ||
-                        (active.status === 'starting' ? 'Preparing workspace' : 'Working')}
-                  </span>
+                  <TaskLiveActivity run={active} />
                 </div>
               )}
               {questions.map((prompt) => (

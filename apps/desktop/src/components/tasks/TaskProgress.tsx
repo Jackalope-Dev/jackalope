@@ -1,11 +1,12 @@
 import { Badge } from '@jackalope/ui';
-import { ArrowUpRight, LoaderCircle } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { ArrowUpRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { taskAgents } from '../../lib/agent-provider';
-import { elapsedLabel, isActive, type TaskRun } from '../../lib/task-runtime';
+import { isActive, type TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
 import { AgentStack } from '../agents/AgentAvatar';
 import { Button } from '../ui/button';
+import { TaskLiveActivity } from './TaskLiveActivity';
 export function TaskProgress({
   run,
   integrated,
@@ -22,13 +23,6 @@ export function TaskProgress({
   verifyCommand?: string;
 }) {
   const active = isActive(run);
-  const progress = active ? run.progress : null;
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (!progress) return;
-    const timer = setInterval(() => tick((value) => value + 1), 1000);
-    return () => clearInterval(timer);
-  }, [progress]);
   const decision = taskDecision(run, integrated, verifyCommand);
   const agents = taskAgents(run);
   const presence = pending ? 'waiting' : active ? 'working' : 'idle';
@@ -51,26 +45,10 @@ export function TaskProgress({
         </div>
         {action && <div className="task-progress-action">{action}</div>}
       </div>
-      {progress && (
-        <p className="task-progress-live" role="status">
-          <LoaderCircle size={14} aria-hidden="true" />
-          <span className="task-progress-live-step">
-            {progress.label}
-            {progress.attempt > 1 && ` · attempt ${progress.attempt}`}
-          </span>
-          {progress.detail && (
-            <span className="task-progress-live-detail" title={progress.detail}>
-              {progress.detail}
-            </span>
-          )}
-          <span className="task-progress-live-elapsed" aria-hidden="true">
-            {elapsedLabel(progress.startedAt)}
-          </span>
-        </p>
-      )}
+      <TaskLiveActivity run={run} />
       {active && !!run.activity.length && (
-        <Button variant="ghost" className="task-progress-activity" onClick={onActivity}>
-          <span>{run.activity.at(-1)?.trim().split('\n')[0] || 'View latest activity'}</span>
+        <Button variant="outline" className="task-progress-activity" onClick={onActivity}>
+          <span>View activity</span>
           <ArrowUpRight size={16} />
         </Button>
       )}

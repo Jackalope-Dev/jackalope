@@ -40,6 +40,7 @@ import { MergeReview } from './MergeReview';
 import { ProjectVerification } from './ProjectVerification';
 import { RunStatus } from './RunStatus';
 import { TaskActivity } from './TaskActivity';
+import { TaskLiveActivity } from './TaskLiveActivity';
 import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { UserPromptCard } from './UserPromptCard';
@@ -359,9 +360,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                       {getAgentMetadata(work.planner.agent)?.name ?? work.planner.agent}
                     </span>
                     <h2>Planning your task</h2>
-                    <p className="managed-agent-update" role="status">
-                      {taskDecision(work.planner).label}
-                    </p>
+                    <TaskLiveActivity run={work.planner} />
                   </div>
                   <Button variant="outline" onClick={() => openActivity(work.planner as TaskRun)}>
                     <Activity size={16} aria-hidden="true" /> View activity
@@ -706,6 +705,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                   </Button>
                 )}
               </div>
+              <TaskLiveActivity run={activityRun} />
               <TaskActivity entries={activityRun.activity} active={isActive(activityRun)} />
             </>
           ) : (
@@ -749,18 +749,22 @@ function ManagedAssignments({
               {getAgentMetadata(run?.agent ?? item.agent)?.name ?? 'Automatic'}
             </span>
             <h3>{item.title}</h3>
-            <p className="managed-agent-update" role={run && isActive(run) ? 'status' : undefined}>
-              {item.error ||
-                (run
-                  ? run.error || taskDecision(run, work.integrated).label
-                  : item.canceled
-                    ? 'Canceled'
-                    : work.paused
-                      ? 'Paused'
-                      : item.dependencies.length
-                        ? 'Waiting for earlier steps'
-                        : 'Queued')}
-            </p>
+            {run && isActive(run) ? (
+              <TaskLiveActivity run={run} />
+            ) : (
+              <p className="managed-agent-update">
+                {item.error ||
+                  (run
+                    ? run.error || taskDecision(run, work.integrated).label
+                    : item.canceled
+                      ? 'Canceled'
+                      : work.paused
+                        ? 'Paused'
+                        : item.dependencies.length
+                          ? 'Waiting for earlier steps'
+                          : 'Queued')}
+              </p>
+            )}
           </div>
           <div className="managed-task-actions">
             {run && (
