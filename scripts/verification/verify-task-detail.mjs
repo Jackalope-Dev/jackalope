@@ -229,12 +229,21 @@ try {
   await page.evaluate(() =>
     window.taskFixture.scenario('review', { result: 'Keyboard search is ready.' }),
   );
-  for (const width of [1280, 960, 680]) {
+  for (const width of [1920, 1280, 960, 680]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const appearance of ['light', 'dark']) {
       await page.evaluate((value) => window.taskFixture.theme(value), appearance);
+      const originalBounds = await tabs.boundingBox();
       for (const name of ['Result', 'Review', 'Preview', 'Activity']) {
         await tabs.getByRole('tab', { name, exact: true }).click();
+        const bounds = await tabs.boundingBox();
+        assert.ok(Math.abs(bounds.x - originalBounds.x) < 1, `${name} keeps the left gutter`);
+        assert.ok(
+          Math.abs(bounds.width - originalBounds.width) < 1,
+          `${name} keeps the page width`,
+        );
+        const frame = await page.locator('.task-detail').boundingBox();
+        assert.ok(frame.width >= width - 18, 'Task details fill the available width');
         if (name === 'Review')
           await page.getByRole('region', { name: 'Code changes', exact: true }).waitFor();
         assert(

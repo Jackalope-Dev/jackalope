@@ -7,7 +7,7 @@
   background: var(--color-bg);
 }
 .daily-work {
-  width: min(100%, 760px);
+  width: 100%;
   align-self: center;
   display: grid;
   gap: 12px;
@@ -317,21 +317,20 @@
   container-type: inline-size;
   container-name: session-canvas;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .live-hub-canvas > .live-session {
   flex: 1;
 }
 .live-start {
   width: 100%;
-  max-width: 660px;
-  padding: 24px 32px;
+  padding: 24px var(--workspace-gutter, 32px);
   margin: clamp(16px, 4vh, 40px) auto 0;
   text-align: center;
   flex: none;
 }
 .live-start + .daily-work {
-  max-width: 660px;
-  padding: 8px 32px 24px;
+  padding: 8px var(--workspace-gutter, 32px) 24px;
 }
 .live-start-mark {
   width: 88px;
@@ -556,19 +555,19 @@
   }
 }
 
-.live-columns[data-review="true"] {
+.live-columns[data-result-view="true"] {
   display: flex;
   flex-direction: column;
 }
-.live-columns[data-review="true"] > .live-work {
+.live-columns[data-result-view="true"] > .live-work {
   order: 0;
   flex: 1;
   border-left: 0;
 }
-.live-columns[data-review="true"] > .live-conversation {
+.live-columns[data-result-view="true"] > .live-conversation {
   order: 1;
   flex: none;
 }
-.live-columns[data-review="true"] .live-transcript {
+.live-columns[data-result-view="true"] .live-transcript {
   display: none;
 }

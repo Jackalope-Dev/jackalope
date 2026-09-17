@@ -575,8 +575,8 @@ button:disabled {
 }
 .task-page {
   padding: 32px var(--workspace-gutter, 32px) 48px;
-  max-width: 1280px;
-  margin-inline: auto;
+  max-width: none;
+  margin-inline: 0;
 }
 .planning-page {
   display: flex;
@@ -732,8 +732,8 @@ button:disabled {
 .workspace-page {
   width: 100%;
   padding: 32px;
-  max-width: 1200px;
-  margin-inline: auto;
+  max-width: none;
+  margin-inline: 0;
 }
 
 .workspace-shell .workspace-canvas > :is(.task-page, .workspace-page) {
@@ -742,7 +742,8 @@ button:disabled {
   width: 100%;
   max-width: none;
   margin-inline: 0;
-  padding-inline: max(var(--workspace-gutter, 32px), calc((100% - 1320px) / 2));
+  padding-inline: var(--workspace-gutter, 32px);
+  scrollbar-gutter: stable;
   overflow-y: auto;
 }
 

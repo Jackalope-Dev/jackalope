@@ -29,7 +29,7 @@ window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebvie
  }
  if(command==='project_git_policy')return args.policy||{attribution:'agent',name:'Fixture',email:'fixture@example.invalid',cleanupAfterMerge:true,autoCheckpoint:true};
  if(command==='routing_settings')return {mode:'agent',defaultMode:'agent',projectMode:null,jevFallback:'local',connected:false,hasKey:false,checkedAt:null,storageError:null,revision:0};
- if(command==='queue_snapshot')return {items:[],mergedRunIds:[]};
+ if(command==='queue_snapshot')return {items:[],mergedRunIds:[],enabledProjects:[]};
  return null;
 }};
 useProjectStore.setState({projects:overview?[project,{...project,id:'second',name:'Second',path:'C:/Fixture/second'}]:[],activeProjectId:'atlas'});
@@ -277,13 +277,17 @@ try {
   await page.getByText('Uncommitted changes', { exact: true }).waitFor();
   await page.evaluate(() => window.setupFixture.pending['C:/Fixture/atlas'].resolve(''));
   assert.equal(await page.getByText('Working tree clean', { exact: true }).count(), 0);
+  await page.evaluate(() => delete window.setupFixture.pending['C:/Fixture/second']);
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/second']);
   await page.evaluate(() =>
     window.setupFixture.pending['C:/Fixture/second'].reject(new Error('Offline fixture')),
   );
   await page.getByText('Setup unavailable', { exact: true }).waitFor();
   assert.equal(await page.getByText('Working tree clean', { exact: true }).count(), 0);
+  await page.evaluate(() => delete window.setupFixture.pending['C:/Fixture/second']);
   await page.getByRole('button', { name: 'Retry repository check' }).click();
+  await page.waitForFunction(() => !!window.setupFixture.pending['C:/Fixture/second']);
   await page.evaluate(() => window.setupFixture.pending['C:/Fixture/second'].resolve(''));
   await page.getByText('Working tree clean', { exact: true }).waitFor();
   assert.deepEqual(errors, []);

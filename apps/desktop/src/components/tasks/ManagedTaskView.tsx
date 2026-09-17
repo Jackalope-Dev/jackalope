@@ -219,11 +219,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     />
   );
   return (
-    <WorkspacePage
-      ref={pageRef}
-      className="managed-task workspace-stack"
-      data-review={viewTab === 'review' || undefined}
-    >
+    <WorkspacePage ref={pageRef} className="managed-task workspace-stack">
       <Button
         className="self-start"
         variant="outline"

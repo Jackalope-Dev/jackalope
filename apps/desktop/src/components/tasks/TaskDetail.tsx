@@ -477,7 +477,7 @@ export function TaskDetail({
       </WorkspacePage>
     );
   return (
-    <WorkspacePage className="task-detail" data-review={tab === 'changes' || undefined}>
+    <WorkspacePage className="task-detail">
       <div className="task-detail-navigation">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft size={16} />

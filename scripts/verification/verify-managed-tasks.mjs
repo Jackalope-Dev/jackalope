@@ -539,7 +539,20 @@ try {
       });
       const review = page.getByRole('button', { name: 'Review changes', exact: true });
       await review.waitFor();
-      assert.equal(await page.getByRole('tablist', { name: 'Planned task views' }).count(), 1);
+      const navigation = page.getByRole('tablist', { name: 'Planned task views' });
+      const originalBounds = await navigation.boundingBox();
+      const frameBounds = await page.locator('.managed-task').boundingBox();
+      assert.ok(frameBounds.width >= width - 18, 'Task pages fill the available workspace');
+      for (const name of ['Review', 'Preview', 'Activity', 'Details', 'Overview']) {
+        await navigation.getByRole('tab', { name, exact: true }).click();
+        const bounds = await navigation.boundingBox();
+        assert.ok(Math.abs(bounds.x - originalBounds.x) < 1, `${name} keeps the same left gutter`);
+        assert.ok(
+          Math.abs(bounds.width - originalBounds.width) < 1,
+          `${name} keeps the same content width`,
+        );
+      }
+      assert.equal(await navigation.count(), 1);
       assert.equal(await page.locator('.managed-task-heading .brand-agent-character').count(), 1);
       await page.getByText('The API and UI now work together.', { exact: false }).waitFor();
       await activity.click();

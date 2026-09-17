@@ -6,10 +6,6 @@
   padding: 44px clamp(24px, 5vw, 72px) 64px;
   color: var(--color-text-primary);
 }
-.task-detail {
-  max-width: 1120px;
-  margin: 0 auto;
-}
 .task-detail > .inline-notice {
   margin-top: 20px;
 }

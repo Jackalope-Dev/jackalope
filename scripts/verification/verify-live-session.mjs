@@ -220,6 +220,11 @@ try {
     .evaluate((el) => el.getBoundingClientRect().width);
   assert.ok(reviewWidth > 800, 'Session review uses the full workspace width');
   assert.equal(await input.isVisible(), true, 'Follow-up stays available during review');
+  const reviewPanel = await page.locator('.live-work').boundingBox();
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  const previewPanel = await page.locator('.live-work').boundingBox();
+  assert.equal(previewPanel.x, reviewPanel.x, 'Preview retains review alignment');
+  assert.equal(previewPanel.width, reviewPanel.width, 'Preview retains the full review width');
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
   await page.evaluate(() => window.sessionFixture.run({ verificationError: 'Check failed' }));
   await page

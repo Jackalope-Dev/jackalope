@@ -306,7 +306,7 @@ export function LiveSessionView({
       <div
         className="live-columns"
         data-expanded={expanded}
-        data-review={(expanded && tab === 'changes') || undefined}
+        data-result-view={(expanded && tab !== 'work') || undefined}
       >
         <div className="live-conversation">
           {!collapsed && (

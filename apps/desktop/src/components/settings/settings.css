@@ -4,9 +4,6 @@
   width: 100%;
   max-width: 340px;
 }
-.appearance-preferences {
-  max-width: 760px;
-}
 .appearance-toolbar-toggle {
   display: flex;
   align-items: center;
@@ -158,6 +155,7 @@
   min-width: 0;
   padding: 32px 32px 40px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   color: var(--color-text-primary);
 }
 
@@ -536,9 +534,6 @@
 }
 .project-preferences {
   min-width: 0;
-}
-.project-preferences > :not(.workspace-heading) {
-  max-width: 760px;
 }
 .project-preferences-section {
   margin-top: var(--workspace-section-gap, 32px);

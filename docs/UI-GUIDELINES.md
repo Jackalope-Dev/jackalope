@@ -27,7 +27,10 @@ WorkspaceHeading for the page title and actions, WorkspaceSectionHeading for
 section titles, and WorkspaceSubnavigation for peer tabs. Keep page headers in
 loading and empty states. Use the shared workspace spacing classes and tokens;
 avoid page-specific padding, title margins and nested page containers. Compact
-forms may constrain their fields without moving the page header.
+forms may constrain individual fields without moving the page header. Workspace pages
+fill the available width with consistent gutters; do not add page-specific width caps
+or change the page width between tabs. Scrollable page containers reserve scrollbar
+space so content length does not shift headings or navigation.
 Give each page a clear purpose and one primary action. Keep filters and details
 near their content. Error and empty states should offer an actionable recovery path.
 
