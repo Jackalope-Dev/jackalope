@@ -50,86 +50,6 @@
   justify-content: flex-start;
   margin-bottom: 0;
 }
-.hero-inline-signup {
-  position: relative;
-  isolation: isolate;
-  margin-top: 18px;
-  border-radius: 10px;
-}
-.hero-inline-signup > .signup {
-  position: relative;
-  z-index: 1;
-  padding: 14px;
-  color: var(--color-text-primary);
-  background: var(--color-bg);
-  border-radius: inherit;
-  box-shadow: 0 18px 42px color-mix(in srgb, var(--color-text-primary) 16%, transparent);
-}
-.hero-inline-signup::before,
-.hero-inline-signup::after {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border: 1px solid color-mix(in srgb, var(--color-accent-ink) 64%, transparent);
-  border-radius: inherit;
-  content: "";
-  pointer-events: none;
-  animation: signup-echo-fold 4.8s cubic-bezier(0.45, 0, 0.25, 1) infinite;
-}
-.hero-inline-signup::before {
-  transform: translate(7px, 3px);
-}
-.hero-inline-signup::after {
-  border-color: color-mix(in srgb, var(--color-accent-ink) 34%, transparent);
-  transform: translate(14px, 6px);
-  animation-name: signup-echo-fold-far;
-}
-@keyframes signup-echo-fold {
-  0%,
-  100% {
-    transform: translate(7px, 3px);
-  }
-  45%,
-  55% {
-    transform: translate(2px, 1px);
-  }
-}
-@keyframes signup-echo-fold-far {
-  0%,
-  100% {
-    transform: translate(14px, 6px);
-  }
-  45%,
-  55% {
-    transform: translate(4px, 2px);
-  }
-}
-.hero-inline-signup .signup label {
-  font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.hero-inline-signup .signup-consent {
-  color: var(--color-text-secondary);
-}
-.hero-inline-signup .signup input[type="email"] {
-  border-radius: 5px;
-}
-.hero-inline-signup .signup-fields .button {
-  border-radius: 5px;
-  border-color: var(--color-accent);
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-  box-shadow: 0 8px 22px var(--color-accent-glow);
-}
-.hero-inline-signup .signup-fields .button:hover {
-  border-color: var(--color-accent-hover);
-  background: var(--color-accent-hover);
-}
-.hero-inline-signup + .landing-text-button {
-  margin-top: 18px;
-}
 .hero-visual {
   position: relative;
   min-width: 0;
@@ -162,36 +82,7 @@
   width: 100%;
   border-radius: 10px 10px 0 0;
 }
-.agent-line {
-  grid-column: 1 / -1;
-  margin-top: 20px;
-  justify-content: flex-start;
-}
-.agent-line p {
-  font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-}
-.agent-line a {
-  right: 0;
-}
-.evidence-rail {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-bottom: 1px solid var(--color-border);
-}
-.evidence-rail > div {
-  min-height: 116px;
-  padding: 28px 24px;
-  border-right: 1px solid var(--color-border);
-}
-.evidence-rail > div:first-child {
-  border-left: 1px solid var(--color-border);
-}
-.evidence-rail small,
-.differentiator-index,
 .acquisition-section-index,
-.acquisition-kind,
 .acquisition-proof-label,
 .acquisition-signals small {
   font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
@@ -199,53 +90,6 @@
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--color-text-muted);
-}
-.evidence-rail strong {
-  display: block;
-  margin-top: 12px;
-  font-size: 13px;
-  line-height: 1.55;
-}
-.differentiators {
-  padding-block: 96px;
-}
-.differentiators-heading {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 60px;
-  align-items: end;
-  margin-bottom: 54px;
-}
-.differentiators-heading p {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-}
-.differentiator-list {
-  border-top: 1px solid var(--color-border);
-}
-.differentiator-row {
-  display: grid;
-  grid-template-columns: 70px minmax(220px, 0.8fr) minmax(0, 1.2fr) auto;
-  gap: 30px;
-  align-items: center;
-  min-height: 150px;
-  border-bottom: 1px solid var(--color-border);
-}
-.differentiator-row h3 {
-  font-size: clamp(22px, 2.2vw, 31px);
-  line-height: 1.25;
-  letter-spacing: -0.05em;
-}
-.differentiator-row p {
-  max-width: 540px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-.differentiator-row a {
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
 }
 .support-disclosure > details[open] > summary {
   border-bottom-color: transparent;
@@ -274,10 +118,6 @@
   font-size: clamp(48px, 6.1vw, 82px);
   line-height: 1.02;
   letter-spacing: -0.065em;
-}
-.acquisition-kind {
-  margin-top: 55px;
-  color: var(--color-accent-ink);
 }
 .acquisition-lede {
   max-width: 650px;
@@ -456,7 +296,6 @@
   }
   .landing-hero-grid,
   .acquisition-hero-grid,
-  .differentiators-heading,
   .acquisition-body {
     grid-template-columns: 1fr;
   }
@@ -471,9 +310,6 @@
   .hero-description {
     font-size: 15px;
   }
-  .hero-inline-signup .signup-fields {
-    flex-direction: column;
-  }
   .hero-visual {
     margin-top: 10px;
   }
@@ -486,31 +322,11 @@
   .hero-window::after {
     display: none;
   }
-  .agent-line {
-    margin-top: 0;
-  }
-  .evidence-rail,
   .acquisition-signals {
     grid-template-columns: 1fr 1fr;
   }
-  .evidence-rail > div,
   .acquisition-signals > span {
     border-top: 1px solid var(--color-border);
-  }
-  .differentiators {
-    padding-block: 68px;
-  }
-  .differentiators-heading {
-    gap: 22px;
-    margin-bottom: 34px;
-  }
-  .differentiator-row {
-    grid-template-columns: 42px 1fr 44px;
-    gap: 16px;
-    padding-block: 26px;
-  }
-  .differentiator-row p {
-    grid-column: 2 / -1;
   }
   .acquisition-hero {
     padding-top: 36px;
@@ -518,9 +334,6 @@
   .acquisition-copy h1 {
     margin-block: 28px 22px;
     font-size: clamp(43px, 12vw, 62px);
-  }
-  .acquisition-kind {
-    margin-top: 32px;
   }
   .acquisition-lede {
     font-size: 15px;
@@ -550,31 +363,17 @@
 }
 
 @media (max-width: 420px) {
-  .hero-inline-signup {
-    margin-inline: 0;
-  }
-  .hero-inline-signup > .signup {
-    padding: 14px;
-  }
   .hero-actions,
   .acquisition-actions {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
   }
-  .evidence-rail,
   .acquisition-signals {
     grid-template-columns: 1fr;
   }
-  .evidence-rail > div,
   .acquisition-signals > span {
     min-height: 78px;
-  }
-  .differentiator-row {
-    grid-template-columns: 34px 1fr;
-  }
-  .differentiator-row a {
-    grid-column: 2;
   }
   .acquisition-proof-label span:last-child {
     display: none;
@@ -585,10 +384,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-inline-signup::before,
-  .hero-inline-signup::after {
-    animation: none;
-  }
   .hero-window,
   .acquisition-proof {
     transform: none;

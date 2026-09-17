@@ -9,7 +9,6 @@
 }
 .managed-task-tabs,
 .managed-overview,
-.managed-detail-panels,
 .managed-activity,
 .managed-assignments {
   display: grid;
@@ -98,14 +97,9 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-.managed-activity-toolbar > .ui-form-field {
-  flex: 1;
-  min-width: min(100%, 240px);
-}
 .managed-activity-toolbar [role="combobox"] {
   max-width: 100%;
 }
-.managed-detail-panels > .ui-panel,
 .managed-attempt-result {
   padding: 20px;
   overflow-wrap: anywhere;
@@ -301,10 +295,6 @@
   .managed-assignment > .managed-task-actions {
     margin-left: 0;
     flex-basis: 100%;
-  }
-  .managed-activity-toolbar > .ui-form-field {
-    flex-basis: calc(100% - 68px);
-    min-width: 0;
   }
   .managed-journey-steps {
     gap: 8px;

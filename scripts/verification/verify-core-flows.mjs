@@ -39,6 +39,9 @@ if(mode) window.__TAURI_INTERNALS__={invoke:async(command,args={})=>{
  if(command==='project_readiness')return {previewCommand:'pnpm run dev -- --port {port} --host 127.0.0.1'};
  if(command==='task_preview_start')return f.preview={running:true,ready:false,port:61234,command:args.command,output:'Starting fixture',exitCode:null};
  if(command==='task_preview_stop'){f.preview=null;return;}
+ if(command==='task_preview_inspect')return {screenshot:{id:'capture',name:'Preview fixture',timestamp:'2026-09-11T12:03:00Z',filePath:'C:/fixture/preview.png',url:'http://127.0.0.1:61234/',width:390,height:640},snapshot:'button Save changes [ref=save]',errors:''};
+ if(command==='task_screenshot')return Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='),c=>c.charCodeAt(0));
+ if(command==='task_preview_inspect_cancel')return;
  if(command==='task_delivery_status')return {head:'local-head',branch:'task/search',changed:true,upstream:'origin/task/search',ahead:1,behind:0,pullRequest:args.remote?{url:'https://github.com/example/example/pull/1',state:'OPEN',headRefOid:'different-head',statusCheckRollup:[{name:'Build',conclusion:'FAILURE'}]}:null,remoteNote:'Fixture state only',checkedAt:'2026-09-11T12:00:00Z'};
  throw new Error('Unexpected fixture command: '+command);
 }};
@@ -50,6 +53,7 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
   page.setDefaultTimeout(15000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.route('**/src/main.tsx*', (route) =>
@@ -102,11 +106,15 @@ try {
     for (const appearance of ['light', 'dark']) {
       await page.evaluate((value) => window.coreFixture.theme(value), appearance);
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      const composer = await page.locator('.live-start-composer').boundingBox();
-      const work = await page.locator('.daily-work').boundingBox();
-      assert.ok(composer.y + composer.height <= work.y, 'Chat must come before attention work');
+      await page.evaluate(() => document.fonts.ready);
+      const { composerBottom, workTop } = await page.evaluate(() => ({
+        composerBottom: document.querySelector('.live-start-composer').getBoundingClientRect()
+          .bottom,
+        workTop: document.querySelector('.daily-work').getBoundingClientRect().top,
+      }));
+      assert.ok(composerBottom <= workTop, 'Chat must come before attention work');
       assert.ok(
-        composer.y + composer.height <= (width === 1280 ? 840 : 640),
+        composerBottom <= (width === 1280 ? 840 : 640),
         'Chat composer must be visible on entry',
       );
       assert.equal(
@@ -233,11 +241,20 @@ try {
     .getByRole('heading', { name: 'Local preview fixture' })
     .waitFor();
   await page.getByRole('button', { name: 'Use phone width' }).click();
-  await page
-    .getByRole('textbox', { name: 'What should change?' })
-    .fill('Make the Save button easier to find.');
-  await page.getByRole('button', { name: 'Add to follow-up' }).click();
+  assert.equal(await page.getByRole('button', { name: 'Add evidence to follow-up' }).count(), 0);
+  await page.getByRole('button', { name: 'Capture evidence', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Element to discuss' }).click();
+  await page.getByRole('option', { name: 'button Save changes [ref=save]', exact: true }).click();
+  await page.getByRole('button', { name: 'Add evidence to follow-up' }).click();
   assert.match(await page.evaluate(() => window.coreFixture.feedback), /phone width.*390px/);
+  assert.match(await page.evaluate(() => window.coreFixture.feedback), /C:\/fixture\/preview.png/);
+  assert.match(await page.evaluate(() => window.coreFixture.feedback), /Save changes \[ref=save\]/);
+  assert.equal(
+    await page.evaluate(
+      () => window.coreFixture.calls.find((call) => call.command === 'task_preview_inspect').narrow,
+    ),
+    true,
+  );
   await page.screenshot({ path: `${output}/preview-feedback.png` });
   await page.getByRole('button', { name: 'Stop preview', exact: true }).click();
   await page.getByRole('button', { name: 'Start preview', exact: true }).waitFor();
@@ -246,7 +263,8 @@ try {
   await page
     .getByText('The PR head differs from the inspected local revision.', { exact: false })
     .waitFor();
-  await page.getByRole('button', { name: 'Prepare a deployment' }).click();
+  await page.getByRole('button', { name: 'More delivery actions' }).click();
+  await page.getByRole('menuitem', { name: 'Prepare a deployment' }).click();
   assert.match(await page.evaluate(() => window.coreFixture.handoff), /Do not commit, push/);
   assert.equal(
     await page.evaluate(() =>

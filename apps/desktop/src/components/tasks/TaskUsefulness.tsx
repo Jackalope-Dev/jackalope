@@ -8,7 +8,7 @@ interface Rating {
   useful: boolean;
   reviewMinutes: number | null;
 }
-export function TaskUsefulness({ runId }: { runId: string }) {
+export function TaskUsefulness({ runId, expanded = false }: { runId: string; expanded?: boolean }) {
   const [rating, setRating] = useState<Rating | null>(null);
   const [minutes, setMinutes] = useState('');
   const [error, setError] = useState('');
@@ -55,7 +55,7 @@ export function TaskUsefulness({ runId }: { runId: string }) {
     }
   };
   return (
-    <Disclosure className="my-4">
+    <Disclosure className="my-4" open={expanded || undefined}>
       <DisclosureSummary>Track result usefulness</DisclosureSummary>
       <div className="space-y-3 py-3">
         <h3>Was this result useful?</h3>

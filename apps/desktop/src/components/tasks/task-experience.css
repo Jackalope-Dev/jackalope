@@ -117,11 +117,6 @@
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
-.task-experience-error {
-  color: var(--color-danger);
-  margin: 12px 0;
-  overflow-wrap: anywhere;
-}
 .task-experience-summary,
 .task-context-instructions > summary {
   min-height: 44px;

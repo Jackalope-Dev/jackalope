@@ -1,24 +1,3 @@
-.codebase-root {
-  margin-top: -12px;
-  margin-bottom: 24px;
-  overflow-wrap: anywhere;
-}
-.codebase-summary {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: 20px;
-}
-.codebase-summary :where(p) span {
-  padding: 0 8px;
-  color: var(--color-text-muted);
-}
-.codebase-summary > span {
-  color: var(--color-text-muted);
-}
 .codebase-toolbar {
   display: flex;
   align-items: center;
@@ -318,30 +297,6 @@
   overflow-wrap: anywhere;
   color: var(--color-accent-ink);
   text-align: left;
-}
-.codebase-check-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 20px;
-  text-align: left;
-  width: 100%;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--color-border);
-  font-size: var(--text-sm);
-  overflow-wrap: anywhere;
-}
-.codebase-check-row span {
-  flex: 1;
-  min-width: 240px;
-}
-.codebase-check-row small {
-  color: var(--color-text-muted);
-}
-.codebase-note {
-  font-size: var(--text-sm);
-  padding: 10px 0;
-  overflow-wrap: anywhere;
 }
 .codebase-page button:focus-visible,
 .codebase-page summary:focus-visible {

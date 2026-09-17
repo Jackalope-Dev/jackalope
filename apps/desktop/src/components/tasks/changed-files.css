@@ -20,6 +20,33 @@
   width: 100%;
   margin-bottom: 8px;
 }
+.changed-files-progress {
+  padding: 8px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.changed-files-progress small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-muted);
+}
+.changed-file-row {
+  display: flex;
+  align-items: start;
+}
+.changed-file-row > button {
+  min-width: 0;
+  flex: 1;
+}
+.changed-file-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  cursor: pointer;
+}
 .changed-files-list button {
   display: flex;
   align-items: start;

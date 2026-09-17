@@ -49,10 +49,14 @@ window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
    if(args.action==='cancel') f.followups=f.followups.filter(item=>item.id!==args.id);
    else f.followups=f.followups.map(item=>item.id===args.id?{...item,paused:false,error:null}:item);
    return;
-  case 'task_review': return { files: ['src/search.ts'], diff: 'diff --git a/src/search.ts b/src/search.ts\\n--- a/src/search.ts\\n+++ b/src/search.ts\\n@@ -1 +1 @@\\n-export const keyboard = false;\\n+export const keyboard = true;\\n', note: 'Changes in this task workspace.' };
+  case 'task_review': return f.review ?? { files: ['src/search.ts'], diff: 'diff --git a/src/search.ts b/src/search.ts\\n--- a/src/search.ts\\n+++ b/src/search.ts\\n@@ -1 +1 @@\\n-export const keyboard = false;\\n+export const keyboard = true;\\n', note: 'Changes in this task workspace.' };
   case 'task_usefulness': return null;
   case 'task_preview_status': return null;
-  case 'task_outcome_snapshot': return 'snapshot';
+  case 'task_outcome_snapshot': return f.tree ?? 'snapshot';
+  case 'task_outcome_review':
+   if(args.review.expectedTree !== (f.tree ?? 'snapshot')) throw new Error('Files changed while you were reviewing.');
+   { const run=useExecutionStore.getState().runs[0]; f.update({contract:{...run.contract,requirements:run.contract.requirements.map(item=>item.id===args.review.requirementId?{...item,receipt:{accepted:args.review.accepted,tree:args.review.expectedTree,note:args.review.note,evidence:args.review.evidence}}:item)}}); }
+   return;
   case 'mcp_list_servers': return [];
   case 'queue_snapshot': return {items: [], mergedRunIds: f.integrated ? ['sample'] : []};
   case 'integration_plans': return [];
@@ -260,6 +264,75 @@ try {
       }
     }
   }
+  await page.setViewportSize({ width: 1280, height: 840 });
+  await tabs.getByRole('tab', { name: 'Review', exact: true }).click();
+  assert.equal(await page.getByRole('tab', { name: 'Review tools', exact: true }).count(), 0);
+  const fileMarker = page.getByRole('checkbox', { name: 'Reviewed: src/search.ts', exact: true });
+  await fileMarker.focus();
+  await page.keyboard.press('Space');
+  assert.equal(await fileMarker.isChecked(), true);
+  await page.getByText('1 of 1 reviewed', { exact: false }).waitFor();
+  await page.reload();
+  await page.evaluate(() => window.taskFixture.scenario('review'));
+  await tabs.getByRole('tab', { name: 'Review', exact: true }).click();
+  assert.equal(await fileMarker.isChecked(), true, 'File tracking survives reopening');
+  await page.evaluate(() => {
+    window.taskFixture.review = {
+      files: ['src/search.ts'],
+      diff: 'Changed patch snapshot',
+      note: '',
+    };
+  });
+  await page.getByRole('button', { name: 'Refresh changes', exact: true }).click();
+  await page.waitForFunction(
+    () => !document.querySelector('[aria-label="Reviewed: src/search.ts"]').checked,
+  );
+  assert.equal(await fileMarker.isChecked(), false, 'Updated changes invalidate old markers');
+  await page.evaluate(() =>
+    window.taskFixture.scenario('review', {
+      contract: {
+        requirements: [
+          { id: 'keys', title: 'Keyboard navigation works', checkpoint: false, receipt: null },
+        ],
+        inputs: {},
+      },
+    }),
+  );
+  await page.getByRole('button', { name: 'Approve work', exact: true }).click();
+  const approval = page.getByRole('dialog', { name: 'Approve work', exact: true });
+  const approveButton = approval.getByRole('button', { name: 'Approve work', exact: true });
+  assert.equal(await approveButton.isDisabled(), true, 'Outcome approval needs evidence');
+  await approval
+    .getByRole('textbox', { name: 'What did you verify?', exact: true })
+    .fill('Tested keyboard navigation in the preview.');
+  await page.evaluate(() => {
+    window.taskFixture.tree = 'new-snapshot';
+  });
+  await approveButton.click();
+  await approval.getByText('Files changed while you were reviewing.', { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(() =>
+      window.taskFixture.calls.some((call) => call.command === 'task_mark_reviewed'),
+    ),
+    false,
+  );
+  await approval.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Approve work', exact: true }).click();
+  await approveButton.click();
+  await approval.waitFor({ state: 'hidden' });
+  assert.equal(
+    await page.evaluate(
+      () => window.taskFixture.calls.filter((call) => call.command === 'task_mark_reviewed').length,
+    ),
+    1,
+  );
+  assert.equal(
+    await page.evaluate(() =>
+      window.taskFixture.calls.some((call) => call.command === 'integration_apply'),
+    ),
+    false,
+    'Approval never merges',
+  );
   await page.evaluate(() =>
     window.taskFixture.scenario('failed', { error: 'Short failure\nLong diagnostic detail' }),
   );

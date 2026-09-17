@@ -479,15 +479,6 @@ pre,
 }
 
 /* Subtle flat gradients */
-.surface-gradient {
-  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-sunken) 100%);
-}
-
-.surface-card {
-  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-surface);
-}
 
 .accent-glow {
   box-shadow: 0 0 15px -2px var(--color-accent-glow);

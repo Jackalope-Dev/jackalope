@@ -24,17 +24,6 @@
 }
 
 /* Top Header Bar */
-.settings-header {
-  height: 64px;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-surface-elevated);
-  flex-shrink: 0;
-  gap: 16px;
-}
 
 .settings-scope-switcher {
   display: inline-flex;
@@ -63,31 +52,6 @@
   background: var(--color-surface-elevated);
   color: var(--color-accent-ink);
   box-shadow: var(--shadow-selection);
-}
-
-.settings-mode-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 8px;
-  font-size: var(--text-xs);
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 140ms;
-}
-
-.settings-mode-pill:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-}
-
-.settings-mode-pill.is-advanced {
-  border-color: var(--color-accent-ink);
-  color: var(--color-accent-ink);
-  background: var(--color-accent-subtle);
 }
 
 /* Main Body Layout: Sidebar + Canvas */
@@ -179,19 +143,6 @@
   margin-bottom: 28px;
 }
 
-.settings-badge-advanced {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-ink);
-}
-
 .settings-input {
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border);
@@ -244,10 +195,6 @@
 }
 
 @media (max-width: 800px) {
-  .settings-dialog {
-    width: 96vw;
-    height: 90vh;
-  }
   .settings-sidebar {
     width: 170px;
   }
@@ -473,9 +420,6 @@
   gap: 12px 20px;
   padding: 8px 0 24px;
 }
-.settings-scope-bar .task-select-trigger {
-  max-width: 280px;
-}
 .settings-scope-pill {
   min-height: 44px;
 }
@@ -548,8 +492,7 @@
 .project-preferences .workspace-heading > div {
   min-width: 0;
 }
-.project-preferences .workspace-heading p,
-.project-settings-identity {
+.project-preferences .workspace-heading p {
   overflow-wrap: anywhere;
 }
 .project-preferences-section > .settings-row {

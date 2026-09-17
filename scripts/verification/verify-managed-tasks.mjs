@@ -541,6 +541,11 @@ try {
       await review.waitFor();
       const navigation = page.getByRole('tablist', { name: 'Planned task views' });
       const originalBounds = await navigation.boundingBox();
+      assert.equal(
+        await page.getByRole('region', { name: 'Task progress', exact: true }).count(),
+        0,
+        'Completed work has no timeline',
+      );
       const frameBounds = await page.locator('.managed-task').boundingBox();
       assert.ok(frameBounds.width >= width - 18, 'Task pages fill the available workspace');
       for (const name of ['Review', 'Preview', 'Activity', 'Details', 'Overview']) {

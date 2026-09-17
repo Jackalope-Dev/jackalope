@@ -12,7 +12,8 @@ release dates.
   Test first-result, visual correction, failed-check recovery, project return and delivery
   with entry developers and power users; measure completion, detours and scope mistakes.
   Include parent-task links, unified Needs you counts, shared file browsing, preview
-  setup explanations and evidence attachment, and blocked-result review.
+  setup explanations and evidence attachment, and blocked-result review. Include optional
+  file markers, outcome approval, and real agent-review requests from the review toolbar.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window

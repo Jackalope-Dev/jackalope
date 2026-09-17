@@ -4,7 +4,6 @@
   width: min(780px, calc(100vw - 48px));
 }
 .capture-destination,
-.work-scope,
 .task-followup-footer {
   display: flex;
   align-items: center;
@@ -21,13 +20,6 @@
 .capture-destination > [role="combobox"] {
   flex: 1;
   min-width: 0;
-}
-.work-scope {
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-.work-scope > [role="combobox"] {
-  min-width: 200px;
 }
 .work-item-action {
   display: inline-flex;
@@ -114,10 +106,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-}
-.capture-dialog .task-composer-note {
-  padding-top: 12px;
-  padding-bottom: 0;
 }
 .capture-dialog .task-composer-footer {
   border-top: 1px solid var(--color-border-subtle);

@@ -117,8 +117,7 @@
   gap: 26px;
   margin-bottom: 15px;
 }
-.landing-text-button,
-.landing-link {
+.landing-text-button {
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -129,8 +128,7 @@
   font-size: 13px;
   font-weight: 550;
 }
-.landing-text-button:hover,
-.landing-link:hover {
+.landing-text-button:hover {
   text-decoration: underline;
   text-underline-offset: 4px;
 }
@@ -152,29 +150,6 @@
 .landing-header .button:hover {
   color: var(--color-on-accent);
   background: var(--color-accent-hover);
-}
-.agent-line {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 75px;
-  border-top: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-}
-.agent-line p {
-  font-size: 14px;
-}
-.agent-line i {
-  padding-inline: 12px;
-  font-style: normal;
-}
-.agent-line a {
-  position: absolute;
-  right: 0;
-  min-height: 44px;
-  min-width: 44px;
-  display: grid;
-  place-items: center;
 }
 .landing-hero :focus-visible,
 .landing-header :focus-visible,
@@ -396,101 +371,6 @@
     translate: 0 0;
   }
 }
-.example-brief {
-  padding: 36px 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 9px 25px;
-  align-items: baseline;
-}
-.example-brief > p {
-  font-size: clamp(23px, 2.5vw, 34px);
-  line-height: 1.5;
-  letter-spacing: -0.045em;
-  max-width: 870px;
-}
-.example-brief > span:last-child {
-  grid-column: 1;
-  font-size: 11px;
-  color: var(--color-text-secondary);
-}
-.example-flow {
-  padding: 32px;
-  display: grid;
-  grid-template-columns: 1fr 40px 1fr;
-  gap: 32px;
-  background: var(--color-surface-sunken);
-  border-radius: 16px;
-}
-.flow-arrow {
-  align-self: center;
-  color: var(--color-text-secondary);
-}
-.step-label {
-  display: block;
-  margin-bottom: 22px;
-  color: var(--color-text-secondary);
-}
-.branch-tracks {
-  display: grid;
-  gap: 12px;
-}
-.branch-tracks > div {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 60px;
-  border-left: 2px solid var(--color-accent);
-  padding: 7px 16px;
-  background: var(--color-bg);
-  border-radius: 0 6px 6px 0;
-}
-.branch-tracks b {
-  font-size: 13px;
-  font-weight: 550;
-  display: block;
-}
-.branch-tracks small {
-  display: block;
-  font-size: 11px;
-  margin-top: 5px;
-  color: var(--color-text-secondary);
-}
-.example-step > p {
-  font-size: 12px;
-  line-height: 1.8;
-  color: var(--color-text-secondary);
-  margin-top: 22px;
-  max-width: 415px;
-}
-.example-patch {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 6px;
-  min-height: 132px;
-  overflow: hidden;
-}
-.example-patch > span {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  font-size: 11px;
-}
-.example-patch > :where(span) > span {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-}
-.example-patch pre {
-  font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
-  font-size: 11px;
-  line-height: 2;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  padding: 4px 18px;
-  color: var(--color-accent-ink);
-}
 .example-note {
   margin-top: 16px;
   color: var(--color-text-secondary);
@@ -503,120 +383,6 @@
 }
 .capabilities :where(.section-lead) h2 {
   grid-column: 1 / -1;
-}
-.capability-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10%;
-  align-items: center;
-  padding-block: 45px;
-  border-bottom: 1px solid var(--color-border);
-}
-.capability-row h3 {
-  font-size: clamp(26px, 2.6vw, 37px);
-  letter-spacing: -0.055em;
-  line-height: 1.3;
-  font-weight: 500;
-  margin-block: 17px;
-}
-.capability-row p {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  max-width: 470px;
-}
-.capability-row small {
-  display: block;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  margin-top: 17px;
-}
-.capability-row .landing-link {
-  margin-top: 16px;
-}
-.capability-art {
-  min-height: 235px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
-}
-.context-stack {
-  padding-inline: 11%;
-}
-.context-stack > span {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--color-border);
-  padding: 13px 20px;
-  background: var(--color-bg);
-  transform: skewY(-6deg);
-  margin-top: -1px;
-}
-.context-stack > span:nth-child(2) {
-  margin-left: 16px;
-  margin-right: -16px;
-}
-.context-stack > span:nth-child(3) {
-  margin-left: 32px;
-  margin-right: -32px;
-}
-.context-stack b {
-  font-size: 26px;
-  letter-spacing: -0.06em;
-  font-weight: 450;
-  display: flex;
-  justify-content: space-between;
-  margin-top: 34px;
-}
-.account-ledger {
-  padding-inline: 8%;
-}
-.account-ledger > div {
-  padding: 20px;
-  border-left: 2px solid var(--color-accent);
-  background: var(--color-shell);
-  margin-block: 5px;
-}
-.account-ledger > div:nth-child(2) {
-  margin-left: 40px;
-  background: var(--color-surface-sunken);
-}
-.account-ledger span {
-  font-size: 11px;
-  display: block;
-  color: var(--color-text-secondary);
-}
-.account-ledger b {
-  display: block;
-  font-size: 14px;
-  margin-top: 12px;
-  font-weight: 450;
-}
-.calendar-art {
-  gap: 24px;
-  text-align: center;
-}
-.calendar-art > div {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-.calendar-art > :where(div) > span {
-  width: 56px;
-  height: 85px;
-  display: grid;
-  place-items: center;
-  font-size: 22px;
-  border-block: 1px solid var(--color-border);
-}
-.calendar-art .calendar-selected {
-  background: var(--color-text-primary);
-  color: var(--color-bg);
-  transform: rotate(-6deg);
-}
-.calendar-art > span {
-  font-size: 11px;
-  color: var(--color-text-secondary);
 }
 .atmosphere-section {
   background: var(--color-shell);
@@ -851,20 +617,8 @@
   }
 }
 @media (max-width: 1100px) {
-  .poster-type h1 {
-    font-size: 7.2vw;
-  }
-
   .hero-actions {
     gap: 17px;
-  }
-
-  .agent-line {
-    gap: 20px;
-  }
-
-  .agent-line i {
-    padding-inline: 6px;
   }
   .product-explorer {
     grid-template-columns: 185px minmax(0, 1fr);
@@ -887,18 +641,6 @@
   .case-tabs button {
     font-size: 12px;
     gap: 16px;
-  }
-  .example-flow {
-    padding: 25px;
-    gap: 20px;
-    grid-template-columns: 1fr 25px 1fr;
-  }
-  .branch-tracks > div {
-    padding-inline: 12px;
-    gap: 10px;
-  }
-  .branch-tracks b {
-    font-size: 12px;
   }
   .atmosphere-layout {
     gap: 40px;
@@ -937,31 +679,13 @@
     margin-top: 28px;
   }
 
-  .poster-type > p {
-    font-size: 17px;
-    margin-top: 22px;
-  }
-
   .echo-caption {
     font-size: 11px;
     bottom: 0;
   }
 
-  .hero-bottom > p {
-    font-size: 13px;
-  }
-
   .hero-actions {
     gap: 25px;
-  }
-
-  .agent-line > span {
-    flex-basis: 100%;
-    font-size: 11px;
-  }
-
-  .agent-line i {
-    padding-inline: 2px;
   }
 
   .workspace-section {
@@ -1051,60 +775,9 @@
   .case-tabs button svg {
     display: none;
   }
-  .example-brief {
-    display: block;
-    padding-block: 26px;
-  }
-  .example-brief > p {
-    margin-block: 14px 10px;
-    font-size: 24px;
-  }
-  .example-brief > span:last-child {
-    font-size: 11px;
-  }
-  .example-flow {
-    grid-template-columns: 1fr;
-    padding: 22px;
-    gap: 25px;
-  }
-  .flow-arrow {
-    rotate: 90deg;
-    width: 22px;
-    height: 22px;
-    justify-self: center;
-  }
-  .step-label {
-    font-size: 11px;
-    margin-bottom: 18px;
-  }
-  .example-step > p {
-    font-size: 11px;
-    margin-top: 18px;
-  }
   .example-note {
     font-size: 11px;
     text-align: left;
-  }
-  .capability-row {
-    grid-template-columns: 1fr;
-    gap: 22px;
-    padding-block: 30px;
-  }
-  .capability-row > div:last-child {
-    grid-row: 1;
-  }
-  .capability-row h3 {
-    font-size: 30px;
-  }
-  .capability-art {
-    min-height: 225px;
-  }
-  .capability-row p {
-    font-size: 12px;
-  }
-  .calendar-art > :where(div) > span {
-    width: 46px;
-    height: 75px;
   }
   .atmosphere-section {
     padding-block: 50px;
@@ -1188,16 +861,6 @@
     font-size: 11px;
     gap: 8px;
   }
-  .example-flow {
-    padding: 16px;
-  }
-  .example-patch > span {
-    padding-inline: 12px;
-  }
-  .example-patch pre {
-    font-size: 11px;
-    padding-inline: 12px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .workbench [role="tabpanel"],
@@ -1208,63 +871,6 @@
   .landing-questions :where(summary) svg,
   .product-tabs :where(button) > svg {
     transition: none;
-  }
-}
-
-.step-label {
-  font-size: 14px;
-  font-weight: 550;
-  color: var(--color-text-primary);
-}
-.capability-art {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  padding-block: 32px;
-  border-radius: 8px;
-}
-.context-stack > span {
-  background: transparent;
-  border-color: currentColor;
-}
-.context-stack b {
-  font-size: 24px;
-}
-.account-ledger > div {
-  border-color: currentColor;
-  background: transparent;
-  border-bottom: 1px solid currentColor;
-}
-.account-ledger > div:nth-child(2) {
-  background: transparent;
-}
-.account-ledger span,
-.calendar-art > span {
-  color: inherit;
-}
-.calendar-art > :where(div) > span {
-  border-color: currentColor;
-}
-.calendar-art .calendar-selected {
-  background: var(--color-on-accent);
-  color: var(--color-accent);
-}
-.branch-tracks > div {
-  animation: branch-enter 300ms ease-out both;
-}
-.branch-tracks > div:nth-child(2) {
-  animation-delay: 75ms;
-}
-.example-patch {
-  animation: branch-enter 350ms 120ms ease-out both;
-}
-@keyframes branch-enter {
-  from {
-    opacity: 0.4;
-    translate: -8px 0;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
   }
 }
 @media (max-width: 1100px) {
@@ -1304,21 +910,6 @@
     font-size: 12px;
     gap: 8px;
   }
-  .agent-line {
-    min-height: 65px;
-  }
-  .agent-line p {
-    font-size: 12px;
-  }
-  .agent-line i {
-    padding-inline: 3px;
-  }
-  .agent-line a {
-    display: none;
-  }
-  .context-stack {
-    padding-inline: 14%;
-  }
 }
 @media (max-width: 360px) {
   .hero-poster h1 {
@@ -1337,14 +928,5 @@
   }
   .landing-text-button {
     font-size: 11px;
-  }
-  .agent-line p {
-    font-size: 11px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .branch-tracks > div,
-  .example-patch {
-    animation: none;
   }
 }

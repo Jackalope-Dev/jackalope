@@ -6,6 +6,15 @@
   gap: 12px;
   margin-bottom: 12px;
 }
+.task-review-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.review-action-dialog {
+  width: min(1000px, calc(100vw - 48px));
+}
 .task-review,
 .task-review-output {
   min-width: 0;
@@ -24,14 +33,12 @@
   font-size: var(--text-xs);
 }
 .task-review-checks,
-.task-review-tools,
 .task-review-delivery {
   display: grid;
   gap: 20px;
   min-width: 0;
 }
 .task-review-checks > * + *,
-.task-review-tools > * + *,
 .task-review-delivery > * + * {
   border-top: 1px solid var(--color-border-subtle);
   padding-top: 20px;

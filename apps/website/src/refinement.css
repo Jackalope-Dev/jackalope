@@ -6,12 +6,6 @@
   font-weight: 600;
   color: var(--color-text-secondary);
 }
-.hero-launch {
-  margin: 18px 0 0;
-  font-size: 13px;
-  color: var(--color-accent-ink);
-  font-weight: 600;
-}
 .landing-hero {
   padding-top: 50px;
 }
@@ -38,65 +32,6 @@
 }
 .hero-description {
   line-height: 1.7;
-}
-.hero-inline-signup::before,
-.hero-inline-signup::after {
-  animation: none;
-}
-.early-access-story {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(32px, 7vw, 100px);
-  padding: 56px;
-  margin-block: 72px;
-  border-radius: 24px;
-  background: var(--color-bg);
-  box-shadow: 0 20px 70px var(--color-accent-glow);
-}
-.early-access-story h2,
-.comparison-teaser h2 {
-  font-size: clamp(30px, 3.5vw, 48px);
-  line-height: 1.1;
-  letter-spacing: -0.05em;
-  margin: 0 0 20px;
-}
-.early-access-story p,
-.comparison-teaser p {
-  color: var(--color-text-secondary);
-  line-height: 1.8;
-}
-.early-access-story .button {
-  margin-top: 18px;
-}
-.early-access-story ol {
-  margin: 0;
-  padding-left: 22px;
-}
-.early-access-story li {
-  padding: 0 0 18px 12px;
-}
-.early-access-story li::marker {
-  color: var(--color-accent-ink);
-  font-weight: 600;
-}
-.early-access-story strong {
-  font-size: 18px;
-}
-.early-access-story :where(li) p {
-  margin: 8px 0;
-  font-size: 14px;
-}
-.comparison-teaser {
-  padding-block: 20px 60px;
-  max-width: 850px;
-  text-align: center;
-}
-.comparison-teaser a {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  color: var(--color-accent-ink);
 }
 .member-navigation {
   display: flex;
@@ -226,10 +161,6 @@
   overflow-y: auto;
 }
 @media (max-width: 1000px) {
-  .early-access-story {
-    padding: 32px;
-    gap: 32px;
-  }
   .hero-window {
     width: 760px;
     transform: none;
@@ -247,11 +178,6 @@
   }
   .hero-window {
     width: 100%;
-  }
-  .early-access-story {
-    grid-template-columns: 1fr;
-    padding: 24px;
-    margin-block: 40px;
   }
   .member-navigation a {
     padding: 10px 12px;

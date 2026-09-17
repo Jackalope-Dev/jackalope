@@ -51,9 +51,6 @@
   font-size: 16px;
   margin-top: 26px;
 }
-.landing-story .hero-launch {
-  font-size: 12px;
-}
 .landing-story .hero-conversion {
   padding-top: 26px;
 }
@@ -146,46 +143,6 @@
 .hero-film-cue > span:last-child {
   color: var(--color-text-secondary);
   white-space: nowrap;
-}
-.landing-story .agent-line {
-  margin-top: 0;
-  min-height: 62px;
-}
-.journey-rail {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 40px;
-  padding-block: 34px;
-  border-bottom: 1px solid var(--color-border);
-}
-.journey-rail a {
-  display: block;
-  min-height: 80px;
-}
-.journey-rail strong {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  font-size: clamp(16px, 1.7vw, 23px);
-  font-weight: 550;
-  letter-spacing: -0.04em;
-}
-.journey-rail svg {
-  flex-shrink: 0;
-  color: var(--color-accent-ink);
-  transition: transform 200ms ease;
-}
-.journey-rail :where(a:hover) svg {
-  transform: translateX(5px);
-}
-.journey-rail span {
-  display: block;
-  max-width: 300px;
-  margin-top: 12px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--color-text-secondary);
 }
 .landing-story .workflow-story {
   padding-block: 84px;
@@ -302,15 +259,6 @@
 }
 .landing-story .product-tabs button[data-state="active"] {
   color: var(--color-accent-ink);
-}
-.landing-story .differentiators {
-  padding-block: 90px;
-}
-.landing-story .early-access-story {
-  border-radius: 0;
-  border-block: 1px solid var(--color-border);
-  box-shadow: none;
-  padding-inline: 0;
 }
 .landing-story .atmosphere-section {
   position: relative;
@@ -587,9 +535,6 @@
     align-items: start;
     flex-direction: column;
   }
-  .journey-rail {
-    gap: 24px;
-  }
 }
 @media (max-width: 760px) {
   .landing-story .landing-hero {
@@ -623,25 +568,6 @@
     width: 100%;
     transform: none;
   }
-  .journey-rail {
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding-block: 12px;
-  }
-  .journey-rail a {
-    padding-block: 20px;
-    min-height: 44px;
-  }
-  .journey-rail a + a {
-    border-top: 1px solid var(--color-border-subtle);
-  }
-  .journey-rail strong {
-    font-size: 22px;
-  }
-  .journey-rail span {
-    max-width: none;
-    margin-top: 6px;
-  }
   .landing-story .workflow-story {
     padding-block: 50px;
   }
@@ -659,9 +585,6 @@
   }
   .landing-story .workspace-heading {
     gap: 18px;
-  }
-  .landing-story .differentiators {
-    padding-block: 50px;
   }
   .landing-story .atmosphere-section {
     padding-block: 50px;
@@ -684,8 +607,7 @@
   .landing-story .hero-window,
   .landing-story .hero-window:hover,
   .landing-story .hero-window:focus-visible,
-  .landing-story .atmosphere-window,
-  .journey-rail svg {
+  .landing-story .atmosphere-window {
     transform: none;
     transition: none;
   }

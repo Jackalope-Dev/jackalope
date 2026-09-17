@@ -1,9 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { multiAgentPlanningPrompt } from '../src/lib/feature-plan.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { savedPlanDraft } from '../src/lib/schedules.ts';
 import { VETTED_SKILLS } from '../src/lib/skills/catalog.ts';
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
+
+test('repository planning keeps the complete objective and only available agent choices', () => {
+  const goal = 'Build a feature\nKeep every constraint';
+  const prompt = multiAgentPlanningPrompt(goal, [
+    { id: 'fixture', available: true },
+    { id: 'missing', available: false },
+  ]);
+  assert.ok(prompt.includes(goal));
+  assert.ok(prompt.includes('actual repository paths'));
+  assert.ok(prompt.includes('independent work in parallel'));
+  assert.ok(prompt.includes('fixture'));
+  assert.ok(!prompt.includes('missing'));
+});
 
 test('prepared ideas restore editable guidelines without nesting prompts or losing custom instructions', () => {
   const skill = VETTED_SKILLS[0];
@@ -204,7 +218,7 @@ test('manual planning never claims execution and questions or unsaved results ne
   );
 });
 
-import { effortFor, effortPrompt, suggestedRunner } from '../src/lib/task-effort.ts';
+import { effortFor, effortPrompt } from '../src/lib/task-effort.ts';
 
 test('task effort is restored with the idea without nesting guidance in the editable intent', () => {
   const draft = planningDraft({
@@ -220,16 +234,4 @@ test('task effort is restored with the idea without nesting guidance in the edit
   assert.match(effortPrompt('quick'), /relevant checks/);
   assert.match(effortPrompt(draft.effort), /separate review pass/);
   assert.notEqual(effortPrompt('quick'), effortPrompt('balanced'));
-});
-
-test('automatic agent selection uses an available preference and never leaves the allowed roster', () => {
-  const runners = [
-    { id: 'preferred', available: false },
-    { id: 'default', available: true },
-    { id: 'other', available: true },
-  ];
-  assert.equal(suggestedRunner(runners, 'preferred', 'default').id, 'default');
-  assert.equal(suggestedRunner(runners, 'other', 'default').id, 'other');
-  assert.equal(suggestedRunner(runners, 'disabled', 'missing').id, 'default');
-  assert.equal(suggestedRunner([], 'preferred', 'default'), undefined);
 });

@@ -337,26 +337,6 @@
   padding: 18px 20px 20px;
 }
 
-.agent-config-heading,
-.agent-config-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.agent-config-heading {
-  justify-content: space-between;
-  gap: 12px 24px;
-  margin-bottom: 8px;
-}
-
-.agent-config-identity {
-  flex: 1 1 240px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .agent-config-fields,
 .agent-manual-form {
   display: grid;
@@ -464,12 +444,6 @@
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-}
-
-.agent-chooser {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 .agent-support-grid {
   display: flex;

@@ -322,7 +322,10 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           }
         />
       </div>
-      {viewTab !== 'review' && <ManagedTaskJourney task={task} work={work} />}
+      {(!hasResult || work.active.length > 0) && <ManagedTaskJourney task={task} work={work} />}
+      {hasResult && !work.active.length && work.interfaceIssue && (
+        <InlineNotice>{work.interfaceIssue}</InlineNotice>
+      )}
       {(error || queueError || task.error) && (
         <InlineNotice tone="error">{error || queueError || task.error}</InlineNotice>
       )}

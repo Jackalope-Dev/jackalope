@@ -10,108 +10,22 @@ aligned with this guide when capabilities or priorities change.
 
 ## Built: the local workspace
 
-The website download page brings desktop platform availability, waitlist signup
-and friend-pass guidance together. Acceptance emails open its confirmation flow;
-unpublished platforms stay Coming soon. Release and delivery acceptance remain open.
+- Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
+  Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
+- Provider accounts, model/effort choices, capacity-aware routing and usage reporting.
+  Decisions can use local rules, an agent or optional Jev assistance.
+- Scoped parallel coordination, dependency snapshots, bounded verification repairs
+  and provider delegation with sequential fallback.
+- Recurring schedules, local change monitors, project lessons, codebase maps, MCP
+  connections, browser tools and Ask Jackalope.
+- Shared appearance, guided setup, history recovery, archiving and optional local
+  usefulness ratings. Optional local-model setup checks editing and continuation.
+- Account connection, waitlist/referral progress, platform download guidance and
+  optional settings sync, feedback and reporting.
 
-Verified waitlist members can connect the desktop, track their queue position and
-referrals, copy their share link and explore the website and tour. Connections
-persist and detect approval; native execution remains approval-gated. Deployed
-and installed acceptance are still required.
-
-Work discovery unifies tasks and chats with explicit project scope, remembered
-views and task/project command search. Tasks opens Chat first; Inbox holds the work
-list. Work rows show each agent's character, live or next-action status and who is
-working now. Isolated results keep review, merge into the target branch and workspace
-cleanup together. Concise task titles, output-first results and diff-first review reduce
-navigation and keep checks, evidence and optional tools close to the changes.
-Project overview surfaces unfinished work and
-local delivery receipts. Task follow-up stays visible through review, with a saved queue
-and explicit stop-and-send while work runs. Queues pause after failure or restart. Preview setup,
-HTTP readiness, sandboxed local pages and fresh browser evidence capture are implemented.
-Delivery reads local Git and optional GitHub PR/CI state and prepares editable handoff
-drafts. Remote publication and deployment still require explicit user action; installed
-acceptance and usability trials remain open.
-
-Live sessions start from a message in Chat, name themselves and group
-history automatically. They capture messages during execution and process ordered
-batches in a shared isolated worktree. A compact detachable window, always-on-top
-pin, persistent drafts, agent results and cumulative patch exports are implemented. Sessions pause
-after restart. Paused sessions use guarded review, verification, merge and cleanup;
-applied receipts prevent further dispatch into the integrated workspace. A new chat can
-carry forward the result. Optional batch and estimated-cost thresholds pause later work;
-they cannot cap provider billing. Installed acceptance remains open; managed task
-planning has a separate reviewed lifecycle.
-
-Six project-setup steps with Git behavior, appearance and automatic command detection
-are implemented, alongside cross-project attention on Chat, remembered task sections
-and changes since the last review.
-Issue, PR-feedback, CI-repair and dependency-update starters prepare editable requests;
-GitHub evidence is read-only. Lesson receipts explain selection, and optional local
-usefulness ratings and review minutes stay local to each task.
-Real daily-use and quality improvements still require observed trials.
-
-Usage & quota brings account limits, reported tokens, task breakdowns and export
-together on one page. Project lessons are managed in Project → Context.
-
-Jackalope Decisions provides project-scoped local rules, agent-powered decisions and
-optional Jev-assisted routing with protected device keys and visible usage. Jev
-fallback uses local rules by default or an explicitly selected agent attempt. Jev
-quality/cost calibration and installed cross-platform acceptance remain in progress.
-
-Task submission can assess focused work, investigation or a reviewed plan using
-the project's Decisions preference. Plans keep scoped assignments, retained attempts
-and usage under one parent. New plans combine completed work progressively, resolve
-overlapping changes in isolated workspaces and attempt bounded repairs of failed checks.
-One result keeps preview, combined checks and outcome review together before explicit
-application. Focused review time and elapsed delivery time remain distinct. Local fast paths
-and cached assessments avoid repeated model calls. Installed-provider acceptance
-and held-out cost/quality comparisons remain open.
-
-Optional local-agent setup includes hardware guidance, download choices and a real
-file/session check before connecting OpenCode to Ollama. Model-free help retrieval
-and compact routing inputs preserve all eligible choices. See [local AI](LOCAL-AI.md)
-for setup and context-selection behavior; real-model and installed acceptance remain open.
-Optional installed title models have separate checks. Managed local helpers can
-reuse bounded authenticated servers; worker task credentials remain isolated.
-Concurrent capacity reads, equivalent-model account selection, symbol-aware
-repository maps and lighter durable output saves reduce repeated setup work.
-Latency receipts preserve failures and missing measurements; installed performance
-and representative quality acceptance remain in progress.
-
-Kimi Code joins the native adapters with accounts, models, permissions, structured
-questions, continuation, task tokens, membership capacity, routing and Ask Jackalope.
-Kimi and OpenCode accept direct project MCP connections. Grok model discovery and
-Antigravity subscription capacity are implemented. Gemini CLI supports headless worker
-tasks, streamed activity and saved-session continuation with provider-controlled permissions.
-Installed-agent acceptance remains
-in progress; provider-specific reporting and permission boundaries still apply.
-
-Projects, agent accounts, tasks, queues, Git worktrees, checks and reviewed
-integration are implemented. Task cleanup includes individual and bulk archiving
-with undo and restore while retaining results and workspaces. The workspace also includes schedules, local change
-monitors, MCP connections, browser sessions, project lessons, codebase maps,
-capacity-aware routing and Ask Jackalope. Provider and platform limits apply;
-implementation does not establish release acceptance.
-
-Repository-aware plans preserve full requests; optional verified predecessor snapshots,
-critical-path admission, structured reports, workspace verification reservations and
-execution timing are implemented. Durable ownership handoffs, explicit interface
-agreements and changed-file scope reviews gate dependent work and integration. Optional
-agent reconciliation and verified local merges keep source worktrees and recovery receipts. Repeated [execution evaluations](EXECUTION-EVALUATION.md)
-and installed acceptance are required before claiming throughput or quality gains.
-
-Requests continuing with one lead can delegate through available provider subagent
-tools, with sequential fallback and combined-result responsibility. Provider execution
-and quality acceptance remain open.
-
-Process-scoped model effort requests for Codex/Claude, usage attribution and direct-CLI
-quality comparisons are implemented. Broader independent evaluation and automatic
-effort escalation remain open; see [agent quality](AGENT-QUALITY.md).
-
-App-wide usage trends connect project, agent and task spending to saved outcomes.
-Routing overhead, missing reports and undated helper usage remain explicit.
-See [usage accounting](USAGE-AND-ROUTING.md) for coverage and attribution limits.
+These capabilities describe source behavior. Provider, platform, delivery and
+installed-app acceptance remain separate. See [current capabilities and limits](STATUS.md)
+for the detailed inventory and [contributor priorities](TODO.md) for outstanding checks.
 
 ## In progress: dependable everyday use
 

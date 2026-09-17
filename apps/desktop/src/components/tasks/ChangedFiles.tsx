@@ -1,6 +1,8 @@
-import { Input } from '@jackalope/ui';
+import { Checkbox, Input } from '@jackalope/ui';
 import { FileCode2, Files } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { reviewFingerprint } from '../../lib/review-fingerprint';
+import { useFileReviewStore } from '../../stores/fileReviewStore';
 import { DiffPreview } from './DiffPreview';
 import './changed-files.css';
 
@@ -8,11 +10,19 @@ export function ChangedFiles({
   files,
   patch,
   visible = true,
+  reviewId,
 }: {
   files: string[];
   patch: string;
   visible?: boolean;
+  reviewId?: string;
 }) {
+  const revision = useMemo(
+    () => `${reviewId}:${reviewFingerprint(JSON.stringify(files) + patch)}`,
+    [reviewId, files, patch],
+  );
+  const reviewed = useFileReviewStore((state) => state.reviewed[revision]);
+  const mark = useFileReviewStore((state) => state.mark);
   const [selected, setSelected] = useState('');
   const [search, setSearch] = useState('');
   const file = files.includes(selected) ? selected : '';
@@ -21,6 +31,12 @@ export function ChangedFiles({
     <div className="changed-files">
       {files.length > 0 && (
         <nav className="changed-files-list" aria-label="Changed files">
+          {reviewId && (
+            <p className="changed-files-progress" role="status">
+              {files.filter((path) => reviewed?.includes(path)).length} of {files.length} reviewed
+              <small>Optional · resets when changes update</small>
+            </p>
+          )}
           {files.length > 1 && (
             <Input
               aria-label="Filter changed files"
@@ -39,20 +55,30 @@ export function ChangedFiles({
             const parts = path.split('/');
             const name = parts.pop();
             return (
-              <button
-                key={path}
-                type="button"
-                aria-label={path}
-                aria-pressed={file === path}
-                title={path}
-                onClick={() => setSelected(path)}
-              >
-                <FileCode2 size={15} aria-hidden="true" />
-                <span>
-                  {name}
-                  {parts.length > 0 && <small>{parts.join('/')}</small>}
-                </span>
-              </button>
+              <div key={path} className="changed-file-row">
+                <button
+                  type="button"
+                  aria-label={path}
+                  aria-pressed={file === path}
+                  title={path}
+                  onClick={() => setSelected(path)}
+                >
+                  <FileCode2 size={15} aria-hidden="true" />
+                  <span>
+                    {name}
+                    {parts.length > 0 && <small>{parts.join('/')}</small>}
+                  </span>
+                </button>
+                {reviewId && (
+                  <label className="changed-file-check" title="Mark file reviewed">
+                    <Checkbox
+                      aria-label={`Reviewed: ${path}`}
+                      checked={reviewed?.includes(path) ?? false}
+                      onChange={(event) => mark(revision, path, event.target.checked)}
+                    />
+                  </label>
+                )}
+              </div>
             );
           })}
           {!matches.length && <p className="task-muted">No matching files.</p>}

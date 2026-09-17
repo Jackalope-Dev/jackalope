@@ -219,9 +219,16 @@ pub(super) fn validate_review(ledger: &Ledger, ids: &[String]) -> Result<(), Str
                         || item.run_id.as_ref().is_none_or(|id| !ids.contains(id))
                 }))
         {
-            return Err(
-                "Review this task's complete combined result before applying changes.".into(),
-            );
+            let reason = task
+                .error
+                .as_deref()
+                .or_else(|| items.iter().find_map(|item| item.error.as_deref()));
+            return Err(match reason {
+                Some(reason) => format!("This task needs attention before merging: {reason}"),
+                None if items.iter().any(|item| item.canceled) =>
+                    "An assignment was canceled. Resolve it in the task overview before merging.".into(),
+                None => "Some assignments are missing from this merge. Open the parent task to review and merge its complete result.".into(),
+            });
         }
     }
     Ok(())
@@ -730,6 +737,34 @@ mod tests {
             },
             runs,
         )
+    }
+
+    #[test]
+    fn merge_blockers_explain_task_errors_and_incomplete_selections() {
+        let (mut ledger, _) = fixture();
+        let ids = vec!["a".into(), "b".into(), "c".into(), "final".into()];
+        ledger.items.last_mut().unwrap().run_id = Some("final".into());
+        assert!(validate_review(&ledger, &ids).is_ok());
+        ledger.managed_tasks[0].error = Some("The target branch changed.".into());
+        assert_eq!(
+            validate_review(&ledger, &ids).unwrap_err(),
+            "This task needs attention before merging: The target branch changed."
+        );
+        ledger.managed_tasks[0].error = None;
+        ledger.items[0].error = Some("Required check failed.".into());
+        assert!(validate_review(&ledger, &ids)
+            .unwrap_err()
+            .contains("Required check failed."));
+        ledger.items[0].error = None;
+        ledger.items[0].canceled = true;
+        assert!(validate_review(&ledger, &ids)
+            .unwrap_err()
+            .contains("canceled"));
+        ledger.items[0].canceled = false;
+        assert!(validate_review(&ledger, &ids[..2])
+            .unwrap_err()
+            .contains("assignments are missing"));
+        assert!(validate_review(&ledger, &["unrelated".into()]).is_ok());
     }
 
     #[test]

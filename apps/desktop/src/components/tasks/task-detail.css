@@ -44,11 +44,6 @@
   align-items: center;
   min-height: 24px;
 }
-.task-progress-next {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  margin-top: 6px;
-}
 .task-progress-action {
   margin-left: auto;
 }
