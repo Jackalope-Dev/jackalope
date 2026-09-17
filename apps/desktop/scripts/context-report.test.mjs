@@ -38,7 +38,8 @@ test('public context evidence keeps paired failures and excludes private identif
   const data = comparison();
   const report = contextReport(data);
   assert.equal(report.metrics.totalTokens.reductionPercent, 50);
-  assert.equal(report.metrics.totalTokens.eligibleForScopedClaim, true);
+  assert.equal(report.metrics.totalTokens.eligibleForPilotSignal, true);
+  assert.equal(report.metrics.totalTokens.eligibleForScopedClaim, false);
   assert.equal(report.totals.after.cachedInputTokens, 270);
   assert.doesNotMatch(JSON.stringify(report), /private/);
   data.trials.at(-1).oraclePassed = false;

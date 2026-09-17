@@ -28,7 +28,11 @@ export function effortFor(value?: string) {
   return taskEfforts.find((effort) => effort.id === value) ?? taskEfforts[1];
 }
 
-export function effortPrompt(value?: string, compact = false) {
+export function effortPrompt(value?: string, compact = false, scoped = false) {
   const effort = effortFor(value);
-  return `[Task approach: ${effort.name}]\n${effort.instruction}${compact ? '' : "\nPreserve the user's intent and existing work. Report the outcome, checks actually performed, and remaining limitations. Leave changes ready for review; do not claim verification or merge readiness without evidence."}`;
+  const instruction =
+    scoped && effort.id === 'balanced'
+      ? "Use the task's stated inputs, tools and completion criteria. Inspect applicable project guidance and preserve existing work; broaden repository exploration only when the requested operation depends on it. For code changes, inspect related call sites and affected edge cases. Complete and verify the requested outcome."
+      : effort.instruction;
+  return `[Task approach: ${effort.name}]\n${instruction}${compact ? '' : "\nPreserve the user's intent and existing work. Report the outcome, checks actually performed, and remaining limitations. Leave changes ready for review; do not claim verification or merge readiness without evidence."}`;
 }

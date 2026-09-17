@@ -14,6 +14,7 @@ const MAX_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_REFERENCES: usize = 30_000;
 static SCANNING: AtomicBool = AtomicBool::new(false);
 
+pub(crate) mod context_pack;
 pub(crate) mod map;
 mod symbols;
 

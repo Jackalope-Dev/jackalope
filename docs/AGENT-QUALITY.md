@@ -144,12 +144,121 @@ creates a sanitized aggregate for reviewing potential public claims. Defaults co
 It excludes prompts, local paths, account fingerprints and raw receipts, retaining
 source/build hashes, task IDs, configurations, counts, missing data and limitations.
 All retained failed trials remain in totals. Duplicate trials are rejected.
-Claims require matched configurations/cases, complete evidence, passing independent
+Pilot signals require matched configurations/cases, complete evidence, passing independent
 oracles, at least three cases with three repetitions each, and a positive lower
-bound from a deterministic case-cluster bootstrap. These are conservative reporting
-checks, not proof of generalization or human quality equivalence. Report the exact
+bound from a deterministic case-cluster bootstrap for a **pilot signal only**.
+`eligibleForScopedClaim` remains false in this exporter. These checks do not establish
+generalization or human quality equivalence. Report the exact
 suite and limitations beside any public number. Tokens are not dollars or quota;
 provider cache state is inherited. Do not publish raw task receipts.
+
+### Independent experiments and publication evidence
+
+For adaptive screening, pass `--stop-file=<path>` and create that file to stop
+before the next matched case repetition. The current repetition finishes so both
+variants remain comparable. The runner checkpoints its plan before dispatch and
+records the active trial; resuming an interrupted run retains unknown interruption
+usage. Preserve the original plan and all unfavorable or partial results. Early
+stopping and configuration selection are exploratory; confirm a promising change
+on a separately frozen held-out suite before making a savings claim.
+
+The quality runner accepts per-variant `--after-workflow=final`,
+`--after-task-approach=scoped`,
+`--after-tool-surface=available`, `--after-named-read=on`,
+`--control-result-selection=off`, `--after-repo-map=off` and
+`--after-context-reuse=on` and `--after-source-context=on` switches; replace `after`
+with `control` as needed.
+Defaults retain existing behavior. The final-workflow experiment changes only
+version-two debugging guidance. Scoped task-approach guidance limits call-site
+investigation to code changes while preserving applicable instructions and checks;
+it is opt-in for Balanced tasks. Saved
+version-two and compact version-three prompts
+remain reproducible. Context reuse independently tests established native sessions
+with the same policy hash; missing sessions or changed policies receive full guidance.
+Changing model or experiment configuration invalidates resume. `--order-seed=<id>`
+randomizes the initial paired order per task and rotates subsequent repetitions.
+`--control-model` and `--after-model` permit explicit model comparisons; changing
+models is a different experiment from a same-model harness comparison.
+
+Available-tool discovery omits MCP operations without selected on-demand connections
+and verification without a saved command. Browser, questions, evidence and coordination
+remain available. The named-read experiment resolves an exact, unambiguous read-only
+tool through the existing broker, avoiding a separate agent search turn when its
+arguments are already known. Incomplete catalogs, duplicate names, changed schemas,
+disallowed tools and mutating operations cannot take this shortcut. It preserves
+attempt ownership, connection allowlists, cancellation and result recovery.
+
+Source-context preparation is opt-in and runs before the first worker call. It reads
+up to four small, explicitly named source files inside the assigned workspace, with
+an 8,000-byte serialized file-entry budget. Complete UTF-8 snapshots include paths
+and content hashes; oversized files, traversal, hidden paths and unsupported types
+are omitted. It does not guess files, summarize code, replace repository instructions
+or run Jev. Workers still inspect missing context and refresh snapshots after changes.
+Compare total task usage and correctness against both an unprepared Jackalope task
+and the native CLI; fewer agent read calls alone are not proof of savings.
+
+`node scripts/evaluation/repository-cases.mjs <suite.json> [revision]` creates
+source-attributed seeded defects from committed Jackalope modules. Their provenance
+and reference code are evaluation inputs, never worker context. These are small
+repository-derived repairs, not historical issue resolutions or multi-repository
+acceptance. Related mutations share a source family for uncertainty estimates.
+
+`pnpm evaluate:impact comparison.json report.json [options.json]` retains failed
+attempts in tokens/time per oracle success, separates cached input, and accepts
+explicit sourced pricing and independent reviews. Prices are API-equivalent estimates,
+not subscription bills. Its product-claim gate requires held-out confirmation,
+independent human reviews, replication and sufficient independent task families;
+it never authorizes publication. Run screening first, freeze the configuration and
+quality tolerance, then collect new confirmation tasks without selecting favorable
+subsets after seeing their outcomes. Missing helper, fallback or correction costs
+prevent complete end-to-end cost claims.
+Related source mutations and variants of one authored task template share a family.
+Exploratory bootstrap intervals resample these families and are omitted below three
+families. A narrow interval on a small authored suite does not establish generalization.
+
+Supply prices under model IDs with `source`, `date`, `input`, `cachedInput` and
+`output` USD per million tokens. For tiered prices, also supply
+`longContextThreshold`, `longInputMultiplier` and `longOutputMultiplier`.
+Without individual request sizes, cumulative input above the threshold produces
+conservative cost bounds instead of an exact estimate. A nonzero `cacheWrite`
+requires an explicit `cacheWriteIncremental` rate above already-counted input.
+Missing accounting stays unknown. Set `protocol.includesHelpers` or
+`protocol.includesExternalFallbacks` when applicable and record the corresponding
+per-trial `helperCostUsd` or `fallbackCostUsd`, including explicit zeros. Use
+`protocol.includesExternalCorrections` and `correctionCostUsd` for agent correction
+work outside the recorded trial.
+Reviews map exact private receipt paths to `accepted` and `notes`, assessing the
+original patch before corrections. The claim gate evaluates agent execution time
+and cost per independently accepted result. Human `reviewMinutes` and
+`correctionMinutes` are optional, separate delivery measurements; they are not
+required for execution claims. Do not treat off-page or agent-assisted review as
+measured human review time.
+
+`node scripts/evaluation/impact-export.mjs comparison.json public-experiment.json options.json`
+exports an allowlisted public artifact. The options add `id`, `title`, `detail`
+and variant `labels` to the impact-report options. Review the artifact and append
+it to the website dataset's `experiments` array, then regenerate the website
+summary. Exports omit receipt paths, account bindings, raw logs and human notes.
+Blocked and unfavorable experiments remain visible; exporting does not publish.
+
+`node scripts/evaluation/continuation-cases.mjs <suite.json>` creates authored
+two-turn fixtures. Their `followups` run on the previous Jackalope session and
+charge every attempt against one shared trial budget. Direct-CLI continuation is
+not supported by this runner and is rejected rather than silently approximated.
+
+`pnpm evaluate:review comparison.json <ignored-output-directory> [seed]` prepares
+an exploratory review set of up to eight tasks and a separate assignment key. The local page
+conceals provider identities and alternates diff-only and recorded-evidence conditions
+within a seeded task shuffle. It records visible focused review time, explicit
+decisions and notes. Human corrections remain unmeasured. One review set cannot
+establish a causal speedup: use counterbalanced reviewers, equivalent task difficulty,
+defect-detection checks and a preregistered review protocol before making that claim.
+After the human downloads their answers, run
+`node scripts/evaluation/review-results.mjs <study-directory> answers.json report.json [metadata.json]`.
+It validates assignment IDs and reports approval aggregates. Timing is excluded by
+default. Only explicit metadata with `reviewMethod: "manual"` and
+`timingUse: "descriptive"` enables descriptive time aggregates. Mixed or agent-assisted
+review remains quality feedback. Missing responses and measurements never become zero.
 
 Prompt and context guidance follows [OpenAI's model guidance](https://developers.openai.com/api/docs/guides/latest-model),
 [provider cache boundaries](https://developers.openai.com/api/docs/guides/prompt-caching),

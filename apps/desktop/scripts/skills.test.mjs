@@ -4,6 +4,21 @@ import { detectSkillsFromPrompt, getSkillById, VETTED_SKILLS } from '../src/lib/
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { getToolById, VETTED_TOOLS } from '../src/lib/skills/tool-registry.ts';
 
+test('final-phase experiment resolves debugging timing without changing saved v2 prompts', () => {
+  const options = {
+    rawPrompt: 'Fix the scheduler',
+    selectedSkillIds: ['systematic-debugging'],
+    executionMode: 'isolated',
+  };
+  const legacy = assemblePrompt({ ...options, version: 2 }).assembledPrompt;
+  const candidate = assemblePrompt({ ...options, version: 4 }).assembledPrompt;
+  assert.match(legacy, /Reproduce behavioral defects with a focused failing check/);
+  assert.match(candidate, /only when its result is needed/);
+  assert.match(candidate, /explicit user or repository instructions/);
+  assert.match(candidate, /final verification/);
+  assert.match(candidate, /Fix the scheduler/);
+});
+
 test('vetted skills catalog contains all core development domains and harness skills', () => {
   assert.equal(VETTED_SKILLS.length, 9);
   const categories = new Set(VETTED_SKILLS.map((s) => s.category));

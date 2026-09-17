@@ -28,6 +28,15 @@ test('prompt baselines pin effort and selected cases without launching providers
   assert.equal(saved.status, 0, saved.stderr);
   const snapshot = JSON.parse(readFileSync(filename, 'utf8'));
   assert.equal(snapshot.effort, 'balanced');
+  const experimental = invoke([
+    '--effort=balanced',
+    '--cases=copy-edit',
+    '--after-task-approach=scoped',
+    `--save-prompts=${filename}`,
+  ]);
+  assert.notEqual(experimental.status, 0);
+  assert.match(experimental.stderr, /Experimental prompts/);
+  assert.deepEqual(JSON.parse(readFileSync(filename, 'utf8')), snapshot);
   assert.deepEqual(Object.keys(snapshot.prompts), ['copy-edit']);
   const options = [
     '--variants=control,after',
@@ -150,6 +159,24 @@ test('resuming completed trials launches no workers and rejects changed configur
   const changed = run('different-model');
   assert.notEqual(changed.status, 0);
   assert.match(changed.stderr, /Resume requires/);
+  const stopFile = path.join(output, 'stop');
+  writeFileSync(stopFile, 'Stop between matched repetitions.');
+  writeFileSync(
+    comparison,
+    JSON.stringify({
+      ...saved,
+      trials: [],
+      activeTrial: { case: fixture.id, variant: 'after', repetition: 1 },
+    }),
+  );
+  const stopped = run('fixture', [`--stop-file=${stopFile}`]);
+  assert.equal(stopped.status, 0, stopped.stderr);
+  const interrupted = JSON.parse(readFileSync(comparison, 'utf8'));
+  assert.deepEqual(interrupted.trials, []);
+  assert.equal(interrupted.activeTrial, null);
+  assert.equal(interrupted.interruptions.length, 1);
+  assert.match(interrupted.interruptions[0].reason, /usage is unknown/);
+  assert.match(interrupted.stopReason, /Unrun trials remain missing/);
 });
 
 test('readiness requires every requested trial to complete within budget and pass its oracle', () => {

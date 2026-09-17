@@ -79,6 +79,11 @@ release dates.
   Include versioned prompt comparisons, resumed sessions, bounded maps and recoverable
   tool-result selection. Require representative independent acceptance before broad
   website claims; retain failures, cache accounting and correction work.
+  Screen available-tool exposure, exact read-only lookup, explicit source preparation
+  and task-scoped/final-phase guidance
+  independently; freeze promising settings before new held-out confirmation.
+  Require independent original-patch acceptance for quality claims. Counterbalanced
+  review-time and correction measurements are separate prerequisites for claiming faster review.
 
 - [ ] Compare repeated single, serial and staged evaluations with matched provider/model
   budgets and independent human review. Validate feature snapshot recovery, shared

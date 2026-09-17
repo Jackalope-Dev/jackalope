@@ -70,7 +70,13 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     if !direct {
         service.launch();
     }
-    let id = Uuid::new_v4().to_string();
+    let mut id = Uuid::new_v4().to_string();
+    let mut attempt_ids = vec![id.clone()];
+    let followups = spec["followups"].as_array().cloned().unwrap_or_default();
+    if direct && !followups.is_empty() {
+        return Err("Continuation experiments currently compare Jackalope variants only.".into());
+    }
+    let mut next_followup = 0;
     let deadline = Instant::now() + Duration::from_secs(15);
     while !direct && service.view()?.bridge_url.is_none() {
         if Instant::now() >= deadline {
@@ -93,7 +99,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         .as_ref()
         .and_then(|r| r.as_ref().ok())
         .map(|r| &r.0);
-    let launch_error = if direct {
+    let mut launch_error = if direct {
         direct_result
             .as_ref()
             .and_then(|r| r.as_ref().err())
@@ -121,13 +127,34 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 .iter()
                 .find(|r| r.id == id)
                 .ok_or("Missing benchmark attempt")?;
+            let budget_exceeded = started.elapsed().as_secs() >= seconds
+                || runs
+                    .iter()
+                    .filter(|r| attempt_ids.contains(&r.id))
+                    .map(|r| r.usage.input + r.usage.output)
+                    .sum::<u64>()
+                    >= tokens;
             if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
+                stopped |= budget_exceeded;
+                if run.status == "review" && !stopped && next_followup < followups.len() {
+                    let previous = id.clone();
+                    id = Uuid::new_v4().to_string();
+                    attempt_ids.push(id.clone());
+                    launch_error = service.start_manual(serde_json::from_value(json!({
+                        "id":id,"previousRunId":previous,"projectId":project_id,"projectName":"Quality benchmark",
+                        "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
+                        "isolated":true,"targetBranch":"main","connectionIds":[],
+                        "prompt":followups[next_followup],"verifyCommand":spec["check"],"autoVerify":true,
+                        "effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
+                    }))?).err();
+                    next_followup += 1;
+                    if launch_error.is_none() {
+                        continue;
+                    }
+                }
                 break;
             }
-            if !stopped
-                && (started.elapsed().as_secs() >= seconds
-                    || run.usage.input + run.usage.output >= tokens)
-            {
+            if !stopped && budget_exceeded {
                 runtime.stop_all();
                 stopped = true;
                 stop_at = Some(Instant::now());
@@ -140,6 +167,10 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     }
     let elapsed = started.elapsed().as_millis();
     let runs = runtime.integration_runs()?;
+    let attempts: Vec<_> = attempt_ids
+        .iter()
+        .filter_map(|id| runs.iter().find(|r| &r.id == id))
+        .collect();
     let run = direct_run.or_else(|| runs.iter().find(|r| r.id == id));
     std::fs::write(
         root.join("oracle.cjs"),
@@ -173,7 +204,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let report = json!({"version":1,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
         "budgetStopped":stopped,"launchError":launch_error,"oracle":oracle,
-        "promptBytes":if direct { spec["prompt"].as_str().map(str::len) } else { input.as_ref().map(Vec::len) },"run":run,"agentVerification":agent_verification,
+        "promptBytes":if direct { spec["prompt"].as_str().map(str::len) } else if followups.is_empty() { input.as_ref().map(Vec::len) } else { Some(attempts.iter().map(|r| r.efficiency.launch_prompt_bytes as usize).sum()) },"run":run,"attempts":if followups.is_empty() {None} else {Some(&attempts)},"agentVerification":agent_verification,
         "accepted":null,"humanReviewMinutes":null,
         "limitations":"Disposable native execution, not installed-app acceptance. Budgets use delayed reported usage; all unsuccessful trials remain in comparisons."});
     let receipt = root.join("quality.json");

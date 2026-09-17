@@ -4,8 +4,9 @@ const CORE: &str = "Jackalope task context: Use the assigned workspace; preserve
 
 pub(super) fn policy_hash() -> String {
     Sha256::digest(format!(
-        "{}:{}",
+        "{}:{}:{}",
         compact_enabled(),
+        reuse_enabled(),
         compact_preamble(None, "")
     ))
     .iter()
@@ -14,6 +15,9 @@ pub(super) fn policy_hash() -> String {
 }
 
 pub(super) fn preamble(previous: Option<&super::TaskRun>, adapter: &str) -> String {
+    if reuse_enabled() && can_reuse(previous, adapter, &policy_hash()) {
+        return format!("{CORE}Continue this native session using its established workflow and evidence. Apply the current task, contract and workspace facts below.\n");
+    }
     if compact_enabled() {
         compact_preamble(previous, adapter)
     } else {
@@ -25,12 +29,19 @@ fn compact_enabled() -> bool {
     std::env::var("JACKALOPE_CONTEXT_EXPERIMENT").is_ok_and(|value| value == "compact")
 }
 
-fn compact_preamble(previous: Option<&super::TaskRun>, adapter: &str) -> String {
-    let resumed = matches!(adapter, "codex" | "claude" | "opencode" | "grok")
+fn reuse_enabled() -> bool {
+    std::env::var("JACKALOPE_CONTEXT_REUSE").is_ok_and(|value| value == "on")
+}
+
+fn can_reuse(previous: Option<&super::TaskRun>, adapter: &str, policy: &str) -> bool {
+    matches!(adapter, "codex" | "claude" | "opencode" | "grok")
         && previous.is_some_and(|run| {
-            run.session_id.is_some()
-                && run.efficiency.prompt_policy_hash.as_deref() == Some(policy_hash().as_str())
-        });
+            run.session_id.is_some() && run.efficiency.prompt_policy_hash.as_deref() == Some(policy)
+        })
+}
+
+fn compact_preamble(previous: Option<&super::TaskRun>, adapter: &str) -> String {
+    let resumed = previous.is_some() && can_reuse(previous, adapter, &policy_hash());
     let mut text = CORE.to_owned();
     if resumed {
         text.push_str("Continue this native session using its established workflow and evidence. Apply the current task, contract and workspace facts below.\n");

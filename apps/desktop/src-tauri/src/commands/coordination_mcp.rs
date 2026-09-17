@@ -223,6 +223,34 @@ impl CoordinationTools {
     }
 
     #[tool(
+        description = "Read an exactly named tool from selected connections when its name and arguments are already known. Supply server if ambiguous. Only unambiguous declared read-only operations execute. Otherwise search_tools supplies the schema. Optional output selects recoverable fields as in read_tool.",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn read_named_tool(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::mcp_broker::NamedReadInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let (result, usage) = self
+            .service
+            .runtime
+            .mcp_broker
+            .read_named(&run.id, input)
+            .await
+            .map_err(|error| ErrorData::invalid_request(error, None))?;
+        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
+        Ok(result)
+    }
+
+    #[tool(
         description = "Read a selected tool result by resultHandle, offset and limit without executing the tool again. Returns captured JSON text with nextOffset. Handles are scoped to this attempt and its latest four selected results.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
@@ -679,9 +707,49 @@ impl CoordinationTools {
     router = self.tool_router,
     name = "jackalope",
     version = "0.1.0",
-    instructions = "Use project before editing, message to coordinate with other task owners, and harness tools for browser automation, user questions, and verification."
+    instructions = "Use supplied launch context. Refresh project for shared-interface changes, scope uncertainty or new coordination needs. Use harness tools for relevant evidence, user questions and final verification."
 )]
-impl ServerHandler for CoordinationTools {}
+impl ServerHandler for CoordinationTools {
+    async fn list_tools(
+        &self,
+        _request: Option<rmcp::model::PaginatedRequestParams>,
+        context: RequestContext<RoleServer>,
+    ) -> Result<rmcp::model::ListToolsResult, ErrorData> {
+        let headers = request_headers(&context)?;
+        let run = self
+            .service
+            .authorized_run(&headers)
+            .map_err(bridge_error)?;
+        let mut tools = self.tool_router.list_all();
+        if !std::env::var("JACKALOPE_NAMED_READ").is_ok_and(|value| value == "on") {
+            tools.retain(|tool| tool.name != "read_named_tool");
+        }
+        if std::env::var("JACKALOPE_TOOL_SURFACE").is_ok_and(|value| value == "available") {
+            let discovery = self.service.runtime.mcp_broker.has_attempt(&run.id);
+            tools.retain(|tool| {
+                available_tool(tool.name.as_ref(), discovery, run.verify_command.as_deref())
+            });
+        }
+        Ok(rmcp::model::ListToolsResult {
+            result_type: Some(rmcp::model::ResultType::COMPLETE),
+            tools,
+            meta: None,
+            next_cursor: None,
+            ttl_ms: None,
+            cache_scope: None,
+        })
+    }
+}
+
+fn available_tool(name: &str, discovery: bool, check: Option<&str>) -> bool {
+    match name {
+        "search_tools" | "read_tool" | "read_named_tool" | "read_tool_result" | "execute_tool" => {
+            discovery
+        }
+        "computer_verify" => check.is_some_and(|value| !value.trim().is_empty()),
+        _ => true,
+    }
+}
 
 async fn authorize(
     WebState(service): WebState<Coordinator>,
@@ -712,6 +780,23 @@ pub(super) fn router(service: Coordinator) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn available_tools_omit_only_unavailable_operations() {
+        assert!(!available_tool("read_named_tool", false, Some("test")));
+        assert!(!available_tool("computer_verify", true, None));
+        assert!(available_tool("computer_verify", false, Some("test")));
+        for tool in [
+            "project",
+            "ask_user",
+            "browser_navigate",
+            "record_validation_step",
+            "agreement",
+            "verification_output",
+        ] {
+            assert!(available_tool(tool, false, None));
+        }
+    }
 
     #[test]
     fn exposes_project_message_and_harness_tools() {

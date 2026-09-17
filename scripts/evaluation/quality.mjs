@@ -1,12 +1,14 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
+import { aggregateAttempts } from './attempts.mjs';
+import { experimentEnvironment, experimentOptions, variantOrder } from './experiments.mjs';
 import { qualityCases } from './quality-cases.mjs';
 import { qualitySummary } from './quality-metrics.mjs';
 import { requireEvaluationPass } from './readiness.mjs';
@@ -28,6 +30,10 @@ if (
     (c) =>
       !/^[a-z0-9-]+$/.test(c.id) ||
       !c.prompt ||
+      (c.followups !== undefined &&
+        (!Array.isArray(c.followups) ||
+          c.followups.length > 5 ||
+          c.followups.some((prompt) => typeof prompt !== 'string' || !prompt.trim()))) ||
       typeof c.oracle !== 'string' ||
       !c.files ||
       Object.entries(c.files).some(
@@ -46,6 +52,17 @@ const selected = value(
 ).split(',');
 const variants = value('--variants', 'before,after').split(',');
 const compactPrompts = args.includes('--compact-prompts');
+const experiments = experimentOptions(args, variants);
+const orderSeed = value('--order-seed', null);
+const experimental = args.some((arg) =>
+  variants.some(
+    (v) =>
+      arg.startsWith(`--${v}-`) &&
+      /-(workflow|task-approach|tool-surface|named-read|result-selection|repo-map|context-reuse|source-context)=/.test(
+        arg,
+      ),
+  ),
+);
 const requestedEffort = value('--effort', null);
 const efforts = Object.fromEntries(
   variants.map((v) => [v, value(`--${v}-effort`, requestedEffort)]),
@@ -60,6 +77,7 @@ const repeat = Number(value('--repeat', '3'));
 const seconds = Number(value('--seconds', '180'));
 const tokens = Number(value('--tokens', '250000'));
 const model = value('--model', '');
+const models = Object.fromEntries(variants.map((v) => [v, value(`--${v}-model`, model)]));
 const agent = value('--agent', 'codex');
 const controlPromptsPath = value('--control-prompts', null);
 const controlPrompts = controlPromptsPath
@@ -95,6 +113,7 @@ if (
   variants.length < 1 ||
   variants.length > 4 ||
   new Set(variants).size !== variants.length ||
+  (args.includes('--execute') && Object.values(models).some((model) => !model.trim())) ||
   variants.some((v) => !['before', 'control', 'after', 'direct'].includes(v)) ||
   Object.values(efforts).some(
     (e) => e !== null && !['quick', 'balanced', 'thorough'].includes(e),
@@ -103,6 +122,8 @@ if (
     (speed) => speed !== null && (agent !== 'codex' || !['standard', 'fast'].includes(speed)),
   ) ||
   selected.some((id) => !cases.some((c) => c.id === id)) ||
+  (variants.includes('direct') &&
+    cases.some((c) => selected.includes(c.id) && c.followups?.length)) ||
   !Number.isInteger(repeat) ||
   repeat < 1 ||
   repeat > 10 ||
@@ -117,6 +138,10 @@ if (
   throw new Error('Invalid quality evaluation options.');
 if (!args.includes('--execute')) {
   if (value('--save-prompts', null)) {
+    if (experimental)
+      throw new Error(
+        'Experimental prompts are retained in trial specs; do not export them as a legacy prompt baseline.',
+      );
     if (!requestedEffort) throw new Error('Pin --effort when saving a prompt baseline.');
     const prompts = Object.fromEntries(
       selected.map((id) => [
@@ -153,6 +178,9 @@ if (!args.includes('--execute')) {
         agent,
         model: model || 'Required for execution',
         controlPromptsHash,
+        experiments,
+        models,
+        orderSeed,
         instructions:
           'Pass --execute --model=<model> --after=<native test executable> --variants=direct,after --effort=balanced for a matched direct-CLI comparison. Legacy before requires --before=<baseline executable>. Trials use installed accounts; reported token limits are not hard spending caps.',
       },
@@ -191,6 +219,9 @@ if (!args.includes('--execute')) {
     variants,
     repeat,
     compactPrompts,
+    ...(experimental ? { experiments } : {}),
+    ...(orderSeed !== null ? { orderSeed } : {}),
+    ...(Object.values(models).some((m) => m !== model) ? { models } : {}),
     suiteSha256: createHash('sha256')
       .update(JSON.stringify(cases.filter((c) => selected.includes(c.id))))
       .digest('hex'),
@@ -226,11 +257,42 @@ if (!args.includes('--execute')) {
     throw new Error('Resume requires the same agent, model, CLI, executable hashes and budgets.');
   const trials = saved?.trials ?? [];
   const interruptions = saved?.interruptions ?? [];
-  for (const id of selected)
+  if (saved?.activeTrial)
+    interruptions.push({
+      ...saved.activeTrial,
+      reason: 'Runner ended before saving a trial receipt; usage is unknown.',
+    });
+  let activeTrial = null;
+  let stopReason = null;
+  const stopFile = value('--stop-file', null);
+  const checkpoint = async () => {
+    const summary = qualitySummary(trials, Object.keys(binaries));
+    await writeFile(
+      `${comparisonPath}.tmp`,
+      `${JSON.stringify({ version: 1, plan, baselineRevision: baseline.revision, controlPromptsHash, controlPromptsRevision: controlPrompts?.revision ?? null, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, activeTrial, stopReason, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
+    );
+    await rename(`${comparisonPath}.tmp`, comparisonPath);
+  };
+  if (!saved || saved.activeTrial) await checkpoint();
+  pairs: for (const id of selected)
     for (let repetition = 1; repetition <= repeat; repetition++) {
+      if (stopFile) {
+        const requested = await access(path.resolve(stopFile)).then(
+          () => true,
+          (error) => {
+            if (error.code !== 'ENOENT') throw error;
+            return false;
+          },
+        );
+        if (requested) {
+          stopReason =
+            'Stop file requested an early end between matched case repetitions. Unrun trials remain missing.';
+          await checkpoint();
+          break pairs;
+        }
+      }
       const fixture = cases.find((c) => c.id === id);
-      const offset = (repetition - 1) % variants.length;
-      const order = [...variants.slice(offset), ...variants.slice(0, offset)];
+      const order = variantOrder(variants, id, repetition, orderSeed);
       for (const variant of order) {
         const completed = trials.some(
           (trial) =>
@@ -249,7 +311,12 @@ if (!args.includes('--execute')) {
                   ))
                 : [
                     assemblePrompt({
-                      version: compactPrompts && variant === 'after' ? 3 : 2,
+                      version:
+                        experiments[variant].workflow === 'final'
+                          ? 4
+                          : compactPrompts && variant === 'after'
+                            ? 3
+                            : 2,
                       rawPrompt: fixture.prompt,
                       selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
                       executionMode: 'isolated',
@@ -257,15 +324,17 @@ if (!args.includes('--execute')) {
                     effortPrompt(
                       efforts[variant] ?? undefined,
                       compactPrompts && variant === 'after',
+                      experiments[variant]['task-approach'] === 'scoped',
                     ),
                   ].join('\n\n');
         if (!prompt) throw new Error(`Missing frozen baseline for ${id}`);
         const spec = {
           ...fixture,
+          rawPrompt: fixture.prompt,
           prompt,
           variant,
           agent,
-          model,
+          model: models[variant],
           seconds,
           tokens,
           ...(efforts[variant] ? { effort: efforts[variant] } : {}),
@@ -275,7 +344,11 @@ if (!args.includes('--execute')) {
         if (saved) {
           try {
             const previous = JSON.parse(await readFile(specPath, 'utf8'));
-            if (JSON.stringify(previous) !== JSON.stringify(spec))
+            const expected =
+              previous.rawPrompt === undefined
+                ? Object.fromEntries(Object.entries(spec).filter(([key]) => key !== 'rawPrompt'))
+                : spec;
+            if (JSON.stringify(previous) !== JSON.stringify(expected))
               throw new Error(
                 `The saved ${id} fixture or prompt changed. Use a new output directory.`,
               );
@@ -285,6 +358,8 @@ if (!args.includes('--execute')) {
         }
         if (completed) continue;
         await writeFile(specPath, `${JSON.stringify(spec, null, 2)}\n`);
+        activeTrial = { case: id, variant, repetition, startedAt: new Date().toISOString() };
+        await checkpoint();
         console.log(`Quality: ${id}, ${variant}, repetition ${repetition}`);
         const execution = await new Promise((resolve) => {
           const child = spawn(
@@ -304,6 +379,7 @@ if (!args.includes('--execute')) {
                 RUST_TEST_THREADS: '1',
                 JACKALOPE_CONTEXT_EXPERIMENT:
                   compactPrompts && variant === 'after' ? 'compact' : 'off',
+                ...experimentEnvironment(experiments[variant]),
               },
               stdio: ['ignore', 'pipe', 'pipe'],
             },
@@ -351,9 +427,17 @@ if (!args.includes('--execute')) {
           error = String(cause);
         }
         const run = report?.run;
-        const usage = run?.usage?.reported ? run.usage : null;
+        const { runs, usage, efficiency } = aggregateAttempts(report);
+        const budgetExceeded = report
+          ? report.budgetStopped === true ||
+            report.elapsedMs >= seconds * 1000 ||
+            (usage !== null && usage.input + usage.output >= tokens)
+          : null;
         trials.push({
           case: id,
+          model: models[variant],
+          experiments: experiments[variant],
+          source: fixture.source ?? null,
           variant,
           repetition,
           receipt: receipt ?? null,
@@ -362,7 +446,7 @@ if (!args.includes('--execute')) {
           error,
           oraclePassed:
             execution.code === 0 &&
-            !report?.budgetStopped &&
+            budgetExceeded === false &&
             (!fixture.toolFixture || report?.fixtureToolCalls > 0) &&
             (variant === 'direct' ||
               !fixture.outcomes?.length ||
@@ -377,6 +461,7 @@ if (!args.includes('--execute')) {
             report?.oracle?.success === true,
           behavioralOraclePassed: report?.oracle?.success === true,
           budgetStopped: report?.budgetStopped ?? null,
+          budgetExceeded,
           profileFingerprint: run?.accountBinding
             ? createHash('sha256')
                 .update(
@@ -394,11 +479,12 @@ if (!args.includes('--execute')) {
           codexSpeed: speeds[variant],
           requestedServiceTier: run?.requestedServiceTier ?? null,
           reasoningEffort: run?.reasoningEffort ?? null,
-          efficiency: run?.efficiency ?? null,
+          efficiency,
           mcpUsage: run?.mcpUsage ?? null,
           fixtureToolCalls: report?.fixtureToolCalls ?? null,
           stages: run?.stages ?? [],
-          usageBreakdown: run ? runUsageBreakdown([run]) : null,
+          usageBreakdown: runs.length ? runUsageBreakdown(runs) : null,
+          attempts: runs.length,
           accepted: null,
           status: run?.status ?? null,
           launchError: report?.launchError ?? null,
@@ -411,12 +497,8 @@ if (!args.includes('--execute')) {
           totalTokens: usage ? usage.input + usage.output : null,
           answeredQuestions: run?.prompts?.filter((p) => p.status === 'answered').length ?? 0,
         });
-        const summary = qualitySummary(trials, Object.keys(binaries));
-        await writeFile(
-          `${comparisonPath}.tmp`,
-          `${JSON.stringify({ version: 1, plan, baselineRevision: baseline.revision, controlPromptsHash, controlPromptsRevision: controlPrompts?.revision ?? null, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
-        );
-        await rename(`${comparisonPath}.tmp`, comparisonPath);
+        activeTrial = null;
+        await checkpoint();
         console.log(JSON.stringify(trials.at(-1)));
       }
     }

@@ -47,6 +47,9 @@ Sanitized comparison exports retain matched configurations,
 oracle outcomes and reporting limits. Broader independent acceptance remains open.
 Optional Jev discovery ranking and local response-field selection have separate
 evaluation suites; the public benchmark methodology keeps their scope explicit.
+Source-attributed repair fixtures and separate workflow, source preparation, tool and continuation
+experiments support screening. Human review exports and complete-attempt cost
+accounting support independent confirmation before broader product claims.
 
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)

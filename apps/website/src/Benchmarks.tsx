@@ -1,4 +1,5 @@
 import evidence from './benchmark-summary.json';
+import { type Experiment, ExperimentResults } from './ExperimentResults';
 import './benchmarks.css';
 
 type Totals = {
@@ -40,6 +41,17 @@ type Evidence = {
   discovery:
     | (DiscoveryTotals & { baselineAllCalls?: DiscoveryTotals | null; regressions: number | null })
     | null;
+  experiments?: Experiment[];
+  screeningStatus?: { interruptedAttempts: number; canceledExperiments: string[] } | null;
+  routingAssessment?: {
+    calls: number;
+    selections: number;
+    errors: number;
+    elapsedMs: number;
+    inputTokens: number;
+    estimatedCostUsd: number;
+    model: string;
+  } | null;
 };
 const data: Evidence = evidence;
 const number = (value: number | null) =>
@@ -54,31 +66,6 @@ const labels: Record<string, string> = {
 
 export function BenchmarksPage() {
   const trials = data.agentTrials;
-  const wins = data.comparisons.flatMap(({ id, title, report }) =>
-    Object.entries(report.metrics)
-      .filter(([, metric]) => metric.eligibleForScopedClaim)
-      .map(([key, metric]) => ({
-        id: `${id}-${key}`,
-        title,
-        value: `${number(metric.reductionPercent)}%`,
-        label: key === 'totalTokens' ? 'fewer reported tokens' : 'less elapsed time',
-      })),
-  );
-  const payloadWins = data.comparisons.filter(
-    ({ report }) => report.toolPayload.eligibleForScopedClaim,
-  );
-  const discoveryBaseline = data.discovery?.baselineAllCalls;
-  const avoidedDiscoveryCalls =
-    data.discovery &&
-    discoveryBaseline &&
-    data.discovery.trials === discoveryBaseline.trials &&
-    data.discovery.jevPassed >= discoveryBaseline.jevPassed &&
-    data.discovery.errors === 0 &&
-    data.discovery.regressions === 0 &&
-    discoveryBaseline.errors === 0 &&
-    data.discovery.calls < discoveryBaseline.calls
-      ? 100 * (1 - data.discovery.calls / discoveryBaseline.calls)
-      : null;
   return (
     <main id="main" className="benchmark-page page-width">
       <header className="benchmark-intro">
@@ -96,50 +83,30 @@ export function BenchmarksPage() {
       <section className="benchmark-highlights" aria-label="Measured scope">
         <div>
           <strong>{number(trials)}</strong>
-          <span>live agent trials; some comparisons share the same baseline trials</span>
+          <span>recorded agent trials; shared baseline trials count once</span>
         </div>
-        {wins.length ? (
-          wins.map((win) => (
-            <div key={win.id}>
-              <strong>{win.value}</strong>
-              <span>
-                {win.label} · {win.title} only
-              </span>
-            </div>
-          ))
-        ) : (
-          <div>
-            <strong>Evidence first</strong>
-            <span>No general speed or cost saving established by this pilot.</span>
-          </div>
-        )}
-        {payloadWins.map(({ id, report }) => (
-          <div key={`payload-${id}`}>
-            <strong>{number(report.toolPayload.reductionPercent)}%</strong>
-            <span>
-              fewer MCP result bytes in the extraction fixtures. Response bodies only; not total
-              tokens or cost.
-            </span>
-          </div>
-        ))}
-        {avoidedDiscoveryCalls !== null && (
-          <div>
-            <strong>{number(avoidedDiscoveryCalls)}%</strong>
-            <span>
-              fewer Jev discovery calls on eight authored queries, with the same or better fixture
-              pass count. Experimental; not a measure of agent savings.
-            </span>
-          </div>
-        )}
-        {avoidedDiscoveryCalls === null && (
-          <div>
-            <strong>Same task</strong>
-            <span>
-              Matched model, reasoning effort, requested speed, account, and behavioral checks.
-            </span>
-          </div>
-        )}
+        <div>
+          <strong>Evidence first</strong>
+          <span>No general speed or cost saving established by these screening experiments.</span>
+        </div>
+        <div>
+          <strong>Failures included</strong>
+          <span>
+            Completed and failed trial receipts are retained; missing usage stays unknown.
+          </span>
+        </div>
       </section>
+      {data.screeningStatus && (
+        <p className="benchmark-caption">
+          This was adaptive screening. We stopped the broad sweep after observing overhead, retained
+          completed results, and selected smaller follow-up experiments. Interrupted attempts with
+          unknown usage: {data.screeningStatus.interruptedAttempts}, excluded from the recorded
+          trial count. Canceled work: {data.screeningStatus.canceledExperiments.join('; ')}. The
+          totals do not establish the full cost of the interrupted experiment. These results are not
+          held-out confirmation or evidence of statistical significance after early stopping.
+        </p>
+      )}
+      <ExperimentResults experiments={data.experiments ?? []} />
       <section className="benchmark-section" aria-labelledby="results-title">
         <h2 id="results-title">Results, including the overhead</h2>
         <p>
@@ -246,7 +213,8 @@ export function BenchmarksPage() {
               {data.discovery.estimatedCostUsd === null
                 ? 'Dollar cost was unavailable.'
                 : `Estimated Jev API input cost: $${data.discovery.estimatedCostUsd.toFixed(6)}.`}{' '}
-              Estimates use <a href="https://typesafe.ai/">TypeSafe’s published input rate</a> of
+              Estimates use{' '}
+              <a href="https://docs.typesafe.ai/models">TypeSafe’s published input rate</a> of
               $0.042 per million tokens on the measurement date; these are not invoices.
             </p>
             {data.discovery.baselineAllCalls && (
@@ -270,6 +238,20 @@ export function BenchmarksPage() {
           speed, or general search accuracy. Jev is a remote service; the field-selection experiment
           above uses local code and requires no Jev call.
         </p>
+        {data.routingAssessment && (
+          <p>
+            A separate routing assessment sent repository-derived repair tasks through the
+            production suitability rules, using sourced model facts and no accepted-task cost
+            history. Across {data.routingAssessment.calls} calls to {data.routingAssessment.model},{' '}
+            {data.routingAssessment.selections} tasks produced an eligible selection and{' '}
+            {data.routingAssessment.errors} API calls failed. Assessment time totaled{' '}
+            {number(data.routingAssessment.elapsedMs / 1000)} seconds, with{' '}
+            {number(data.routingAssessment.inputTokens)} input tokens and an estimated input cost of
+            ${data.routingAssessment.estimatedCostUsd.toFixed(6)}. An assessment without an eligible
+            selection leaves the configured fallback in place. This measures routing overhead; it
+            does not establish downstream quality or savings.
+          </p>
+        )}
       </section>
       <section className="benchmark-section" aria-labelledby="method-title">
         <h2 id="method-title">Methodology</h2>
@@ -302,17 +284,22 @@ export function BenchmarksPage() {
             not zero.
           </li>
           <li>
-            <strong>Counterbalance and repeat.</strong> Rotate variant order over three repetitions
-            per case. Provider-side cache state is inherited, not controlled. Wall-clock results
-            include network and service variability; builds and full verification run outside the
-            timed experiment.
+            <strong>Counterbalance and repeat.</strong> Freeze repetition counts and seeded variant
+            order before each experiment. Provider-side cache state is inherited, not controlled.
+            Wall-clock results include network and service variability; builds and full verification
+            run outside the timed experiment.
           </li>
           <li>
-            <strong>Limit the claim.</strong> A scoped improvement requires the planned matrix to
-            finish, matched configurations, complete usage, every oracle passing, and a positive
-            lower bound in a descriptive case-cluster bootstrap (2,000 resamples). Three authored
-            cases are a pilot, not a population-level confidence estimate. The JSON includes
-            individual measurements and build provenance.
+            <strong>Separate screening from claims.</strong> A small suite can identify promising
+            changes, but it cannot establish unchanged quality. Our product claim gate requires a
+            frozen confirmation run on at least 50 held-out tasks from 20 independent source
+            families, independent quality acceptance of original patches, complete agent cost
+            accounting, replication, and recorded resource and cache conditions. The lower
+            confidence bound must show at least a 10% time or cost improvement and rule out a
+            quality regression exceeding two percentage points. Those are reporting thresholds, not
+            guarantees; satisfying the minimum sample alone does not pass the gate. Related seeded
+            defects share a source-family cluster in the 2,000-resample bootstrap. These claims
+            concern agent execution; human review time is a separate, optional measurement.
           </li>
         </ol>
         <p>

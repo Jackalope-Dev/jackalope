@@ -262,6 +262,91 @@ impl TaskRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    #[ignore = "Live production routing assessment; requires JACKALOPE_JEV_SPEC and JACKALOPE_JEV_TEST_KEY"]
+    async fn installed_routing_assessment() {
+        let path = PathBuf::from(std::env::var("JACKALOPE_JEV_SPEC").unwrap());
+        let key = std::env::var("JACKALOPE_JEV_TEST_KEY").unwrap();
+        let spec: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let options: Options = serde_json::from_value(spec["options"].clone()).unwrap();
+        options.validate().unwrap();
+        let candidates: Vec<_> = options
+            .models
+            .iter()
+            .enumerate()
+            .map(|(i, model)| {
+                super::super::tests::candidate(
+                    &format!("worker_{i}"),
+                    &model.adapter,
+                    &model.model,
+                    None,
+                )
+            })
+            .collect();
+        let mut trials = Vec::new();
+        for task in spec["cases"].as_array().unwrap() {
+            let workspace =
+                std::env::temp_dir().join(format!("jackalope-routing-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&workspace).unwrap();
+            for (name, content) in task["files"].as_object().unwrap() {
+                let relative = PathBuf::from(name);
+                assert!(relative
+                    .components()
+                    .all(|part| matches!(part, std::path::Component::Normal(_))));
+                let target = workspace.join(relative);
+                std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+                std::fs::write(target, content.as_str().unwrap()).unwrap();
+            }
+            for args in [
+                vec!["init", "-b", "main"],
+                vec!["config", "user.name", "Evaluation fixture"],
+                vec!["config", "user.email", "evaluation@example.invalid"],
+                vec!["config", "commit.gpgsign", "false"],
+                vec!["add", "."],
+                vec!["commit", "-m", "Evaluation fixture"],
+            ] {
+                let mut command = std::process::Command::new("git");
+                command.args(args).current_dir(&workspace);
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    command.creation_flags(0x08000000);
+                }
+                assert!(command.output().unwrap().status.success());
+            }
+            let req: RunRequest = serde_json::from_value(json!({
+                "id":uuid::Uuid::new_v4().to_string(), "projectId":uuid::Uuid::new_v4().to_string(),
+                "projectName":"Routing assessment", "projectPath":workspace, "agent":"auto",
+                "prompt":task["prompt"], "verifyCommand":task["check"], "isolated":true, "connectionIds":[], "effort":"balanced"
+            }))
+            .unwrap();
+            let run = TaskRun::default();
+            let started = std::time::Instant::now();
+            let payload = request(&req, &run, &candidates, json!({}), &options);
+            let response = jev::evaluate(&key, &payload, || false).await;
+            let selection_result = response
+                .as_ref()
+                .ok()
+                .map(|value| selection(value, &candidates, &options, &json!({})));
+            let selected = selection_result
+                .as_ref()
+                .and_then(|result| result.as_ref().ok());
+            let selection_error = selection_result
+                .as_ref()
+                .and_then(|result| result.as_ref().err());
+            let model = selected
+                .as_ref()
+                .and_then(|choice| candidates.iter().find(|c| c.id == choice.candidate_id))
+                .and_then(|c| c.model.clone());
+            trials.push(json!({"case":task["id"], "selectedModel":model, "choice":selected,
+                "elapsedMs":started.elapsed().as_millis(), "usage":response.as_ref().ok().map(jev::usage),
+                "returnedModel":response.as_ref().ok().and_then(|v|v["model"].as_str()),
+                "answers":response.as_ref().ok().map(|v| &v["answers"]), "error":response.err(), "selectionError":selection_error,
+                "rubricRevision":2, "inputHash":crate::commands::decisions::context::fingerprint(&payload)}));
+            std::fs::write(path.with_extension("results.json"), serde_json::to_vec_pretty(&json!({"trials":trials,"scope":"Production Jev request and selection logic with unknown capacity and no accepted-cost history. Selection alone is not downstream quality or savings evidence."})).unwrap()).unwrap();
+        }
+    }
+
     fn answer() -> Value {
         json!({"answers":{"ambiguity":{"type":"noul","noul":0.1},
             "fit_a":{"type":"score","score":2.5,"confidence":0.5,"probabilities":{"0":0,"1":0,"2":0.5,"3":0.5}},

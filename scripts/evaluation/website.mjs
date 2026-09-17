@@ -43,7 +43,14 @@ const discovery = data.discovery
       ),
     )
   : null;
-const output = `${JSON.stringify({ date: data.date, environment: data.environment, agentTrials: identities.size, comparisons, discovery }, null, 2)}\n`;
+const experiments = (data.experiments ?? []).map(({ trialMeasurements, ...experiment }) => {
+  for (const row of trialMeasurements ?? []) identities.add(row.trialId);
+  return experiment;
+});
+const routingAssessment = data.routingAssessment
+  ? { ...data.routingAssessment, trials: undefined }
+  : null;
+const output = `${JSON.stringify({ date: data.date, environment: data.environment, agentTrials: identities.size, comparisons, discovery, experiments, routingAssessment, screeningStatus: data.screeningStatus ?? null }, null, 2)}\n`;
 if (process.argv.includes('--check')) {
   if (
     JSON.stringify(JSON.parse(await readFile(target, 'utf8'))) !==

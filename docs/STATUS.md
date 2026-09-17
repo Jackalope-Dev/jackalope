@@ -142,6 +142,12 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   MCP result selection retains expandable source data without repeating calls.
   Matched comparison exports omit private receipts and gate scoped public claims;
   representative quality, monetary savings and installed acceptance remain open.
+  Independent experiment switches cover final-phase and task-scoped guidance,
+  available tool exposure, exact read-only tool lookup, explicit source preparation,
+  field selection, maps and continuation
+  context. Source-attributed repair fixtures, multi-turn accounting, model-price
+  bounds and randomized human review exports support screening before confirmation.
+  Screening can stop between matched repetitions while retaining interrupted attempts.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup includes project, agents, decisions, behavior, appearance and an optional
   first task. Theme editors open directly; existing saved app/project choices remain compatible.

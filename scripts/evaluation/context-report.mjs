@@ -192,8 +192,9 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
         {
           reductionPercent: savings,
           interval: confidence,
-          eligibleForScopedClaim:
+          eligibleForPilotSignal:
             blockers.length === 0 && confidence !== null && confidence.low > 0,
+          eligibleForScopedClaim: false,
         },
       ];
     }),
@@ -213,10 +214,11 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
         totals[candidate].mcpReceivedBytes,
         totals[candidate].mcpDeliveredBytes,
       ),
-      eligibleForScopedClaim:
+      eligibleForPilotSignal:
         blockers.length === 0 &&
         totals[candidate].mcpReceivedBytes > totals[candidate].mcpDeliveredBytes &&
         measured(totals[candidate].mcpDeliveredBytes),
+      eligibleForScopedClaim: false,
       scope:
         'Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction.',
     },

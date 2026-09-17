@@ -55,10 +55,18 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
       const rules =
         version === 1
           ? ((legacyGuidelines as Record<string, string[]>)[skillId] ?? skill.guidelines)
-          : version === 2
+          : version === 2 || version === 4
             ? ((versionTwoGuidelines as Record<string, string[]>)[skillId] ?? skill.guidelines)
             : skill.guidelines;
-      for (const rule of rules) {
+      const workflowRules =
+        version === 4 && skillId === 'systematic-debugging'
+          ? [
+              'Inspect the affected code and establish the cause. Run a reproduction check before implementation only when its result is needed to choose the fix or explicit user or repository instructions require it.',
+              'Preserve unrelated behavior and existing work. Complete the coherent implementation before batching required tests and builds in final verification.',
+              'Verify the fix and affected boundaries, including repository-required checks. Repeat passing checks only after relevant changes, failures or unresolved concerns.',
+            ]
+          : rules;
+      for (const rule of workflowRules) {
         skillGuidelines.add(rule);
       }
     }
@@ -102,12 +110,13 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
   const sections: string[] = [];
 
   // 1. Primary User Objective
-  sections.push(`${version < 3 ? '### 🎯 Objective' : 'Task'}\n${trimmedRaw}`);
+  const compact = version === 3;
+  sections.push(`${!compact ? '### 🎯 Objective' : 'Task'}\n${trimmedRaw}`);
 
   // 2. Project Rules if present
   if (hasProjectRules) {
     const rulesBlock = projectRules.map((r) => `- ${r}`).join('\n');
-    sections.push(`${version < 3 ? '### 📋 Project Rules' : 'Project rules'}\n${rulesBlock}`);
+    sections.push(`${!compact ? '### 📋 Project Rules' : 'Project rules'}\n${rulesBlock}`);
   }
 
   // 3. Workflow Guidelines & Constraints
@@ -118,7 +127,7 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
     const priority =
       version === 1 ? '' : 'Apply relevant guidance; explicit user instructions take precedence.\n';
     sections.push(
-      `${version < 3 ? '### 📐 Guidelines & Quality Constraints' : 'Relevant guidance'}\n${priority}${guidelinesBlock}`,
+      `${!compact ? '### 📐 Guidelines & Quality Constraints' : 'Relevant guidance'}\n${priority}${guidelinesBlock}`,
     );
   }
 
@@ -128,7 +137,7 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
       .map((t) => `- **${t.name}**: ${t.description} (Capabilities: ${t.capabilities.join(', ')})`)
       .join('\n');
     sections.push(
-      `${version < 3 ? '### 🛠️ Active Tools & Capabilities' : 'Selected tools'}\n${toolsBlock}`,
+      `${!compact ? '### 🛠️ Active Tools & Capabilities' : 'Selected tools'}\n${toolsBlock}`,
     );
   }
 
