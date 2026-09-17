@@ -1125,7 +1125,7 @@ async fn per_agent_discovery_runs_concurrently_not_sequentially() {
 }
 
 #[test]
-fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_stop() {
+fn agent_and_automatic_verification_reuse_only_an_unchanged_checked_snapshot_and_honor_stop() {
     let root = std::env::temp_dir().join(format!("jackalope-finish-{}", uuid::Uuid::new_v4()));
     let workspace = root.join("repo");
     std::fs::create_dir_all(&workspace).unwrap();
@@ -1168,6 +1168,16 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
         .unwrap();
     assert!(first.result.success);
     assert!(first.tree.is_some());
+    let verify = || {
+        tauri::async_runtime::block_on(crate::commands::verification::agent_verify(
+            runtime.clone(),
+            run.clone(),
+            serde_json::from_value(serde_json::json!({})).unwrap(),
+        ))
+    };
+    let recovered = verify().unwrap();
+    assert_eq!(recovered["reused"], true);
+    assert_eq!(recovered["check_id"], first.checked_at);
     crate::commands::verification::finish(&runtime, &run.id).unwrap();
     assert_eq!(
         std::fs::read_to_string(workspace.join(".git/check-count"))
@@ -1177,6 +1187,7 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
         1
     );
     std::fs::write(workspace.join("result.txt"), "new output").unwrap();
+    assert_eq!(verify().unwrap()["reused"], false);
     crate::commands::verification::finish(&runtime, &run.id).unwrap();
     assert_eq!(
         std::fs::read_to_string(workspace.join(".git/check-count"))
@@ -1185,7 +1196,20 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
             .count(),
         2
     );
+    for invalid in ["failed", "unbound", "different command"] {
+        runtime.update(&run.id, |current| {
+            let check = current.verification.as_mut().unwrap();
+            match invalid {
+                "failed" => check.result.success = false,
+                "unbound" => check.tree = None,
+                _ => check.command = "different".into(),
+            }
+        });
+        assert_eq!(verify().unwrap()["reused"], false, "{invalid}");
+    }
+    assert_eq!(verify().unwrap()["reused"], true);
     runtime.stop(&run.id).unwrap();
+    assert!(verify().is_err());
     std::fs::write(workspace.join("result.txt"), "changed again").unwrap();
     crate::commands::verification::finish(&runtime, &run.id).unwrap();
     assert_eq!(
@@ -1193,7 +1217,7 @@ fn automatic_verification_reuses_only_an_unchanged_checked_snapshot_and_honors_s
             .unwrap()
             .lines()
             .count(),
-        2
+        5
     );
     drop(runtime);
     std::fs::remove_dir_all(root).unwrap();

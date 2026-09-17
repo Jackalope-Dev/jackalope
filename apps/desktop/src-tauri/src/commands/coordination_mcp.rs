@@ -609,7 +609,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Run this attempt's saved project check by calling with {}. No command or args are needed; project.verification.command shows the exact saved command. Replacements and extra arguments are rejected. Runs in the task directory with bounded execution, stall and cancellation controls. Returns exit code, stdout and stderr. Long successful output may omit passing-test lines; use verification_output with check_id to read stored output. Failures remain intact within capture limits.",
+        description = "Run this attempt's saved project check by calling with {}. No command or args are needed; project.verification.command shows the exact saved command. Replacements and extra arguments are rejected. Reuses a successful result only when the command and workspace snapshot still match. Runs in the task directory with bounded execution, stall and cancellation controls. Returns exit code, stdout and stderr. Long successful output may omit passing-test lines. If the response is lost or times out, call verification_output with {} to recover the latest stored result without rerunning. Failures remain intact within capture limits.",
         annotations(read_only_hint = false, open_world_hint = false)
     )]
     async fn computer_verify(
@@ -629,7 +629,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Read this attempt's latest stored verification stdout or stderr using check_id from computer_verify. offset and limit count Unicode characters; follow next_offset for more. Does not rerun the command.",
+        description = "Read this attempt's latest stored verification result without rerunning the command. Call with {} after a lost or timed-out computer_verify response to recover check_id, success, exit code and stdout. This reports the saved check, not whether subsequent edits remain verified. Use stream stderr for errors; offset and limit count Unicode characters. Provide the returned check_id when following next_offset so pages cannot mix different checks.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn verification_output(

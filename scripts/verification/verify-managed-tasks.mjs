@@ -423,6 +423,39 @@ try {
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-working.png`,
         fullPage: true,
       });
+      const live = page
+        .locator('.managed-assignment')
+        .filter({ has: page.getByRole('region', { name: 'Live activity' }) })
+        .first();
+      await page.evaluate(() => {
+        const worker = window.fixture.runs.find((run) => run.id === 'worker');
+        worker.activity = ['Reading src/task.ts', 'Searching the project', 'Editing src/task.ts'];
+        worker.progress = null;
+        window.fixture.sync();
+      });
+      await live.getByText('Editing src/task.ts', { exact: true }).waitFor();
+      assert.equal(await live.locator('.task-live-recent li').count(), 2);
+      await page.evaluate(() => {
+        const worker = window.fixture.runs.find((run) => run.id === 'worker');
+        worker.progress = {
+          step: 'verification',
+          label: 'Running project checks',
+          detail: 'Compiling task_runtime v1.0.0',
+          startedAt: new Date().toISOString(),
+          attempt: 1,
+        };
+        window.fixture.sync();
+      });
+      await live.getByText('Compiling task_runtime v1.0.0', { exact: true }).waitFor();
+      assert.equal(await taskHeading.evaluate((el) => el === document.activeElement), true);
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+        false,
+      );
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-live-checks.png`,
+        fullPage: true,
+      });
       await page.getByRole('button', { name: 'Stop task' }).click();
       await page.getByRole('button', { name: 'Retry assignment' }).waitFor();
       await page.screenshot({

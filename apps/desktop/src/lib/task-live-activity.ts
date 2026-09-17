@@ -9,7 +9,12 @@ export function activityLine(text: string) {
 export function activityKind(
   text: string,
 ): 'attention' | 'read' | 'edit' | 'search' | 'check' | 'activity' {
-  if (/failed|denied|error|blocked/i.test(text)) return 'attention';
+  if (
+    /^(tool request failed|file change failed|error\b|permission denied)|(?: · |: )(failed|error|denied)$/i.test(
+      text,
+    )
+  )
+    return 'attention';
   if (/^(reading|using read)/i.test(text)) return 'read';
   if (/^(editing|writing|changed|using (edit|write))/i.test(text)) return 'edit';
   if (/search|using (grep|glob)/i.test(text)) return 'search';

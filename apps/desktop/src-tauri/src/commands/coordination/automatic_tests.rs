@@ -87,7 +87,7 @@ async fn help_and_verification_output_require_the_current_attempt_credential() {
     let state = || WebState(f.service.clone());
     let input = || {
         Json(super::super::verification::output::OutputRequest {
-            check_id: "check-1".into(),
+            check_id: Some("check-1".into()),
             stream: "stdout".into(),
             offset: 0,
             limit: None,

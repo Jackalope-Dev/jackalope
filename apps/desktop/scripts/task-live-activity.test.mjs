@@ -34,4 +34,5 @@ test('questions and stopping do not imply that the agent is still editing', () =
   assert.deepEqual(liveActivity({ ...run, status: 'stopping' }).recent, []);
   assert.equal(liveActivity({ ...run, status: 'review' }), null);
   assert.equal(liveActivity({ ...run, activity: ['Tool request failed'] }).kind, 'attention');
+  assert.equal(liveActivity({ ...run, activity: ['Reading src/error-handler.ts'] }).kind, 'read');
 });

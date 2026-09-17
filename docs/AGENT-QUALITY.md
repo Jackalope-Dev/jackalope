@@ -42,8 +42,12 @@ provider's own GUI.
 - `computer_verify` omits recognized passing-test lines only from long successful
   responses, preserving diagnostics and stderr. Failed output remains intact within
   the existing capture limit. `verification_output` (HTTP `/v1/computer/output`)
-  retrieves the latest saved check by ID in Unicode character ranges. Stored results
-  and the review UI retain captured output. Neither operation permits a new command.
+  accepts `{}` to recover the latest saved result and check ID after a lost or
+  timed-out response. Further output pages require that ID to prevent mixing checks.
+  Stored results and the review UI retain captured output. Neither operation permits
+  a new command. Agent verification reuses a passing result only when the saved
+  command and Git workspace snapshot still match; changed, failed or unbound checks
+  execute again. Reading output alone does not verify subsequent edits.
 - Codex receives permission to invoke verification only when the task has a saved
   check. `computer_verify {}` runs that attempt's saved command; `project.verification`
   exposes the command and automatic-check setting. Launch guidance names the saved

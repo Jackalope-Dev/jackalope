@@ -71,7 +71,7 @@ test('return view selects latest attempts, prioritizes blockers and retains revi
   const blocker = { ...run, id: 'blocked', taskId: 'other', status: 'interrupted' };
   const reviewed = { ...run, id: 'reviewed', taskId: 'third', status: 'reviewed' };
   assert.deepEqual(
-    returnToProject([run, latest, blocker, reviewed], 'p', []).map((r) => r.id),
+    returnToProject([run, latest, blocker, reviewed], 'p', []).map((item) => item.run.id),
     ['blocked', 'new', 'reviewed'],
   );
   assert.deepEqual(returnToProject([run, latest], 'p', ['new']), []);

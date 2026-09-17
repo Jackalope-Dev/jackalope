@@ -38,10 +38,12 @@ export function TaskLiveActivity({ run }: { run: TaskRun }) {
           </span>
         )}
       </div>
-      <div className="task-live-current" data-kind={state.kind}>
-        <Icon size={16} aria-hidden="true" />
-        <span>{state.current}</span>
-      </div>
+      {state.current !== state.phase && (
+        <div className="task-live-current" data-kind={state.kind}>
+          <Icon size={16} aria-hidden="true" />
+          <span>{state.current}</span>
+        </div>
+      )}
       {!!state.recent.length && (
         <ol className="task-live-recent" aria-label="Recent activity">
           {state.recent.map((line) => (

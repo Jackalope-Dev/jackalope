@@ -260,11 +260,8 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
     }) {
         return Err("Checks could not start while another attempt owns this workspace.".into());
     }
-    if let Some(check) = &run.verification {
-        let tree = super::integration::workspace_tree(run, &runtime.integration_directory())?;
-        if check.command == command && check.result.success && check.tree.as_ref() == Some(&tree) {
-            return Ok(());
-        }
+    if reusable_check(runtime, run, command)?.is_some() {
+        return Ok(());
     }
     let _lease = leases::reserve(&run.workspace)?;
     drop(guard);
@@ -272,21 +269,48 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
     Ok(())
 }
 
+fn reusable_check<'a>(
+    runtime: &TaskRuntime,
+    run: &'a TaskRun,
+    command: &str,
+) -> Result<Option<&'a Verification>, String> {
+    let Some(check) = run
+        .verification
+        .as_ref()
+        .filter(|check| check.command == command && check.result.success && check.tree.is_some())
+    else {
+        return Ok(None);
+    };
+    let tree = super::integration::workspace_tree(run, &runtime.integration_directory())?;
+    Ok((check.tree.as_ref() == Some(&tree)).then_some(check))
+}
+
 pub async fn agent_verify(
     runtime: TaskRuntime,
     run: TaskRun,
     input: super::harness::ComputerVerifyInput,
 ) -> Result<serde_json::Value, String> {
-    let command = agent_command(run.verify_command.as_deref(), &input)?.to_string();
     tauri::async_runtime::spawn_blocking(move || {
         let guard = super::integration::execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|current| current.id == run.id)
+            .ok_or("Task not found")?;
+        let command = agent_command(run.verify_command.as_deref(), &input)?;
         if !runtime.is_running(&run.id) {
             return Err("This attempt is no longer active.".into());
         }
         let _lease = leases::reserve(&run.workspace)?;
+        if let Some(check) = reusable_check(&runtime, run, command)? {
+            let mut response = output::response(check);
+            response["reused"] = true.into();
+            return Ok(response);
+        }
         drop(guard);
-        let result = execute(&runtime, &run, &command)?;
-        let response = output::response(&result);
+        let result = execute(&runtime, run, command)?;
+        let mut response = output::response(&result);
+        response["reused"] = false.into();
         runtime.update_checked(&run.id, |current| {
             current.efficiency.verification(
                 &result.result.stdout,

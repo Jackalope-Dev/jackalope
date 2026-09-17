@@ -6,11 +6,16 @@ use serde_json::{json, Value};
 #[derive(Deserialize, rmcp::schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OutputRequest {
-    pub check_id: String,
+    pub check_id: Option<String>,
+    #[serde(default = "stdout_stream")]
     pub stream: String,
     #[serde(default)]
     pub offset: usize,
     pub limit: Option<usize>,
+}
+
+fn stdout_stream() -> String {
+    "stdout".into()
 }
 
 pub(super) fn response(check: &Verification) -> Value {
@@ -48,10 +53,18 @@ pub(super) fn response(check: &Verification) -> Value {
 
 pub fn read(check: Option<&Verification>, input: OutputRequest) -> Result<Value, String> {
     let check = check.ok_or("This attempt has no saved verification output")?;
-    if input.check_id != check.checked_at {
+    if input
+        .check_id
+        .as_ref()
+        .is_some_and(|id| id != &check.checked_at)
+    {
         return Err(
-            "Verification changed. Read the latest check before requesting its output.".into(),
+            "Verification changed. Call verification_output with {} to read the latest check."
+                .into(),
         );
+    }
+    if input.offset > 0 && input.check_id.is_none() {
+        return Err("Provide check_id when continuing a stored output page.".into());
     }
     let text = match input.stream.as_str() {
         "stdout" => &check.result.stdout,
@@ -70,6 +83,8 @@ pub fn read(check: Option<&Verification>, input: OutputRequest) -> Result<Value,
     let next = input.offset + content.chars().count();
     Ok(
         json!({"check_id":check.checked_at,"stream":input.stream,"text":content,
+        "command":check.command,"success":check.result.success,"exit_code":check.result.exit_code,
+        "timed_out":check.result.timed_out,"duration_ms":check.result.duration_ms,
         "offset":input.offset,"next_offset":if next<total {Some(next)}else{None},
         "total_characters":total,"capture_truncated":check.result.truncated}),
     )
@@ -106,7 +121,7 @@ mod tests {
         let mut check = check(true);
         check.result.stdout = "one🦊two".into();
         let input = |id: &str| OutputRequest {
-            check_id: id.into(),
+            check_id: Some(id.into()),
             stream: "stdout".into(),
             offset: 3,
             limit: Some(1),
@@ -115,5 +130,27 @@ mod tests {
         assert_eq!(page["text"], "🦊");
         assert_eq!(page["next_offset"], 4);
         assert!(read(Some(&check), input("older-receipt")).is_err());
+    }
+
+    #[test]
+    fn lost_response_can_be_recovered_without_a_check_id() {
+        for success in [true, false] {
+            let check = check(success);
+            let page = read(Some(&check), serde_json::from_value(json!({})).unwrap()).unwrap();
+            assert_eq!(page["check_id"], "receipt-1");
+            assert_eq!(page["success"], success);
+            assert_eq!(page["exit_code"], if success { 0 } else { 1 });
+            assert_eq!(page["stream"], "stdout");
+            assert!(page["text"]
+                .as_str()
+                .unwrap()
+                .contains("preserve this diagnostic"));
+            assert!(read(
+                Some(&check),
+                serde_json::from_value(json!({"offset": 1})).unwrap()
+            )
+            .is_err());
+        }
+        assert!(read(None, serde_json::from_value(json!({})).unwrap()).is_err());
     }
 }
