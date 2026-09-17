@@ -355,14 +355,17 @@ try {
       await page.getByRole('searchbox', { name: 'Search activity' }).waitFor();
       assert.equal(await activity.evaluate((el) => el === document.activeElement), true);
       await page.locator('summary').filter({ hasText: 'Using Read' }).waitFor();
-      await activity.press('ArrowRight');
+      await details.focus();
+      await details.press('Enter');
       await page.getByRole('heading', { name: 'Your request', exact: true }).waitFor();
       await page.getByRole('heading', { name: 'Usage', exact: true }).waitFor();
       await page.screenshot({
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-details.png`,
         fullPage: true,
       });
-      await details.press('Home');
+      await details.press('Enter');
+      await activity.focus();
+      await activity.press('Home');
       await page.getByRole('heading', { name: 'Planning your task' }).waitFor();
       assert.equal(await page.locator('#managed-attempt-result').count(), 0);
       await page.evaluate(() => {
@@ -533,6 +536,7 @@ try {
       await details.focus();
       await details.press('Enter');
       await page.getByRole('heading', { name: 'Your request', exact: true }).waitFor();
+      await details.press('Enter');
       await overview.click();
       await review.focus();
       await page.screenshot({

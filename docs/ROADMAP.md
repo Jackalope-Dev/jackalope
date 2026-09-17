@@ -48,7 +48,7 @@ are implemented, alongside cross-project attention on Chat, remembered task sect
 and changes since the last review.
 Issue, PR-feedback, CI-repair and dependency-update starters prepare editable requests;
 GitHub evidence is read-only. Lesson receipts explain selection, and optional local
-usefulness ratings and review minutes feed a report with explicit history coverage.
+usefulness ratings and review minutes stay local to each task.
 Real daily-use and quality improvements still require observed trials.
 
 Jackalope Decisions provides project-scoped local rules, agent-powered decisions and

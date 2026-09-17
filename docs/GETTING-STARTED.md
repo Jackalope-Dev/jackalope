@@ -36,8 +36,8 @@ in the worktree before preparing another integration. Source worktrees are kept.
 
 Use **Changes since my last review** to inspect the next iteration against a saved
 review position. Marking files seen does not accept them. Chat's start page shows work
-waiting across your projects. Optional usefulness ratings and review time remain local
-and can be summarized in **Usage → Useful work and review effort**.
+waiting across your projects. Optional usefulness ratings and review time are saved
+locally with each task. **Usage & quota** shows account limits and recorded token activity.
 
 **Session limits** can pause after a number of batches or at an estimated dollar
 threshold. A running batch can exceed that estimate; these are not provider billing

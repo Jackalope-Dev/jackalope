@@ -465,7 +465,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
               )}
             </section>
           )}
-          {work.combined && !isActive(work.combined) && (
+          {work.combined && !isActive(work.combined) && !detail && (
             <section ref={resultRef} className="managed-result" aria-label="Complete task result">
               <div className="managed-result-toolbar">
                 <div className="managed-result-agent">

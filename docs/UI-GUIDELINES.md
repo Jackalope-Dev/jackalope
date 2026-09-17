@@ -36,13 +36,32 @@ Remove repeated instructions, slogans, decorative status labels and normal-state
 footnotes. Preserve accessible names, dialog descriptions and consequential
 information about cost, permissions, data loss, consent and recovery.
 
-Task titles should be short objectives, with original instructions in Details.
+Task titles should be short objectives, with original instructions in task details under Activity.
 Results lead with output; review leads with the diff and a compact checks area.
-Use outlined buttons for secondary actions, visible selected tabs, and disclosures
-for optional evidence and tools. Keep follow-up compact so the result remains usable
+Task, managed-task and chat review reuse `ResultReview`; file navigation and diffs
+reuse `ChangedFiles`. Keep delivery actions in Review and one follow-up composer
+per task. Worker links resolve to their parent task instead of a second result screen.
+Use outlined buttons for secondary actions, visible selected tabs, and open sections
+for results, checks and next actions. Keep follow-up compact so the result remains usable
 at 960 by 640. Existing work should be visible before opening new-task capture.
 Chat leads with its composer and places work needing attention underneath. Keep
 optional session limits, workflow starters and context controls in its options menu.
+
+Visible content is the default. Use short headings, spacing, compact lists and clear
+buttons to make a page scannable. Do not build pages from stacks of accordions or
+collapsed sections. Remove low-value content and repeated copy instead of hiding it
+behind an expander.
+
+Keep the current state, main output, required inputs, next action and blocking checks
+or errors visible without expanding anything. Tabs can separate distinct views;
+an options menu can hold secondary commands. Neither should conceal the information
+needed to understand the current view or make its main decision.
+
+Reserve disclosures for optional detail such as long logs, raw records or rarely used
+advanced settings. Give each one a specific label and keep any useful summary visible.
+Avoid nested disclosures and repeated expand-to-reach-an-action flows. A short section
+with only one or two controls should normally remain open. Use shared keyboard and
+focus behavior whenever an optional disclosure is justified.
 
 Marketing can be expressive while showing actual product workflows. Keep
 availability and limitations beside the claims they qualify. Avoid invented
@@ -155,9 +174,9 @@ with the feature. Its containerClassName adjusts placement, while shared styles
 reserve space for the search and clear icons.
 
 Disclosure and DisclosureSummary render native details/summary elements, retaining
-open, name, onToggle and nested-section behavior. The shared chevron and focus style
+open, name and onToggle behavior. The shared chevron and focus style
 replace local markers. Wrap expanded content in DisclosureBody for consistent spacing
-between paragraphs, nested disclosures and controls. Table owns cell padding and its
+between paragraphs and controls. Table owns cell padding and its
 keyboard-scrollable container; avoid recreating table gutters in page styles.
 Use workspace-sections for section gaps, workspace-section with workspace-stack for
 heading/content spacing, and workspace-card-grid for responsive grids of up to three cards.

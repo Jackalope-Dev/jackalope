@@ -17,14 +17,16 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   Active task, plan and chat views show recent tool activity, workspace file labels and
   native check output from existing events, without extra model calls.
   Project opens an overview with unfinished work, setup and recorded local deliveries.
-- Chat's start page surfaces attention, review and active work across projects. Task
+- Chat's start page groups review and blocked work under Needs you, alongside active work across projects. Task
   and session sections remember where the user was reading. Project readiness distinguishes
   unavailable inspection from a clean checkout.
 - Result views prioritize unanswered questions, recovery and failed checks. Isolated
   work keeps review, merge into the target branch and workspace cleanup on the Review
-  tab. Short task titles preserve the full instructions in Details. Result leads with
-  output; Review shows the diff beside checks and evidence, with optional tools disclosed.
-  Preview, activity, details and delivery keep visible actions and a compact follow-up.
+  tab. Task, managed-task and chat reviews share a searchable changed-file browser,
+  checks and evidence; a blocked merge does not hide the workspace diff. Worker links
+  reopen the parent task. Result leads with output, Activity contains optional task
+  details, and Review contains PR/CI/delivery actions. Preview explains setup requirements
+  and attaches captured evidence to the single follow-up composer.
   The work list prioritizes existing tasks, with new capture opened explicitly.
   Running tasks offer saved
   queued follow-ups or explicit stop-and-send; queues pause after failures and restart.
@@ -111,9 +113,8 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup includes project, agents, decisions, behavior, appearance and an optional
   first task. Theme editors open directly; existing saved app/project choices remain compatible.
-- Optional local usefulness ratings and reported review minutes feed a seven-day workflow
-  report in Usage. Coverage is loaded history, with missing ratings/time explicit; copying
-  the aggregate report is a user action. This does not establish product retention or quality gains.
+- Review views save optional local usefulness ratings and reported review minutes with
+  each task. These self-reported values do not establish product retention or quality gains.
 
 ## Services and distribution
 

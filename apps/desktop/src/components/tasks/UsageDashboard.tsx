@@ -29,7 +29,6 @@ import { CapacityPanel } from './CapacityPanel';
 import { DecisionUsage, useTaskDecisionUsage } from './DecisionUsage';
 import { JevConnectionUsage } from './JevConnectionUsage';
 import { tokenLabel, UsageInsights } from './UsageInsights';
-import { WorkflowReport } from './WorkflowReport';
 export function UsageDashboard({
   view = 'tokens',
   onTask,
@@ -258,7 +257,6 @@ export function UsageDashboard({
         }
       />
 
-      <WorkflowReport />
       {view === 'analytics' ? (
         <>
           {loading && <p role="status">Loading saved task history…</p>}

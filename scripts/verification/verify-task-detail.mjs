@@ -112,7 +112,7 @@ try {
     await page.screenshot({ path: `${output}/load-failure.png` });
     throw error;
   }
-  assert.equal(await page.getByRole('tab').count(), 6);
+  assert.equal(await page.getByRole('tab').count(), 4);
   const tabs = page.getByRole('tablist', { name: 'Task sections' });
   await tabs.getByRole('tab', { name: 'Result', exact: true }).focus();
   await page.keyboard.press('ArrowRight');

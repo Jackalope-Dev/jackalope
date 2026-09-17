@@ -85,7 +85,7 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
  case 'task_preview_status': return f.preview ?? null;
  case 'task_preview_start': f.preview={port:5418,command:args.command,running:true,ready:true,output:'Ready',exitCode:null};return f.preview;
  case 'task_preview_inspect': return {screenshot:{id:'capture',name:'Preview capture',timestamp:new Date().toISOString(),filePath:'C:/preview.png',url:'http://localhost:5418/',mimeType:'image/png'},snapshot:'button Save [ref=save]',errors:''};
- case 'task_screenshot_read': return {dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='};
+ case 'task_screenshot': return Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='), c=>c.charCodeAt(0));
  case 'task_preview_inspect_cancel': return;
 
  case 'plugin:window|minimize': case 'plugin:window|close': return;
@@ -212,7 +212,7 @@ try {
     }),
   );
   await page.getByRole('button', { name: 'Review changes', exact: true }).click();
-  await page.getByText('1 file · Checks passed').waitFor();
+  await page.getByRole('navigation', { name: 'Changed files', exact: true }).waitFor();
   const calls = await page.evaluate(() => window.sessionFixture.calls.map((c) => c.command));
   assert.ok(calls.lastIndexOf('live_session_action') < calls.lastIndexOf('live_session_review'));
   await page.evaluate(() => window.sessionFixture.run({ verificationError: 'Check failed' }));

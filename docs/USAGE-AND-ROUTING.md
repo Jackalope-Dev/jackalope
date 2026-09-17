@@ -278,14 +278,18 @@ handoffs. Unknown usage or missing attempt history blocks later dispatch when a 
 threshold is set. A batch already running can exceed the threshold; there is no
 account-wide reservation or provider billing cap. Saving new limits never resumes work.
 
-The Usage page also offers a local workflow report. Review views save explicit useful/
-needs-work ratings and optional whole minutes spent reviewing or correcting. The
-seven-day aggregate uses loaded local task history and UTC dates. It counts task starts,
+Usage focuses on account limits, tokens, estimated cost and task activity. Review views
+save optional useful/needs-work ratings and whole minutes spent reviewing or correcting
+locally with each task.
+
+The native `workflow_report` command retains an aggregate for engineering diagnostics;
+it is not a Usage page section. Its seven-day window uses loaded local task history and
+UTC dates. It counts task starts,
 days with starts, follow-up attempts, failures, latest-attempt ratings and useful tasks
 with a prior failure. First-useful timing is measured from the first loaded task start
 to the earliest retained useful rating, not sign-in or installation. Superseded ratings
-are excluded; missing review minutes remain unknown. Copying exports aggregate values
-without prompts or project names. It neither sends telemetry nor measures retention.
+are excluded; missing review minutes remain unknown. Aggregate values exclude prompts
+and project names. The command neither sends telemetry nor measures retention.
 
 Enforced monetary budgets, calibrated routing estimates, proactive proposals and shared
 host accounting are future work in the [roadmap](ROADMAP.md). They must preserve

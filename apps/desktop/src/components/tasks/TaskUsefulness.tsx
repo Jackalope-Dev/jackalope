@@ -60,7 +60,7 @@ export function TaskUsefulness({ runId }: { runId: string }) {
       <div className="space-y-3 py-3">
         <h3>Was this result useful?</h3>
         <p className="task-muted">
-          Saved locally for your workflow report. This does not accept changes or send feedback.
+          Saved locally with this task. This does not accept changes or send feedback.
         </p>
         <label className="block">
           Minutes spent reviewing and correcting (optional)
