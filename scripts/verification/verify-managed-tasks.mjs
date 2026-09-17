@@ -7,7 +7,7 @@ const output = 'output/playwright/managed-tasks';
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  for (const width of [1280, 960, 540]) {
+  for (const width of [1920, 1280, 960, 540]) {
     for (const dark of [false, true]) {
       const context = await browser.newContext({
         viewport: { width, height: width === 960 ? 640 : 840 },
@@ -81,10 +81,11 @@ try {
               projectName: 'Fixture project',
               projectPath: 'C:/fixture',
               agent: 'codex',
-              status: 'review',
+              status: 'running',
               prompt: 'Plan task',
               result: 'Proposed work is ready.',
-              activity: [],
+              activity: ['Using Grep', 'Using Read'],
+              progress: { label: 'Checking repository boundaries', completed: 0, total: 1 },
               usage,
               startedAt: new Date().toISOString(),
               contextReceipt: {},
@@ -153,7 +154,10 @@ try {
               }
               if (command === 'task_plan_create') return f.task.id;
               if (command === 'queue_snapshot') return f.queue;
-              if (command === 'task_plan_preview') return f.steps;
+              if (command === 'task_plan_preview') {
+                if (f.previewError) throw Error('The saved plan could not be loaded.');
+                return f.steps;
+              }
               if (command === 'task_plan_start') {
                 assertFixture(args.plannerRunId === 'planner');
                 f.task.started = true;
@@ -164,6 +168,7 @@ try {
                   projectId: 'fixture',
                   runId: index === 0 ? 'worker' : null,
                   dependencies: s.dependsOn,
+                  agent: s.agent,
                 }));
                 f.queue.enabledProjects = ['managed:parent'];
                 f.task.runIds.push('worker');
@@ -172,12 +177,17 @@ try {
                   id: 'worker',
                   taskId: 'worker',
                   status: 'running',
+                  progress: { label: 'Implementing API changes', completed: 0, total: 1 },
                   startedAt: new Date().toISOString(),
                 });
                 f.sync();
                 return;
               }
               if (command === 'task_plan_action') {
+                if (args.action === 'retry-plan') {
+                  f.runs[0].status = 'running';
+                  f.runs[0].error = null;
+                }
                 if (args.action === 'pause') f.queue.enabledProjects = [];
                 if (args.action === 'stop') {
                   f.queue.enabledProjects = [];
@@ -257,16 +267,16 @@ try {
       await page.route(`${origin}/managed-fixture.html`, (route) =>
         route.fulfill({
           contentType: 'text/html',
-          body: `<!doctype html><html><head><meta charset="utf-8"><title>Managed task browser fixture</title></head><body><div id="root"></div><script type="module">
+          body: `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Managed task browser fixture</title></head><body><div id="root"></div><script type="module">
       import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>type=>type; window.__vite_plugin_react_preamble_installed__=true;
       const source=await fetch('/src/components/tasks/ManagedTaskView.tsx').then(r=>r.text());const reactUrl=source.split('"').find(url=>url.includes('/react.js?'));const {default:React}=await import(reactUrl);const mainSource=await fetch('/src/main.tsx').then(r=>r.text());const domUrl=mainSource.split('"').find(url=>url.includes('/react-dom_client.js?'));const {default:ReactDOM}=await import(domUrl);
-      await import('/src/index.css');await import('/src/components/ui/experience.css');await import('/src/components/tasks/task-workspace.css');
+      await import('/src/index.css');await import('/src/components/ui/experience.css');await import('/src/components/tasks/task-workspace.css');await import('/src/components/sessions/live-session.css');
       const {useThemeStore}=await import('/src/stores/themeStore.ts');const theme=useThemeStore.getState();theme.setAppTheme({...theme.appTheme,appearance:'manual',isDark:window.fixture.dark});
       const {useProjectStore}=await import('/src/stores/projectStore.ts');const {useExecutionStore}=await import('/src/stores/executionStore.ts');const {useManagedTaskStore}=await import('/src/stores/managedTaskStore.ts');
       const f=window.fixture;const project={id:'fixture',name:'Fixture project',path:'C:/fixture',gitBranch:'main',worktrees:[],preferences:{verifyCommand:'node check.mjs',autoVerify:true}};useProjectStore.setState({projects:[project],activeProjectId:'fixture'});
       f.sync=()=>{useExecutionStore.setState({runs:structuredClone(f.runs),refresh:async()=>{},select:()=>{}});useManagedTaskStore.setState({queue:structuredClone(f.queue),refresh:async()=>f.sync()});};f.sync();
       const {ManagedTaskView}=await import('/src/components/tasks/ManagedTaskView.tsx');const {useTaskAssessment,TaskAssessmentNotice}=await import('/src/components/tasks/useTaskAssessment.tsx');const {DecisionUsage,useTaskDecisionUsage}=await import('/src/components/tasks/DecisionUsage.tsx');
-      function App(){const assessment=useTaskAssessment();const decisionUsage=useTaskDecisionUsage();const selected=useManagedTaskStore(s=>s.selectedId);const task=useManagedTaskStore(s=>s.queue.managedTasks[0]);const [error,setError]=React.useState('');const act=fn=>fn().catch(e=>setError(String(e)));return React.createElement('main',{style:{maxWidth:1100,width:'100%',margin:'auto'}},selected?React.createElement(ManagedTaskView,{task,onBack:()=>useManagedTaskStore.getState().select(null)}):React.createElement(React.Fragment,null,React.createElement('h1',null,'Start a task'),React.createElement('button',{onClick:()=>act(()=>assessment.assess(f.request,f.request.prompt))},'Assess fixture'),React.createElement(TaskAssessmentNotice,{assessment:assessment.assessment,busy:assessment.busy,onCancel:()=>act(assessment.cancel),onSingle:()=>{},onPlan:()=>act(()=>assessment.create(f.request,f.request.prompt))}),React.createElement('p',{role:'status'},error)),!selected&&React.createElement(DecisionUsage,{...decisionUsage,projectId:'fixture'}));}
+      function App(){const assessment=useTaskAssessment();const decisionUsage=useTaskDecisionUsage();const selected=useManagedTaskStore(s=>s.selectedId);const task=useManagedTaskStore(s=>s.queue.managedTasks[0]);const [error,setError]=React.useState('');const act=fn=>fn().catch(e=>setError(String(e)));return React.createElement('main',{className:'live-hub',style:{height:'100dvh',width:'100%'}},selected?React.createElement('div',{className:'live-hub-body'},React.createElement('div',{className:'live-hub-canvas'},React.createElement(ManagedTaskView,{task,onBack:()=>useManagedTaskStore.getState().select(null)}))):React.createElement(React.Fragment,null,React.createElement('h1',null,'Start a task'),React.createElement('button',{onClick:()=>act(()=>assessment.assess(f.request,f.request.prompt))},'Assess fixture'),React.createElement(TaskAssessmentNotice,{assessment:assessment.assessment,busy:assessment.busy,onCancel:()=>act(assessment.cancel),onSingle:()=>{},onPlan:()=>act(()=>assessment.create(f.request,f.request.prompt))}),React.createElement('p',{role:'status'},error)),!selected&&React.createElement(DecisionUsage,{...decisionUsage,projectId:'fixture'}));}
       ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
       </script></body></html>`,
         }),
@@ -278,6 +288,108 @@ try {
       await page.waitForFunction(() => !!window.fixture.pending);
       await page.evaluate(() => window.fixture.pending(window.fixture.assessment));
       await page.getByRole('button', { name: 'Create a plan', exact: true }).click();
+      const overview = page.getByRole('tab', { name: 'Overview', exact: true });
+      const activity = page.getByRole('tab', { name: 'Activity', exact: true });
+      const details = page.getByRole('tab', { name: 'Details', exact: true });
+      await page.getByRole('heading', { name: 'Planning your task' }).waitFor();
+      const planningCharacter = page.locator('.managed-planning-status .brand-agent-character');
+      assert.equal(await planningCharacter.getAttribute('data-state'), 'working');
+      if (dark)
+        assert.equal(
+          await planningCharacter.evaluate((el) => getComputedStyle(el).animationName),
+          'none',
+        );
+      if (width === 1280 && !dark) {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        assert.equal(
+          await planningCharacter.evaluate((el) => getComputedStyle(el).animationName),
+          'none',
+        );
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.evaluate(() => {
+          Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
+          window.dispatchEvent(new Event('blur'));
+        });
+        await page.waitForFunction(
+          () =>
+            !document
+              .querySelector('.managed-planning-status .managed-agent')
+              .hasAttribute('data-animated'),
+        );
+        await page.evaluate(() => {
+          delete document.hasFocus;
+          window.dispatchEvent(new Event('focus'));
+        });
+        await page.waitForFunction(() =>
+          document
+            .querySelector('.managed-planning-status .managed-agent')
+            .hasAttribute('data-animated'),
+        );
+      }
+      assert.equal(await page.getByText('No result yet.', { exact: true }).count(), 0);
+      assert.equal(await page.getByRole('heading', { name: 'Usage', exact: true }).count(), 0);
+      assert.equal(
+        await page.locator('.managed-task').evaluate((el) => getComputedStyle(el).overflowY),
+        'visible',
+      );
+      assert.equal(
+        await page.locator('.live-hub-canvas').evaluate((el) => getComputedStyle(el).overflowY),
+        'auto',
+      );
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-planning.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: 'View activity', exact: true }).click();
+      await page.getByRole('searchbox', { name: 'Search activity' }).waitFor();
+      assert.equal(await activity.evaluate((el) => el === document.activeElement), true);
+      await page.locator('summary').filter({ hasText: 'Using Read' }).waitFor();
+      await activity.press('ArrowRight');
+      await page.getByRole('heading', { name: 'Your request', exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'Usage', exact: true }).waitFor();
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-details.png`,
+        fullPage: true,
+      });
+      await details.press('Home');
+      await page.getByRole('heading', { name: 'Planning your task' }).waitFor();
+      assert.equal(await page.locator('#managed-attempt-result').count(), 0);
+      await page.evaluate(() => {
+        const f = window.fixture;
+        f.runs[0].prompts = [
+          {
+            id: 'question',
+            status: 'pending',
+            question: 'Which API version should I use?',
+            inputType: 'text',
+            options: [],
+            createdAt: new Date().toISOString(),
+          },
+        ];
+        f.sync();
+      });
+      await page.getByText('Waiting for your answer', { exact: true }).waitFor();
+      assert.equal(await planningCharacter.getAttribute('data-state'), 'waiting');
+      await page.evaluate(() => {
+        const f = window.fixture;
+        f.runs[0].prompts = [];
+        f.runs[0].status = 'failed';
+        f.runs[0].error = 'The provider disconnected.';
+        f.sync();
+      });
+      await page.getByRole('button', { name: 'Retry planning', exact: true }).click();
+      await page.getByRole('heading', { name: 'Planning your task' }).waitFor();
+      await page.evaluate(() => {
+        window.fixture.previewError = true;
+        window.fixture.runs[0].status = 'review';
+        window.fixture.runs[0].progress = null;
+        window.fixture.sync();
+      });
+      await page.getByRole('button', { name: 'Reload plan', exact: true }).waitFor();
+      await page.evaluate(() => {
+        window.fixture.previewError = false;
+      });
+      await page.getByRole('button', { name: 'Reload plan', exact: true }).click();
       const start = page.getByRole('button', { name: 'Start reviewed plan' });
       await start.waitFor().catch(async (error) => {
         console.error(
@@ -301,6 +413,12 @@ try {
       });
       await start.press('Enter');
       await page.getByRole('button', { name: 'Pause dispatch' }).waitFor();
+      const taskHeading = page.getByRole('heading', { name: 'Implement API and UI', exact: true });
+      assert.equal(await taskHeading.evaluate((el) => el === document.activeElement), true);
+      assert.ok(
+        (await taskHeading.boundingBox()).y >= 0,
+        'Starting work keeps the task title in view',
+      );
       await page.screenshot({
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-working.png`,
         fullPage: true,
@@ -311,8 +429,19 @@ try {
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-stopped.png`,
         fullPage: true,
       });
-      await page.getByText('All attempts (2)', { exact: true }).click();
-      await page.getByText('All attempts (2)', { exact: true }).click();
+      assert.equal(
+        await page
+          .locator('.managed-assignment .brand-agent-character[data-state="working"]')
+          .count(),
+        0,
+      );
+      await activity.click();
+      await page.getByRole('combobox', { name: 'Choose attempt' }).click();
+      await page.getByRole('option', { name: /^Planning/ }).click();
+      await page.getByRole('button', { name: 'View result', exact: true }).click();
+      await page.getByRole('heading', { name: 'Planning result', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Close details', exact: true }).click();
+      assert.equal(await overview.evaluate((el) => el === document.activeElement), true);
       await page.evaluate(() => {
         const f = window.fixture;
         f.queue.items.forEach((item, index) => {
@@ -356,19 +485,17 @@ try {
       await review.waitFor();
       assert.equal(await page.getByRole('navigation', { name: 'Task result' }).count(), 1);
       await page.getByText('The API and UI now work together.', { exact: false }).waitFor();
-      const taskDetails = page.locator('.managed-details > summary');
-      await page.waitForFunction(() => !document.querySelector('.managed-details').open);
-      await taskDetails.focus();
-      await taskDetails.press('Enter');
-      await page.getByText('Request and approach', { exact: true }).waitFor();
-      await taskDetails.press('Enter');
+      await details.focus();
+      await details.press('Enter');
+      await page.getByRole('heading', { name: 'Your request', exact: true }).waitFor();
+      await overview.click();
       await review.focus();
       await page.screenshot({
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-result.png`,
         fullPage: true,
       });
       await page.getByRole('button', { name: 'Preview', exact: true }).click();
-      await page.getByRole('heading', { name: 'Try result', exact: true }).waitFor();
+      await page.getByRole('region', { name: 'Try result', exact: true }).waitFor();
       await review.focus();
       await review.press('Enter');
       assert.equal(await review.count(), 0);

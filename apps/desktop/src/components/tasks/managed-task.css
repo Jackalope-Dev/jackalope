@@ -1,6 +1,180 @@
-.managed-journey {
-  padding-bottom: 20px;
+.managed-task.workspace-page-layout {
+  --workspace-heading-gap: 16px;
+  --workspace-section-gap: 20px;
+}
+.live-hub-canvas > .managed-task {
+  flex: none;
+  min-height: 100%;
+  overflow: visible;
+}
+.managed-task-tabs,
+.managed-overview,
+.managed-detail-panels,
+.managed-activity,
+.managed-assignments {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.managed-task-tabs > [hidden] {
+  display: none;
+}
+.managed-task-tabs > [role="tablist"] {
+  justify-self: start;
+}
+.managed-task-tabs > [role="tabpanel"] {
+  padding-top: 0;
+}
+.managed-agent {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+}
+.managed-agent:not([data-animated]) .brand-agent-character,
+.managed-agent:not([data-animated]) .brand-agent-face {
+  animation-play-state: paused;
+}
+.managed-agent-name {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  margin-bottom: 4px;
+}
+.managed-agent-message {
+  flex: 1;
+  min-width: 0;
+}
+.managed-agent-message h2,
+.managed-agent-message h3,
+.managed-result-agent h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.managed-agent-update {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 0 12px 12px 12px;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.managed-planning-status,
+.managed-assignment {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+.managed-planning-status > .managed-agent {
+  width: 72px;
+  height: 72px;
+  flex-basis: 72px;
+}
+.managed-result-agent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.managed-result-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border-subtle);
+}
+.managed-result-toolbar .workspace-subnavigation {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.managed-activity-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.managed-activity-toolbar > .ui-form-field {
+  flex: 1;
+  min-width: min(100%, 240px);
+}
+.managed-activity-toolbar [role="combobox"] {
+  max-width: 100%;
+}
+.managed-detail-panels > .ui-panel,
+.managed-attempt-result {
+  padding: 20px;
+  overflow-wrap: anywhere;
+}
+.managed-request > p {
+  line-height: 1.6;
+  max-width: 80ch;
+}
+.managed-plan {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.managed-plan-step {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-wrap: anywhere;
+}
+.managed-plan-step header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.managed-plan-step header > div {
+  flex: 1;
+  min-width: 0;
+}
+.managed-plan-step h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.managed-plan-description {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.managed-plan-dependency {
+  margin-top: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.managed-plan-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+}
+.managed-plan-scopes code {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+}
+.managed-journey {
+  padding-block: 4px;
 }
 .managed-journey-steps {
   display: grid;
@@ -9,7 +183,6 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  max-width: 720px;
 }
 .managed-journey-steps li {
   display: flex;
@@ -58,29 +231,14 @@
   align-items: center;
   gap: 8px;
 }
-.managed-assignment {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-block: 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-.managed-assignment:last-child {
-  border-bottom: 0;
-}
-.managed-assignment strong {
-  font-weight: 500;
-}
-.managed-plan > .ui-disclosure {
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-.managed-plan > .ui-disclosure > .ui-disclosure-summary {
-  padding-block: 14px;
-}
 .managed-plan-number {
-  min-width: 24px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
@@ -90,17 +248,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 20px;
-}
-.managed-plan-start p {
-  flex: 1;
-  min-width: min(100%, 320px);
-  max-width: 68ch;
-  font-size: var(--text-xs);
-  line-height: 1.6;
-}
-.managed-details {
-  border-top: 1px solid var(--color-border-subtle);
-  padding-top: 8px;
 }
 .managed-result-body {
   display: grid;
@@ -161,6 +308,21 @@
   font-size: var(--text-sm);
 }
 @media (max-width: 640px) {
+  .managed-planning-status,
+  .managed-assignment {
+    flex-wrap: wrap;
+    padding: 16px;
+    gap: 12px;
+  }
+  .managed-planning-status > button,
+  .managed-assignment > .managed-task-actions {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+  .managed-activity-toolbar > .ui-form-field {
+    flex-basis: calc(100% - 68px);
+    min-width: 0;
+  }
   .managed-journey-steps {
     gap: 8px;
   }

@@ -59,7 +59,11 @@ export function LiveSessions({
       <div className="live-hub-body" data-has-history={items.length > 0 || managedTasks.length > 0}>
         <div className="live-hub-canvas">
           {selectedTask ? (
-            <ManagedTaskView task={selectedTask} onBack={() => managed.select(null)} />
+            <ManagedTaskView
+              key={selectedTask.id}
+              task={selectedTask}
+              onBack={() => managed.select(null)}
+            />
           ) : session ? (
             <LiveSessionView
               key={session.id}

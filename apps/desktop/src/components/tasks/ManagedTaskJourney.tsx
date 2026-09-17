@@ -33,9 +33,11 @@ export function ManagedTaskJourney({
           </li>
         ))}
       </ol>
-      <p className="managed-journey-description" role="status">
-        {progress.description}
-      </p>
+      {work.interfaceIssue && !work.active.length && (
+        <p className="managed-journey-description" role="status">
+          {work.interfaceIssue}
+        </p>
+      )}
     </section>
   );
 }
