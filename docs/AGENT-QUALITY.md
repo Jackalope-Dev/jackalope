@@ -23,7 +23,7 @@ provider's own GUI.
 - Generated instructions identify the worktree Jackalope already assigned. Saved
   version-one ideas reconstruct their original generated text before migration;
   edited instructions remain verbatim.
-- Native MCP adapters use their tool descriptions. Grok and Antigravity receive a
+- Native MCP adapters use their tool descriptions. Grok, Antigravity and Gemini CLI receive a
   short authenticated `GET /v1/help` bootstrap instead of the entire HTTP manual
   on every launch. Coordination ownership, untrusted messages, pending user input
   and permission boundaries remain explicit.

@@ -5,6 +5,21 @@ use super::*;
 const RECENT_TOUCHED_ATTEMPTS: usize = 3;
 const RECENT_TOUCHED_PATHS: usize = 60;
 
+/// Adapters with a native task protocol. Others (Aider, Goose) fail explicitly at launch.
+pub(super) const EXECUTABLE_ADAPTERS: &[&str] = &[
+    "codex",
+    "claude",
+    "kimi",
+    "antigravity",
+    "opencode",
+    "grok",
+    "gemini",
+];
+
+pub(super) fn unimplemented_adapter(adapter: &str) -> String {
+    format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code, Antigravity or Gemini CLI to run this task.")
+}
+
 /// Launch the agent, retrying a transient failure (an antivirus or indexer lock
 /// on the executable, `ETXTBSY` just after a write) a bounded number of times.
 /// A missing executable is not retried. Returns the child and the attempt count.
@@ -429,6 +444,9 @@ impl TaskRuntime {
         {
             return Err("This agent was disabled for the project before launch.".into());
         }
+        if !EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
+            return Err(unimplemented_adapter(&adapter));
+        }
         let mut cmd = command(executable);
         if let Some(binding) = &req.account_binding {
             if !self
@@ -509,8 +527,17 @@ impl TaskRuntime {
                 crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
             }
+        } else if adapter == "gemini" {
+            if let Some(ref old) = previous {
+                crate::commands::previews::ensure_idle(&old.workspace)?;
+                crate::commands::verification::ensure_idle(&old.workspace)?;
+            }
+            gemini::configure(
+                &mut cmd,
+                previous.as_ref().and_then(|old| old.session_id.as_deref()),
+            );
         } else {
-            return Err(format!("The {adapter} task adapter is not implemented yet. Account setup is available in Settings; choose Codex, Claude, Grok, OpenCode, Kimi Code or Antigravity to run this task."));
+            return Err(unimplemented_adapter(&adapter));
         }
         let reasoning_effort = super::effort::configure(&mut cmd, &adapter, req.effort);
         self.update_checked(id, |run| run.reasoning_effort = reasoning_effort)?;
@@ -613,7 +640,7 @@ impl TaskRuntime {
                 req.verify_command.as_deref(),
                 &adapter,
             ));
-            if ["grok", "antigravity"].contains(&adapter.as_str()) {
+            if matches!(adapter.as_str(), "grok" | "antigravity" | "gemini") {
                 input.push_str(crate::commands::coordination::http_bootstrap());
             }
             if has_discovery {
@@ -787,6 +814,7 @@ impl TaskRuntime {
                 }
                 return;
             }
+            let mut gemini_stream = gemini::Stream::new(resumed_session.clone());
             let mut stream = antigravity::Stream::new(resumed_session);
             if let Err(error) = crate::commands::process_control::bounded_lines(
                 BufReader::new(stdout),
@@ -799,8 +827,10 @@ impl TaskRuntime {
                     if truncated {
                         activity(r, "An oversized agent event was omitted. Inspect the agent session for full output.");
                         if output_adapter == "antigravity" { r.error.get_or_insert("Antigravity returned an oversized protocol event; the result could not be fully verified.".into()); }
+                        if output_adapter == "gemini" { r.error.get_or_insert("Gemini CLI returned an oversized protocol event; the result could not be fully verified.".into()); }
                     }
                     else if output_adapter == "antigravity" { stream.consume(r, &line); }
+                    else if output_adapter == "gemini" { gemini_stream.consume(r, &line); }
                     else { consume_adapter_event(r, &line, &output_adapter); }
                 });
                 },
@@ -811,6 +841,9 @@ impl TaskRuntime {
             }
             if output_adapter == "antigravity" {
                 runtime.update(&event_id, |run| stream.finish(run));
+            }
+            if output_adapter == "gemini" {
+                runtime.update(&event_id, |run| gemini_stream.finish(run));
             }
         });
         let runtime = self.clone();
@@ -862,7 +895,7 @@ impl TaskRuntime {
                     let _ = process.lock().unwrap().kill();
                 }
             }
-            if (adapter == "antigravity" || adapter == "kimi")
+            if matches!(adapter.as_str(), "antigravity" | "kimi" | "gemini")
                 && !timed_out
                 && started.elapsed() > antigravity::TIMEOUT
             {
@@ -889,6 +922,13 @@ impl TaskRuntime {
         tree.terminate();
         let _ = reader.join();
         let _ = diagnostics.join();
+        if adapter == "gemini" && !exit.success() {
+            self.update(id, |run| {
+                for line in run.diagnostics.clone() {
+                    gemini::diagnostic(run, &line);
+                }
+            });
+        }
         // ACP completion is the turn receipt; its persistent server is stopped by the owner.
         let success = if adapter == "kimi" {
             acp_success.load(std::sync::atomic::Ordering::SeqCst) && !timed_out

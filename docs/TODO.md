@@ -31,6 +31,7 @@ release dates.
 - [ ] Check keyboard and screen-reader access, narrow layouts, title-bar controls,
   themes, reduced motion and appearance preview rollback. Include agent characters in installed-app checks.
   Cover live activity, file labels, queued checks and provider tool failures.
+  Include direct Usage & quota navigation, filters, export and the quota-handoff setting.
 - [ ] Validate helper actions, notifications and external links in installed builds,
   including Ask context defaults, saved opt-outs and its settings navigation.
 - [ ] Exercise checkpoints, commit attribution, edited merge messages and cleanup
@@ -90,7 +91,11 @@ release dates.
 - [ ] Validate hourly schedules, timezones, missed runs and restart recovery.
 - [ ] Complete packaged desktop-control checks, including multiple monitors,
   interruption, indicator failure and permission renewal.
-- [ ] Implement Gemini CLI, Aider and Goose execution protocols.
+- [ ] Implement Aider and Goose execution protocols.
+- [ ] Validate Gemini CLI task execution with installed profiles: login and account switching,
+  headless flags and stream events for the installed version, exact-session resume, reported
+  usage, cancellation, the attempt limit, quota and permission failures. Unit tests do not
+  establish real execution.
 - [ ] Validate OpenCode direct MCP, Grok model discovery and Antigravity quota refresh with
   installed profiles; retain explicit CLI/version boundaries from the capability boundaries.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without

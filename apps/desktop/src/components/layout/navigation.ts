@@ -73,7 +73,7 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'usage',
     label: 'Usage & quota',
-    description: 'Agents: account limits, token usage and performance insights.',
+    description: 'Agents: account limits and recorded token usage.',
     icon: ChartNoAxesColumn,
     group: 'agents',
     primary: false,
@@ -170,11 +170,6 @@ export const MCP_VIEWS = [
   { id: 'mcps', label: 'Connections' },
   { id: 'mcp-marketplace', label: 'Marketplace' },
 ] as const;
-export const USAGE_VIEWS = [
-  { id: 'tokens', label: 'Tokens & usage' },
-  { id: 'analytics', label: 'Performance & insights' },
-] as const;
-export type UsageView = (typeof USAGE_VIEWS)[number]['id'];
 export function navigateWorkspace(tab: ActiveTab) {
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));
 }

@@ -54,8 +54,7 @@ CLI adapters without a verified protocol for it.
 ## Measurements
 
 Native journals record preparation, routing, execution, verification waiting,
-verification and checkpoint stages. Performance & insights displays summed work
-time and copies local evaluation data without prompts, answers or account labels.
+verification and checkpoint stages for execution evaluation.
 Parallel stages overlap in wall time. Interrupted stages have no completed timing;
 older records remain unmeasured. Follow-ups are not automatically corrections.
 Human acceptance uses saved outcome receipts, not successful agent exits.

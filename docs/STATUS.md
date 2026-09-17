@@ -52,7 +52,7 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   GitHub evidence uses the installed authenticated CLI and remains read-only; excerpts
   are labeled. Optional batch and estimated-cost limits pause subsequent batches, with
   unknown cost blocking further dispatch when a cost threshold is set. These are not billing caps.
-- Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity adapters with
+- Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity and Gemini CLI adapters with
   [provider-specific capabilities](AGENT-SUPPORT.md).
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
@@ -84,7 +84,7 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - Individual and bulk task archiving with undo and restore, preserving results and workspaces.
   Durable incremental task saves, bounded concurrent history loading, recovery
   exports and [archive management](HISTORY-RECOVERY.md).
-- Project guidance, editable lessons, codebase maps and task outcome insights. Context
+- Project guidance, editable lessons and codebase maps. Context
   previews and saved receipts explain lesson selection with revision/source evidence;
   Chat supports per-request lesson opt-outs.
 - MCP connections, task-owned Chromium sessions and scoped desktop-window grants.
@@ -98,7 +98,8 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   checks file edits and session continuation before connecting a local account.
   Optional installed title models receive a separate check and context limit;
   managed local helpers can reuse authenticated servers with bounded idle lifetimes.
-- App-wide usage trends, project/agent/task breakdowns, measured routing overhead
+- A single Usage & quota page with account limits, app-wide usage trends,
+  project/agent/task breakdowns, measured routing overhead
   and usage by saved outcome, with missing reports and helper usage kept explicit.
   Usage separates context a provider read as new from cached re-reads, and reports
   model calls and average context, because cumulative tokens track turn count rather
@@ -158,7 +159,8 @@ platform-specific implementations. Native CI and device checks are described in
 
 ## Known limits
 
-Gemini CLI, Aider and Goose account setup does not include native task execution.
+Aider and Goose account setup does not include native task execution. Gemini CLI
+tasks run through its headless stream; installed-profile execution is not yet validated.
 Antigravity named accounts use Gemini API keys; isolated subscription accounts are
 unsupported. Discovery and fixture responses do not establish real account execution.
 

@@ -12,7 +12,7 @@ import { useMcpStore } from '../src/stores/mcpStore.ts';
 import { useSettingsStore } from '../src/stores/settingsStore.ts';
 
 test('all built-in agents share discovery with explicit transport and account limits', () => {
-  for (const agent of ['codex', 'claude', 'grok', 'opencode', 'antigravity']) {
+  for (const agent of ['codex', 'claude', 'grok', 'opencode', 'antigravity', 'gemini']) {
     assert.equal(connectionSupport(agent, 'stdio', true), null);
     assert.equal(connectionSupport(agent, 'http', true), null);
     assert.notEqual(connectionSupport(agent, 'sse', true), null);
@@ -20,6 +20,7 @@ test('all built-in agents share discovery with explicit transport and account li
   assert.equal(connectionSupport('claude', 'sse', false), null);
   assert.notEqual(connectionSupport('codex', 'sse', false), null);
   assert.notEqual(connectionSupport('antigravity', 'http', false), null);
+  assert.notEqual(connectionSupport('gemini', 'stdio', false), null);
   assert.notEqual(connectionSupport('unknown', 'http', true), null);
   assert.equal(agentCapabilities('antigravity').accounts, true);
   assert.equal(agentCapabilities('opencode').capacity, false);

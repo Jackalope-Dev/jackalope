@@ -1,5 +1,17 @@
 [
   {
+    "id": "gemini-cli-can-run-tasks",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Gemini CLI can run tasks.",
+    "description": "Run Gemini CLI worker tasks from Jackalope with your selected account.",
+    "items": [
+      "Follow streamed progress and file activity, then continue the saved conversation.",
+      "Review the changes and native project checks before applying them."
+    ],
+    "note": "Shell and HTTP tools follow Gemini CLI permissions. Installed-app and cross-platform acceptance remain in progress."
+  },
+  {
     "id": "see-what-your-agents-are-doing",
     "date": "2026-09-17",
     "status": "In development",

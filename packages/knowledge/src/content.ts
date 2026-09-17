@@ -354,7 +354,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How does automatic agent selection work?',
         paragraphs: [
           'Settings → Decisions chooses local rules, agent-powered reasoning, or Jev-assisted decisions. Projects inherit the app default unless you override it. Automatic tasks select among eligible agents, configured models, and permitted accounts. Project restrictions, tool compatibility, and reported capacity constrain the options.',
-          'Local rules use preferences and current capacity without a model call. Agent-powered routing uses your default agent. Optional Jev uses your TypeSafe key and may reduce routing cost and latency; savings are not guaranteed. Jackalope validates the decision and saves its reason and any reported usage. For Jev uncertainty or service errors, choose Local (the default, with no extra model cost) or Agent-powered fallback, which uses agent tokens or subscription capacity. If that agent attempt fails, local rules take over. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity runs as a worker. Explicit assignments remain available.',
+          'Local rules use preferences and current capacity without a model call. Agent-powered routing uses your default agent. Optional Jev uses your TypeSafe key and may reduce routing cost and latency; savings are not guaranteed. Jackalope validates the decision and saves its reason and any reported usage. For Jev uncertainty or service errors, choose Local (the default, with no extra model cost) or Agent-powered fallback, which uses agent tokens or subscription capacity. If that agent attempt fails, local rules take over. Codex, Claude Code, Grok, OpenCode, and Kimi Code can coordinate; Antigravity and Gemini CLI run as workers. Explicit assignments remain available.',
           'Task assessments use the same project preference. Local fast paths and unchanged recent requests avoid model calls; other eligible requests make one bounded assessment, with one extra agent attempt only when you select that Jev fallback. Both provider attempts remain visible in Usage. Jev classifies the approach but cannot generate or authorize a plan. Usage lists assessment calls separately, including calls that never launched a task, and counts reused assessments once. Real-provider cost and quality comparisons remain open.',
         ],
       },
@@ -413,15 +413,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Set up agents and account profiles',
     shortTitle: 'Agents & accounts',
     description:
-      'Set up Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity, choose project accounts, and understand credential storage limits.',
+      'Set up supported agent CLIs, choose project accounts, and understand credential storage limits.',
     readingTime: '3 min read',
     sections: [
       {
         id: 'supported-adapters',
         question: 'Which coding agents can run tasks?',
         paragraphs: [
-          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, and Antigravity have native task adapters. Install the corresponding CLI and configure provider access. Model access, permissions, and billing remain with your provider.',
-          'Kimi Code uses kimi for tasks, routing, and Ask Jackalope. Antigravity uses agy for worker tasks. Gemini CLI, Aider, and Goose appear in account setup but do not yet have task execution adapters. Discovery of an executable is not proof of valid authentication.',
+          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity, and Gemini CLI have native task adapters. Install the corresponding CLI and configure provider access. Model access, permissions, and billing remain with your provider.',
+          'Kimi Code uses kimi for tasks, routing, and Ask Jackalope. Antigravity uses agy for worker tasks. Gemini CLI runs worker tasks with automatic file-edit approval and saved-session continuation; shell tools require the CLI’s own permission policy. Aider and Goose support account setup but do not yet have task execution adapters. Discovery of an executable is not proof of valid authentication.',
         ],
       },
       {
@@ -508,7 +508,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How are project MCP tools delivered?',
         paragraphs: [
           'Configure connections in MCP → Connections and select the project tools for a task. Codex supports direct stdio and HTTP connections; Claude Code also supports SSE.',
-          'Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity support on-demand discovery for supported stdio and HTTP connections. Direct delivery supports Codex, Claude Code, OpenCode, and Kimi Code; CLI-global tools still use the agent’s own configuration.',
+          'Supported task adapters offer on-demand discovery for stdio and HTTP connections. Grok, Antigravity, and Gemini CLI use an HTTP bridge and need permission for an HTTP client. Direct delivery supports Codex, Claude Code, OpenCode, and Kimi Code; CLI-global tools still use the agent’s own configuration.',
         ],
       },
       {

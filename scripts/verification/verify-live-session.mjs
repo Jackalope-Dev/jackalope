@@ -470,6 +470,14 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
   await page.evaluate(() => window.sessionFixture.theme('light'));
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.brand-agent-character, .daily-work-row')].every(
+      (element) => getComputedStyle(element).color === 'rgb(30, 30, 36)',
+    ),
+  );
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   await page.screenshot({ path: `${output}/hub-active-controls-light.png` });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.evaluate(async () => {

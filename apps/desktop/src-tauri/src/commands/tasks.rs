@@ -3,6 +3,7 @@ mod delegation;
 mod efficiency;
 pub(super) mod effort;
 pub(in crate::commands) mod events;
+mod gemini;
 pub(super) mod helper_process;
 mod journal;
 #[cfg(test)]

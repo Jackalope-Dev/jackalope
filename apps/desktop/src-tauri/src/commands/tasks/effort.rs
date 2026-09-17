@@ -72,6 +72,10 @@ mod tests {
             assert_eq!(level.is_some(), ["codex", "claude"].contains(&adapter));
             assert_eq!(command.get_envs().count(), 0);
         }
+        let mut gemini = Command::new("fixture");
+        let level = configure(&mut gemini, "gemini", Some(TaskEffort::Thorough));
+        assert!(level.is_none());
+        assert_eq!(gemini.get_args().count(), 0);
         assert!(serde_json::from_str::<TaskEffort>("\"unlimited\"").is_err());
         assert_eq!(TaskEffort::Balanced.level(), "medium");
         assert_eq!(TaskEffort::Thorough.level(), "high");

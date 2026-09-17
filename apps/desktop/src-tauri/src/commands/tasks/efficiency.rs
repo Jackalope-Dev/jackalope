@@ -63,6 +63,14 @@ pub(super) fn useful_event(line: &str, adapter: &str) -> bool {
                         .as_str()
                         .is_some_and(|text| !text.is_empty()))
         }
+        "gemini" => {
+            event["type"] == "tool_use"
+                || (event["type"] == "message"
+                    && event["role"] == "assistant"
+                    && event["content"]
+                        .as_str()
+                        .is_some_and(|text| !text.is_empty()))
+        }
         _ => false,
     }
 }
@@ -207,6 +215,13 @@ impl Efficiency {
                 }
             }
         }
+        if adapter == "gemini" && event["type"] == "tool_use" {
+            let name = event["tool_name"].as_str();
+            if let (Some(id), Some(name)) = (event["tool_id"].as_str(), name) {
+                self.tool(id, name);
+                self.touched(&event["parameters"], workspace);
+            }
+        }
     }
     pub fn verification(&mut self, stdout: &str, response: &serde_json::Value, success: bool) {
         self.verification_calls += 1;
@@ -260,6 +275,26 @@ mod tests {
             r#"{"type":"text","part":{"text":"hello"}}"#,
             "opencode"
         ));
+        assert!(!useful_event(
+            r#"{"type":"init","session_id":"s","model":"m"}"#,
+            "gemini"
+        ));
+        assert!(!useful_event(
+            r#"{"type":"message","role":"user","content":"prompt"}"#,
+            "gemini"
+        ));
+        assert!(useful_event(
+            r#"{"type":"message","role":"assistant","content":"hello there"}"#,
+            "gemini"
+        ));
+        let mut metrics = Efficiency::default();
+        let tool = serde_json::json!({"type":"tool_use","tool_name":"write_file","tool_id":"t1","parameters":{"file_path":"src/a.ts","content":"never store"}});
+        metrics.observe(&tool, "gemini", "/work");
+        metrics.observe(&tool, "gemini", "/work");
+        assert_eq!(metrics.tool_calls["write_file"], 1);
+        assert!(metrics.touched_paths.contains("src/a.ts"));
+        let saved = serde_json::to_string(&metrics).unwrap();
+        assert!(!saved.contains("never store"));
         let mut metrics = Efficiency::default();
         metrics.first_activity(std::time::Duration::from_millis(12));
         metrics.first_activity(std::time::Duration::from_millis(30));

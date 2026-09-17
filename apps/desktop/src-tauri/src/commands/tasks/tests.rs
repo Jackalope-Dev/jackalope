@@ -302,10 +302,29 @@ fn antigravity_rejects_missing_accounts_and_does_not_invent_resumed_usage() {
 }
 
 #[test]
+fn only_aider_and_goose_remain_explicitly_unimplemented() {
+    for adapter in BUILTIN_AGENTS {
+        let executable = runtime::EXECUTABLE_ADAPTERS.contains(adapter);
+        let unsupported = ["aider", "goose"].contains(adapter);
+        assert_eq!(executable, !unsupported, "{adapter}");
+    }
+    for adapter in ["aider", "goose"] {
+        let message = runtime::unimplemented_adapter(adapter);
+        let expected = format!("The {adapter} task adapter is not implemented yet");
+        assert!(message.starts_with(&expected));
+        assert!(message.contains("Gemini CLI"));
+    }
+}
+
+#[test]
 #[ignore = "Runs a paid or free installed agent in a disposable repository; set JACKALOPE_AGENT_TRIAL"]
 fn installed_agent_lifecycle_trial() {
     let agent = std::env::var("JACKALOPE_AGENT_TRIAL").expect("Choose the agent explicitly");
-    assert!(BUILTIN_AGENTS.contains(&agent.as_str()));
+    agent_lifecycle_trial(&agent, None);
+}
+
+pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> PathBuf {
+    assert!(BUILTIN_AGENTS.contains(&agent));
     let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo).unwrap();
@@ -337,14 +356,26 @@ fn installed_agent_lifecycle_trial() {
     .unwrap();
     let history = root.join("history");
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
-    let model = std::env::var("JACKALOPE_AGENT_MODEL").ok();
+    let selected_agent = if let Some(executable) = executable {
+        let mut policy = super::super::agent_policy::AgentPolicy::default();
+        policy.custom_agents.push(super::super::agent_policy::CustomAgent {
+            id: "lifecycle-fixture".into(), name: "Lifecycle fixture".into(),
+            command: executable.to_string_lossy().into_owned(), adapter: Some(agent.into()),
+        });
+        std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
+        std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
+        "lifecycle-fixture"
+    } else {
+        agent
+    };
+    let model = executable.is_none().then(|| std::env::var("JACKALOPE_AGENT_MODEL").ok()).flatten();
     let request = RunRequest {
         retry_of: None,
         live_session_id: None,
                 effort: None,
         dependency_snapshot: Default::default(),
         id: uuid::Uuid::new_v4().to_string(), project_id: uuid::Uuid::new_v4().to_string(),
-        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: agent.clone(),
+        project_name: "Agent acceptance fixture".into(), project_path: repo_text, agent: selected_agent.into(),
         agent_profile_id: None, verify_command: None, target_branch: Some("main".into()),
         account_binding: None, model,
         prompt: "Create a file named receipt.txt containing exactly JACKALOPE_NATIVE_OK. Do not run shell commands or use network tools. Remember the phrase copper-rabbit-731 for our next turn; do not write that phrase to a file. Finish with a short confirmation.".into(),
@@ -354,6 +385,10 @@ fn installed_agent_lifecycle_trial() {
     };
     let workflow_trial = std::env::var_os("JACKALOPE_WORKFLOW_TRIAL").is_some();
     let mut request = request;
+    if executable.is_some() {
+        request.auto_verify = true;
+        request.verify_command = Some("node -e \"require('node:assert/strict').equal(require('node:fs').readFileSync('receipt.txt','utf8').trim(),'JACKALOPE_NATIVE_OK')\"".into());
+    }
     if workflow_trial {
         let workflow = runtime
             .knowledge
@@ -425,6 +460,9 @@ fn installed_agent_lifecycle_trial() {
     assert!(!repo.join("receipt.txt").exists());
     assert!(first.session_id.is_some());
     assert!(first.usage.reported);
+    if executable.is_some() {
+        assert!(first.verification.as_ref().is_some_and(|check| check.result.success));
+    }
     let mut next = request.clone();
     next.id = uuid::Uuid::new_v4().to_string();
     next.previous_run_id = Some(first.id.clone());
@@ -523,7 +561,9 @@ fn installed_agent_lifecycle_trial() {
         restored.inner.lock().unwrap().runs[&second.id].result,
         second.result
     );
-    println!("Verified {agent}: isolated edit, reported usage, continuation, account binding, cancellation, restart. Fixture: {}", root.display());
+    let source = if executable.is_some() { "fixture protocol for" } else { "installed" };
+    println!("Verified {source} {agent}: isolated edit, reported usage, continuation, account binding, cancellation, restart. Fixture: {}", root.display());
+    root
 }
 
 #[test]

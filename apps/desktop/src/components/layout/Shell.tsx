@@ -39,8 +39,6 @@ import {
   DEFAULT_WORKSPACE_TAB,
   MCP_VIEWS,
   type ProjectSettingsDestination,
-  USAGE_VIEWS,
-  type UsageView,
   WORKSPACE_VIEWS,
 } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
@@ -138,7 +136,6 @@ export function Shell({
   useEffect(() => {
     useHelperStore.setState({ screen: activeTab });
   }, [activeTab]);
-  const [usageView, setUsageView] = useState<UsageView>('tokens');
   const previousView = useRef<ActiveTab>(DEFAULT_WORKSPACE_TAB);
   useEffect(() => {
     if (activeTab !== 'preferences') previousView.current = activeTab;
@@ -469,14 +466,6 @@ export function Shell({
               }))}
             />
           )}
-        {activeTab === 'usage' && (
-          <WorkspaceSubnavigation
-            label="Usage views"
-            items={USAGE_VIEWS}
-            value={usageView}
-            onChange={setUsageView}
-          />
-        )}
         {(activeTab === 'mcps' || activeTab === 'mcp-marketplace') && (
           <WorkspaceSubnavigation
             label="MCP views"
@@ -542,9 +531,7 @@ export function Shell({
                 }}
               />
             )}
-            {activeTab === 'usage' && (
-              <UsageDashboard view={usageView} onTask={() => setActiveTab('kanban')} />
-            )}
+            {activeTab === 'usage' && <UsageDashboard onTask={() => setActiveTab('kanban')} />}
             {activeTab === 'preferences' && (
               <SettingsPage
                 key={`${settingsCategory}:${settingsProjectId ?? 'app'}`}

@@ -176,15 +176,15 @@ explanation before launch. Custom agents inherit their configured adapter.
 The shared agent-capabilities.json drives frontend checks and native direct
 connection validation.
 
-| Capability | Codex | Claude | Grok | OpenCode | Kimi | Antigravity |
-| --- | --- | --- | --- | --- | --- | --- |
-| Shared harness | MCP | MCP | HTTP | MCP | MCP | HTTP |
-| On-demand stdio / HTTP | Yes | Yes | Yes | Yes | Yes | Yes |
-| Direct project connections | stdio / HTTP | stdio / HTTP / SSE | No | stdio / HTTP / SSE | stdio / HTTP / SSE | No |
-| Continuation, stop, history | Yes | Yes | Yes | Yes | Yes | Yes |
-| Separate managed accounts | Yes | Yes | Yes | Yes | Yes | Gemini API keys |
-| Capacity reader | Yes | Yes | When reported | No universal provider quota | Managed membership | Subscription login |
-| Default coordinator / helper | Yes | Yes | Yes | Yes | Yes | No verified tool-free interface |
+| Capability | Codex | Claude | Grok | OpenCode | Kimi | Antigravity | Gemini CLI |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Shared harness | MCP | MCP | HTTP | MCP | MCP | HTTP | HTTP |
+| On-demand stdio / HTTP | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Direct project connections | stdio / HTTP | stdio / HTTP / SSE | No | stdio / HTTP / SSE | stdio / HTTP / SSE | No | No |
+| Continuation, stop, history | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Separate managed accounts | Yes | Yes | Yes | Yes | Yes | Gemini API keys | Yes |
+| Capacity reader | Yes | Yes | When reported | No universal provider quota | Managed membership | Subscription login | No |
+| Default coordinator / helper | Yes | Yes | Yes | Yes | Yes | No verified tool-free interface | No verified tool-free interface |
 
 Unknown capacity stays unknown. Kimi ACP approvals and structured questions are
 connected to Jackalope's question UI. Other native terminal prompts need their

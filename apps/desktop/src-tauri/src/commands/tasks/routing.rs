@@ -442,10 +442,7 @@ impl TaskRuntime {
             let Ok((adapter, _)) = policy.resolve(&agent) else {
                 continue;
             };
-            if !matches!(
-                adapter.as_str(),
-                "codex" | "claude" | "grok" | "opencode" | "antigravity" | "kimi"
-            ) {
+            if !super::runtime::EXECUTABLE_ADAPTERS.contains(&adapter.as_str()) {
                 continue;
             }
             if !orchestrator

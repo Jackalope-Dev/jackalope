@@ -56,10 +56,12 @@ pub(super) fn workspace_path(raw: &str, workspace: &str) -> Option<String> {
 pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
     let verb = match name.to_ascii_lowercase().as_str() {
         "read" | "read_file" | "readfile" => Some("Reading"),
-        "edit" | "edit_file" | "str_replace" | "str_replace_editor" => Some("Editing"),
+        "edit" | "edit_file" | "replace" | "str_replace" | "str_replace_editor" => Some("Editing"),
         "write" | "write_file" | "writefile" => Some("Writing"),
-        "grep" | "glob" | "search" | "search_files" => return "Searching the project".into(),
-        "bash" | "powershell" | "shell" | "execute" | "command_execution" => {
+        "grep" | "glob" | "search" | "search_files" | "grep_search" | "list_directory" => {
+            return "Searching the project".into()
+        }
+        "bash" | "powershell" | "shell" | "execute" | "command_execution" | "run_shell_command" => {
             return "Running a command".into()
         }
         "mcp__jackalope__computer_verify" | "computer_verify" => {

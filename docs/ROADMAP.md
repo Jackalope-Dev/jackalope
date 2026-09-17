@@ -51,6 +51,9 @@ GitHub evidence is read-only. Lesson receipts explain selection, and optional lo
 usefulness ratings and review minutes stay local to each task.
 Real daily-use and quality improvements still require observed trials.
 
+Usage & quota brings account limits, reported tokens, task breakdowns and export
+together on one page. Project lessons are managed in Project → Context.
+
 Jackalope Decisions provides project-scoped local rules, agent-powered decisions and
 optional Jev-assisted routing with protected device keys and visible usage. Jev
 fallback uses local rules by default or an explicitly selected agent attempt. Jev
@@ -79,7 +82,9 @@ and representative quality acceptance remain in progress.
 Kimi Code joins the native adapters with accounts, models, permissions, structured
 questions, continuation, task tokens, membership capacity, routing and Ask Jackalope.
 Kimi and OpenCode accept direct project MCP connections. Grok model discovery and
-Antigravity subscription capacity are implemented. Installed-agent acceptance remains
+Antigravity subscription capacity are implemented. Gemini CLI supports headless worker
+tasks, streamed activity and saved-session continuation with provider-controlled permissions.
+Installed-agent acceptance remains
 in progress; provider-specific reporting and permission boundaries still apply.
 
 Projects, agent accounts, tasks, queues, Git worktrees, checks and reviewed

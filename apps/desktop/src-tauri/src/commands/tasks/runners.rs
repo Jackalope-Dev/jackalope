@@ -79,7 +79,7 @@ pub(super) fn discover_runner(
                 return runner;
             }
             if adapter == "gemini" {
-                runner.detail = "Installed. Add separate accounts and complete sign-in in Jackalope. Task execution support is still in development.".into();
+                runner.detail = "Uses gemini in headless mode with automatic edit approval. Add separate accounts and complete sign-in in Jackalope; access and quota are checked when a task starts.".into();
                 return runner;
             }
             if adapter == "aider" {

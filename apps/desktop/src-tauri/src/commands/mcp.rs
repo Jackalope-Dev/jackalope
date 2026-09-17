@@ -760,6 +760,12 @@ mod tests {
         assert!(project_servers(&id, Some(&[]), "antigravity")
             .unwrap()
             .is_empty());
+        assert!(project_servers(&id, Some(&selected), "gemini")
+            .unwrap_err()
+            .contains("on-demand discovery"));
+        assert!(project_servers(&id, Some(&[]), "gemini")
+            .unwrap()
+            .is_empty());
         assert!(project_servers(&id, Some(&["off".into()]), "codex").is_err());
         assert!(config_path("project:../escape").is_err());
         let invalid = parse_server_spec(
@@ -791,7 +797,7 @@ mod tests {
             json!({"mcpServers":{"tools":spec(&server,&scope)}}).to_string(),
         )
         .unwrap();
-        for adapter in ["codex", "claude", "grok", "antigravity"] {
+        for adapter in ["codex", "claude", "grok", "antigravity", "gemini"] {
             let (direct, optimized) =
                 project_delivery(&id, Some(&["tools".into()]), adapter).unwrap();
             assert!(direct.is_empty());

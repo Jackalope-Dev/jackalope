@@ -42,7 +42,7 @@ export const roadmapStages = [
         title: 'Your agents. One workspace.',
         summary: 'Projects, accounts, and context that stay with the task.',
         detail:
-          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, and Antigravity adapters are implemented, with provider-specific limits. Kimi supports routing, structured questions, task tokens, and membership quota. Kimi and OpenCode accept direct project tools. Grok models and Antigravity subscription quota are detected through their CLIs. Antigravity remains a worker. Antigravity named profiles use Gemini API keys with separate billing; its subscription login is shared. Named accounts, project preferences, saved ideas, and persistent task history keep work organized. Archive old tasks individually or in bulk, then undo or restore them while keeping results and workspaces. App-wide usage charts connect task, project, and agent spending to saved outcomes, with routing overhead and missing reports visible. Project decision preferences can use local rules, an agent, or Jev with a securely stored TypeSafe key. Jev fallback uses local rules by default, with an optional agent attempt that uses agent capacity. Jev cost and quality comparisons remain to be validated. Installed-agent acceptance is still in progress.',
+          'Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity, and Gemini CLI adapters are implemented, with provider-specific limits. Kimi supports routing, structured questions, task tokens, and membership quota. Kimi and OpenCode accept direct project tools. Grok models and Antigravity subscription quota are detected through their CLIs. Antigravity remains a worker. Antigravity named profiles use Gemini API keys with separate billing; its subscription login is shared. Named accounts, project preferences, saved ideas, and persistent task history keep work organized. Archive old tasks individually or in bulk, then undo or restore them while keeping results and workspaces. App-wide usage charts connect task, project, and agent spending to saved outcomes, with routing overhead and missing reports visible. Project decision preferences can use local rules, an agent, or Jev with a securely stored TypeSafe key. Jev fallback uses local rules by default, with an optional agent attempt that uses agent capacity. Jev cost and quality comparisons remain to be validated. Installed-agent acceptance is still in progress.',
       },
       {
         title: 'A local way to get started.',
@@ -66,7 +66,7 @@ export const roadmapStages = [
         title: 'Tools that travel with the work.',
         summary: 'In-app help, MCP connections, browser sessions, and recurring tasks.',
         detail:
-          'Ask Jackalope connects your default agent to official help and reviewed changes to appearance, preferences, and tasks. External agents can use the same tools through an opt-in local MCP connection. Automatic project lessons learn from explicit preferences, reviewed feedback, and repository patterns, with editable sources and evidence-based performance insights. Codebase maps, task-owned browsers, hourly recurring tasks, and capacity-aware routing keep work connected. Local change-only monitors check committed content without model calls.',
+          'Ask Jackalope connects your default agent to official help and reviewed changes to appearance, preferences, and tasks. External agents can use the same tools through an opt-in local MCP connection. Automatic project lessons learn from explicit preferences, reviewed feedback, and repository patterns, with editable sources in Project context. Usage & quota brings account limits, reported tokens, task breakdowns, and export together on one page. Codebase maps, task-owned browsers, hourly recurring tasks, and capacity-aware routing keep work connected. Local change-only monitors check committed content without model calls.',
       },
     ],
   },
@@ -116,7 +116,7 @@ export const roadmapStages = [
         title: 'More agents at the table.',
         summary: 'Broader execution support and deeper provider controls.',
         detail:
-          'Gemini CLI, Aider, and Goose execution protocols are on the backlog. Account setup and model discovery do not yet mean those agents can run tasks. We also plan richer questions, permissions, and account controls for supported providers.',
+          'Aider and Goose execution protocols are on the backlog. Account setup and model discovery do not yet mean those agents can run tasks. We also plan richer questions, permissions, and account controls for supported providers.',
       },
       {
         title: 'Carry reviewed work further.',

@@ -1,6 +1,7 @@
 # Agent support and acceptance
 
-Jackalope has native Codex, Claude Code, Grok Build, OpenCode, Kimi Code and Antigravity adapters.
+Jackalope has native Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Antigravity and
+Gemini CLI adapters.
 The native registry is `tasks/runners.rs`; the desktop selection catalog is
 `src/lib/agent-catalog.ts`. New agents need a real CLI protocol adapter, not just
 an entry in either list. Manually configured executables must implement their
@@ -21,6 +22,7 @@ for shared tools and notification coverage.
 | Kimi Code | ACP authentication; access checked at launch | stdio, HTTP, SSE, plus on-demand discovery |
 | OpenCode | Provider validates at launch | stdio, HTTP, SSE, plus on-demand discovery |
 | Antigravity | Provider validates at launch | On-demand discovery through HTTP bridge |
+| Gemini CLI | Profile credential files; access checked at launch | On-demand discovery through HTTP bridge |
 
 Validate the selected CLI version, account and model with the opt-in lifecycle
 test below. It exercises real file output, worktree isolation, usage, continuation,
@@ -34,6 +36,32 @@ reported error or empty result cannot become a successful review state.
 Model IDs use OpenCode's `provider/model` format. Provider configuration and
 credential validity remain OpenCode's responsibility; no credentials is not
 equivalent to no available model.
+
+## Gemini CLI
+
+Gemini tasks run `gemini --output-format stream-json --approval-mode auto_edit`
+with the task on stdin, as described in the
+[headless mode reference](https://geminicli.com/docs/cli/headless/).
+`auto_edit` approves file edits only; tools that need interactive confirmation,
+including shell commands unless the CLI's own policy allows them, are unavailable.
+Task processes suppress browser sign-in prompts; an expired or missing login must
+be renewed through account setup before retrying.
+The HTTP bridge requires an independently permitted HTTP client; Jackalope does not
+enable unrestricted shell access or change the CLI's policy. Automatic saved checks
+run natively after a successful attempt even when in-agent checks are unavailable.
+A selected model is passed with `--model`; Gemini CLI has no model catalog command,
+so model discovery reports none and the model in use comes from the stream.
+
+The stream supplies the session ID, assistant text, tool calls and results, errors
+and final stats. Continuation passes the saved ID to `--resume` after preview and
+verification processes are idle. Completion requires one successful result event
+with a nonempty response after the final tool call. A different resumed session ID,
+malformed, oversized, out-of-order or missing events fail
+the attempt. Usage comes from the result stats; missing or empty stats and resumed
+attempts, whose counters can include earlier turns, stay unknown. Permission
+denials and terminal quota errors fail the attempt, and quota errors hand off during
+routing. Recoverable warnings and stderr retries cannot trigger handoff; stderr is
+classified after an unsuccessful process exit. Attempts have a 30-minute limit.
 
 ## Kimi Code
 
@@ -123,8 +151,8 @@ configuration and filesystem permissions still apply. Real account switching
 between two authenticated identities, revoked/expired credentials and every
 provider/model combination remain release acceptance work.
 
-Direct project-selected MCP delivery fails explicitly for Grok and Antigravity.
-All six native adapters can use connections configured for
+Direct project-selected MCP delivery fails explicitly for Grok, Antigravity and Gemini CLI.
+All seven native adapters can use connections configured for
 [on-demand discovery](MCP-DISCOVERY.md) through the HTTP bridge.
 Their own CLI configuration can still supply tools.
 The common coordination bridge is available to agents through task instructions;
@@ -145,6 +173,7 @@ imply that the provider lacks the underlying capability.
 | OpenCode account quota | OpenCode routes to independent providers, API keys and local models. Its task usage events do not supply a universal remaining-account allowance. No arbitrary provider balance is assigned to an OpenCode profile. |
 | Grok / Antigravity direct MCP | The retained headless interfaces lack a verified per-process MCP override. Project tools work through on-demand discovery. Grok ACP advertises MCP; moving execution to it needs usage, permission and resume parity with the existing adapter, rather than silently changing an established session protocol. |
 | Antigravity coordinator, native prompts and subscription profiles | Headless stdin accepts user messages, not permission replies; no verified tool-free invocation or isolated subscription-keychain override is connected. Worker tools and questions use the shared harness; named profiles use separate Gemini API keys. Plan mode alone is not a no-tools guarantee. |
+| Gemini CLI direct MCP, prompts, quota and helpers | No verified per-process MCP override is connected, so project tools use on-demand discovery. Headless mode has no permission-reply channel; questions use the shared harness. No quota reader or tool-free helper interface is connected, so Gemini runs as a worker with unknown capacity. |
 | Codex legacy SSE | Its direct MCP interface uses stdio or streamable HTTP. Use a supported transport; legacy SSE must not be silently relabeled HTTP. Claude, Kimi and OpenCode support direct SSE. |
 
 Sources: [Kimi ACP](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/kimi-acp),
@@ -158,7 +187,7 @@ Sources: [Kimi ACP](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/ki
 
 ## Other candidates
 
-Gemini CLI, Aider and Goose appear in the catalog and support managed account
+Aider and Goose appear in the catalog and support managed account
 setup. They still lack native task protocol adapters and lifecycle acceptance.
 Their task launch explicitly fails with an explanation instead of falling through
 to Grok's flags. Account setup must not be presented as task execution acceptance.
