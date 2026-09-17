@@ -415,6 +415,7 @@ pub(super) fn accessibility_checkpoint(value: &Value) -> Option<super::harness::
             if value["truncated"] == true { " Findings were truncated." } else { "" })),
         evidence: vec![value["content"].as_str().unwrap_or_default().to_owned()],
         timestamp: chrono::Utc::now().to_rfc3339(),
+        requirements: vec![],
     })
 }
 

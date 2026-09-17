@@ -40,6 +40,7 @@ pub enum DecisionKind {
     WorkerSelection,
     TaskStrategy,
     ContextSelection,
+    ToolDiscovery,
     TaskReview,
     MonitorRelevance,
     AssignmentMatching,

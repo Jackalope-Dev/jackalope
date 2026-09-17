@@ -1,6 +1,11 @@
 import { Checkbox, FormField, Textarea } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
-import { correctionPrompt, type Requirement, requirementState } from '../../lib/task-outcomes';
+import {
+  correctionPrompt,
+  type Requirement,
+  requirementAssessment,
+  requirementState,
+} from '../../lib/task-outcomes';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
@@ -132,6 +137,7 @@ export function TaskOutcomes({
               {item.receipt && (
                 <p className="whitespace-pre-wrap break-words mt-2">{item.receipt.note}</p>
               )}
+              <RequirementAnswer run={run} requirementId={item.id} />
             </div>
             {canReview && (item.checkpoint ? index === step : finalStep) && (
               <Button
@@ -273,5 +279,33 @@ export function TaskOutcomes({
       )}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
     </section>
+  );
+}
+
+function RequirementAnswer({ run, requirementId }: { run: TaskRun; requirementId: string }) {
+  const report = requirementAssessment(run.validationSteps, requirementId);
+  if (!report)
+    return <p className="task-muted mt-2">No agent assessment recorded for this requirement.</p>;
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-sm font-medium">
+        Agent assessment ·{' '}
+        {{ met: 'Met', partial: 'Partially met', unverified: 'Not verified' }[report.answer.status]}
+      </p>
+      <p className="whitespace-pre-wrap break-words">{report.answer.summary}</p>
+      {!!report.answer.evidence.length && (
+        <ul className="list-disc pl-5 text-sm">
+          {[...new Set(report.answer.evidence)].map((item) => (
+            <li key={item} className="break-words">
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="task-muted">
+        Reported {new Date(report.timestamp).toLocaleString()}. Agent-supplied evidence; verify
+        against the current diff before accepting.
+      </p>
+    </div>
   );
 }

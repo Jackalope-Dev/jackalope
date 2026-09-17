@@ -4,6 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowDownToLine, ArrowRight, Menu as MenuIcon, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AccessPage } from './Access';
+import { BenchmarksPage } from './Benchmarks';
 import { BrandMark } from './BrandMark';
 import { tour } from './content';
 import { DownloadPage } from './Download';
@@ -253,6 +254,8 @@ export function App({ path = '/' }: { path?: string }) {
         <LegalPage kind={path === '/privacy/' ? 'privacy' : 'terms'} />
       ) : path === '/roadmap/' ? (
         <RoadmapPage />
+      ) : path === '/benchmarks/' ? (
+        <BenchmarksPage />
       ) : marketingPage ? (
         <MarketingPage page={marketingPage} dark={dark} />
       ) : (

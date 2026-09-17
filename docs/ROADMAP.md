@@ -43,6 +43,8 @@ complete task delivery and quality on representative repositories before claimin
 Versioned prompt guidance, same-policy continuation context and recoverable tool-result
 selection are implemented. Sanitized comparison exports retain matched configurations,
 oracle outcomes and reporting limits. Broader independent acceptance remains open.
+Optional Jev discovery ranking and local response-field selection have separate
+evaluation suites; the public benchmark methodology keeps their scope explicit.
 
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)

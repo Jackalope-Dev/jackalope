@@ -306,6 +306,26 @@ Matching cases alone does not establish unchanged quality or a speed improvement
 
 ## Jev decision comparisons
 
+For the bounded discovery experiment, generate a suite with
+`node scripts/evaluation/discovery-cases.mjs <suite.json>`. Set
+`JACKALOPE_JEV_SPEC` to its absolute path and `JACKALOPE_JEV_TEST_KEY` in the
+trial process environment, then run the native test executable with
+`--ignored --exact commands::decisions::discovery::trial::installed_discovery_trial --nocapture`.
+This makes billable requests and writes `<suite>.results.json` next to the input.
+Keep credentials out of command arguments, source and receipts. Each authored
+case repeats three times with an application-cold request; results include failed
+requests, model IDs, typed answers, local search time, Jev wall time and reported
+usage. Expected tool IDs are withheld from the API payload. The oracle checks
+recall at five or an empty result when the capability is absent. This measures
+discovery only, not downstream agent savings or real-project quality.
+
+The website's `/benchmarks/` page consumes sanitized measurements in
+`apps/website/public/research/benchmarks.json`. Generate comparison reports with
+`evaluate:context`, retain individual trial measurements and provenance, and
+review public copy against the report's claim blockers. Preserve unfavorable
+comparisons and label authored fixtures, inherited caches, missing billing data
+and unmeasured human acceptance. Raw receipts belong in ignored scratch output.
+
 `pnpm evaluate:jev <trials.json> [report.json]` summarizes independently reviewed
 trials without calling a provider or installing a routing policy. Supply an array
 with `id`, `caseId`, `configuration`, `category`, `variant` (`local`, `agent`, `jev`),

@@ -44,6 +44,8 @@ pub struct ValidationStep {
     #[serde(default)]
     pub evidence: Vec<String>,
     pub timestamp: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requirements: Vec<super::outcomes::RequirementAssessment>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -175,6 +177,11 @@ pub struct RecordValidationInput {
     #[schemars(description = "File paths of screenshots or logs gathered as evidence")]
     #[serde(default)]
     pub evidence: Vec<String>,
+    #[serde(default)]
+    #[schemars(
+        description = "Optional final batch of requirement answers: requirementId from the task contract, met/partial/unverified, concise justification and evidence references. Agent assessments do not accept requirements for the user."
+    )]
+    pub requirements: Vec<super::outcomes::RequirementAssessment>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]

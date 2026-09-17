@@ -45,6 +45,7 @@ const selected = value(
   suitePath ? cases.map((c) => c.id).join(',') : 'copy-edit,design-tokens,scheduler-fix',
 ).split(',');
 const variants = value('--variants', 'before,after').split(',');
+const compactPrompts = args.includes('--compact-prompts');
 const requestedEffort = value('--effort', null);
 const efforts = Object.fromEntries(
   variants.map((v) => [v, value(`--${v}-effort`, requestedEffort)]),
@@ -122,6 +123,7 @@ if (!args.includes('--execute')) {
         id,
         [
           assemblePrompt({
+            version: compactPrompts ? 3 : 2,
             rawPrompt: cases.find((c) => c.id === id).prompt,
             selectedSkillIds: resolveTaskGuidelines(
               cases.find((c) => c.id === id).prompt,
@@ -129,7 +131,7 @@ if (!args.includes('--execute')) {
             ),
             executionMode: 'isolated',
           }).assembledPrompt,
-          effortPrompt(requestedEffort),
+          effortPrompt(requestedEffort, compactPrompts),
         ].join('\n\n'),
       ]),
     );
@@ -184,6 +186,15 @@ if (!args.includes('--execute')) {
   const cliVersion =
     spawnSync(agent, ['--version'], { encoding: 'utf8', windowsHide: true }).stdout?.trim() ?? null;
   const comparisonPath = path.join(output, 'comparison.json');
+  const plan = {
+    cases: selected,
+    variants,
+    repeat,
+    compactPrompts,
+    suiteSha256: createHash('sha256')
+      .update(JSON.stringify(cases.filter((c) => selected.includes(c.id))))
+      .digest('hex'),
+  };
   let saved = null;
   try {
     saved = JSON.parse(await readFile(comparisonPath, 'utf8'));
@@ -198,6 +209,7 @@ if (!args.includes('--execute')) {
   if (
     saved &&
     (saved.agent !== agent ||
+      JSON.stringify(saved.plan) !== JSON.stringify(plan) ||
       saved.baselineRevision !== baseline.revision ||
       saved.model !== model ||
       saved.cliVersion !== cliVersion ||
@@ -237,11 +249,15 @@ if (!args.includes('--execute')) {
                   ))
                 : [
                     assemblePrompt({
+                      version: compactPrompts && variant === 'after' ? 3 : 2,
                       rawPrompt: fixture.prompt,
                       selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
                       executionMode: 'isolated',
                     }).assembledPrompt,
-                    effortPrompt(efforts[variant] ?? undefined),
+                    effortPrompt(
+                      efforts[variant] ?? undefined,
+                      compactPrompts && variant === 'after',
+                    ),
                   ].join('\n\n');
         if (!prompt) throw new Error(`Missing frozen baseline for ${id}`);
         const spec = {
@@ -282,7 +298,13 @@ if (!args.includes('--execute')) {
             {
               cwd: root,
               windowsHide: true,
-              env: { ...process.env, JACKALOPE_QUALITY_SPEC: specPath, RUST_TEST_THREADS: '1' },
+              env: {
+                ...process.env,
+                JACKALOPE_QUALITY_SPEC: specPath,
+                RUST_TEST_THREADS: '1',
+                JACKALOPE_CONTEXT_EXPERIMENT:
+                  compactPrompts && variant === 'after' ? 'compact' : 'off',
+              },
               stdio: ['ignore', 'pipe', 'pipe'],
             },
           );
@@ -383,7 +405,7 @@ if (!args.includes('--execute')) {
         const summary = qualitySummary(trials, Object.keys(binaries));
         await writeFile(
           `${comparisonPath}.tmp`,
-          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, controlPromptsHash, controlPromptsRevision: controlPrompts?.revision ?? null, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
+          `${JSON.stringify({ version: 1, plan, baselineRevision: baseline.revision, controlPromptsHash, controlPromptsRevision: controlPrompts?.revision ?? null, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
         );
         await rename(`${comparisonPath}.tmp`, comparisonPath);
         console.log(JSON.stringify(trials.at(-1)));

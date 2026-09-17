@@ -35,6 +35,7 @@ pub struct ModelEvidence {
 pub struct Options {
     pub objective: Objective,
     pub context_selection: bool,
+    pub tool_discovery: bool,
     pub failure_triage: bool,
     pub requirement_coverage: bool,
     pub review_prioritization: bool,

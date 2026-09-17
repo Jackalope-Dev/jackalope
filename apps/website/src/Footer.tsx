@@ -27,6 +27,7 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
       ['Field notes', '/blog/'],
       ['Changelog', '/changelog/'],
       ['Roadmap', '/roadmap/'],
+      ['Benchmarks & methodology', '/benchmarks/'],
     ],
   },
   {

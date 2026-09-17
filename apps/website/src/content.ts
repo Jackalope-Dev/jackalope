@@ -187,6 +187,12 @@ export const pages: SitePage[] = [
       'Find Jackalope desktop downloads and platform availability. Join the waitlist or claim a friend’s Instant Access Pass for early access.',
   },
   {
+    path: '/benchmarks/',
+    title: 'Agent performance benchmarks & methodology | Jackalope',
+    description:
+      'Measured task performance through Jackalope and the native agent CLI, with token usage, independent checks, limitations, and reproducible methodology.',
+  },
+  {
     path: '/tour/',
     title: 'Jackalope app tour: Tasks, coding agents & code review',
     description: tour.description,

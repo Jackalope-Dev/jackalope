@@ -99,6 +99,20 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
         row.budgetStopped === false &&
         typeof row.oraclePassed === 'boolean',
     );
+  const planned =
+    comparison.plan &&
+    variants.every((v) => comparison.plan.variants?.includes(v)) &&
+    comparison.plan.cases?.length > 0 &&
+    Number.isInteger(comparison.plan.repeat) &&
+    comparison.plan.repeat > 0 &&
+    rows.length === comparison.plan.cases.length * comparison.plan.repeat * 2 &&
+    comparison.plan.cases.every((id) =>
+      variants.every((v) =>
+        Array.from({ length: comparison.plan.repeat }, (_, i) =>
+          identities.has(`${v}:${id}:${i + 1}`),
+        ).every(Boolean),
+      ),
+    );
   const validUsage = rows.every(
     (row) =>
       measured(row.input) &&
@@ -141,6 +155,8 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
     }),
   );
   const blockers = [];
+  if (!planned)
+    blockers.push('The complete planned case and repetition matrix is not recorded or fulfilled.');
   if (!matched) blockers.push('Cases, repetitions or provider configurations differ.');
   if (!provenance)
     blockers.push('Build, CLI, model, effort, account binding or receipt evidence is missing.');
@@ -182,6 +198,21 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
     metrics,
     blockers,
     cases: caseIds,
+    plan: comparison.plan ?? null,
+    trialMeasurements: rows.map((row) => ({
+      case: row.case,
+      variant: row.variant,
+      repetition: row.repetition,
+      oraclePassed: row.oraclePassed,
+      elapsedMs: row.elapsedMs,
+      input: row.input,
+      output: row.output,
+      cacheRead: row.cacheRead,
+      totalTokens: row.totalTokens,
+      promptBytes: row.promptBytes,
+      mcpUsage: row.mcpUsage ?? null,
+      fixtureToolCalls: row.fixtureToolCalls ?? null,
+    })),
     repetitions: Object.fromEntries(
       caseIds.map((id) => [id, rows.filter((r) => r.case === id && r.variant === baseline).length]),
     ),

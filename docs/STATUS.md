@@ -71,6 +71,10 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   suitability gates and optional cost-aware objectives. Opt-in context selection,
   failure triage, requirement coverage, review priorities, monitor filtering and
   Automatic assignment matching retain typed receipts and separate usage.
+  An off-by-default bounded tool-discovery experiment can rank ambiguous searches
+  through Jev. Reproducible coding, tool-response and discovery suites supply
+  sanitized measurements for the website methodology page; general savings and
+  real-project quality equivalence are not established by authored fixtures.
   Live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.

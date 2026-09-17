@@ -6,6 +6,7 @@ export type DecisionKind =
   | 'worker_selection'
   | 'task_strategy'
   | 'context_selection'
+  | 'tool_discovery'
   | 'task_review'
   | 'monitor_relevance'
   | 'assignment_matching';
@@ -46,6 +47,7 @@ export const decisionLabels: Record<DecisionKind, string> = {
   worker_selection: 'Worker selection',
   task_strategy: 'Task strategy',
   context_selection: 'Context selection',
+  tool_discovery: 'Tool discovery',
   task_review: 'Result assessment',
   monitor_relevance: 'Monitor relevance',
   assignment_matching: 'Assignment matching',
@@ -66,6 +68,7 @@ export interface ModelEvidence {
 export interface DecisionOptions {
   objective: 'quality' | 'balanced' | 'economical';
   contextSelection: boolean;
+  toolDiscovery: boolean;
   failureTriage: boolean;
   requirementCoverage: boolean;
   reviewPrioritization: boolean;

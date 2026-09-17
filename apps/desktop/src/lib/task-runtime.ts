@@ -219,6 +219,12 @@ export interface ValidationStep {
   notes?: string | null;
   evidence: string[];
   timestamp: string;
+  requirements?: {
+    requirementId: string;
+    status: 'met' | 'partial' | 'unverified';
+    summary: string;
+    evidence: string[];
+  }[];
 }
 export interface ScreenshotArtifact {
   id: string;

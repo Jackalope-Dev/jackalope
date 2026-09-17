@@ -7,6 +7,7 @@ function comparison() {
     agent: 'codex',
     model: 'fixture',
     cliVersion: 'fixture-cli',
+    plan: { cases: ['a', 'b', 'c'], variants: ['direct', 'after'], repeat: 3 },
     executableHashes: { direct: 'baseline', after: 'candidate' },
     trials: ['direct', 'after'].flatMap((variant) =>
       ['a', 'b', 'c'].flatMap((id) =>

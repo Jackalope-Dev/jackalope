@@ -187,7 +187,7 @@ impl CoordinationTools {
             .service
             .runtime
             .mcp_broker
-            .search(&run.id, input)
+            .search_context(&run.id, input, Some((&self.service.runtime, &run)))
             .await
             .map_err(|e| ErrorData::invalid_request(e, None))?;
         super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
@@ -593,7 +593,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Record a structured validation or verification step during a test run (e.g. 'Step 1: Scaffolding check' or 'Step 3: Submit onboarding form'). Surfaces directly in Jackalope's verification review.",
+        description = "Record validation evidence. After implementation and final checks, include a requirements array to answer the task expectations in one call, with a status, short justification and evidence per requirement. Surfaces in review; does not grant human acceptance.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -611,6 +611,8 @@ impl CoordinationTools {
             .service
             .authorized_run(&headers)
             .map_err(bridge_error)?;
+        super::outcomes::validate_assessments(&input.requirements, run.contract.as_ref())
+            .map_err(|e| ErrorData::invalid_params(e, None))?;
         let step = super::harness::ValidationStep {
             id: uuid::Uuid::new_v4().to_string(),
             step: input.step,
@@ -618,6 +620,7 @@ impl CoordinationTools {
             notes: input.notes,
             evidence: input.evidence,
             timestamp: chrono::Utc::now().to_rfc3339(),
+            requirements: input.requirements,
         };
         self.service.runtime.update(&run.id, |r| {
             r.activity.push(format!(

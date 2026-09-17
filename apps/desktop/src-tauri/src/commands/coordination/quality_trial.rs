@@ -43,7 +43,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     }
     let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
     let service = Coordinator::new(root.join("profile/coordination"), runtime.clone())?;
-    let _owner = Owner(runtime.clone(), service.clone());
+    let mut owner = Owner(runtime.clone(), service.clone(), None);
     let direct = spec["variant"] == "direct";
     let project_id = Uuid::new_v4().to_string();
     let fixture_scope = format!("project:{project_id}");
@@ -55,7 +55,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         let counter = root.join("tool-calls.txt");
         std::fs::write(
             &server_path,
-            r#"const fs=require('node:fs'), data=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));let calls=0;require('readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);const send=result=>console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result}));if(q.method==='initialize')send({protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'result-fixture',version:'1'}});if(q.method==='tools/list')send({tools:[{name:'fixture_report',description:'Return a report keyed by record ID in structuredContent.report.',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{}}}]});if(q.method==='tools/call'){fs.writeFileSync(process.argv[3],String(++calls));send({content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data,isError:false});}});"#,
+            r#"const fs=require('node:fs'), data=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));require('readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);const send=result=>console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result}));if(q.method==='initialize')send({protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'result-fixture',version:'1'}});if(q.method==='tools/list')send({tools:[{name:'fixture_report',description:'Return a report keyed by record ID in structuredContent.report.',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{}}}]});if(q.method==='tools/call'){fs.appendFileSync(process.argv[3],'call\n');send({content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data,isError:false});}});"#,
         )?;
         let config = json!({"command":"node","args":[server_path,source,counter]});
         spec["fixtureMcp"] = json!({"quality_fixture":config});
@@ -64,6 +64,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 "id":"quality_fixture","name":"Disposable tool-result fixture","scope":fixture_scope,"transport":"stdio",
                 "command":"node","args":config["args"],"discovery":true
             }))?).await?;
+            owner.2 = Some(fixture_scope.clone());
         }
     }
     if !direct {
@@ -167,7 +168,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let tool_calls = has_fixture.then(|| {
         std::fs::read_to_string(root.join("tool-calls.txt"))
             .ok()
-            .and_then(|text| text.parse::<u64>().ok())
+            .map(|text| text.lines().count() as u64)
     });
     let report = json!({"version":1,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
@@ -180,14 +181,25 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     println!("Quality receipt: {}", receipt.display());
     if has_fixture && !direct {
         crate::commands::mcp::mcp_delete_server("quality_fixture".into(), fixture_scope).await?;
+        owner.2 = None;
     }
     Ok(())
 }
 
-struct Owner(TaskRuntime, Coordinator);
+struct Owner(TaskRuntime, Coordinator, Option<String>);
 impl Drop for Owner {
     fn drop(&mut self) {
         self.0.stop_all();
         self.1.shutdown();
+        if let Some(scope) = self.2.take() {
+            std::thread::spawn(move || {
+                tauri::async_runtime::block_on(crate::commands::mcp::mcp_delete_server(
+                    "quality_fixture".into(),
+                    scope,
+                ))
+            })
+            .join()
+            .ok();
+        }
     }
 }

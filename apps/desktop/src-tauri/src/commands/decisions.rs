@@ -2,6 +2,7 @@ use super::tasks::TaskRuntime;
 pub mod assistance;
 pub mod context;
 mod contracts;
+pub mod discovery;
 pub mod evaluation;
 pub mod options;
 pub(crate) mod settings;

@@ -55,6 +55,7 @@ release dates.
   with installed providers. Compare complete cost and quality on held-out tasks;
   preserve serial live-session batch and cost limits.
 - [ ] Calibrate Jev decision thresholds on held-out tasks and compare end-to-end cost,
+  including bounded tool discovery overhead and downstream retrieval failures,
   latency and outcomes with local rules and agent routing. Include optional context
   reranking, failure/coverage advice, review priorities, monitor false negatives and
   assignment matching; compare complete costs including assistance calls and corrections.

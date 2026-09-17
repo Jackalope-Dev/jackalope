@@ -459,6 +459,8 @@ pub(super) async fn bridge_validation_step(
     Json(input): Json<super::harness::RecordValidationInput>,
 ) -> Result<Json<super::harness::ValidationStep>, StatusCode> {
     let run = service.authorized_run(&headers)?;
+    super::outcomes::validate_assessments(&input.requirements, run.contract.as_ref())
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
     let step = super::harness::ValidationStep {
         id: Uuid::new_v4().to_string(),
         step: input.step,
@@ -466,6 +468,7 @@ pub(super) async fn bridge_validation_step(
         notes: input.notes,
         evidence: input.evidence,
         timestamp: Utc::now().to_rfc3339(),
+        requirements: input.requirements,
     };
     service.runtime.update(&run.id, |r| {
         r.activity.push(format!(
@@ -661,7 +664,7 @@ async fn bridge_tool_search(
     let (result, usage) = service
         .runtime
         .mcp_broker
-        .search(&run.id, input)
+        .search_context(&run.id, input, Some((&service.runtime, &run)))
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
     super::mcp_broker::record_usage(&service.runtime, &run, usage);

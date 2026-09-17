@@ -33,8 +33,8 @@ export function planningDraft(
     executionMode: isolated ? ('isolated' as const) : ('current' as const),
   };
   const generated = assemblePrompt(assembly).assembledPrompt;
-  const legacy = (task.promptVersion === undefined ? [1, 2] : [task.promptVersion])
-    .filter((version) => version < 3)
+  const legacy = (task.promptVersion === undefined ? [1, 2, 3] : [task.promptVersion])
+    .filter((version) => version <= 3)
     .map((version) => assemblePrompt({ ...assembly, version }).assembledPrompt);
   const automatic = task.clarifications?.some(
     (item) => item.question === 'Task guideline selection' && item.answer === 'Automatic',

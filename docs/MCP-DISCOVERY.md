@@ -121,6 +121,17 @@ merges with existing configuration. Verified with the installed CLI and its
 
 ## Verification
 
+Settings → Decisions includes an off-by-default Jev tool-discovery experiment.
+In Jev mode it can promote strongly relevant tools for ambiguous searches using
+the query, at most 4,000 task characters and 32 descriptions capped at 1,200
+characters each. Exact tool names and empty-query browsing stay local. Schemas,
+credentials and tool results are not included. The existing candidate scope and
+execution permissions still apply; uncertain or failed evaluations retain local
+ordering. Decision receipts record usage separately from agent execution, and
+search responses include the receipt reference and elapsed decision time. Include
+that overhead when comparing complete workflows. Downstream savings require live
+task evidence; relevance scores alone do not establish correctness or savings.
+
 Ordinary native tests cover stdio and authenticated HTTP discovery, pagination,
 small schema responses, execution handles, changed definitions, allow/deny lists,
 account-directory separation, protocol revision conversion and process cleanup. These are protocol fixtures.

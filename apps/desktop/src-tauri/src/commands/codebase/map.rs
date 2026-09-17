@@ -288,7 +288,9 @@ pub(crate) fn prepare_task_map(
         .iter()
         .filter(|file| task.contains(&file.path))
         .count();
-    let budget = if (1..=2).contains(&explicit) {
+    let budget = if (1..=2).contains(&explicit)
+        && std::env::var("JACKALOPE_CONTEXT_EXPERIMENT").is_ok_and(|value| value == "compact")
+    {
         budget.min(3_000)
     } else {
         budget

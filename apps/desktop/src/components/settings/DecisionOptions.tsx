@@ -20,6 +20,11 @@ import { InlineNotice } from '../ui/InlineNotice';
 
 const helpers = [
   [
+    'toolDiscovery',
+    'Experiment with tool discovery',
+    'Rank bounded tool descriptions for ambiguous searches. Sends the search and task brief to Jev; savings are unproven. Exact names and uncertain results keep local ordering.',
+  ],
+  [
     'contextSelection',
     'Select relevant context',
     'Rerank saved lessons and, at the app level, Ask Jackalope documentation excerpts.',

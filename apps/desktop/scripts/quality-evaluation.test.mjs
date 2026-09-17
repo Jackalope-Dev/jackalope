@@ -67,6 +67,15 @@ test('resuming completed trials launches no workers and rejects changed configur
   ].join('\n\n');
   const comparison = path.join(output, 'comparison.json');
   const saved = {
+    plan: {
+      cases: [fixture.id],
+      variants: ['before', 'after'],
+      repeat: 1,
+      compactPrompts: false,
+      suiteSha256: createHash('sha256')
+        .update(JSON.stringify([fixture]))
+        .digest('hex'),
+    },
     baselineRevision: baseline.revision,
     agent: 'codex',
     model: 'fixture',
