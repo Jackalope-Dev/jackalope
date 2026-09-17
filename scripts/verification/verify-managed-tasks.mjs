@@ -302,7 +302,7 @@ try {
       await page.getByRole('button', { name: 'Create a plan', exact: true }).click();
       const overview = page.getByRole('tab', { name: 'Overview', exact: true });
       const activity = page.getByRole('tab', { name: 'Activity', exact: true });
-      const details = page.getByText('Task details', { exact: true });
+      const details = page.getByRole('tab', { name: 'Details', exact: true });
       await page.getByRole('heading', { name: 'Planning your task' }).waitFor();
       const planningCharacter = page.locator('.managed-planning-status .brand-agent-character');
       assert.equal(await planningCharacter.getAttribute('data-state'), 'working');
@@ -539,7 +539,8 @@ try {
       });
       const review = page.getByRole('button', { name: 'Review changes', exact: true });
       await review.waitFor();
-      assert.equal(await page.getByRole('navigation', { name: 'Task result' }).count(), 1);
+      assert.equal(await page.getByRole('tablist', { name: 'Planned task views' }).count(), 1);
+      assert.equal(await page.locator('.managed-task-heading .brand-agent-character').count(), 1);
       await page.getByText('The API and UI now work together.', { exact: false }).waitFor();
       await activity.click();
       await details.focus();
@@ -566,7 +567,9 @@ try {
         0,
       );
       await review.click();
+      await page.getByRole('tab', { name: 'Merge', exact: true }).click();
       await page.getByText('Checks need attention before merging.', { exact: false }).waitFor();
+      await page.getByRole('tab', { name: 'Changes', exact: true }).click();
       await page
         .locator('.task-review .changed-files-diff')
         .getByText('Combined feature', { exact: false })
@@ -582,14 +585,13 @@ try {
         f.prepareError = null;
         f.sync();
       });
-      await page.getByRole('button', { name: 'Preview', exact: true }).click();
+      await page.getByRole('tab', { name: 'Preview', exact: true }).click();
       await page.getByRole('region', { name: 'Try result', exact: true }).waitFor();
       await review.focus();
       await review.press('Enter');
       assert.equal(await review.count(), 0);
       await page.waitForFunction(() => document.activeElement?.textContent === 'Review');
       const apply = page.getByRole('button', { name: 'Apply changes to main', exact: true });
-      await apply.waitFor();
       await page.getByText('Combined feature', { exact: false }).first().waitFor();
       assert.equal(await page.getByRole('navigation', { name: 'Changed files' }).count(), 1);
       assert.equal(
@@ -612,6 +614,23 @@ try {
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-review.png`,
         fullPage: true,
       });
+      const diffBox = await page.locator('.task-review .changed-files').boundingBox();
+      const reviewBox = await page.locator('.task-review').boundingBox();
+      assert.ok(Math.abs(diffBox.width - reviewBox.width) < 3, 'Changes use the full review width');
+      assert.equal(
+        await page.getByRole('region', { name: 'Project verification' }).isVisible(),
+        false,
+      );
+      await page.getByRole('tab', { name: 'Changes', exact: true }).focus();
+      await page.keyboard.press('ArrowRight');
+      await page.getByRole('region', { name: 'Project verification' }).waitFor();
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-checks.png`,
+        fullPage: true,
+      });
+      await page.getByRole('tab', { name: 'Merge', exact: true }).click();
+      await page.getByRole('button', { name: 'Refresh merge', exact: true }).click();
+      await apply.waitFor();
       const commitDetails = page.getByText('Commit details', { exact: true });
       await commitDetails.click();
       const commitMessage = page.getByRole('textbox', { name: 'Commit message', exact: true });
@@ -622,7 +641,10 @@ try {
         true,
         'Editing must retain the field and focus',
       );
+      await page.getByRole('tab', { name: 'Changes', exact: true }).click();
       await page.getByText('Combined feature', { exact: false }).first().waitFor();
+      await page.getByRole('tab', { name: 'Merge', exact: true }).click();
+      assert.equal(await commitMessage.inputValue(), 'Complete API and UI');
       await page.getByRole('button', { name: 'Refresh merge', exact: true }).click();
       await apply.waitFor();
       assert.equal(
@@ -639,6 +661,7 @@ try {
             'src/server/feature-handler.ts',
           ];
         });
+        await page.getByRole('tab', { name: 'Changes', exact: true }).click();
         await page.getByRole('button', { name: 'Refresh changes', exact: true }).click();
         const files = page.getByRole('navigation', { name: 'Changed files' });
         const selectedFile = files.getByRole('button', {
@@ -651,6 +674,7 @@ try {
           path: `${output}/${width}-${dark ? 'dark' : 'light'}-files.png`,
           fullPage: true,
         });
+        await page.getByRole('tab', { name: 'Merge', exact: true }).click();
         await apply.focus();
       }
       await apply.press('Enter');

@@ -1,6 +1,6 @@
 .changed-files {
   display: grid;
-  grid-template-columns: minmax(150px, 22%) minmax(0, 1fr);
+  grid-template-columns: clamp(150px, 20%, 240px) minmax(0, 1fr);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   overflow: hidden;

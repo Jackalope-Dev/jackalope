@@ -215,6 +215,12 @@ try {
   await page.getByRole('navigation', { name: 'Changed files', exact: true }).waitFor();
   const calls = await page.evaluate(() => window.sessionFixture.calls.map((c) => c.command));
   assert.ok(calls.lastIndexOf('live_session_action') < calls.lastIndexOf('live_session_review'));
+  const reviewWidth = await page
+    .locator('.task-review')
+    .evaluate((el) => el.getBoundingClientRect().width);
+  assert.ok(reviewWidth > 800, 'Session review uses the full workspace width');
+  assert.equal(await input.isVisible(), true, 'Follow-up stays available during review');
+  await page.getByRole('button', { name: 'Activity', exact: true }).click();
   await page.evaluate(() => window.sessionFixture.run({ verificationError: 'Check failed' }));
   await page
     .locator('.live-message')
@@ -582,7 +588,7 @@ try {
     });
   });
   await page.getByRole('button', { name: 'Review changes', exact: true }).click();
-  await page.getByText('More review tools', { exact: true }).click();
+  await page.getByRole('tab', { name: 'Review tools', exact: true }).click();
   await page.getByRole('button', { name: 'Changes since my last review' }).click();
   await page.getByText('All current changes.', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Mark these changes seen' }).click();
@@ -592,6 +598,7 @@ try {
   await page.getByRole('button', { name: 'Useful result', exact: true }).click();
   await page.getByText('Your rating is saved.', { exact: true }).waitFor();
   await page.getByText('Track result usefulness', { exact: true }).click();
+  await page.getByRole('tab', { name: 'Merge', exact: true }).click();
   await page.getByRole('button', { name: 'Preview merge into main', exact: true }).click();
   await page.getByRole('button', { name: 'Merge into main and clean up', exact: true }).waitFor();
   await page.screenshot({ path: `${output}/review-1280-dark.png` });

@@ -20,6 +20,10 @@
   margin-inline: 0;
   padding-inline: max(var(--workspace-gutter, 32px), calc((100% - 1320px) / 2));
 }
+.workspace-page-layout[data-review="true"] {
+  max-width: none;
+  padding-inline: var(--workspace-gutter, 32px);
+}
 .workspace-heading {
   display: flex;
   flex-wrap: wrap;

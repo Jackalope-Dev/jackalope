@@ -1,10 +1,11 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
-import { FileDiff, RefreshCw } from 'lucide-react';
+import { FileDiff, GitMerge, ListChecks, RefreshCw, ScanEye } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { ChangedFiles } from './ChangedFiles';
 import { CrossModelReviewPanel } from './CrossModelReviewPanel';
 import { ProjectVerification } from './ProjectVerification';
@@ -12,6 +13,8 @@ import { ReviewProgress } from './ReviewProgress';
 import { TaskImpact } from './TaskImpact';
 import { TaskUsefulness } from './TaskUsefulness';
 import './result-review.css';
+
+export type ReviewSection = 'changes' | 'checks' | 'delivery' | 'tools';
 
 export function ResultReview({
   run,
@@ -21,6 +24,10 @@ export function ResultReview({
   visible = true,
   review: suppliedReview,
   onRefresh,
+  delivery,
+  unavailable,
+  section,
+  onSectionChange,
 }: {
   run: TaskRun;
   onCorrect?: (prompt: string) => void;
@@ -29,7 +36,13 @@ export function ResultReview({
   visible?: boolean;
   review?: Review;
   onRefresh?: () => void | Promise<void>;
+  delivery?: ReactNode;
+  unavailable?: ReactNode;
+  section?: ReviewSection;
+  onSectionChange?: (section: ReviewSection) => void;
 }) {
+  const [selected, setSelected] = useState<ReviewSection>('changes');
+  const current = section ?? selected;
   const [loadedReview, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,76 +63,148 @@ export function ResultReview({
     }
   }, [run.id, suppliedReview, onRefresh]);
   useEffect(() => {
-    if (visible && !suppliedReview) void load();
-  }, [load, visible, suppliedReview]);
+    if (visible && !suppliedReview && !unavailable) void load();
+  }, [load, visible, suppliedReview, unavailable]);
+  const checkFailed = !!run.verificationError || run.verification?.result.success === false;
   return (
     <div className="task-review">
-      <div className="task-review-toolbar">
-        <h3 className="flex items-center gap-2 font-medium">
-          <FileDiff size={16} />
-          Changes{' '}
-          {review ? `· ${review.files.length} ${review.files.length === 1 ? 'file' : 'files'}` : ''}
-        </h3>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={loading}
-          onClick={() => void load()}
-          loading={loading}
-          loadingLabel="Reading…"
-        >
-          <RefreshCw size={14} /> Refresh changes
-        </Button>
-      </div>
-      {error && (
-        <InlineNotice tone="error" className="mt-3">
-          {error}
-        </InlineNotice>
-      )}
-      {loading && (
-        <p role="status" className="task-muted">
-          Reading changes from this task’s workspace…
-        </p>
-      )}
-      <div className="task-review-layout">
-        <section className="task-review-output" aria-label="Changed files">
-          {review && (
+      <Tabs.Root
+        value={current}
+        onValueChange={(value) => {
+          setSelected(value as ReviewSection);
+          onSectionChange?.(value as ReviewSection);
+        }}
+      >
+        <Tabs.List aria-label="Review sections">
+          <Tabs.Trigger value="changes">
+            <FileDiff size={16} aria-hidden="true" /> Changes
+          </Tabs.Trigger>
+          {!unavailable && (
+            <Tabs.Trigger value="checks">
+              <ListChecks size={16} aria-hidden="true" /> Checks{' '}
+              {checkFailed && <span className="review-check-warning">Need attention</span>}
+            </Tabs.Trigger>
+          )}
+          {delivery && (
+            <Tabs.Trigger value="delivery">
+              <GitMerge size={16} aria-hidden="true" /> Merge
+            </Tabs.Trigger>
+          )}
+          {!unavailable && (
+            <Tabs.Trigger value="tools">
+              <ScanEye size={16} aria-hidden="true" /> Review tools
+            </Tabs.Trigger>
+          )}
+        </Tabs.List>
+        <ReviewPanel current={current} value="changes">
+          {unavailable || (
             <>
-              <ChangedFiles files={review.files} patch={review.diff} visible={visible} />
-              {review.note && (
-                <Disclosure>
-                  <DisclosureSummary>About these changes</DisclosureSummary>
-                  <p className="task-muted">{review.note}</p>
-                </Disclosure>
+              <div className="task-review-toolbar">
+                <h3 className="flex items-center gap-2 font-medium">
+                  <FileDiff size={16} />
+                  Changes{' '}
+                  {review
+                    ? `· ${review.files.length} ${review.files.length === 1 ? 'file' : 'files'}`
+                    : ''}
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                  onClick={() => void load()}
+                  loading={loading}
+                  loadingLabel="Reading…"
+                >
+                  <RefreshCw size={14} /> Refresh changes
+                </Button>
+              </div>
+              {error && (
+                <InlineNotice tone="error" className="mt-3">
+                  {error}
+                </InlineNotice>
               )}
+              {loading && (
+                <p role="status" className="task-muted">
+                  Reading changes from this task’s workspace…
+                </p>
+              )}
+              <section className="task-review-output" aria-label="Changed files">
+                {review && (
+                  <>
+                    <ChangedFiles
+                      files={review.files}
+                      patch={review.diff}
+                      visible={visible && current === 'changes'}
+                    />
+                    {review.note && (
+                      <Disclosure>
+                        <DisclosureSummary>About these changes</DisclosureSummary>
+                        <p className="task-muted">{review.note}</p>
+                      </Disclosure>
+                    )}
+                  </>
+                )}
+              </section>
             </>
           )}
-        </section>
-        <aside className="task-review-checklist" aria-label="Review checks">
-          <ProjectVerification
-            run={run}
-            command={project?.preferences?.verifyCommand}
-            onCorrect={onCorrect}
-          />
-          {outcomes}
-          {evidence}
-          {review && (
-            <Disclosure className="task-review-tools">
-              <DisclosureSummary>More review tools</DisclosureSummary>
-              <ReviewProgress key={`progress:${run.id}`} runId={run.id} />
-              <TaskImpact
-                key={`${run.id}:${JSON.stringify(review.files)}`}
+        </ReviewPanel>
+        {!unavailable && (
+          <ReviewPanel current={current} value="checks">
+            <section className="task-review-checks" aria-label="Review checks">
+              <ProjectVerification
                 run={run}
-                files={review.files}
+                command={project?.preferences?.verifyCommand}
+                onCorrect={onCorrect}
               />
-              {review.diff && (
-                <CrossModelReviewPanel run={run} files={review.files} diff={review.diff} />
-              )}
-              <TaskUsefulness key={`usefulness:${run.id}`} runId={run.id} />
-            </Disclosure>
-          )}
-        </aside>
-      </div>
+              {outcomes}
+              {evidence}
+            </section>
+          </ReviewPanel>
+        )}
+        {delivery && (
+          <ReviewPanel current={current} value="delivery">
+            <div className="task-review-delivery">{delivery}</div>
+          </ReviewPanel>
+        )}
+        {!unavailable && (
+          <ReviewPanel current={current} value="tools">
+            {review && (
+              <div className="task-review-tools">
+                <ReviewProgress key={`progress:${run.id}`} runId={run.id} />
+                <TaskImpact
+                  key={`${run.id}:${JSON.stringify(review.files)}`}
+                  run={run}
+                  files={review.files}
+                />
+                {review.diff && (
+                  <CrossModelReviewPanel run={run} files={review.files} diff={review.diff} />
+                )}
+                <TaskUsefulness key={`usefulness:${run.id}`} runId={run.id} />
+              </div>
+            )}
+          </ReviewPanel>
+        )}
+      </Tabs.Root>
     </div>
+  );
+}
+
+function ReviewPanel({
+  current,
+  value,
+  children,
+}: {
+  current: ReviewSection;
+  value: ReviewSection;
+  children: ReactNode;
+}) {
+  const [visited, setVisited] = useState(current === value);
+  useEffect(() => {
+    if (current === value) setVisited(true);
+  }, [current, value]);
+  return (
+    <Tabs.Content value={value} forceMount hidden={current !== value}>
+      {(visited || current === value) && children}
+    </Tabs.Content>
   );
 }

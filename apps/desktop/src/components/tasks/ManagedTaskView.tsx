@@ -1,14 +1,4 @@
-import {
-  Disclosure,
-  DisclosureSummary,
-  FormField,
-  IconButton,
-  Panel,
-  Select,
-  SelectItem,
-  Tabs,
-  Textarea,
-} from '@jackalope/ui';
+import { FormField, IconButton, Panel, Select, SelectItem, Textarea } from '@jackalope/ui';
 import { Activity, ArrowLeft, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { getAgentMetadata } from '../../lib/agent-catalog';
@@ -31,7 +21,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
-import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
+import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { ManagedTaskAgent } from './ManagedTaskAgent';
 import { ManagedTaskDetails } from './ManagedTaskDetails';
 import { ManagedTaskJourney } from './ManagedTaskJourney';
@@ -64,13 +54,12 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const [viewTab, setViewTab] = useState('overview');
   const [planPending, setPlanPending] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
-  const [resultTab, setResultTab] = useState<'result' | 'changes' | 'preview'>('result');
-  const resultRef = useRef<HTMLElement>(null);
   const pageRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const wasStarted = useRef(task.started);
   const overviewTabRef = useRef<HTMLButtonElement>(null);
   const activityTabRef = useRef<HTMLButtonElement>(null);
+  const reviewTabRef = useRef<HTMLButtonElement>(null);
   const previewRunning = useManagedPreview(work.combined?.id, work.ready && !work.integrated);
   const selectionKey = work.steps.flatMap(({ run }) => (run ? [run.id] : [])).join(',');
   const reviewRunIds = useMemo(() => selectionKey.split(',').filter(Boolean), [selectionKey]);
@@ -149,7 +138,11 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     if (selectedResult) select(selectedResult);
     return () => select(null);
   }, [selectedResult, select]);
-  const recordReview = !!task.delivery && work.ready && !work.integrated && viewTab === 'overview';
+  const recordReview =
+    !!task.delivery &&
+    work.ready &&
+    !work.integrated &&
+    ['overview', 'review', 'preview'].includes(viewTab);
   useEffect(() => {
     if (!recordReview) return;
     let seconds = 0;
@@ -176,10 +169,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     setViewTab('overview');
     if (run.id === work.combined?.id && !isActive(run)) {
       setDetailId(null);
-      setResultTab('result');
-      requestAnimationFrame(() =>
-        resultRef.current?.querySelector<HTMLButtonElement>('[aria-current="page"]')?.focus(),
-      );
+      requestAnimationFrame(() => overviewTabRef.current?.focus());
       return;
     }
     setDetailId(run.id);
@@ -214,9 +204,10 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const prepareCorrection = (text: string) => {
     setCorrection(text);
     setViewTab('overview');
-    setResultTab('result');
     requestAnimationFrame(() => document.getElementById('managed-result-correction')?.focus());
   };
+  const lead = work.active[0] ?? work.combined ?? work.planner;
+  const hasResult = !!work.combined && !isActive(work.combined);
   const showAssignments = task.started && (!work.combined || work.active.length > 0);
   const assignments = (
     <ManagedAssignments
@@ -228,7 +219,11 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     />
   );
   return (
-    <WorkspacePage ref={pageRef} className="managed-task workspace-stack">
+    <WorkspacePage
+      ref={pageRef}
+      className="managed-task workspace-stack"
+      data-review={viewTab === 'review' || undefined}
+    >
       <Button
         className="self-start"
         variant="outline"
@@ -240,91 +235,97 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         <ArrowLeft size={15} />
         All tasks
       </Button>
-      <WorkspaceHeading
-        titleRef={titleRef}
-        title={task.title}
-        description={
-          <span role="status">
-            {work.status} · {task.request.projectName}
-          </span>
-        }
-        action={
-          <div className="managed-task-actions">
-            {task.delivery &&
-              task.error &&
-              task.delivery.repairs.length >= task.delivery.repairLimit &&
-              !work.active.length &&
-              !work.integrated && (
+      <div className="managed-task-heading">
+        <ManagedTaskAgent provider={lead?.agent ?? task.request.agent} run={lead} />
+        <WorkspaceHeading
+          titleRef={titleRef}
+          title={task.title}
+          description={
+            <span role="status">
+              {work.status} · {task.request.projectName} ·{' '}
+              {getAgentMetadata(lead?.agent ?? task.request.agent)?.name ?? task.request.agent}
+            </span>
+          }
+          action={
+            <div className="managed-task-actions">
+              {task.delivery &&
+                task.error &&
+                task.delivery.repairs.length >= task.delivery.repairLimit &&
+                !work.active.length &&
+                !work.integrated && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(() =>
+                        managedTaskCommand('action', { id: task.id, action: 'retry-repair' }),
+                      )
+                    }
+                  >
+                    Try another repair
+                  </Button>
+                )}
+              {task.started && !work.integrated && !work.ready && !work.failed && (
                 <Button
-                  disabled={busy}
+                  variant="outline"
+                  disabled={busy || work.failed}
                   onClick={() =>
                     void act(() =>
-                      managedTaskCommand('action', { id: task.id, action: 'retry-repair' }),
+                      managedTaskCommand('action', {
+                        id: task.id,
+                        action: work.paused ? 'resume' : 'pause',
+                      }),
                     )
                   }
                 >
-                  Try another repair
+                  {work.paused ? 'Resume task' : 'Pause dispatch'}
                 </Button>
               )}
-            {task.started && !work.integrated && !work.ready && !work.failed && (
-              <Button
-                variant="outline"
-                disabled={busy || work.failed}
-                onClick={() =>
-                  void act(() =>
-                    managedTaskCommand('action', {
-                      id: task.id,
-                      action: work.paused ? 'resume' : 'pause',
-                    }),
-                  )
-                }
-              >
-                {work.paused ? 'Resume task' : 'Pause dispatch'}
-              </Button>
-            )}
-            {!!work.active.length && (
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() =>
-                  void act(() => managedTaskCommand('action', { id: task.id, action: 'stop' }))
-                }
-              >
-                Stop task
-              </Button>
-            )}
-            {work.combined &&
-              !isActive(work.combined) &&
-              !work.active.length &&
-              !work.integrated &&
-              (viewTab !== 'overview' || resultTab !== 'changes') && (
+              {!!work.active.length && (
                 <Button
-                  onClick={() => {
-                    setDetailId(null);
-                    setViewTab('overview');
-                    setResultTab('changes');
-                    requestAnimationFrame(() =>
-                      resultRef.current
-                        ?.querySelector<HTMLButtonElement>('[aria-current="page"]')
-                        ?.focus(),
-                    );
-                    void act(() => managedTaskCommand('action', { id: task.id, action: 'pause' }));
-                  }}
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() => managedTaskCommand('action', { id: task.id, action: 'stop' }))
+                  }
                 >
-                  Review changes
+                  Stop task
                 </Button>
               )}
-            <IconButton
-              label="Refresh task"
-              title="Refresh task"
-              onClick={() => void act(refreshAll)}
-              disabled={busy}
-            >
-              <RefreshCw size={16} aria-hidden="true" />
-            </IconButton>
-          </div>
-        }
-      />
+              {work.combined &&
+                !isActive(work.combined) &&
+                !work.active.length &&
+                !work.integrated &&
+                viewTab !== 'review' && (
+                  <Button
+                    onClick={() => {
+                      setDetailId(null);
+                      setViewTab('review');
+                      requestAnimationFrame(() => reviewTabRef.current?.focus());
+                      void act(() =>
+                        managedTaskCommand('action', { id: task.id, action: 'pause' }),
+                      );
+                    }}
+                  >
+                    Review changes
+                  </Button>
+                )}
+              {hasResult && !work.integrated && !work.active.length && viewTab !== 'overview' && (
+                <Button variant="outline" onClick={() => prepareCorrection(correction)}>
+                  Request changes
+                </Button>
+              )}
+              <IconButton
+                label="Refresh task"
+                title="Refresh task"
+                onClick={() => void act(refreshAll)}
+                disabled={busy}
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+              </IconButton>
+            </div>
+          }
+        />
+      </div>
       <ManagedTaskJourney task={task} work={work} />
       {(error || queueError || task.error) && (
         <InlineNotice tone="error">{error || queueError || task.error}</InlineNotice>
@@ -343,9 +344,16 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           <Tabs.Trigger ref={overviewTabRef} value="overview">
             Overview
           </Tabs.Trigger>
+          {hasResult && (
+            <Tabs.Trigger ref={reviewTabRef} value="review">
+              Review
+            </Tabs.Trigger>
+          )}
+          {hasResult && !work.integrated && <Tabs.Trigger value="preview">Preview</Tabs.Trigger>}
           <Tabs.Trigger ref={activityTabRef} value="activity">
             Activity
           </Tabs.Trigger>
+          <Tabs.Trigger value="details">Details</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="overview" className="managed-overview">
           {showAssignments && (
@@ -472,80 +480,18 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
             </section>
           )}
           {work.combined && !isActive(work.combined) && !detail && (
-            <section ref={resultRef} className="managed-result" aria-label="Complete task result">
-              <div className="managed-result-toolbar">
-                <div className="managed-result-agent">
-                  <ManagedTaskAgent provider={work.combined.agent} run={work.combined} />
-                  <div>
-                    <span className="managed-agent-name">
-                      {getAgentMetadata(work.combined.agent)?.name ?? work.combined.agent}
-                    </span>
-                    <h2>{work.integrated ? 'Changes applied' : 'Task result'}</h2>
-                  </div>
-                </div>
-                <WorkspaceSubnavigation
-                  label="Task result"
-                  value={resultTab}
-                  onChange={setResultTab}
-                  items={[
-                    { id: 'result', label: 'Result' },
-                    { id: 'changes', label: 'Review' },
-                    ...(!work.integrated ? [{ id: 'preview' as const, label: 'Preview' }] : []),
-                  ]}
-                />
-              </div>
+            <section className="managed-result" aria-label="Complete task result">
               <div className="managed-result-body">
-                {resultTab === 'result' &&
-                  (work.combined.detailsOmitted ? (
-                    <p role="status">Loading the combined result…</p>
-                  ) : (
-                    <Suspense fallback={<p>Loading result…</p>}>
-                      <TaskMarkdown
-                        content={
-                          work.combined.result ||
-                          'Open the checks and work details to inspect this result.'
-                        }
-                        active={false}
-                        onOpenLink={(url) => void openExternalUrl(url)}
-                      />
-                    </Suspense>
-                  ))}
-                {resultTab === 'changes' && (
-                  <>
-                    {!work.integrated && (
-                      <ResultReview
-                        key={work.combined.id}
-                        run={work.combined}
-                        onCorrect={prepareCorrection}
-                        outcomes={
-                          <TaskOutcomes
-                            run={work.combined}
-                            canReview={!work.active.length}
-                            onCorrect={prepareCorrection}
-                            onAdvance={async () => {
-                              throw new Error('Continue this task through the follow-up below.');
-                            }}
-                          />
-                        }
-                      />
-                    )}
-                    {project && (
-                      <MergeReview
-                        key={selectionKey}
-                        project={project}
-                        runs={runs}
-                        items={work.items}
-                        merged={queue.mergedRunIds}
-                        onChanged={refreshAll}
-                        onlyRunIds={reviewRunIds}
-                        managedTitle={task.title}
-                        changesReviewed={!work.integrated}
-                      />
-                    )}
-                  </>
-                )}
-                {resultTab === 'preview' && !work.integrated && (
-                  <TaskPreview run={work.combined} onFeedback={prepareCorrection} />
+                {work.combined.detailsOmitted ? (
+                  <p role="status">Loading the combined result…</p>
+                ) : (
+                  <Suspense fallback={<p>Loading result…</p>}>
+                    <TaskMarkdown
+                      content={work.combined.result || 'Open review to inspect this result.'}
+                      active={false}
+                      onOpenLink={(url) => void openExternalUrl(url)}
+                    />
+                  </Suspense>
                 )}
               </div>
               {!work.integrated && !work.active.length && (
@@ -675,6 +621,51 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
             </Panel>
           )}
         </Tabs.Content>
+        {hasResult && work.combined && (
+          <Tabs.Content value="review" forceMount hidden={viewTab !== 'review'}>
+            <ResultReview
+              key={work.combined.id}
+              run={work.combined}
+              visible={viewTab === 'review'}
+              onCorrect={prepareCorrection}
+              unavailable={
+                work.integrated ? (
+                  <p className="task-muted">The applied patch is saved in the merge receipt.</p>
+                ) : undefined
+              }
+              outcomes={
+                <TaskOutcomes
+                  run={work.combined}
+                  canReview={!work.active.length}
+                  onCorrect={prepareCorrection}
+                  onAdvance={async () => {
+                    throw new Error('Continue this task through its follow-up.');
+                  }}
+                />
+              }
+              delivery={
+                project && (
+                  <MergeReview
+                    key={selectionKey}
+                    project={project}
+                    runs={runs}
+                    items={work.items}
+                    merged={queue.mergedRunIds}
+                    onChanged={refreshAll}
+                    onlyRunIds={reviewRunIds}
+                    managedTitle={task.title}
+                    changesReviewed={!work.integrated}
+                  />
+                )
+              }
+            />
+          </Tabs.Content>
+        )}
+        {hasResult && work.combined && !work.integrated && (
+          <Tabs.Content value="preview">
+            <TaskPreview run={work.combined} onFeedback={prepareCorrection} />
+          </Tabs.Content>
+        )}
         <Tabs.Content value="activity" className="managed-activity">
           {activityRun ? (
             <>
@@ -710,16 +701,15 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           ) : (
             <p className="task-muted">No attempts have been recorded yet.</p>
           )}
-          <Disclosure className="my-4">
-            <DisclosureSummary>Task details</DisclosureSummary>
-            <ManagedTaskDetails task={task} work={work} />
-            {task.started && (
-              <Panel className="workspace-stack">
-                <WorkspaceSectionHeading title="Work in this task" />
-                {assignments}
-              </Panel>
-            )}
-          </Disclosure>
+        </Tabs.Content>
+        <Tabs.Content value="details" className="managed-overview">
+          <ManagedTaskDetails task={task} work={work} />
+          {task.started && (
+            <Panel className="workspace-stack">
+              <WorkspaceSectionHeading title="Work in this task" />
+              {assignments}
+            </Panel>
+          )}
         </Tabs.Content>
       </Tabs.Root>
     </WorkspacePage>

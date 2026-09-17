@@ -4,7 +4,6 @@ import {
   Disclosure,
   DisclosureSummary,
   DropdownMenu as Menu,
-  Tabs,
   Textarea,
 } from '@jackalope/ui';
 import {
@@ -44,8 +43,9 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
+import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { FeedbackTouchpoint } from './FeedbackTouchpoint';
-import { ResultReview } from './ResultReview';
+import { ResultReview, type ReviewSection } from './ResultReview';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { TaskActivity } from './TaskActivity';
 import { TaskDelivery } from './TaskDelivery';
@@ -103,7 +103,9 @@ export function TaskDetail({
         : (savedTab ?? 'result'),
   );
   const [detailsOpen, setDetailsOpen] = useState(savedTab === 'context');
-  const [deliveryOpen, setDeliveryOpen] = useState(savedTab === 'delivery');
+  const [reviewSection, setReviewSection] = useState<ReviewSection>(
+    savedTab === 'delivery' ? 'delivery' : 'changes',
+  );
   useEffect(() => {
     useWorkViewStore.getState().remember(run.taskId, tab);
   }, [run.taskId, tab]);
@@ -124,9 +126,11 @@ export function TaskDetail({
             : section,
       );
       if (section === 'context') setDetailsOpen(true);
-      if (section === 'delivery') setDeliveryOpen(true);
+      if (section === 'delivery' || section === 'integrate') setReviewSection('delivery');
+      if (section === 'verify') setReviewSection('checks');
       if (section === 'integrate') {
         setIntegrating(true);
+        setReviewSection('delivery');
         requestAnimationFrame(() =>
           document.getElementById('task-merge')?.scrollIntoView({ block: 'start' }),
         );
@@ -222,9 +226,12 @@ export function TaskDetail({
         ?.querySelector<HTMLElement>('button, input, textarea')
         ?.focus();
     } else {
-      setTab(section === 'integrate' || section === 'verify' ? 'changes' : section);
+      setTab(['integrate', 'verify', 'delivery'].includes(section) ? 'changes' : section);
+      if (section === 'verify') setReviewSection('checks');
+      if (section === 'delivery') setReviewSection('delivery');
       if (section === 'integrate') {
         setIntegrating(true);
+        setReviewSection('delivery');
         requestAnimationFrame(() =>
           document.getElementById('task-merge')?.scrollIntoView({ block: 'start' }),
         );
@@ -425,8 +432,8 @@ export function TaskDetail({
     onCapture(id);
   };
   const outcomes = !!run.contract?.requirements.length && (
-    <Disclosure className="task-review-section">
-      <DisclosureSummary>Requirements · {run.contract.requirements.length}</DisclosureSummary>
+    <section className="task-review-section">
+      <h3 className="font-medium">Requirements · {run.contract.requirements.length}</h3>
       <TaskOutcomes
         key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
         run={run}
@@ -446,23 +453,17 @@ export function TaskDetail({
           });
         }}
       />
-    </Disclosure>
+    </section>
   );
   const evidence = !!(run.validationSteps?.length || run.screenshots?.length) && (
-    <Disclosure
-      className="task-review-section"
-      open={run.validationSteps?.some((step) => step.status === 'failed') || undefined}
-    >
-      <DisclosureSummary>
-        Agent evidence ·{' '}
-        {run.validationSteps?.filter((step) => step.status === 'failed').length || 0} failed checks
-      </DisclosureSummary>
+    <section className="task-review-section">
+      <h3 className="font-medium">Agent evidence</h3>
       <ValidationJourney
         runId={run.id}
         steps={run.validationSteps ?? []}
         screenshots={run.screenshots ?? []}
       />
-    </Disclosure>
+    </section>
   );
   if (run.detailsOmitted)
     return (
@@ -476,7 +477,7 @@ export function TaskDetail({
       </WorkspacePage>
     );
   return (
-    <WorkspacePage className="task-detail">
+    <WorkspacePage className="task-detail" data-review={tab === 'changes' || undefined}>
       <div className="task-detail-navigation">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft size={16} />
@@ -537,6 +538,7 @@ export function TaskDetail({
                     onSelect={() => {
                       setTab('changes');
                       setIntegrating(true);
+                      setReviewSection('delivery');
                     }}
                   >
                     <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Review and merge'}
@@ -556,7 +558,7 @@ export function TaskDetail({
                     className="workspace-menu-item"
                     onSelect={() => {
                       setTab('changes');
-                      setDeliveryOpen(true);
+                      setReviewSection('delivery');
                     }}
                   >
                     PR, CI &amp; delivery
@@ -723,66 +725,58 @@ export function TaskDetail({
           </Tabs.Content>
           {((!active && run.workspace) || tab === 'changes') && (
             <Tabs.Content value="changes" forceMount hidden={tab !== 'changes'}>
-              {!active && run.workspace && !integrated ? (
-                <ResultReview
-                  visible={tab === 'changes'}
-                  outcomes={outcomes}
-                  evidence={evidence}
-                  key={run.id}
-                  run={run}
-                  onCorrect={
-                    canContinue
-                      ? (prompt) =>
-                          draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
-                      : undefined
-                  }
-                />
-              ) : (
-                <>
-                  <div>
-                    {outcomes}
-                    {evidence}
-                  </div>
-                  <p className="task-muted">
-                    {integrated
-                      ? 'The reviewed patch and cleanup results are saved in the merge receipt below.'
-                      : active
-                        ? 'Changes become available for review after this attempt stops.'
-                        : 'No workspace was recorded for this attempt. Inspect its result and activity for more detail.'}
-                  </p>
-                </>
-              )}
-              {finished && isLatest && isolated && (integrating || integrated) && (
-                <TaskIntegration run={run} onApplied={applied} />
-              )}
-              {finished && (
-                <Disclosure
-                  open={deliveryOpen}
-                  onToggle={(event) => setDeliveryOpen(event.currentTarget.open)}
-                  className="my-4"
-                >
-                  <DisclosureSummary>PR, CI &amp; delivery</DisclosureSummary>
-                  <TaskDelivery
-                    key={run.id}
-                    run={run}
-                    integrated={integrated}
-                    onReview={() => {
-                      setTab('changes');
-                      if (isolated) setIntegrating(true);
-                    }}
-                    onHandoff={(text) => {
-                      const id = useTaskStore.getState().addTask({
-                        projectId: run.projectId,
-                        title: `Deliver: ${title}`.slice(0, 160),
-                        rawPrompt: text,
-                        status: 'backlog',
-                      });
-                      onCapture(id);
-                    }}
-                  />
-                  {finished && isLatest && <TaskLearning run={run} allowSave />}
-                </Disclosure>
-              )}
+              <ResultReview
+                visible={tab === 'changes'}
+                section={reviewSection}
+                onSectionChange={setReviewSection}
+                outcomes={outcomes}
+                evidence={evidence}
+                key={run.id}
+                run={run}
+                unavailable={
+                  integrated || active || !run.workspace ? (
+                    <p className="task-muted">
+                      {integrated
+                        ? 'The reviewed patch and cleanup results are saved in the merge receipt.'
+                        : active
+                          ? 'Changes become available for review after this attempt stops.'
+                          : 'No workspace was recorded for this attempt. Inspect its result and activity.'}
+                    </p>
+                  ) : undefined
+                }
+                onCorrect={
+                  canContinue
+                    ? (prompt) =>
+                        draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
+                    : undefined
+                }
+                delivery={
+                  finished && (
+                    <>
+                      {isLatest && isolated && <TaskIntegration run={run} onApplied={applied} />}
+                      <TaskDelivery
+                        key={run.id}
+                        run={run}
+                        integrated={integrated}
+                        onReview={() => {
+                          setTab('changes');
+                          setReviewSection('changes');
+                        }}
+                        onHandoff={(text) => {
+                          const id = useTaskStore.getState().addTask({
+                            projectId: run.projectId,
+                            title: `Deliver: ${title}`.slice(0, 160),
+                            rawPrompt: text,
+                            status: 'backlog',
+                          });
+                          onCapture(id);
+                        }}
+                      />
+                      {isLatest && <TaskLearning run={run} allowSave />}
+                    </>
+                  )
+                }
+              />
             </Tabs.Content>
           )}
           <Tabs.Content value="activity">

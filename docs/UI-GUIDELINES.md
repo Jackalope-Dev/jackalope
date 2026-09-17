@@ -37,10 +37,13 @@ footnotes. Preserve accessible names, dialog descriptions and consequential
 information about cost, permissions, data loss, consent and recovery.
 
 Task titles should be short objectives, with original instructions in task details under Activity.
-Results lead with output; review leads with the diff and a compact checks area.
-Task, managed-task and chat review reuse `ResultReview`; file navigation and diffs
-reuse `ChangedFiles`. Keep delivery actions in Review and one follow-up composer
-per task. Worker links resolve to their parent task instead of a second result screen.
+Results lead with output. Review gives the changed-file browser the full content
+width, with separate Changes, Checks, Merge and Review tools views. Task, managed-task
+and chat review reuse `ResultReview`; file navigation and diffs reuse `ChangedFiles`.
+Keep check failures visible in navigation, preserve review inputs when switching views,
+and load optional tools on first use. Keep one follow-up composer per task. Worker links resolve to their parent task instead of a second result screen.
+Use `WorkspaceTabs` for keyboard-navigable task and review panels with the same
+appearance as workspace navigation. Keep the task agent beside its heading.
 Use outlined buttons for secondary actions, visible selected tabs, and open sections
 for results, checks and next actions. Keep follow-up compact so the result remains usable
 at 960 by 640. Existing work should be visible before opening new-task capture.

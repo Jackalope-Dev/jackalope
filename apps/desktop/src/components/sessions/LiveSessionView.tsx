@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { CopyButton, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import { CopyButton } from '@jackalope/ui';
 import {
   ArrowLeft,
   ChevronDown,
@@ -303,7 +303,11 @@ export function LiveSessionView({
           <InlineNotice tone="error">{error || session.error}</InlineNotice>
         </div>
       )}
-      <div className="live-columns" data-expanded={expanded}>
+      <div
+        className="live-columns"
+        data-expanded={expanded}
+        data-review={(expanded && tab === 'changes') || undefined}
+      >
         <div className="live-conversation">
           {!collapsed && (
             <div
@@ -554,52 +558,60 @@ export function LiveSessionView({
               </>
             )}
             {tab === 'changes' &&
-              !integrated &&
               (active ? (
                 <p className="live-muted">Finish or stop work to review the current changes.</p>
-              ) : review ? (
-                <>
-                  <p className="live-muted">Queue paused for review.</p>
-                  {latest && (
-                    <ResultReview
-                      key={latest.id}
-                      run={latest}
-                      review={review}
-                      onRefresh={showReview}
-                      onCorrect={(text) => {
-                        void append(text).catch((cause) => setError(String(cause)));
-                      }}
-                      evidence={<CopyButton text={review.patchPath} label="Copy patch path" />}
-                    />
-                  )}
-                </>
+              ) : latest && (review || integrated) ? (
+                <ResultReview
+                  key={latest.id}
+                  run={latest}
+                  review={review ?? undefined}
+                  unavailable={
+                    integrated ? (
+                      <p className="live-muted">The applied patch is saved in the merge receipt.</p>
+                    ) : undefined
+                  }
+                  onRefresh={showReview}
+                  onCorrect={(text) => {
+                    void append(text).catch((cause) => setError(String(cause)));
+                  }}
+                  evidence={
+                    review && <CopyButton text={review.patchPath} label="Copy patch path" />
+                  }
+                  delivery={
+                    <>
+                      {project &&
+                        (session.paused || integrated) &&
+                        (pending ? (
+                          <InlineNotice>
+                            Run or cancel queued messages before merging this session.
+                          </InlineNotice>
+                        ) : (
+                          <MergeReview
+                            key={`merge:${latest.id}`}
+                            project={project}
+                            runs={runs}
+                            items={[]}
+                            merged={session.integratedRunId ? [session.integratedRunId] : []}
+                            onlyRunId={latest.id}
+                            changesReviewed={!integrated && !!review}
+                            onChanged={refresh}
+                          />
+                        ))}
+                      <TaskDelivery
+                        run={latest}
+                        integrated={integrated}
+                        onHandoff={integrated ? nextChat : append}
+                      />
+                      <TaskLearning run={latest} allowSave />
+                    </>
+                  }
+                />
               ) : latest ? (
                 <Button variant="outline" disabled={busy} onClick={showReview}>
                   Load current changes
                 </Button>
               ) : (
                 <p className="live-muted">No changes yet.</p>
-              ))}
-            {tab === 'changes' &&
-              latest &&
-              !active &&
-              project &&
-              (session.paused || integrated) &&
-              (pending ? (
-                <InlineNotice>
-                  Run or cancel queued messages before merging this session.
-                </InlineNotice>
-              ) : (
-                <MergeReview
-                  key={`merge:${latest.id}`}
-                  project={project}
-                  runs={runs}
-                  items={[]}
-                  merged={session.integratedRunId ? [session.integratedRunId] : []}
-                  onlyRunId={latest.id}
-                  changesReviewed={!integrated && !!review}
-                  onChanged={refresh}
-                />
               ))}
             {tab === 'preview' &&
               (integrated ? (
@@ -615,18 +627,7 @@ export function LiveSessionView({
                     : 'Run a change to start a preview.'}
                 </p>
               ))}
-            {tab === 'changes' && latest && !active && (
-              <Disclosure className="my-4">
-                <DisclosureSummary>PR, CI &amp; delivery</DisclosureSummary>
-                <TaskDelivery
-                  run={latest}
-                  integrated={integrated}
-                  onHandoff={integrated ? nextChat : append}
-                />
-                <TaskLearning run={latest} allowSave />
-              </Disclosure>
-            )}
-            {latest?.workspace && (
+            {latest?.workspace && tab === 'work' && (
               <details className="live-workspace">
                 <summary>Workspace</summary>
                 <p>{latest.workspace}</p>

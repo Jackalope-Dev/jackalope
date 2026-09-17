@@ -24,8 +24,10 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   work keeps review, merge into the target branch and workspace cleanup on the Review
   tab. Task, managed-task and chat reviews share a searchable changed-file browser,
   checks and evidence; a blocked merge does not hide the workspace diff. Worker links
-  reopen the parent task. Result leads with output, Activity contains optional task
-  details, and Review contains PR/CI/delivery actions. Preview explains setup requirements
+  reopen the parent task. Review separates full-width changes, checks, merge/delivery
+  and optional tools. Planned tasks use one navigation row for overview, review,
+  preview, activity and details, with the agent beside the task heading.
+  Preview explains setup requirements
   and attaches captured evidence to the single follow-up composer.
   The work list prioritizes existing tasks, with new capture opened explicitly.
   Running tasks offer saved

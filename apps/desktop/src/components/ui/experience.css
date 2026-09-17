@@ -707,7 +707,8 @@ button:disabled {
   }
 }
 
-.workspace-subnavigation {
+.workspace-subnavigation,
+.workspace-tab-list {
   display: flex;
   flex-shrink: 0;
   gap: 4px;
@@ -715,13 +716,18 @@ button:disabled {
   overflow-x: auto;
   border-bottom: 1px solid var(--color-border);
 }
-.workspace-subnavigation .workspace-nav-item {
+.workspace-subnavigation .workspace-nav-item,
+.workspace-tab-list .workspace-nav-item {
   flex-shrink: 0;
   white-space: nowrap;
 }
-.workspace-subnavigation [aria-current="page"] {
+.workspace-subnavigation [aria-current="page"],
+.workspace-tab-list [data-state="active"] {
   color: var(--color-accent-ink);
   background: var(--color-accent-subtle);
+}
+.workspace-tab-list {
+  padding-inline: 0;
 }
 .workspace-page {
   width: 100%;

@@ -555,3 +555,20 @@
     animation: none;
   }
 }
+
+.live-columns[data-review="true"] {
+  display: flex;
+  flex-direction: column;
+}
+.live-columns[data-review="true"] > .live-work {
+  order: 0;
+  flex: 1;
+  border-left: 0;
+}
+.live-columns[data-review="true"] > .live-conversation {
+  order: 1;
+  flex: none;
+}
+.live-columns[data-review="true"] .live-transcript {
+  display: none;
+}

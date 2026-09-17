@@ -362,9 +362,11 @@ Automated regression coverage and isolated native trials are described in
 [CONTRIBUTING.md](../CONTRIBUTING.md) and [SELF-DEVELOPMENT.md](SELF-DEVELOPMENT.md).
 Record detailed local receipts privately. Fixtures and source builds do not prove
 installed-app acceptance.
-Task result views keep Conversation, Review, Preview, Activity, Details and Delivery
-together. Recovery, unanswered questions and failed checks drive the primary action.
-Review is a separate decision from passing checks or local integration.
+Task result views keep output, review, preview and activity together. Review separates
+full-width changes from checks and evidence, merge/delivery, and optional review tools.
+Planned tasks keep request and assignment details in a separate view. Recovery,
+unanswered questions and failed checks drive the primary action. Review is a separate
+decision from passing checks or local integration.
 
 **Try result** starts the reviewed preview command in the task workspace, remembers
 it for that project, and selects a free port when the port is zero. HTTP readiness
