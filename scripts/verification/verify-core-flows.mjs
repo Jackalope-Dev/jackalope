@@ -15,6 +15,8 @@ import {useExecutionStore} from '/src/stores/executionStore.ts';
 import {useProjectStore} from '/src/stores/projectStore.ts';
 import {useLiveSessionStore} from '/src/stores/liveSessionStore.ts';
 import {useWorkViewStore} from '/src/stores/workViewStore.ts';
+import {useReferralStore} from '/src/stores/referralStore.ts';
+import {useCompanionStore} from '/src/stores/companionStore.ts';
 import {applyThemeTokens,DEFAULT_THEME} from '/node_modules/@jackalope/brand/src/theme.ts';
 import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
@@ -26,6 +28,10 @@ useExecutionStore.setState({runs:[base,{...base,id:'blocked',taskId:'blocked',pr
 useLiveSessionStore.setState({sessions:[{id:'live',title:'Live keyboard exploration',request:{projectId:'atlas',projectName:'Atlas'},createdAt:base.startedAt,updatedAt:base.startedAt,paused:true,closed:false,pinned:false,messages:[],batches:[],draft:{text:'',revision:0},error:null}],runs:[],loading:false,refresh:async()=>{}});
 const f=window.coreFixture={calls:[],preview:null,feedback:'',handoff:'',theme:appearance=>applyThemeTokens({...DEFAULT_THEME,isDark:appearance==='dark'}),view:()=>useWorkViewStore.getState(),preferences:()=>useProjectStore.getState().projects[0].preferences};
 f.theme('dark');
+const referrals={limit:5,remaining:3,accepted:2,downloaded:1,connected:1,shareUrl:'https://example.test/invite',invites:[]};
+useReferralStore.setState({referrals,load:async()=>{}});
+f.passes=remaining=>useReferralStore.setState({referrals:remaining===null?null:{...referrals,remaining}});
+f.notices=count=>useCompanionStore.setState({readIds:[],sources:{fixture:Array.from({length:count},(_,index)=>({id:'notice-'+index,title:'Review fixture result',detail:'Fixture only',kind:'attention'}))}});
 const mode=new URLSearchParams(location.search).get('mode');
 if(mode) window.__TAURI_INTERNALS__={invoke:async(command,args={})=>{
  f.calls.push({...args,command});
@@ -57,6 +63,61 @@ try {
   );
   await page.goto(url);
   await page.getByRole('heading', { name: 'Pick up where you left off', exact: true }).waitFor();
+  const passes = page.getByRole('button', { name: '3/5 Trial passes', exact: true });
+  await passes.waitFor();
+  const searchBox = await page
+    .getByRole('button', { name: 'Search commands', exact: true })
+    .boundingBox();
+  const passesBox = await passes.boundingBox();
+  assert.ok(passesBox.y >= searchBox.y + searchBox.height, 'Trial passes belong below search');
+  await passes.click();
+  await page.getByRole('heading', { name: 'Invitations', exact: true }).waitFor();
+  await page.getByText('of 5 Instant Access Passes available', { exact: true }).waitFor();
+  await page
+    .getByRole('navigation', { name: 'Workspace', exact: true })
+    .getByRole('button', { name: 'Tasks', exact: true })
+    .click();
+  await page.getByRole('textbox', { name: 'Message', exact: true }).waitFor();
+  for (const remaining of [0, null, 5, 3]) {
+    await page.evaluate((value) => window.coreFixture.passes(value), remaining);
+    await page
+      .getByRole('button', {
+        name: remaining === null ? 'Trial passes' : `${remaining}/5 Trial passes`,
+        exact: true,
+      })
+      .waitFor();
+  }
+  for (const count of [1, 10, 100]) {
+    await page.evaluate((value) => window.coreFixture.notices(value), count);
+    await page
+      .locator('.companion-badge')
+      .filter({ hasText: count > 99 ? '99+' : String(count) })
+      .waitFor();
+    const badge = await page.locator('.companion-badge').boundingBox();
+    assert.equal(badge.width, badge.height, 'Notification badge must stay circular');
+  }
+  await page.evaluate(() => window.coreFixture.notices(0));
+  for (const width of [1280, 960, 680]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
+    for (const appearance of ['light', 'dark']) {
+      await page.evaluate((value) => window.coreFixture.theme(value), appearance);
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const composer = await page.locator('.live-start-composer').boundingBox();
+      const work = await page.locator('.daily-work').boundingBox();
+      assert.ok(composer.y + composer.height <= work.y, 'Chat must come before attention work');
+      assert.ok(
+        composer.y + composer.height <= (width === 1280 ? 840 : 640),
+        'Chat composer must be visible on entry',
+      );
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+        false,
+      );
+      assert.equal(await page.getByText('Session limits', { exact: true }).count(), 0);
+      await page.screenshot({ path: `${output}/chat-${width}-${appearance}.png` });
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 840 });
   const taskTabs = page.getByRole('navigation', { name: 'tasks views', exact: true });
   assert.deepEqual(await taskTabs.getByRole('button').allTextContents(), [
     'Chat',

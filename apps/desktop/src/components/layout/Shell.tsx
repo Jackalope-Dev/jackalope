@@ -32,6 +32,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSubnavigation } from '../ui/WorkspaceSubnavigation';
+import { InvitationsButton } from './InvitationsButton';
 import {
   type ActiveTab,
   AGENT_VIEWS,
@@ -409,6 +410,13 @@ export function Shell({
             </button>
           ))}
         </nav>
+        <InvitationsButton
+          onClick={() => {
+            setSettingsProjectId(undefined);
+            setSettingsCategory('Invitations');
+            setActiveTab('preferences');
+          }}
+        />
       </div>
       <main
         ref={canvas}

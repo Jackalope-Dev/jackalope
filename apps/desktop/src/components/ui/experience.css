@@ -742,6 +742,8 @@ button:disabled {
 
 .workspace-nav .workspace-invitations,
 .workspace-invitations.workspace-nav-item {
+  flex: none;
+  margin-left: auto;
   gap: 9px;
   white-space: nowrap;
   padding: 8px 14px;
@@ -762,9 +764,4 @@ button:disabled {
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
-}
-.invitation-count small {
-  font-size: var(--text-xs);
-  font-weight: 400;
-  color: var(--color-text-secondary);
 }

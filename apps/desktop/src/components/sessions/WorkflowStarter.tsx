@@ -14,9 +14,11 @@ import { Select, SelectItem } from '../ui/Select';
 export function WorkflowStarter({
   projectPath,
   onDraft,
+  embedded = false,
 }: {
   projectPath: string;
   onDraft: (text: string) => void;
+  embedded?: boolean;
 }) {
   const [kind, setKind] = useState<RecipeId>('issue');
   const [value, setValue] = useState('');
@@ -43,57 +45,62 @@ export function WorkflowStarter({
       setBusy(false);
     }
   };
-  return (
+  const content = (
+    <div className="space-y-3 py-3">
+      <Select
+        aria-label="Workflow recipe"
+        value={kind}
+        disabled={busy}
+        onValueChange={(id) => {
+          setKind(id as RecipeId);
+          setValue('');
+          setError('');
+        }}
+      >
+        {workflowRecipes.map((item) => (
+          <SelectItem key={item.id} value={item.id}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </Select>
+      <label className="block">
+        {recipe.input}
+        <Input
+          value={value}
+          disabled={busy}
+          maxLength={200}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              void prepare();
+            }
+          }}
+        />
+      </label>
+      <p className="task-muted">
+        GitHub items are read from this project's repository. Review the prepared request before
+        sending it.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy || !value.trim()}
+        loading={busy}
+        loadingLabel="Reading…"
+        onClick={() => void prepare()}
+      >
+        Prepare task draft
+      </Button>
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+    </div>
+  );
+  return embedded ? (
+    content
+  ) : (
     <Disclosure>
       <DisclosureSummary>Start from a repeatable workflow</DisclosureSummary>
-      <div className="space-y-3 py-3">
-        <Select
-          aria-label="Workflow recipe"
-          value={kind}
-          disabled={busy}
-          onValueChange={(id) => {
-            setKind(id as RecipeId);
-            setValue('');
-            setError('');
-          }}
-        >
-          {workflowRecipes.map((item) => (
-            <SelectItem key={item.id} value={item.id}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </Select>
-        <label className="block">
-          {recipe.input}
-          <Input
-            value={value}
-            disabled={busy}
-            maxLength={200}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                void prepare();
-              }
-            }}
-          />
-        </label>
-        <p className="task-muted">
-          GitHub items are read from this project's repository. Review the prepared request before
-          sending it.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy || !value.trim()}
-          loading={busy}
-          loadingLabel="Reading…"
-          onClick={() => void prepare()}
-        >
-          Prepare task draft
-        </Button>
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      </div>
+      {content}
     </Disclosure>
   );
 }

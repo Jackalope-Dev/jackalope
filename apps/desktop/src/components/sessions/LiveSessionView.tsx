@@ -36,6 +36,7 @@ import { TaskUsefulness } from '../tasks/TaskUsefulness';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Tooltip } from '../ui/Tooltip';
+import { ChatOptions } from './ChatOptions';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
@@ -155,6 +156,26 @@ export function LiveSessionView({
   const provider = active?.agent ?? latest?.agent ?? session.request.agent;
   const tools = (
     <>
+      {!integrated && (
+        <ChatOptions
+          items={[
+            {
+              id: 'limits',
+              label: 'Session limits',
+              content: () => (
+                <SessionLimits
+                  embedded
+                  initial={session.limits}
+                  onSave={async (limits) => {
+                    await sessionCommand('limits', { id: session.id, limits });
+                    await refresh();
+                  }}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
       {detached && (
         <Tooltip content={session.pinned ? 'Turn off always on top' : 'Always on top'}>
           <button
@@ -526,16 +547,6 @@ export function LiveSessionView({
                     </Button>
                   )}
                 </div>
-                {!integrated && (
-                  <SessionLimits
-                    key={JSON.stringify(session.limits)}
-                    initial={session.limits}
-                    onSave={async (limits) => {
-                      await sessionCommand('limits', { id: session.id, limits });
-                      await refresh();
-                    }}
-                  />
-                )}
                 {integrated && latest && !detached && (
                   <Button
                     onClick={() => {

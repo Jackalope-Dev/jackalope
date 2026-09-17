@@ -41,6 +41,8 @@ Results lead with output; review leads with the diff and a compact checks area.
 Use outlined buttons for secondary actions, visible selected tabs, and disclosures
 for optional evidence and tools. Keep follow-up compact so the result remains usable
 at 960 by 640. Existing work should be visible before opening new-task capture.
+Chat leads with its composer and places work needing attention underneath. Keep
+optional session limits, workflow starters and context controls in its options menu.
 
 Marketing can be expressive while showing actual product workflows. Keep
 availability and limitations beside the claims they qualify. Avoid invented

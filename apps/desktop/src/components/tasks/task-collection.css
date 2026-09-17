@@ -38,9 +38,6 @@
 .work-priorities span {
   font-size: var(--text-xs);
 }
-.workspace-invitations {
-  margin-left: auto;
-}
 @media (max-width: 1000px) {
   .work-priorities button {
     flex-direction: column;

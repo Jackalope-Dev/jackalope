@@ -18,20 +18,14 @@ export function InvitationsButton({ onClick }: { onClick: () => void }) {
     };
   }, [load]);
   return (
-    <button
-      type="button"
-      className="workspace-nav-item workspace-invitations"
-      onClick={onClick}
-      aria-label={referrals ? `Invitations, ${referrals.remaining} left to give` : 'Invitations'}
-    >
-      <Ticket size={17} />
-      <span>Invite friends</span>
+    <button type="button" className="workspace-nav-item workspace-invitations" onClick={onClick}>
+      <Ticket size={17} aria-hidden="true" />
       {referrals && (
         <span className="invitation-count">
-          {referrals.remaining}
-          <small> left</small>
+          {referrals.remaining}/{referrals.limit}
         </span>
       )}
+      <span>Trial passes</span>
     </button>
   );
 }

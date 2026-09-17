@@ -32,14 +32,19 @@
   top: 0;
   right: -4px;
   pointer-events: none;
-  min-width: 18px;
-  padding: 1px 4px;
-  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
   background: var(--color-accent);
   color: var(--color-on-accent);
   text-align: center;
   font-size: var(--text-xs);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .companion-hint {
   position: absolute;

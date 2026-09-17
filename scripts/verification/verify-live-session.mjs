@@ -383,7 +383,11 @@ try {
   assert.equal(await input.inputValue(), 'And keep keyboard focus in the search box.');
   await page.getByRole('button', { name: 'New chat', exact: true }).click();
   assert.equal(await input.inputValue(), 'A separate draft');
-  await page.getByText('Start from a repeatable workflow', { exact: true }).click();
+  assert.equal(await page.getByText('Session limits', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page
+    .getByRole('menuitem', { name: 'Start from a repeatable workflow', exact: true })
+    .click();
   await page.getByLabel('Issue number', { exact: true }).fill('42');
   await page.getByRole('button', { name: 'Prepare task draft' }).click();
   await page.waitForFunction(() =>
@@ -391,8 +395,10 @@ try {
   );
   assert.ok((await input.inputValue()).startsWith('A separate draft'));
   assert.ok((await input.inputValue()).includes("user's explicit authorization"));
-  await page.getByText('Start from a repeatable workflow', { exact: true }).click();
-  await page.getByText('Session limits', { exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(await input.evaluate((node) => node === document.activeElement), true);
+  await page.getByRole('button', { name: 'Chat options', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
   await page.getByLabel('Pause after this many batches').fill('3');
   await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).fill('5');
   await page.getByRole('button', { name: 'Save limits' }).click();
@@ -403,7 +409,18 @@ try {
     ),
     { maxBatches: 3, pauseAtEstimatedUsd: 5 },
   );
-  await page.getByText('Session limits · 3 batches', { exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: 'Chat options', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Session limits', exact: true }).press('Enter');
+  assert.equal(await page.getByLabel('Pause after this many batches').inputValue(), '3');
+  assert.equal(
+    await page.getByLabel('Pause at estimated cost (USD)', { exact: true }).inputValue(),
+    '5',
+  );
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.getByRole('region', { name: 'Work across all projects' }).waitFor();
   await page.setViewportSize({ width: 960, height: 640 });
   await page.evaluate(() => window.sessionFixture.theme('light'));

@@ -7,9 +7,11 @@ import { InlineNotice } from '../ui/InlineNotice';
 export function SessionLimits({
   initial,
   onSave,
+  embedded = false,
 }: {
   initial?: Limits;
   onSave: (limits: Limits) => Promise<void> | void;
+  embedded?: boolean;
 }) {
   const [batches, setBatches] = useState(initial?.maxBatches?.toString() ?? '');
   const [cost, setCost] = useState(initial?.pauseAtEstimatedUsd?.toString() ?? '');
@@ -41,65 +43,70 @@ export function SessionLimits({
       setBusy(false);
     }
   };
-  return (
+  const content = (
+    <div className="space-y-3 py-3">
+      <label className="block">
+        Pause after this many batches
+        <Input
+          type="number"
+          min={1}
+          max={1000}
+          step={1}
+          disabled={busy}
+          value={batches}
+          onChange={(event) => {
+            setBatches(event.target.value);
+            setSaved(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (!busy) void save();
+            }
+          }}
+        />
+      </label>
+      <label className="block">
+        Pause at estimated cost (USD)
+        <Input
+          type="number"
+          min={0.01}
+          max={100000}
+          step={0.01}
+          disabled={busy}
+          value={cost}
+          onChange={(event) => {
+            setCost(event.target.value);
+            setSaved(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (!busy) void save();
+            }
+          }}
+        />
+      </label>
+      <p className="task-muted">
+        Limits pause the next batch. A running batch can exceed the estimate. Missing cost reports
+        pause further work when a cost threshold is set. This is not a provider billing cap. Blank
+        fields remove limits.
+      </p>
+      <Button type="button" variant="outline" disabled={busy} onClick={() => void save()}>
+        Save limits
+      </Button>
+      {saved && <p role="status">Limits saved.</p>}
+      {error && <InlineNotice tone="error">{error}</InlineNotice>}
+    </div>
+  );
+  return embedded ? (
+    content
+  ) : (
     <Disclosure className="my-3">
       <DisclosureSummary>
         Session limits{initial?.maxBatches ? ` · ${initial.maxBatches} batches` : ''}
       </DisclosureSummary>
-      <div className="space-y-3 py-3">
-        <label className="block">
-          Pause after this many batches
-          <Input
-            type="number"
-            min={1}
-            max={1000}
-            step={1}
-            disabled={busy}
-            value={batches}
-            onChange={(event) => {
-              setBatches(event.target.value);
-              setSaved(false);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                if (!busy) void save();
-              }
-            }}
-          />
-        </label>
-        <label className="block">
-          Pause at estimated cost (USD)
-          <Input
-            type="number"
-            min={0.01}
-            max={100000}
-            step={0.01}
-            disabled={busy}
-            value={cost}
-            onChange={(event) => {
-              setCost(event.target.value);
-              setSaved(false);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                if (!busy) void save();
-              }
-            }}
-          />
-        </label>
-        <p className="task-muted">
-          Limits pause the next batch. A running batch can exceed the estimate. Missing cost reports
-          pause further work when a cost threshold is set. This is not a provider billing cap. Blank
-          fields remove limits.
-        </p>
-        <Button type="button" variant="outline" disabled={busy} onClick={() => void save()}>
-          Save limits
-        </Button>
-        {saved && <p role="status">Limits saved.</p>}
-        {error && <InlineNotice tone="error">{error}</InlineNotice>}
-      </div>
+      {content}
     </Disclosure>
   );
 }

@@ -70,12 +70,12 @@ export function LiveSessions({
           ) : (
             <>
               <SessionRecovery />
-              <DailyWork />
               <SessionStart
                 key={`${project?.id}:${fresh}`}
                 project={project}
                 onOpenProject={onOpenProject}
               />
+              <DailyWork />
             </>
           )}
         </div>

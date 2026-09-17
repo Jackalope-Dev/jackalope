@@ -14,6 +14,7 @@ import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { ChatOptions } from './ChatOptions';
 import { SessionLimits } from './SessionLimits';
 import { WorkflowStarter } from './WorkflowStarter';
 
@@ -164,6 +165,60 @@ export function SessionStart({
             void send();
           }}
         >
+          <div className="live-start-toolbar">
+            <ChatOptions
+              onClose={() => input.current?.focus()}
+              items={[
+                {
+                  id: 'limits',
+                  label: 'Session limits',
+                  content: () => (
+                    <SessionLimits
+                      embedded
+                      initial={limits}
+                      onSave={(next) => {
+                        assessment.clear();
+                        setLimits(next);
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: 'workflow',
+                  label: 'Start from a repeatable workflow',
+                  content: (close) => (
+                    <WorkflowStarter
+                      embedded
+                      projectPath={project.path}
+                      onDraft={(prompt) => {
+                        assessment.clear();
+                        setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
+                        close();
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: 'context',
+                  label: 'Saved project context',
+                  content: () => (
+                    <TaskKnowledge
+                      embedded
+                      projectId={project.id}
+                      projectPath={project.path}
+                      prompt={text}
+                      selection={context}
+                      onChange={(next) => {
+                        assessment.clear();
+                        setContext(next);
+                      }}
+                      allowWorkflows={false}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </div>
           <Textarea
             ref={input}
             aria-label="Message"
@@ -202,32 +257,6 @@ export function SessionStart({
               Send
             </Button>
           </div>
-          <TaskKnowledge
-            projectId={project.id}
-            projectPath={project.path}
-            prompt={text}
-            selection={context}
-            onChange={(next) => {
-              assessment.clear();
-              setContext(next);
-            }}
-            allowWorkflows={false}
-          />
-          <WorkflowStarter
-            projectPath={project.path}
-            onDraft={(prompt) => {
-              assessment.clear();
-              setText((current) => (current.trim() ? `${current}\n\n${prompt}` : prompt));
-              input.current?.focus();
-            }}
-          />
-          <SessionLimits
-            initial={limits}
-            onSave={(next) => {
-              assessment.clear();
-              setLimits(next);
-            }}
-          />
         </form>
       ) : (
         <Button variant="outline" onClick={onOpenProject}>

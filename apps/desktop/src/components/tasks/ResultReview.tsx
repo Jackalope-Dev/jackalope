@@ -84,12 +84,12 @@ export function ResultReview({
                 <div className="task-review-file">
                   <Select
                     aria-label="Changed file"
-                    value={file || 'all'}
-                    onValueChange={(value) => setFile(value === 'all' ? '' : value)}
+                    value={file ? `file:${file}` : 'all'}
+                    onValueChange={(value) => setFile(value === 'all' ? '' : value.slice(5))}
                   >
                     <SelectItem value="all">All changed files ({review.files.length})</SelectItem>
                     {review.files.map((path) => (
-                      <SelectItem key={path} value={path}>
+                      <SelectItem key={path} value={`file:${path}`}>
                         {path}
                       </SelectItem>
                     ))}

@@ -31,8 +31,10 @@ work rows; command search also finds projects, tasks, sessions and current-task 
 Parallel planning remains inside Inbox with the existing ownership and dependency
 contracts; plans stay editable before dispatch.
 
-Chat's start page shows loaded work across projects, prioritizing attention and review.
-Its links select the relevant project or open the all-project Inbox. The last task or
+Chat's start page leads with the message composer. Its options menu holds session
+limits, workflow starters and saved project context. Loaded work appears underneath,
+prioritizing attention and review across projects. Its links select the relevant
+project or open the all-project Inbox. The last task or
 session section persists across navigation. Project setup covers project, agents,
 decisions, behavior, appearance and an optional first task.
 Workspace inspection can suggest preparation, checks and preview commands without
