@@ -39,6 +39,10 @@ pub enum StrategyChoice {
 pub enum DecisionKind {
     WorkerSelection,
     TaskStrategy,
+    ContextSelection,
+    TaskReview,
+    MonitorRelevance,
+    AssignmentMatching,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -77,6 +81,8 @@ pub struct DecisionAttempt {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DecisionReceipt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<serde_json::Value>,
     pub version: u32,
     pub kind: DecisionKind,
     pub requested_mode: DecisionMode,

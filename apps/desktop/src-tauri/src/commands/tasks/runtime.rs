@@ -207,6 +207,19 @@ impl TaskRuntime {
         })?;
         self.update(id, |run| run.progress = None);
         let mut request = req.clone();
+        if let Err(error) =
+            crate::commands::decisions::assistance::select_context(self, &mut request)
+        {
+            self.update_checked(id, |run| {
+                activity(
+                    run,
+                    &format!("Context assessment unavailable: {error}. Saved context retained."),
+                )
+            })?;
+        }
+        self.update_checked(id, |run| {
+            run.context_receipt = request.context_receipt.clone()
+        })?;
         let mut resume = previous;
         loop {
             if !self.is_running(id) {
@@ -982,6 +995,22 @@ impl TaskRuntime {
                         current.checkpoint_error = Some(error);
                     }
                 })?;
+            }
+        }
+        if self.is_running(id) && !quota_stopped {
+            let current = self
+                .integration_runs()?
+                .into_iter()
+                .find(|run| run.id == id)
+                .ok_or("Attempt not found")?;
+            match crate::commands::decisions::assistance::review(self, req, &current, !success) {
+                Ok(Some(advice)) => {
+                    self.update_checked(id, |run| activity(run, &advice))?;
+                }
+                Err(error) => {
+                    self.update_checked(id, |run| activity(run, &format!("Jev review unavailable: {error}. Review the saved checks and changes.")))?;
+                }
+                _ => {}
             }
         }
         let canceled = self.inner.lock().unwrap().canceled.remove(id);

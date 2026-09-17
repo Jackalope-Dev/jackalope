@@ -8,6 +8,7 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceTabs as Tabs } from '../ui/WorkspaceTabs';
 import { ApproveWork } from './ApproveWork';
 import { ChangedFiles } from './ChangedFiles';
+import { DecisionAdvice } from './DecisionAdvice';
 import { ProjectVerification } from './ProjectVerification';
 import { ReviewActions } from './ReviewActions';
 import './result-review.css';
@@ -76,6 +77,7 @@ export function ResultReview({
   const checkFailed = !!run.verificationError || run.verification?.result.success === false;
   return (
     <div className="task-review">
+      <DecisionAdvice run={run} />
       <Tabs.Root
         value={current}
         onValueChange={(value) => {

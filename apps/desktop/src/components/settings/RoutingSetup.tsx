@@ -21,6 +21,7 @@ import {
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
 import './routing.css';
+import { DecisionOptions } from './DecisionOptions';
 
 export function RoutingCircuit({ mode }: { mode: RoutingMode }) {
   return (
@@ -341,6 +342,9 @@ export function RoutingSetup({
             </Button>
           )}
         </div>
+      )}
+      {desktop && selected === 'jev' && settings?.connected && (
+        <DecisionOptions projectId={projectId} />
       )}
       {!desktop && (
         <InlineNotice>Open the desktop app to configure routing and connect Jev.</InlineNotice>

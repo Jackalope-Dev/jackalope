@@ -39,18 +39,9 @@ struct StrategyContext {
     version: u8,
     request: String,
     intent: String,
-    repository: RepositoryContext,
-    constraints: Constraints,
-    saved_context: super::knowledge::ContextReceipt,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RepositoryContext {
-    source_head: String,
-    map: Option<String>,
-    instructions: String,
     explicit_scopes: Vec<String>,
+    constraints: Constraints,
+    routing_context: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -73,6 +64,8 @@ struct SavedAssessment {
     instructions: String,
     #[serde(default)]
     saved_context: String,
+    #[serde(default)]
+    routing_context_hash: String,
 }
 
 static IN_FLIGHT: OnceLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = OnceLock::new();
@@ -163,7 +156,11 @@ pub(super) fn validated_assessment(
             &request.context_selection,
         )?
         .text();
-    if instructions != saved.instructions || context != saved.saved_context {
+    if instructions != saved.instructions
+        || context != saved.saved_context
+        || routing_context_hash(runtime, request, &decisions::context::repository(request))?
+            != saved.routing_context_hash
+    {
         return Err(
             "Repository instructions or saved context changed. Reassess before creating a plan."
                 .into(),
@@ -293,18 +290,34 @@ fn local_strategy(
 }
 
 fn root_instructions(root: &Path) -> Result<String, String> {
-    let file = root.join("AGENTS.md");
-    if !file.exists() {
-        return Ok(String::new());
+    let mut instructions = Vec::new();
+    for name in ["AGENTS.md", "CLAUDE.md"] {
+        let file = root.join(name);
+        if !file.exists() {
+            continue;
+        }
+        let path = file
+            .canonicalize()
+            .map_err(|_| "Repository instructions are unavailable.")?;
+        if !path.starts_with(root.canonicalize().map_err(|_| "Project unavailable.")?) {
+            return Err("Repository instructions resolve outside the project.".into());
+        }
+        let text = String::from_utf8(history::read_bounded(&path, 24_000)?)
+            .map_err(|_| "Repository instructions are not readable text.")?;
+        instructions.push(format!("{name}\n{text}"));
     }
-    let path = file
-        .canonicalize()
-        .map_err(|_| "Repository instructions are unavailable.")?;
-    if !path.starts_with(root.canonicalize().map_err(|_| "Project unavailable.")?) {
-        return Err("Repository instructions resolve outside the project.".into());
-    }
-    String::from_utf8(history::read_bounded(&path, 24_000)?)
-        .map_err(|_| "Repository instructions are not readable text.".into())
+    Ok(instructions.join("\n"))
+}
+
+fn routing_context_hash(
+    runtime: &TaskRuntime,
+    request: &RunRequest,
+    repository: &serde_json::Value,
+) -> Result<String, String> {
+    Ok(decisions::context::fingerprint(
+        &serde_json::json!({"repository":repository,
+        "options":decisions::options::options(runtime, &request.project_id)?}),
+    ))
 }
 
 fn agent_assessment(
@@ -411,8 +424,11 @@ fn assess(
     let (fallback, local_reason, cheap) = local_strategy(&intent, allowed, &scopes);
     let diff = super::tasks::git(&request.project_path, &["diff", "HEAD", "--", "."])
         .unwrap_or_else(|_| "unavailable".into());
+    let repository = decisions::context::repository(&request);
+    let routing_context_hash = routing_context_hash(runtime, &request, &repository)?;
     let fingerprint = serde_json::to_vec(&(
-        1,
+        2,
+        &routing_context_hash,
         request_identity(&request)?,
         &intent,
         &head,
@@ -449,6 +465,7 @@ fn assess(
         parallel_available: allowed,
         reason: local_reason,
         decision: DecisionReceipt {
+            evidence: None,
             version: 1,
             kind: DecisionKind::TaskStrategy,
             requested_mode: policy.mode,
@@ -470,17 +487,25 @@ fn assess(
     let receipt_instructions = instructions.clone();
     let receipt_context = saved_context.text();
     if !cheap && policy.mode != DecisionMode::Deterministic {
+        let mut context_request = request.clone();
+        context_request.context_receipt = saved_context.clone();
+        let routing_context = decisions::context::task_with_repository(
+            &context_request,
+            &super::tasks::TaskRun {
+                contract: super::outcomes::TaskContract::build(
+                    &request.context_selection,
+                    &saved_context,
+                )?,
+                ..Default::default()
+            },
+            repository,
+        );
         let context = StrategyContext {
+            routing_context,
             version: 1,
             request: request.prompt.clone(),
             intent,
-            saved_context,
-            repository: RepositoryContext {
-                source_head: head,
-                instructions,
-                explicit_scopes: scopes,
-                map: super::codebase::map::task_map(root, &request.prompt, &[], 4000),
-            },
+            explicit_scopes: scopes,
             constraints: Constraints {
                 isolated: request.isolated,
                 has_verification: request.auto_verify && request.verify_command.is_some(),
@@ -513,6 +538,7 @@ fn assess(
                                 usage: value.usage,
                             });
                         }
+                        assessment.decision.evidence = value.evidence;
                         assessment.decision.concentration = value.concentration;
                         assessment.decision.fallback_reason = value.fallback_reason;
                         Ok(value.choice)
@@ -577,6 +603,7 @@ fn assess(
         assessment: assessment.clone(),
         instructions: receipt_instructions,
         saved_context: receipt_context,
+        routing_context_hash,
     })
     .map_err(|error| error.to_string())?;
     history::write_atomic(
@@ -729,6 +756,24 @@ mod tests {
                 .unwrap()
                 .cached
         );
+        std::fs::write(repo.join("CLAUDE.md"), "Do not delegate this task.").unwrap();
+        assert!(validated_assessment(&runtime, &first.id, &request).is_err());
+        let restricted = assess(
+            &runtime,
+            request.clone(),
+            request.prompt.clone(),
+            uuid::Uuid::new_v4().to_string(),
+        )
+        .unwrap();
+        assert!(!restricted.cached);
+        assert!(!restricted.parallel_available);
+        assert_eq!(restricted.strategy, StrategyChoice::Single);
+        std::fs::remove_file(repo.join("CLAUDE.md")).unwrap();
+        let options_path = decisions::settings::directory(&runtime).join("options.json");
+        std::fs::create_dir_all(options_path.parent().unwrap()).unwrap();
+        std::fs::write(&options_path, r#"{"default":{"objective":"balanced"}}"#).unwrap();
+        assert!(validated_assessment(&runtime, &first.id, &request).is_err());
+        std::fs::remove_file(&options_path).unwrap();
         let mut changed = request.clone();
         changed.connection_ids = Some(vec!["new-tool".into()]);
         assert!(validated_assessment(&runtime, &first.id, &changed).is_err());

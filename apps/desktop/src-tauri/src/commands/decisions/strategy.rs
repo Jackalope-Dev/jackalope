@@ -3,6 +3,7 @@ use super::*;
 use serde_json::{json, Value};
 
 pub struct StrategyEvaluation {
+    pub evidence: Option<Value>,
     pub model_call_attempted: bool,
     pub choice: Option<StrategyChoice>,
     pub concentration: Option<f64>,
@@ -24,27 +25,38 @@ pub async fn assess_strategy(
     if let Err(error) = jev::check_request_size(&payload) {
         return Ok(abstain(error, false));
     }
-    let key = match jev::key_for_routing(runtime, project_id) {
-        Ok(Some(key)) => key,
-        Ok(None) => {
-            return Ok(abstain(
-                "Jev decisions are not enabled for this project.".into(),
-                false,
-            ))
-        }
-        Err(error) => return Ok(abstain(error, false)),
-    };
-    if canceled() {
-        return Ok(abstain("Decision assessment was canceled.".into(), false));
-    }
-    Ok(match jev::evaluate(&key, &payload, canceled).await {
-        Ok(value) => strategy_result(&value),
-        Err(error) => abstain(error, true),
-    })
+    Ok(
+        match evaluation::evaluate(
+            runtime,
+            project_id,
+            None,
+            DecisionKind::TaskStrategy,
+            2,
+            &payload,
+            true,
+            &canceled,
+        )
+        .await
+        {
+            Ok(Some(result)) => {
+                let mut assessment = strategy_result(&result.value());
+                assessment.usage = result.usage();
+                assessment.evidence = Some(result.evidence());
+                assessment.model_call_attempted = !result.cached;
+                if result.record.decision.fallback_reason.is_some() {
+                    assessment.fallback_reason = result.record.decision.fallback_reason;
+                }
+                assessment
+            }
+            Ok(None) => abstain("Jev decisions are unavailable or canceled.".into(), false),
+            Err(error) => abstain(error, false),
+        },
+    )
 }
 
 fn abstain(reason: String, attempted: bool) -> StrategyEvaluation {
     StrategyEvaluation {
+        evidence: None,
         model_call_attempted: attempted,
         choice: None,
         concentration: None,
@@ -83,6 +95,7 @@ fn strategy_result(value: &Value) -> StrategyEvaluation {
         None
     };
     StrategyEvaluation {
+        evidence: None,
         model_call_attempted: true,
         choice,
         concentration,

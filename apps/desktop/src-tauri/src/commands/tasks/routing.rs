@@ -112,6 +112,8 @@ struct Candidate {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Choice {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    assessment: Option<Value>,
     candidate_id: String,
     reason: String,
     expected_usage_percent: Option<f64>,
@@ -358,6 +360,7 @@ fn rank_by_capacity<'a>(candidates: &'a [Candidate], reason: &str) -> (&'a Candi
     (
         candidate,
         Choice {
+            assessment: None,
             candidate_id: candidate.id.clone(),
             reason: reason.into(),
             expected_usage_percent: None,
@@ -395,7 +398,7 @@ fn ranked_fallback<'a>(
         })
         .collect();
     if let Some(candidate) = ranked.first() {
-        return Ok((candidate, Choice { candidate_id: candidate.id.clone(), reason: "Using the default agent's next-ranked eligible option after quota exhaustion; current account, model and project restrictions were rechecked.".into(), expected_usage_percent: expected, alternatives: ranked.iter().skip(1).map(|candidate| candidate.id.clone()).collect() }));
+        return Ok((candidate, Choice { assessment:None, candidate_id: candidate.id.clone(), reason: "Using the default agent's next-ranked eligible option after quota exhaustion; current account, model and project restrictions were rechecked.".into(), expected_usage_percent: expected, alternatives: ranked.iter().skip(1).map(|candidate| candidate.id.clone()).collect() }));
     }
     Err("The default agent has no quota available to reroute, and none of its previously ranked fallbacks remain eligible. Progress is preserved; review accounts or wait for quota to reset.".into())
 }
@@ -738,7 +741,7 @@ impl TaskRuntime {
                     || (router.is_none()
                         && (mode != DecisionMode::Agent || history.fallbacks.is_empty()))));
         let (_, mut choice) = if single {
-            (&candidates[0], Choice { candidate_id: candidates[0].id.clone(), reason: "Only one eligible agent, model and account; no routing model call was needed.".into(), expected_usage_percent: None, alternatives: vec![] })
+            (&candidates[0], Choice { assessment:None, candidate_id: candidates[0].id.clone(), reason: "Only one eligible agent, model and account; no routing model call was needed.".into(), expected_usage_percent: None, alternatives: vec![] })
         } else if deterministic {
             rank_by_capacity(
                 &candidates,
@@ -849,6 +852,7 @@ impl TaskRuntime {
             .unwrap_or_default();
         let decision = RoutingDecision {
             assessment: Some(DecisionReceipt {
+                evidence: if used_jev { choice.assessment.clone() } else { None },
                 version: 1,
                 kind: DecisionKind::WorkerSelection,
                 requested_mode: mode,

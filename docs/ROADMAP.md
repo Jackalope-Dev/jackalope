@@ -13,7 +13,9 @@ aligned with this guide when capabilities or priorities change.
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
 - Provider accounts, model/effort choices, capacity-aware routing and usage reporting.
-  Decisions can use local rules, an agent or optional Jev assistance.
+  Decisions can use local rules, an agent or optional Jev assistance. Jev supports
+  repository/model evidence, cost objectives and opt-in context, result, monitor and
+  assignment assistance; live calibration and installed acceptance remain open.
 - Scoped parallel coordination, dependency snapshots, bounded verification repairs
   and provider delegation with sequential fallback.
 - Recurring schedules, local change monitors, project lessons, codebase maps, MCP

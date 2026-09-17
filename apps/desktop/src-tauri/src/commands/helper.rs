@@ -197,7 +197,10 @@ impl Helper {
             (turn, history, actions)
         };
         let mut exchanges = vec![];
-        let documentation = super::retrieval::passages(&turn.prompt);
+        let documentation =
+            super::decisions::assistance::documentation(&self.runtime, &turn.prompt, || {
+                canceled.load(Ordering::SeqCst)
+            });
         for _ in 0..10 {
             if canceled.load(Ordering::SeqCst) {
                 return Err("Stopped.".into());

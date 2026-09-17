@@ -1,4 +1,4 @@
-import type { DecisionReceipt } from './decisions';
+import type { DecisionReceipt, DecisionRecord } from './decisions';
 import { nativeTask } from './task-runtime.ts';
 
 export interface TaskDecisionUsage {
@@ -8,7 +8,13 @@ export interface TaskDecisionUsage {
   decision: DecisionReceipt;
 }
 
-export const readTaskDecisionUsage = () => nativeTask<TaskDecisionUsage[]>('task_strategy_history');
+export const readTaskDecisionUsage = async (): Promise<TaskDecisionUsage[]> => {
+  const [strategies, decisions] = await Promise.all([
+    nativeTask<TaskDecisionUsage[]>('task_strategy_history'),
+    nativeTask<DecisionRecord[]>('decision_history'),
+  ]);
+  return [...strategies, ...decisions.filter((record) => !record.accountedElsewhere)];
+};
 
 export function decisionUsageEntries(decision: DecisionReceipt) {
   if (decision.attempts?.length) return decision.attempts;

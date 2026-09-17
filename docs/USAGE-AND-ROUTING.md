@@ -36,31 +36,89 @@ even when abstaining, and leave execution authorization to their native owner.
 Decision receipts attached to work are explanatory copies; provider attempts and
 immutable assessment records own usage accounting.
 
-Jev receives the complete task, selected saved context, acceptance criteria,
-coordination instructions, verification command, handoff reasons, relevant recorded
-outcomes and eligible worker capability metadata. Account credentials and private
-bridge tokens are excluded. Independent Score questions assess reasoning fit and
-Noul questions assess required tool support in one request. Code validates the
-distributions, gates uncertain answers and ranks suitable candidates with local
-preference/capacity tie breaks. A separate Choice contract supports execution-strategy
-advice; it cannot generate a plan or authorize execution. These follow TypeSafe's
-[state](https://docs.typesafe.ai/concepts/state),
-[Score](https://docs.typesafe.ai/primitives/score) and
-[Noul](https://docs.typesafe.ai/primitives/noul) contracts.
+Jev receives a versioned task context shared with strategy assessment: the complete
+request, selected saved context, acceptance requirements, root repository guidance,
+a bounded repository map and change scope, verification command and assignment
+instructions. Tool delivery evidence contains connection names, not credentials,
+endpoints or command arguments. A map or configured connection is not proof of
+current file contents, discovered tool schemas or execution permission.
 
-The current Jev gates (0.75 distribution concentration, at least 0.9 tool support,
-reasoning score at least 2/3) are provisional and need held-out task calibration.
-Concentration is not a calibrated probability of task success. Unknown, malformed,
-unavailable or oversized decisions use the saved Jev fallback: Local by default,
-or one Agent-powered attempt when explicitly selected. The agent attempt uses normal
-tokens or subscription capacity; failure returns to local rules. Cancellation never
-starts a fallback call. The method and fallback save together per project; restoring
-the app default restores both. Equivalent agent/model workers share one assessment across their accounts; account
-preference and headroom are compared locally. The native request budget is 64 distinct
-workers and 256 KiB; larger inputs
-fall back whole rather than silently dropping candidates or task requirements.
-Requests use a fixed HTTPS endpoint, no redirects/retries, an eight-second timeout,
-bounded responses and cancellation. Key checks make one small billable request.
+Settings exposes optional sourced model records for exact adapter/model IDs,
+including capabilities, restrictions, context limits, effort support and price
+references. These records are user-supplied, not independently verified. Records
+older than 90 days are marked stale; model names do not establish competence.
+Historical outcomes retain account/effort cohorts, sample size, lexical task-match
+coverage, recency and missing usage. Lexical similarity is observational evidence,
+not a controlled comparison.
+
+Independent Score questions assess reasoning and domain fit; Noul questions assess
+tool support and task ambiguity. Code validates every answer and admits each
+candidate separately. Probability mass in the suitable Score levels must reach
+0.9, as must tool support; ambiguous tasks use 0.95. Uncertainty between two
+suitable levels does not reject a worker. Malformed responses still fail validation.
+These provisional gates require held-out calibration and are not probabilities of
+task success. Strategy Choice remains advisory and cannot create or authorize a plan.
+
+Quality first is the default routing objective. Balanced compares recorded costs
+among suitable workers within 0.2 of the highest composite fit; Economical compares
+all suitable workers. Cost ranking requires complete recorded worker/routing dollar
+costs, matching requested effort/account, at least ten decided tasks, lexical
+matches and fresh evidence throughout the cohort, and a 95% Wilson lower success
+bound of 0.7. Missing comparable costs retain quality ranking; token prices alone
+cannot predict completion costs. The comparison excludes separately recorded
+assistance and projectless activity. Subscription quota is never treated as dollars.
+Explicit worker/effort selections and continuation identities remain pinned.
+
+Validated Jev assessments can be reused for ten minutes within a running app when
+request, repository evidence, model evidence, questions and policy still match.
+Capacity is rechecked before launch. Receipts retain the returned model identifier,
+rubric revision, input fingerprint, probabilities and routing disposition. If the
+provider returns an alias, its concrete version remains unknown. Reuse does not
+create another paid usage record. Policy changes or cancellation prevent applying
+an in-flight result. Responses and requests remain bounded, with a fixed HTTPS
+endpoint, pooled connections, no redirects/retries and an eight-second timeout.
+The native request budget remains 64 distinct workers and 256 KiB; oversized inputs
+fall back whole. Byte limits are not an exact model-token count.
+
+Jev fallback remains Local by default, or one Agent-powered attempt when selected.
+Cancellation cannot launch fallback work. Unknown usage stays unknown, including
+interrupted requests. Decision records contain bounded typed outputs and hashes,
+not the full task or diff. Existing routing and strategy receipts own their costs;
+optional assistance has a separate ledger so those calls are not counted twice.
+
+## Optional Jev assistance
+
+Routing goals and optional assistance in Settings → Decisions can inherit app
+settings or use project overrides. All additional helpers default off. While enabled
+and Jev is connected for that scope, relevant repository guidance, candidate lessons,
+diffs, results and check output may be sent to TypeSafe. Each call records usage even
+when the response is rejected. Helpers fall back to existing behavior without a
+second agent assessment.
+
+- Context selection reranks a bounded set of saved lessons before new worker starts.
+  Explicit workflows and lesson exclusions remain authoritative. Uncertain existing
+  lessons remain included; only strong irrelevance/conflict evidence removes them.
+  At app scope, the same option reranks Ask Jackalope documentation passages.
+- Failure triage classifies supported code, environment, dependency, permission and
+  quota failures after execution. It never retries a task or bypasses a denial.
+- Requirement coverage compares saved requirements (or the original request) with
+  bounded result, tracked diff and check evidence. Missing evidence stays unknown;
+  the advisory cannot accept an outcome or replace verification.
+- Review prioritization identifies changed tracked files needing focused review.
+  Untracked file contents are not included, and truncated evidence remains explicit.
+  Result Review shows the recorded advice; later edits can make it stale.
+- Monitor filtering skips only clearly unrelated committed changes. Missing,
+  oversized, truncated or uncertain evidence retains the approved monitor behavior.
+  Assessment runs outside the scheduler lock; schedule identity and source revision
+  are checked before suppressing a change. Quiet local checks make no Jev call.
+- Assignment matching evaluates an Automatic planned worker's own responsibility,
+  dependencies and handoffs against eligible models. It does not change reviewed
+  scopes, explicit workers, accounts, effort or the number of assignments.
+
+Optional assessment calls appear with their purpose in Usage and its export,
+including monitor checks that launch no worker and app-scoped documentation calls.
+The ledger records interrupted calls as unknown until a usable report is retained.
+The separate worker/routing totals do not include this assistance ledger.
 
 Jev routing attempts appear in task/project usage with reported input/output tokens,
 including usable reports from rejected assessments. Estimated cost uses the

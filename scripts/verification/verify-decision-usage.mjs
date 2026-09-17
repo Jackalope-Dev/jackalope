@@ -53,6 +53,33 @@ try {
           HTMLAnchorElement.prototype.click = () => {};
           window.__TAURI_INTERNALS__ = {
             invoke: async (command) => {
+              if (command === 'decision_history')
+                return [
+                  {
+                    ...record,
+                    id: 'context-helper',
+                    accountedElsewhere: false,
+                    decision: {
+                      ...record.decision,
+                      kind: 'context_selection',
+                      provider: 'jev',
+                      attempts: [{ provider: 'jev', usage }],
+                    },
+                  },
+                  {
+                    ...record,
+                    id: 'app-documentation',
+                    projectId: '',
+                    accountedElsewhere: false,
+                    decision: {
+                      ...record.decision,
+                      kind: 'context_selection',
+                      provider: 'jev',
+                      attempts: [{ provider: 'jev', usage }],
+                    },
+                  },
+                  { ...record, id: 'worker-already-counted', accountedElsewhere: true },
+                ];
               if (command === 'task_strategy_history')
                 return [
                   record,
@@ -100,8 +127,8 @@ const {UsageDashboard}=await import('/src/components/tasks/UsageDashboard.tsx');
       );
       await page.goto(`${origin}/decision-usage-fixture.html`);
       const assessments = page.getByRole('region', { name: 'Task assessment usage' });
-      await assessments.getByText(/2 assessments/).waitFor();
-      assert.match(await assessments.innerText(), /3 model calls/);
+      await assessments.getByText(/4 assessments/).waitFor();
+      assert.match(await assessments.innerText(), /5 model calls/);
       assert.match(await assessments.innerText(), /1 usage reports unavailable/);
       const exportButton = page.getByRole('button', { name: 'Export', exact: true });
       assert.equal(await exportButton.isEnabled(), true, await page.locator('body').innerText());
@@ -113,21 +140,22 @@ const {UsageDashboard}=await import('/src/components/tasks/UsageDashboard.tsx');
       assert.equal(exported.attempts.length, 0);
       assert.deepEqual(
         exported.taskAssessments.assessments.map((entry) => entry.id),
-        ['assessment-one', 'assessment-two'],
+        ['assessment-one', 'assessment-two', 'context-helper', 'app-documentation'],
       );
       await page.getByRole('combobox', { name: 'Project', exact: true }).click();
       await page.getByRole('option', { name: 'Alpha', exact: true }).click();
-      await assessments.getByText(/1 assessment ·/).waitFor();
+      await assessments.getByText(/2 assessments ·/).waitFor();
       await exportButton.click();
       exported = await page.evaluate(async () => JSON.parse(await window.fixture.download.text()));
       assert.equal(exported.filters.project, 'alpha');
-      assert.equal(exported.taskAssessments.assessments.length, 1);
+      assert.equal(exported.taskAssessments.assessments.length, 2);
       assert.equal(
         exported.taskAssessments.assessments[0].decision.usage.estimatedCostUsd,
         0.0000042,
       );
       await assessments.getByText('Assessment details', { exact: true }).click();
       await assessments.getByRole('cell', { name: 'Agent (fallback)', exact: true }).waitFor();
+      await assessments.getByRole('cell', { name: 'Context selection', exact: true }).waitFor();
       assert.equal(exported.taskAssessments.assessments[0].decision.attempts.length, 2);
       await page.screenshot({
         path: `${output}/${width}-${dark ? 'dark' : 'light'}.png`,

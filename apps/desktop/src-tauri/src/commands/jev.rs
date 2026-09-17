@@ -8,6 +8,14 @@ pub(crate) const MODEL: &str = "jev-latest";
 pub mod checks;
 const ENDPOINT: &str = "https://api.typesafe.ai/v1/systemone";
 const MAX_BYTES: usize = 256 * 1024;
+static CLIENT: std::sync::LazyLock<Result<reqwest::Client, reqwest::Error>> =
+    std::sync::LazyLock::new(|| {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .connect_timeout(Duration::from_secs(3))
+            .timeout(Duration::from_secs(8))
+            .build()
+    });
 use super::decisions::settings::{
     self, check_revision, directory, read as preferences, save, LOCK as SETTINGS_LOCK,
 };
@@ -254,12 +262,7 @@ async fn evaluate_at(
     if body.len() > MAX_BYTES {
         return Err("This routing context is too large for Jev routing.".into());
     }
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .connect_timeout(Duration::from_secs(3))
-        .timeout(Duration::from_secs(8))
-        .build()
-        .map_err(|_| "Could not connect to Jev.")?;
+    let client = CLIENT.as_ref().map_err(|_| "Could not connect to Jev.")?;
     let request = async {
         let mut authorization = reqwest::header::HeaderValue::from_str(&format!("Bearer {key}"))
             .map_err(|_| "Enter a valid TypeSafe API key.")?;

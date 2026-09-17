@@ -1,5 +1,9 @@
 use super::tasks::TaskRuntime;
+pub mod assistance;
+pub mod context;
 mod contracts;
+pub mod evaluation;
+pub mod options;
 pub(crate) mod settings;
 mod strategy;
 pub use contracts::*;

@@ -1,5 +1,17 @@
 [
   {
+    "id": "jev-decision-assistance",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "More context for Jev decisions",
+    "description": "Optional Jev assistance helps select context, assess results and focus review, with clearer routing evidence and usage.",
+    "items": [
+      "Choose routing goals and supply model evidence while preserving explicit assignments.",
+      "Enable context selection, result checks, review priorities, monitor filtering and Automatic assignment matching."
+    ],
+    "note": "In development. Real-provider savings, quality calibration and installed-app acceptance remain open."
+  },
+  {
     "id": "gemini-cli-can-run-tasks",
     "date": "2026-09-17",
     "status": "In development",

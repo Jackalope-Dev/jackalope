@@ -14,6 +14,28 @@ const config = {
   revision: 0,
   projects: {},
 };
+const assistance = {
+  revision: 0,
+  inherited: true,
+  options: {
+    objective: 'quality',
+    contextSelection: false,
+    failureTriage: false,
+    requirementCoverage: false,
+    reviewPrioritization: false,
+    monitorFiltering: false,
+    assignmentMatching: false,
+    models: [],
+  },
+};
+const assistanceDefaults = structuredClone(assistance.options);
+const assistanceProjects = {};
+const assistanceView = (projectId) => ({
+  revision: assistance.revision,
+  inherited: Boolean(projectId && !assistanceProjects[projectId]),
+  options: assistanceProjects[projectId] ?? assistanceDefaults,
+});
+let failOptionsSave = false;
 let failConnect = true;
 const calls = [];
 const status = (projectId) => ({
@@ -61,6 +83,15 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.exposeFunction('fixtureInvoke', async (command, args) => {
     calls.push({ command, ...args, key: args.key ? '[redacted]' : undefined });
+    if (command === 'decision_options') return assistanceView(args.projectId);
+    if (command === 'decision_options_save') {
+      assert.equal(args.revision, assistance.revision);
+      if (failOptionsSave) throw new Error('Decision options changed. Reload before saving.');
+      if (args.options) assistanceProjects[args.projectId] = args.options;
+      else delete assistanceProjects[args.projectId];
+      assistance.revision++;
+      return assistanceView(args.projectId);
+    }
     if (command === 'routing_settings') return status(args.projectId);
     if (command === 'routing_connect') {
       assert.equal(args.key, secret);
@@ -108,6 +139,7 @@ try {
   await agent.waitFor();
   await agent.focus();
   await page.keyboard.press('ArrowDown');
+  await page.waitForFunction(() => document.querySelector('input[value=jev]')?.checked);
   assert.equal(await jev.isChecked(), true);
   const fallback = page.getByRole('combobox', { name: 'If Jev is unavailable or uncertain' });
   assert.match(await fallback.innerText(), /Local \(default\)/);
@@ -155,6 +187,77 @@ try {
   assert.match(await fallback.innerText(), /Agent-powered/);
   assert.equal(await page.getByRole('button', { name: 'Save routing choice' }).isDisabled(), true);
   assert.equal(config.mode, 'agent');
+  const assistanceSummary = page.getByText('Routing goals and optional assistance', {
+    exact: true,
+  });
+  await assistanceSummary.focus();
+  await page.keyboard.press('Enter');
+  const contextHelper = page.getByRole('checkbox', { name: /^Select relevant context/ });
+  assert.equal(await contextHelper.isChecked(), false);
+  await contextHelper.check();
+  assert.equal(assistanceProjects.alpha, undefined);
+  await page.getByRole('combobox', { name: 'Routing goal' }).click();
+  await page.getByRole('option', { name: 'Balanced', exact: true }).click();
+  await page.getByText('Model evidence (0)', { exact: true }).click();
+  await page.getByRole('button', { name: 'Add model evidence' }).click();
+  const modelId = page.getByLabel('Exact model ID', { exact: true });
+  await page.getByLabel('Agent adapter', { exact: true }).fill('codex');
+  await modelId.pressSequentially('fixture-model');
+  assert.equal(await modelId.inputValue(), 'fixture-model');
+  assert.equal(await modelId.evaluate((node) => document.activeElement === node), true);
+  await page
+    .getByLabel('Capabilities and restrictions', { exact: true })
+    .fill('Fixture evidence only');
+  await page
+    .getByLabel('Evidence source', { exact: true })
+    .fill('fixture://independent-evaluation');
+  await page.getByRole('checkbox', { name: 'medium', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'high', exact: true }).check();
+  await page.getByRole('button', { name: 'Save decision assistance', exact: true }).click();
+  await page.getByText('Decision assistance saved.', { exact: true }).waitFor();
+  assert.equal(assistanceProjects.alpha.contextSelection, true);
+  assert.equal(assistanceProjects.alpha.objective, 'balanced');
+  assert.deepEqual(assistanceProjects.alpha.models[0].efforts, ['medium', 'high']);
+  assert.equal(assistanceProjects.alpha.failureTriage, false);
+  for (const [width, height] of [
+    [1280, 840],
+    [960, 640],
+  ]) {
+    await page.setViewportSize({ width, height });
+    for (const dark of [true, false]) {
+      await page.evaluate((dark) => window.fixtureTheme(dark), dark);
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await modelId.scrollIntoViewIfNeeded();
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+        false,
+      );
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-model-evidence.png`,
+      });
+      await assistanceSummary.evaluate((node) => node.scrollIntoView({ block: 'start' }));
+      await page.screenshot({
+        path: `${output}/${width}-${dark ? 'dark' : 'light'}-assistance.png`,
+      });
+    }
+  }
+  await contextHelper.uncheck();
+  failOptionsSave = true;
+  await page.getByRole('button', { name: 'Save decision assistance', exact: true }).click();
+  await page
+    .getByText('Decision options changed. Reload before saving.', { exact: false })
+    .waitFor();
+  failOptionsSave = false;
+  await page.getByRole('button', { name: 'Reload decision options' }).click();
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('input[type=checkbox]')].some((node) => node.checked),
+  );
+  assert.equal(await contextHelper.isChecked(), true);
+  await page.getByRole('button', { name: 'Use app assistance defaults' }).click();
+  await page.getByText('Inheriting app assistance defaults.', { exact: true }).waitFor();
+  assert.equal(await contextHelper.isChecked(), false);
+  assert.equal(assistanceProjects.alpha, undefined);
+  await page.setViewportSize({ width: 1280, height: 840 });
   await page.goto(`${url}/?project=beta`);
   await agent.waitFor();
   assert.equal(await agent.isChecked(), true);
@@ -236,7 +339,7 @@ try {
   const continueButton = page.getByRole('button', { name: 'Continue', exact: true });
   assert.equal(await continueButton.isEnabled(), true);
   await continueButton.click();
-  await page.getByText('Step 4 of 4', { exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Commits and cleanup', exact: true }).waitFor();
   assert.equal(
     await page.evaluate(
       (secret) => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(secret),

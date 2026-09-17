@@ -222,6 +222,27 @@ usage. Insufficient or mixed historical evidence is not a learned specialty.
 Provider configuration references: [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference)
 and [Claude model effort](https://code.claude.com/docs/en/model-config#adjust-effort-level).
 
+## Jev decision comparisons
+
+`pnpm evaluate:jev <trials.json> [report.json]` summarizes independently reviewed
+trials without calling a provider or installing a routing policy. Supply an array
+with `id`, `caseId`, `configuration`, `category`, `variant` (`local`, `agent`, `jev`),
+`split` (`train`, `holdout`) and boolean `accepted`. Jev rows additionally require
+`model`, `rubricRevision` and `inputHash` from their retained decision receipts.
+Record `totalTokens`, `totalCostUsd`, `elapsedMs`, `correctionMinutes` and optional
+`fallback`; unknown measurements use null. Include every attempt, assistance call,
+failure and correction in the totals. Avoid mixing configurations or providers
+under one configuration identifier.
+
+Duplicate receipts and overlap between training and held-out cases are rejected.
+The report retains failures in cost-per-accepted-result numerators and makes
+incomplete measurement coverage explicit. Compare matching case sets and repeat
+counts across variants; a minimum sample flag does not establish superiority.
+Use separate labels to calibrate suitability, relevance and coverage probabilities;
+Jev distribution concentration is not a task-success probability. Include missed
+requirements, false monitor suppression and unnecessary escalations in independent
+review. Broader real-repository and installed-provider acceptance remains required.
+
 ## Daily-use pilot
 
 Use a consenting cohort of ten developers spanning first-time and experienced agent

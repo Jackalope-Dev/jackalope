@@ -6,6 +6,7 @@ import {
   readTaskDecisionUsage,
   type TaskDecisionUsage,
 } from '../../lib/decision-usage';
+import { decisionLabels } from '../../lib/decisions';
 import { summarizeUsage } from '../../lib/usage-insights';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
@@ -113,7 +114,7 @@ export function DecisionUsage({
                           : ''}
                         {entry.decision.provider === 'local_rules' ? ' → local fallback' : ''}
                       </td>
-                      <td>Task strategy</td>
+                      <td>{decisionLabels[entry.decision.kind]}</td>
                       <td>
                         {entry.attempt.usage.reported
                           ? (

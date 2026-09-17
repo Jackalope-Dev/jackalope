@@ -50,7 +50,11 @@ release dates.
   with installed providers. Compare complete cost and quality on held-out tasks;
   preserve serial live-session batch and cost limits.
 - [ ] Calibrate Jev decision thresholds on held-out tasks and compare end-to-end cost,
-  latency and outcomes with local rules and agent routing. Validate real API usage,
+  latency and outcomes with local rules and agent routing. Include optional context
+  reranking, failure/coverage advice, review priorities, monitor false negatives and
+  assignment matching; compare complete costs including assistance calls and corrections.
+  Validate evidence freshness, individual suitability gates, cost objectives and cache
+  invalidation with real model identifiers. Validate real API usage,
   quota errors, cancellation, optional agent fallback costs, project inheritance and credential replace/remove on
   Windows, macOS Keychain and Linux Secret Service, including locked services.
 

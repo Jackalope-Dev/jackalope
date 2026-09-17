@@ -67,6 +67,10 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   Jackalope Decisions offers local rules, agent-powered or optional Jev-assisted
   routing, with project overrides and protected device keys. Jev fallback defaults to
   local rules, with an optional agent attempt; both providers retain usage reports.
+  Jev selection uses shared repository context, sourced model evidence, individual
+  suitability gates and optional cost-aware objectives. Opt-in context selection,
+  failure triage, requirement coverage, review priorities, monitor filtering and
+  Automatic assignment matching retain typed receipts and separate usage.
   Live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.
