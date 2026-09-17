@@ -59,9 +59,14 @@ see [browser automation](BROWSER-AUTOMATION.md).
 
 ## Verification
 
-Keep `@types/node` aligned with the Node 24 runtime declared in `package.json`
+Keep `@types/node` aligned with the Node 26 runtime declared in `package.json`
 and CI. The Cloudflare Vitest plugin requires Vitest 4; upgrade the test runner
 only when the plugin's peer dependencies support the new major.
+
+Dependabot groups npm and Actions minor/patch updates and Rust patch updates to
+reduce competing lockfile changes. Review larger upgrades separately. Keep the
+direct `windows`, `windows-collections` and `windows-future` crates on the same
+Windows bindings generation; they exchange types through `windows-core`.
 
 `pnpm check:dependencies` checks JavaScript and Rust advisories. Install
 `cargo-audit` 0.22.2 with `cargo install cargo-audit --version 0.22.2 --locked`.

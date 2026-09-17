@@ -64,7 +64,7 @@ before choosing a jurisdiction. No region choice is embedded in the scaffold.
 
 ## 2. Verify the source locally
 
-Run from the repository root in PowerShell, using Node 24 and the repository's
+Run from the repository root in PowerShell, using Node 26 and the repository's
 pinned pnpm version. Preserve unrelated drafts. Stop on any nonzero exit code.
 
 ```powershell

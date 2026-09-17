@@ -11,9 +11,12 @@ const userCargo = process.env.USERPROFILE
   ? join(process.env.USERPROFILE, '.cargo', 'bin', 'cargo.exe')
   : null;
 const cargo = userCargo && existsSync(userCargo) ? userCargo : 'cargo';
+const args = process.argv.slice(2);
+if (args.length && (args.length !== 1 || args[0] !== '--native-only'))
+  throw new Error('Usage: pnpm verify [--native-only]');
+const nativeOnly = args.includes('--native-only');
 
-const checks = [
-  [process.execPath, ['scripts/security/dependencies.mjs', '--patch-only']],
+const sharedChecks = [
   [process.execPath, ['scripts/knowledge.mjs', '--check']],
   [process.execPath, [pnpm, 'check']],
   [process.execPath, [pnpm, 'typecheck']],
@@ -27,6 +30,23 @@ const checks = [
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'typecheck']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'test']],
   [process.execPath, [pnpm, '--filter', '@jackalope/server', 'build']],
+  [process.execPath, [pnpm, 'build']],
+  [
+    process.execPath,
+    [
+      pnpm,
+      '--filter',
+      '@jackalope/server',
+      'exec',
+      'wrangler',
+      'deploy',
+      '--config',
+      '../website/wrangler.jsonc',
+      '--dry-run',
+    ],
+  ],
+];
+const nativeChecks = [
   [process.execPath, [pnpm, '--filter', '@jackalope/desktop', 'test']],
   [cargo, ['fmt', '--manifest-path', 'apps/desktop/src-tauri/Cargo.toml', '--check']],
   [
@@ -40,7 +60,11 @@ const checks = [
       '--no-default-features',
     ],
   ],
-  [process.execPath, [pnpm, 'build']],
+];
+const checks = [
+  [process.execPath, ['scripts/security/dependencies.mjs', '--patch-only']],
+  ...(!nativeOnly ? sharedChecks : []),
+  ...nativeChecks,
 ];
 for (const [command, args] of checks) {
   const started = performance.now();

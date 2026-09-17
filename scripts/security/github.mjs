@@ -138,10 +138,6 @@ if (repository.visibility !== 'public')
     'Keep the repository private until reviewed source is pushed. GitHub requires an eligible paid plan or public visibility for these protection rules; this command does not change visibility.',
   );
 const user = api(`users/${reviewer}`);
-for (const workflow of ['desktop-release.yml', 'publish-release.yml']) {
-  if (api(`${prefix}/actions/workflows/${workflow}`).state === 'active')
-    api(`${prefix}/actions/workflows/${workflow}/disable`, 'PUT');
-}
 const variables = list(`${prefix}/actions/variables`, 'variables');
 for (const [name, value] of Object.entries({
   STORE_AUTOMATION_ENABLED: 'false',

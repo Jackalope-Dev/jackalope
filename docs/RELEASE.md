@@ -96,7 +96,7 @@ See [BACKEND.md](BACKEND.md) for the separate remote backend roadmap.
 
 ## 4. Prepare the Windows build/signing machine
 
-Use Windows x64, a supported Node 24 runtime (matching current CI), and the pnpm
+Use Windows x64, a supported Node 26 runtime (matching current CI), and the pnpm
 version in root `package.json`. Install Git, Rust
 with the MSVC toolchain, Visual Studio C++ build tools/Windows SDK, and WebView2.
 Record exact versions. Packaging may download WiX/NSIS tooling on its first run;

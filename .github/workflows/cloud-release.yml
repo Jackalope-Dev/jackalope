@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
+          node-version-file: '.node-version'
       - id: plan
         env:
           GH_TOKEN: ${{ github.token }}
@@ -73,7 +73,7 @@ jobs:
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
+          node-version-file: '.node-version'
           cache: pnpm
       - name: Install Linux native dependencies
         if: runner.os == 'Linux'
@@ -92,6 +92,7 @@ jobs:
           key: cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
             cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
+            cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-
       - run: pnpm verify
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features beta-access execution_access
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -162,8 +163,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '24'
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+          node-version-file: '.node-version'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: cloud-candidate-*
           path: output/cloud-candidates

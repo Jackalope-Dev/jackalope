@@ -44,7 +44,7 @@ see the [roadmap](docs/ROADMAP.md).
 
 ## Run from source
 
-Install Node 24.18+ within Node 24 and pnpm 10.11.0. Native development also needs
+Install Node 26.9+ within Node 26 and pnpm 10.11.0. Native development also needs
 Rust 1.98.1 and your platform's [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 On Windows, install the MSVC C++ build tools and WebView2. Install and sign in to
 the supported agent CLI you want to use.

@@ -154,7 +154,7 @@ Keep these repository variables disabled until their prerequisites pass:
 
 | Variable | Purpose |
 | --- | --- |
-| `RELEASE_DISTRIBUTION=store` | Windows uses Store; Cloud handles Mac/Linux. `cloud` additionally permits direct Windows EXE builds. Legacy R2 requires `legacy` and remains disabled |
+| `RELEASE_DISTRIBUTION=store` | Windows uses Store; Cloud handles Mac/Linux. `cloud` additionally permits direct Windows EXE builds. Legacy R2 publication has no Actions workflow |
 | `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the Store configuration contains the three Mac/Linux targets |
 | `CLOUD_SIGNING_READY` | Optional direct Windows Azure signing is configured; unnecessary for Store/Mac/Linux |
 | `APPLE_SIGNING_READY` | Developer ID signing and notarization are configured |
@@ -201,8 +201,8 @@ pnpm release:setup --apply
 ```
 
 The first command audits; `--apply` configures the release branches/protections,
-branch-scoped environments, default-off missing gates and immutable tag rules,
-and disables the two legacy R2 workflows. It selects Store Windows distribution,
+branch-scoped environments, default-off missing gates and immutable tag rules.
+It selects Store Windows distribution,
 removes Windows from Cloud target/acceptance lists and preserves Unix target choices. It creates missing beta/stable branches from current remote master; existing branches
 are never reset. Bootstrap branches are not evidence of a tested release. Existing enablement flags and secrets are preserved.
 The command does not change visibility or commit code. For initial migration, keep
@@ -244,8 +244,11 @@ disabled when Cloudflare Git builds own it. Server staging uses `service-staging
 desktop signing or publication credentials. Configure their deployment credentials
 following [server operations](SERVER-LAUNCH.md#github-deployment-environments).
 Cloudflare Git builds retain their tokens in Cloudflare; no duplicate deployment
-secrets are required in GitHub. Infrastructure preflight only reads public API and
-website responses and has no deployment environment or Cloudflare credentials.
+secrets are required in GitHub. The main verification workflow covers server and
+website checks on PRs. Optional Actions deployment runs only on eligible pushes or
+manual dispatch and validates the service before deploying. Infrastructure preflight
+is a manual operational check: it only reads public API and website responses and
+has no deployment environment or Cloudflare credentials.
 Set `VITE_WINDOWS_STORE_URL` and server `ACCESS_STORE_URL` to the accepted Store
 product link. Website Mac/Linux download variables must identify accepted Cloud artifacts; review any Store URL override before changing distribution.
 The legacy website synchronization script reads the R2 feed and must not be used as

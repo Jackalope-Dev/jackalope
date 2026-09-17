@@ -29,9 +29,13 @@ export async function collectCandidates(
   if (!/^[a-f0-9]{40}$/.test(source) || !['beta', 'stable'].includes(channel) || !publicKey)
     throw new Error('Expected source, channel and updater key are required');
   const packages = [];
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const path = resolve(directory, entry.name);
+  const entries = await readdir(directory, { withFileTypes: true });
+  const paths = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => resolve(directory, entry.name));
+  if (entries.some((entry) => entry.isFile() && entry.name === 'receipt.json'))
+    paths.push(resolve(directory));
+  for (const path of paths) {
     const candidate = await validateCloudFiles(path, { requireCandidate: true });
     packages.push({ ...candidate, directory: path });
   }
