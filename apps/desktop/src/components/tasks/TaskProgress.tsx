@@ -45,7 +45,7 @@ export function TaskProgress({
         </div>
         {action && <div className="task-progress-action">{action}</div>}
       </div>
-      <TaskLiveActivity run={run} />
+      <TaskLiveActivity run={run} omitPhase={decision.label} />
       {active && !!run.activity.length && (
         <Button variant="outline" className="task-progress-activity" onClick={onActivity}>
           <span>View activity</span>

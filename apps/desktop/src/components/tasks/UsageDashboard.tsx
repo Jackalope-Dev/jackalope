@@ -275,7 +275,6 @@ export function UsageDashboard({
       ) : (
         <div className="workspace-sections">
           <CapacityPanel />
-          <JevConnectionUsage />
           <section className="workspace-section workspace-stack" aria-label="Task usage">
             <WorkspaceSectionHeading
               title="Task usage"
@@ -615,7 +614,7 @@ export function UsageDashboard({
             >
               <WorkspaceSectionHeading
                 title="Other app activity"
-                description="Ask Jackalope · retained conversation, separate from task totals. These turns have no saved dates or project links, so the period filter does not apply."
+                description="Device activity, separate from task totals and period filters."
                 action={
                   <Button variant="outline" onClick={() => void refreshHelper()}>
                     Refresh helper history
@@ -630,6 +629,7 @@ export function UsageDashboard({
                 </InlineNotice>
               ) : (
                 <p className="task-muted">
+                  <strong>Ask Jackalope</strong> ·{' '}
                   {helper.turns.length ? tokenLabel(helperUsage.tokens) : 'No saved turns'}
                   {helper.turns.length > 0 &&
                     ` reported tokens · ${helperUsage.reported} of ${helperUsage.calls} turns reported usage`}
@@ -672,6 +672,7 @@ export function UsageDashboard({
                   </DisclosureBody>
                 </Disclosure>
               )}
+              <JevConnectionUsage />
             </section>
           )}
         </div>

@@ -51,7 +51,6 @@ import { TaskActivity } from './TaskActivity';
 import { TaskDelivery } from './TaskDelivery';
 import { TaskFailure } from './TaskFailure';
 import { TaskIntegration } from './TaskIntegration';
-import { TaskLiveActivity } from './TaskLiveActivity';
 import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { TaskProgress } from './TaskProgress';
@@ -787,7 +786,6 @@ export function TaskDetail({
             </Tabs.Content>
           )}
           <Tabs.Content value="activity">
-            <TaskLiveActivity run={run} />
             <TaskActivity entries={run.activity} active={active} />
             <Disclosure
               open={detailsOpen}

@@ -424,10 +424,6 @@
 .live-history-row[aria-current="page"] {
   background: var(--color-surface-hover);
 }
-.live-history-row .live-mascot {
-  width: 32px;
-  height: 32px;
-}
 .live-history-copy {
   display: flex;
   flex-direction: column;

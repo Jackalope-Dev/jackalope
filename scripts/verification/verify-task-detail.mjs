@@ -128,6 +128,7 @@ try {
   await page.getByRole('searchbox', { name: 'Search activity' }).fill('arrow-key');
   assert.equal(await page.locator('.task-activity-list > li').count(), 1);
   await page
+    .getByRole('region', { name: 'Task activity', exact: true })
     .getByText('Added arrow-key navigation to the search results.', { exact: true })
     .click();
   await page.getByText('Selection follows the focused result.', { exact: false }).waitFor();
@@ -319,6 +320,22 @@ try {
   await tabs.getByRole('tab', { name: 'Review', exact: true }).click();
   await page.getByText('Requirements · 1', { exact: true }).click();
   await page.getByText('Keyboard navigation works', { exact: true }).waitFor();
+  const outcomes = page.getByRole('region', {
+    name: 'Expected outcomes and evidence',
+    exact: true,
+  });
+  await outcomes.getByRole('button', { name: 'Review evidence', exact: true }).click();
+  const evidenceLabel = await outcomes.locator('label[for="evidence-keys"]').boundingBox();
+  const evidenceControl = await outcomes
+    .getByRole('combobox', { name: 'Evidence', exact: true })
+    .boundingBox();
+  assert.ok(
+    evidenceLabel.y + evidenceLabel.height <= evidenceControl.y + 1,
+    'Evidence label sits above its picker',
+  );
+  await outcomes.screenshot({ path: `${output}/evidence-960-dark.png` });
+  await outcomes.getByRole('button', { name: 'Cancel', exact: true }).click();
+
   await page.getByText('Agent evidence · 0 failed checks', { exact: true }).click();
   await page.getByText('Search with arrow keys', { exact: true }).waitFor();
   await page.getByText('Automatic checks could not finish:', { exact: false }).waitFor();
@@ -347,10 +364,13 @@ try {
       },
     }),
   );
-  const live = page.locator('.task-progress-live');
-  await live.getByText('Running project setup · attempt 2', { exact: true }).waitFor();
+  const live = page.getByRole('region', { name: 'Live activity', exact: true });
+  await live.getByText('Attempt 2', { exact: true }).waitFor();
   await live.getByText('Progress: resolved 337, reused 337, downloaded 0, added 334').waitFor();
-  await live.getByText('2m 14s', { exact: true }).waitFor();
+  await live
+    .locator('.task-live-elapsed')
+    .filter({ hasText: /2m \d+s/ })
+    .waitFor();
   await page.getByText('Running project setup', { exact: true }).first().waitFor();
   assert.equal(
     await page.locator('.task-progress-steps').count(),

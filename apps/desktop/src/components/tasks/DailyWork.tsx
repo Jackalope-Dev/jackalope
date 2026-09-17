@@ -94,7 +94,6 @@ export function DailyWork() {
           <span>{item.stage === 'review' ? 'Review result' : workPresence(item).action}</span>
         </button>
       ))}
-      {!needsYou.length && <p className="task-muted">No loaded work is waiting for your review.</p>}
     </section>
   );
 }

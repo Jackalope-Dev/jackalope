@@ -365,3 +365,24 @@ test('the final result stays stable when intermediate integrations are inserted 
   assert.equal(managedTaskProgress(parent, work).stage, 3);
   assert.equal(work.assignments.length, 1);
 });
+
+test('finished implementation moves to checks even when verification failed', () => {
+  const ended = runs.map((run) =>
+    run.id === 'new'
+      ? {
+          ...run,
+          status: 'review',
+          verification: { result: { success: false }, tree: null },
+        }
+      : run,
+  );
+  const blocked = {
+    ...task,
+    error: 'The target branch changed. Reassess the task before starting this plan.',
+  };
+  const work = managedTaskWork(blocked, queue, ended);
+  assert.equal(work.ready, false);
+  assert.equal(work.status, 'Needs attention');
+  assert.equal(managedTaskProgress(blocked, work).stage, 2);
+  assert.equal(managedTaskProgress(task, managedTaskWork(task, queue, runs)).stage, 1);
+});

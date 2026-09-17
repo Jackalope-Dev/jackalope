@@ -250,19 +250,23 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         }
         action={
           <div className="managed-task-actions">
-            {task.delivery && task.error && !work.active.length && !work.integrated && (
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  void act(() =>
-                    managedTaskCommand('action', { id: task.id, action: 'retry-repair' }),
-                  )
-                }
-              >
-                Try another repair
-              </Button>
-            )}
-            {task.started && !work.integrated && !work.ready && (
+            {task.delivery &&
+              task.error &&
+              task.delivery.repairs.length >= task.delivery.repairLimit &&
+              !work.active.length &&
+              !work.integrated && (
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() =>
+                      managedTaskCommand('action', { id: task.id, action: 'retry-repair' }),
+                    )
+                  }
+                >
+                  Try another repair
+                </Button>
+              )}
+            {task.started && !work.integrated && !work.ready && !work.failed && (
               <Button
                 variant="outline"
                 disabled={busy || work.failed}
@@ -289,7 +293,9 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                 Stop task
               </Button>
             )}
-            {work.ready &&
+            {work.combined &&
+              !isActive(work.combined) &&
+              !work.active.length &&
               !work.integrated &&
               (viewTab !== 'overview' || resultTab !== 'changes') && (
                 <Button

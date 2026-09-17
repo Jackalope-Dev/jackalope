@@ -209,6 +209,7 @@ try {
                 ];
               if (command === 'task_list') return f.runs;
               if (command === 'integration_prepare') {
+                if (f.prepareError) throw new Error(f.prepareError);
                 f.integration = {
                   id: 'combined-plan',
                   runIds: args.runIds,
@@ -353,7 +354,11 @@ try {
       });
       await page.getByRole('button', { name: 'View activity', exact: true }).click();
       await page.getByRole('searchbox', { name: 'Search activity' }).waitFor();
-      assert.equal(await activity.evaluate((el) => el === document.activeElement), true);
+      await page.waitForFunction(
+        () =>
+          document.activeElement?.getAttribute('data-state') === 'active' &&
+          document.activeElement?.textContent === 'Activity',
+      );
       await page.locator('summary').filter({ hasText: 'Using Read' }).waitFor();
       await details.focus();
       await details.press('Enter');
@@ -488,7 +493,11 @@ try {
       await page.getByRole('button', { name: 'View result', exact: true }).click();
       await page.getByRole('heading', { name: 'Planning result', exact: true }).waitFor();
       await page.getByRole('button', { name: 'Close details', exact: true }).click();
-      assert.equal(await overview.evaluate((el) => el === document.activeElement), true);
+      await page.waitForFunction(
+        () =>
+          document.activeElement?.getAttribute('data-state') === 'active' &&
+          document.activeElement?.textContent === 'Overview',
+      );
       await page.evaluate(() => {
         const f = window.fixture;
         f.queue.items.forEach((item, index) => {
@@ -543,17 +552,42 @@ try {
         path: `${output}/${width}-${dark ? 'dark' : 'light'}-result.png`,
         fullPage: true,
       });
+      await page.evaluate(() => {
+        const f = window.fixture;
+        f.task.error = 'The target branch changed. Reassess the task before starting this plan.';
+        const run = f.runs.find((run) => run.id === 'combined');
+        run.verification.result.success = false;
+        f.prepareError = 'Checks need attention before merging.';
+        f.sync();
+      });
+      await review.waitFor();
+      assert.equal(
+        await page.getByRole('button', { name: 'Try another repair', exact: true }).count(),
+        0,
+      );
+      await review.click();
+      await page.getByText('Checks need attention before merging.', { exact: false }).waitFor();
+      await page
+        .locator('.task-review .changed-files-diff')
+        .getByText('Combined feature', { exact: false })
+        .waitFor();
+      assert.equal(
+        await page.getByRole('button', { name: 'Apply changes to main', exact: true }).count(),
+        0,
+      );
+      await page.evaluate(() => {
+        const f = window.fixture;
+        f.task.error = null;
+        f.runs.find((run) => run.id === 'combined').verification.result.success = true;
+        f.prepareError = null;
+        f.sync();
+      });
       await page.getByRole('button', { name: 'Preview', exact: true }).click();
       await page.getByRole('region', { name: 'Try result', exact: true }).waitFor();
       await review.focus();
       await review.press('Enter');
       assert.equal(await review.count(), 0);
-      assert.equal(
-        await page
-          .getByRole('button', { name: 'Review', exact: true })
-          .evaluate((el) => el === document.activeElement),
-        true,
-      );
+      await page.waitForFunction(() => document.activeElement?.textContent === 'Review');
       const apply = page.getByRole('button', { name: 'Apply changes to main', exact: true });
       await apply.waitFor();
       await page.getByText('Combined feature', { exact: false }).first().waitFor();

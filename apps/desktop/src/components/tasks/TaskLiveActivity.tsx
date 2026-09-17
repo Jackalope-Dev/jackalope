@@ -13,7 +13,7 @@ const icons = {
   check: Terminal,
 };
 
-export function TaskLiveActivity({ run }: { run: TaskRun }) {
+export function TaskLiveActivity({ run, omitPhase }: { run: TaskRun; omitPhase?: string }) {
   const active = isActive(run);
   const [, tick] = useState(0);
   useEffect(() => {
@@ -30,7 +30,8 @@ export function TaskLiveActivity({ run }: { run: TaskRun }) {
   return (
     <section className="task-live-activity" aria-label="Live activity">
       <div className="task-live-heading">
-        <span role="status">{state.phase}</span>
+        {state.phase !== omitPhase && <span role="status">{state.phase}</span>}
+        {run.progress && run.progress.attempt > 1 && <span>Attempt {run.progress.attempt}</span>}
         {elapsed && (
           <span className="task-live-elapsed">
             <span className="sr-only">Elapsed: </span>

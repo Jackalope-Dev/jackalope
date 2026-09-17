@@ -1,9 +1,9 @@
-import { AgentCharacter } from '@jackalope/brand/agent-character';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { sessionWork } from '../../lib/live-session';
 import { observeLiveSessions, useLiveSessionStore } from '../../stores/liveSessionStore';
 import type { Project } from '../../stores/projectStore';
+import { AgentStack } from '../agents/AgentAvatar';
 import { DailyWork } from '../tasks/DailyWork';
 import { Button } from '../ui/button';
 import { LiveSessionView } from './LiveSessionView';
@@ -103,25 +103,38 @@ export function LiveSessions({
             {managedTasks.length > 0 && (
               <section className="live-history-group">
                 <h2>Planned tasks</h2>
-                {managedTasks.map((task) => (
-                  <button
-                    type="button"
-                    className="live-history-row"
-                    key={task.id}
-                    aria-current={selectedTask?.id === task.id ? 'page' : undefined}
-                    onClick={() => {
-                      select(null);
-                      managed.select(task.id);
-                    }}
-                  >
-                    <span className="live-history-copy">
-                      <strong>{task.title}</strong>
-                      <span className="live-muted">
-                        {managedTaskWork(task, managed.queue, taskRuns).status}
+                {managedTasks.map((task) => {
+                  const work = managedTaskWork(task, managed.queue, taskRuns);
+                  const state = work.questions.length
+                    ? 'waiting'
+                    : work.active.length
+                      ? 'working'
+                      : 'idle';
+                  return (
+                    <button
+                      type="button"
+                      className="live-history-row"
+                      key={task.id}
+                      aria-current={selectedTask?.id === task.id ? 'page' : undefined}
+                      onClick={() => {
+                        select(null);
+                        managed.select(task.id);
+                      }}
+                    >
+                      <AgentStack
+                        agents={[
+                          work.active[0]?.agent ?? work.combined?.agent ?? task.request.agent,
+                        ]}
+                        state={state}
+                        size="xs"
+                      />
+                      <span className="live-history-copy">
+                        <strong>{task.title}</strong>
+                        <span className="live-muted">{work.status}</span>
                       </span>
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </section>
             )}
             {['Needs attention', 'In progress', 'Recent', 'Finished'].map((label, group) => {
@@ -141,14 +154,13 @@ export function LiveSessions({
                           select(item.id);
                         }}
                       >
-                        <span className="live-mascot" aria-hidden="true">
-                          <AgentCharacter
-                            provider={work.latest?.agent ?? item.request.agent}
-                            state={
-                              work.questions.length ? 'waiting' : work.active ? 'working' : 'idle'
-                            }
-                          />
-                        </span>
+                        <AgentStack
+                          agents={[work.latest?.agent ?? item.request.agent]}
+                          state={
+                            work.questions.length ? 'waiting' : work.active ? 'working' : 'idle'
+                          }
+                          size="xs"
+                        />
                         <span className="live-history-copy">
                           <strong>{item.title}</strong>
                           <span className="live-muted">

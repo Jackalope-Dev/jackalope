@@ -169,11 +169,14 @@ export function managedTaskProgress(task: ManagedTask, work: ReturnType<typeof m
   const finished = work.assignments.filter(
     ({ run }) => run && !isActive(run) && run.verification?.result.success,
   ).length;
+  const implemented =
+    work.assignments.length > 0 &&
+    work.assignments.every(({ run }) => run && ['review', 'reviewed'].includes(run.status));
   const stage = work.integrated
     ? 4
     : work.ready
       ? 3
-      : task.started && finished === work.assignments.length && finished > 0
+      : task.started && implemented
         ? 2
         : task.started
           ? 1

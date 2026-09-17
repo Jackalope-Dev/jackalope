@@ -40,7 +40,7 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
  case 'live_session_snapshot': return {sessions:useLiveSessionStore.getState().sessions,runs:useLiveSessionStore.getState().runs,error:null};
  case 'knowledge_list': return [];
  case 'knowledge_preview': return {entries:[],bytes:0,reasons:{}};
- case 'queue_snapshot': return {items:[],managedTasks:[],messages:[],enabledProjects:[],concurrency:3,bridgeUrl:null,bridgeError:null,mergedRunIds:[]};
+ case 'queue_snapshot': return f.managedQueue ?? {items:[],managedTasks:[],messages:[],enabledProjects:[],concurrency:3,bridgeUrl:null,bridgeError:null,mergedRunIds:[]};
  case 'task_strategy_assess': return {id:'fixture-assessment',sourceHead:'base',strategy:'single',parallelAvailable:false,reason:'This fixture continues with one lead.',createdAt:new Date().toISOString(),cached:false,decision:{version:1,kind:'task_strategy',requestedMode:'deterministic',provider:'local_rules',policyRevision:1,modelCallAttempted:false,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,reported:true}}};
  case 'task_strategy_history': return [];
  case 'task_strategy_cancel': return;
@@ -414,6 +414,73 @@ try {
   assert.ok(titles.indexOf('Review new results') < titles.indexOf('Earlier session'));
   assert.equal(titles.at(-1), 'Finished walkthrough');
   await page.screenshot({ path: `${output}/hub-1280-dark.png` });
+  await page.getByRole('button', { name: 'New chat', exact: true }).click();
+  const daily = page.getByRole('region', { name: 'Work across all projects', exact: true });
+  assert.equal(await daily.getByText('No loaded work is waiting for your review.').count(), 0);
+  for (const button of [
+    daily.getByRole('button', { name: 'All projects', exact: true }),
+    daily.getByRole('button', { name: /in progress/ }),
+  ]) {
+    assert.notEqual(
+      await button.evaluate((el) => getComputedStyle(el).backgroundColor),
+      'rgba(0, 0, 0, 0)',
+    );
+  }
+  await page.evaluate(async () => {
+    const { useManagedTaskStore } = await import('/src/stores/managedTaskStore.ts');
+    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
+    const run = {
+      ...(await import('/src/stores/liveSessionStore.ts')).useLiveSessionStore.getState().runs[0],
+      id: 'working-run',
+      taskId: 'working-run',
+      projectId: 'atlas',
+      status: 'running',
+      liveSessionId: null,
+    };
+    const queue = {
+      ...useManagedTaskStore.getState().queue,
+      managedTasks: [
+        {
+          id: 'working-task',
+          title: 'Implement search controls',
+          request: { projectId: 'atlas', agent: 'codex' },
+          plannerRunId: 'planner',
+          runIds: [run.id],
+          started: true,
+          error: null,
+        },
+      ],
+      items: [],
+      enabledProjects: ['managed:working-task'],
+    };
+    window.sessionFixture.managedQueue = queue;
+    useExecutionStore.setState({ runs: [run] });
+    useManagedTaskStore.setState({ queue });
+  });
+  const working = history.getByRole('button', {
+    name: 'Implement search controls Working',
+    exact: true,
+  });
+  const character = working.locator('.brand-agent-character');
+  await character.waitFor();
+  assert.equal(await character.getAttribute('data-state'), 'working');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  assert.notEqual(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
+  await page.screenshot({ path: `${output}/hub-active-controls-dark.png` });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(await character.evaluate((el) => getComputedStyle(el).animationName), 'none');
+  await page.evaluate(() => window.sessionFixture.theme('light'));
+  await page.screenshot({ path: `${output}/hub-active-controls-light.png` });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(async () => {
+    const { useManagedTaskStore } = await import('/src/stores/managedTaskStore.ts');
+    const queue = { ...useManagedTaskStore.getState().queue, managedTasks: [] };
+    window.sessionFixture.managedQueue = queue;
+    useManagedTaskStore.setState({ queue });
+    (await import('/src/stores/executionStore.ts')).useExecutionStore.setState({ runs: [] });
+    window.sessionFixture.theme('dark');
+  });
+
   await page.getByRole('button', { name: 'New chat', exact: true }).click();
   assert.equal(await input.inputValue(), '');
   await input.fill('A separate draft');

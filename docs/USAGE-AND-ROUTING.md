@@ -148,7 +148,8 @@ Task assessments have a separate project/period-scoped ledger, including calls t
 never launched work and failed calls with unavailable reports. Immutable receipt IDs
 deduplicate reused assessments. They are excluded from worker and routing totals and
 hidden under agent/account filters because assessment history has no account attribution.
-Jev connection checks remain separate device-wide, all-time setup overhead.
+Jev connection checks appear as a compact setup-usage row under Other app activity,
+with device-wide, all-time totals separate from task and period totals.
 
 JSON export schema 5 preserves the earlier attempt and usage-breakdown fields,
 filters, task/outcome summaries, trends and helper data, and adds task assessments.

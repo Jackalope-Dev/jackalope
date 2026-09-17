@@ -11,7 +11,8 @@ release dates.
   preview readiness/cancellation/evidence capture and PR/CI reads in installed WebViews.
   Test first-result, visual correction, failed-check recovery, project return and delivery
   with entry developers and power users; measure completion, detours and scope mistakes.
-  Include concise titles, diff-first review, disclosed evidence, and all task sections.
+  Include parent-task links, unified Needs you counts, shared file browsing, preview
+  setup explanations and evidence attachment, and blocked-result review.
 - [ ] Validate bulk task archiving, undo, restore and restart recovery in installed
   builds, including unsaved history and interrupted attempts.
 - [ ] Validate live sessions with installed providers: rapid capture, concurrent window

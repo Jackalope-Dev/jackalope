@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { nativeTask, type RunUsage } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { InlineNotice } from '../ui/InlineNotice';
-import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 
 export interface JevConnectionTotals {
   calls: number;
@@ -29,18 +28,18 @@ export function JevConnectionUsage() {
   }, []);
   if (!error && !totals?.calls) return null;
   return (
-    <section className="workspace-section workspace-stack">
-      <WorkspaceSectionHeading
-        title="Jev connection checks"
-        description="Device totals across all time. Setup checks are separate from project, period and task totals above."
-      />
-      {error ? (
-        <InlineNotice tone="error">{error}</InlineNotice>
-      ) : (
-        totals && (
-          <>
+    <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1" aria-label="Jev setup usage">
+      <dt>
+        <strong className="text-sm">Jev setup</strong>
+        <span className="task-muted text-xs ml-3">This device · all time</span>
+      </dt>
+      <dd>
+        {error ? (
+          <InlineNotice tone="error">Jev setup usage unavailable. {error}</InlineNotice>
+        ) : (
+          totals && (
             <p className="task-muted text-sm">
-              {totals.calls.toLocaleString()} checks ·{' '}
+              {totals.calls.toLocaleString()} calls ·{' '}
               {totals.usage.reported
                 ? `${totals.usage.input.toLocaleString()} input + ${totals.usage.output.toLocaleString()} output tokens reported`
                 : 'Token usage unavailable'}{' '}
@@ -48,21 +47,12 @@ export function JevConnectionUsage() {
               {totals.usage.estimatedCostUsd == null
                 ? 'Cost unavailable'
                 : `$${totals.usage.estimatedCostUsd.toFixed(6)} estimated`}
+              {totals.unreportedCalls > 0 &&
+                ` · ${totals.unreportedCalls.toLocaleString()} missing ${totals.unreportedCalls === 1 ? 'report' : 'reports'}`}
             </p>
-            {totals.unreportedCalls > 0 && (
-              <p className="task-muted text-xs">
-                {totals.unreportedCalls} checks have no usage report and are excluded from known
-                token and cost totals.
-              </p>
-            )}
-            <p className="task-muted text-xs">
-              Jev task-routing calls, including reported usage from uncertain decisions, are
-              included in the routing entries above. Estimates use $0.042 per million input tokens
-              and free output; TypeSafe billing remains authoritative.
-            </p>
-          </>
-        )
-      )}
-    </section>
+          )
+        )}
+      </dd>
+    </dl>
   );
 }
