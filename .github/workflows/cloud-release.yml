@@ -137,7 +137,7 @@ jobs:
           APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
           APPLE_API_PRIVATE_KEY: ${{ runner.os == 'macOS' && env.CLOUD_MODE == 'candidate' && secrets.APPLE_API_PRIVATE_KEY || '' }}
         run: node scripts/release/cloud-build-unix.mjs "$CLOUD_MODE" "$RELEASE_CHANNEL"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always() && (steps.windows.outcome == 'success' || steps.unix.outcome == 'success')
         with:
           name: cloud-${{ env.CLOUD_MODE }}-${{ matrix.target }}
@@ -180,7 +180,7 @@ jobs:
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
           RELEASE_MODE: ${{ needs.plan.outputs.mode }}
         run: node scripts/release/cloud-publish.mjs output/cloud-candidates $env:RELEASE_MODE
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: cloud-publication-${{ github.run_attempt }}

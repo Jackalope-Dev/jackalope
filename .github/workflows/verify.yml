@@ -54,7 +54,7 @@ jobs:
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features store
       - run: pnpm tauri build --bundles nsis
         if: vars.RELEASE_DISTRIBUTION != 'store'
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: vars.RELEASE_DISTRIBUTION != 'store'
         with:
           name: windows-trial-installer
@@ -133,7 +133,7 @@ jobs:
         if: runner.os == 'macOS'
         run: tar -czf apps/desktop/src-tauri/target/release/bundle/macos-trial.tar.gz -C apps/desktop/src-tauri/target/release/bundle/macos Jackalope.app
       - name: Preserve trial packages
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: trial-${{ matrix.os }}-${{ runner.arch }}
           path: |
