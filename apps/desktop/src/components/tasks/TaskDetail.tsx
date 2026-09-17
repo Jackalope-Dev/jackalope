@@ -726,6 +726,7 @@ export function TaskDetail({
           {((!active && run.workspace) || tab === 'changes') && (
             <Tabs.Content value="changes" forceMount hidden={tab !== 'changes'}>
               <ResultReview
+                canApprove={isLatest && finished}
                 visible={tab === 'changes'}
                 section={reviewSection}
                 onSectionChange={setReviewSection}

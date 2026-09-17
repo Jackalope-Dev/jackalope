@@ -562,6 +562,7 @@ export function LiveSessionView({
                 <p className="live-muted">Finish or stop work to review the current changes.</p>
               ) : latest && (review || integrated) ? (
                 <ResultReview
+                  canApprove={session.paused && !active && !pending && !integrated}
                   key={latest.id}
                   run={latest}
                   review={review ?? undefined}

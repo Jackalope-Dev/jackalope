@@ -21,12 +21,12 @@ const dateLabel = (date: string) =>
 
 const sectionId = (section: BlogSection, index: number) => section.id || `section-${index + 1}`;
 
-export function JournalTeaser({ all = false }: { all?: boolean }) {
+function JournalIndex() {
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const grid = gridRef.current;
-    if (!all || !grid) return;
+    if (!grid) return;
     const cards = Array.from(grid.children) as HTMLElement[];
     let frame = 0;
     const layout = () => {
@@ -78,25 +78,17 @@ export function JournalTeaser({ all = false }: { all?: boolean }) {
       grid.style.removeProperty('height');
       for (const card of cards) card.removeAttribute('style');
     };
-  }, [all]);
+  }, []);
 
   return (
-    <section
-      className={`journal-teaser page-width${all ? ' journal-index' : ''}`}
-      aria-labelledby="notes-title"
-    >
+    <section className="journal-teaser page-width journal-index" aria-labelledby="notes-title">
       <div className="journal-section-heading">
         <div>
-          <h2 id="notes-title">{all ? 'Guides and field notes' : 'A few field notes.'}</h2>
+          <h2 id="notes-title">Guides and field notes</h2>
         </div>
-        {!all && (
-          <a className="text-link" href="/blog/">
-            All notes <ArrowRight size={16} />
-          </a>
-        )}
       </div>
       <div className="notes-grid" ref={gridRef}>
-        {(all ? posts : posts.slice(0, 2)).map((post) => (
+        {posts.map((post) => (
           <a
             className="note-preview"
             href={`/blog/${post.slug}/`}
@@ -309,7 +301,7 @@ export function JournalPage({ path }: { path: string }) {
             building.
           </p>
         </header>
-        <JournalTeaser all />
+        <JournalIndex />
       </main>
     );
   return (

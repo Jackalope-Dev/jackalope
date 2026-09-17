@@ -623,6 +623,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         {hasResult && work.combined && (
           <Tabs.Content value="review" forceMount hidden={viewTab !== 'review'}>
             <ResultReview
+              canApprove={!work.active.length && !work.integrated}
               key={work.combined.id}
               run={work.combined}
               visible={viewTab === 'review'}

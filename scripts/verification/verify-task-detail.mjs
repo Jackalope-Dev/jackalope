@@ -58,6 +58,8 @@ window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
    { const run=useExecutionStore.getState().runs[0]; f.update({contract:{...run.contract,requirements:run.contract.requirements.map(item=>item.id===args.review.requirementId?{...item,receipt:{accepted:args.review.accepted,tree:args.review.expectedTree,note:args.review.note,evidence:args.review.evidence}}:item)}}); }
    return;
   case 'mcp_list_servers': return [];
+  case 'agent_models': return {models:[],source:'fixture',account:null,checkedAt:'now',detail:'Browser fixture'};
+  case 'project_readiness': return {head:'head',branch:'main',changes:'',recentChanges:'',prepareCommand:null,verifyCommand:null,previewCommand:null,dependenciesMissing:false,missingConfiguration:[],notes:[]};
   case 'queue_snapshot': return {items: [], mergedRunIds: f.integrated ? ['sample'] : []};
   case 'integration_plans': return [];
   case 'integration_list': return [];
@@ -305,11 +307,12 @@ try {
   await approval
     .getByRole('textbox', { name: 'What did you verify?', exact: true })
     .fill('Tested keyboard navigation in the preview.');
+  await approveButton.click({ trial: true });
   await page.evaluate(() => {
     window.taskFixture.tree = 'new-snapshot';
   });
   await approveButton.click();
-  await approval.getByText('Files changed while you were reviewing.', { exact: true }).waitFor();
+  await approval.getByText('Files changed while you were reviewing.', { exact: false }).waitFor();
   assert.equal(
     await page.evaluate(() =>
       window.taskFixture.calls.some((call) => call.command === 'task_mark_reviewed'),
@@ -333,6 +336,50 @@ try {
     false,
     'Approval never merges',
   );
+  await page.getByRole('tab', { name: 'Changes', exact: true }).click();
+  await page.evaluate(async () => {
+    const { useExecutionStore } = await import('/src/stores/executionStore.ts');
+    useExecutionStore.setState({
+      runners: [
+        {
+          id: 'claude',
+          name: 'Claude Code',
+          available: true,
+          signedIn: true,
+          account: 'Fixture',
+          detail: 'Browser fixture',
+        },
+      ],
+      discover: async () => {},
+    });
+  });
+  await page.getByRole('button', { name: 'Ask an agent to review', exact: true }).click();
+  const capture = page.getByRole('dialog');
+  const request = capture.getByRole('textbox', {
+    name: 'What do you want to accomplish?',
+    exact: true,
+  });
+  await request.waitFor();
+  assert.match(await request.inputValue(), /Source workspace: C:\/Projects\/atlas-task/);
+  assert.match(await request.inputValue(), /Do not edit files/);
+  assert.equal(
+    await page.evaluate(() =>
+      window.taskFixture.calls.some(
+        (call) => call.command === 'continue' || call.command === 'task_start',
+      ),
+    ),
+    false,
+    'Opening a review request does not spend agent tokens',
+  );
+  await request.fill('My edited peer review request');
+  await capture.getByRole('button', { name: 'Close capture', exact: true }).click();
+  await page.getByRole('button', { name: 'Ask an agent to review', exact: true }).click();
+  assert.equal(await request.inputValue(), 'My edited peer review request');
+  await capture.getByRole('button', { name: 'Close capture', exact: true }).click();
+  await page.evaluate(() => {
+    window.taskFixture.tree = undefined;
+    window.taskFixture.review = undefined;
+  });
   await page.evaluate(() =>
     window.taskFixture.scenario('failed', { error: 'Short failure\nLong diagnostic detail' }),
   );
@@ -360,12 +407,19 @@ try {
     const first = useExecutionStore.getState().runs[0];
     useExecutionStore.setState({
       runs: [
-        { ...first, status: 'stopped', prompts: [] },
+        { ...first, status: 'review', prompts: [] },
         { ...first, id: 'newer', startedAt: '2026-09-11T13:00:00Z' },
       ],
     });
   });
   await page.getByText('You’re viewing an earlier attempt.').waitFor();
+  await tabs.getByRole('tab', { name: 'Review', exact: true }).click();
+  await page.getByRole('tab', { name: 'Changes', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: 'Approve work', exact: true }).count(),
+    0,
+    'Earlier attempts cannot be approved from the toolbar',
+  );
   await page.waitForTimeout(1200);
   assert.equal(
     await page.evaluate(

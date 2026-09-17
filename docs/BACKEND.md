@@ -20,21 +20,13 @@ rehearsal builds have no reporting endpoint. Disclosure precedes the first uploa
 feedback always needs a separate review and Send action. Hosting updates alone
 does not activate ingestion. See [BETA-MONITORING.md](BETA-MONITORING.md).
 
-## Telemetry: on by default, opt-out
+## Telemetry and feedback
 
-Configured official builds default telemetry **on**, with an opt-out. Requirements:
+Configured official builds default telemetry **on**. Onboarding discloses collection
+in a separate step with an opt-out. Settings can disable it later; disabling stops
+sending immediately. Enabled telemetry sends automatically without a per-event action.
 
-- Disclosed as its own step in the onboarding flow, plain language, with a
-  clear one-click way to turn it off right there — not buried in a settings
-  submenu the user has to go find.
-- Also toggleable at any later point from Settings; toggling off must stop
-  sending immediately, not just suppress future opt-in prompts.
-- Fully automatic once enabled: no user action per event. This is the
-  opposite of feedback (below), which is never automatic.
-
-**Payload boundary — metadata only, never content.** This is the hard
-constraint, not a nice-to-have, because Jackalope runs against users' private
-codebases and agent conversations:
+Telemetry contains metadata only:
 
 - Allowed: fixed view/operation names and outcomes, task status transitions with
   allowlisted agent and task/Chat workflow, fixed error categories and page/operation context,
@@ -49,20 +41,11 @@ codebases and agent conversations:
   logs do not store IPs or headers. Daily keyed hashes serve only rate limiting;
   review Cloudflare edge/Access log retention before activating collection.
 
-## Feedback: separate, explicit, user-initiated
-
-Feedback is not telemetry and must never be bundled into it:
-
-- Settings provides feedback review and an explicit Send action. Nothing is sent
-  until the user triggers it.
-- The submission can reasonably include more context than telemetry does
-  (the user is choosing to share it), but still needs a clear "what gets
-  sent" disclosure at the point of submission — don't silently attach a full
-  diagnostic bundle without saying so.
-- No implicit dependency on telemetry being enabled — a user who opted out of
-  telemetry can still submit feedback, and vice versa; keep the two toggles
-  independent in the data model and the UI.
-
+Feedback has separate consent and an explicit review/Send action. Disclose the
+submitted fields before sending; never attach diagnostic bundles silently.
+Submitting feedback does not require telemetry to be enabled. See
+[monitoring and payload contracts](BETA-MONITORING.md) and
+[feedback invitations](FEEDBACK-INVITATIONS.md) for delivery and retention behavior.
 
 ## Remaining service work
 

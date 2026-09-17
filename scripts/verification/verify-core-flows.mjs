@@ -49,6 +49,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
 React.createElement('p',{style:{position:'fixed',bottom:0,right:4,zIndex:90,fontSize:10,color:'var(--color-text-secondary)',pointerEvents:'none'}},'Browser fixture only; no native execution'),
 mode?React.createElement('main',{style:{height:'100vh',overflow:'auto',padding:24}},mode==='preview'?React.createElement(TaskPreview,{run:base,onFeedback:text=>{f.feedback=text}}):React.createElement(TaskDelivery,{run:base,onHandoff:text=>{f.handoff=text}})):React.createElement(Shell)));
 `;
+async function applyTheme(page, appearance) {
+  const foreground = await page.evaluate((value) => {
+    window.coreFixture.theme(value);
+    const probe = document.createElement('span');
+    probe.style.cssText = 'color: var(--color-text-primary); transition: none';
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, appearance);
+  await page.waitForFunction(
+    (color) => getComputedStyle(document.body).color === color,
+    foreground,
+  );
+  return foreground;
+}
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 840 } });
@@ -104,7 +120,7 @@ try {
   for (const width of [1280, 960, 680]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const appearance of ['light', 'dark']) {
-      await page.evaluate((value) => window.coreFixture.theme(value), appearance);
+      await applyTheme(page, appearance);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.evaluate(() => document.fonts.ready);
       const { composerBottom, workTop } = await page.evaluate(() => ({
@@ -144,20 +160,18 @@ try {
   for (const width of [1280, 960]) {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const appearance of ['light', 'dark']) {
-      await page.evaluate((value) => window.coreFixture.theme(value), appearance);
+      const foreground = await applyTheme(page, appearance);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.waitForFunction(
-        () =>
-          getComputedStyle(document.querySelector('.work-item')).color ===
-          getComputedStyle(document.querySelector('.task-home')).color,
+        (color) => getComputedStyle(document.querySelector('.work-item')).color === color,
+        foreground,
       );
       await page.locator('.task-home').evaluate((node) => {
         node.scrollTop = 0;
       });
-      await page.waitForFunction(() => {
+      await page.waitForFunction((color) => {
         const canvas = document.querySelector('.task-home');
         const bounds = canvas.getBoundingClientRect();
-        const color = getComputedStyle(canvas).color;
         return [...document.querySelectorAll('.work-item-title')].every((node) => {
           const rect = node.getBoundingClientRect();
           return (
@@ -166,7 +180,7 @@ try {
             getComputedStyle(node).color === color
           );
         });
-      });
+      }, foreground);
       assert(
         await rows
           .first()

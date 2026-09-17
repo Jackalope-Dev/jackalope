@@ -1,14 +1,11 @@
 import { Bot } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { useState } from 'react';
 import { buildReviewPrompt } from '../../lib/cross-model-review';
 import { reviewFingerprint } from '../../lib/review-fingerprint';
 import type { TaskRun } from '../../lib/task-runtime';
 import { useExecutionStore } from '../../stores/executionStore';
 import { Button } from '../ui/button';
-
-const CaptureTask = lazy(() =>
-  import('./CaptureTask').then((module) => ({ default: module.CaptureTask })),
-);
+import { CaptureTask } from './CaptureTask';
 
 export function CrossModelReviewPanel({
   run,
@@ -39,13 +36,11 @@ export function CrossModelReviewPanel({
         <Bot size={16} /> Ask an agent to review
       </Button>
       {open && (
-        <Suspense fallback={<p role="status">Preparing review request…</p>}>
-          <CaptureTask
-            draftKey={key}
-            onClose={() => setOpen(false)}
-            onStarted={() => setOpen(false)}
-          />
-        </Suspense>
+        <CaptureTask
+          draftKey={key}
+          onClose={() => setOpen(false)}
+          onStarted={() => setOpen(false)}
+        />
       )}
     </>
   );

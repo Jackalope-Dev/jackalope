@@ -26,6 +26,7 @@ export function ResultReview({
   unavailable,
   section,
   onSectionChange,
+  canApprove = true,
 }: {
   run: TaskRun;
   onCorrect?: (prompt: string) => void;
@@ -38,6 +39,7 @@ export function ResultReview({
   unavailable?: ReactNode;
   section?: ReviewSection;
   onSectionChange?: (section: ReviewSection) => void;
+  canApprove?: boolean;
 }) {
   const [selected, setSelected] = useState<ReviewSection>('changes');
   const hasChecks = !unavailable || !!outcomes || !!evidence;
@@ -119,18 +121,19 @@ export function ResultReview({
                   >
                     <RefreshCw size={14} /> Refresh changes
                   </Button>
-                  {run.status === 'review' && !unfinishedWorkflow && (
+                  {canApprove && run.status === 'review' && !unfinishedWorkflow && (
                     <ApproveWork
                       run={run}
                       onApproved={() => changeSection(delivery ? 'delivery' : 'checks')}
                     />
                   )}
-                  {unfinishedWorkflow && (
+                  {canApprove && unfinishedWorkflow && (
                     <Button onClick={() => changeSection('checks')}>
                       Review outcomes <ArrowRight size={16} />
                     </Button>
                   )}
-                  {run.status === 'reviewed' &&
+                  {canApprove &&
+                    run.status === 'reviewed' &&
                     (delivery ? (
                       <Button onClick={() => changeSection('delivery')}>
                         Continue to merge <ArrowRight size={16} />

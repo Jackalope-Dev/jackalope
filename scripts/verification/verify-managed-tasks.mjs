@@ -293,7 +293,10 @@ try {
       </script></body></html>`,
         }),
       );
-      await page.goto(`${origin}/managed-fixture.html`);
+      await page.goto(`${origin}/managed-fixture.html`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      });
       await page.getByRole('button', { name: 'Assess fixture' }).click();
       await page.getByRole('button', { name: 'Cancel assessment' }).click();
       await page.getByRole('button', { name: 'Assess fixture' }).click();

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import type { BuiltinAgentId } from '../lib/agent-catalog';
+import { createPersistStorage } from '../lib/persist-storage.ts';
 
 export type DefaultRunnerId = BuiltinAgentId;
 export type NotificationLevel = 'all' | 'failures-only' | 'none';
@@ -73,30 +74,6 @@ export const DEFAULT_SETTINGS: Omit<
   },
 };
 
-const memoryStore: Record<string, string> = {};
-const safeStorage = createJSONStorage(() => ({
-  getItem: (name: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage.getItem(name);
-    }
-    return memoryStore[name] ?? null;
-  },
-  setItem: (name: string, value: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(name, value);
-    } else {
-      memoryStore[name] = value;
-    }
-  },
-  removeItem: (name: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(name);
-    } else {
-      delete memoryStore[name];
-    }
-  },
-}));
-
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
@@ -122,7 +99,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'jackalope-settings',
-      storage: safeStorage,
+      storage: createPersistStorage(),
       merge: (saved, current) => {
         const values = saved && typeof saved === 'object' ? (saved as Record<string, unknown>) : {};
         return {

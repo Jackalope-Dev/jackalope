@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-test('settingsStore defaults, updates, and export formatting', async () => {
-  // Test default settings invariants
+test('settingsStore defaults preserve execution and privacy preferences', async () => {
   const { DEFAULT_SETTINGS } = await import('../src/stores/settingsStore.ts');
 
   assert.equal(DEFAULT_SETTINGS.defaultRunner, 'codex');
@@ -31,7 +30,6 @@ test('projectStore preferences structure and overrides', async () => {
   assert.ok(initial);
   assert.equal(initial.name, 'Jackalope Core');
 
-  // Update preferences
   useProjectStore.getState().updateProjectPreferences(testProject.id, {
     preferredRunner: 'claude',
     verifyCommand: 'pnpm build',
@@ -47,10 +45,31 @@ test('projectStore preferences structure and overrides', async () => {
     'Always keep TypeScript strict mode clean.',
   );
 
-  // Clean up
   useProjectStore.getState().removeProject(testProject.id);
   const deleted = useProjectStore.getState().projects.find((p) => p.id === testProject.id);
   assert.equal(deleted, undefined);
+});
+
+test('model policy defaults allow discovered models and retain saved restrictions', async () => {
+  const { useAgentConfigStore: store } = await import('../src/stores/agentConfigStore.ts');
+  const previous = store.getState();
+  const { name, storage } = store.persist.getOptions();
+  try {
+    assert.deepEqual(store.getInitialState().allowedModels, {});
+    assert.equal(store.getState().isModelAllowed('new-provider-model'), true);
+    storage.setItem(name, {
+      version: 0,
+      state: { allowedModels: { 'saved-model': false, 'explicitly-enabled': true } },
+    });
+    await store.persist.rehydrate();
+    assert.equal(store.getState().isModelAllowed('saved-model'), false);
+    assert.equal(store.getState().isModelAllowed('explicitly-enabled'), true);
+    assert.equal(store.getState().isModelAllowed('new-provider-model'), true);
+    store.getState().toggleModel('new-provider-model');
+    assert.equal(store.getState().isModelAllowed('new-provider-model'), false);
+  } finally {
+    store.setState(previous, true);
+  }
 });
 
 test('obsolete preferences retire without losing supported settings or saved opt-outs', async () => {

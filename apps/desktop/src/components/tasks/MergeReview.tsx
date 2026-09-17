@@ -73,6 +73,7 @@ export function MergeReview({
   const completeSelection = !managedTitle || !onlyRunIds || chosen.length === onlyRunIds.length;
   const destination = mergeDestination(candidates[0] ?? { targetBranch: null }, project);
   const candidateKey = candidateIds.join();
+  const reviewedSelection = candidates.map((run) => `${run.id}:${run.status}`).join();
   const onlyRunIdsKey = onlyRunIds?.join(',');
   useEffect(() => {
     if (!onlyRunId || !candidateKey.split(',').includes(onlyRunId)) return;
@@ -149,10 +150,10 @@ export function MergeReview({
       !managedTitle ||
       !completeSelection ||
       !candidateKey ||
-      preparedSelection.current === candidateKey
+      preparedSelection.current === reviewedSelection
     )
       return;
-    preparedSelection.current = candidateKey;
+    preparedSelection.current = reviewedSelection;
     void prepare();
   });
 

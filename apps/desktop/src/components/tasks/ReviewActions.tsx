@@ -1,7 +1,7 @@
 import { IconButton, DropdownMenu as Menu } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { MoreHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Review, TaskRun } from '../../lib/task-runtime';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { CrossModelReviewPanel } from './CrossModelReviewPanel';
@@ -16,12 +16,13 @@ const titles = {
 };
 export function ReviewActions({ run, review }: { run: TaskRun; review: Review }) {
   const [tool, setTool] = useState<keyof typeof titles | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <>
       {!!review.diff && <CrossModelReviewPanel run={run} files={review.files} diff={review.diff} />}
       <Menu.Root>
         <Menu.Trigger asChild>
-          <IconButton variant="outline" label="More review actions">
+          <IconButton ref={trigger} variant="outline" label="More review actions">
             <MoreHorizontal size={18} />
           </IconButton>
         </Menu.Trigger>
@@ -45,7 +46,14 @@ export function ReviewActions({ run, review }: { run: TaskRun; review: Review })
           if (!open) setTool(null);
         }}
       >
-        <DialogContent className="review-action-dialog" aria-describedby={undefined}>
+        <DialogContent
+          className="review-action-dialog"
+          aria-describedby={undefined}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            trigger.current?.focus();
+          }}
+        >
           <DialogCloseButton />
           <DialogHeader title={tool ? titles[tool] : 'Review'} />
           {tool === 'progress' && <ReviewProgress runId={run.id} />}

@@ -122,15 +122,6 @@ export const troubleshootingScenarios: TroubleshootingScenario[] = [
   },
 ];
 
-export const likelyArticleSlugs = [
-  'fixing-cli-path-on-windows',
-  'resolving-git-worktree-locks',
-  'git-worktrees',
-  'task-routing-and-quotas',
-  'multi-account-and-agents',
-  'connecting-custom-mcp-servers',
-];
-
 export interface KnowledgeGuideSection {
   id: string;
   question: string;

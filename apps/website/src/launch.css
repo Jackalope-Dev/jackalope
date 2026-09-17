@@ -669,10 +669,6 @@
     padding-inline: 14px;
   }
 
-  :where(.hero-topline) .landing-kicker {
-    font-size: 11px;
-  }
-
   .hero-poster {
     grid-template-columns: 1fr;
     gap: 6px;
