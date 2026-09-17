@@ -4,6 +4,7 @@ import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { DialogCloseButton, DialogContent, DialogHeader } from '../ui/Dialog';
 import { useDialogFocus } from '../ui/useDialogFocus';
 import { McpConnectionForm } from './McpConnectionForm';
+import { McpConnectionResult, type SavedMcpConnection } from './McpConnectionResult';
 export function McpAddCustomModal({
   open,
   onClose,
@@ -14,6 +15,8 @@ export function McpAddCustomModal({
   existingServer?: McpServerConfig | null;
 }) {
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<SavedMcpConnection | null>(null);
+  const [lastSaved, setLastSaved] = useState<SavedMcpConnection | null>(null);
   const focus = useDialogFocus();
   return (
     <Dialog.Root
@@ -30,13 +33,21 @@ export function McpAddCustomModal({
             <>Connect a local command or remote MCP server, then choose where it is available.</>
           }
         />
-        <McpConnectionForm
-          initial={existingServer ?? undefined}
-          editing={!!existingServer}
-          onCancel={onClose}
-          onSaved={onClose}
-          onBusyChange={setBusy}
-        />
+        {saved ? (
+          <McpConnectionResult saved={saved} onDone={onClose} onEdit={() => setSaved(null)} />
+        ) : (
+          <McpConnectionForm
+            initial={lastSaved?.server ?? existingServer ?? undefined}
+            initialAuthentication={lastSaved?.agentSignIn ? 'oauth' : undefined}
+            editing={!!existingServer || !!lastSaved}
+            onCancel={onClose}
+            onSaved={(result) => {
+              setSaved(result);
+              setLastSaved(result);
+            }}
+            onBusyChange={setBusy}
+          />
+        )}
       </DialogContent>
     </Dialog.Root>
   );

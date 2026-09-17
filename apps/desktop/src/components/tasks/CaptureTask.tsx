@@ -4,6 +4,7 @@ import { FolderOpen, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { connectionSupport } from '../../lib/agent-capabilities';
 import { useAgentModels } from '../../lib/agent-models';
+import { effectiveConnections } from '../../lib/mcp-connection';
 import { planningDraft } from '../../lib/planning';
 import { detectSkillsFromPrompt, VETTED_SKILLS } from '../../lib/skills/catalog';
 import { assemblePrompt, PROMPT_VERSION } from '../../lib/skills/context-assembler';
@@ -131,13 +132,13 @@ export function CaptureTask({
   const [setup, setSetup] = useState(false);
   const [setupProject, setSetupProject] = useState<string | null>(null);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
-  const connections = servers.filter(
-    (s) => s.enabled !== false && s.scope === `project:${project?.id}`,
-  );
+  const connections = effectiveConnections(servers, project?.id);
   const connectionIssues = Object.fromEntries(
     connections.flatMap((server) => {
       const reason = current.agent
-        ? connectionSupport(adapter, server.transport, server.discovery === true)
+        ? server.agents && !server.agents.includes(adapter)
+          ? `This connection is restricted to ${server.agents.join(', ')}.`
+          : connectionSupport(adapter, server.transport, server.discovery === true)
         : null;
       return reason ? [[server.id, reason]] : [];
     }),
@@ -145,7 +146,12 @@ export function CaptureTask({
   const incompatible = connections.filter(
     (server) =>
       connectionIssues[server.id] &&
-      (!current.connectionIds || current.connectionIds.includes(server.id)),
+      (!server.agents ||
+        server.agents.includes(adapter) ||
+        current.connectionIds?.includes(server.id)) &&
+      (server.scope === 'global' ||
+        !current.connectionIds ||
+        current.connectionIds.includes(server.id)),
   );
   const toolError = incompatible.length
     ? `${incompatible.map((server) => server.name).join(', ')} cannot be used with this agent. Under Customize task, choose automatic routing or update the project connection settings.`

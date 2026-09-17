@@ -611,7 +611,7 @@ impl CoordinationTools {
             .service
             .authorized_run(&headers)
             .map_err(bridge_error)?;
-        super::outcomes::validate_assessments(&input.requirements, run.contract.as_ref())
+        super::outcomes::validate_assessments(&input.requirements, Some(&run.contract))
             .map_err(|e| ErrorData::invalid_params(e, None))?;
         let step = super::harness::ValidationStep {
             id: uuid::Uuid::new_v4().to_string(),

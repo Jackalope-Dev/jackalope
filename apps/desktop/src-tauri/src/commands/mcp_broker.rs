@@ -346,10 +346,15 @@ async fn search_catalog(
     });
     let mut decision = None;
     if semantic
-        && matches.len() > input.limit.unwrap_or(5).clamp(1, 8)
-        && !matches
-            .iter()
-            .any(|(_, _, tool)| tool.name.eq_ignore_ascii_case(input.query.trim()))
+        && super::decisions::discovery::needs_assessment(
+            &input.query,
+            matches.iter().filter(|(score, _, _)| *score > 0).count(),
+            matches.len(),
+            input.limit.unwrap_or(5).clamp(1, 8),
+            matches
+                .iter()
+                .any(|(_, _, tool)| tool.name.eq_ignore_ascii_case(input.query.trim())),
+        )
     {
         if let Some((runtime, run)) = context {
             let items: Vec<_> = matches.iter().take(32).map(|(_, server, tool)| json!({"server":server,"name":tool.name,"description":tool.description.as_deref().unwrap_or_default().chars().take(1200).collect::<String>(),"readOnly":is_read_only(tool)})).collect();

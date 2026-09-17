@@ -49,9 +49,9 @@ mod tests {
     fn only_known_native_sessions_with_the_same_policy_receive_delta_guidance() {
         let mut old = super::super::TaskRun::default();
         let full = compact_preamble(None, "codex");
-        assert_eq!(preamble(Some(&old), "codex"), full);
+        assert_eq!(compact_preamble(Some(&old), "codex"), full);
         old.session_id = Some("native-session".into());
-        assert_eq!(preamble(Some(&old), "codex"), full);
+        assert_eq!(compact_preamble(Some(&old), "codex"), full);
         old.efficiency.prompt_policy_hash = Some(policy_hash());
         let delta = compact_preamble(Some(&old), "codex");
         assert!(delta.len() < full.len());

@@ -1,0 +1,319 @@
+{
+  "date": "2026-09-17",
+  "environment": {
+    "system": "Windows 11 Home 10.0.26200",
+    "processor": "AMD Ryzen 5 9600X (6 cores)",
+    "node": "26.9.0",
+    "model": "gpt-6-astra",
+    "cli": "codex-cli 0.155.0-alpha.2.6",
+    "effort": "medium (Balanced)",
+    "requestedSpeed": "standard / default",
+    "scope": "One local machine; provider caches and remote service load not controlled"
+  },
+  "agentTrials": 63,
+  "comparisons": [
+    {
+      "id": "initial-baseline",
+      "title": "Initial coordinator baseline",
+      "detail": "Three coding fixtures, three repetitions each. The initial Jackalope build is compared with the native CLI directly. This establishes the starting overhead.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "control",
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 780365,
+            "inputTokens": 776896,
+            "outputTokens": 3469,
+            "cachedInputTokens": 614656,
+            "elapsedMs": 303901,
+            "promptBytes": 3609,
+            "medianElapsedMs": 32976,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "control": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1015632,
+            "inputTokens": 1009586,
+            "outputTokens": 6046,
+            "cachedInputTokens": 798976,
+            "elapsedMs": 417655,
+            "promptBytes": 77532,
+            "medianElapsedMs": 45519,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -30.148328025987837,
+            "interval": {
+              "low": -60.978532594015064,
+              "high": -1.2651398370403077,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -37.43126873554217,
+            "interval": {
+              "low": -68.13144675792783,
+              "high": -1.6588599354042222,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        }
+      }
+    },
+    {
+      "id": "compact-prompts",
+      "title": "Compact prompt experiment",
+      "detail": "The same 27-trial run compares compact guidance and smaller repository context with the initial Jackalope baseline. This candidate regressed and is disabled by default; use --compact-prompts only for further experiments.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "control",
+        "candidate": "after",
+        "totals": {
+          "control": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1015632,
+            "inputTokens": 1009586,
+            "outputTokens": 6046,
+            "cachedInputTokens": 798976,
+            "elapsedMs": 417655,
+            "promptBytes": 77532,
+            "medianElapsedMs": 45519,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1106966,
+            "inputTokens": 1101035,
+            "outputTokens": 5931,
+            "cachedInputTokens": 877056,
+            "elapsedMs": 445917,
+            "promptBytes": 64947,
+            "medianElapsedMs": 49199,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -8.992824172534931,
+            "interval": {
+              "low": -16.523683705016555,
+              "high": 0.6956097263324912,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -6.766829081418879,
+            "interval": {
+              "low": -25.504008782727293,
+              "high": 5.300248591693846,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        }
+      }
+    },
+    {
+      "id": "field-selection",
+      "title": "Exact field selection",
+      "detail": "Three large MCP-response fixtures, three repetitions each. Native CLI direct delivery is compared with Jackalope discovery and agent-requested local field selection. Both variants must produce the exact same record. This compares the whole harness, including its extra discovery and verification work.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "after",
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1201921,
+            "inputTokens": 1199470,
+            "outputTokens": 2451,
+            "cachedInputTokens": 1005312,
+            "elapsedMs": 295108,
+            "promptBytes": 4248,
+            "medianElapsedMs": 33744,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1302300,
+            "inputTokens": 1298099,
+            "outputTokens": 4201,
+            "cachedInputTokens": 1135104,
+            "elapsedMs": 373990,
+            "promptBytes": 73188,
+            "medianElapsedMs": 41520,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": 5200812,
+            "mcpDeliveredBytes": 6339,
+            "expansionReads": 0
+          }
+        },
+        "cases": ["tool-builds", "tool-deliveries", "tool-packages"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -8.35154723147362,
+            "interval": {
+              "low": -22.45546966660492,
+              "high": 2.7354151537158033,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -26.729875164346616,
+            "interval": {
+              "low": -45.52178731843901,
+              "high": -13.057662979479169,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": 99.87811518662855,
+          "eligibleForScopedClaim": true,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        }
+      }
+    },
+    {
+      "id": "final-workflow",
+      "title": "Final verification workflow",
+      "detail": "Three coding fixtures, three repetitions each, using the final default prompt policy. Compact prompts are disabled; verification is batched after implementation by default. The comparator is a fresh matched native CLI run.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "after",
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 801838,
+            "inputTokens": 798432,
+            "outputTokens": 3406,
+            "cachedInputTokens": 677120,
+            "elapsedMs": 290279,
+            "promptBytes": 3609,
+            "medianElapsedMs": 32176,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1083651,
+            "inputTokens": 1077430,
+            "outputTokens": 6221,
+            "cachedInputTokens": 914048,
+            "elapsedMs": 423462,
+            "promptBytes": 79944,
+            "medianElapsedMs": 45131,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -35.14587734679573,
+            "interval": {
+              "low": -48.716711789318246,
+              "high": -16.970739217826193,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -45.881031697091416,
+            "interval": {
+              "low": -71.60244752595287,
+              "high": -11.97560739521828,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        }
+      }
+    }
+  ],
+  "discovery": {
+    "trials": 24,
+    "calls": 15,
+    "localPassed": 12,
+    "jevPassed": 19,
+    "elapsedMs": 2038,
+    "inputTokens": 29280,
+    "estimatedCostUsd": 0.00122976,
+    "errors": 0,
+    "model": "jev-1.13.0",
+    "regressions": 0,
+    "baselineAllCalls": {
+      "trials": 24,
+      "calls": 24,
+      "localPassed": 12,
+      "jevPassed": 18,
+      "elapsedMs": 3919,
+      "inputTokens": 46875,
+      "estimatedCostUsd": 0.00196875,
+      "errors": 0,
+      "model": "jev-1.13.0"
+    }
+  }
+}

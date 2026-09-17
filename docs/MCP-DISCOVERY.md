@@ -1,7 +1,8 @@
 # Native MCP discovery
 
-In Connections, add or edit a **project** connection and enable **Discover tools on
-demand**. New tasks include enabled project connections automatically; review them
+In Connections, choose **Add tools** to browse the marketplace or **Custom connection**
+to supply your own endpoint or command. Add or edit a project or all-project connection
+and enable **On-demand tools**. New tasks include enabled project connections automatically; review them
 under Customize task → Tools. Saved task connection restrictions remain honored,
 with an explicit action to return to project defaults. Direct delivery
 remains the default for existing connections. A task's selected connection IDs
@@ -14,6 +15,39 @@ same search/execute operations through the local HTTP harness. Custom agents use
 their configured adapter. Manual, queued and scheduled attempts use the same
 launch path. No model API proxy, additional API key, Node sidecar or embedding
 model is required by the broker (an upstream stdio server may require its own runtime).
+
+## Marketplace and connection setup
+
+The marketplace opens on a bundled Recommended collection. `curated-servers.ts`
+contains publisher identity, source/setup links, authentication requirements and
+connection presets. Keep these aligned with publisher documentation, pin local
+package versions, and preserve isolated browser profiles. AllMCPs search is broader
+discovery, not a source of trusted installation commands for curated entries;
+matching directory IDs resolve to the bundled preset. Recommendations are editorial
+choices, not security audits or live service-health claims.
+
+Recommended browsing does not request the AllMCPs directory. All servers and search
+use AllMCPs; opt-out hides both discovery views while preserving saved connections.
+Source icons may load publisher avatars. Directory failures leave recommendations
+and custom setup usable. Never load a detail endpoint for a made-up registry ID.
+
+The form defaults to a remote URL and keeps identifiers, environment variables and
+client JSON in Advanced settings. Bearer tokens use a masked field; unrelated
+headers and client options survive token changes. Save and check stores the settings
+before probing. A failed check offers editing and retry without losing the saved
+connection. Local checks execute the configured process and may download packages.
+Disabled connections are retained and omitted from new task attempts.
+
+OAuth presets use direct Codex/Claude delivery and a separate sign-in step. Buttons
+use the current project's selected agent account, including for all-project
+connections. Other accounts require separate authorization. The native check cannot
+verify CLI-owned OAuth. Platforms without the native sign-in launcher require the
+agent's terminal flow. Saving does not establish authentication or tool execution.
+
+Copied connection diagnostics redact credentials, environment values, arguments,
+opaque options and URL paths/query values. They are for sharing structure, not
+reinstallation. Tool lists and checks are observations; editing or deleting a
+connection invalidates its check and discards late probe responses.
 
 ## Discovery and execution
 
@@ -124,7 +158,9 @@ merges with existing configuration. Verified with the installed CLI and its
 Settings → Decisions includes an off-by-default Jev tool-discovery experiment.
 In Jev mode it can promote strongly relevant tools for ambiguous searches using
 the query, at most 4,000 task characters and 32 descriptions capped at 1,200
-characters each. Exact tool names and empty-query browsing stay local. Schemas,
+characters each. Exact tool names, empty-query browsing and nonempty local results
+that fit the requested page stay local; reranking only helps when keyword search
+misses or overflows that page. Schemas,
 credentials and tool results are not included. The existing candidate scope and
 execution permissions still apply; uncertain or failed evaluations retain local
 ordering. Decision receipts record usage separately from agent execution, and
@@ -138,6 +174,12 @@ account-directory separation, protocol revision conversion and process cleanup. 
 Rendered browser checks cover connection/tool filtering, discovery editing, keyboard
 focus and dismissal, light/dark appearance, reduced motion, 960×640 layout and the
 task usage disclosure. Browser checks do not establish native or installed-app acceptance.
+
+With the desktop Vite server running, execute
+`node apps/desktop/scripts/verify-mcp-marketplace.mjs`. Set `JACKALOPE_PREVIEW_URL`
+to its origin (default `http://127.0.0.1:5197`). The isolated browser fixture checks
+curated discovery, token editing, OAuth handoff, saved-check recovery, duplicate
+prevention, redacted copying and marketplace opt-out without using live accounts.
 
 The opt-in `installed_agents_use_native_discovery` trial launches real installed
 agents through TaskRuntime and Coordinator against a local echo fixture. Set

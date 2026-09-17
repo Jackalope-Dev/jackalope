@@ -137,6 +137,7 @@ test('version two drafts migrate only when their saved text is still generated',
   const edited = `${refinedPrompt}\nKeep this user requirement.`;
   assert.equal(planningDraft({ ...task, refinedPrompt: edited }).prompt, edited);
   const current = assemblePrompt({
+    version: 3,
     rawPrompt,
     selectedSkillIds: ['systematic-debugging'],
   }).assembledPrompt;

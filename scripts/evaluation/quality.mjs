@@ -364,6 +364,15 @@ if (!args.includes('--execute')) {
             execution.code === 0 &&
             !report?.budgetStopped &&
             (!fixture.toolFixture || report?.fixtureToolCalls > 0) &&
+            (variant === 'direct' ||
+              !fixture.outcomes?.length ||
+              fixture.outcomes.every((_, index) =>
+                run?.validationSteps?.some((step) =>
+                  step.requirements?.some(
+                    (item) => item.requirementId === `requirement-${index}` && item.summary?.trim(),
+                  ),
+                ),
+              )) &&
             run?.status === 'review' &&
             report?.oracle?.success === true,
           behavioralOraclePassed: report?.oracle?.success === true,

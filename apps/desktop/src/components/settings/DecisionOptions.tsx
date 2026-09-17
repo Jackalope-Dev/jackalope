@@ -22,7 +22,7 @@ const helpers = [
   [
     'toolDiscovery',
     'Experiment with tool discovery',
-    'Rank bounded tool descriptions for ambiguous searches. Sends the search and task brief to Jev; savings are unproven. Exact names and uncertain results keep local ordering.',
+    'Rank bounded descriptions when local search misses or returns too many tools. Sends the search and task brief to Jev; savings are unproven. Small local result sets and exact names avoid a call.',
   ],
   [
     'contextSelection',

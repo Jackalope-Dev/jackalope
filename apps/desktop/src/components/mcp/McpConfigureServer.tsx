@@ -1,26 +1,33 @@
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { recommendationFor } from './curated-servers';
 import { McpConnectionForm } from './McpConnectionForm';
+import { McpConnectionResult, type SavedMcpConnection } from './McpConnectionResult';
 import { McpServerIcon } from './McpServerIcon';
+import { SourceLink } from './McpSourceLink';
 import { marketplaceName } from './marketplace-info';
 export function McpConfigureServer({
   server,
   onClose,
+  onDone,
   defaultScope,
 }: {
   server: AllMcpsServer;
   onClose: () => void;
+  onDone: () => void;
   defaultScope?: string;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const projectId = useProjectStore((state) => state.activeProjectId);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<SavedMcpConnection | null>(null);
+  const [lastSaved, setLastSaved] = useState<SavedMcpConnection | null>(null);
+  const recommendation = recommendationFor(server.id);
   useEffect(() => {
     heading.current?.focus();
   }, []);
@@ -44,41 +51,59 @@ export function McpConfigureServer({
         }
       />
       {saved ? (
-        <div className="mcp-configuration-saved" role="status">
-          <Check size={28} />
-          <h2>Connection added</h2>
-          <p>Available to new tasks in the selected scope.</p>
-          <Button onClick={onClose}>Back to server</Button>
-        </div>
+        <McpConnectionResult saved={saved} onDone={onDone} onEdit={() => setSaved(null)} />
       ) : (
         <>
           <InlineNotice className="mb-4">
-            Review the publisher and command. Packages may download when the connection starts.
+            {recommendation?.setup ??
+              'Review the publisher, connection settings, and required credentials.'}
+            {!snippet.url &&
+              ' Saving and checking starts this local process and may download its package.'}
+            {recommendation && (
+              <div className="mcp-detail-links">
+                <SourceLink url={recommendation.documentation}>
+                  {recommendation.publisher} setup guide
+                </SourceLink>
+              </div>
+            )}
           </InlineNotice>
           <McpConnectionForm
-            initial={{
-              id: server.id,
-              name: marketplaceName(server),
-              scope: defaultScope ?? (projectId ? `project:${projectId}` : 'global'),
-              description: server.description,
-              command: snippet.command ?? '',
-              args: snippet.args ?? [],
-              url: snippet.url ?? '',
-              transport:
-                snippet.type === 'sse'
-                  ? 'sse'
-                  : snippet.url || server.installKind === 'remote'
-                    ? 'http'
-                    : 'stdio',
-              env,
-              extra: Object.fromEntries(
-                Object.entries(snippet).filter(
-                  ([key]) => !['command', 'args', 'env', 'url', 'type'].includes(key),
+            editing={!!lastSaved}
+            initialAuthentication={
+              lastSaved
+                ? lastSaved.agentSignIn
+                  ? 'oauth'
+                  : undefined
+                : recommendation?.authentication
+            }
+            initial={
+              lastSaved?.server ?? {
+                id: server.id,
+                name: marketplaceName(server),
+                scope: defaultScope ?? (projectId ? `project:${projectId}` : 'global'),
+                description: server.description,
+                command: snippet.command ?? '',
+                args: snippet.args ?? [],
+                url: snippet.url ?? '',
+                transport:
+                  snippet.type === 'sse'
+                    ? 'sse'
+                    : snippet.url || server.installKind === 'remote'
+                      ? 'http'
+                      : 'stdio',
+                env,
+                extra: Object.fromEntries(
+                  Object.entries(snippet).filter(
+                    ([key]) => !['command', 'args', 'env', 'url', 'type'].includes(key),
+                  ),
                 ),
-              ),
-            }}
+              }
+            }
             onCancel={onClose}
-            onSaved={() => setSaved(true)}
+            onSaved={(result) => {
+              setSaved(result);
+              setLastSaved(result);
+            }}
             onBusyChange={setBusy}
           />
         </>

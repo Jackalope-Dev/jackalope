@@ -78,6 +78,12 @@ const connectionsCache = createReadCache<McpServerConfig[]>(30_000, 8);
 let connectionsVersion = 0;
 let searchVersion = 0;
 let inspectVersion = 0;
+const probeVersions = new Map<string, number>();
+const nextProbeVersion = (key: string) => {
+  const version = (probeVersions.get(key) ?? 0) + 1;
+  probeVersions.set(key, version);
+  return version;
+};
 
 interface McpState {
   servers: McpServerConfig[];
@@ -157,28 +163,45 @@ export const useMcpStore = create<McpState>((set, get) => ({
 
   saveServer: async (server: McpServerConfig) => {
     await saveMcpServer(server);
-    set({ probeResults: {} });
+    const key = `${server.scope}:${server.id}`;
+    nextProbeVersion(key);
+    set((state) => ({
+      probeResults: Object.fromEntries(
+        Object.entries(state.probeResults).filter(([id]) => id !== key),
+      ),
+      probingIds: { ...state.probingIds, [key]: false },
+    }));
     connectionsCache.clear();
     await get().loadServers(undefined, true);
   },
 
   deleteServer: async (id: string, scope: string) => {
     await deleteMcpServer(id, scope);
-    set({ probeResults: {} });
+    const key = `${scope}:${id}`;
+    nextProbeVersion(key);
+    set((state) => ({
+      probeResults: Object.fromEntries(
+        Object.entries(state.probeResults).filter(([id]) => id !== key),
+      ),
+      probingIds: { ...state.probingIds, [key]: false },
+    }));
     connectionsCache.clear();
     await get().loadServers(undefined, true);
   },
 
   probeServer: async (server: McpServerConfig) => {
     const key = `${server.scope}:${server.id}`;
+    const version = nextProbeVersion(key);
     set((s) => ({ probingIds: { ...s.probingIds, [key]: true } }));
     try {
       const result = await probeMcpServer(server);
+      if (probeVersions.get(key) !== version) return;
       set((s) => ({
         probeResults: { ...s.probeResults, [key]: result },
         probingIds: { ...s.probingIds, [key]: false },
       }));
     } catch (e) {
+      if (probeVersions.get(key) !== version) return;
       set((s) => ({
         probeResults: {
           ...s.probeResults,

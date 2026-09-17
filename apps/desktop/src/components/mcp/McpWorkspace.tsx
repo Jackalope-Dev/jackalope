@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { connectionFailure, redactConnection } from '../../lib/mcp-connection';
 import { nativeTask } from '../../lib/task-runtime';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
@@ -27,6 +28,12 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { FilterGroup, WorkspaceToolbar } from '../ui/WorkspaceToolbar';
+import {
+  recommendationFor,
+  recommendationGroups,
+  recommendedMatches,
+  recommendedServers,
+} from './curated-servers';
 import { McpAddCustomModal } from './McpAddCustomModal';
 import { McpMarketplaceCard } from './McpMarketplaceCard';
 import { McpServerPage } from './McpServerPage';
@@ -80,10 +87,13 @@ export function McpWorkspace({
     setLocalTab(next);
     onViewChange?.(next);
   };
+  const [directory, setDirectory] = useState(false);
+  const showDirectory = directory || !!searchQuery.trim();
   const [scopeFilter, setScopeFilter] = useState('all');
   const [configuredSearch, setConfiguredSearch] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copyError, setCopyError] = useState('');
+  const [noticeTone, setNoticeTone] = useState<'error' | 'info'>('error');
 
   // Modals
   const [initialConfigure, setInitialConfigure] = useState(false);
@@ -99,18 +109,25 @@ export function McpWorkspace({
 
   // Debounced search for marketplace
   useEffect(() => {
-    if (activeTab !== 'marketplace' || !useMcpMarketplace) return;
+    if (activeTab !== 'marketplace' || !useMcpMarketplace || !showDirectory) return;
     const timer = setTimeout(() => {
       void searchMarketplace(searchQuery, selectedCategory);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedCategory, activeTab, useMcpMarketplace, searchMarketplace]);
+  }, [
+    searchQuery,
+    selectedCategory,
+    activeTab,
+    useMcpMarketplace,
+    searchMarketplace,
+    showDirectory,
+  ]);
 
   const openListing = (server: AllMcpsServer, configure = false) => {
     returnTo.current = { top: workspace.current?.scrollTop ?? 0, id: server.id, configure };
     setInitialConfigure(configure);
     setInspectingServer(server);
-    void inspectServer(server);
+    if (!recommendationFor(server.id)) void inspectServer(server);
   };
   useLayoutEffect(() => {
     if (inspectingServer) workspace.current?.scrollTo({ top: 0 });
@@ -130,26 +147,13 @@ export function McpWorkspace({
   }, [inspectingServer]);
 
   const handleCopyJson = async (server: McpServerConfig) => {
-    const snippet = {
-      mcpServers: {
-        [server.id]: {
-          ...server.extra,
-          ...(server.url
-            ? { type: server.transport, url: server.url }
-            : {
-                command: server.command,
-                args: server.args,
-              }),
-          env: server.env,
-          description: server.description,
-        },
-      },
-    };
+    const snippet = redactConnection(server);
     try {
       await navigator.clipboard.writeText(JSON.stringify(snippet, null, 2));
       setCopiedId(`${server.scope}:${server.id}`);
       setCopyError('');
     } catch {
+      setNoticeTone('error');
       setCopyError(
         'Could not copy the configuration. Open Edit to inspect the connection settings.',
       );
@@ -173,13 +177,45 @@ export function McpWorkspace({
     return true;
   });
 
+  const showConnections = () => {
+    setInspectingServer(null);
+    useMcpStore.getState().clearInspecting();
+    setActiveTab('configured');
+  };
+  const renderCard = (item: AllMcpsServer) => {
+    const server = recommendedServers.find((preset) => preset.id === item.id) ?? item;
+    const scopes = [
+      ...new Set(
+        servers
+          .filter((saved) => saved.id.toLowerCase() === server.id.toLowerCase())
+          .map((saved) => saved.scope),
+      ),
+    ];
+    return (
+      <McpMarketplaceCard
+        key={server.id}
+        server={server}
+        scopes={scopes}
+        onInspect={() => openListing(server)}
+        onConfigure={() => (scopes.length ? showConnections() : openListing(server, true))}
+      />
+    );
+  };
+  const matchingRecommendations = recommendedMatches(searchQuery);
+  const directoryResults = marketplaceServers.filter(
+    (item) =>
+      selectedCategory !== 'all' ||
+      !matchingRecommendations.some((preset) => preset.id === item.id),
+  );
+
   return (
     <WorkspacePage className="mcp-workspace" ref={workspace}>
-      {inspectingServer && activeTab === 'marketplace' ? (
+      {inspectingServer && activeTab === 'marketplace' && useMcpMarketplace ? (
         <McpServerPage
           key={inspectingServer.id}
           server={inspectingServer}
           initialConfigure={initialConfigure}
+          onDone={showConnections}
           onClose={() => {
             setInspectingServer(null);
             useMcpStore.getState().clearInspecting();
@@ -197,16 +233,16 @@ export function McpWorkspace({
             action={
               <div className="flex flex-wrap items-center gap-2">
                 {activeTab === 'configured' && (
-                  <Button variant="outline" onClick={() => setActiveTab('marketplace')}>
+                  <Button onClick={() => setActiveTab('marketplace')}>
                     <Globe size={16} />
-                    Browse marketplace
+                    Add tools
                   </Button>
                 )}
                 <Button
                   variant="outline"
                   onClick={() => {
                     void loadServers(undefined, true);
-                    if (useMcpMarketplace && activeTab === 'marketplace') {
+                    if (useMcpMarketplace && activeTab === 'marketplace' && showDirectory) {
                       void searchMarketplace(undefined, undefined, true);
                     }
                   }}
@@ -216,19 +252,20 @@ export function McpWorkspace({
                   Refresh
                 </Button>
                 <Button
+                  variant="outline"
                   onClick={() => {
                     setEditingServer(null);
                     setCustomModalOpen(true);
                   }}
                 >
                   <Plus size={16} />
-                  Add connection
+                  Custom connection
                 </Button>
               </div>
             }
           />
           {copyError && (
-            <InlineNotice tone="error" className="mb-4">
+            <InlineNotice tone={noticeTone} className="mb-4">
               {copyError}
             </InlineNotice>
           )}
@@ -384,16 +421,20 @@ export function McpWorkspace({
                                           id: server.id,
                                           scope: server.scope,
                                           agent,
-                                          profileId: server.scope.startsWith('project:')
-                                            ? agentAccountFor(project, agent)
-                                            : undefined,
+                                          profileId: agentAccountFor(project, agent),
                                         })
-                                          .then(() =>
+                                          .then(() => {
+                                            setNoticeTone('info');
                                             setCopyError(
                                               'Sign-in opened in your CLI. Complete authorization and check access there. Connection probes use configured headers or environment tokens.',
-                                            ),
-                                          )
-                                          .catch((error) => setCopyError(String(error)))
+                                            );
+                                          })
+                                          .catch(() => {
+                                            setNoticeTone('error');
+                                            setCopyError(
+                                              'Could not open sign-in. Use the selected agent account’s MCP sign-in flow in a terminal.',
+                                            );
+                                          })
                                       }
                                     >
                                       Sign in with {agent === 'claude' ? 'Claude' : 'Codex'}
@@ -413,6 +454,7 @@ export function McpWorkspace({
                                     : server.scope}
                               </Badge>
                               <Badge>{server.transport}</Badge>
+                              {server.enabled === false && <Badge>Disabled</Badge>}
                               {server.discovery && <Badge>On demand</Badge>}
                             </div>
                           </div>
@@ -435,11 +477,9 @@ export function McpWorkspace({
 
                           <div className="mcp-card-meta">
                             {server.url ? (
-                              <span>{server.url}</span>
+                              <span>{server.url.split('?')[0].replace(/\/\/[^/]*@/, '//')}</span>
                             ) : (
-                              <span>
-                                {server.command} {(server.args || []).join(' ')}
-                              </span>
+                              <span>Local command · {server.args?.length ?? 0} arguments</span>
                             )}
                           </div>
 
@@ -449,6 +489,9 @@ export function McpWorkspace({
                             </p>
                           )}
 
+                          {!probe && (
+                            <p className="task-muted text-xs mb-2">Not checked by Jackalope</p>
+                          )}
                           {/* Probe / Status info */}
                           {probe && (
                             <div className="mb-2">
@@ -461,7 +504,8 @@ export function McpWorkspace({
                               ) : (
                                 <div className="text-xs text-[var(--color-danger)] flex items-center gap-1.5 font-medium">
                                   <X size={13} />
-                                  Probe failed: {probe.error || 'Connection error'}
+                                  {connectionFailure(probe.error).title}.{' '}
+                                  {connectionFailure(probe.error).detail}
                                 </div>
                               )}
 
@@ -513,13 +557,13 @@ export function McpWorkspace({
                               variant="ghost"
                               size="sm"
                               onClick={() => void handleCopyJson(server)}
-                              title="Copy JSON configuration"
+                              title="Copy redacted configuration"
                             >
                               {copiedId === key ? <Check size={13} /> : <Copy size={13} />}
                               <span className="sr-only">
                                 {copiedId === key
                                   ? 'Configuration copied'
-                                  : `Copy ${server.name} configuration`}
+                                  : `Copy ${server.name} redacted configuration`}
                               </span>
                             </Button>
                           </div>
@@ -579,7 +623,6 @@ export function McpWorkspace({
                   <Button
                     onClick={() => {
                       setUseMcpMarketplace(true);
-                      void searchMarketplace(undefined, undefined, true);
                     }}
                   >
                     <Globe size={15} />
@@ -598,59 +641,95 @@ export function McpWorkspace({
                     />
                   </div>
 
-                  {/* Category Pills */}
-                  <div className="mcp-category-pills">
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => setSelectedCategory(cat.id)}
-                        aria-pressed={selectedCategory === cat.id}
-                        className={`mcp-category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {marketplaceError && (
-                    <InlineNotice tone="error" className="mb-4">
-                      {marketplaceError}
-                    </InlineNotice>
-                  )}
-
-                  {loadingMarketplace ? (
-                    <div className="p-16 text-center text-[var(--color-text-muted)]">
-                      <LoadingIcon
-                        size={24}
-                        className="mx-auto mb-3 text-[var(--color-accent-ink)]"
-                      />
-                      Searching allmcps.com registry…
-                    </div>
-                  ) : marketplaceServers.length === 0 ? (
-                    <EmptyState
-                      icon={Search}
-                      title="No MCP servers found"
-                      description="Try another search term or select a different category."
+                  <div className="mcp-browse-controls">
+                    <FilterGroup
+                      label="Marketplace collection"
+                      value={directory ? 'directory' : 'recommended'}
+                      onChange={(value) => {
+                        setDirectory(value === 'directory');
+                        setSelectedCategory('all');
+                        if (value === 'recommended') setSearchQuery('');
+                      }}
+                      items={[
+                        { id: 'recommended', label: 'Recommended' },
+                        { id: 'directory', label: 'All servers' },
+                      ]}
                     />
+                    <p className="task-muted">
+                      {showDirectory
+                        ? 'Search results are supplied by AllMCPs. Review the publisher before connecting.'
+                        : 'A starting collection of publisher-maintained servers, selected by Jackalope.'}
+                    </p>
+                  </div>
+                  {!showDirectory ? (
+                    recommendationGroups.map((group) => (
+                      <section className="mcp-recommendation-group" key={group} aria-label={group}>
+                        <h2>{group}</h2>
+                        <div className="mcp-grid">
+                          {recommendedServers
+                            .filter((item) => recommendationFor(item.id)?.group === group)
+                            .map(renderCard)}
+                        </div>
+                      </section>
+                    ))
                   ) : (
-                    <div className="mcp-grid">
-                      {marketplaceServers.map((item) => (
-                        <McpMarketplaceCard
-                          key={item.id}
-                          server={item}
-                          scopes={[
-                            ...new Set(
-                              servers
-                                .filter((s) => s.id.toLowerCase() === item.id.toLowerCase())
-                                .map((s) => s.scope),
-                            ),
-                          ]}
-                          onInspect={() => openListing(item)}
-                          onConfigure={() => openListing(item, true)}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      {directory && (
+                        <div className="mcp-category-pills">
+                          {CATEGORIES.map((cat) => (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => setSelectedCategory(cat.id)}
+                              aria-pressed={selectedCategory === cat.id}
+                              className={`mcp-category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
+                            >
+                              {cat.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {selectedCategory === 'all' && matchingRecommendations.length > 0 && (
+                        <section
+                          className="mcp-recommendation-group"
+                          aria-label="Recommended matches"
+                        >
+                          <h2>Recommended{searchQuery.trim() ? ' matches' : ''}</h2>
+                          <div className="mcp-grid">{matchingRecommendations.map(renderCard)}</div>
+                        </section>
+                      )}
+                      <section className="mcp-recommendation-group" aria-label="AllMCPs directory">
+                        <h2>From AllMCPs</h2>
+                        {marketplaceError && (
+                          <InlineNotice tone="warning" className="mb-4">
+                            The directory could not be loaded. Recommended tools and custom
+                            connections are still available.{' '}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void searchMarketplace(undefined, undefined, true)}
+                            >
+                              Retry search
+                            </Button>
+                          </InlineNotice>
+                        )}
+                        {loadingMarketplace ? (
+                          <p className="task-muted" role="status">
+                            <LoadingIcon size={16} /> Searching AllMCPs…
+                          </p>
+                        ) : directoryResults.length > 0 ? (
+                          <div className="mcp-grid">{directoryResults.map(renderCard)}</div>
+                        ) : (
+                          !marketplaceError && (
+                            <EmptyState
+                              icon={Search}
+                              title="No additional servers found"
+                              description="Try another search term, select a different category, or add a custom connection."
+                            />
+                          )
+                        )}
+                      </section>
+                    </>
                   )}
                 </>
               )}

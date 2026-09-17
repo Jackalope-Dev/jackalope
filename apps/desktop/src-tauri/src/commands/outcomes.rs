@@ -2,6 +2,7 @@ use super::{
     integration,
     tasks::{TaskRun, TaskRuntime},
 };
+use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tauri::State;
@@ -80,7 +81,7 @@ pub fn validate_assessments(
     contract: Option<&TaskContract>,
 ) -> Result<(), String> {
     let mut seen = std::collections::HashSet::new();
-    if items.len() > 12
+    if items.len() > 24
         || items.iter().any(|item| {
             !seen.insert(&item.requirement_id)
                 || !contract
@@ -494,5 +495,32 @@ mod tests {
         assert!(validate_assessments(&[answer.clone()], None).is_err());
         answer.requirement_id = "invented".into();
         assert!(validate_assessments(&[answer], Some(&contract)).is_err());
+    }
+
+    #[test]
+    fn one_report_can_cover_twelve_steps_and_twelve_outcomes() {
+        let contract = TaskContract {
+            requirements: (0..24)
+                .map(|index| Requirement {
+                    id: format!("requirement-{index}"),
+                    title: format!("Expectation {index}"),
+                    checkpoint: index < 12,
+                    receipt: None,
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let answers: Vec<_> = contract
+            .requirements
+            .iter()
+            .map(|item| RequirementAssessment {
+                requirement_id: item.id.clone(),
+                status: AssessmentStatus::Unverified,
+                summary: "Not yet verified".into(),
+                evidence: vec![],
+            })
+            .collect();
+        assert!(validate_assessments(&answers, Some(&contract)).is_ok());
+        assert!(contract.require_accepted("tree").is_err());
     }
 }

@@ -28,6 +28,7 @@
     "evaluate:execution": "node scripts/evaluation/run.mjs",
     "evaluate:quality": "node scripts/evaluation/quality.mjs",
     "evaluate:context": "node scripts/evaluation/context-report.mjs",
+    "evaluate:website": "node scripts/evaluation/website.mjs",
     "evaluate:speed": "node scripts/evaluation/speed.mjs",
     "evaluate:jev": "node scripts/evaluation/jev.mjs",
     "evaluate:routing": "node scripts/evaluation/routing.mjs",

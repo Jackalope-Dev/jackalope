@@ -1,7 +1,9 @@
 import { Checkbox } from '@jackalope/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { connectionSupport } from '../../lib/agent-capabilities';
 import { builtinAgents } from '../../lib/agent-catalog';
+import { bearerToken, withBearerToken, withoutBearerToken } from '../../lib/mcp-connection';
 import { mcpEndpointError } from '../../lib/mcp-endpoint';
 import type { McpServerConfig } from '../../lib/tauri-bridge';
 import { useMcpStore } from '../../stores/mcpStore';
@@ -13,30 +15,53 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/Switch';
 import { Textarea } from '../ui/Textarea';
+import type { SavedMcpConnection } from './McpConnectionResult';
 
 export function McpConnectionForm({
   initial,
   editing = false,
+  initialAuthentication,
   onCancel,
   onSaved,
   onBusyChange,
 }: {
   initial?: Partial<McpServerConfig>;
   editing?: boolean;
+  initialAuthentication?: 'none' | 'token' | 'oauth';
   onCancel: () => void;
-  onSaved: () => void;
+  onSaved: (saved: SavedMcpConnection) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const { projects, activeProjectId } = useProjectStore();
   const project = projects.find((project) => project.id === activeProjectId);
+  const initialToken = bearerToken(initial?.extra);
+  const defaultsToAgentSignIn =
+    initialAuthentication === 'oauth' ||
+    (initial?.managed &&
+      initial.transport === 'http' &&
+      initial.discovery === false &&
+      !Object.keys(initial.extra ?? {}).length);
   const [name, setName] = useState(initial?.name ?? '');
   const [id, setId] = useState(initial?.id ?? '');
   const [idEdited, setIdEdited] = useState(!!initial?.id);
   const [scope, setScope] = useState(
     initial?.scope ?? (project ? `project:${project.id}` : 'global'),
   );
-  const [agents, setAgents] = useState<string[] | null>(initial?.agents ?? null);
-  const [transport, setTransport] = useState(initial?.transport ?? 'stdio');
+  const [agents, setAgents] = useState<string[] | null>(
+    initial?.agents ?? (defaultsToAgentSignIn ? ['codex', 'claude'] : null),
+  );
+  const [transport, setTransport] = useState(initial?.transport ?? 'http');
+  const [authentication, setAuthentication] = useState(
+    initialAuthentication ??
+      (initialToken !== undefined
+        ? 'token'
+        : Object.keys(initial?.extra ?? {}).length
+          ? 'advanced'
+          : defaultsToAgentSignIn
+            ? 'oauth'
+            : 'none'),
+  );
+  const [token, setToken] = useState(initialToken ?? '');
   const [command, setCommand] = useState(initial?.command ?? '');
   const [args, setArgs] = useState(
     (initial?.args ?? []).map((value) => ({ id: crypto.randomUUID(), value })),
@@ -49,9 +74,21 @@ export function McpConnectionForm({
       value,
     })),
   );
-  const [extra, setExtra] = useState(JSON.stringify(initial?.extra ?? {}, null, 2));
-  const [discovery, setDiscovery] = useState(initial?.discovery ?? true);
+  const [extra, setExtra] = useState(
+    JSON.stringify(
+      initialToken !== undefined
+        ? withoutBearerToken(initial?.extra ?? {})
+        : (initial?.extra ?? {}),
+      null,
+      2,
+    ),
+  );
+  const [discovery, setDiscovery] = useState(
+    initial?.discovery ?? initialAuthentication !== 'oauth',
+  );
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [error, setError] = useState('');
   const legacy = editing && !initial?.managed && !initial?.scope?.startsWith('project:');
   const submit = async (event: React.FormEvent) => {
@@ -69,17 +106,42 @@ export function McpConnectionForm({
         const endpointError = mcpEndpointError(url.trim());
         if (endpointError) throw new Error(endpointError);
       }
+      const agentSignIn = transport === 'http' && authentication === 'oauth';
       if (
-        !legacy &&
-        !discovery &&
-        (!agents || agents.some((id) => !['codex', 'claude'].includes(id)))
+        agentSignIn &&
+        (discovery || !agents || agents.some((agent) => !['codex', 'claude'].includes(agent)))
       )
         throw new Error(
-          'Enable on-demand tools for all agents, or select Codex and Claude for a direct connection.',
+          'For agent sign-in, turn off on-demand tools and select Codex, Claude, or both.',
         );
-      const parsed: unknown = JSON.parse(extra || '{}');
+      if (
+        !legacy &&
+        (agents ?? builtinAgents.map((agent) => agent.id)).some((agent) =>
+          connectionSupport(agent, transport, transport !== 'sse' && discovery),
+        )
+      )
+        throw new Error(
+          'The selected agents do not all support this connection. Enable on-demand tools or choose compatible agents.',
+        );
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(extra || '{}');
+      } catch {
+        throw new Error(
+          'Client options must be valid JSON. Check the syntax in Advanced settings.',
+        );
+      }
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
         throw new Error('Client options must be a JSON object.');
+      if (transport !== 'stdio' && authentication === 'token' && !token.trim())
+        throw new Error('Enter a bearer token.');
+      if (
+        !editing &&
+        useMcpStore.getState().servers.some((server) => server.id === id && server.scope === scope)
+      )
+        throw new Error(
+          'A connection with this identifier already exists here. Edit it from Connections, or choose a different identifier in Advanced settings.',
+        );
       const keys = env.map((item) => item.key.trim()).filter(Boolean);
       if (
         new Set(keys).size !== keys.length ||
@@ -90,7 +152,7 @@ export function McpConnectionForm({
         );
       setBusy(true);
       onBusyChange?.(true);
-      await useMcpStore.getState().saveServer({
+      const server: McpServerConfig = {
         ...initial,
         id,
         name: name.trim(),
@@ -104,14 +166,25 @@ export function McpConnectionForm({
         env: Object.fromEntries(
           env.filter((item) => item.key.trim()).map((item) => [item.key.trim(), item.value]),
         ),
-        extra: parsed as Record<string, unknown>,
-        enabled: initial?.enabled ?? true,
+        extra:
+          transport !== 'stdio' && authentication === 'token'
+            ? withBearerToken(parsed as Record<string, unknown>, token.trim())
+            : authentication === 'oauth' && transport === 'http'
+              ? withoutBearerToken(parsed as Record<string, unknown>)
+              : (parsed as Record<string, unknown>),
+        enabled,
         discovery: !legacy && transport !== 'sse' && discovery,
-      });
-      onSaved();
+      };
+      await useMcpStore.getState().saveServer(server);
+      if (enabled && !agentSignIn && transport !== 'sse') {
+        setChecking(true);
+        await useMcpStore.getState().probeServer(server);
+      }
+      onSaved({ server, agentSignIn });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
+      setChecking(false);
       setBusy(false);
       onBusyChange?.(false);
     }
@@ -134,22 +207,11 @@ export function McpConnectionForm({
                 placeholder="Postgres"
               />
             </FormField>
-            <FormField label="Identifier">
-              <Input
-                required
-                disabled={editing}
-                value={id}
-                onChange={(event) => {
-                  setIdEdited(true);
-                  setId(event.target.value);
-                }}
-              />
-            </FormField>
           </div>
           <fieldset className="mcp-scope-options" aria-label="Connection type">
             {[
-              { id: 'stdio', label: 'Local command' },
               { id: 'http', label: 'Remote URL' },
+              { id: 'stdio', label: 'Local command' },
               ...(transport === 'sse' ? [{ id: 'sse', label: 'Legacy SSE' }] : []),
             ].map((item) => (
               <Button
@@ -165,6 +227,10 @@ export function McpConnectionForm({
           </fieldset>
           {transport === 'stdio' ? (
             <>
+              <p className="task-muted">
+                This runs a process on your computer. Save and check starts it and may download
+                packages.
+              </p>
               <FormField label="Command">
                 <Input
                   className="font-mono"
@@ -224,74 +290,170 @@ export function McpConnectionForm({
               />
             </FormField>
           )}
-          <div>
-            <div className="mcp-field-heading">
-              <h3>Environment variables</h3>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setEnv([...env, { id: crypto.randomUUID(), key: '', value: '' }])}
-              >
-                <Plus size={15} />
-                Add variable
-              </Button>
-            </div>
-            {env.map((item, index) => (
-              <div className="mcp-variable-row" key={item.id}>
-                <Input
-                  aria-label={`Variable ${index + 1} name`}
-                  className="task-input font-mono"
-                  placeholder="API_TOKEN"
-                  value={item.key}
-                  onChange={(event) =>
-                    setEnv(
-                      env.map((variable) =>
-                        variable.id === item.id
-                          ? { ...variable, key: event.target.value }
-                          : variable,
-                      ),
-                    )
-                  }
-                />
-                <Input
-                  aria-label={`Variable ${index + 1} value`}
+          {transport !== 'stdio' && (
+            <>
+              <FormField label="Authentication">
+                <select
                   className="task-input"
-                  type="password"
-                  placeholder="Value"
-                  value={item.value}
-                  onChange={(event) =>
-                    setEnv(
-                      env.map((variable) =>
-                        variable.id === item.id
-                          ? { ...variable, value: event.target.value }
-                          : variable,
-                      ),
-                    )
-                  }
-                />
+                  value={authentication}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    let options: Record<string, unknown>;
+                    try {
+                      const parsed: unknown = JSON.parse(extra || '{}');
+                      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+                        throw new Error();
+                      options = parsed as Record<string, unknown>;
+                    } catch {
+                      setError(
+                        'Fix the client options JSON in Advanced settings before changing authentication.',
+                      );
+                      return;
+                    }
+                    if (authentication === 'token' && next === 'advanced' && token.trim())
+                      options = withBearerToken(options, token.trim());
+                    if (next === 'token') {
+                      setToken(bearerToken(options) ?? token);
+                      options = withoutBearerToken(options);
+                    }
+                    if (next === 'none' || next === 'oauth') options = withoutBearerToken(options);
+                    setExtra(JSON.stringify(options, null, 2));
+                    setAuthentication(next);
+                    if (next === 'oauth') {
+                      setDiscovery(false);
+                      setAgents(['codex', 'claude']);
+                    } else if (authentication === 'oauth') {
+                      setDiscovery(true);
+                      setAgents(null);
+                    }
+                  }}
+                >
+                  {!Object.keys(initial?.extra ?? {}).length && (
+                    <option value="none">No authentication</option>
+                  )}
+                  <option value="token">Bearer token / API key</option>
+                  {transport === 'http' && !legacy && (
+                    <option value="oauth">Sign in through Codex or Claude</option>
+                  )}
+                  <option value="advanced">Use headers or client options</option>
+                </select>
+              </FormField>
+              {authentication === 'token' && (
+                <FormField label="Bearer token">
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    value={token}
+                    onChange={(event) => setToken(event.target.value)}
+                    required
+                    placeholder="Token from the service"
+                  />
+                </FormField>
+              )}
+              {authentication === 'oauth' && (
+                <InlineNotice>
+                  After saving, sign in separately through each selected agent. This connection is
+                  available to those agents through their own accounts.
+                </InlineNotice>
+              )}
+              {authentication === 'advanced' && (
+                <p className="task-muted">
+                  Your existing headers and client options are preserved below.
+                </p>
+              )}
+            </>
+          )}
+          <details
+            className="mcp-advanced-settings"
+            open={authentication === 'advanced' || env.length > 0 || undefined}
+          >
+            <summary>Advanced settings</summary>
+            <FormField label="Identifier">
+              <Input
+                required
+                disabled={editing}
+                value={id}
+                onChange={(event) => {
+                  setIdEdited(true);
+                  setId(event.target.value);
+                }}
+              />
+            </FormField>
+            <div>
+              <div className="mcp-field-heading">
+                <h3>Environment variables</h3>
                 <Button
                   type="button"
                   variant="ghost"
-                  aria-label={`Remove variable ${index + 1}`}
-                  onClick={() => setEnv(env.filter((variable) => variable.id !== item.id))}
+                  onClick={() => setEnv([...env, { id: crypto.randomUUID(), key: '', value: '' }])}
                 >
-                  <Trash2 size={15} />
+                  <Plus size={15} />
+                  Add variable
                 </Button>
               </div>
-            ))}
-          </div>
-          <FormField label="Headers and client options (JSON)">
-            <Textarea
-              className="font-mono"
-              rows={4}
-              value={extra}
-              onChange={(event) => setExtra(event.target.value)}
-              spellCheck={false}
-            />
-          </FormField>
+              {env.map((item, index) => (
+                <div className="mcp-variable-row" key={item.id}>
+                  <Input
+                    aria-label={`Variable ${index + 1} name`}
+                    className="task-input font-mono"
+                    placeholder="API_TOKEN"
+                    value={item.key}
+                    onChange={(event) =>
+                      setEnv(
+                        env.map((variable) =>
+                          variable.id === item.id
+                            ? { ...variable, key: event.target.value }
+                            : variable,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    aria-label={`Variable ${index + 1} value`}
+                    className="task-input"
+                    type="password"
+                    placeholder="Value"
+                    value={item.value}
+                    onChange={(event) =>
+                      setEnv(
+                        env.map((variable) =>
+                          variable.id === item.id
+                            ? { ...variable, value: event.target.value }
+                            : variable,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={`Remove variable ${index + 1}`}
+                    onClick={() => setEnv(env.filter((variable) => variable.id !== item.id))}
+                  >
+                    <Trash2 size={15} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <FormField label="Headers and client options (JSON)">
+              <Textarea
+                className="font-mono"
+                rows={4}
+                value={extra}
+                onChange={(event) => {
+                  setExtra(event.target.value);
+                  if (authentication === 'none') setAuthentication('advanced');
+                }}
+                spellCheck={false}
+              />
+            </FormField>
+          </details>
         </section>
         <section className="mcp-form-section">
           <h2>Availability</h2>
+          {editing && (
+            <Switch label="Connection enabled" checked={enabled} onCheckedChange={setEnabled} />
+          )}
           {legacy ? (
             <p className="task-muted">
               Editing the existing {scope} client configuration. Existing agent sessions need a
@@ -336,6 +498,7 @@ export function McpConnectionForm({
                 <Button
                   type="button"
                   variant={agents === null ? 'secondary' : 'outline'}
+                  disabled={authentication === 'oauth' && transport === 'http'}
                   aria-pressed={agents === null}
                   onClick={() => setAgents(null)}
                 >
@@ -356,6 +519,11 @@ export function McpConnectionForm({
                     <label key={agent.id}>
                       <Checkbox
                         checked={agents.includes(agent.id)}
+                        disabled={
+                          authentication === 'oauth' &&
+                          transport === 'http' &&
+                          !['codex', 'claude'].includes(agent.id)
+                        }
                         onChange={(event) =>
                           setAgents(
                             event.target.checked
@@ -374,14 +542,24 @@ export function McpConnectionForm({
                 <Switch
                   label="On-demand tools"
                   checked={discovery}
-                  disabled={transport === 'sse'}
-                  onCheckedChange={setDiscovery}
+                  disabled={
+                    transport === 'sse' || (authentication === 'oauth' && transport === 'http')
+                  }
+                  onCheckedChange={(value) => {
+                    setDiscovery(value);
+                    if (!value)
+                      setAgents(
+                        (agents ?? builtinAgents.map((agent) => agent.id)).filter(
+                          (agent) => !connectionSupport(agent, transport, false),
+                        ),
+                      );
+                  }}
                 />
               </div>
               <p className="task-muted">
                 Loads relevant tools as tasks need them. Uses these credentials for selected agents.
-                Direct connections support Codex and Claude; on-demand tools support every agent
-                adapter.
+                Direct connections depend on the selected agent and transport. On-demand tools
+                support every agent adapter.
               </p>
               {transport !== 'stdio' && (
                 <p className="task-muted">
@@ -398,8 +576,15 @@ export function McpConnectionForm({
         <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={busy} loading={busy} loadingLabel="Saving…">
-          {editing ? 'Save changes' : 'Add connection'}
+        <Button
+          type="submit"
+          disabled={busy}
+          loading={busy}
+          loadingLabel={checking ? 'Checking connection…' : 'Saving connection…'}
+        >
+          {(transport === 'http' && authentication === 'oauth') || transport === 'sse'
+            ? 'Save connection'
+            : 'Save and check'}
         </Button>
       </DialogFooter>
     </form>

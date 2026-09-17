@@ -1,14 +1,16 @@
 import { Disclosure, DisclosureSummary, SearchField, Tabs } from '@jackalope/ui';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
-import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
-import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { type AllMcpsServer, useMcpStore } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
 import { LoadingState } from '../ui/LoadingState';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
+import { recommendationFor } from './curated-servers';
 import { McpConfigureServer } from './McpConfigureServer';
+import { McpRecommendedDetails } from './McpRecommendedDetails';
 import { McpServerIcon } from './McpServerIcon';
+import { SourceLink } from './McpSourceLink';
 import {
   categoryLabel,
   marketplaceName,
@@ -28,43 +30,16 @@ function dateLabel(value?: string | null) {
     : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function SourceLink({ url, children }: { url?: string | null; children: ReactNode }) {
-  const href = safeMarketplaceUrl(url);
-  const [error, setError] = useState(false);
-  return href ? (
-    <>
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={async (event) => {
-          if (!isTauriEnvironment()) return;
-          event.preventDefault();
-          try {
-            const { open } = await import('@tauri-apps/plugin-shell');
-            await open(href);
-            setError(false);
-          } catch {
-            setError(true);
-          }
-        }}
-      >
-        {children}
-        <ExternalLink size={13} aria-hidden="true" />
-      </a>
-      {error && <span role="alert">Could not open this link.</span>}
-    </>
-  ) : null;
-}
-
 export function McpServerPage({
   server,
   initialConfigure = false,
   onClose,
+  onDone,
 }: {
   server: AllMcpsServer;
   initialConfigure?: boolean;
   onClose: () => void;
+  onDone: () => void;
 }) {
   const [configuring, setConfiguring] = useState(initialConfigure);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -103,7 +78,18 @@ export function McpServerPage({
   ];
 
   if (configuring)
-    return <McpConfigureServer server={server} onClose={() => setConfiguring(false)} />;
+    return (
+      <McpConfigureServer server={server} onClose={() => setConfiguring(false)} onDone={onDone} />
+    );
+  if (recommendationFor(server.id))
+    return (
+      <McpRecommendedDetails
+        server={server}
+        scopes={scopes}
+        onClose={onClose}
+        onConfigure={scopes.length ? onDone : () => setConfiguring(true)}
+      />
+    );
   return (
     <section className="mcp-server-page" aria-label={`${marketplaceName(server)} details`}>
       <WorkspaceHeading
@@ -339,8 +325,8 @@ export function McpServerPage({
               )}
             </section>
             <p className="mcp-detail-note">
-              Choose Global, Claude Code, Codex or Grok in the next step. Jackalope writes the
-              selected client configuration; restart existing agent sessions to pick up changes.
+              Choose this project or all projects in the next step, then select which agents can use
+              the connection. Saved changes apply to new task attempts.
             </p>
           </Tabs.Content>
           <Tabs.Content value="docs" className="mcp-detail-content">

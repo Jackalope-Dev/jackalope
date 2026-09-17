@@ -35,7 +35,7 @@
 
 .mcp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 1rem;
 }
 
@@ -561,8 +561,7 @@
   cursor: pointer;
 }
 .mcp-configure-actions {
-  position: sticky;
-  bottom: 12px;
+  position: static;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
@@ -580,6 +579,9 @@
   padding-block: 24px;
 }
 .mcp-configuration-saved > svg {
+  color: var(--color-text-secondary);
+}
+.mcp-configuration-saved[data-checked="true"] > svg {
   color: var(--color-success);
 }
 .mcp-market-card .mcp-card-footer {
@@ -615,11 +617,15 @@
   border-radius: 12px;
 }
 
-.mcp-connection-dialog {
+.ui-dialog.mcp-connection-dialog {
   width: min(1040px, calc(100vw - 48px));
   max-width: 1040px;
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
+  scroll-padding-block: 24px 120px;
+}
+.mcp-workspace:has(.mcp-connection-form) {
+  scroll-padding-block: 24px 120px;
 }
 .mcp-form-grid {
   display: grid;
@@ -696,8 +702,7 @@
   accent-color: var(--color-accent);
 }
 .mcp-connection-form .mcp-configure-actions {
-  position: sticky;
-  bottom: 12px;
+  position: static;
   margin-top: 24px;
   padding: 16px;
   background: var(--color-surface);
@@ -719,4 +724,45 @@
 .mcp-connection-form .task-label .task-input {
   width: 100%;
   min-width: 0;
+}
+
+.mcp-browse-controls {
+  display: grid;
+  gap: 16px;
+  margin: 20px 0 28px;
+}
+.mcp-recommendation-group {
+  margin-bottom: 32px;
+}
+.mcp-recommendation-group > h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.mcp-preset-endpoint {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+.mcp-advanced-settings > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+  font-size: var(--text-sm);
+}
+.mcp-advanced-settings > :not(summary) {
+  margin-top: 16px;
+}
+.mcp-result-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.mcp-field-pair {
+  grid-template-columns: minmax(0, 1fr);
 }

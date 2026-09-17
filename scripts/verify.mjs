@@ -17,6 +17,7 @@ if (args.length && (args.length !== 1 || args[0] !== '--native-only'))
 const nativeOnly = args.includes('--native-only');
 
 const sharedChecks = [
+  [process.execPath, ['scripts/evaluation/website.mjs', '--check']],
   [process.execPath, ['scripts/knowledge.mjs', '--check']],
   [process.execPath, [pnpm, 'check']],
   [process.execPath, [pnpm, 'typecheck']],

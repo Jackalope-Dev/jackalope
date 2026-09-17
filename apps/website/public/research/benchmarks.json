@@ -1,6 +1,5378 @@
 {
   "date": "2026-09-17",
-  "environment": {},
-  "comparisons": [],
-  "discovery": null
+  "environment": {
+    "system": "Windows 11 Home 10.0.26200",
+    "processor": "AMD Ryzen 5 9600X (6 cores)",
+    "node": "26.9.0",
+    "model": "gpt-6-astra",
+    "cli": "codex-cli 0.155.0-alpha.2.6",
+    "effort": "medium (Balanced)",
+    "requestedSpeed": "standard / default",
+    "scope": "One local machine; provider caches and remote service load not controlled"
+  },
+  "comparisons": [
+    {
+      "id": "initial-baseline",
+      "title": "Initial coordinator baseline",
+      "detail": "Three coding fixtures, three repetitions each. The initial Jackalope build is compared with the native CLI directly. This establishes the starting overhead.",
+      "report": {
+        "version": 1,
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "control",
+        "matched": true,
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 780365,
+            "inputTokens": 776896,
+            "outputTokens": 3469,
+            "cachedInputTokens": 614656,
+            "elapsedMs": 303901,
+            "promptBytes": 3609,
+            "medianElapsedMs": 32976,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "control": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1015632,
+            "inputTokens": 1009586,
+            "outputTokens": 6046,
+            "cachedInputTokens": 798976,
+            "elapsedMs": 417655,
+            "promptBytes": 77532,
+            "medianElapsedMs": 45519,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -30.148328025987837,
+            "interval": {
+              "low": -60.978532594015064,
+              "high": -1.2651398370403077,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -37.43126873554217,
+            "interval": {
+              "low": -68.13144675792783,
+              "high": -1.6588599354042222,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        },
+        "blockers": [],
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "plan": {
+          "cases": ["design-tokens", "scheduler-fix", "csv-cell"],
+          "variants": ["control", "after", "direct"],
+          "repeat": 3,
+          "compactPrompts": true,
+          "suiteSha256": "bdbd854d7070a047c4c5a24018df2e563e993ad6da9e816e5e23acf2f59a0931"
+        },
+        "trialMeasurements": [
+          {
+            "case": "design-tokens",
+            "variant": "control",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 45519,
+            "input": 99829,
+            "output": 493,
+            "cacheRead": 48384,
+            "totalTokens": 100322,
+            "promptBytes": 8231,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 43005,
+            "input": 90582,
+            "output": 390,
+            "cacheRead": 66816,
+            "totalTokens": 90972,
+            "promptBytes": 340,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "design-tokens",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 42283,
+            "input": 90423,
+            "output": 389,
+            "cacheRead": 80000,
+            "totalTokens": 90812,
+            "promptBytes": 340,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "design-tokens",
+            "variant": "control",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 39750,
+            "input": 74976,
+            "output": 478,
+            "cacheRead": 55936,
+            "totalTokens": 75454,
+            "promptBytes": 8231,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 32986,
+            "input": 90300,
+            "output": 376,
+            "cacheRead": 66560,
+            "totalTokens": 90676,
+            "promptBytes": 340,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "design-tokens",
+            "variant": "control",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 34967,
+            "input": 99660,
+            "output": 471,
+            "cacheRead": 80768,
+            "totalTokens": 100131,
+            "promptBytes": 8231,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "control",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 60246,
+            "input": 136243,
+            "output": 902,
+            "cacheRead": 119040,
+            "totalTokens": 137145,
+            "promptBytes": 9009,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 42935,
+            "input": 116638,
+            "output": 487,
+            "cacheRead": 104320,
+            "totalTokens": 117125,
+            "promptBytes": 525,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 32976,
+            "input": 93196,
+            "output": 423,
+            "cacheRead": 68224,
+            "totalTokens": 93619,
+            "promptBytes": 525,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "control",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 57772,
+            "input": 136900,
+            "output": 982,
+            "cacheRead": 113664,
+            "totalTokens": 137882,
+            "promptBytes": 9009,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 31479,
+            "input": 93122,
+            "output": 428,
+            "cacheRead": 75520,
+            "totalTokens": 93550,
+            "promptBytes": 525,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "control",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 47860,
+            "input": 136143,
+            "output": 785,
+            "cacheRead": 119168,
+            "totalTokens": 136928,
+            "promptBytes": 9009,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "control",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 40764,
+            "input": 100293,
+            "output": 640,
+            "cacheRead": 73856,
+            "totalTokens": 100933,
+            "promptBytes": 8604,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 28756,
+            "input": 67651,
+            "output": 335,
+            "cacheRead": 51584,
+            "totalTokens": 67986,
+            "promptBytes": 338,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "csv-cell",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 23934,
+            "input": 67551,
+            "output": 313,
+            "cacheRead": 44288,
+            "totalTokens": 67864,
+            "promptBytes": 338,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "csv-cell",
+            "variant": "control",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 54149,
+            "input": 126229,
+            "output": 865,
+            "cacheRead": 107392,
+            "totalTokens": 127094,
+            "promptBytes": 8604,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 25547,
+            "input": 67433,
+            "output": 328,
+            "cacheRead": 57344,
+            "totalTokens": 67761,
+            "promptBytes": 338,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "csv-cell",
+            "variant": "control",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 36628,
+            "input": 99313,
+            "output": 430,
+            "cacheRead": 80768,
+            "totalTokens": 99743,
+            "promptBytes": 8604,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          }
+        ],
+        "repetitions": {
+          "csv-cell": 3,
+          "design-tokens": 3,
+          "scheduler-fix": 3
+        },
+        "sourceSha256": "51ea38435e65d52e8598d1fc79f12b906c4b0df98be0d373bfb646f45a657979",
+        "executableHashes": {
+          "direct": "3de9513867bac78ac4727ab7b8e4b0eafc45412f9b038c9b2021dafaa7456920",
+          "control": "19be81074b4ba85145f54b6335bc73cbfd14d5d62a9354405944d32028b858dc"
+        },
+        "baselineRevision": "f0b95b3857a9dc862f062d8451654310fd46167b",
+        "controlPromptsRevision": "11c433fe+initial-working-tree",
+        "controlPromptsHash": "7bdf5a50e88e94a379e05127b02473c72728491cfe89693fad7a4b12ca454871",
+        "budgets": {
+          "secondsPerTrial": 240,
+          "tokensPerTrial": 500000
+        },
+        "requestedEffort": {
+          "control": "balanced",
+          "after": "balanced",
+          "direct": "balanced"
+        },
+        "requestedSpeed": {
+          "control": "standard",
+          "after": "standard",
+          "direct": "standard"
+        },
+        "quality": "Independent authored-fixture oracles only. Human acceptance and correction time are unmeasured; passing does not establish quality equivalence on real projects.",
+        "measurement": "Tokens sum input and output across every retained attempt, including failures. Cached input is included once. Tokens are not dollars or subscription quota. Elapsed time includes native task completion and automatic checks; direct CLI has its own tool inventory. Provider cache state is inherited, not controlled.",
+        "scope": "Local disposable task benchmark. Any eligible claim must name the model, CLI, suite, repetitions, comparator and oracle results. No general speed, cost or quality guarantee.",
+        "originalReceiptSha256": "2bf6f1d3fd9d97dbadee4919ffc7b2b115707b09730a48bad539463f77fdf508",
+        "planProvenance": "Original recorded invocation; matrix attached after execution because this invocation predated the runner plan field. Original receipt is retained unchanged."
+      }
+    },
+    {
+      "id": "compact-prompts",
+      "title": "Compact prompt experiment",
+      "detail": "The same 27-trial run compares compact guidance and smaller repository context with the initial Jackalope baseline. This candidate regressed and is disabled by default; use --compact-prompts only for further experiments.",
+      "report": {
+        "version": 1,
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "control",
+        "candidate": "after",
+        "matched": true,
+        "totals": {
+          "control": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1015632,
+            "inputTokens": 1009586,
+            "outputTokens": 6046,
+            "cachedInputTokens": 798976,
+            "elapsedMs": 417655,
+            "promptBytes": 77532,
+            "medianElapsedMs": 45519,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1106966,
+            "inputTokens": 1101035,
+            "outputTokens": 5931,
+            "cachedInputTokens": 877056,
+            "elapsedMs": 445917,
+            "promptBytes": 64947,
+            "medianElapsedMs": 49199,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -8.992824172534931,
+            "interval": {
+              "low": -16.523683705016555,
+              "high": 0.6956097263324912,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -6.766829081418879,
+            "interval": {
+              "low": -25.504008782727293,
+              "high": 5.300248591693846,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        },
+        "blockers": [],
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "plan": {
+          "cases": ["design-tokens", "scheduler-fix", "csv-cell"],
+          "variants": ["control", "after", "direct"],
+          "repeat": 3,
+          "compactPrompts": true,
+          "suiteSha256": "bdbd854d7070a047c4c5a24018df2e563e993ad6da9e816e5e23acf2f59a0931"
+        },
+        "trialMeasurements": [
+          {
+            "case": "design-tokens",
+            "variant": "control",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 45519,
+            "input": 99829,
+            "output": 493,
+            "cacheRead": 48384,
+            "totalTokens": 100322,
+            "promptBytes": 8231,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 42233,
+            "input": 98631,
+            "output": 500,
+            "cacheRead": 61440,
+            "totalTokens": 99131,
+            "promptBytes": 6809,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 61925,
+            "input": 123084,
+            "output": 485,
+            "cacheRead": 97152,
+            "totalTokens": 123569,
+            "promptBytes": 6809,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "control",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 39750,
+            "input": 74976,
+            "output": 478,
+            "cacheRead": 55936,
+            "totalTokens": 75454,
+            "promptBytes": 8231,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "control",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 34967,
+            "input": 99660,
+            "output": 471,
+            "cacheRead": 80768,
+            "totalTokens": 100131,
+            "promptBytes": 8231,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 46743,
+            "input": 98350,
+            "output": 447,
+            "cacheRead": 85760,
+            "totalTokens": 98797,
+            "promptBytes": 6809,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "control",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 60246,
+            "input": 136243,
+            "output": 902,
+            "cacheRead": 119040,
+            "totalTokens": 137145,
+            "promptBytes": 9009,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 63847,
+            "input": 134882,
+            "output": 882,
+            "cacheRead": 112896,
+            "totalTokens": 135764,
+            "promptBytes": 7643,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 7,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 55185,
+            "input": 158267,
+            "output": 860,
+            "cacheRead": 114816,
+            "totalTokens": 159127,
+            "promptBytes": 7643,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 6,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "control",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 57772,
+            "input": 136900,
+            "output": 982,
+            "cacheRead": 113664,
+            "totalTokens": 137882,
+            "promptBytes": 9009,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "control",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 47860,
+            "input": 136143,
+            "output": 785,
+            "cacheRead": 119168,
+            "totalTokens": 136928,
+            "promptBytes": 9009,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 51415,
+            "input": 164198,
+            "output": 890,
+            "cacheRead": 146944,
+            "totalTokens": 165088,
+            "promptBytes": 7643,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 6,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "control",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 40764,
+            "input": 100293,
+            "output": 640,
+            "cacheRead": 73856,
+            "totalTokens": 100933,
+            "promptBytes": 8604,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 47367,
+            "input": 98574,
+            "output": 714,
+            "cacheRead": 72704,
+            "totalTokens": 99288,
+            "promptBytes": 7197,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 49199,
+            "input": 151827,
+            "output": 757,
+            "cacheRead": 124288,
+            "totalTokens": 152584,
+            "promptBytes": 7197,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "control",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 54149,
+            "input": 126229,
+            "output": 865,
+            "cacheRead": 107392,
+            "totalTokens": 127094,
+            "promptBytes": 8604,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "control",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 36628,
+            "input": 99313,
+            "output": 430,
+            "cacheRead": 80768,
+            "totalTokens": 99743,
+            "promptBytes": 8604,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 28003,
+            "input": 73222,
+            "output": 396,
+            "cacheRead": 61056,
+            "totalTokens": 73618,
+            "promptBytes": 7197,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 3,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          }
+        ],
+        "repetitions": {
+          "csv-cell": 3,
+          "design-tokens": 3,
+          "scheduler-fix": 3
+        },
+        "sourceSha256": "51ea38435e65d52e8598d1fc79f12b906c4b0df98be0d373bfb646f45a657979",
+        "executableHashes": {
+          "control": "19be81074b4ba85145f54b6335bc73cbfd14d5d62a9354405944d32028b858dc",
+          "after": "3de9513867bac78ac4727ab7b8e4b0eafc45412f9b038c9b2021dafaa7456920"
+        },
+        "baselineRevision": "f0b95b3857a9dc862f062d8451654310fd46167b",
+        "controlPromptsRevision": "11c433fe+initial-working-tree",
+        "controlPromptsHash": "7bdf5a50e88e94a379e05127b02473c72728491cfe89693fad7a4b12ca454871",
+        "budgets": {
+          "secondsPerTrial": 240,
+          "tokensPerTrial": 500000
+        },
+        "requestedEffort": {
+          "control": "balanced",
+          "after": "balanced",
+          "direct": "balanced"
+        },
+        "requestedSpeed": {
+          "control": "standard",
+          "after": "standard",
+          "direct": "standard"
+        },
+        "quality": "Independent authored-fixture oracles only. Human acceptance and correction time are unmeasured; passing does not establish quality equivalence on real projects.",
+        "measurement": "Tokens sum input and output across every retained attempt, including failures. Cached input is included once. Tokens are not dollars or subscription quota. Elapsed time includes native task completion and automatic checks; direct CLI has its own tool inventory. Provider cache state is inherited, not controlled.",
+        "scope": "Local disposable task benchmark. Any eligible claim must name the model, CLI, suite, repetitions, comparator and oracle results. No general speed, cost or quality guarantee.",
+        "originalReceiptSha256": "2bf6f1d3fd9d97dbadee4919ffc7b2b115707b09730a48bad539463f77fdf508",
+        "planProvenance": "Original recorded invocation; matrix attached after execution because this invocation predated the runner plan field. Original receipt is retained unchanged."
+      }
+    },
+    {
+      "id": "field-selection",
+      "title": "Exact field selection",
+      "detail": "Three large MCP-response fixtures, three repetitions each. Native CLI direct delivery is compared with Jackalope discovery and agent-requested local field selection. Both variants must produce the exact same record. This compares the whole harness, including its extra discovery and verification work.",
+      "report": {
+        "version": 1,
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "after",
+        "matched": true,
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1201921,
+            "inputTokens": 1199470,
+            "outputTokens": 2451,
+            "cachedInputTokens": 1005312,
+            "elapsedMs": 295108,
+            "promptBytes": 4248,
+            "medianElapsedMs": 33744,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1302300,
+            "inputTokens": 1298099,
+            "outputTokens": 4201,
+            "cachedInputTokens": 1135104,
+            "elapsedMs": 373990,
+            "promptBytes": 73188,
+            "medianElapsedMs": 41520,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": 5200812,
+            "mcpDeliveredBytes": 6339,
+            "expansionReads": 0
+          }
+        },
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -8.35154723147362,
+            "interval": {
+              "low": -22.45546966660492,
+              "high": 2.7354151537158033,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -26.729875164346616,
+            "interval": {
+              "low": -45.52178731843901,
+              "high": -13.057662979479169,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "toolPayload": {
+          "reductionPercent": 99.87811518662855,
+          "eligibleForScopedClaim": true,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        },
+        "blockers": [],
+        "cases": ["tool-builds", "tool-deliveries", "tool-packages"],
+        "plan": {
+          "cases": ["tool-deliveries", "tool-builds", "tool-packages"],
+          "variants": ["direct", "after"],
+          "repeat": 3,
+          "compactPrompts": false,
+          "suiteSha256": "db3bcded59677bf0a4dd45caef691e40acc96903029efaf80652f81db7a58056"
+        },
+        "trialMeasurements": [
+          {
+            "case": "tool-deliveries",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 34168,
+            "input": 140128,
+            "output": 259,
+            "cacheRead": 120704,
+            "totalTokens": 140387,
+            "promptBytes": 476,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-deliveries",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 42840,
+            "input": 153714,
+            "output": 462,
+            "cacheRead": 126336,
+            "totalTokens": 154176,
+            "promptBytes": 8136,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 587412,
+              "resultBytesReturned": 676,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 6,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-deliveries",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 38013,
+            "input": 127476,
+            "output": 478,
+            "cacheRead": 113408,
+            "totalTokens": 127954,
+            "promptBytes": 8136,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 587412,
+              "resultBytesReturned": 676,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 6,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-deliveries",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 35690,
+            "input": 140228,
+            "output": 286,
+            "cacheRead": 120704,
+            "totalTokens": 140514,
+            "promptBytes": 476,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-deliveries",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 33744,
+            "input": 140179,
+            "output": 282,
+            "cacheRead": 120704,
+            "totalTokens": 140461,
+            "promptBytes": 476,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-deliveries",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 36277,
+            "input": 127251,
+            "output": 455,
+            "cacheRead": 113280,
+            "totalTokens": 127706,
+            "promptBytes": 8136,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 587412,
+              "resultBytesReturned": 676,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 7,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-builds",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 25577,
+            "input": 141126,
+            "output": 271,
+            "cacheRead": 116224,
+            "totalTokens": 141397,
+            "promptBytes": 468,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-builds",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 37362,
+            "input": 127091,
+            "output": 418,
+            "cacheRead": 94720,
+            "totalTokens": 127509,
+            "promptBytes": 8128,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 568254,
+              "resultBytesReturned": 695,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 6,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-builds",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 43436,
+            "input": 150818,
+            "output": 435,
+            "cacheRead": 132096,
+            "totalTokens": 151253,
+            "promptBytes": 8128,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 568254,
+              "resultBytesReturned": 695,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 7,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-builds",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 31573,
+            "input": 141141,
+            "output": 273,
+            "cacheRead": 121216,
+            "totalTokens": 141414,
+            "promptBytes": 468,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-builds",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 28565,
+            "input": 141205,
+            "output": 269,
+            "cacheRead": 121216,
+            "totalTokens": 141474,
+            "promptBytes": 468,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-builds",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 43936,
+            "input": 176945,
+            "output": 480,
+            "cacheRead": 162816,
+            "totalTokens": 177425,
+            "promptBytes": 8128,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 568254,
+              "resultBytesReturned": 695,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 7,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-packages",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 38498,
+            "input": 107832,
+            "output": 264,
+            "cacheRead": 75520,
+            "totalTokens": 108096,
+            "promptBytes": 472,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-packages",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 40374,
+            "input": 153416,
+            "output": 427,
+            "cacheRead": 139392,
+            "totalTokens": 153843,
+            "promptBytes": 8132,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 577938,
+              "resultBytesReturned": 742,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 6,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-packages",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 50232,
+            "input": 127356,
+            "output": 505,
+            "cacheRead": 113280,
+            "totalTokens": 127861,
+            "promptBytes": 8132,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 577938,
+              "resultBytesReturned": 742,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 7,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "tool-packages",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 31287,
+            "input": 108032,
+            "output": 266,
+            "cacheRead": 88832,
+            "totalTokens": 108298,
+            "promptBytes": 472,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-packages",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 36006,
+            "input": 139599,
+            "output": 281,
+            "cacheRead": 120192,
+            "totalTokens": 139880,
+            "promptBytes": 472,
+            "mcpUsage": null,
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "tool-packages",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 41520,
+            "input": 154032,
+            "output": 541,
+            "cacheRead": 139776,
+            "totalTokens": 154573,
+            "promptBytes": 8132,
+            "mcpUsage": {
+              "searches": 1,
+              "calls": 1,
+              "failures": 0,
+              "catalogTools": 1,
+              "catalogBytes": 213,
+              "schemaBytesReturned": 213,
+              "resultBytesReceived": 577938,
+              "resultBytesReturned": 742,
+              "resultReads": 0
+            },
+            "fixtureToolCalls": 1,
+            "observedToolCalls": 6,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          }
+        ],
+        "repetitions": {
+          "tool-builds": 3,
+          "tool-deliveries": 3,
+          "tool-packages": 3
+        },
+        "sourceSha256": "57c2b94ed263e7542a6e83b1ee0a0bb3b9f26ab4d6af3bffde1c25461a15c4eb",
+        "executableHashes": {
+          "direct": "07ccc1e87fdb687c6da4e17edec1510db917fdbe21f17b7a6efcbf194d8aed3b",
+          "after": "07ccc1e87fdb687c6da4e17edec1510db917fdbe21f17b7a6efcbf194d8aed3b"
+        },
+        "baselineRevision": "f0b95b3857a9dc862f062d8451654310fd46167b",
+        "controlPromptsRevision": null,
+        "controlPromptsHash": null,
+        "budgets": {
+          "secondsPerTrial": 240,
+          "tokensPerTrial": 500000
+        },
+        "requestedEffort": {
+          "direct": "balanced",
+          "after": "balanced"
+        },
+        "requestedSpeed": {
+          "direct": "standard",
+          "after": "standard"
+        },
+        "quality": "Independent authored-fixture oracles only. Human acceptance and correction time are unmeasured; passing does not establish quality equivalence on real projects.",
+        "measurement": "Tokens sum input and output across every retained attempt, including failures. Cached input is included once. Tokens are not dollars or subscription quota. Elapsed time includes native task completion and automatic checks; direct CLI has its own tool inventory. Provider cache state is inherited, not controlled.",
+        "scope": "Local disposable task benchmark. Any eligible claim must name the model, CLI, suite, repetitions, comparator and oracle results. No general speed, cost or quality guarantee."
+      }
+    },
+    {
+      "id": "final-workflow",
+      "title": "Final verification workflow",
+      "detail": "Three coding fixtures, three repetitions each, using the final default prompt policy. Compact prompts are disabled; verification is batched after implementation by default. The comparator is a fresh matched native CLI run.",
+      "report": {
+        "version": 1,
+        "agent": "codex",
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.155.0-alpha.2.6",
+        "baseline": "direct",
+        "candidate": "after",
+        "matched": true,
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 801838,
+            "inputTokens": 798432,
+            "outputTokens": 3406,
+            "cachedInputTokens": 677120,
+            "elapsedMs": 290279,
+            "promptBytes": 3609,
+            "medianElapsedMs": 32176,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 1083651,
+            "inputTokens": 1077430,
+            "outputTokens": 6221,
+            "cachedInputTokens": 914048,
+            "elapsedMs": 423462,
+            "promptBytes": 79944,
+            "medianElapsedMs": 45131,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -35.14587734679573,
+            "interval": {
+              "low": -48.716711789318246,
+              "high": -16.970739217826193,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -45.881031697091416,
+            "interval": {
+              "low": -71.60244752595287,
+              "high": -11.97560739521828,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForScopedClaim": false
+          }
+        },
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        },
+        "blockers": [],
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "plan": {
+          "cases": ["design-tokens", "scheduler-fix", "csv-cell"],
+          "variants": ["direct", "after"],
+          "repeat": 3,
+          "compactPrompts": false,
+          "suiteSha256": "bdbd854d7070a047c4c5a24018df2e563e993ad6da9e816e5e23acf2f59a0931"
+        },
+        "trialMeasurements": [
+          {
+            "case": "design-tokens",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 37757,
+            "input": 90584,
+            "output": 390,
+            "cacheRead": 70656,
+            "totalTokens": 90974,
+            "promptBytes": 340,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "design-tokens",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 45976,
+            "input": 125323,
+            "output": 549,
+            "cacheRead": 112000,
+            "totalTokens": 125872,
+            "promptBytes": 8499,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 32908,
+            "input": 92168,
+            "output": 494,
+            "cacheRead": 70528,
+            "totalTokens": 92662,
+            "promptBytes": 8499,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "design-tokens",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 30667,
+            "input": 90153,
+            "output": 372,
+            "cacheRead": 79744,
+            "totalTokens": 90525,
+            "promptBytes": 340,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "design-tokens",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 34886,
+            "input": 90265,
+            "output": 375,
+            "cacheRead": 79744,
+            "totalTokens": 90640,
+            "promptBytes": 340,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "design-tokens",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 36798,
+            "input": 99333,
+            "output": 456,
+            "cacheRead": 74880,
+            "totalTokens": 99789,
+            "promptBytes": 8499,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 37094,
+            "input": 116081,
+            "output": 453,
+            "cacheRead": 104192,
+            "totalTokens": 116534,
+            "promptBytes": 525,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 68658,
+            "input": 155471,
+            "output": 874,
+            "cacheRead": 140160,
+            "totalTokens": 156345,
+            "promptBytes": 9277,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 58694,
+            "input": 169101,
+            "output": 981,
+            "cacheRead": 150144,
+            "totalTokens": 170082,
+            "promptBytes": 9277,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 7,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 32176,
+            "input": 93026,
+            "output": 416,
+            "cacheRead": 81408,
+            "totalTokens": 93442,
+            "promptBytes": 525,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 36306,
+            "input": 116116,
+            "output": 457,
+            "cacheRead": 98176,
+            "totalTokens": 116573,
+            "promptBytes": 525,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "scheduler-fix",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 53819,
+            "input": 135868,
+            "output": 915,
+            "cacheRead": 118784,
+            "totalTokens": 136783,
+            "promptBytes": 9277,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 5,
+            "verificationCalls": 2,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "direct",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 25497,
+            "input": 67369,
+            "output": 322,
+            "cacheRead": 48384,
+            "totalTokens": 67691,
+            "promptBytes": 338,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "csv-cell",
+            "variant": "after",
+            "repetition": 1,
+            "oraclePassed": true,
+            "elapsedMs": 40244,
+            "input": 100173,
+            "output": 694,
+            "cacheRead": 87040,
+            "totalTokens": 100867,
+            "promptBytes": 8872,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "after",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 41234,
+            "input": 99965,
+            "output": 622,
+            "cacheRead": 86784,
+            "totalTokens": 100587,
+            "promptBytes": 8872,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          },
+          {
+            "case": "csv-cell",
+            "variant": "direct",
+            "repetition": 2,
+            "oraclePassed": true,
+            "elapsedMs": 26240,
+            "input": 67460,
+            "output": 318,
+            "cacheRead": 57472,
+            "totalTokens": 67778,
+            "promptBytes": 338,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "csv-cell",
+            "variant": "direct",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 29656,
+            "input": 67378,
+            "output": 303,
+            "cacheRead": 57344,
+            "totalTokens": 67681,
+            "promptBytes": 338,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 3,
+            "verificationCalls": 0,
+            "verificationReuses": null
+          },
+          {
+            "case": "csv-cell",
+            "variant": "after",
+            "repetition": 3,
+            "oraclePassed": true,
+            "elapsedMs": 45131,
+            "input": 100028,
+            "output": 636,
+            "cacheRead": 73728,
+            "totalTokens": 100664,
+            "promptBytes": 8872,
+            "mcpUsage": null,
+            "fixtureToolCalls": null,
+            "observedToolCalls": 4,
+            "verificationCalls": 1,
+            "verificationReuses": 1
+          }
+        ],
+        "repetitions": {
+          "csv-cell": 3,
+          "design-tokens": 3,
+          "scheduler-fix": 3
+        },
+        "sourceSha256": "0a5effeaa6ab14f801e9b9c5e950100ef8dbf1d59b3ab1ee157ae50f91e2b1cf",
+        "executableHashes": {
+          "direct": "07ccc1e87fdb687c6da4e17edec1510db917fdbe21f17b7a6efcbf194d8aed3b",
+          "after": "07ccc1e87fdb687c6da4e17edec1510db917fdbe21f17b7a6efcbf194d8aed3b"
+        },
+        "baselineRevision": "f0b95b3857a9dc862f062d8451654310fd46167b",
+        "controlPromptsRevision": null,
+        "controlPromptsHash": null,
+        "budgets": {
+          "secondsPerTrial": 240,
+          "tokensPerTrial": 500000
+        },
+        "requestedEffort": {
+          "direct": "balanced",
+          "after": "balanced"
+        },
+        "requestedSpeed": {
+          "direct": "standard",
+          "after": "standard"
+        },
+        "quality": "Independent authored-fixture oracles only. Human acceptance and correction time are unmeasured; passing does not establish quality equivalence on real projects.",
+        "measurement": "Tokens sum input and output across every retained attempt, including failures. Cached input is included once. Tokens are not dollars or subscription quota. Elapsed time includes native task completion and automatic checks; direct CLI has its own tool inventory. Provider cache state is inherited, not controlled.",
+        "scope": "Local disposable task benchmark. Any eligible claim must name the model, CLI, suite, repetitions, comparator and oracle results. No general speed, cost or quality guarantee."
+      }
+    }
+  ],
+  "discovery": {
+    "trials": 24,
+    "calls": 15,
+    "localPassed": 12,
+    "jevPassed": 19,
+    "elapsedMs": 2038,
+    "inputTokens": 29280,
+    "estimatedCostUsd": 0.00122976,
+    "errors": 0,
+    "model": "jev-1.13.0",
+    "regressions": 0,
+    "baselineAllCalls": {
+      "trials": 24,
+      "calls": 24,
+      "localPassed": 12,
+      "jevPassed": 18,
+      "elapsedMs": 3919,
+      "inputTokens": 46875,
+      "estimatedCostUsd": 0.00196875,
+      "errors": 0,
+      "model": "jev-1.13.0"
+    },
+    "baselineTrialMeasurements": [
+      {
+        "case": "shipped-revision",
+        "repetition": 1,
+        "local": [],
+        "selected": ["deployment_status"],
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 639,
+        "jevElapsedMs": 538,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.09
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "review-feedback",
+        "repetition": 1,
+        "local": [],
+        "selected": [],
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 226,
+        "jevElapsedMs": 130,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.88
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "slow-request",
+        "repetition": 1,
+        "local": [],
+        "selected": ["trace_find"],
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 283,
+        "jevElapsedMs": 134,
+        "usage": {
+          "input": 1954,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008206800000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.15
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.03
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "dependency-conflict",
+        "repetition": 1,
+        "local": [],
+        "selected": [],
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 250,
+        "jevElapsedMs": 135,
+        "usage": {
+          "input": 1953,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.000082026
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.87
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "literal-name",
+        "repetition": 1,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 265,
+        "jevElapsedMs": 156,
+        "usage": {
+          "input": 1944,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008164800000000002
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.91
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "ambiguous-status",
+        "repetition": 1,
+        "local": ["build_status", "deployment_status"],
+        "selected": ["build_status", "deployment_status"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 204,
+        "jevElapsedMs": 178,
+        "usage": {
+          "input": 1950,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008190000000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.92
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.17
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "absent-operation",
+        "repetition": 1,
+        "local": [],
+        "selected": [],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 222,
+        "jevElapsedMs": 123,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.09
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "untrusted-description",
+        "repetition": 1,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 228,
+        "jevElapsedMs": 157,
+        "usage": {
+          "input": 1971,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008278200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.9
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.12
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "shipped-revision",
+        "repetition": 2,
+        "local": [],
+        "selected": ["deployment_status"],
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 166,
+        "jevElapsedMs": 187,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "review-feedback",
+        "repetition": 2,
+        "local": [],
+        "selected": [],
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 234,
+        "jevElapsedMs": 134,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.11
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.89
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "slow-request",
+        "repetition": 2,
+        "local": [],
+        "selected": ["trace_find"],
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 165,
+        "jevElapsedMs": 149,
+        "usage": {
+          "input": 1954,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008206800000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.14
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.03
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "dependency-conflict",
+        "repetition": 2,
+        "local": [],
+        "selected": [],
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 176,
+        "jevElapsedMs": 182,
+        "usage": {
+          "input": 1953,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.000082026
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.87
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "literal-name",
+        "repetition": 2,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 226,
+        "jevElapsedMs": 127,
+        "usage": {
+          "input": 1944,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008164800000000002
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.9
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.11
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "ambiguous-status",
+        "repetition": 2,
+        "local": ["build_status", "deployment_status"],
+        "selected": ["build_status", "deployment_status"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 195,
+        "jevElapsedMs": 123,
+        "usage": {
+          "input": 1950,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008190000000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.91
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.18
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "absent-operation",
+        "repetition": 2,
+        "local": [],
+        "selected": [],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 173,
+        "jevElapsedMs": 121,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.09
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "untrusted-description",
+        "repetition": 2,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 238,
+        "jevElapsedMs": 198,
+        "usage": {
+          "input": 1971,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008278200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.91
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.12
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "shipped-revision",
+        "repetition": 3,
+        "local": [],
+        "selected": ["deployment_status"],
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 169,
+        "jevElapsedMs": 145,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.11
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.92
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "review-feedback",
+        "repetition": 3,
+        "local": [],
+        "selected": [],
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 230,
+        "jevElapsedMs": 135,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.12
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.88
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.03
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "slow-request",
+        "repetition": 3,
+        "local": [],
+        "selected": ["trace_find"],
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 236,
+        "jevElapsedMs": 198,
+        "usage": {
+          "input": 1954,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008206800000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.16
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "dependency-conflict",
+        "repetition": 3,
+        "local": [],
+        "selected": [],
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 235,
+        "jevElapsedMs": 186,
+        "usage": {
+          "input": 1953,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.000082026
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.86
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "literal-name",
+        "repetition": 3,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 249,
+        "jevElapsedMs": 139,
+        "usage": {
+          "input": 1944,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008164800000000002
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.9
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.11
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "ambiguous-status",
+        "repetition": 3,
+        "local": ["build_status", "deployment_status"],
+        "selected": ["build_status", "deployment_status"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 249,
+        "jevElapsedMs": 142,
+        "usage": {
+          "input": 1950,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008190000000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.92
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.19
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "absent-operation",
+        "repetition": 3,
+        "local": [],
+        "selected": [],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 225,
+        "jevElapsedMs": 80,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.09
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "untrusted-description",
+        "repetition": 3,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 234,
+        "jevElapsedMs": 122,
+        "usage": {
+          "input": 1971,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008278200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.91
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.13
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      }
+    ],
+    "baselineExecutableSha256": "f511ed9f357dbc283c83e88c2ec6177ab0ed11d868f736e01174a273ff4d5955",
+    "trialMeasurements": [
+      {
+        "case": "shipped-revision",
+        "repetition": 1,
+        "local": [],
+        "selected": ["deployment_status"],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 537,
+        "jevElapsedMs": 316,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.09
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "review-feedback",
+        "repetition": 1,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 225,
+        "jevElapsedMs": 168,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.88
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "slow-request",
+        "repetition": 1,
+        "local": [],
+        "selected": ["trace_find"],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 166,
+        "jevElapsedMs": 103,
+        "usage": {
+          "input": 1954,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008206800000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.16
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.03
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "dependency-conflict",
+        "repetition": 1,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 218,
+        "jevElapsedMs": 132,
+        "usage": {
+          "input": 1953,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.000082026
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.86
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "literal-name",
+        "repetition": 1,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 187,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "ambiguous-status",
+        "repetition": 1,
+        "local": ["build_status", "deployment_status"],
+        "selected": ["build_status", "deployment_status"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 215,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "absent-operation",
+        "repetition": 1,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 233,
+        "jevElapsedMs": 120,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "untrusted-description",
+        "repetition": 1,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 174,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "shipped-revision",
+        "repetition": 2,
+        "local": [],
+        "selected": ["deployment_status"],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 192,
+        "jevElapsedMs": 93,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "review-feedback",
+        "repetition": 2,
+        "local": [],
+        "selected": ["pull_request_read"],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 220,
+        "jevElapsedMs": 91,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.9
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "slow-request",
+        "repetition": 2,
+        "local": [],
+        "selected": ["trace_find"],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 215,
+        "jevElapsedMs": 127,
+        "usage": {
+          "input": 1954,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008206800000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.15
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.92
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "dependency-conflict",
+        "repetition": 2,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 295,
+        "jevElapsedMs": 120,
+        "usage": {
+          "input": 1953,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.000082026
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.87
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "literal-name",
+        "repetition": 2,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 171,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "ambiguous-status",
+        "repetition": 2,
+        "local": ["build_status", "deployment_status"],
+        "selected": ["build_status", "deployment_status"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 223,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "absent-operation",
+        "repetition": 2,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 232,
+        "jevElapsedMs": 121,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "untrusted-description",
+        "repetition": 2,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 227,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "shipped-revision",
+        "repetition": 3,
+        "local": [],
+        "selected": ["deployment_status"],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 190,
+        "jevElapsedMs": 142,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.09
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.93
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "review-feedback",
+        "repetition": 3,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 156,
+        "jevElapsedMs": 87,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.13
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.89
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "slow-request",
+        "repetition": 3,
+        "local": [],
+        "selected": ["trace_find"],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": true,
+        "localMicros": 160,
+        "jevElapsedMs": 100,
+        "usage": {
+          "input": 1954,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008206800000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.08
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.14
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.94
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.03
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "dependency-conflict",
+        "repetition": 3,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": false,
+        "jevPassed": false,
+        "localMicros": 157,
+        "jevElapsedMs": 202,
+        "usage": {
+          "input": 1953,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.000082026
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.06
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.88
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.05
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "literal-name",
+        "repetition": 3,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 163,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "ambiguous-status",
+        "repetition": 3,
+        "local": ["build_status", "deployment_status"],
+        "selected": ["build_status", "deployment_status"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 158,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      },
+      {
+        "case": "absent-operation",
+        "repetition": 3,
+        "local": [],
+        "selected": [],
+        "called": true,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 149,
+        "jevElapsedMs": 116,
+        "usage": {
+          "input": 1951,
+          "output": 330,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0.00008194200000000001
+        },
+        "model": "jev-1.13.0",
+        "answers": {
+          "relevant_0": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_1": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_2": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_3": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_4": {
+            "type": "noul",
+            "noul": 0.1
+          },
+          "relevant_5": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_6": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "relevant_7": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_8": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_9": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_10": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_11": {
+            "type": "noul",
+            "noul": 0.07
+          },
+          "relevant_12": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_13": {
+            "type": "noul",
+            "noul": 0.03
+          },
+          "relevant_14": {
+            "type": "noul",
+            "noul": 0.02
+          },
+          "relevant_15": {
+            "type": "noul",
+            "noul": 0.02
+          }
+        },
+        "error": null
+      },
+      {
+        "case": "untrusted-description",
+        "repetition": 3,
+        "local": ["invoice_find"],
+        "selected": ["invoice_find"],
+        "called": false,
+        "localPassed": true,
+        "jevPassed": true,
+        "localMicros": 158,
+        "jevElapsedMs": 0,
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reported": true,
+          "estimatedCostUsd": 0
+        },
+        "model": null,
+        "answers": {},
+        "error": null
+      }
+    ],
+    "suiteSha256": "dcb6dabf1c48e7fc1060c70e0af6d90ae264152c82c3d8e3e2d43a4bd7371cf8",
+    "executableSha256": "551c5bf0471ee01128f8d00a394d9ce1a57709fb473f2a9d9b74a95d5950a21d",
+    "inputUsdPerMillion": 0.042,
+    "priceSource": "https://typesafe.ai/",
+    "measurement": "Authored tool-description ranking only, 32 candidates maximum, no agent execution, cold application cache. Recall at five and empty results for absent capabilities. No agent-token savings, end-to-end latency improvement or general accuracy claim.",
+    "comparison": "The same authored queries and fixed promotion threshold were used before and after adding the local-page bypass. The two runs were sequential, not interleaved; remote service latency is uncontrolled. Skipped requests have known zero API input usage. This measures avoided Jev calls, not downstream agent savings."
+  }
 }

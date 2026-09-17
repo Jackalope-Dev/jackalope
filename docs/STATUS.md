@@ -78,6 +78,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   Live provider calibration and native cross-platform acceptance remain open.
 - Isolated Git worktrees, task checkpoints, verification, snapshot-bound outcome
   acceptance, combined patch review and guarded integration with recoverable cleanup.
+  Final verification guidance batches checks after implementation. Agents can report
+  all requirement assessments in one call; review shows their justifications and
+  evidence separately from human acceptance. Compact prompt/map changes remain opt-in experiments.
 - Durable ownership handoffs, explicit interface agreements and changed-file scope
   checks gate dependent work and integration. Projects can opt into agent reconciliation
   and verified local merging; source worktrees remain available. See
@@ -101,7 +104,10 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - Project guidance, editable lessons and codebase maps. Context
   previews and saved receipts explain lesson selection with revision/source evidence;
   Chat supports per-request lesson opt-outs.
-- MCP connections, task-owned Chromium sessions and scoped desktop-window grants.
+- MCP connections with a curated marketplace, publisher setup presets, token entry,
+  agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
+  connections remain available; live publisher/account acceptance remains open.
+  Task-owned Chromium sessions and scoped desktop-window grants.
 - Codex/Claude effort requests, focused isolated-task coordination, verification
   timeout alignment, usage attribution
   and direct-CLI quality comparisons with separate routing evaluation gates. See
@@ -131,8 +137,8 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   Symbol definitions, related tests and explicit file locations sharpen retrieval;
   per-repository locks allow independent scans. Detailed launch timings and latency
   summaries retain failures and missing measurements in quality comparisons.
-- Versioned prompt guidance scopes checks to repository requirements and affected
-  behavior. Confirmed same-policy native resumes reuse workflow context. Optional
+- Compact version-three guidance and same-policy native context reuse remain
+  opt-in experiments; normal tasks retain version-two guidance. Optional
   MCP result selection retains expandable source data without repeating calls.
   Matched comparison exports omit private receipts and gate scoped public claims;
   representative quality, monetary savings and installed acceptance remain open.

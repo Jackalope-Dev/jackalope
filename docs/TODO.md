@@ -55,8 +55,8 @@ release dates.
   with installed providers. Compare complete cost and quality on held-out tasks;
   preserve serial live-session batch and cost limits.
 - [ ] Calibrate Jev decision thresholds on held-out tasks and compare end-to-end cost,
-  including bounded tool discovery overhead and downstream retrieval failures,
-  latency and outcomes with local rules and agent routing. Include optional context
+  latency and outcomes with local rules and agent routing, including bounded tool
+  discovery overhead and downstream retrieval failures. Include optional context
   reranking, failure/coverage advice, review priorities, monitor false negatives and
   assignment matching; compare complete costs including assistance calls and corrections.
   Validate evidence freshness, individual suitability gates, cost objectives and cache
@@ -119,6 +119,11 @@ release dates.
 - [ ] Extend reconnect/failover with explicit process ownership and recovery.
 
 ## Context, usage and integrations
+
+- [ ] Validate curated MCP presets with installed agents and intended service accounts,
+  including account-specific OAuth, revocation, local browser prerequisites and restart.
+  Keep publisher endpoints and pinned local packages current; fixtures do not verify
+  third-party authorization or service availability.
 
 - [ ] Verify automatic lessons across tasks, queues, schedules and restart,
   including evidence, edits, removal and frozen task context. Measure outcomes.

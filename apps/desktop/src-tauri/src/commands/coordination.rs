@@ -459,7 +459,7 @@ pub(super) async fn bridge_validation_step(
     Json(input): Json<super::harness::RecordValidationInput>,
 ) -> Result<Json<super::harness::ValidationStep>, StatusCode> {
     let run = service.authorized_run(&headers)?;
-    super::outcomes::validate_assessments(&input.requirements, run.contract.as_ref())
+    super::outcomes::validate_assessments(&input.requirements, Some(&run.contract))
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     let step = super::harness::ValidationStep {
         id: Uuid::new_v4().to_string(),

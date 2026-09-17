@@ -19,7 +19,7 @@ aligned with this guide when capabilities or priorities change.
 - Scoped parallel coordination, dependency snapshots, bounded verification repairs
   and provider delegation with sequential fallback.
 - Recurring schedules, local change monitors, project lessons, codebase maps, MCP
-  connections, browser tools and Ask Jackalope.
+  connections with curated discovery and guided setup, browser tools and Ask Jackalope.
 - Shared appearance, guided setup, history recovery, archiving and optional local
   usefulness ratings. Optional local-model setup checks editing and continuation.
 - Account connection, waitlist/referral progress, platform download guidance and
@@ -40,8 +40,10 @@ dispatch and CPU-based check capacity are implemented. Execution timings and off
 delivery comparisons retain waits, failures and missing review evidence. Validate
 complete task delivery and quality on representative repositories before claiming gains.
 
-Versioned prompt guidance, same-policy continuation context and recoverable tool-result
-selection are implemented. Sanitized comparison exports retain matched configurations,
+Versioned prompt guidance and recoverable tool-result selection are implemented;
+compact prompts and same-policy continuation context remain opt-in experiments.
+Final requirement assessments help users inspect evidence before acceptance.
+Sanitized comparison exports retain matched configurations,
 oracle outcomes and reporting limits. Broader independent acceptance remains open.
 Optional Jev discovery ranking and local response-field selection have separate
 evaluation suites; the public benchmark methodology keeps their scope explicit.

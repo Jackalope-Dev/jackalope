@@ -1,6 +1,7 @@
 import { ArrowRight, Check, Shield, Star } from 'lucide-react';
 import type { AllMcpsServer } from '../../stores/mcpStore';
 import { Button } from '../ui/button';
+import { recommendationFor } from './curated-servers';
 import { McpServerIcon } from './McpServerIcon';
 import {
   categoryLabel,
@@ -23,6 +24,7 @@ export function McpMarketplaceCard({
   onConfigure: () => void;
 }) {
   const setup = marketplaceSetup(server);
+  const recommendation = recommendationFor(server.id);
   return (
     <article className="mcp-market-card" aria-label={server.name} data-server-id={server.id}>
       <div className="mcp-market-heading">
@@ -33,11 +35,13 @@ export function McpMarketplaceCard({
               {marketplaceName(server)}
             </button>
           </h3>
-          <p className="mcp-market-source">{sourceLabel(server.url)}</p>
+          <p className="mcp-market-source">
+            {recommendation ? `By ${recommendation.publisher}` : sourceLabel(server.url)}
+          </p>
         </div>
       </div>
       <div className="mcp-market-labels">
-        <span>{categoryLabel(server.category)}</span>
+        <span>{recommendation ? 'Publisher maintained' : categoryLabel(server.category)}</span>
         {server.isOfficial && (
           <span title="Listed as official by AllMCPs">
             <Shield size={12} aria-hidden="true" /> Official
@@ -64,8 +68,20 @@ export function McpMarketplaceCard({
           <dd>{setup.remote ? 'Remote server' : 'Local process'}</dd>
         </div>
         <div>
-          <dt>Setup fields</dt>
-          <dd>{setup.envVars.length ? `${setup.envVars.length} to configure` : 'None listed'}</dd>
+          <dt>{recommendation ? 'Setup' : 'Setup fields'}</dt>
+          <dd>
+            {recommendation
+              ? recommendation.authentication === 'oauth'
+                ? 'Agent sign-in'
+                : recommendation.authentication === 'token'
+                  ? 'Access token'
+                  : setup.remote
+                    ? 'No sign-in required'
+                    : 'Node.js + browser'
+              : setup.envVars.length
+                ? `${setup.envVars.length} to configure`
+                : 'None listed'}
+          </dd>
         </div>
       </dl>
       <div className="mcp-market-status">
@@ -75,13 +91,24 @@ export function McpMarketplaceCard({
           </span>
         ) : (
           <span>
-            {setup.reviewNeeded ? 'Review suggested setup' : 'Setup instructions available'}
+            {recommendation
+              ? recommendation.authentication === 'oauth'
+                ? 'Codex & Claude'
+                : 'On-demand tools · all agents'
+              : setup.reviewNeeded
+                ? 'Review suggested setup'
+                : 'Setup instructions available'}
           </span>
         )}
       </div>
       <div className="mcp-card-footer">
-        <Button variant="ghost" size="sm" data-action="configure" onClick={onConfigure}>
-          {scopes.length ? 'Reconfigure' : 'Configure'}
+        <Button
+          variant={recommendation ? 'primary' : 'ghost'}
+          size="sm"
+          data-action="configure"
+          onClick={onConfigure}
+        >
+          {scopes.length ? 'Manage connection' : 'Configure'}
         </Button>
         <Button variant="outline" size="sm" data-action="inspect" onClick={onInspect}>
           View details <ArrowRight size={14} aria-hidden="true" />

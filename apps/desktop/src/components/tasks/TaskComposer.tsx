@@ -101,7 +101,10 @@ export function TaskComposer({
   const effort = effortFor(current.effort);
   const effortIndex = taskEfforts.indexOf(effort);
   const toolCount = projectConnections.filter(
-    (server) => !current.connectionIds || current.connectionIds.includes(server.id),
+    (server) =>
+      server.scope === 'global' ||
+      !current.connectionIds ||
+      current.connectionIds.includes(server.id),
   ).length;
   const customTools = current.connectionIds !== undefined;
   const controls = [
@@ -419,7 +422,7 @@ export function TaskComposer({
                   <p className="task-muted mb-3">
                     {customTools
                       ? 'This saved task has a custom tool selection. It is kept until you choose to use the project defaults.'
-                      : 'Enabled project tools are included automatically. Manage connections once in project settings; Jackalope checks agent compatibility when routing.'}
+                      : 'Enabled project and all-project tools are included automatically. Manage connections in the marketplace or project settings; Jackalope checks agent compatibility when routing.'}
                   </p>
                   {customTools && (
                     <Button
@@ -444,10 +447,15 @@ export function TaskComposer({
                         <Plug size={16} aria-hidden="true" />
                         <span>
                           {server.name}
+                          {server.scope === 'global' ? ' · All projects' : ''}
                           {server.discovery ? ' · On demand' : ''}
-                          {current.connectionIds && !current.connectionIds.includes(server.id) && (
-                            <span className="task-muted block text-xs">Excluded by saved task</span>
-                          )}
+                          {server.scope !== 'global' &&
+                            current.connectionIds &&
+                            !current.connectionIds.includes(server.id) && (
+                              <span className="task-muted block text-xs">
+                                Excluded by saved task
+                              </span>
+                            )}
                           {connectionIssues[server.id] && (
                             <span className="task-muted block text-xs">
                               {connectionIssues[server.id]}

@@ -36,13 +36,32 @@ async fn installed_discovery_trial() {
             let local_micros = started.elapsed().as_micros();
             let items: Vec<_> = candidates.iter().map(|(_, item)| item.clone()).collect();
             let payload = super::payload(task, query, &items);
+            let called = super::needs_assessment(
+                query,
+                candidates.iter().filter(|(score, _)| *score > 0).count(),
+                candidates.len(),
+                5,
+                candidates.iter().any(|(_, item)| {
+                    item["name"]
+                        .as_str()
+                        .is_some_and(|name| name.eq_ignore_ascii_case(query.trim()))
+                }),
+            );
             let started = Instant::now();
-            let response = jev::evaluate(&key, &payload, || false).await;
+            let response = if called {
+                jev::evaluate(&key, &payload, || false).await
+            } else {
+                Ok(json!({}))
+            };
             let elapsed = started.elapsed().as_millis();
-            let checked = response
-                .as_ref()
-                .map_err(Clone::clone)
-                .and_then(|r| evaluation::validate(&payload, r));
+            let checked = if called {
+                response
+                    .as_ref()
+                    .map_err(Clone::clone)
+                    .and_then(|r| evaluation::validate(&payload, r))
+            } else {
+                Ok(json!({}))
+            };
             let flags = checked
                 .as_ref()
                 .map(|answers| priorities(answers, items.len()))
@@ -66,9 +85,9 @@ async fn installed_discovery_trial() {
                     values.contains(expected)
                 }
             };
-            trials.push(json!({"case":case["id"],"repetition":repetition,"local":local,"selected":selected,
+            trials.push(json!({"case":case["id"],"repetition":repetition,"local":local,"selected":selected,"called":called,
                 "localPassed":pass(&local),"jevPassed":pass(&selected),"localMicros":local_micros,"jevElapsedMs":elapsed,
-                "usage":response.as_ref().ok().map(jev::usage),"model":response.as_ref().ok().map(|r|&r["model"]),
+                "usage":if called {response.as_ref().ok().map(jev::usage)} else {Some(crate::commands::tasks::Usage {reported:true,estimated_cost_usd:Some(0.0),..Default::default()})},"model":response.as_ref().ok().map(|r|&r["model"]),
                 "answers":checked.as_ref().ok(),"error":checked.err()}));
             let report = json!({"version":1,"requestedModel":jev::MODEL,"repeat":repeat,"cases":cases.iter().map(|c|&c["id"]).collect::<Vec<_>>(),"trials":trials,
                 "scope":"Authored tool-description ranking only, 32 candidates maximum, no agent execution, cold application cache. Recall at five and empty results for absent capabilities. No agent-token savings, end-to-end latency improvement or general accuracy claim."});

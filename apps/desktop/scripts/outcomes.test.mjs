@@ -2,7 +2,32 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFeaturePlan } from '../src/lib/feature-plan.ts';
 import { recoveryHandoff, returnToProject } from '../src/lib/project-return.ts';
-import { correctionPrompt, requirementState } from '../src/lib/task-outcomes.ts';
+import {
+  correctionPrompt,
+  requirementAssessment,
+  requirementState,
+} from '../src/lib/task-outcomes.ts';
+
+test('latest agent answers attach to the matching requirement without accepting it', () => {
+  const answer = {
+    requirementId: 'one',
+    status: 'partial',
+    summary: 'Missing keyboard evidence',
+    evidence: [],
+  };
+  const steps = [
+    { timestamp: 'earlier', requirements: [{ ...answer, status: 'met' }] },
+    { timestamp: 'later', requirements: [answer] },
+  ];
+  assert.deepEqual(requirementAssessment(steps, 'one'), { answer, timestamp: 'later' });
+  assert.equal(requirementAssessment(steps, 'other'), null);
+  assert.equal(requirementAssessment(undefined, 'one'), null);
+  assert.equal(
+    requirementState({ id: 'one', title: 'Keyboard works', receipt: null }, 'tree'),
+    'Not verified',
+  );
+});
+
 import { taskDecision } from '../src/lib/task-workflow.ts';
 
 test('acceptance is unknown until a current file snapshot has been inspected', () => {

@@ -1,5 +1,29 @@
 [
   {
+    "id": "curated-mcp-marketplace",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Find and connect useful tools",
+    "description": "The MCP marketplace starts with a curated collection of publisher tools and guides you through connection setup.",
+    "items": [
+      "Discover GitHub, Linear, Notion, browser tools and more, with publisher links and reviewed connection presets.",
+      "Add tokens without editing JSON, follow agent-specific sign-in steps, and check saved connections with clear retry guidance.",
+      "Keep full AllMCPs search and custom connections, with redacted configuration copying and project-aware tool visibility."
+    ]
+  },
+  {
+    "id": "context-evidence",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "Smaller tool responses and clearer task evidence",
+    "description": "Select the fields an agent needs from large tool results, then review concise answers to the task requirements.",
+    "items": [
+      "Optional response selection keeps omitted data retrievable without repeating the upstream call.",
+      "Final verification guidance batches checks after implementation, with agent explanations and evidence beside each requirement.",
+      "A reproducible benchmark methodology compares native CLI tasks with Jackalope and keeps scoped measurements separate from general savings claims."
+    ]
+  },
+  {
     "id": "more-control-over-task-speed",
     "date": "2026-09-17",
     "status": "In development",

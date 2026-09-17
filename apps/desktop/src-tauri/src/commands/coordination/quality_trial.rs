@@ -104,7 +104,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 "id":id,"projectId":project_id,"projectName":"Quality benchmark",
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
                 "isolated":true,"targetBranch":"main","connectionIds":if has_fixture {vec!["quality_fixture"]} else {vec![]},
-                "contextSelection":{"memoryOff":true},"prompt":spec["prompt"],
+                "contextSelection":{"memoryOff":true,"outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default()},"prompt":spec["prompt"],
                 "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
             }))?)
             .err()

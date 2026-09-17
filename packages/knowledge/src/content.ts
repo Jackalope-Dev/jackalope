@@ -967,7 +967,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
   {
     slug: 'connecting-custom-mcp-servers',
     category: 'mcp',
-    title: 'Connect a custom MCP server',
+    title: 'Find and connect MCP tools',
     shortTitle: 'Connect MCP tools',
     description:
       'Add local commands or remote HTTP endpoints, choose the project and agent, and verify a real tool request.',
@@ -977,7 +977,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'mcp-overview',
         question: 'How do I connect project tools?',
         paragraphs: [
-          'MCP connects agents to tools and data sources. Add connections in MCP → Connections, choose project defaults, and review what a task receives. Delivery depends on the selected adapter and transport.',
+          'Open MCP → Marketplace for a curated collection of publisher-maintained tools. Review what a service does and its setup guide, then choose Configure. Search or choose All servers to browse the wider AllMCPs directory. Use Custom connection for your own endpoint or local command.',
         ],
       },
       {
@@ -987,10 +987,10 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'Choose Local command in the connection form. Use the executable and arguments from the server’s own documentation; installing a package does not tell Jackalope which resources it should expose.',
         ],
         steps: [
-          'Give the connection a recognizable Name and unique Identifier. Choose its project or global scope and eligible agents.',
+          'Give the connection a recognizable Name. Choose this project or all projects and the eligible agents. A unique identifier is generated; you can change it in Advanced settings.',
           'Put only the executable in Command. Add each command-line argument separately under Arguments; do not paste a whole shell command into Command.',
-          'Configure the environment values the server requires. Check that the executable is discoverable under the same user account as Jackalope.',
-          'Save the connection and use its probe. Then select it for a small task that requests a specific, read-only tool action.',
+          'Configure required environment values under Advanced settings. Check that the executable is discoverable under the same user account as Jackalope.',
+          'Choose Save and check. This starts the local process and may download its package. A failed check keeps your settings so you can edit or retry. Then try a small task that requests a specific, read-only action.',
         ],
         callout: {
           kind: 'note',
@@ -1003,14 +1003,14 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Choose Remote URL and use the server’s documented HTTP MCP endpoint. A product homepage, dashboard URL, or ordinary REST endpoint is not necessarily an MCP endpoint. Configure the authentication and client options the server documents.',
           'Codex direct delivery supports HTTP; Claude Code supports HTTP and legacy SSE. On-demand discovery supports HTTP and stdio, not SSE. The form retains Legacy SSE for existing SSE connections; new connections use Local command or Remote URL.',
-          'Use the probe for configured header or environment authentication. For a CLI-owned OAuth session, complete sign-in in the correct CLI account. Check redirects and expired authentication if the endpoint returns a login page instead of a protocol response.',
+          'For a token, choose Bearer token / API key and use the masked field. Other headers and client options are under Advanced settings. Save and check tests configured credentials. OAuth services instead offer Sign in through Codex or Claude: save, then finish sign-in in each selected agent account. Saving does not verify sign-in, and the connection check cannot verify an agent-owned OAuth session.',
         ],
       },
       {
         id: 'enforcing-tool-gating',
         question: 'How do I choose tools for a task?',
         paragraphs: [
-          'Review project connections and use Customize task to select those the task needs. Check CLI-global configuration separately. A connection selection is not a guarantee that the agent has no other tools or local permissions.',
+          'Review project and all-project connections under Customize task → Tools. Project overrides take precedence over all-project connections with the same identifier. Existing saved task restrictions still apply to project connections. Check CLI-global configuration separately. A connection selection is not a guarantee that the agent has no other tools or local permissions.',
         ],
       },
       {

@@ -17,10 +17,14 @@ provider's own GUI.
   is launched to emulate them. These are agent instructions, not native enforcement
   of a worker count or evidence that a provider actually delegated. Provider
   lifecycle, usage coverage and quality still require installed trials.
-- Confirmed Codex, Claude, OpenCode and Grok native-session continuations with the
+- In the opt-in compact-prompt experiment, confirmed Codex, Claude, OpenCode and Grok native-session continuations with the
   same recorded prompt-policy hash reuse prior workflow instructions. Current task,
   contract, workspace, permissions and coordination data remain explicit. Older
   receipts, changed policies and other adapters receive full guidance.
+  Normal tasks retain version-two guidance and the full preamble. The quality runner's
+  `--compact-prompts` flag selects version-three frontend guidance and sets
+  `JACKALOPE_CONTEXT_EXPERIMENT=compact` only for the candidate. Keep it experimental
+  until matched task evidence supports enabling it.
 - Automatic guidelines distinguish design tokens from authentication tokens, skip
   negated requests and fenced examples, and avoid a debugging workflow for spelling
   fixes. Explicitly selected guidelines and project defaults remain available.
@@ -34,12 +38,18 @@ provider's own GUI.
 - Routing receives the task, outcome contract and selected knowledge without the
   worker's bridge protocol manual. Different agents/models still use the existing
   validated router; unknown defaults are not assumed equivalent.
+- Workers finish a coherent implementation before batching required tests, builds
+  and evidence capture in a final verification phase. Explicit test-first or repository
+  instructions, and diagnostics necessary to choose an implementation, take precedence.
+  Each applicable requirement gets a concise final agent assessment with a status,
+  justification and evidence references through one `record_validation_step` call.
+  These claims appear beside the review controls and never accept requirements for the user.
 - Workers batch independent reads/searches where supported, reuse established
   context and keep progress concise. Repository-required checks remain mandatory;
   changes, failures and unresolved concerns justify additional verification.
 - Repository maps rank file paths and bounded Tree-sitter declarations, include
   related test names and task-referenced file locations, and remain limited to
-  6 KB, or 3 KB when the request explicitly names one or two indexed files.
+  6 KB. The compact experiment caps this at 3 KB when the request explicitly names one or two indexed files.
   Cached lines are advisory and must be verified before edits. Scans share
   a lock per repository/commit, allowing unrelated repositories to scan independently.
   Account capacity reads share in-flight refreshes and use at most four concurrent
@@ -324,7 +334,9 @@ The website's `/benchmarks/` page consumes sanitized measurements in
 `evaluate:context`, retain individual trial measurements and provenance, and
 review public copy against the report's claim blockers. Preserve unfavorable
 comparisons and label authored fixtures, inherited caches, missing billing data
-and unmeasured human acceptance. Raw receipts belong in ignored scratch output.
+and unmeasured human acceptance. Run `pnpm evaluate:website` after updating the
+public dataset to generate the smaller page summary; verification checks it for
+drift. Raw receipts belong in ignored scratch output.
 
 `pnpm evaluate:jev <trials.json> [report.json]` summarizes independently reviewed
 trials without calling a provider or installing a routing policy. Supply an array

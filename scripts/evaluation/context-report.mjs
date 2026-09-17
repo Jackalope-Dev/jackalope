@@ -150,6 +150,18 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
               ? elapsed[Math.floor(elapsed.length / 2)]
               : null,
           measuredTokenTrials: selected.filter((row) => measured(row.totalTokens)).length,
+          mcpReceivedBytes: sum(
+            selected.map((row) => ({ value: row.mcpUsage?.resultBytesReceived })),
+            'value',
+          ),
+          mcpDeliveredBytes: sum(
+            selected.map((row) => ({ value: row.mcpUsage?.resultBytesReturned })),
+            'value',
+          ),
+          expansionReads: sum(
+            selected.map((row) => ({ value: row.mcpUsage?.resultReads })),
+            'value',
+          ),
         },
       ];
     }),
@@ -196,6 +208,18 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
     matched,
     totals,
     metrics,
+    toolPayload: {
+      reductionPercent: reduction(
+        totals[candidate].mcpReceivedBytes,
+        totals[candidate].mcpDeliveredBytes,
+      ),
+      eligibleForScopedClaim:
+        blockers.length === 0 &&
+        totals[candidate].mcpReceivedBytes > totals[candidate].mcpDeliveredBytes &&
+        measured(totals[candidate].mcpDeliveredBytes),
+      scope:
+        'Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction.',
+    },
     blockers,
     cases: caseIds,
     plan: comparison.plan ?? null,
@@ -212,6 +236,11 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
       promptBytes: row.promptBytes,
       mcpUsage: row.mcpUsage ?? null,
       fixtureToolCalls: row.fixtureToolCalls ?? null,
+      observedToolCalls: row.efficiency?.toolCalls
+        ? Object.values(row.efficiency.toolCalls).reduce((sum, count) => sum + count, 0)
+        : null,
+      verificationCalls: row.efficiency?.verificationCalls ?? null,
+      verificationReuses: row.efficiency?.verificationReuses ?? null,
     })),
     repetitions: Object.fromEntries(
       caseIds.map((id) => [id, rows.filter((r) => r.case === id && r.variant === baseline).length]),
@@ -220,6 +249,13 @@ export function contextReport(comparison, baseline = 'direct', candidate = 'afte
     executableHashes: Object.fromEntries(
       variants.map((v) => [v, comparison.executableHashes?.[v] ?? null]),
     ),
+    baselineRevision: comparison.baselineRevision ?? null,
+    controlPromptsRevision: comparison.controlPromptsRevision ?? null,
+    controlPromptsHash: comparison.controlPromptsHash ?? null,
+    budgets: {
+      secondsPerTrial: comparison.seconds ?? null,
+      tokensPerTrial: comparison.tokens ?? null,
+    },
     requestedEffort: comparison.efforts,
     requestedSpeed: comparison.speeds,
     quality:

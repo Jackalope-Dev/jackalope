@@ -128,6 +128,7 @@ export function TaskOutcomes({
                 {item.title}
               </h3>
               <p className="task-muted">
+                Your review ·{' '}
                 {item.checkpoint && index < step && item.receipt?.accepted
                   ? 'Accepted before advancing · prior step snapshot'
                   : item.checkpoint && index > step

@@ -1,4 +1,4 @@
-import evidence from '../public/research/benchmarks.json';
+import evidence from './benchmark-summary.json';
 import './benchmarks.css';
 
 type Totals = {
@@ -7,35 +7,41 @@ type Totals = {
   totalTokens: number | null;
   cachedInputTokens: number | null;
   elapsedMs: number | null;
+  mcpReceivedBytes: number | null;
+  mcpDeliveredBytes: number | null;
 };
 type Report = {
   model: string;
   cliVersion: string;
   baseline: string;
   candidate: string;
-  totals: Record<string, Totals>;
+  totals: Record<string, Totals | undefined>;
   cases: string[];
   metrics: Record<string, { reductionPercent: number | null; eligibleForScopedClaim: boolean }>;
   blockers: string[];
-  sourceSha256: string;
-  trialMeasurements: { case: string; variant: string; repetition: number }[];
+  toolPayload: { reductionPercent: number | null; eligibleForScopedClaim: boolean; scope: string };
+};
+type DiscoveryTotals = {
+  trials: number;
+  calls: number;
+  localPassed: number;
+  jevPassed: number;
+  elapsedMs: number;
+  inputTokens: number | null;
+  estimatedCostUsd: number | null;
+  errors: number;
+  model: string;
 };
 type Evidence = {
+  agentTrials: number;
   date: string;
   environment: Record<string, string>;
   comparisons: { id: string; title: string; detail: string; report: Report }[];
-  discovery: {
-    trials: number;
-    localPassed: number;
-    jevPassed: number;
-    elapsedMs: number;
-    inputTokens: number | null;
-    estimatedCostUsd: number | null;
-    errors: number;
-    model: string;
-  } | null;
+  discovery:
+    | (DiscoveryTotals & { baselineAllCalls?: DiscoveryTotals | null; regressions: number | null })
+    | null;
 };
-const data = evidence as Evidence;
+const data: Evidence = evidence;
 const number = (value: number | null) =>
   value === null
     ? 'Unavailable'
@@ -47,13 +53,7 @@ const labels: Record<string, string> = {
 };
 
 export function BenchmarksPage() {
-  const trials = new Set(
-    data.comparisons.flatMap(({ report }) =>
-      report.trialMeasurements.map(
-        (row) => `${report.sourceSha256}:${row.case}:${row.variant}:${row.repetition}`,
-      ),
-    ),
-  ).size;
+  const trials = data.agentTrials;
   const wins = data.comparisons.flatMap(({ id, title, report }) =>
     Object.entries(report.metrics)
       .filter(([, metric]) => metric.eligibleForScopedClaim)
@@ -64,6 +64,21 @@ export function BenchmarksPage() {
         label: key === 'totalTokens' ? 'fewer reported tokens' : 'less elapsed time',
       })),
   );
+  const payloadWins = data.comparisons.filter(
+    ({ report }) => report.toolPayload.eligibleForScopedClaim,
+  );
+  const discoveryBaseline = data.discovery?.baselineAllCalls;
+  const avoidedDiscoveryCalls =
+    data.discovery &&
+    discoveryBaseline &&
+    data.discovery.trials === discoveryBaseline.trials &&
+    data.discovery.jevPassed >= discoveryBaseline.jevPassed &&
+    data.discovery.errors === 0 &&
+    data.discovery.regressions === 0 &&
+    discoveryBaseline.errors === 0 &&
+    data.discovery.calls < discoveryBaseline.calls
+      ? 100 * (1 - data.discovery.calls / discoveryBaseline.calls)
+      : null;
   return (
     <main id="main" className="benchmark-page page-width">
       <header className="benchmark-intro">
@@ -98,102 +113,162 @@ export function BenchmarksPage() {
             <span>No general speed or cost saving established by this pilot.</span>
           </div>
         )}
-        <div>
-          <strong>Same task</strong>
-          <span>
-            Matched model, reasoning effort, requested speed, account, and behavioral checks.
-          </span>
-        </div>
+        {payloadWins.map(({ id, report }) => (
+          <div key={`payload-${id}`}>
+            <strong>{number(report.toolPayload.reductionPercent)}%</strong>
+            <span>
+              fewer MCP result bytes in the extraction fixtures. Response bodies only; not total
+              tokens or cost.
+            </span>
+          </div>
+        ))}
+        {avoidedDiscoveryCalls !== null && (
+          <div>
+            <strong>{number(avoidedDiscoveryCalls)}%</strong>
+            <span>
+              fewer Jev discovery calls on eight authored queries, with the same or better fixture
+              pass count. Experimental; not a measure of agent savings.
+            </span>
+          </div>
+        )}
+        {avoidedDiscoveryCalls === null && (
+          <div>
+            <strong>Same task</strong>
+            <span>
+              Matched model, reasoning effort, requested speed, account, and behavioral checks.
+            </span>
+          </div>
+        )}
       </section>
       <section className="benchmark-section" aria-labelledby="results-title">
         <h2 id="results-title">Results, including the overhead</h2>
         <p>
           These are authored, disposable fixtures on one Windows machine. They are a reproducible
           starting point, not a representative sample of software engineering or proof of equivalent
-          quality on real projects. Passing means passing the stated fixture oracle; human
+          quality on real projects. Passing means satisfying the prewritten task check; human
           acceptance and correction time are not measured.
         </p>
-        {data.comparisons.map(({ id, title, detail, report }) => (
-          <article key={id} className="benchmark-result" id={id}>
-            <h3>{title}</h3>
-            <p>{detail}</p>
-            <p className="benchmark-caption">
-              {report.model} · {report.cliVersion} · {report.cases.join(', ')}
-            </p>
-            <section
-              className="benchmark-table"
-              // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll wide measurement tables.
-              tabIndex={0}
-              aria-label={`${title} measurements`}
-            >
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">Variant</th>
-                    <th scope="col">Oracle passes</th>
-                    <th scope="col">Total tokens</th>
-                    <th scope="col">Cached input</th>
-                    <th scope="col">Total seconds</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[report.baseline, report.candidate].map((variant) => {
-                    const total = report.totals[variant];
-                    return (
-                      <tr key={variant}>
-                        <th scope="row">{labels[variant] ?? variant}</th>
-                        <td>
-                          {total.oraclePassed}/{total.trials}
-                        </td>
-                        <td>{number(total.totalTokens)}</td>
-                        <td>{number(total.cachedInputTokens)}</td>
-                        <td>{number(total.elapsedMs === null ? null : total.elapsedMs / 1000)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </section>
-            <p>
-              {Object.entries(report.metrics)
-                .map(
-                  ([key, metric]) =>
-                    `${key === 'totalTokens' ? 'Token' : 'Elapsed-time'} change: ${metric.reductionPercent === null ? 'unavailable' : `${number(Math.abs(metric.reductionPercent))}% ${metric.reductionPercent > 0 ? 'lower' : 'higher'}`}`,
-                )
-                .join('. ')}
-              .
-            </p>
-            {!!report.blockers.length && (
-              <p className="benchmark-caption">Claim limitations: {report.blockers.join(' ')}</p>
-            )}
-          </article>
-        ))}
+        <p className="benchmark-caption">
+          Prewritten fixture checks score outputs outside the agent’s workspace. These are self-run
+          experiments, not an external audit.
+        </p>
+        {data.comparisons.map(({ id, title, detail, report }) => {
+          const candidate = report.totals[report.candidate];
+          return (
+            <article key={id} className="benchmark-result" id={id}>
+              <h3>{title}</h3>
+              <p>{detail}</p>
+              <p className="benchmark-caption">
+                {report.model} · {report.cliVersion} · {report.cases.join(', ')}
+              </p>
+              <section
+                className="benchmark-table"
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll wide measurement tables.
+                tabIndex={0}
+                aria-label={`${title} measurements`}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Variant</th>
+                      <th scope="col">Successful trials</th>
+                      <th scope="col">Total tokens</th>
+                      <th scope="col">Cached input</th>
+                      <th scope="col">Total seconds</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[report.baseline, report.candidate].map((variant) => {
+                      const total = report.totals[variant];
+                      if (!total) return null;
+                      return (
+                        <tr key={variant}>
+                          <th scope="row">{labels[variant] ?? variant}</th>
+                          <td>
+                            {total.oraclePassed}/{total.trials}
+                          </td>
+                          <td>{number(total.totalTokens)}</td>
+                          <td>{number(total.cachedInputTokens)}</td>
+                          <td>
+                            {number(total.elapsedMs === null ? null : total.elapsedMs / 1000)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </section>
+              <p>
+                {Object.entries(report.metrics)
+                  .map(
+                    ([key, metric]) =>
+                      `${key === 'totalTokens' ? 'Token' : 'Elapsed-time'} change: ${metric.reductionPercent === null ? 'unavailable' : `${number(Math.abs(metric.reductionPercent))}% ${metric.reductionPercent > 0 ? 'lower' : 'higher'}`}`,
+                  )
+                  .join('. ')}
+                .
+              </p>
+              {candidate &&
+                candidate.mcpReceivedBytes !== null &&
+                candidate.mcpReceivedBytes > 0 && (
+                  <p className="benchmark-caption">
+                    Jackalope received {number(candidate.mcpReceivedBytes)} result bytes and
+                    returned {number(candidate.mcpDeliveredBytes)} bytes, including any expansion
+                    reads. {report.toolPayload.scope}
+                  </p>
+                )}
+              {!!report.blockers.length && (
+                <p className="benchmark-caption">Claim limitations: {report.blockers.join(' ')}</p>
+              )}
+            </article>
+          );
+        })}
       </section>
       <section className="benchmark-section" aria-labelledby="jev-title">
         <h2 id="jev-title">Jev: test the decision before adding the call</h2>
         <p>
           Jev can rank tool descriptions before an agent receives their schemas. This experiment
           sends a bounded task brief, search query, and at most 32 candidate descriptions. Strong
-          relevance scores can promote candidates; uncertain answers keep local search behavior.
-          Exact tool names bypass this step. Empty-query browsing remains available, and Jev does
-          not execute tools or change permissions. The option is off by default.
+          relevance scores (at least 0.9) can promote candidates; uncertain answers keep local
+          search behavior. Exact tool names and nonempty local results that already fit on one page
+          bypass this step. Empty-query browsing remains available, and Jev does not execute tools
+          or change permissions. The option is off by default.
         </p>
         {data.discovery && (
-          <p>
-            On {data.discovery.trials} authored ranking trials, local search met the expected
-            top-five or absent-result check {data.discovery.localPassed} times; Jev-assisted ranking
-            met it {data.discovery.jevPassed} times. Jev added{' '}
-            {number(data.discovery.elapsedMs / 1000)} seconds in total and reported{' '}
-            {number(data.discovery.inputTokens)} input tokens. {data.discovery.errors} calls failed.{' '}
-            {data.discovery.estimatedCostUsd === null
-              ? 'Dollar cost was unavailable.'
-              : `Estimated Jev API input cost: $${data.discovery.estimatedCostUsd.toFixed(6)}, using $0.042 per million input tokens; this is not an invoice.`}
-          </p>
+          <>
+            <p>
+              Across eight authored queries repeated three times ({data.discovery.trials} ranking
+              trials), local search met the expected top-five or absent-result check{' '}
+              {data.discovery.localPassed} times; Jev-assisted ranking met it{' '}
+              {data.discovery.jevPassed} times, using {data.discovery.calls} API calls to{' '}
+              {data.discovery.model}. Jev added {number(data.discovery.elapsedMs / 1000)} seconds in
+              total and reported {number(data.discovery.inputTokens)} input tokens.{' '}
+              {data.discovery.errors} calls failed.{' '}
+              {data.discovery.estimatedCostUsd === null
+                ? 'Dollar cost was unavailable.'
+                : `Estimated Jev API input cost: $${data.discovery.estimatedCostUsd.toFixed(6)}.`}{' '}
+              Estimates use <a href="https://typesafe.ai/">TypeSafe’s published input rate</a> of
+              $0.042 per million tokens on the measurement date; these are not invoices.
+            </p>
+            {data.discovery.baselineAllCalls && (
+              <p>
+                The earlier version called Jev for all {data.discovery.baselineAllCalls.calls}{' '}
+                trials and passed {data.discovery.baselineAllCalls.jevPassed} checks. Its total was{' '}
+                {number(data.discovery.baselineAllCalls.inputTokens)} input tokens,{' '}
+                {number(data.discovery.baselineAllCalls.elapsedMs / 1000)} seconds, and $
+                {data.discovery.baselineAllCalls.estimatedCostUsd?.toFixed(6) ?? 'unavailable'} in
+                estimated API input cost. The local-page bypass avoided{' '}
+                {data.discovery.baselineAllCalls.calls - data.discovery.calls} requests. Both runs
+                used the same queries and promotion threshold; they ran sequentially, so service
+                latency is not controlled. Skipped requests consume zero Jev input tokens.{' '}
+                {data.discovery.regressions} previously passing trials failed in the later run.
+              </p>
+            )}
+          </>
         )}
         <p>
           This isolates retrieval behavior. It does not measure downstream agent savings, end-to-end
           speed, or general search accuracy. Jev is a remote service; the field-selection experiment
-          below uses local code and requires no Jev call.
+          above uses local code and requires no Jev call.
         </p>
       </section>
       <section className="benchmark-section" aria-labelledby="method-title">
