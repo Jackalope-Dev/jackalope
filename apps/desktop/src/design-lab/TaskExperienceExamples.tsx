@@ -9,7 +9,7 @@ import { TaskOutcomes } from '../components/tasks/TaskOutcomes';
 import { Button } from '../components/ui/button';
 import { Select, SelectItem } from '../components/ui/Select';
 import { assemblePrompt } from '../lib/skills/context-assembler';
-import type { PendingUserPrompt, TaskRun } from '../lib/task-runtime';
+import type { PendingUserPrompt } from '../lib/task-runtime';
 import '../components/tasks/task-workspace.css';
 
 const patch =
@@ -77,7 +77,7 @@ const outcomePreview = {
       ],
     },
   ],
-} as TaskRun;
+} satisfies Parameters<typeof TaskOutcomes>[0]['run'];
 
 export function TaskExperienceExamples() {
   const [scenario, setScenario] = useState('choice');

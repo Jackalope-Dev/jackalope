@@ -13,13 +13,18 @@ import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { ScreenshotPreview } from './ScreenshotPreview';
 
+type OutcomeRun = Pick<
+  TaskRun,
+  'id' | 'contract' | 'verification' | 'validationSteps' | 'screenshots'
+>;
+
 export function TaskOutcomes({
   run,
   canReview,
   onCorrect,
   onAdvance,
 }: {
-  run: TaskRun;
+  run: OutcomeRun;
   canReview: boolean;
   onCorrect: (prompt: string) => void;
   onAdvance: () => Promise<void>;
@@ -283,7 +288,7 @@ export function TaskOutcomes({
   );
 }
 
-function RequirementAnswer({ run, requirementId }: { run: TaskRun; requirementId: string }) {
+function RequirementAnswer({ run, requirementId }: { run: OutcomeRun; requirementId: string }) {
   const report = requirementAssessment(run.validationSteps, requirementId);
   if (!report)
     return <p className="task-muted mt-2">No agent assessment recorded for this requirement.</p>;
