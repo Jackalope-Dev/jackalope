@@ -119,8 +119,8 @@ pub struct Efficiency {
     pub launches: u64,
     pub verification_calls: u64,
     pub verification_failures: u64,
-    pub verification_reuses: u64,
-    pub preparation_reuses: u64,
+    pub verification_reuses: Option<u64>,
+    pub preparation_reuses: Option<u64>,
     pub verification_stdout_bytes: u64,
     pub verification_delivered_bytes: u64,
     pub tool_calls: std::collections::BTreeMap<String, u64>,
@@ -272,7 +272,13 @@ mod tests {
         for command in [None, Some(""), Some("   ")] {
             assert!(verification_instructions(command, "claude").is_empty());
         }
-        assert!(verification_instructions(Some(command), "grok").is_empty());
+        for adapter in ["grok", "antigravity", "gemini"] {
+            let instructions = verification_instructions(Some(command), adapter);
+            assert!(instructions.contains("POST /v1/computer/verify with {}"));
+            assert!(instructions.contains("POST /v1/computer/output with {}"));
+            assert!(instructions.contains(&serde_json::to_string(command).unwrap()));
+        }
+        assert!(verification_instructions(Some(command), "unsupported").is_empty());
     }
     #[test]
     fn startup_noise_is_not_first_activity() {

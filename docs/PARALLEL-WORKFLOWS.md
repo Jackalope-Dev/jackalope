@@ -76,6 +76,12 @@ Planning considers integration and review effort, shared contracts, generated fi
 manifests and lockfiles. Shared changes have one owner or an explicit dependency.
 Tightly coupled work stays together; a small request can remain one assignment.
 
+Planning accounts for repeated discovery, setup and checks in each assignment.
+Dispatch prioritizes prerequisites on the longest remaining dependency chains,
+independently of their saved order, while retaining fairness across projects.
+Canceled, failed and already launched descendants do not inflate that priority.
+Scope, interface, verification and snapshot gates still determine eligibility.
+
 The parent stays together in Chat and Inbox. Expand assignments for their results,
 questions and follow-ups; all attempts and reported usage remain attached. Workers
 inherit the selected agent, account, model, effort and tools. The existing queue

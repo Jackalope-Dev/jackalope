@@ -132,7 +132,7 @@ pub(in crate::commands) fn prepare(
         let saved = record.clone();
         runtime.update_checked(id, |run| {
             run.preparation = Some(saved);
-            run.efficiency.preparation_reuses += 1;
+            run.efficiency.preparation_reuses = Some(run.efficiency.preparation_reuses.unwrap_or(0) + 1);
             activity(
                 run,
                 "Workspace dependencies already match the project manifests. Skipped the setup command.",
@@ -270,7 +270,10 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
         return Err("Checks could not start while another attempt owns this workspace.".into());
     }
     if reusable_check(runtime, run, command)?.is_some() {
-        runtime.update_checked(id, |r| r.efficiency.verification_reuses += 1)?;
+        runtime.update_checked(id, |r| {
+            r.efficiency.verification_reuses =
+                Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
+        })?;
         return Ok(());
     }
     let _lease = leases::reserve(&run.workspace)?;
@@ -314,7 +317,10 @@ pub async fn agent_verify(
         let _lease = leases::reserve(&run.workspace)?;
         if let Some(check) = reusable_check(&runtime, run, command)? {
             let mut response = output::response(check);
-            runtime.update_checked(&run.id, |r| r.efficiency.verification_reuses += 1)?;
+            runtime.update_checked(&run.id, |r| {
+                r.efficiency.verification_reuses =
+                    Some(r.efficiency.verification_reuses.unwrap_or(0) + 1)
+            })?;
             response["reused"] = true.into();
             return Ok(response);
         }

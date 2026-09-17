@@ -37,8 +37,8 @@ export interface TaskRun {
     launches: number;
     verificationCalls: number;
     verificationFailures: number;
-    verificationReuses?: number;
-    preparationReuses?: number;
+    verificationReuses?: number | null;
+    preparationReuses?: number | null;
     verificationStdoutBytes: number;
     verificationDeliveredBytes: number;
   };

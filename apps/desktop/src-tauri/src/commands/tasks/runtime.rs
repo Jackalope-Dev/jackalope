@@ -1470,7 +1470,11 @@ impl TaskRuntime {
                 codex_speed: request.codex_speed,
                 reasoning_effort: None,
                 requested_service_tier: None,
-                efficiency: Default::default(),
+                efficiency: super::efficiency::Efficiency {
+                    verification_reuses: Some(0),
+                    preparation_reuses: Some(0),
+                    ..Default::default()
+                },
                 dependency_invalidated: false,
                 stages: vec![],
                 progress: None,

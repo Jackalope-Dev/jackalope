@@ -35,6 +35,11 @@ Focused task guidance and retrievable compact verification output are implemente
 [Quality trials](AGENT-QUALITY.md) compare the changed behavior against a preserved
 baseline; broader provider comparisons and independent acceptance remain in progress.
 
+Codex speed controls, fresh context for changed workspaces, dependency-priority
+dispatch and CPU-based check capacity are implemented. Execution timings and offline
+delivery comparisons retain waits, failures and missing review evidence. Validate
+complete task delivery and quality on representative repositories before claiming gains.
+
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)
 exercise these contracts; installed startup, memory and responsiveness acceptance remains open.

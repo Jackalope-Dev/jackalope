@@ -25,6 +25,8 @@ const base = {
  activity: ['Read src/search.tsx', 'Added arrow-key navigation to the search results.\\nSelection follows the focused result.', 'Running the focused search checks.'],
  diagnostics: [], error: null, persistenceError: null, exitCode: null,
  usage: { input: 1400, output: 620, cacheRead: 0, cacheWrite: 0, reported: true, estimatedCostUsd: null },
+ codexSpeed: 'fast', requestedServiceTier: 'fast',
+ efficiency: {timings: {workspace: {calls: 1, totalMs: 1500, maxMs: 1500}, verificationWait: {calls: 1, totalMs: 2000, maxMs: 2000}}, firstActivityMs: 2500, preparationReuses: 1, verificationReuses: 2},
 };
 const f = window.taskFixture = {
  calls: [], failStop: false, integrated: false, followups: [],
@@ -148,6 +150,15 @@ try {
   await page.waitForFunction(
     () => document.activeElement?.getAttribute('aria-label') === 'More task actions',
   );
+  await menu.click();
+  await page.getByRole('menuitem', { name: 'Task details' }).click();
+  await page.getByText('Provider confirmation is unavailable.', { exact: false }).waitFor();
+  await page.getByText('Execution timing', { exact: true }).click();
+  await page.getByText('Waiting for check capacity', { exact: true }).waitFor();
+  await page.getByText('Completed setup reused', { exact: true }).waitFor();
+  await page.screenshot({ path: `${output}/execution-timing-1280-dark.png` });
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
   const reply = page.getByRole('textbox', { name: 'Follow-up instructions' });
   await reply.fill('Also support Escape to close search.');
   await page.evaluate(() => (window.taskFixture.failStop = true));

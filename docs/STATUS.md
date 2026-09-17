@@ -103,6 +103,12 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   and direct-CLI quality comparisons with separate routing evaluation gates. See
   [agent quality](AGENT-QUALITY.md); automatic escalation and learned routing
   remain dependent on broader independent acceptance.
+- Optional Codex Fast processing for tasks and chats, preserved through planned
+  assignments and continuation, with higher-usage disclosure and requested-tier receipts.
+  Fresh context for changed checkouts, recorded setup guidance, dependency-priority
+  dispatch and CPU-based check capacity reduce avoidable execution work. Task timing
+  separates command waits and execution; offline comparisons include independently
+  supplied review/correction time. Representative speed and quality acceptance remains open.
 - Ask Jackalope documentation answers and reviewed local actions, backed by bounded
   model-free documentation retrieval. Optional [OpenCode/Ollama setup](LOCAL-AI.md)
   checks file edits and session continuation before connecting a local account.

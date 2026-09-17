@@ -5,15 +5,18 @@ import { Select, SelectItem } from '../ui/Select';
 export function CodexSpeedSelect({
   value,
   onChange,
+  disabled,
 }: {
   value: RunRequest['codexSpeed'];
   onChange: (value: RunRequest['codexSpeed']) => void;
+  disabled?: boolean;
 }) {
   const id = useId();
   return (
     <div className="workspace-stack">
       <label htmlFor={id}>Codex speed</label>
       <Select
+        disabled={disabled}
         id={id}
         aria-label="Codex speed"
         aria-describedby={`${id}-help`}

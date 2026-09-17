@@ -21,15 +21,36 @@ pub(in crate::commands) fn configure(
         CodexSpeed::Fast => "fast",
     };
     command.args(["-c", &format!("service_tier=\"{tier}\"")]);
-    if speed == Some(CodexSpeed::Fast) {
-        command.args(["-c", "features.fast_mode=true"]);
-    }
+    command.args([
+        "-c",
+        &format!("features.fast_mode={}", speed == Some(CodexSpeed::Fast)),
+    ]);
     Some(tier.into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_history_stays_unknown_and_summaries_preserve_explicit_speed() {
+        let mut saved = serde_json::to_value(super::super::tests::sample("codex")).unwrap();
+        saved.as_object_mut().unwrap().remove("codexSpeed");
+        saved
+            .as_object_mut()
+            .unwrap()
+            .remove("requestedServiceTier");
+        let mut run: super::super::TaskRun = serde_json::from_value(saved).unwrap();
+        assert_eq!(run.codex_speed, None);
+        assert_eq!(run.requested_service_tier, None);
+        run.codex_speed = Some(CodexSpeed::Fast);
+        run.requested_service_tier = Some("fast".into());
+        let summary = run.summary();
+        assert_eq!(summary.codex_speed, run.codex_speed);
+        assert_eq!(summary.requested_service_tier, run.requested_service_tier);
+        let metrics: super::super::efficiency::Efficiency = serde_json::from_str("{}").unwrap();
+        assert_eq!(metrics.verification_reuses, None);
+    }
 
     #[test]
     fn speed_is_explicit_and_does_not_change_model_or_effort() {

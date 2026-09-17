@@ -45,6 +45,11 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Compare task speed on representative repository work with matched models,
+  accounts and effort: Codex service tiers, dirty/clean context, command capacity,
+  setup/check reuse and dependency scheduling. Include failures, independent review,
+  corrections and defects; validate requested tiers in installed provider versions.
+
 - [ ] Validate task assessment, stale-cache invalidation, reviewed planning, scoped
   dispatch, retained usage, pause/stop/restart recovery and explicit final integration
   with installed providers. Compare complete cost and quality on held-out tasks;

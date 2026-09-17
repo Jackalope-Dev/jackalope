@@ -70,6 +70,17 @@ silently satisfy worker acceptance. The isolated preview selects an available po
   The JavaScript regex engine works under the existing CSP without eval or WASM
   permissions. Original patches remain accessible if rendering fails.
 
+## Task command capacity
+
+Task preparation and saved checks share a bounded native command pool. Its default
+capacity is one slot per four available logical CPUs, with a minimum of one and a
+maximum of four. `JACKALOPE_CHECK_CONCURRENCY=1..8` overrides that capacity for the
+Jackalope process; invalid values use the CPU-based default. Tune against real
+command CPU/memory use and queue timings, since commands may start their own workers.
+Workspace reservations, cancellation and command timeouts remain enforced.
+See [task speed measurements](AGENT-QUALITY.md#task-speed-and-delivery-measurements)
+for queue, command, reuse and accepted-delivery measurements.
+
 ## Remaining acceptance
 
 Measure cold/warm installed startup, idle and active process-tree CPU/RSS, memory

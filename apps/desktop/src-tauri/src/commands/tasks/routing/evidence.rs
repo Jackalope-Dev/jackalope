@@ -116,7 +116,8 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
             *old = run;
         }
     }
-    let mut groups = BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>), Group>::new();
+    let mut groups =
+        BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>), Group>::new();
     for run in latest
         .values()
         .filter(|r| ["review", "reviewed", "failed", "stopped"].contains(&r.status.as_str()))

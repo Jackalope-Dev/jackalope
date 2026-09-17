@@ -54,8 +54,9 @@ export function speedReport(comparison, reviews = {}) {
     model: comparison.model,
     efforts: comparison.efforts,
     speeds: comparison.speeds,
-    comparable:
+    matchedCases:
       cohorts.length > 1 &&
+      !comparison.interruptions?.length &&
       cohorts.every(
         (cohort) =>
           cohort.configurations.length === 1 &&

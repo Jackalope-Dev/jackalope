@@ -222,6 +222,45 @@ usage. Insufficient or mixed historical evidence is not a learned specialty.
 Provider configuration references: [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference)
 and [Claude model effort](https://code.claude.com/docs/en/model-config#adjust-effort-level).
 
+## Task speed and delivery measurements
+
+Task customization and new Chat options offer a separate Codex speed preference:
+provider setting, Standard or Fast. Explicit choices apply only to Codex worker
+processes, including managed assignments, retries and continuations. Fast sets
+the CLI service tier and feature flag without changing model or reasoning effort;
+it can consume more credits and depends on provider/model availability. Other
+adapters retain their provider configuration. History records the requested tier,
+not confirmation that the provider delivered it. Global CLI configuration is not
+modified. See [Codex speed](https://learn.chatgpt.com/docs/agent-configuration/speed).
+
+Workers receive recorded workspace/setup facts and their saved verification command.
+HTTP adapters receive the corresponding bridge route. These facts help avoid
+repeated setup and tool discovery; repository-required checks and permissions remain
+in force. Repository maps include nearby guidance and package manifests. Clean
+worktrees at the same repository/commit share cached scans; dirty or non-Git
+checkouts scan afresh. Maps remain bounded, advisory context to verify before editing.
+
+Execution timing in task details and usage exports separates waiting for setup/check
+capacity from running those commands. Reuse counters remain unknown in older records.
+Setup reuse fingerprints nested manifests, lockfiles, setup scripts, toolchain files
+and relevant environment settings; missing recorded dependency directories invalidate
+reuse. This does not replace a project's own dependency and build cache configuration.
+
+Quality trials accept `--codex-speed=standard|fast` or a variant override such as
+`--after-codex-speed=fast`. Omission inherits the provider configuration. Resume
+requires identical requested speed settings; offline routing keeps requested tiers
+in separate cohorts. Compare matched models, effort, accounts, cases and repetitions.
+
+`pnpm evaluate:speed comparison.json [reviews.json] [report.json]` summarizes a
+retained quality comparison without launching agents. Optional reviews map exact
+receipt paths to `{"accepted":true,"reviewMinutes":2,"correctionMinutes":0}`.
+Use independent review and explicit zero for no time. Correction minutes cover
+additional elapsed correction work outside the recorded trial; do not count the
+same time twice. Delivery time includes the recorded trial, review and correction
+time, retaining unsuccessful trials in the total per accepted result. Missing
+reviews, durations and crash interruptions prevent a complete acceptance claim.
+Matching cases alone does not establish unchanged quality or a speed improvement.
+
 ## Jev decision comparisons
 
 `pnpm evaluate:jev <trials.json> [report.json]` summarizes independently reviewed

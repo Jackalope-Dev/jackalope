@@ -224,10 +224,12 @@ test('task effort is restored with the idea without nesting guidance in the edit
   const draft = planningDraft({
     rawPrompt: 'Fix the dialog',
     effort: 'thorough',
+    codexSpeed: 'fast',
     model: 'configured-model',
   });
   assert.equal(draft.prompt, 'Fix the dialog');
   assert.equal(draft.effort, 'thorough');
+  assert.equal(draft.codexSpeed, 'fast');
   assert.equal(draft.model, 'configured-model');
   assert.equal(effortFor(undefined).id, 'balanced');
   assert.equal(effortFor('unknown').id, 'balanced');

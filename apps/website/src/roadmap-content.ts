@@ -54,7 +54,7 @@ export const roadmapStages = [
         title: 'One request, a reviewed approach.',
         summary: 'Project decision preferences guide task assessment and planning.',
         detail:
-          'Review an approach, then follow Plan, Work, Check and Review in one task. Jackalope combines completed assignments, resolves overlapping changes in isolated workspaces and can repair failed checks within a bounded allowance. Review the complete result, preview and checks before applying changes. Local fast paths and reused assessments avoid extra model calls; usage includes planning and repair work. Installed-provider testing and cost/quality comparisons remain in progress.',
+          'Review an approach, then follow Plan, Work, Check and Review in one task. Jackalope combines completed assignments, resolves overlapping changes in isolated workspaces and can repair failed checks within a bounded allowance. Review the complete result, preview and checks before applying changes. Local fast paths and reused assessments avoid extra model calls; usage includes planning and repair work. Codex speed controls, workspace context freshness, dependency scheduling and check capacity help reduce repeated work. Task timings show waits and execution. Installed-provider testing and comparisons including review and corrections remain in progress.',
       },
       {
         title: 'Room to work in parallel.',

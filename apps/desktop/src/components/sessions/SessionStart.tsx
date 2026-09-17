@@ -182,9 +182,11 @@ export function SessionStart({
                   label: 'Codex speed',
                   content: () => (
                     <CodexSpeedSelect
+                      disabled={busy}
                       value={codexSpeed}
                       onChange={(value) => {
                         assessment.clear();
+                        pending.current = null;
                         setCodexSpeed(value);
                       }}
                     />

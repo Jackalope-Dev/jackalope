@@ -1,5 +1,17 @@
 [
   {
+    "id": "more-control-over-task-speed",
+    "date": "2026-09-17",
+    "status": "In development",
+    "title": "More control over task speed.",
+    "description": "Choose Codex processing speed and inspect where task time goes.",
+    "items": [
+      "Optional Codex Fast processing keeps the selected model effort, with higher usage disclosed.",
+      "Task execution uses fresh context for changed workspaces, safer setup reuse, and resource-aware checks.",
+      "Execution timings and delivery comparisons include waits, failed work, and recorded review time."
+    ]
+  },
+  {
     "id": "jev-decision-assistance",
     "date": "2026-09-17",
     "status": "In development",

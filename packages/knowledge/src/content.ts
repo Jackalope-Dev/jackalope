@@ -1145,6 +1145,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'task-speed',
+        question: 'Can I speed up tasks without reducing model effort?',
+        paragraphs: [
+          'Choose Codex speed under Customize task, or in the options for a new Chat. Provider setting keeps the existing CLI choice. Standard and Fast request an explicit processing tier for Codex workers. Fast can use more credits and requires a supported model and account; it does not change model effort. Other agents keep their own settings.',
+          'The choice follows planned assignments, retries and continuations. Task details record the requested tier and offer Execution timing for measured setup, context and check stages. Some stages overlap, and older records may have no measurements. Provider acceptance and actual speed gains require observation.',
+          'Jackalope supplies relevant repository context and completed setup facts, reuses matching saved checks and schedules independent work through workspace safeguards. Required verification and review still apply.',
+        ],
+      },
+      {
         id: 'try-result',
         question: 'How do I see the result and request a correction?',
         paragraphs: [

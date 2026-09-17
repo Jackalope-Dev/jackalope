@@ -33,15 +33,15 @@ test('delivery measurement includes unsuccessful work and requires complete inde
 
 test('comparisons require matching cases and homogeneous measured configurations', () => {
   const trials = [trial('a', 'control', 1000, true), trial('b', 'after', 1000, true)];
-  assert.equal(speedReport({ trials }).comparable, true);
+  assert.equal(speedReport({ trials }).matchedCases, true);
   assert.equal(
-    speedReport({ trials: [trials[0], { ...trials[1], case: 'different' }] }).comparable,
+    speedReport({ trials: [trials[0], { ...trials[1], case: 'different' }] }).matchedCases,
     false,
   );
   assert.equal(
     speedReport({
       trials: [...trials, { ...trials[1], receipt: 'c', requestedServiceTier: 'fast' }],
-    }).comparable,
+    }).matchedCases,
     false,
   );
 });
