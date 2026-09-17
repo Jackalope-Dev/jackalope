@@ -22,6 +22,7 @@ import { AgentAvatar } from '../agents/AgentAvatar';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
 import { Button } from '../ui/button';
 import { Select, SelectItem } from '../ui/Select';
+import { CodexSpeedSelect } from './CodexSpeedSelect';
 import { OutcomeEditor } from './OutcomeEditor';
 import { TaskContextPanel } from './TaskContextPanel';
 import './task-composer.css';
@@ -226,6 +227,10 @@ export function TaskComposer({
                 {effort.description} Codex and Claude also receive a matching model effort request;
                 other agents keep their configured model effort.
               </p>
+              <CodexSpeedSelect
+                value={current.codexSpeed}
+                onChange={(codexSpeed) => onChange({ codexSpeed })}
+              />
             </section>
             <fieldset className="composer-config" aria-label="Task configuration">
               {controls.map(({ id, icon: Icon, label, value }) => (

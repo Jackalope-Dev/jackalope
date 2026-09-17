@@ -339,7 +339,7 @@ try {
   const continueButton = page.getByRole('button', { name: 'Continue', exact: true });
   assert.equal(await continueButton.isEnabled(), true);
   await continueButton.click();
-  await page.getByRole('heading', { name: 'Commits and cleanup', exact: true }).waitFor();
+  await page.locator('#onboarding-heading[data-step=behavior]').waitFor();
   assert.equal(
     await page.evaluate(
       (secret) => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(secret),

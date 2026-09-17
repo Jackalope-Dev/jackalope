@@ -553,7 +553,11 @@ impl TaskRuntime {
             return Err(unimplemented_adapter(&adapter));
         }
         let reasoning_effort = super::effort::configure(&mut cmd, &adapter, req.effort);
-        self.update_checked(id, |run| run.reasoning_effort = reasoning_effort)?;
+        let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
+        self.update_checked(id, |run| {
+            run.reasoning_effort = reasoning_effort;
+            run.requested_service_tier = tier;
+        })?;
         if let Some(model) = &selected_model {
             if adapter != "kimi" {
                 cmd.args(["--model", model]);
@@ -645,6 +649,15 @@ impl TaskRuntime {
             .map(|r| r.contract.clone())
             .unwrap_or_default();
         input.push_str(&contract.text());
+        let launch_context = self
+            .inner
+            .lock()
+            .unwrap()
+            .runs
+            .get(id)
+            .map(super::efficiency::launch_context)
+            .unwrap_or_default();
+        input.push_str(&launch_context);
         if let Some(context) = &req.coordination {
             cmd.env("JACKALOPE_BRIDGE_URL", &context.endpoint)
                 .env("JACKALOPE_BRIDGE_TOKEN", &context.token);
@@ -1170,6 +1183,7 @@ impl TaskRuntime {
         Ok(RunRequest {
             live_session_id: run.live_session_id.clone(),
             effort: run.effort,
+            codex_speed: run.codex_speed,
             dependency_snapshot: run.dependency_snapshot.clone(),
             monitor_change: run.monitor_change.clone(),
             context_selection: Default::default(),
@@ -1406,6 +1420,7 @@ impl TaskRuntime {
             request.account_binding = Some(binding.clone());
             if let Some(old) = &previous {
                 request.effort = request.effort.or(old.effort);
+                request.codex_speed = request.codex_speed.or(old.codex_speed);
                 request.verify_command = old.verify_command.clone();
                 request.prepare_command = old.prepare_command.clone();
                 request.auto_verify = old.auto_verify;
@@ -1415,6 +1430,7 @@ impl TaskRuntime {
             }
             if let Some(old) = &retried {
                 request.effort = request.effort.or(old.effort);
+                request.codex_speed = request.codex_speed.or(old.codex_speed);
                 request.verify_command = old.verify_command.clone();
                 request.prepare_command = old.prepare_command.clone();
                 request.auto_verify = old.auto_verify;
@@ -1451,7 +1467,9 @@ impl TaskRuntime {
                 archived_at: None,
                 live_session_id: request.live_session_id.clone(),
                 effort: request.effort,
+                codex_speed: request.codex_speed,
                 reasoning_effort: None,
+                requested_service_tier: None,
                 efficiency: Default::default(),
                 dependency_invalidated: false,
                 stages: vec![],

@@ -116,7 +116,7 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
             *old = run;
         }
     }
-    let mut groups = BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>), Group>::new();
+    let mut groups = BTreeMap::<(&str, Option<&str>, Option<&str>, Option<&str>, Option<&str>), Group>::new();
     for run in latest
         .values()
         .filter(|r| ["review", "reviewed", "failed", "stopped"].contains(&r.status.as_str()))
@@ -149,6 +149,7 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
                     .as_ref()
                     .and_then(|b| b.profile_id.as_deref()),
                 run.reasoning_effort.as_deref(),
+                run.requested_service_tier.as_deref(),
             ))
             .or_default();
         group.accepted += usize::from(accepted);
@@ -181,8 +182,8 @@ pub(super) fn evidence(runs: &[TaskRun], request: &RunRequest) -> Value {
             group.observed += 1;
         }
     }
-    serde_json::json!({"scope":"Latest loaded task outcome by final agent/model/account/requested effort. Costs include all loaded attempts, routing and quota retries. Historical human decisions are not current-file verification or causal comparisons; difficulty and earlier configurations differ. Unknown effort is the inherited CLI default. Fewer than ten decided tasks is insufficient evidence. Never infer model ability from brand names.",
-        "requestedEffort":request.effort.map(|effort|effort.level()),"groups":groups.into_iter().map(|((agent, model, profile, effort),g)| serde_json::json!({"agent":agent,"model":model,"profileId":profile,"reasoningEffort":effort,"accepted":g.accepted,"corrections":g.corrections,"total":g.tasks,"attempts":g.attempts,"usageCoverage":g.observed,"totalTokens":(g.observed==g.tasks).then_some(g.tokens),"tokensPerAcceptedTask":if g.accepted>0 && g.observed==g.tasks {Some(g.tokens as f64/g.accepted as f64)} else {None},"decided":g.accepted+g.corrections,"sufficientSample":g.accepted+g.corrections>=10,"matchedTaskEvidence":g.matched==g.tasks && g.tasks>=10,"freshEvidence":g.fresh==g.tasks,"successLowerBound":success_lower_bound(g.accepted,g.accepted+g.corrections),
+    serde_json::json!({"scope":"Latest loaded task outcome by final agent/model/account/requested effort/service tier. Costs include all loaded attempts, routing and quota retries. Historical human decisions are not current-file verification or causal comparisons; difficulty and earlier configurations differ. Unknown effort is the inherited CLI default. Fewer than ten decided tasks is insufficient evidence. Never infer model ability from brand names.",
+        "requestedEffort":request.effort.map(|effort|effort.level()),"groups":groups.into_iter().map(|((agent, model, profile, effort, tier),g)| serde_json::json!({"agent":agent,"model":model,"profileId":profile,"reasoningEffort":effort,"requestedServiceTier":tier,"accepted":g.accepted,"corrections":g.corrections,"total":g.tasks,"attempts":g.attempts,"usageCoverage":g.observed,"totalTokens":(g.observed==g.tasks).then_some(g.tokens),"tokensPerAcceptedTask":if g.accepted>0 && g.observed==g.tasks {Some(g.tokens as f64/g.accepted as f64)} else {None},"decided":g.accepted+g.corrections,"sufficientSample":g.accepted+g.corrections>=10,"matchedTaskEvidence":g.matched==g.tasks && g.tasks>=10,"freshEvidence":g.fresh==g.tasks,"successLowerBound":success_lower_bound(g.accepted,g.accepted+g.corrections),
             "matchMethod":"Lexical task overlap; observational evidence, not matched trials", "latestObservedAt":g.latest,
             "usdPerAcceptedTask":if g.accepted>0 && g.cost_observed==g.tasks {Some(g.dollars/g.accepted as f64)} else {None}})).collect::<Vec<_>>()})
 }

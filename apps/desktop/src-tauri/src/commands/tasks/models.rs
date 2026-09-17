@@ -31,7 +31,11 @@ pub struct TaskRun {
     #[serde(default)]
     pub effort: Option<super::effort::TaskEffort>,
     #[serde(default)]
+    pub codex_speed: Option<super::speed::CodexSpeed>,
+    #[serde(default)]
     pub reasoning_effort: Option<String>,
+    #[serde(default)]
+    pub requested_service_tier: Option<String>,
     #[serde(default)]
     pub efficiency: super::efficiency::Efficiency,
     #[serde(default)]
@@ -128,6 +132,8 @@ pub struct RunRequest {
     pub live_session_id: Option<String>,
     #[serde(default)]
     pub effort: Option<super::effort::TaskEffort>,
+    #[serde(default)]
+    pub codex_speed: Option<super::speed::CodexSpeed>,
     #[serde(skip)]
     pub dependency_snapshot: crate::commands::integration::DependencySnapshot,
     #[serde(skip)]
@@ -224,7 +230,9 @@ impl TaskRun {
             archived_at: self.archived_at.clone(),
             live_session_id: self.live_session_id.clone(),
             effort: self.effort,
+            codex_speed: self.codex_speed,
             reasoning_effort: self.reasoning_effort.clone(),
+            requested_service_tier: self.requested_service_tier.clone(),
             efficiency: self.efficiency.clone(),
             dependency_invalidated: self.dependency_invalidated,
             stages: self.stages.clone(),

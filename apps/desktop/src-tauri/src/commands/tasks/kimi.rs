@@ -883,6 +883,7 @@ setInterval(()=>{},1000);
             retry_of: None,
             live_session_id: None,
             effort: None,
+        codex_speed: None,
             dependency_snapshot: Default::default(),
             monitor_change: None,
             context_selection: Default::default(),

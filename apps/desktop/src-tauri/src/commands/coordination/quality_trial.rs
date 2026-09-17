@@ -83,7 +83,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
                 "isolated":true,"targetBranch":"main","connectionIds":[],
                 "contextSelection":{"memoryOff":true},"prompt":spec["prompt"],
-                "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"]
+                "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
             }))?)
             .err()
     };

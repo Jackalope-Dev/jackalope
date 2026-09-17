@@ -60,6 +60,9 @@ pub(super) fn run(
         return Err("Direct trials support Codex and Claude".into());
     }
     let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, effort);
+    let codex_speed =
+        serde_json::from_value(spec["codexSpeed"].clone()).map_err(|e| e.to_string())?;
+    let requested_service_tier = tasks::speed::configure(&mut cmd, &adapter, codex_speed);
     cmd.args(["--model", model])
         .current_dir(repo)
         .stdin(Stdio::piped())
@@ -80,6 +83,8 @@ pub(super) fn run(
         model: Some(model.into()),
         effort,
         reasoning_effort,
+        codex_speed,
+        requested_service_tier,
         account: binding.label.clone(),
         account_binding: Some(binding),
         workspace: repo.to_string_lossy().into(),

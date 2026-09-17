@@ -288,6 +288,7 @@ impl Coordinator {
                 retry_of: None,
                 live_session_id: None,
                 effort: None,
+        codex_speed: None,
                 dependency_snapshot: Default::default(),
                 monitor_change: None,
                 context_selection: item.context_selection.clone(),
@@ -322,6 +323,7 @@ impl Coordinator {
             {
                 request.model = task.request.model.clone();
                 request.effort = task.request.effort;
+    request.codex_speed = task.request.codex_speed;
                 request.connection_ids = task.request.connection_ids.clone();
                 request.agent_profile_id = task.request.agent_profile_id.clone();
             }

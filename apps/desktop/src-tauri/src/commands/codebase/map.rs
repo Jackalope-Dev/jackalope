@@ -11,6 +11,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
+mod context;
+
 /// A repeated task on the same repository and commit reuses the scan, across worktrees.
 const CACHE_TTL: Duration = Duration::from_secs(600);
 const CACHE_ENTRIES: usize = 6;
@@ -105,10 +107,8 @@ static CACHE: OnceLock<Mutex<HashMap<String, Entry>>> = OnceLock::new();
 /// Isolated tasks get a fresh worktree each time, and keying on the directory made each one
 /// pay for a full scan of a tree that was already analyzed. `--git-common-dir` is shared by a
 /// repository and all of its worktrees, and `HEAD` distinguishes the commits they sit on;
-/// together they identify the tracked content. Uncommitted edits are not in the key: the map
-/// offers paths, declarations and imports as hints to verify, so a file added since the commit
-/// is a miss the worker resolves by searching. A checkout that is not a
-/// repository falls back to its own path.
+/// together they identify the tracked content. Dirty and non-Git checkouts bypass the cache.
+/// The map remains advisory: files can change again after the scan.
 fn fingerprint(root: &Path) -> String {
     let git = |args: &[&str]| -> Option<String> {
         let output = crate::commands::git_command::command(
@@ -154,6 +154,16 @@ fn cache_entry(cache: &Mutex<HashMap<String, Entry>>, key: String) -> Option<Ent
 }
 
 fn cached_snapshot(root: &Path) -> Option<(Arc<CodebaseSnapshot>, bool)> {
+    let clean = crate::commands::git_command::command(
+        root,
+        &["status", "--porcelain=v1", "--untracked-files=normal"],
+        crate::commands::git_command::Policy::Inspection,
+    )
+    .output()
+    .is_ok_and(|output| output.status.success() && output.stdout.is_empty());
+    if !clean {
+        return Some((Arc::new(scan(root).ok()?), false));
+    }
     let key = fingerprint(root);
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let entry = cache_entry(cache, key)?;
@@ -384,6 +394,10 @@ pub(crate) fn prepare_task_map(
         shape(&snapshot)
     );
     let mut rendered = 0;
+    let context = context::related(root, &selected);
+    if text.len() + context.len() < budget / 2 {
+        text.push_str(&context);
+    }
     for path in &selected {
         let mut entry = format!("\n{path}");
         if let Some(language) = languages.get(path) {
@@ -579,6 +593,7 @@ mod tests {
     #[test]
     fn worktrees_of_one_repository_and_commit_share_a_scan_but_other_checkouts_do_not() {
         let f = Fixture::new();
+        f.write(".gitignore", ".worktrees/\n");
         f.write("src/todos.ts", "export const parse = () => [];");
         let git = |root: &Path, args: &[&str]| {
             let ok = crate::commands::git_command::command(
@@ -613,6 +628,14 @@ mod tests {
             Arc::ptr_eq(&first, &reused),
             "the worktree reused the repository scan"
         );
+        f.write("src/todos.ts", "export function freshSymbol() {}\n");
+        let changed = snapshot(&f.0).unwrap();
+        assert!(!Arc::ptr_eq(&first, &changed));
+        assert!(changed.files.iter().any(|file| file
+            .symbols
+            .iter()
+            .any(|symbol| symbol.name == "freshSymbol")));
+        assert!(Arc::ptr_eq(&reused, &snapshot(&tree).unwrap()));
         git(
             &f.0,
             &["worktree", "remove", "--force", tree.to_str().unwrap()],

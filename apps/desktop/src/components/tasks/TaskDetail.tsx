@@ -55,6 +55,7 @@ import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { TaskProgress } from './TaskProgress';
 import { TaskSaveRecovery } from './TaskSaveRecovery';
+import { TaskTiming } from './TaskTiming';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
 import { ValidationJourney } from './ValidationJourney';
@@ -879,6 +880,14 @@ export function TaskDetail({
                     <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
                   ))}
                 <p className="task-muted mt-3">
+                  {run.requestedServiceTier && (
+                    <>
+                      Codex processing requested:{' '}
+                      {run.requestedServiceTier === 'fast' ? 'Fast · higher usage' : 'Standard'}.
+                      Provider confirmation is unavailable.
+                      <br />
+                    </>
+                  )}
                   {run.effort && (
                     <>
                       Task approach: {run.effort} · Model effort:{' '}
@@ -889,6 +898,7 @@ export function TaskDetail({
                   Reported usage:{' '}
                   {run.usage.reported ? describeRunUsage(run) : 'Unavailable for this attempt'}
                 </p>
+                <TaskTiming run={run} />
                 {run.mcpUsage && (
                   <Disclosure className="my-3">
                     <DisclosureSummary>

@@ -17,6 +17,8 @@ export function usageEntries(runs: TaskRun[]) {
       usageObservations: [],
       effort: undefined,
       reasoningEffort: undefined,
+      codexSpeed: undefined,
+      requestedServiceTier: undefined,
       efficiency: undefined,
 
       startedAt: handoff.recordedAt,
@@ -53,6 +55,8 @@ export function usageEntries(runs: TaskRun[]) {
       usageObservations: [],
       effort: undefined,
       reasoningEffort: undefined,
+      codexSpeed: undefined,
+      requestedServiceTier: undefined,
       efficiency: undefined,
 
       startedAt: attempt.recordedAt,

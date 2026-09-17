@@ -49,6 +49,12 @@ const requestedEffort = value('--effort', null);
 const efforts = Object.fromEntries(
   variants.map((v) => [v, value(`--${v}-effort`, requestedEffort)]),
 );
+const speeds = Object.fromEntries(
+  variants.map((variant) => [
+    variant,
+    value(`--${variant}-codex-speed`, value('--codex-speed', null)),
+  ]),
+);
 const repeat = Number(value('--repeat', '3'));
 const seconds = Number(value('--seconds', '180'));
 const tokens = Number(value('--tokens', '250000'));
@@ -72,6 +78,9 @@ if (
   Object.values(efforts).some(
     (e) => e !== null && !['quick', 'balanced', 'thorough'].includes(e),
   ) ||
+  Object.values(speeds).some(
+    (speed) => speed !== null && (agent !== 'codex' || !['standard', 'fast'].includes(speed)),
+  ) ||
   selected.some((id) => !cases.some((c) => c.id === id)) ||
   !Number.isInteger(repeat) ||
   repeat < 1 ||
@@ -93,6 +102,7 @@ if (!args.includes('--execute')) {
         variants: Object.keys(binaries),
         repeat,
         efforts,
+        speeds,
         seconds,
         tokens,
         agent,
@@ -149,6 +159,8 @@ if (!args.includes('--execute')) {
       saved.cliVersion !== cliVersion ||
       saved.seconds !== seconds ||
       saved.tokens !== tokens ||
+      JSON.stringify(saved.speeds ?? Object.fromEntries(variants.map((v) => [v, null]))) !==
+        JSON.stringify(speeds) ||
       JSON.stringify(saved.efforts ?? Object.fromEntries(variants.map((v) => [v, null]))) !==
         JSON.stringify(efforts) ||
       Object.keys(saved.executableHashes).join() !== variants.join() ||
@@ -193,6 +205,7 @@ if (!args.includes('--execute')) {
           seconds,
           tokens,
           ...(efforts[variant] ? { effort: efforts[variant] } : {}),
+          ...(speeds[variant] ? { codexSpeed: speeds[variant] } : {}),
         };
         const specPath = path.join(output, `${id}-${repetition}-${variant}.json`);
         if (saved) {
@@ -298,6 +311,8 @@ if (!args.includes('--execute')) {
           category: fixture.category ?? fixture.id,
           split: fixture.split ?? 'regression',
           effort: efforts[variant],
+          codexSpeed: speeds[variant],
+          requestedServiceTier: run?.requestedServiceTier ?? null,
           reasoningEffort: run?.reasoningEffort ?? null,
           efficiency: run?.efficiency ?? null,
           stages: run?.stages ?? [],
@@ -317,7 +332,7 @@ if (!args.includes('--execute')) {
         const summary = qualitySummary(trials, Object.keys(binaries));
         await writeFile(
           `${comparisonPath}.tmp`,
-          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, efforts, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
+          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
         );
         await rename(`${comparisonPath}.tmp`, comparisonPath);
         console.log(JSON.stringify(trials.at(-1)));

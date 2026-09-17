@@ -9,16 +9,31 @@ static CHECKS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::
 
 pub(super) struct CheckSlot;
 
+fn capacity(cores: usize, configured: Option<&str>) -> usize {
+    configured
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| (1..=8).contains(value))
+        .unwrap_or_else(|| (cores / 4).clamp(1, 4))
+}
+
+fn concurrency() -> usize {
+    capacity(
+        std::thread::available_parallelism().map_or(4, |count| count.get()),
+        std::env::var("JACKALOPE_CHECK_CONCURRENCY").ok().as_deref(),
+    )
+}
+
 pub(super) fn check_slot(canceled: impl Fn() -> bool) -> Result<CheckSlot, String> {
     use std::sync::atomic::Ordering;
     let started = std::time::Instant::now();
+    let limit = concurrency();
     loop {
         if canceled() || started.elapsed().as_secs() >= super::QUEUE_TIMEOUT_SECS {
             return Err("Verification was canceled or timed out waiting for a check slot.".into());
         }
         if CHECKS
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |count| {
-                (count < 2).then_some(count + 1)
+                (count < limit).then_some(count + 1)
             })
             .is_ok()
         {
@@ -81,6 +96,16 @@ impl Drop for Lease {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn check_capacity_is_bounded_and_reserves_cores_for_workers() {
+        for (cores, expected) in [(1, 1), (4, 1), (8, 2), (16, 4), (64, 4)] {
+            assert_eq!(capacity(cores, None), expected);
+            assert_eq!(capacity(cores, Some("0")), expected);
+            assert_eq!(capacity(cores, Some("9")), expected);
+        }
+        assert_eq!(capacity(64, Some("1")), 1);
+        assert_eq!(capacity(4, Some("8")), 8);
+    }
     #[test]
     fn canceled_queue_wait_does_not_claim_capacity() {
         assert!(check_slot(|| true).is_err());

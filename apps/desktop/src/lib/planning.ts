@@ -13,6 +13,7 @@ export function planningDraft(
     | 'connectionIds'
     | 'contextSelection'
     | 'effort'
+    | 'codexSpeed'
     | 'model'
   >,
 ) {
@@ -44,6 +45,7 @@ export function planningDraft(
     : automatic && task.rawPrompt === generated;
   return {
     effort: task.effort,
+    codexSpeed: task.codexSpeed,
     model: task.model,
     contextSelection: task.contextSelection,
     prompt: structured ? task.rawPrompt : task.refinedPrompt || task.rawPrompt,

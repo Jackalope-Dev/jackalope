@@ -132,6 +132,7 @@ pub(in crate::commands) fn prepare(
         let saved = record.clone();
         runtime.update_checked(id, |run| {
             run.preparation = Some(saved);
+            run.efficiency.preparation_reuses += 1;
             activity(
                 run,
                 "Workspace dependencies already match the project manifests. Skipped the setup command.",
@@ -141,7 +142,9 @@ pub(in crate::commands) fn prepare(
     }
     let _lease = leases::reserve(workspace)?;
     drop(guard);
-    let _slot = leases::check_slot(|| !runtime.is_running(id))?;
+    let _slot = runtime.timed(id, "preparationWait", || {
+        leases::check_slot(|| !runtime.is_running(id))
+    })?;
     let mut attempt = 1;
     let record = loop {
         runtime.update_checked(id, |run| {
@@ -159,12 +162,14 @@ pub(in crate::commands) fn prepare(
                 },
             );
         })?;
-        let result = process_control::run_supervised(
-            shell(command, workspace)?,
-            check_limits(PREPARE_STALL_SECS),
-            || !runtime.is_running(id),
-            observer(runtime, id),
-        )?;
+        let result = runtime.timed(id, "preparation", || {
+            process_control::run_supervised(
+                shell(command, workspace)?,
+                check_limits(PREPARE_STALL_SECS),
+                || !runtime.is_running(id),
+                observer(runtime, id),
+            )
+        })?;
         let record = PreparationRecord::from_result(command, attempt, &result);
         let saved = record.clone();
         runtime.update_checked(id, |run| {
@@ -201,7 +206,9 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
                 1,
             ));
         });
-        let _slot = leases::check_slot(|| active && !runtime.is_running(&run.id))?;
+        let _slot = runtime.timed(&run.id, "verificationWait", || {
+            leases::check_slot(|| active && !runtime.is_running(&run.id))
+        })?;
         let directory = runtime.integration_directory();
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let before = super::integration::workspace_tree(run, &directory)?;
@@ -214,12 +221,14 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
                 1,
             ))
         });
-        let result = process_control::run_supervised(
-            shell(command, &run.workspace)?,
-            check_limits(CHECK_STALL_SECS),
-            || agent_active && !runtime.is_running(&run.id),
-            observer(runtime, &run.id),
-        )?;
+        let result = runtime.timed(&run.id, "verification", || {
+            process_control::run_supervised(
+                shell(command, &run.workspace)?,
+                check_limits(CHECK_STALL_SECS),
+                || agent_active && !runtime.is_running(&run.id),
+                observer(runtime, &run.id),
+            )
+        })?;
         runtime.update(&run.id, |r| r.progress = None);
         let after = super::integration::workspace_tree(run, &directory)?;
         let verification = Verification {
@@ -261,6 +270,7 @@ pub(in crate::commands) fn finish(runtime: &TaskRuntime, id: &str) -> Result<(),
         return Err("Checks could not start while another attempt owns this workspace.".into());
     }
     if reusable_check(runtime, run, command)?.is_some() {
+        runtime.update_checked(id, |r| r.efficiency.verification_reuses += 1)?;
         return Ok(());
     }
     let _lease = leases::reserve(&run.workspace)?;
@@ -304,6 +314,7 @@ pub async fn agent_verify(
         let _lease = leases::reserve(&run.workspace)?;
         if let Some(check) = reusable_check(&runtime, run, command)? {
             let mut response = output::response(check);
+            runtime.update_checked(&run.id, |r| r.efficiency.verification_reuses += 1)?;
             response["reused"] = true.into();
             return Ok(response);
         }

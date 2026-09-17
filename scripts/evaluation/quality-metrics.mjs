@@ -28,6 +28,17 @@ export function qualitySummary(trials, variants = ['before', 'after']) {
           : null;
       const successes = rows.filter((trial) => trial.oraclePassed).length;
       const elapsed = measurements(rows.map((trial) => trial.elapsedMs));
+      const accepted = rows.filter((trial) => trial.accepted === true).length;
+      const reviewed = rows.filter((trial) => typeof trial.accepted === 'boolean').length;
+      const delivery = measurements(
+        rows.map((trial) =>
+          [trial.elapsedMs, trial.reviewMinutes, trial.correctionMinutes].every(
+            (value) => Number.isFinite(value) && value >= 0,
+          )
+            ? trial.elapsedMs + (trial.reviewMinutes + trial.correctionMinutes) * 60_000
+            : null,
+        ),
+      );
       const phases = [
         ...new Set(rows.flatMap((trial) => Object.keys(trial.efficiency?.timings ?? {}))),
       ].sort();
@@ -36,6 +47,13 @@ export function qualitySummary(trials, variants = ['before', 'after']) {
         {
           trials: rows.length,
           oraclePassed: successes,
+          accepted,
+          reviewCoverage: reviewed,
+          deliveryMs: delivery,
+          msPerAcceptedResult:
+            accepted && reviewed === rows.length && delivery.total !== null
+              ? delivery.total / accepted
+              : null,
           usageCoverage: measured.length,
           totalTokens: total,
           tokensPerOracleSuccess: successes && total !== null ? total / successes : null,
@@ -43,6 +61,10 @@ export function qualitySummary(trials, variants = ['before', 'after']) {
           msPerOracleSuccess:
             successes && elapsed.total !== null ? elapsed.total / successes : null,
           firstActivityMs: measurements(rows.map((trial) => trial.efficiency?.firstActivityMs)),
+          verificationReuses: measurements(
+            rows.map((trial) => trial.efficiency?.verificationReuses),
+          ),
+          preparationReuses: measurements(rows.map((trial) => trial.efficiency?.preparationReuses)),
           timings: Object.fromEntries(
             phases.map((phase) => [
               phase,

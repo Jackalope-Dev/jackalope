@@ -49,6 +49,7 @@ export function routingEvidence(comparisons, outcome = 'accepted') {
         comparison.cliVersion ?? null,
         comparison.executableHashes?.[trial.variant] ?? null,
         trial.profileFingerprint ?? null,
+        trial.requestedServiceTier ?? null,
       ]);
       const group = groups.get(key) ?? {
         category: trial.category,
@@ -59,6 +60,7 @@ export function routingEvidence(comparisons, outcome = 'accepted') {
         cliVersion: comparison.cliVersion ?? null,
         executableHash: comparison.executableHashes?.[trial.variant] ?? null,
         profileFingerprint: trial.profileFingerprint ?? null,
+        requestedServiceTier: trial.requestedServiceTier ?? null,
         train: [],
         holdout: [],
       };

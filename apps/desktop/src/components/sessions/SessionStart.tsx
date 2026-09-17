@@ -11,6 +11,7 @@ import { syncAgentConfig } from '../../stores/agentConfigStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { agentAccountFor, type Project } from '../../stores/projectStore';
 import { TaskKnowledge } from '../knowledge/TaskKnowledge';
+import { CodexSpeedSelect } from '../tasks/CodexSpeedSelect';
 import { TaskAssessmentNotice, useTaskAssessment } from '../tasks/useTaskAssessment';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -40,6 +41,10 @@ export function SessionStart({
     } catch {
       return {};
     }
+  });
+  const [codexSpeed, setCodexSpeed] = useState<RunRequest['codexSpeed']>(() => {
+    const saved = localStorage.getItem(`${draftKey}:codex-speed`);
+    return saved === 'fast' || saved === 'standard' ? saved : undefined;
   });
   const [busy, setBusy] = useState(false);
   const [limits, setLimits] = useState<Limits>(() => {
@@ -84,10 +89,12 @@ export function SessionStart({
       else localStorage.removeItem(draftKey);
       localStorage.setItem(`${draftKey}:context`, JSON.stringify(context));
       localStorage.setItem(`${draftKey}:limits`, JSON.stringify(limits));
+      if (codexSpeed) localStorage.setItem(`${draftKey}:codex-speed`, codexSpeed);
+      else localStorage.removeItem(`${draftKey}:codex-speed`);
     } catch {
       setError('This draft could not be saved. Keep this page open until sending succeeds.');
     }
-  }, [draftKey, text, context, limits]);
+  }, [draftKey, text, context, limits, codexSpeed]);
   const send = async (choice: 'assess' | 'single' | 'plan' = 'assess') => {
     const value = text.trim();
     if (!project || !value || sending.current) return;
@@ -112,6 +119,7 @@ export function SessionStart({
         projectName: project.name,
         projectPath: project.path,
         agent,
+        codexSpeed,
         agentProfileId: agentAccountFor(project, agent),
         prompt: value,
         isolated: true,
@@ -169,6 +177,19 @@ export function SessionStart({
             <ChatOptions
               onClose={() => input.current?.focus()}
               items={[
+                {
+                  id: 'speed',
+                  label: 'Codex speed',
+                  content: () => (
+                    <CodexSpeedSelect
+                      value={codexSpeed}
+                      onChange={(value) => {
+                        assessment.clear();
+                        setCodexSpeed(value);
+                      }}
+                    />
+                  ),
+                },
                 {
                   id: 'limits',
                   label: 'Session limits',

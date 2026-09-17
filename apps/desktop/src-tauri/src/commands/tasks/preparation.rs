@@ -141,25 +141,116 @@ pub fn tail(text: &str, limit: usize) -> String {
 pub fn fingerprint(workspace: &Path, command: &str) -> String {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    "preparation-v2".hash(&mut hasher);
+    std::env::consts::OS.hash(&mut hasher);
+    std::env::consts::ARCH.hash(&mut hasher);
     command.hash(&mut hasher);
-    for name in MANIFESTS {
-        name.hash(&mut hasher);
-        match std::fs::read(workspace.join(name)) {
-            Ok(bytes) => bytes.hash(&mut hasher),
-            Err(_) => b"absent".hash(&mut hasher),
+    let Some(inputs) = dependency_inputs(workspace) else {
+        return uuid::Uuid::new_v4().to_string();
+    };
+    let mut bytes = 0;
+    for input in inputs {
+        input.hash(&mut hasher);
+        let Ok(metadata) = std::fs::metadata(workspace.join(&input)) else {
+            return uuid::Uuid::new_v4().to_string();
+        };
+        bytes += metadata.len();
+        if bytes > 8 * 1024 * 1024 {
+            return uuid::Uuid::new_v4().to_string();
         }
+        let Ok(content) = std::fs::read(workspace.join(input)) else {
+            return uuid::Uuid::new_v4().to_string();
+        };
+        content.hash(&mut hasher);
     }
-    // Workspace package manifests matter too: a new package changes what a workspace install links.
-    if let Ok(text) = std::fs::read_to_string(workspace.join("pnpm-workspace.yaml")) {
-        text.hash(&mut hasher);
+    for name in [
+        "PATH",
+        "NODE_ENV",
+        "npm_config_production",
+        "RUSTUP_TOOLCHAIN",
+        "VIRTUAL_ENV",
+        "UV_PROJECT_ENVIRONMENT",
+    ] {
+        name.hash(&mut hasher);
+        std::env::var_os(name).hash(&mut hasher);
     }
     format!("{:016x}", hasher.finish())
+}
+
+fn dependency_inputs(workspace: &Path) -> Option<Vec<String>> {
+    let mut paths = Vec::new();
+    let walk = ignore::WalkBuilder::new(workspace)
+        .hidden(false)
+        .follow_links(false)
+        .filter_entry(|entry| {
+            !entry.file_type().is_some_and(|kind| kind.is_dir())
+                || ![
+                    ".git",
+                    ".worktrees",
+                    ".jackalope",
+                    "node_modules",
+                    "target",
+                    ".venv",
+                    "venv",
+                    "dist",
+                    "build",
+                ]
+                .contains(&entry.file_name().to_str().unwrap_or_default())
+        })
+        .build();
+    for (count, entry) in walk.enumerate() {
+        if count >= 20_000 {
+            return None;
+        }
+        let entry = entry.ok()?;
+        if !entry.file_type().is_some_and(|kind| kind.is_file()) {
+            continue;
+        }
+        let name = entry.file_name().to_str()?;
+        let relative = entry
+            .path()
+            .strip_prefix(workspace)
+            .ok()?
+            .to_str()?
+            .replace('\\', "/");
+        if MANIFESTS.contains(&name)
+            || [
+                "package.json",
+                "Cargo.toml",
+                "pyproject.toml",
+                "go.mod",
+                "pnpm-workspace.yaml",
+                ".npmrc",
+                ".yarnrc.yml",
+                ".node-version",
+                ".nvmrc",
+                ".python-version",
+                "rust-toolchain.toml",
+                "rust-toolchain",
+            ]
+            .contains(&name)
+            || relative.starts_with("scripts/")
+            || relative.starts_with(".cargo/")
+        {
+            paths.push(relative);
+        }
+    }
+    paths.sort();
+    Some(paths)
 }
 
 /// Read the marker a previous successful run left, if it still matches this fingerprint.
 pub fn already_prepared(workspace: &Path, fingerprint: &str) -> Option<String> {
     let text = std::fs::read_to_string(workspace.join(MARKER)).ok()?;
     let saved: Value = serde_json::from_str(&text).ok()?;
+    let artifacts = saved["artifacts"].as_array()?;
+    if artifacts.iter().any(|artifact| {
+        artifact.as_str().is_none_or(|name| {
+            !["node_modules", ".venv", "venv"].contains(&name) || !workspace.join(name).is_dir()
+        })
+    }) {
+        return None;
+    }
     (saved["fingerprint"].as_str()? == fingerprint).then(|| {
         saved["completedAt"]
             .as_str()
@@ -183,6 +274,7 @@ pub fn record_prepared(workspace: &Path, fingerprint: &str, command: &str) {
             "fingerprint": fingerprint,
             "command": command,
             "completedAt": Utc::now().to_rfc3339(),
+            "artifacts": (["node_modules", ".venv", "venv"].into_iter().filter(|name| workspace.join(name).is_dir()).collect::<Vec<_>>()),
         })
         .to_string(),
     );
@@ -223,6 +315,31 @@ mod tests {
             fingerprint(&workspace, "pnpm install"),
             "editing a lockfile must change the digest"
         );
+        std::fs::remove_dir_all(workspace).unwrap();
+    }
+
+    #[test]
+    fn preparation_invalidates_nested_manifests_scripts_and_removed_dependencies() {
+        let workspace = scratch();
+        std::fs::create_dir_all(workspace.join("packages/one")).unwrap();
+        std::fs::create_dir_all(workspace.join("scripts")).unwrap();
+        std::fs::write(workspace.join("packages/one/package.json"), "{}").unwrap();
+        let first = fingerprint(&workspace, "pnpm install");
+        std::fs::write(
+            workspace.join("packages/one/package.json"),
+            "{\"version\":\"2\"}",
+        )
+        .unwrap();
+        let second = fingerprint(&workspace, "pnpm install");
+        assert_ne!(first, second);
+        std::fs::write(workspace.join("scripts/setup.mjs"), "prepare()").unwrap();
+        let third = fingerprint(&workspace, "pnpm install");
+        assert_ne!(second, third);
+        std::fs::create_dir(workspace.join("node_modules")).unwrap();
+        record_prepared(&workspace, &third, "pnpm install");
+        assert!(already_prepared(&workspace, &third).is_some());
+        std::fs::remove_dir(workspace.join("node_modules")).unwrap();
+        assert!(already_prepared(&workspace, &third).is_none());
         std::fs::remove_dir_all(workspace).unwrap();
     }
 

@@ -18,6 +18,7 @@ mod routing;
 mod runners;
 mod runtime;
 mod snapshots;
+pub(super) mod speed;
 mod storage;
 #[cfg(test)]
 mod tests;

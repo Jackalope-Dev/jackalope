@@ -19,6 +19,7 @@ import type { TaskStatus } from './taskStore';
 
 export interface TaskDraft {
   effort?: TaskEffort;
+  codexSpeed?: 'standard' | 'fast';
   model?: string;
   contextSelection?: ContextSelection;
   prompt: string;

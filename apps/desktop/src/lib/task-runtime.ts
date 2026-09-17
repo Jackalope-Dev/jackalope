@@ -22,6 +22,8 @@ export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
   effort?: import('./task-effort').TaskEffort | null;
+  codexSpeed?: 'standard' | 'fast' | null;
+  requestedServiceTier?: string | null;
   reasoningEffort?: string | null;
   efficiency?: {
     timings?: Record<string, { calls: number; totalMs: number; maxMs: number }>;
@@ -35,6 +37,8 @@ export interface TaskRun {
     launches: number;
     verificationCalls: number;
     verificationFailures: number;
+    verificationReuses?: number;
+    preparationReuses?: number;
     verificationStdoutBytes: number;
     verificationDeliveredBytes: number;
   };
@@ -223,6 +227,7 @@ export interface ScreenshotArtifact {
 }
 export interface RunRequest {
   effort?: import('./task-effort').TaskEffort;
+  codexSpeed?: 'standard' | 'fast';
   contextSelection?: import('./knowledge').ContextSelection;
   connectionIds?: string[];
   model?: string;
