@@ -7,6 +7,9 @@ import { buildAdmin } from './scripts/build-admin.mjs';
 await buildAdmin();
 
 export default defineConfig({
+  test: {
+    testTimeout: 30_000,
+  },
   plugins: [
     cloudflareTest({
       wrangler: { configPath: './wrangler.jsonc' },

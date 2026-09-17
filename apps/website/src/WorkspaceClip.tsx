@@ -43,7 +43,7 @@ export function WorkspaceClip({
         <button
           type="button"
           onClick={() => setStarted(true)}
-          aria-label={`Play ${scene.label.toLowerCase()} demo`}
+          aria-label={`See it in motion: ${scene.label.toLowerCase()} demo`}
           aria-describedby={descriptionId}
         >
           <img

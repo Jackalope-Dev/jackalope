@@ -38,7 +38,7 @@ export const growthPages: MarketingPage[] = [
     kind: 'Workspace comparison',
     title: 'Compare coding-agent workspaces | Jackalope',
     description:
-      'Compare Jackalope with Superset, Orca, Conductor, Emdash, Braid, Worktree, Codius, and Hermes by the workflow you want.',
+      'Compare Jackalope with Codex app, Cursor, Superset, Orca, and other coding-agent workspaces by agent choice, execution, and review.',
     headline: 'Your agents are a choice. So is your workspace.',
     lede: 'Choose a workspace around the way you brief agents, follow parallel work, and review changes. Here is how Jackalope fits.',
     image: 'review',
@@ -59,6 +59,16 @@ export const growthPages: MarketingPage[] = [
         table: {
           columns: ['Requirement', 'Products to examine', 'What to check'],
           rows: [
+            [
+              'Codex with local and cloud environments',
+              'Codex app',
+              'Whether Codex’s own worktrees and Git review cover the workflow, or you need several agent CLIs together.',
+            ],
+            [
+              'An integrated agent and cloud workflow',
+              'Cursor',
+              'Worktrees in the Agents Window, cloud execution, and how results reach review.',
+            ],
             [
               'Remote machines and scheduled work',
               'Superset, Codius, Emdash',
@@ -97,6 +107,8 @@ export const growthPages: MarketingPage[] = [
           ],
         },
         links: [
+          { href: '/compare/codex-app/', label: 'Jackalope vs Codex app' },
+          { href: '/compare/cursor/', label: 'Jackalope vs Cursor' },
           {
             href: '/compare/superset/',
             label: 'Jackalope vs Superset',
@@ -299,7 +311,7 @@ export const growthPages: MarketingPage[] = [
       {
         title: 'Keep browser and native acceptance separate.',
         paragraphs: [
-          'The selected agent needs a supported path to the browser tools. Check connection support before assigning the task; OpenCode uses its own CLI tools rather than Jackalope project-tool delivery. Use a test account and environment appropriate to the actions in the brief.',
+          'The selected agent needs a supported path to the browser tools. Codex, Claude Code, OpenCode, and Kimi Code support direct project connections. Grok, Antigravity, and Gemini CLI use on-demand discovery through a permitted HTTP client. Check the selected account and tool permissions, and use a test environment appropriate to the brief.',
           'A browser preview does not exercise a packaged desktop application’s native permissions or operating-system integration. For a change that crosses that boundary, retain the browser evidence and name the additional installed-app check needed before acceptance.',
         ],
         links: [

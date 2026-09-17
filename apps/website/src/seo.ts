@@ -3,6 +3,7 @@ import { serializeBlogPost } from './blog-types.ts';
 import { company, normalizePath, pages, posts, siteOrigin, tour, updates } from './content.ts';
 import { knowledgeGuides } from './knowledge-content.ts';
 import { type MarketingPage, marketingPages } from './marketing-content.ts';
+import { platformDownloads } from './platform-downloads.ts';
 
 const escapeHtml = (value: string) =>
   value.replace(
@@ -17,11 +18,20 @@ export const indexablePages = pages.filter((page) => !page.noindex);
 function lastModified(path: string) {
   const comparison = marketingPages.find((page) => page.path === path)?.comparison;
   if (comparison) return comparison.reviewed;
-  if (path === '/compare/') return '2026-09-09';
+  if (path === '/compare/')
+    return marketingPages
+      .flatMap((page) => page.comparison?.reviewed ?? [])
+      .sort()
+      .at(-1);
   if (path === '/tour/') return tour.published;
   if (path === '/changelog/') return updates[0]?.date;
-  if (path === '/blog/') return posts[0]?.date;
-  return posts.find((post) => path === `/blog/${post.slug}/`)?.date;
+  if (path === '/blog/')
+    return posts
+      .map((post) => post.updated ?? post.date)
+      .sort()
+      .at(-1);
+  const post = posts.find((post) => path === `/blog/${post.slug}/`);
+  return post?.updated ?? post?.date;
 }
 
 export function pageHtml(html: string, path: string, origin = siteOrigin) {
@@ -76,7 +86,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
       isPartOf: { '@id': `${origin}/#website` },
       ...(comparison
         ? {
-            datePublished: comparison.reviewed,
+            datePublished: comparison.published,
             dateModified: comparison.reviewed,
             author: { '@id': `${origin}/#organization` },
             publisher: { '@id': `${origin}/#organization` },
@@ -95,7 +105,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
         : post
           ? {
               datePublished: post.date,
-              dateModified: post.date,
+              dateModified: post.updated ?? post.date,
               author: { '@type': 'Organization', name: company.name, url: company.url },
               publisher: { '@id': `${origin}/#organization` },
               image: `${origin}/social-preview.png`,
@@ -225,7 +235,7 @@ export function pageHtml(html: string, path: string, origin = siteOrigin) {
     ...(post
       ? [
           `<meta property="article:published_time" content="${post.date}T12:00:00Z" />`,
-          `<meta property="article:modified_time" content="${post.date}T12:00:00Z" />`,
+          `<meta property="article:modified_time" content="${post.updated ?? post.date}T12:00:00Z" />`,
         ]
       : []),
     `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')}</script>`,
@@ -275,10 +285,11 @@ function marketingPageText(page: MarketingPage, origin: string) {
   return `# ${page.headline}\n${origin}${page.path}\n\n${page.lede}\n\n${body}\n\n${details}`;
 }
 
-export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
-  const availability = releaseVersion
-    ? `Windows x64 version ${releaseVersion} is available at ${origin}/#download. See ${origin}/roadmap/ for platform plans.`
-    : 'Public downloads are not open yet. Join the waitlist for early-access news. See the roadmap for platform plans.';
+export function discoveryFiles(origin = siteOrigin, env: Record<string, string | undefined> = {}) {
+  const downloads = platformDownloads(env).filter((platform) => platform.url);
+  const availability = downloads.length
+    ? `Downloads are configured for ${downloads.map((platform) => `${platform.name}${platform.store ? ' through Microsoft Store' : ` version ${env.VITE_RELEASE_VERSION?.trim()}`}`).join(', ')}. See ${origin}/download/ for current availability and access requirements. Early access requires waitlist approval or a claimed Instant Access Pass; model access is separate.`
+    : `Public downloads are not open yet. Join the waitlist for early-access news. See ${origin}/download/ for platform availability.`;
   const intro = `# Jackalope\n\n> A desktop workspace for coding agents, local Git projects, tasks, worktrees, and review.\n\nJackalope is a product of Jackalope Digital LLC (${company.url}). The canonical product website is ${origin}.\n\n## Availability\n\n${availability} Users bring their own locally installed agents and provider accounts; an AI subscription is not included.\n\n## Product\n\nTasks keep ideas, attempts, results, and review together. Isolated Git worktrees separate working directories. Users inspect patches and run project checks before deciding what to integrate. Website screenshots and the recorded tour use Atlas sample project data.\n\n`;
   const publicPages = indexablePages;
   const links = publicPages
@@ -289,8 +300,8 @@ export function discoveryFiles(origin = siteOrigin, releaseVersion?: string) {
     'knowledge/llms.txt': `# Jackalope knowledgebase\n\n> Official help for Jackalope and its local agent tools.\n\n## Guides\n\n${knowledgeGuides.map((guide) => `- [${guide.title}](${origin}/knowledge/${guide.slug}/index.md): ${guide.description}`).join('\n')}\n`,
     'robots.txt': `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`,
     'sitemap.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPages.map((page) => `<url><loc>${escapeHtml(origin + page.path)}</loc>${lastModified(page.path) ? `<lastmod>${lastModified(page.path)}</lastmod>` : ''}</url>`).join('')}</urlset>`,
-    'llms.txt': `${intro}## Agent support\n\nNative task adapters: Codex, Claude Code, Grok Build, OpenCode, Kimi Code, and Antigravity. Direct project MCP connections support Codex, Claude Code, OpenCode, and Kimi Code; all six adapters support on-demand discovery. Kimi supports named accounts, model selection, structured questions, task tokens, membership quota, routing, and Ask Jackalope. Antigravity is worker-only; its current model and subscription quota use read-only CLI commands. Named profiles use Gemini API keys with separate billing, while subscription login is shared. Gemini CLI, Aider, and Goose offer account setup but not task execution. Provider access and reported usage vary by adapter. See ${origin}/agents/ for coverage and limits and ${origin}/agents/kimi-code/ for Kimi setup.\n\n## Knowledgebase & Diagnostics\n\n- [Agent-readable documentation index](${origin}/knowledge/llms.txt)\n- [Ask Jackalope and local MCP tools](${origin}/knowledge/ask-jackalope/index.md)\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: Reported quota windows, preflight headroom estimates, and up to three handoffs\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
-    'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => guideMarkdown(guide, origin)).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note ?? ''}`).join('\n\n')}\n`,
+    'llms.txt': `${intro}## Agent support\n\nNative task adapters: Codex, Claude Code, Grok Build, OpenCode, Kimi Code, Gemini CLI, and Antigravity. Direct project MCP connections support Codex, Claude Code, OpenCode, and Kimi Code; all seven adapters support on-demand discovery. Kimi supports named accounts, model selection, structured questions, task tokens, membership quota, routing, and Ask Jackalope. Antigravity is worker-only; its current model and subscription quota use read-only CLI commands. Named profiles use Gemini API keys with separate billing, while subscription login is shared. Gemini CLI runs worker tasks with session continuation and file-edit approval; shell and HTTP tools follow its own permission policy. Its quota is unknown, and it does not coordinate routing or Ask Jackalope. Installed-provider acceptance remains open. Aider and Goose offer account setup but not task execution. Provider access and reported usage vary by adapter. See ${origin}/agents/ for coverage and limits and ${origin}/agents/kimi-code/ for Kimi setup.\n\n## Knowledgebase & Diagnostics\n\n- [Agent-readable documentation index](${origin}/knowledge/llms.txt)\n- [Ask Jackalope and local MCP tools](${origin}/knowledge/ask-jackalope/index.md)\n\nOfficial documentation, architecture guides, and troubleshooting recipes are available at ${origin}/knowledge/:\n- Isolated Git Worktree Architecture: Preventing checkout collisions across parallel agents\n- Task Routing & Quota Handoff: Reported quota windows, preflight headroom estimates, and up to three handoffs\n- Multi-Account Profiles: Segregating Work and Personal agent provider sign-ins\n- MCP Tools & Built-In Browser Automation: Central Model Context Protocol management\n- Diagnostic Playbook: Resolving missing CLI PATH, expired tokens, and worktree lock errors\n\n## Pages\n\n${links}\n\n## Optional\n\n- [Full text](${origin}/llms-full.txt)\n- [RSS feed](${origin}/feed.xml)\n`,
+    'llms-full.txt': `${intro}${marketingPages.map((page) => marketingPageText(page, origin)).join('\n\n')}\n\n# Jackalope Knowledgebase & Documentation\n${origin}/knowledge/\n\n${knowledgeGuides.map((guide) => guideMarkdown(guide, origin)).join('\n\n')}\n\n${posts.map((post) => `# ${post.title}\n${origin}/blog/${post.slug}/\nPublished ${post.date} by ${company.name}.${post.updated ? ` Updated ${post.updated}.` : ''}\n\n${serializeBlogPost(post)}`).join('\n\n')}\n\n# Changelog\n\n${updates.map((update) => `## ${update.date}: ${update.title} (${update.status})\n\n${update.description}\n${update.items.map((item) => `- ${item}`).join('\n')}\n\n${update.note ?? ''}`).join('\n\n')}\n`,
     'feed.xml': `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Jackalope field notes</title><link>${origin}/blog/</link><description>Notes from the Jackalope studio.</description><language>en</language><atom:link href="${origin}/feed.xml" rel="self" type="application/rss+xml"/>${posts.map((post) => `<item><title>${escapeHtml(post.title)}</title><link>${origin}/blog/${post.slug}/</link><guid isPermaLink="true">${origin}/blog/${post.slug}/</guid><pubDate>${new Date(`${post.date}T12:00:00Z`).toUTCString()}</pubDate><description>${escapeHtml(post.description)}</description></item>`).join('')}</channel></rss>`,
     'site.webmanifest': JSON.stringify({
       name: 'Jackalope',

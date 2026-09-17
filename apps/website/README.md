@@ -25,6 +25,12 @@ dated milestones in `src/changelog.json`. Update the shared source when content
 changes; route metadata, structured data, sitemap, RSS and LLM-readable discovery
 files are generated from it.
 
+Keep article publication dates stable when editing. Use a field note's `updated`
+date for a substantive revision, and keep comparison `published` dates separate
+from `reviewed` source dates. Visible bylines, article metadata and sitemap dates
+must agree; ordinary builds do not refresh editorial dates. Discovery availability
+uses the same platform configuration as the download page, including Store links.
+
 `public/media` contains runtime screenshots and the current 64-second tour.
 The recording uses fictional sample projects, accounts, activity and check results,
 with an instrumental soundtrack and English captions. It demonstrates the frontend,

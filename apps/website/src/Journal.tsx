@@ -134,6 +134,12 @@ export function JournalPage({ path }: { path: string }) {
           <div className="article-byline">
             Jackalope Digital LLC <span>·</span>{' '}
             <time dateTime={post.date}>{dateLabel(post.date)}</time>
+            {post.updated && (
+              <>
+                <span>·</span> Updated{' '}
+                <time dateTime={post.updated}>{dateLabel(post.updated)}</time>
+              </>
+            )}
             <span>·</span>
             {post.readingTime}
           </div>

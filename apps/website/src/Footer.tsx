@@ -38,6 +38,7 @@ const groups: Array<{ title: string; links: Array<[string, string, ReactNode?]> 
       ['Grok', '/agents/grok/'],
       ['OpenCode', '/agents/opencode/'],
       ['Kimi Code', '/agents/kimi-code/'],
+      ['Gemini CLI', '/agents/gemini-cli/'],
     ],
   },
   {

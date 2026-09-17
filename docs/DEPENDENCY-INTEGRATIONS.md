@@ -68,6 +68,15 @@ reduce competing lockfile changes. Review larger upgrades separately. Keep the
 direct `windows`, `windows-collections` and `windows-future` crates on the same
 Windows bindings generation; they exchange types through `windows-core`.
 
+Update `@pierre/diffs` manually together with its version-specific pnpm patch;
+Dependabot cannot rebase that patch. Keyring major upgrades also require manual
+review of platform features and saved-credential compatibility. Dependabot skips
+these version updates; dependency audits still check the installed versions.
+
+The server's Workers and D1 integration tests have a 30-second per-test timeout
+to accommodate hosted Windows runner overhead while retaining a bounded failure
+for stalled requests. Test assertions and concurrent-delivery coverage still run.
+
 `pnpm check:dependencies` checks JavaScript and Rust advisories. Install
 `cargo-audit` 0.22.2 with `cargo install cargo-audit --version 0.22.2 --locked`.
 The check fails on vulnerabilities and unreviewed warnings. The exact package,

@@ -28,6 +28,11 @@ export async function verifySeo(directory, pages, origin) {
     const html = await read(page.path === '/404/' ? '404.html' : `${page.path.slice(1)}index.html`);
     const head = html.match(/<head>([\s\S]*?)<\/head>/)?.[1];
     assert.ok(head, `${page.path}: missing head`);
+    assert.match(
+      Buffer.from(html).subarray(0, 1024).toString(),
+      /<meta charset="utf-8"\s*\/?>/i,
+      `${page.path}: declare UTF-8 within the first 1024 bytes`,
+    );
     const single = (pattern, label, decodeHtml = true) => {
       const matches = [...head.matchAll(pattern)];
       assert.equal(matches.length, 1, `${page.path}: expected one ${label}`);
@@ -93,6 +98,22 @@ export async function verifySeo(directory, pages, origin) {
     assert.equal(data['@context'], 'https://schema.org');
     const entity = data['@graph'].find((entry) => entry['@id'] === `${origin}${page.path}`);
     assert.equal(entity?.description, description, `${page.path}: structured page metadata`);
+    if (entity.datePublished) {
+      assert.ok(
+        Date.parse(entity.datePublished) <= Date.parse(entity.dateModified),
+        `${page.path}: modification cannot precede publication`,
+      );
+      assert.ok(
+        html.toLowerCase().includes(`datetime="${entity.dateModified}"`),
+        `${page.path}: the article modification date must also be visible`,
+      );
+      assert.ok(
+        sitemap.includes(
+          `<loc>${origin}${page.path}</loc><lastmod>${entity.dateModified}</lastmod>`,
+        ),
+        `${page.path}: sitemap and article modification dates must agree`,
+      );
+    }
     const breadcrumbs = data['@graph'].find((entry) => entry['@type'] === 'BreadcrumbList');
     if (breadcrumbs) {
       const items = breadcrumbs.itemListElement;

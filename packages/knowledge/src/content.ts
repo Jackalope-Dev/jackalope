@@ -151,6 +151,143 @@ export interface KnowledgeGuide {
 
 export const knowledgeGuides: KnowledgeGuide[] = [
   {
+    slug: 'chat-and-follow-ups',
+    category: 'workflows',
+    title: 'Continue coding-agent work with chat and follow-ups',
+    shortTitle: 'Chat and follow-ups',
+    description:
+      'Start a chat, queue corrections, pause work, and review a saved result in Jackalope. Recover after a failed attempt or restart.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'start-chat',
+        question: 'How do I start a chat in Jackalope?',
+        paragraphs: [
+          'Open Tasks → Chat, choose your project and agent account, and send the first message. The session keeps its messages and successive batches in one isolated Git workspace. You need approved Jackalope access, a supported installed agent, and a usable provider account to run work.',
+          'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A chat processes batches in order; it is not a parallel plan.',
+        ],
+        links: [
+          { label: 'Set up an agent and account', href: '/knowledge/multi-account-and-agents/' },
+        ],
+      },
+      {
+        id: 'queue-correction',
+        question: 'Should I queue a message or stop current work?',
+        paragraphs: [
+          'Queue message saves a correction for the next batch while the current attempt continues. Messages are processed in order in the same workspace and account. Choose Stop and send when the active attempt needs to stop before the correction runs; Jackalope waits for shutdown and saves the message before resuming.',
+          'Pause queue prevents later batches from starting. Stop work also stops the active attempt. Ordinary tasks offer Queue follow-up and Stop & send with the same distinction. A failed save keeps the draft so you can recover it.',
+        ],
+        codeBox: {
+          title: 'A focused follow-up',
+          code: 'Keep the existing form layout.\nMake each validation error reachable from its input with a screen reader.\nCheck keyboard focus after a failed submission and report the checks you ran.',
+        },
+      },
+      {
+        id: 'resume-session',
+        question: 'What happens after failure, restart, or closing a popout?',
+        paragraphs: [
+          'Failures and app restarts pause dispatch. Open the saved chat, inspect the last attempt and any required action, then explicitly resume or retry when the problem is resolved. Queued messages do not silently replay after a restart.',
+          'Pop out opens a compact chat window, and its pin keeps that window on top. Closing the popout leaves execution running. Use the task’s stop controls when you want to stop work.',
+        ],
+        links: [
+          { label: 'Diagnose a stopped task', href: '/knowledge/troubleshooting-and-diagnostics/' },
+        ],
+      },
+      {
+        id: 'session-limits',
+        question: 'Do session limits enforce a spending cap?',
+        paragraphs: [
+          'No. Optional batch and estimated-cost thresholds pause subsequent batches. A running batch can exceed the threshold. If cost is unavailable and a cost threshold is set, Jackalope pauses further dispatch instead of assuming the work was free. Provider billing and usage limits remain separate.',
+        ],
+      },
+      {
+        id: 'review-chat',
+        question: 'How do I merge a finished chat?',
+        paragraphs: [
+          'Pause dispatch, then run or cancel queued messages. Stop any preview before integration. Review the cumulative patch and checks for the latest batch, approve the outcome when it meets your request, and explicitly merge into the intended branch.',
+          'Changes since my last review compares files with a saved review position; it does not approve or merge them. After a successful merge, continue in a new chat from the updated branch. The delivered session retains its history and cannot start more work in the old workspace.',
+        ],
+        links: [{ label: 'Review and merge step by step', href: '/knowledge/review-and-merge/' }],
+        callout: {
+          kind: 'note',
+          text: 'These workflows are implemented in prerelease source. Installed-provider, recovery, and native-window acceptance remain in progress; check Download for platform availability.',
+        },
+      },
+    ],
+  },
+  {
+    slug: 'review-and-merge',
+    category: 'workflows',
+    title: 'Review, approve, and merge AI-generated changes',
+    shortTitle: 'Review and merge AI changes',
+    description:
+      'Inspect changed files and checks, approve a task outcome, and merge into your target branch. Learn why a merge can be blocked and how to recover.',
+    readingTime: '3 min read',
+    sections: [
+      {
+        id: 'review-changes',
+        question: 'What should I review before merging an agent’s work?',
+        paragraphs: [
+          'Review the current patch against the requested behavior, read checks that apply to that patch, and try the changed flow. In Jackalope, open Review and use Changes, Checks, and Merge to inspect each part. Tasks, planned work, and chats use the same review controls.',
+          'Search the changed-file list and inspect the full diff, including unexpected files. For planned work, review the combined result under the parent task. A worker’s passing checks do not prove that several changes work together.',
+        ],
+        steps: [
+          'Read the original outcome and any unanswered questions.',
+          'Inspect the patch and compare it with the requested scope.',
+          'Read the saved check commands, exit results, and output for the current files.',
+          'Use a local preview or the application to check behavior the automated checks do not cover.',
+          'Request a correction or approve the outcome, then review the separate merge action.',
+        ],
+        links: [
+          {
+            label: 'A practical AI code review checklist',
+            href: '/blog/review-ai-generated-code-checklist/',
+          },
+        ],
+      },
+      {
+        id: 'approval-and-markers',
+        question: 'Does marking a file reviewed approve the work?',
+        paragraphs: [
+          'No. File review markers track your place for the displayed patch and reset when it changes. Approve work records acceptance of the task outcome for its snapshot. Merging is a separate action that applies the prepared change to the target branch.',
+          'Agent review prepares an editable request for another agent. It runs only after you submit it. Review its findings and check the actual change; an agent response does not replace your acceptance or required project checks.',
+        ],
+      },
+      {
+        id: 'blocked-merge',
+        question: 'Why is the merge blocked even though the agent finished?',
+        paragraphs: [
+          'Finishing an attempt does not establish that the result is ready to integrate. Required checks, outcome acceptance, active work, queued messages, a running preview, or changed source and target files can prevent a merge. The diff remains available so you can inspect the work while resolving the blocker.',
+        ],
+        bullets: [
+          'If checks failed, inspect the output and send the relevant failure with a focused follow-up.',
+          'If files or the target branch changed, refresh the prepared review and run the required checks on the new result.',
+          'For chat, pause dispatch and run or cancel queued messages before preparing integration.',
+          'Stop the task’s preview before continuing, merging, or removing its workspace.',
+          'Keep unrelated local changes and the source worktree until you have resolved the reported conflict.',
+        ],
+        links: [
+          { label: 'Worktree and integration safeguards', href: '/knowledge/git-worktrees/' },
+        ],
+      },
+      {
+        id: 'merge-and-cleanup',
+        question: 'What happens after a local merge?',
+        paragraphs: [
+          'Inspect the target branch, combined patch, checks, and proposed commit message before applying the merge. A successful local merge puts the reviewed change on that branch. Workspace cleanup is explicit. If cleanup fails, retain the receipt and retry cleanup; do not assume the merge itself failed.',
+          'A local merge does not push a branch, create a pull request, or deploy. Delivery can read local Git and optional GitHub PR and CI state through your authenticated CLI and prepare an editable next-step draft. Review its destination and effects before starting publication work.',
+          'Review and integration safeguards are implemented in prerelease source. Installed-provider and recovery acceptance remain in progress.',
+        ],
+        links: [
+          {
+            label: 'Continue a chat after delivery',
+            href: '/knowledge/chat-and-follow-ups/#review-chat',
+          },
+        ],
+      },
+    ],
+  },
+  {
     slug: 'ask-jackalope',
     category: 'workflows',
     title: 'Ask Jackalope: help, appearance and local agent tools',
@@ -1014,6 +1151,9 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Running tasks offer Queue follow-up and Stop & send. Queued instructions stay in order, continue in the same workspace and account, and pause after failures or restart. Run or cancel queued follow-ups before merging. Chat also lets you queue messages or explicitly stop current work and send.',
           'On Chat’s start page, pick up work waiting across your projects. Session limits can pause later batches after a batch count or an estimated dollar threshold. A running batch can exceed the threshold, and missing cost reports pause further work when a cost limit is set. This is not a provider billing cap.',
         ],
+        links: [
+          { label: 'Queue messages and recover a chat', href: '/knowledge/chat-and-follow-ups/' },
+        ],
       },
       {
         id: 'delivery-state',
@@ -1037,11 +1177,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         paragraphs: [
           'Open the result and review changes file by file in the unified or side-by-side diff. Compare the patch with your requested outcome, including accidental changes outside the scope.',
           'Read the saved command output and checks. Confirm they ran in the intended checkout and exercised the changed behavior. A successful build does not establish that a browser flow or native application worked.',
-          'For worktree tasks, Review & merge prepares the combined patch and checks integration preconditions. Review that combined result before merging it into the target branch.',
+          'Review separates Changes, Checks, and Merge. Track files with optional review markers, then use Approve work to accept the outcome for the displayed snapshot. Preparing and applying the merge remains a separate step; inspect the combined result and required checks first.',
           'Chat uses the same guarded merge path for its latest batch. Pause dispatch and run or cancel queued messages before preparing the merge. After integration, continue in a new chat to work from the updated target branch.',
           'Changes since my last review compares the current files with a review position you explicitly saved. Marking them seen does not accept changes or replace checks. You can optionally rate usefulness and report review minutes; Usage summarizes these locally and offers an aggregate report to copy.',
         ],
         links: [
+          {
+            label: 'Review, approval, and blocked-merge recovery',
+            href: '/knowledge/review-and-merge/',
+          },
           {
             label: 'Understand Review & merge',
             href: '/knowledge/git-worktrees/',

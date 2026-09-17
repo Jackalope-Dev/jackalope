@@ -12,6 +12,7 @@ export type MarketingPage = {
   signals: string[];
   comparison?: {
     name: string;
+    published: string;
     reviewed: string;
     overview: {
       jackalope: string;
@@ -40,9 +41,9 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Product guide',
     title: 'Parallel coding agents with one review workflow | Jackalope',
     description:
-      'Run Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity in parallel worktrees with shared project context and review in Jackalope.',
+      'Run Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, and Antigravity in parallel worktrees with shared project context and review in Jackalope.',
     headline: 'Run coding agents in parallel. Keep the work coherent.',
-    lede: 'Jackalope is a desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity, following their progress, and reviewing the combined result before integration.',
+    lede: 'Jackalope is a desktop workspace for assigning focused tasks to Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, and Antigravity, following their progress, and reviewing the combined result before integration.',
     image: 'tasks',
     signals: [
       'Multiple agents',
@@ -64,7 +65,7 @@ export const marketingPages: MarketingPage[] = [
           'Each parallel task can receive its own Git worktree and branch, preventing two agents from editing the same checkout. Project instructions and relevant updates keep each agent informed about related work.',
         ],
         bullets: [
-          'Choose Codex, Claude Code, Grok, OpenCode, Kimi Code, or Antigravity per task.',
+          'Choose Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, or Antigravity per task.',
           'Keep task questions and follow-up attempts attached to the original outcome.',
           'Pause new tasks while active tasks continue.',
           'Inspect each result and the combined patch before changing the target branch.',
@@ -198,17 +199,17 @@ export const marketingPages: MarketingPage[] = [
     kind: 'Agent compatibility',
     title: 'Supported AI coding agents | Jackalope',
     description:
-      'Compare Codex, Claude Code, Grok, OpenCode, Kimi Code, and Antigravity support for tasks, tools, accounts, and usage in Jackalope.',
+      'Compare Codex, Claude Code, Grok, OpenCode, Kimi Code, Gemini CLI, and Antigravity support for tasks, tools, accounts, and usage in Jackalope.',
     headline: 'Bring the coding agents you already use.',
     lede: 'Jackalope works around installed agent CLIs and their provider accounts. Choose an agent per task while keeping the brief, progress, changes, and review in one project workflow.',
     image: 'agents',
-    signals: ['Codex', 'Claude Code', 'Grok', 'OpenCode', 'Kimi Code', 'Antigravity'],
+    signals: ['Codex', 'Claude Code', 'Grok', 'OpenCode', 'Kimi Code', 'Gemini CLI', 'Antigravity'],
     sections: [
       {
         title: 'Choose by the connection your task needs.',
         paragraphs: [
           'Jackalope runs installed coding-agent CLIs. Start with your required provider, account, model, and tools, then check the adapter below. An agent logo or successful account setup does not establish that Jackalope can execute tasks with it.',
-          'All six native adapters implement tasks, continuation, and review. Usage reporting varies by CLI and account. Kimi exposes task token totals and membership limits; Antigravity subscription quota requires a CLI with read-only command output. The tool and account differences are important when moving a working CLI setup into a project.',
+          'All seven native adapters implement tasks, continuation, and review. Usage reporting varies by CLI and account. Kimi exposes task token totals and membership limits; Antigravity subscription quota requires a CLI with read-only command output. The tool and account differences are important when moving a working CLI setup into a project.',
         ],
       },
       {
@@ -245,6 +246,11 @@ export const marketingPages: MarketingPage[] = [
               'Named sign-ins; account model choices; task tokens and membership quota.',
             ],
             [
+              'Gemini CLI',
+              'On-demand discovery through an HTTP client permitted by the CLI.',
+              'Selected account; saved-session continuation; unknown account quota; worker tasks only.',
+            ],
+            [
               'Antigravity',
               'On-demand discovery; worker tasks, not automatic routing coordination.',
               'Named profiles use Gemini API keys. Shared subscription login has reported quota windows.',
@@ -269,6 +275,7 @@ export const marketingPages: MarketingPage[] = [
             label: 'OpenCode setup',
           },
           { href: '/agents/kimi-code/', label: 'Kimi Code setup and limits' },
+          { href: '/agents/gemini-cli/', label: 'Gemini CLI setup and limits' },
         ],
       },
       {
@@ -276,7 +283,7 @@ export const marketingPages: MarketingPage[] = [
         paragraphs: [
           'Kimi Code uses the kimi CLI for tasks, automatic routing, and Ask Jackalope, with account profiles, model selection, continuation, and in-task permission choices. Authenticated installed-app acceptance remains open.',
           'Antigravity uses the agy CLI for worker tasks. Its named profiles use Gemini API keys with separate API billing; they do not create isolated subscription sign-ins. Use its existing subscription login only with that shared-login limitation in mind.',
-          'Gemini CLI, Aider, and Goose offer account setup in the catalog but do not have native task execution adapters. Hermes and other unlisted agents are not supported task runners. Use the roadmap to follow planned support rather than assuming a configured executable can run as another agent.',
+          'Gemini CLI runs worker tasks with saved-session continuation. File edits are automatically approved; shell and HTTP tools require its own CLI permission policy. Account quota is unknown, and it does not coordinate routing or Ask Jackalope. Aider and Goose offer account setup in the catalog but do not have native task execution adapters. Hermes and other unlisted agents are not supported task runners. Use the roadmap to follow planned support rather than assuming a configured executable can run as another agent.',
         ],
         links: [
           {
@@ -327,6 +334,64 @@ export const marketingPages: MarketingPage[] = [
         href: '/guides/run-codex-and-claude-code-in-parallel/',
         label: 'Run Codex and Claude Code in parallel',
       },
+    ],
+  },
+  {
+    path: '/agents/gemini-cli/',
+    kind: 'Agent integration',
+    title: 'Gemini CLI desktop workspace and GUI | Jackalope',
+    description:
+      'Use Gemini CLI in Jackalope’s desktop workspace for tasks, Git worktrees, saved conversations, and review. Check setup, permissions, and current limits.',
+    headline: 'Bring Gemini CLI into your task workspace.',
+    lede: 'Jackalope provides a desktop workflow around your installed Gemini CLI: assign a task, follow streamed activity, continue its saved conversation, and review the changes. The adapter is implemented; installed-app acceptance remains in progress.',
+    image: 'agents',
+    signals: ['Installed Gemini CLI', 'Worker tasks', 'Session continuation', 'Patch review'],
+    sections: [
+      {
+        title: 'How do I connect Gemini CLI?',
+        paragraphs: [
+          'Install Gemini CLI using its official instructions and complete provider sign-in before launching a task. In Jackalope, open Agents → Configuration, check the executable, and select the account for your project. Approved Jackalope access and your own provider access are required.',
+          'Try a small task in a local Git project with passing baseline checks. A missing or expired login must be renewed through account setup; task processes do not open a browser to sign you in.',
+        ],
+        links: [
+          { label: 'Official Gemini CLI setup', href: 'https://geminicli.com/docs/' },
+          { label: 'Agent accounts in Jackalope', href: '/knowledge/multi-account-and-agents/' },
+        ],
+      },
+      {
+        title: 'Which permissions does a Gemini task use?',
+        paragraphs: [
+          'Gemini worker tasks run in headless mode with automatic file-edit approval. That does not grant unrestricted shell access. Shell commands and HTTP clients must already be permitted by Gemini CLI’s own policy; a tool requiring interactive confirmation cannot be approved through this headless session.',
+          'Project tools use on-demand discovery through an HTTP bridge and need a permitted HTTP client. Direct project MCP injection is not connected for this adapter. If a task cannot run its check through a tool, saved automatic project checks can still run natively after a successful attempt.',
+        ],
+        links: [
+          { label: 'Gemini CLI headless mode', href: 'https://geminicli.com/docs/cli/headless/' },
+          {
+            label: 'Project MCP and browser tools',
+            href: '/knowledge/mcp-and-browser-automation/',
+          },
+        ],
+      },
+      {
+        title: 'Can I continue a task and inspect usage?',
+        paragraphs: [
+          'Yes. Jackalope retains the Gemini session identifier for continuation, with the task’s workspace and account. Stop previews and checks before continuing. Inspect the updated patch and new check output after a follow-up.',
+          'Task usage comes from the CLI’s final statistics when usable. Missing reports stay unknown; resumed counters can include earlier turns and are not treated as new-attempt usage. Account quota is unknown. Gemini CLI has no connected model-catalog command, so a configured model is passed to the CLI without inventing a discovered model list.',
+        ],
+      },
+      {
+        title: 'Can Gemini choose agents or answer Ask Jackalope?',
+        paragraphs: [
+          'Gemini CLI currently runs as a worker. It does not supply the tool-free interface used for routing coordination or Ask Jackalope. Use an eligible coordinator or local decision rules, and assign Gemini to the supported work you want it to perform.',
+          'Jackalope is prerelease. CLI discovery and automated fixtures do not prove that your installed account, permissions, and operating system have passed a real task. Check platform availability on Download and test a focused change when you receive access.',
+        ],
+        links: [{ label: 'Agent compatibility', href: '/agents/' }],
+      },
+    ],
+    related: [
+      { label: 'Your first task', href: '/knowledge/task-composer-and-effort-levels/' },
+      { label: 'Chat and follow-ups', href: '/knowledge/chat-and-follow-ups/' },
+      { label: 'Review and merge', href: '/knowledge/review-and-merge/' },
     ],
   },
   {
