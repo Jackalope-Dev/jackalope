@@ -163,7 +163,8 @@ Usage records connection waits and tool execution separately.
 The optional `JACKALOPE_BATCH_READ=on` experiment exposes `read_tools` for up to eight
 independent read-only calls with at most four connections active. Results retain input
 order and per-call errors. Each call can select exact JSON fields or filter/project/count
-array rows through `output.rows`. Missing required fields preserve the original result;
+array rows through `output.rows`. Calls without an explicit selection retain full results.
+Missing required fields preserve the original result;
 row outputs include source indices and pagination. Complete selected results remain
 recoverable through `read_tool_result` for the latest sixteen selections in the attempt.
 Batching never authorizes a mutable operation or retries one automatically.

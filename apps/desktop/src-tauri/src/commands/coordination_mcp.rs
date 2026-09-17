@@ -26,86 +26,6 @@ struct CoordinationTools {
 }
 
 impl CoordinationTools {
-    #[tool(
-        description = "Assess whether two or three independent workers justify delegation. Validates disjoint write scopes, bounded briefs, explicit estimated overhead and an aggregate token admission budget. Returns focused briefs only when admitted. Estimates are not measured savings; this tool neither launches workers nor grants permission.",
-        annotations(read_only_hint = true, open_world_hint = false)
-    )]
-    async fn plan_delegation(
-        &self,
-        context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::tasks::dispatch_plan::Input>,
-    ) -> Result<CallToolResult, ErrorData> {
-        if !std::env::var("JACKALOPE_DISPATCH_PLAN").is_ok_and(|value| value == "on") {
-            return Err(ErrorData::invalid_request(
-                "Delegation planning is not enabled.",
-                None,
-            ));
-        }
-        let run = self
-            .service
-            .authorized_run(&request_headers(&context)?)
-            .map_err(bridge_error)?;
-        let value = super::tasks::dispatch_plan::assess(input)
-            .map_err(|e| ErrorData::invalid_params(e, None))?;
-        self.service.runtime.update(&run.id, |run| {
-            *run.efficiency.delegation_plans.get_or_insert(0) += 1;
-            *run.efficiency.delegation_plans_admitted.get_or_insert(0) +=
-                u64::from(value["admitted"] == true);
-        });
-        Ok(CallToolResult::structured(value))
-    }
-    #[tool(
-        description = "Read bounded source ranges or find file/symbol locations in the assigned workspace. Supply a previously read blockHash to omit unchanged text. Changed bytes refresh automatically. Results retain file/line/hash provenance; ranking is advisory and never filters explicitly requested blocks.",
-        annotations(read_only_hint = true, open_world_hint = false)
-    )]
-    async fn read_context(
-        &self,
-        context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::codebase::context_read::Input>,
-    ) -> Result<CallToolResult, ErrorData> {
-        if !std::env::var("JACKALOPE_CONTEXT_READ").is_ok_and(|value| value == "on") {
-            return Err(ErrorData::invalid_request(
-                "Source context reads are not enabled.",
-                None,
-            ));
-        }
-        let run = self
-            .service
-            .authorized_run(&request_headers(&context)?)
-            .map_err(bridge_error)?;
-        let workspace = run.workspace.clone();
-        let query = input.query.clone();
-        let started = std::time::Instant::now();
-        let value = tauri::async_runtime::spawn_blocking(move || {
-            super::codebase::context_read::read(std::path::Path::new(&workspace), input)
-        })
-        .await
-        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
-        .map_err(|e| ErrorData::invalid_params(e, None))?;
-        if !self.service.runtime.is_running(&run.id) {
-            return Err(ErrorData::invalid_request("This attempt has ended.", None));
-        }
-        if let Some(query) = query {
-            super::decisions::assistance::shadow_candidates(
-                &self.service.runtime,
-                &run,
-                &query,
-                &value["candidates"]["items"],
-            )
-            .await;
-        }
-        self.service.runtime.update(&run.id, |run| {
-            run.efficiency.timing("contextRead", started.elapsed());
-            *run.efficiency.context_blocks_unchanged.get_or_insert(0) += value["blocks"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter(|block| block["unchanged"] == true)
-                .count()
-                as u64;
-        });
-        Ok(CallToolResult::structured(value))
-    }
     fn platform_router() -> ToolRouter<Self> {
         let mut router = Self::tool_router();
         if !super::desktop_control::platform::supported() {
@@ -194,6 +114,86 @@ fn bridge_error(status: StatusCode) -> ErrorData {
 
 #[tool_router]
 impl CoordinationTools {
+    #[tool(
+        description = "Assess whether two or three independent workers justify delegation. Validates disjoint write scopes, bounded briefs, explicit estimated overhead and an aggregate token admission budget. Returns focused briefs only when admitted. Estimates are not measured savings; this tool neither launches workers nor grants permission.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn plan_delegation(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::tasks::dispatch_plan::Input>,
+    ) -> Result<CallToolResult, ErrorData> {
+        if !std::env::var("JACKALOPE_DISPATCH_PLAN").is_ok_and(|value| value == "on") {
+            return Err(ErrorData::invalid_request(
+                "Delegation planning is not enabled.",
+                None,
+            ));
+        }
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let value = super::tasks::dispatch_plan::assess(input)
+            .map_err(|e| ErrorData::invalid_params(e, None))?;
+        self.service.runtime.update(&run.id, |run| {
+            *run.efficiency.delegation_plans.get_or_insert(0) += 1;
+            *run.efficiency.delegation_plans_admitted.get_or_insert(0) +=
+                u64::from(value["admitted"] == true);
+        });
+        Ok(CallToolResult::structured(value))
+    }
+    #[tool(
+        description = "Read bounded source ranges or find file/symbol locations in the assigned workspace. Supply a previously read blockHash to omit unchanged text. Changed bytes refresh automatically. Results retain file/line/hash provenance; ranking is advisory and never filters explicitly requested blocks.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn read_context(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::codebase::context_read::Input>,
+    ) -> Result<CallToolResult, ErrorData> {
+        if !std::env::var("JACKALOPE_CONTEXT_READ").is_ok_and(|value| value == "on") {
+            return Err(ErrorData::invalid_request(
+                "Source context reads are not enabled.",
+                None,
+            ));
+        }
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let workspace = run.workspace.clone();
+        let query = input.query.clone();
+        let started = std::time::Instant::now();
+        let value = tauri::async_runtime::spawn_blocking(move || {
+            super::codebase::context_read::read(std::path::Path::new(&workspace), input)
+        })
+        .await
+        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+        .map_err(|e| ErrorData::invalid_params(e, None))?;
+        if !self.service.runtime.is_running(&run.id) {
+            return Err(ErrorData::invalid_request("This attempt has ended.", None));
+        }
+        if let Some(query) = query {
+            super::decisions::assistance::shadow_candidates(
+                &self.service.runtime,
+                &run,
+                &query,
+                &value["candidates"]["items"],
+            )
+            .await;
+        }
+        self.service.runtime.update(&run.id, |run| {
+            run.efficiency.timing("contextRead", started.elapsed());
+            *run.efficiency.context_blocks_unchanged.get_or_insert(0) += value["blocks"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|block| block["unchanged"] == true)
+                .count()
+                as u64;
+        });
+        Ok(CallToolResult::structured(value))
+    }
     #[tool(
         description = "Retrieve schemas for optional coordination tools when shared ownership, interfaces or messages need attention. Discovery does not change permissions.",
         annotations(read_only_hint = true, open_world_hint = false)
@@ -1043,6 +1043,14 @@ mod tests {
         let router = CoordinationTools::platform_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
+        for name in [
+            "read_tools",
+            "read_context",
+            "plan_delegation",
+            "discover_harness_tools",
+        ] {
+            assert!(names.contains(&name), "Missing native route: {name}");
+        }
         assert!(names.contains(&"inbox"));
         assert!(names.contains(&"acknowledge_message"));
         assert!(names.contains(&"read_tool"));

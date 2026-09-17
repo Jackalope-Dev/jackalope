@@ -38,7 +38,7 @@ test('shadow screening retains unavailable decisions and exposes missed relevant
   assert.equal(report.falseNegatives, 1);
   assert.equal(report.unavailable, 1);
   assert.equal(report.relevanceRecall, 0.5);
-  assert.equal(report.actualDecisionCostUsd, null);
+  assert.equal(report.estimatedDecisionCostUsd, null);
   assert.equal(report.actualAgentsAvoided, 0);
   assert.equal(report.publicationEligible, false);
   assert.throws(() => assistanceEvidence(records, [...labels, labels[0]]));

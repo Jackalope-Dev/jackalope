@@ -60,11 +60,11 @@ export function assistanceEvidence(records, labels) {
     wouldSuppress,
     unavailable,
     relevanceRecall: relevant ? retainedRelevant / relevant : null,
-    actualDecisionCostUsd: costKnown ? costs.reduce((sum, cost) => sum + cost, 0) : null,
+    estimatedDecisionCostUsd: costKnown ? costs.reduce((sum, cost) => sum + cost, 0) : null,
     actualAgentsAvoided: 0,
     publicationEligible: false,
     scope:
-      'Shadow relevance screening only. Unavailable decisions retain evidence. Proposed suppression is not an avoided agent call, task-quality result or measured saving. Include downstream matched execution and all decision costs before making a product claim.',
+      'Shadow relevance screening only. Unavailable decisions retain evidence. Decision cost is a token-price estimate, not an invoice. Proposed suppression is not an avoided agent call, task-quality result or measured saving. Include downstream matched execution and all decision costs before making a product claim.',
   };
 }
 

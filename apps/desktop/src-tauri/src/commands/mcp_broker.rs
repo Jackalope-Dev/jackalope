@@ -47,6 +47,25 @@ pub struct BrokerUsage {
     pub tool_elapsed_ms: Option<u64>,
 }
 
+impl BrokerUsage {
+    fn supersedes(&self, old: &Self) -> bool {
+        self.searches >= old.searches
+            && self.calls >= old.calls
+            && self.failures >= old.failures
+            && self.schema_bytes_returned >= old.schema_bytes_returned
+            && [
+                (self.result_reads, old.result_reads),
+                (self.result_bytes_received, old.result_bytes_received),
+                (self.result_bytes_returned, old.result_bytes_returned),
+                (self.batches, old.batches),
+                (self.connection_wait_ms, old.connection_wait_ms),
+                (self.tool_elapsed_ms, old.tool_elapsed_ms),
+            ]
+            .into_iter()
+            .all(|(current, previous)| current.unwrap_or(0) >= previous.unwrap_or(0))
+    }
+}
+
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SearchInput {
@@ -744,11 +763,11 @@ pub(crate) fn rank(terms: &[String], server: &str, tool: &Tool) -> usize {
 
 pub(super) fn record_usage(runtime: &super::tasks::TaskRuntime, run: &TaskRun, usage: BrokerUsage) {
     runtime.update(&run.id, |record| {
-        if record.mcp_usage.as_ref().is_none_or(|old| {
-            old.searches <= usage.searches
-                && old.calls <= usage.calls
-                && old.result_reads <= usage.result_reads
-        }) {
+        if record
+            .mcp_usage
+            .as_ref()
+            .is_none_or(|old| usage.supersedes(old))
+        {
             record.mcp_usage = Some(usage);
         }
     });

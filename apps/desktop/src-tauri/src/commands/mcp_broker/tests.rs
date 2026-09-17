@@ -1,5 +1,28 @@
 use super::*;
 
+#[test]
+fn delayed_call_receipts_cannot_erase_completed_batch_accounting() {
+    let call = BrokerUsage {
+        calls: 3,
+        result_bytes_returned: Some(200),
+        ..Default::default()
+    };
+    let batch = BrokerUsage {
+        batches: Some(1),
+        result_bytes_returned: Some(250),
+        ..call.clone()
+    };
+    assert!(batch.supersedes(&call));
+    assert!(!call.supersedes(&batch));
+    let refreshed = BrokerUsage {
+        catalog_tools: 0,
+        catalog_bytes: 0,
+        ..batch.clone()
+    };
+    assert!(refreshed.supersedes(&batch));
+    assert!(call.supersedes(&BrokerUsage::default()));
+}
+
 #[tokio::test]
 #[ignore = "Measures local fixture transport and filtering only; no model calls"]
 async fn local_optimization_trial() {
