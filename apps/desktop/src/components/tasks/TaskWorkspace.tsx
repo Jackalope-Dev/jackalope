@@ -166,6 +166,7 @@ export function TaskWorkspace({
   if (managedTask)
     return (
       <ManagedTaskView
+        key={managedTask.id}
         task={managedTask}
         onBack={() => {
           managed.select(null);

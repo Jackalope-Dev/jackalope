@@ -241,34 +241,6 @@
   padding-top: 28px;
   border-top: 1px solid var(--color-border);
 }
-.merge-patch-layout {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  margin-top: 20px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.merge-patch-layout nav {
-  background: var(--color-surface);
-  padding: 8px;
-  max-height: 480px;
-  overflow-y: auto;
-}
-.merge-patch-layout nav button {
-  width: 100%;
-  text-align: left;
-  display: block;
-  padding: 10px;
-  font-size: var(--text-xs);
-  overflow-wrap: anywhere;
-  border-radius: 6px;
-  color: var(--color-text-secondary);
-}
-.merge-patch-layout nav button.selected {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-ink);
-}
 .merge-approval {
   display: flex;
   flex-wrap: wrap;
@@ -329,9 +301,6 @@
   }
   .queue-flow button {
     min-width: 75px;
-  }
-  .merge-patch-layout {
-    grid-template-columns: 140px minmax(0, 1fr);
   }
   .queue-controls label {
     flex-direction: column;

@@ -1,5 +1,5 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { CopyButton } from '@jackalope/ui';
+import { CopyButton, Disclosure, DisclosureSummary } from '@jackalope/ui';
 import {
   ArrowLeft,
   ChevronDown,
@@ -28,12 +28,10 @@ import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
 import { MergeReview } from '../tasks/MergeReview';
-import { ProjectVerification } from '../tasks/ProjectVerification';
-import { ReviewProgress } from '../tasks/ReviewProgress';
+import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
 import { TaskLiveActivity } from '../tasks/TaskLiveActivity';
 import { TaskPreview } from '../tasks/TaskPreview';
-import { TaskUsefulness } from '../tasks/TaskUsefulness';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Tooltip } from '../ui/Tooltip';
@@ -44,7 +42,6 @@ import { SessionRecovery } from './SessionRecovery';
 import './live-session.css';
 
 const TaskMarkdown = lazy(() => import('../tasks/TaskMarkdown'));
-const RichDiff = lazy(() => import('../tasks/RichDiff'));
 
 export function LiveSessionView({
   session,
@@ -78,7 +75,11 @@ export function LiveSessionView({
   const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState(() => {
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
-    return ['work', 'changes', 'preview', 'delivery'].includes(saved) ? saved : 'work';
+    return saved === 'delivery'
+      ? 'changes'
+      : ['work', 'changes', 'preview'].includes(saved)
+        ? saved
+        : 'work';
   });
   useEffect(() => {
     useWorkViewStore.getState().remember(`session:${session.id}`, tab);
@@ -422,7 +423,7 @@ export function LiveSessionView({
         {expanded && (
           <aside className="live-work" id="live-session-work">
             <fieldset className="live-tabs" aria-label="Session details">
-              {(['work', 'changes', 'preview', 'delivery'] as const).map((value) => (
+              {(['work', 'changes', 'preview'] as const).map((value) => (
                 <Button
                   key={value}
                   variant="ghost"
@@ -438,13 +439,7 @@ export function LiveSessionView({
                     }
                   }}
                 >
-                  {value === 'work'
-                    ? 'Activity'
-                    : value === 'changes'
-                      ? 'Review'
-                      : value === 'preview'
-                        ? 'Preview'
-                        : 'Delivery'}
+                  {value === 'work' ? 'Activity' : value === 'changes' ? 'Review' : 'Preview'}
                 </Button>
               ))}
             </fieldset>
@@ -564,19 +559,19 @@ export function LiveSessionView({
                 <p className="live-muted">Finish or stop work to review the current changes.</p>
               ) : review ? (
                 <>
-                  <div className="live-review-meta">
-                    <span>
-                      {review.files.length} {review.files.length === 1 ? 'file' : 'files'} ·{' '}
-                      {review.verified ? 'Checks passed' : 'Not verified'}
-                    </span>
-                    <CopyButton text={review.patchPath} label="Copy patch path" />
-                  </div>
-                  <p className="live-muted">Dispatch paused. Changes remain uncommitted.</p>
-                  {latest && <ReviewProgress key={latest.id} runId={latest.id} />}
-                  {review.note && <p className="live-muted">{review.note}</p>}
-                  <Suspense fallback={<p>Loading diff…</p>}>
-                    <RichDiff patch={review.diff} />
-                  </Suspense>
+                  <p className="live-muted">Queue paused for review.</p>
+                  {latest && (
+                    <ResultReview
+                      key={latest.id}
+                      run={latest}
+                      review={review}
+                      onRefresh={showReview}
+                      onCorrect={(text) => {
+                        void append(text).catch((cause) => setError(String(cause)));
+                      }}
+                      evidence={<CopyButton text={review.patchPath} label="Copy patch path" />}
+                    />
+                  )}
                 </>
               ) : latest ? (
                 <Button variant="outline" disabled={busy} onClick={showReview}>
@@ -585,18 +580,6 @@ export function LiveSessionView({
               ) : (
                 <p className="live-muted">No changes yet.</p>
               ))}
-            {tab === 'changes' && latest && !active && !integrated && (
-              <ProjectVerification
-                run={latest}
-                command={project?.preferences?.verifyCommand}
-                onCorrect={(text) => {
-                  void append(text).catch((cause) => setError(String(cause)));
-                }}
-              />
-            )}
-            {tab === 'changes' && latest && !active && (
-              <TaskUsefulness key={`usefulness:${latest.id}`} runId={latest.id} />
-            )}
             {tab === 'changes' &&
               latest &&
               !active &&
@@ -614,6 +597,7 @@ export function LiveSessionView({
                   items={[]}
                   merged={session.integratedRunId ? [session.integratedRunId] : []}
                   onlyRunId={latest.id}
+                  changesReviewed={!integrated && !!review}
                   onChanged={refresh}
                 />
               ))}
@@ -631,20 +615,17 @@ export function LiveSessionView({
                     : 'Run a change to start a preview.'}
                 </p>
               ))}
-            {tab === 'delivery' &&
-              (latest && !active ? (
-                <>
-                  <TaskDelivery
-                    run={latest}
-                    integrated={integrated}
-                    onReview={showReview}
-                    onHandoff={integrated ? nextChat : append}
-                  />
-                  <TaskLearning run={latest} allowSave />
-                </>
-              ) : (
-                <p className="live-muted">Finish or stop work to prepare delivery.</p>
-              ))}
+            {tab === 'changes' && latest && !active && (
+              <Disclosure className="my-4">
+                <DisclosureSummary>PR, CI &amp; delivery</DisclosureSummary>
+                <TaskDelivery
+                  run={latest}
+                  integrated={integrated}
+                  onHandoff={integrated ? nextChat : append}
+                />
+                <TaskLearning run={latest} allowSave />
+              </Disclosure>
+            )}
             {latest?.workspace && (
               <details className="live-workspace">
                 <summary>Workspace</summary>

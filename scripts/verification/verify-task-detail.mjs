@@ -232,7 +232,7 @@ try {
     await page.setViewportSize({ width, height: width === 1280 ? 840 : 640 });
     for (const appearance of ['light', 'dark']) {
       await page.evaluate((value) => window.taskFixture.theme(value), appearance);
-      for (const name of ['Result', 'Review', 'Preview', 'Activity', 'Details', 'Delivery']) {
+      for (const name of ['Result', 'Review', 'Preview', 'Activity']) {
         await tabs.getByRole('tab', { name, exact: true }).click();
         if (name === 'Review')
           await page.getByRole('region', { name: 'Code changes', exact: true }).waitFor();
@@ -324,7 +324,8 @@ try {
   await page.getByText('Automatic checks could not finish:', { exact: false }).waitFor();
   await page.locator('.task-detail').evaluate((el) => (el.scrollTop = 0));
   await page.screenshot({ path: `${output}/review-tools-960-dark.png` });
-  await tabs.getByRole('tab', { name: 'Details', exact: true }).click();
+  await page.getByRole('button', { name: 'More task actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Task details', exact: true }).click();
   await page.getByText('Example model', { exact: true }).waitFor();
   await page.getByText('Original request', { exact: true }).click();
   await page.getByText('Example model', { exact: true }).scrollIntoViewIfNeeded();

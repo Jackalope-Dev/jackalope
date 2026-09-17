@@ -179,55 +179,8 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.task-review-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.task-review {
-  container-type: inline-size;
-}
-.task-review-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 30%);
-  gap: 16px;
-  align-items: start;
-}
-.task-review-output,
-.task-review-checklist {
-  min-width: 0;
-}
-.task-review-checklist {
-  display: grid;
-  gap: 12px;
-}
-.task-verification,
-.task-review-checklist > details {
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 12px;
-  background: var(--color-surface);
-}
-.task-verification > * + * {
-  margin-top: 10px;
-}
-.task-verification > div:first-child {
-  flex-wrap: wrap;
-}
-.task-review-file {
-  margin-bottom: 8px;
-}
-.task-review-file > button {
-  max-width: 100%;
-}
 .task-detail .ui-disclosure-summary {
   min-height: 44px;
-}
-.task-review-checklist .task-muted {
-  font-size: var(--text-xs);
-  line-height: 1.5;
 }
 .task-detail .result-canvas > [data-state="active"] {
   min-width: 0;
@@ -238,18 +191,7 @@
 .task-detail .task-delivery {
   max-width: 900px;
 }
-@container (max-width: 740px) {
-  .task-review-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .task-review-checklist {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 @media (max-width: 700px) {
-  .task-review-checklist {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .task-progress-main {
     padding: 16px;
     gap: 12px;

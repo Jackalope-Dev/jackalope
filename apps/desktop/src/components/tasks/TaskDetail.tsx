@@ -95,7 +95,16 @@ export function TaskDetail({
   const [queueing, setQueueing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const workRequest = useWorkViewStore((state) => state.request);
-  const [tab, setTab] = useState(useWorkViewStore.getState().reading[run.taskId] ?? 'result');
+  const savedTab = useWorkViewStore.getState().reading[run.taskId];
+  const [tab, setTab] = useState(
+    savedTab === 'context'
+      ? 'activity'
+      : savedTab === 'delivery'
+        ? 'changes'
+        : (savedTab ?? 'result'),
+  );
+  const [detailsOpen, setDetailsOpen] = useState(savedTab === 'context');
+  const [deliveryOpen, setDeliveryOpen] = useState(savedTab === 'delivery');
   useEffect(() => {
     useWorkViewStore.getState().remember(run.taskId, tab);
   }, [run.taskId, tab]);
@@ -108,7 +117,15 @@ export function TaskDetail({
         ?.querySelector<HTMLElement>('button, input, textarea')
         ?.focus();
     } else {
-      setTab(['verify', 'integrate'].includes(section) ? 'changes' : section);
+      setTab(
+        ['verify', 'integrate', 'delivery'].includes(section)
+          ? 'changes'
+          : section === 'context'
+            ? 'activity'
+            : section,
+      );
+      if (section === 'context') setDetailsOpen(true);
+      if (section === 'delivery') setDeliveryOpen(true);
       if (section === 'integrate') {
         setIntegrating(true);
         requestAnimationFrame(() =>
@@ -526,9 +543,26 @@ export function TaskDetail({
                     <GitMerge size={16} /> {integrated ? 'Merge receipt' : 'Review and merge'}
                   </Menu.Item>
                 )}
-                <Menu.Item className="workspace-menu-item" onSelect={() => setTab('context')}>
+                <Menu.Item
+                  className="workspace-menu-item"
+                  onSelect={() => {
+                    setTab('activity');
+                    setDetailsOpen(true);
+                  }}
+                >
                   Task details
                 </Menu.Item>
+                {finished && (
+                  <Menu.Item
+                    className="workspace-menu-item"
+                    onSelect={() => {
+                      setTab('changes');
+                      setDeliveryOpen(true);
+                    }}
+                  >
+                    PR, CI &amp; delivery
+                  </Menu.Item>
+                )}
               </Menu.Content>
             </Menu.Portal>
           </Menu.Root>
@@ -627,8 +661,6 @@ export function TaskDetail({
             { value: 'changes', label: 'Review' },
             { value: 'preview', label: 'Preview' },
             { value: 'activity', label: 'Activity' },
-            { value: 'context', label: 'Details' },
-            { value: 'delivery', label: 'Delivery' },
           ].map(({ value, label }) => (
             <Tabs.Trigger key={value} value={value}>
               {label}
@@ -724,11 +756,224 @@ export function TaskDetail({
               {finished && isLatest && isolated && (integrating || integrated) && (
                 <TaskIntegration run={run} onApplied={applied} />
               )}
+              {finished && (
+                <Disclosure
+                  open={deliveryOpen}
+                  onToggle={(event) => setDeliveryOpen(event.currentTarget.open)}
+                  className="my-4"
+                >
+                  <DisclosureSummary>PR, CI &amp; delivery</DisclosureSummary>
+                  <TaskDelivery
+                    key={run.id}
+                    run={run}
+                    integrated={integrated}
+                    onReview={() => {
+                      setTab('changes');
+                      if (isolated) setIntegrating(true);
+                    }}
+                    onHandoff={(text) => {
+                      const id = useTaskStore.getState().addTask({
+                        projectId: run.projectId,
+                        title: `Deliver: ${title}`.slice(0, 160),
+                        rawPrompt: text,
+                        status: 'backlog',
+                      });
+                      onCapture(id);
+                    }}
+                  />
+                  {finished && isLatest && <TaskLearning run={run} allowSave />}
+                </Disclosure>
+              )}
             </Tabs.Content>
           )}
           <Tabs.Content value="activity">
             <TaskLiveActivity run={run} />
             <TaskActivity entries={run.activity} active={active} />
+            <Disclosure
+              open={detailsOpen}
+              onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
+              className="my-4"
+            >
+              <DisclosureSummary>Task details</DisclosureSummary>
+              <section className="task-environment" aria-label="Context, history and usage">
+                {run.status !== 'reviewed' && (
+                  <TaskLearning key={`knowledge:${run.id}`} run={run} />
+                )}
+                <DefinitionList
+                  items={[
+                    { label: 'Agent', value: run.agent },
+                    { label: 'Model', value: run.model || 'Agent default' },
+                    { label: 'Account', value: run.accountBinding?.label || run.account },
+                    { label: 'Started', value: new Date(run.startedAt).toLocaleString() },
+                    ...(run.endedAt
+                      ? [{ label: 'Ended', value: new Date(run.endedAt).toLocaleString() }]
+                      : []),
+                    {
+                      label: 'Workspace',
+                      value: run.workspace || (active ? 'Preparing' : 'Not recorded'),
+                    },
+                    { label: 'Branch', value: run.branch || 'Not recorded' },
+                    { label: 'Target', value: run.targetBranch || 'Not recorded' },
+                  ]}
+                />
+                {!!run.dependencySnapshot?.sources.length && (
+                  <Disclosure className="task-notice">
+                    <DisclosureSummary>
+                      Verified feature inputs ({run.dependencySnapshot.sources.length})
+                    </DisclosureSummary>
+                    {run.dependencySnapshot.sources.map((source) => (
+                      <p key={source.runId}>
+                        {source.runId} · {source.tree.slice(0, 12)}
+                      </p>
+                    ))}
+                  </Disclosure>
+                )}
+                <Disclosure className="my-4">
+                  <DisclosureSummary>Original request</DisclosureSummary>
+                  <p className="task-request whitespace-pre-wrap">
+                    {attempts[0]?.prompt ?? run.prompt}
+                  </p>
+                </Disclosure>
+                {attempts.length > 1 && (
+                  <Disclosure className="my-4">
+                    <DisclosureSummary>Instruction for this attempt</DisclosureSummary>
+                    <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
+                  </Disclosure>
+                )}
+                {routing && (
+                  <Disclosure className="my-4">
+                    <DisclosureSummary>Agent selection and handoffs</DisclosureSummary>
+                    {!routing.decisions.length && (
+                      <p className="task-muted">
+                        Checking available agents, models and account quotas.
+                      </p>
+                    )}
+                    <ol className="space-y-3 mt-3">
+                      {routing.decisions.map((decision, index) => (
+                        <li key={decision.checkedAt}>
+                          <p>
+                            {decision.agent} · {decision.model || 'CLI default model'} ·{' '}
+                            {decision.account}
+                          </p>
+                          <p className="task-muted">{decision.reason}</p>
+                          <p className="task-muted">
+                            Selected by {decision.orchestrator} ·{' '}
+                            {decision.remainingPercent === null
+                              ? 'Quota unknown'
+                              : `${Math.round(decision.remainingPercent)}% headroom after local reservations at selection`}{' '}
+                            · Routing usage:{' '}
+                            {decision.usage.reported
+                              ? `${(decision.usage.input + decision.usage.output).toLocaleString()} tokens`
+                              : 'not reported'}
+                          </p>
+                          {routing.handoffs[index] && (
+                            <p className="task-muted">
+                              Quota handoff · {routing.handoffs[index].failure.message} · Worker
+                              usage:{' '}
+                              {routing.handoffs[index].usage.reported
+                                ? `${(routing.handoffs[index].usage.input + routing.handoffs[index].usage.output).toLocaleString()} tokens`
+                                : 'not reported'}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  </Disclosure>
+                )}
+                {run.prompts
+                  ?.filter((p) => p.status === 'answered')
+                  .map((p) => (
+                    <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
+                  ))}
+                <p className="task-muted mt-3">
+                  {run.effort && (
+                    <>
+                      Task approach: {run.effort} · Model effort:{' '}
+                      {run.reasoningEffort ? `${run.reasoningEffort} requested` : 'Agent default'}
+                      <br />
+                    </>
+                  )}
+                  Reported usage:{' '}
+                  {run.usage.reported ? describeRunUsage(run) : 'Unavailable for this attempt'}
+                </p>
+                {run.mcpUsage && (
+                  <Disclosure className="my-3">
+                    <DisclosureSummary>
+                      Tool discovery · {run.mcpUsage.calls}{' '}
+                      {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
+                    </DisclosureSummary>
+                    <p className="task-muted mt-2">
+                      Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools}{' '}
+                      · Failed calls: {run.mcpUsage.failures}
+                    </p>
+                    <p className="task-muted">
+                      {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB tool definitions
+                      returned across searches (catalog size:{' '}
+                      {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB).
+                    </p>
+                  </Disclosure>
+                )}
+                {!!run.diagnostics.length && (
+                  <Disclosure>
+                    <DisclosureSummary>Agent diagnostics</DisclosureSummary>
+                    <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
+                  </Disclosure>
+                )}
+              </section>
+              {isLatest && (
+                <Disclosure className="my-4">
+                  <DisclosureSummary>Connections for the next step</DisclosureSummary>
+                  <p className="task-muted">Changes apply to the next continuation.</p>
+                  {connections?.map((server) => (
+                    <label key={server.id} className="flex items-center gap-3 min-h-11">
+                      <Checkbox
+                        checked={(
+                          drafts[key]?.connectionIds ??
+                          run.connectionIds ??
+                          connections.map((s) => s.id)
+                        ).includes(server.id)}
+                        onChange={(event) => {
+                          const ids =
+                            drafts[key]?.connectionIds ??
+                            run.connectionIds ??
+                            connections.map((s) => s.id);
+                          draft(key, {
+                            connectionIds: event.target.checked
+                              ? [...ids, server.id]
+                              : ids.filter((id) => id !== server.id),
+                          });
+                        }}
+                      />
+                      {server.name}
+                    </label>
+                  ))}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      useProjectStore.getState().selectProject(run.projectId);
+                      setToolsOpen(true);
+                    }}
+                  >
+                    Manage task connections
+                  </Button>
+                </Disclosure>
+              )}
+              {!active && !run.detailsOmitted && (
+                <FeedbackTouchpoint
+                  key={run.id}
+                  runId={run.id}
+                  paused={acting || integrating || !!reply.trim() || pending.length > 0}
+                />
+              )}
+              {run.status === 'reviewed' && <TaskLearning key={`learning:${run.id}`} run={run} />}
+              {!active && currentProject && (
+                <WorkspaceReadiness
+                  key={`readiness:${run.id}`}
+                  project={currentProject}
+                  path={run.workspace || run.projectPath}
+                />
+              )}
+            </Disclosure>
           </Tabs.Content>
           <Tabs.Content value="preview">
             {!active && run.status !== 'interrupted' && run.workspace && !integrated ? (
@@ -755,205 +1000,6 @@ export function TaskDetail({
                   ? 'These changes are integrated. Start a new task from the updated project to preview further changes.'
                   : 'Finish or stop work before trying this result.'}
               </p>
-            )}
-          </Tabs.Content>
-          <Tabs.Content value="delivery">
-            <TaskDelivery
-              key={run.id}
-              run={run}
-              integrated={integrated}
-              onReview={() => {
-                setTab('changes');
-                if (isolated) setIntegrating(true);
-              }}
-              onHandoff={(text) => {
-                const id = useTaskStore.getState().addTask({
-                  projectId: run.projectId,
-                  title: `Deliver: ${title}`.slice(0, 160),
-                  rawPrompt: text,
-                  status: 'backlog',
-                });
-                onCapture(id);
-              }}
-            />
-            {finished && isLatest && <TaskLearning run={run} allowSave />}
-          </Tabs.Content>
-          <Tabs.Content value="context">
-            <section className="task-environment" aria-label="Context, history and usage">
-              {run.status !== 'reviewed' && <TaskLearning key={`knowledge:${run.id}`} run={run} />}
-              <DefinitionList
-                items={[
-                  { label: 'Agent', value: run.agent },
-                  { label: 'Model', value: run.model || 'Agent default' },
-                  { label: 'Account', value: run.accountBinding?.label || run.account },
-                  { label: 'Started', value: new Date(run.startedAt).toLocaleString() },
-                  ...(run.endedAt
-                    ? [{ label: 'Ended', value: new Date(run.endedAt).toLocaleString() }]
-                    : []),
-                  {
-                    label: 'Workspace',
-                    value: run.workspace || (active ? 'Preparing' : 'Not recorded'),
-                  },
-                  { label: 'Branch', value: run.branch || 'Not recorded' },
-                  { label: 'Target', value: run.targetBranch || 'Not recorded' },
-                ]}
-              />
-              {!!run.dependencySnapshot?.sources.length && (
-                <Disclosure className="task-notice">
-                  <DisclosureSummary>
-                    Verified feature inputs ({run.dependencySnapshot.sources.length})
-                  </DisclosureSummary>
-                  {run.dependencySnapshot.sources.map((source) => (
-                    <p key={source.runId}>
-                      {source.runId} · {source.tree.slice(0, 12)}
-                    </p>
-                  ))}
-                </Disclosure>
-              )}
-              <Disclosure className="my-4">
-                <DisclosureSummary>Original request</DisclosureSummary>
-                <p className="task-request whitespace-pre-wrap">
-                  {attempts[0]?.prompt ?? run.prompt}
-                </p>
-              </Disclosure>
-              {attempts.length > 1 && (
-                <Disclosure className="my-4">
-                  <DisclosureSummary>Instruction for this attempt</DisclosureSummary>
-                  <p className="task-request whitespace-pre-wrap">{run.prompt}</p>
-                </Disclosure>
-              )}
-              {routing && (
-                <section className="my-4" aria-label="Automatic routing">
-                  <h3 className="text-base font-medium">Agent selection and handoffs</h3>
-                  {!routing.decisions.length && (
-                    <p className="task-muted">
-                      Checking available agents, models and account quotas.
-                    </p>
-                  )}
-                  <ol className="space-y-3 mt-3">
-                    {routing.decisions.map((decision, index) => (
-                      <li key={decision.checkedAt}>
-                        <p>
-                          {decision.agent} · {decision.model || 'CLI default model'} ·{' '}
-                          {decision.account}
-                        </p>
-                        <p className="task-muted">{decision.reason}</p>
-                        <p className="task-muted">
-                          Selected by {decision.orchestrator} ·{' '}
-                          {decision.remainingPercent === null
-                            ? 'Quota unknown'
-                            : `${Math.round(decision.remainingPercent)}% headroom after local reservations at selection`}{' '}
-                          · Routing usage:{' '}
-                          {decision.usage.reported
-                            ? `${(decision.usage.input + decision.usage.output).toLocaleString()} tokens`
-                            : 'not reported'}
-                        </p>
-                        {routing.handoffs[index] && (
-                          <p className="task-muted">
-                            Quota handoff · {routing.handoffs[index].failure.message} · Worker
-                            usage:{' '}
-                            {routing.handoffs[index].usage.reported
-                              ? `${(routing.handoffs[index].usage.input + routing.handoffs[index].usage.output).toLocaleString()} tokens`
-                              : 'not reported'}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              )}
-              {run.prompts
-                ?.filter((p) => p.status === 'answered')
-                .map((p) => (
-                  <UserPromptCard key={p.id} runId={run.id} prompt={p} active={false} />
-                ))}
-              <p className="task-muted mt-3">
-                {run.effort && (
-                  <>
-                    Task approach: {run.effort} · Model effort:{' '}
-                    {run.reasoningEffort ? `${run.reasoningEffort} requested` : 'Agent default'}
-                    <br />
-                  </>
-                )}
-                Reported usage:{' '}
-                {run.usage.reported ? describeRunUsage(run) : 'Unavailable for this attempt'}
-              </p>
-              {run.mcpUsage && (
-                <Disclosure className="my-3">
-                  <DisclosureSummary>
-                    Tool discovery · {run.mcpUsage.calls}{' '}
-                    {run.mcpUsage.calls === 1 ? 'call' : 'calls'}
-                  </DisclosureSummary>
-                  <p className="task-muted mt-2">
-                    Searches: {run.mcpUsage.searches} · Catalog tools: {run.mcpUsage.catalogTools} ·
-                    Failed calls: {run.mcpUsage.failures}
-                  </p>
-                  <p className="task-muted">
-                    {(run.mcpUsage.schemaBytesReturned / 1024).toFixed(1)} KB tool definitions
-                    returned across searches (catalog size:{' '}
-                    {(run.mcpUsage.catalogBytes / 1024).toFixed(1)} KB).
-                  </p>
-                </Disclosure>
-              )}
-              {!!run.diagnostics.length && (
-                <Disclosure>
-                  <DisclosureSummary>Agent diagnostics</DisclosureSummary>
-                  <pre className="task-output">{run.diagnostics.join('\n\n')}</pre>
-                </Disclosure>
-              )}
-            </section>
-            {isLatest && (
-              <section className="mt-6" aria-label="Connections for the next step">
-                <h3 className="text-base font-medium mb-3">Connections for the next step</h3>
-                <p className="task-muted">Changes apply to the next continuation.</p>
-                {connections?.map((server) => (
-                  <label key={server.id} className="flex items-center gap-3 min-h-11">
-                    <Checkbox
-                      checked={(
-                        drafts[key]?.connectionIds ??
-                        run.connectionIds ??
-                        connections.map((s) => s.id)
-                      ).includes(server.id)}
-                      onChange={(event) => {
-                        const ids =
-                          drafts[key]?.connectionIds ??
-                          run.connectionIds ??
-                          connections.map((s) => s.id);
-                        draft(key, {
-                          connectionIds: event.target.checked
-                            ? [...ids, server.id]
-                            : ids.filter((id) => id !== server.id),
-                        });
-                      }}
-                    />
-                    {server.name}
-                  </label>
-                ))}
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    useProjectStore.getState().selectProject(run.projectId);
-                    setToolsOpen(true);
-                  }}
-                >
-                  Manage task connections
-                </Button>
-              </section>
-            )}
-            {!active && !run.detailsOmitted && (
-              <FeedbackTouchpoint
-                key={run.id}
-                runId={run.id}
-                paused={acting || integrating || !!reply.trim() || pending.length > 0}
-              />
-            )}
-            {run.status === 'reviewed' && <TaskLearning key={`learning:${run.id}`} run={run} />}
-            {!active && currentProject && (
-              <WorkspaceReadiness
-                key={`readiness:${run.id}`}
-                project={currentProject}
-                path={run.workspace || run.projectPath}
-              />
             )}
           </Tabs.Content>
         </div>

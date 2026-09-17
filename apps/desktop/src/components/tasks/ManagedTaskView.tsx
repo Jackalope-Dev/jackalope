@@ -1,6 +1,5 @@
 import {
   Disclosure,
-  DisclosureBody,
   DisclosureSummary,
   FormField,
   IconButton,
@@ -37,7 +36,7 @@ import { ManagedTaskAgent } from './ManagedTaskAgent';
 import { ManagedTaskDetails } from './ManagedTaskDetails';
 import { ManagedTaskJourney } from './ManagedTaskJourney';
 import { MergeReview } from './MergeReview';
-import { ProjectVerification } from './ProjectVerification';
+import { ResultReview } from './ResultReview';
 import { RunStatus } from './RunStatus';
 import { TaskActivity } from './TaskActivity';
 import { TaskLiveActivity } from './TaskLiveActivity';
@@ -341,7 +340,6 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           <Tabs.Trigger ref={activityTabRef} value="activity">
             Activity
           </Tabs.Trigger>
-          <Tabs.Trigger value="details">Details</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="overview" className="managed-overview">
           {showAssignments && (
@@ -508,28 +506,22 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                   ))}
                 {resultTab === 'changes' && (
                   <>
-                    <TaskOutcomes
-                      run={work.combined}
-                      canReview={!work.integrated && !work.active.length}
-                      onCorrect={prepareCorrection}
-                      onAdvance={async () => {
-                        throw new Error('Continue this task through the follow-up below.');
-                      }}
-                    />
                     {!work.integrated && (
-                      <Disclosure
-                        className="managed-checks"
-                        open={!work.combined.verification?.result.success || undefined}
-                      >
-                        <DisclosureSummary>
-                          {work.combined.verification?.result.success
-                            ? 'Combined checks passed'
-                            : 'Checks need attention'}
-                        </DisclosureSummary>
-                        <DisclosureBody>
-                          <ProjectVerification run={work.combined} onCorrect={prepareCorrection} />
-                        </DisclosureBody>
-                      </Disclosure>
+                      <ResultReview
+                        key={work.combined.id}
+                        run={work.combined}
+                        onCorrect={prepareCorrection}
+                        outcomes={
+                          <TaskOutcomes
+                            run={work.combined}
+                            canReview={!work.active.length}
+                            onCorrect={prepareCorrection}
+                            onAdvance={async () => {
+                              throw new Error('Continue this task through the follow-up below.');
+                            }}
+                          />
+                        }
+                      />
                     )}
                     {project && (
                       <MergeReview
@@ -541,6 +533,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                         onChanged={refreshAll}
                         onlyRunIds={reviewRunIds}
                         managedTitle={task.title}
+                        changesReviewed={!work.integrated}
                       />
                     )}
                   </>
@@ -711,15 +704,16 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           ) : (
             <p className="task-muted">No attempts have been recorded yet.</p>
           )}
-        </Tabs.Content>
-        <Tabs.Content value="details" className="managed-detail-panels">
-          <ManagedTaskDetails task={task} work={work} />
-          {task.started && (
-            <Panel className="workspace-stack">
-              <WorkspaceSectionHeading title="Work in this task" />
-              {assignments}
-            </Panel>
-          )}
+          <Disclosure className="my-4">
+            <DisclosureSummary>Task details</DisclosureSummary>
+            <ManagedTaskDetails task={task} work={work} />
+            {task.started && (
+              <Panel className="workspace-stack">
+                <WorkspaceSectionHeading title="Work in this task" />
+                {assignments}
+              </Panel>
+            )}
+          </Disclosure>
         </Tabs.Content>
       </Tabs.Root>
     </WorkspacePage>

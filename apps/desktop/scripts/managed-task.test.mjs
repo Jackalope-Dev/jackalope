@@ -79,7 +79,11 @@ test('explicit run and project selection cannot be masked by a previous parent',
   assert.equal(selectedManagedTask(queue, runs, 'parent', 'new'), task);
   assert.equal(selectedManagedTask(queue, runs, 'parent', 'unrelated'), undefined);
   assert.equal(selectedManagedTask(queue, runs, 'parent', null, 'other'), undefined);
-  assert.equal(selectedManagedTask(queue, runs, null, 'new'), undefined);
+  assert.equal(selectedManagedTask(queue, runs, null, 'new'), task);
+  assert.equal(selectedManagedTask(queue, runs, null, 'plan'), task);
+  assert.equal(selectedManagedTask(queue, runs, null, 'old'), task);
+  assert.equal(selectedManagedTask(queue, runs, null, 'new', 'other'), undefined);
+  assert.equal(selectedManagedTask(queue, runs, null, 'unrelated'), undefined);
   assert.equal(selectedManagedTask(queue, [], 'parent', 'new'), task);
 });
 

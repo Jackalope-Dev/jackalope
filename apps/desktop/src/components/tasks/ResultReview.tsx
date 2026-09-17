@@ -5,13 +5,13 @@ import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
-import { Select, SelectItem } from '../ui/Select';
+import { ChangedFiles } from './ChangedFiles';
 import { CrossModelReviewPanel } from './CrossModelReviewPanel';
-import { DiffPreview } from './DiffPreview';
 import { ProjectVerification } from './ProjectVerification';
 import { ReviewProgress } from './ReviewProgress';
 import { TaskImpact } from './TaskImpact';
 import { TaskUsefulness } from './TaskUsefulness';
+import './result-review.css';
 
 export function ResultReview({
   run,
@@ -19,17 +19,21 @@ export function ResultReview({
   outcomes,
   evidence,
   visible = true,
+  review: suppliedReview,
+  onRefresh,
 }: {
   run: TaskRun;
   onCorrect?: (prompt: string) => void;
   outcomes?: ReactNode;
   evidence?: ReactNode;
   visible?: boolean;
+  review?: Review;
+  onRefresh?: () => void | Promise<void>;
 }) {
-  const [review, setReview] = useState<Review | null>(null);
+  const [loadedReview, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [file, setFile] = useState('');
+  const review = suppliedReview ?? loadedReview;
   const { projects } = useProjectStore();
   const project = projects.find((p) => p.id === run.projectId);
 
@@ -37,16 +41,17 @@ export function ResultReview({
     setLoading(true);
     setError('');
     try {
-      setReview(await nativeTask<Review>('task_review', { id: run.id }));
+      if (suppliedReview) await onRefresh?.();
+      else setReview(await nativeTask<Review>('task_review', { id: run.id }));
     } catch (error) {
       setError(String(error));
     } finally {
       setLoading(false);
     }
-  }, [run.id]);
+  }, [run.id, suppliedReview, onRefresh]);
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (visible && !suppliedReview) void load();
+  }, [load, visible, suppliedReview]);
   return (
     <div className="task-review">
       <div className="task-review-toolbar">
@@ -80,36 +85,7 @@ export function ResultReview({
         <section className="task-review-output" aria-label="Changed files">
           {review && (
             <>
-              {review.files.length > 1 && (
-                <div className="task-review-file">
-                  <Select
-                    aria-label="Changed file"
-                    value={file ? `file:${file}` : 'all'}
-                    onValueChange={(value) => setFile(value === 'all' ? '' : value.slice(5))}
-                  >
-                    <SelectItem value="all">All changed files ({review.files.length})</SelectItem>
-                    {review.files.map((path) => (
-                      <SelectItem key={path} value={`file:${path}`}>
-                        {path}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                </div>
-              )}
-              {review.diff ? (
-                visible && (
-                  <DiffPreview key={review.diff} patch={review.diff} file={file || undefined} />
-                )
-              ) : (
-                <p className="task-muted">No text changes to review.</p>
-              )}
-              {!review.diff && review.files.length > 0 && (
-                <ul className="task-files">
-                  {review.files.map((path) => (
-                    <li key={path}>{path}</li>
-                  ))}
-                </ul>
-              )}
+              <ChangedFiles files={review.files} patch={review.diff} visible={visible} />
               {review.note && (
                 <Disclosure>
                   <DisclosureSummary>About these changes</DisclosureSummary>

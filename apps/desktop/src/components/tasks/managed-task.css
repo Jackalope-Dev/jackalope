@@ -261,12 +261,6 @@
   padding-top: 0;
   border-top: 0;
 }
-.managed-merge-review .merge-patch-layout {
-  margin-top: 0;
-}
-.merge-patch-layout[data-single-file] {
-  grid-template-columns: minmax(0, 1fr);
-}
 .managed-commit-details {
   margin-top: 12px;
 }
@@ -286,12 +280,6 @@
 }
 .managed-followup > button {
   justify-self: start;
-}
-.managed-merge-review .merge-patch-layout nav button {
-  min-height: 44px;
-}
-.managed-merge-review .merge-patch-layout nav button[aria-current] {
-  font-weight: 600;
 }
 .managed-measurements {
   display: grid;
@@ -332,17 +320,5 @@
   }
   .managed-journey-steps li::after {
     display: none;
-  }
-  .managed-task .merge-patch-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .managed-task .merge-patch-layout nav {
-    display: flex;
-    flex-wrap: wrap;
-    max-height: 144px;
-    gap: 4px;
-  }
-  .managed-task .merge-patch-layout nav button {
-    width: auto;
   }
 }

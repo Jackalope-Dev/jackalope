@@ -1,4 +1,4 @@
-import { Checkbox, Textarea } from '@jackalope/ui';
+import { Checkbox, FormField, Textarea } from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 import { correctionPrompt, type Requirement, requirementState } from '../../lib/task-outcomes';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
@@ -149,8 +149,7 @@ export function TaskOutcomes({
           </div>
           {editing === item.id && (
             <div className="space-y-3 pl-7">
-              <label className="block" htmlFor={`evidence-${item.id}`}>
-                Evidence
+              <FormField label="Evidence">
                 <Select id={`evidence-${item.id}`} value={evidence} onValueChange={setEvidence}>
                   <SelectItem value="manual">My inspection or interactive test</SelectItem>
                   {run.verification?.result.success && run.verification.tree === tree && (
@@ -169,7 +168,7 @@ export function TaskOutcomes({
                     </SelectItem>
                   ))}
                 </Select>
-              </label>
+              </FormField>
               {evidence.startsWith('screenshot:') &&
                 run.screenshots
                   ?.filter((s) => `screenshot:${s.id}` === evidence)
@@ -199,8 +198,7 @@ export function TaskOutcomes({
                   {run.verification.result.stdout} {run.verification.result.stderr}
                 </pre>
               )}
-              <label className="block" htmlFor={`note-${item.id}`}>
-                What did you verify, or what needs to change?
+              <FormField label="What did you verify, or what needs to change?">
                 <Textarea
                   id={`note-${item.id}`}
                   rows={3}
@@ -209,7 +207,7 @@ export function TaskOutcomes({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                 />
-              </label>
+              </FormField>
               <div className="flex flex-wrap gap-2">
                 <Button
                   disabled={busy || !tree || !note.trim()}

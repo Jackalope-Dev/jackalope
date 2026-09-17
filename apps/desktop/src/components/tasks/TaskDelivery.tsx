@@ -1,4 +1,11 @@
-import { CopyButton, DefinitionList, Disclosure, DisclosureSummary } from '@jackalope/ui';
+import {
+  CopyButton,
+  DefinitionList,
+  Disclosure,
+  DisclosureSummary,
+  DropdownMenu as Menu,
+} from '@jackalope/ui';
+import { ChevronDown, GitPullRequest } from 'lucide-react';
 import { useState } from 'react';
 import { nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { openExternalUrl } from '../../lib/tauri-bridge';
@@ -63,13 +70,20 @@ export function TaskDelivery({
       setBusy(false);
     }
   };
+  const prepare = async (goal: string) => {
+    setError('');
+    try {
+      await onHandoff(deliveryHandoff(run, integrated, goal));
+    } catch (cause) {
+      setError(String(cause));
+    }
+  };
   return (
     <section className="task-delivery space-y-4" aria-label="Delivery">
-      <h2 className="text-base">Deliver this result</h2>
       <p>
         {integrated
           ? 'Merged locally. Choose what to prepare next.'
-          : 'Review and merge the local changes before publishing.'}
+          : 'Review and merge the changes above before publishing.'}
       </p>
       <div className="flex flex-wrap gap-2">
         {onReview && !integrated && <Button onClick={onReview}>Review changes</Button>}
@@ -149,28 +163,37 @@ export function TaskDelivery({
       )}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       <div className="space-y-2">
-        <h3 className="text-base">Prepare the next step</h3>
-        <p className="task-muted">
-          Creates a draft for review. Nothing is published until you approve it.
-        </p>
         <div className="flex flex-wrap gap-2">
-          {['a pull request', 'CI verification', 'a deployment'].map((goal) => (
-            <Button
-              key={goal}
-              variant="outline"
-              onClick={async () => {
-                setError('');
-                try {
-                  await onHandoff(deliveryHandoff(run, integrated, goal));
-                } catch (cause) {
-                  setError(String(cause));
-                }
-              }}
-            >
-              Prepare {goal}
-            </Button>
-          ))}
+          <Button variant="outline" onClick={() => void prepare('a pull request')}>
+            <GitPullRequest size={16} aria-hidden="true" /> Prepare pull request
+          </Button>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="outline">
+                More delivery actions <ChevronDown size={16} aria-hidden="true" />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content
+                className="workspace-menu"
+                align="start"
+                sideOffset={8}
+                collisionPadding={12}
+              >
+                {['CI verification', 'a deployment'].map((goal) => (
+                  <Menu.Item
+                    key={goal}
+                    className="workspace-menu-item"
+                    onSelect={() => void prepare(goal)}
+                  >
+                    Prepare {goal}
+                  </Menu.Item>
+                ))}
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu.Root>
         </div>
+        <p className="task-muted">Prepares a draft for your review. Nothing is published.</p>
         <CopyButton
           text={deliveryHandoff(run, integrated, 'a delivery handoff')}
           label="Copy delivery handoff"

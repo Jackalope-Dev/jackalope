@@ -1,10 +1,11 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
-import { lazy, Suspense, useState } from 'react';
+import { useState } from 'react';
 import { nativeTask } from '../../lib/task-runtime';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 
-const RichDiff = lazy(() => import('./RichDiff'));
+import { ChangedFiles } from './ChangedFiles';
+
 interface Progress {
   tree: string;
   diff: string;
@@ -52,9 +53,7 @@ export function ReviewProgress({ runId }: { runId: string }) {
                 : ' in this result'}
             </DisclosureSummary>
             {progress.diff ? (
-              <Suspense fallback={<p>Loading changes…</p>}>
-                <RichDiff patch={progress.diff} />
-              </Suspense>
+              <ChangedFiles files={progress.files} patch={progress.diff} />
             ) : (
               <p>
                 {progress.viewedAt

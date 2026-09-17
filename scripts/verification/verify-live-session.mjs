@@ -82,7 +82,12 @@ window.__TAURI_INTERNALS__ = { transformCallback:()=>0, metadata:{currentWindow:
   f.run({status:'stopping'});
   if(f.holdStop)await new Promise(resolve=>{f.releaseStop=resolve});
   f.run({status:'stopped'});f.update({batches:s.batches.map(batch=>({...batch,settled:true}))});return;
- case 'task_preview_status': return null;
+ case 'task_preview_status': return f.preview ?? null;
+ case 'task_preview_start': f.preview={port:5418,command:args.command,running:true,ready:true,output:'Ready',exitCode:null};return f.preview;
+ case 'task_preview_inspect': return {screenshot:{id:'capture',name:'Preview capture',timestamp:new Date().toISOString(),filePath:'C:/preview.png',url:'http://localhost:5418/',mimeType:'image/png'},snapshot:'button Save [ref=save]',errors:''};
+ case 'task_screenshot_read': return {dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2WQAAAAASUVORK5CYII='};
+ case 'task_preview_inspect_cancel': return;
+
  case 'plugin:window|minimize': case 'plugin:window|close': return;
  default: throw new Error('Unexpected fixture command: '+command);
  }
@@ -266,19 +271,31 @@ try {
   await page.evaluate(() => window.sessionFixture.run({ status: 'review' }));
   await input.fill('x'.repeat(11990));
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
-  const feedback = page.getByRole('textbox', { name: 'What should change?', exact: true });
-  await feedback.fill('Make the Save action clearer.');
-  await page.getByRole('button', { name: 'Add to follow-up', exact: true }).click();
+  assert.equal(
+    await page.getByRole('textbox', { name: 'What should change?', exact: true }).count(),
+    0,
+  );
+  await page.getByText('Add a preview command below, or detect one from the project.').waitFor();
+  assert.equal(
+    await page.getByRole('button', { name: 'Start preview', exact: true }).isDisabled(),
+    true,
+  );
+  assert.equal(
+    await page.getByText('Stop preview before continuing or merging.', { exact: false }).count(),
+    0,
+  );
+  await page.getByLabel('Preview command', { exact: true }).fill('node app.mjs --port {port}');
+  await page.getByRole('button', { name: 'Start preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Capture evidence', exact: true }).click();
+  await page.getByRole('button', { name: 'Add evidence to follow-up', exact: true }).click();
   await page.getByText('This would exceed the message limit.', { exact: false }).first().waitFor();
-  assert.equal(await feedback.inputValue(), 'Make the Save action clearer.');
   assert.equal((await input.inputValue()).length, 11990);
   await input.fill('Keep the keyboard shortcuts.');
-  await page.getByRole('button', { name: 'Add to follow-up', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('#preview-feedback').value === '');
-  assert.match(
-    await input.inputValue(),
-    /Keep the keyboard shortcuts[\s\S]*Make the Save action clearer/,
+  await page.getByRole('button', { name: 'Add evidence to follow-up', exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('textarea').value.includes('Preview evidence'),
   );
+  assert.match(await input.inputValue(), /Keep the keyboard shortcuts[\s\S]*Preview evidence/);
   await page.goto(`${url}/?compact`, { waitUntil: 'domcontentloaded' });
   await page.setViewportSize({ width: 440, height: 620 });
   const pin = page.getByRole('button', { name: 'Always on top', exact: true });
@@ -490,6 +507,7 @@ try {
     });
   });
   await page.getByRole('button', { name: 'Review changes', exact: true }).click();
+  await page.getByText('More review tools', { exact: true }).click();
   await page.getByRole('button', { name: 'Changes since my last review' }).click();
   await page.getByText('All current changes.', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Mark these changes seen' }).click();

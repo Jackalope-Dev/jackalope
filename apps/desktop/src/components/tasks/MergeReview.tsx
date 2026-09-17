@@ -13,7 +13,7 @@ import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Input } from '../ui/input';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
-import { DiffPreview } from './DiffPreview';
+import { ChangedFiles } from './ChangedFiles';
 import './project-queue.css';
 export function MergeReview({
   project,
@@ -24,7 +24,9 @@ export function MergeReview({
   onlyRunId,
   onlyRunIds,
   managedTitle,
+  changesReviewed = false,
 }: {
+  changesReviewed?: boolean;
   onlyRunIds?: string[];
   managedTitle?: string;
   onlyRunId?: string;
@@ -45,7 +47,6 @@ export function MergeReview({
   const [selected, setSelected] = useState<string[]>(onlyRunIds ?? (onlyRunId ? [onlyRunId] : []));
   const [plans, setPlans] = useState<IntegrationPlan[]>([]);
   const [plan, setPlan] = useState<IntegrationPlan | null>(null);
-  const [file, setFile] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState(managedTitle ?? '');
@@ -80,7 +81,6 @@ export function MergeReview({
   const changeSelection = (next: string[]) => {
     setSelected(next);
     setPlan(null);
-    setFile('');
     setError('');
   };
   const planEligible =
@@ -119,7 +119,6 @@ export function MergeReview({
       setPlan(next);
       setPreparedMessage(message);
       setCleanup(next.commitPolicy?.cleanupAfterMerge ?? false);
-      setFile('');
       await load();
     } catch (error) {
       setError(String(error));
@@ -171,7 +170,7 @@ export function MergeReview({
     <div className={`merge-review${managedTitle ? ' managed-merge-review' : ''}`} id="task-merge">
       {managedTitle ? (
         <WorkspaceSectionHeading
-          title={applied ? `Integrated into ${plan.targetBranch}` : 'Combined changes'}
+          title={applied ? `Integrated into ${plan.targetBranch}` : `Merge into ${destination}`}
           description={
             plan
               ? `${plan.files.length} ${plan.files.length === 1 ? 'file' : 'files'} · ${plan.targetBranch}`
@@ -187,7 +186,7 @@ export function MergeReview({
                 loadingLabel="Preparing…"
               >
                 <RefreshCw size={16} aria-hidden="true" />
-                Refresh changes
+                Refresh merge
               </Button>
             )
           }
@@ -398,35 +397,10 @@ export function MergeReview({
             </InlineNotice>
           )}
 
-          <div
-            className="merge-patch-layout"
-            data-single-file={(!!managedTitle && plan.files.length <= 1) || undefined}
-          >
-            {(!managedTitle || plan.files.length > 1) && (
-              <nav aria-label="Changed files">
-                <button
-                  className={!file ? 'selected' : ''}
-                  aria-current={!file ? 'page' : undefined}
-                  type="button"
-                  onClick={() => setFile('')}
-                >
-                  All changes
-                </button>
-                {plan.files.map((name) => (
-                  <button
-                    className={file === name ? 'selected' : ''}
-                    aria-current={file === name ? 'page' : undefined}
-                    type="button"
-                    key={name}
-                    onClick={() => setFile(name)}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </nav>
-            )}
-            <DiffPreview patch={plan.patch} file={file} />
-          </div>
+          <Disclosure open={!changesReviewed || applied || undefined} className="my-4">
+            <DisclosureSummary>Merge preview · {plan.files.length} files</DisclosureSummary>
+            <ChangedFiles files={plan.files} patch={plan.patch} />
+          </Disclosure>
           {managedTitle && (
             <Disclosure className="managed-commit-details">
               <DisclosureSummary>Commit details</DisclosureSummary>
@@ -508,7 +482,6 @@ export function MergeReview({
               key={p.id}
               onClick={() => {
                 setPlan(p);
-                setFile('');
                 if (managedTitle) {
                   const savedMessage = p.commitMessage ?? managedTitle;
                   setMessage(savedMessage);

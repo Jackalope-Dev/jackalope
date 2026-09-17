@@ -246,6 +246,17 @@ try {
                 f.sync();
                 return f.integration;
               }
+              if (command === 'task_review')
+                return {
+                  files: f.reviewFiles ?? ['feature.txt'],
+                  diff: (f.reviewFiles ?? ['feature.txt'])
+                    .map(
+                      (file) =>
+                        `diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1 @@\n+Combined feature\n`,
+                    )
+                    .join(''),
+                  note: '',
+                };
               if (command === 'task_plan_review_time') return;
               if (command === 'integration_plans')
                 return f.integration
@@ -290,7 +301,7 @@ try {
       await page.getByRole('button', { name: 'Create a plan', exact: true }).click();
       const overview = page.getByRole('tab', { name: 'Overview', exact: true });
       const activity = page.getByRole('tab', { name: 'Activity', exact: true });
-      const details = page.getByRole('tab', { name: 'Details', exact: true });
+      const details = page.getByText('Task details', { exact: true });
       await page.getByRole('heading', { name: 'Planning your task' }).waitFor();
       const planningCharacter = page.locator('.managed-planning-status .brand-agent-character');
       assert.equal(await planningCharacter.getAttribute('data-state'), 'working');
@@ -518,6 +529,7 @@ try {
       await review.waitFor();
       assert.equal(await page.getByRole('navigation', { name: 'Task result' }).count(), 1);
       await page.getByText('The API and UI now work together.', { exact: false }).waitFor();
+      await activity.click();
       await details.focus();
       await details.press('Enter');
       await page.getByRole('heading', { name: 'Your request', exact: true }).waitFor();
@@ -541,12 +553,12 @@ try {
       const apply = page.getByRole('button', { name: 'Apply changes to main', exact: true });
       await apply.waitFor();
       await page.getByText('Combined feature', { exact: false }).first().waitFor();
-      assert.equal(await page.getByRole('navigation', { name: 'Changed files' }).count(), 0);
+      assert.equal(await page.getByRole('navigation', { name: 'Changed files' }).count(), 1);
       assert.equal(
         await page.getByText('Previous integration reviews', { exact: true }).count(),
         0,
       );
-      const diffTop = (await page.locator('.merge-patch-layout').boundingBox()).y;
+      const diffTop = (await page.locator('.task-review .changed-files').boundingBox()).y;
       assert.ok(
         diffTop < (width === 960 ? 640 : 840),
         'The diff should begin in the first viewport',
@@ -573,7 +585,7 @@ try {
         'Editing must retain the field and focus',
       );
       await page.getByText('Combined feature', { exact: false }).first().waitFor();
-      await page.getByRole('button', { name: 'Refresh changes', exact: true }).click();
+      await page.getByRole('button', { name: 'Refresh merge', exact: true }).click();
       await apply.waitFor();
       assert.equal(
         await page.evaluate(() => window.fixture.integration.commitMessage),
@@ -596,7 +608,7 @@ try {
           exact: true,
         });
         await selectedFile.click();
-        assert.equal(await selectedFile.getAttribute('aria-current'), 'page');
+        assert.equal(await selectedFile.getAttribute('aria-pressed'), 'true');
         await page.screenshot({
           path: `${output}/${width}-${dark ? 'dark' : 'light'}-files.png`,
           fullPage: true,

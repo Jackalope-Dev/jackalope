@@ -283,13 +283,6 @@
   overflow: auto;
   flex: 0 1 auto;
 }
-.live-review-meta {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 14px;
-  font-size: var(--text-xs);
-}
 .live-workspace {
   font-size: var(--text-xs);
   color: var(--color-text-muted);

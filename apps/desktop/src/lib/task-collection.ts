@@ -53,16 +53,16 @@ export function selectedManagedTask(
   runId: string | null,
   projectId: string | null = null,
 ) {
-  const task = queue.managedTasks?.find(
-    (task) => task.id === taskId && (projectId === null || task.request.projectId === projectId),
+  const ownsRun = (task: ManagedTask) =>
+    task.plannerRunId === runId ||
+    task.runIds.includes(runId ?? '') ||
+    managedTaskWork(task, queue, runs).work.some((run) => run.id === runId);
+  const tasks = (queue.managedTasks ?? []).filter(
+    (task) => projectId === null || task.request.projectId === projectId,
   );
-  if (!task || !runId) return task;
-  const work = managedTaskWork(task, queue, runs);
-  return task.plannerRunId === runId ||
-    task.runIds.includes(runId) ||
-    work.work.some((run) => run.id === runId)
-    ? task
-    : undefined;
+  if (!taskId) return runId ? tasks.find(ownsRun) : undefined;
+  const task = tasks.find((task) => task.id === taskId);
+  return task && (!runId || ownsRun(task)) ? task : undefined;
 }
 
 export function workPresence(item: WorkItem): {
