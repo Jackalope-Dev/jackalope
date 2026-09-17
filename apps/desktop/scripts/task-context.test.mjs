@@ -113,3 +113,33 @@ test('legacy generated ideas migrate without nesting while edited instructions s
   const edited = `${refinedPrompt}\nPreserve this additional requirement.`;
   assert.equal(planningDraft({ ...task, refinedPrompt: edited }).prompt, edited);
 });
+
+test('version two drafts migrate only when their saved text is still generated', () => {
+  const rawPrompt = 'Fix the runtime crash';
+  const refinedPrompt = assemblePrompt({
+    rawPrompt,
+    selectedSkillIds: ['systematic-debugging'],
+    executionMode: 'isolated',
+    version: 2,
+  }).assembledPrompt;
+  assert.match(refinedPrompt, /all existing regression tests/);
+  const task = {
+    rawPrompt,
+    refinedPrompt,
+    promptVersion: 2,
+    clarifications: [
+      { question: 'Task guideline selection', answer: 'Automatic' },
+      { question: 'Active Skill Guidelines', answer: 'Systematic Debugging & Triage' },
+    ],
+  };
+  assert.equal(planningDraft(task).prompt, rawPrompt);
+  assert.equal(planningDraft({ ...task, promptVersion: undefined }).prompt, rawPrompt);
+  const edited = `${refinedPrompt}\nKeep this user requirement.`;
+  assert.equal(planningDraft({ ...task, refinedPrompt: edited }).prompt, edited);
+  const current = assemblePrompt({
+    rawPrompt,
+    selectedSkillIds: ['systematic-debugging'],
+  }).assembledPrompt;
+  assert.doesNotMatch(current, /all existing regression tests/);
+  assert.match(current, /repository-required checks/);
+});

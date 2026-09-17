@@ -110,6 +110,7 @@ pub struct Timing {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Efficiency {
+    pub prompt_policy_hash: Option<String>,
     pub timings: std::collections::BTreeMap<String, Timing>,
     pub first_activity_ms: Option<u64>,
     pub routing_calls_avoided: u64,
@@ -145,6 +146,14 @@ const PATH_KEYS: &[&str] = &[
 const MAX_TOUCHED_PATHS: usize = 200;
 
 impl Efficiency {
+    pub fn for_launch() -> Self {
+        Self {
+            verification_reuses: Some(0),
+            preparation_reuses: Some(0),
+            ..Self::default()
+        }
+    }
+
     pub fn first_activity(&mut self, elapsed: std::time::Duration) {
         self.first_activity_ms
             .get_or_insert(elapsed.as_millis().min(u64::MAX as u128) as u64);
@@ -247,6 +256,28 @@ impl Efficiency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn launch_context_reports_only_successful_preparation_without_waiving_checks() {
+        let mut run = super::super::tests::sample("codex");
+        run.workspace = "C:/work/assigned".into();
+        run.verify_command = Some("pnpm verify".into());
+        run.preparation = Some(super::super::PreparationRecord {
+            command: "pnpm install".into(),
+            success: false,
+            ..Default::default()
+        });
+        let failed = launch_context(&run);
+        assert!(failed.contains("C:/work/assigned"));
+        assert!(!failed.contains("pnpm install"));
+        run.preparation.as_mut().unwrap().success = true;
+        let ready = launch_context(&run);
+        assert!(ready.contains("pnpm install"));
+        assert!(ready.contains("pnpm verify"));
+        assert!(ready.contains("saved setup is not verification"));
+        assert_eq!(Efficiency::for_launch().verification_reuses, Some(0));
+        assert_eq!(Efficiency::default().verification_reuses, None);
+    }
+
     #[test]
     fn claude_bridge_timeout_covers_the_native_check_without_storing_credentials() {
         let bridge = claude_bridge("http://127.0.0.1:1234");

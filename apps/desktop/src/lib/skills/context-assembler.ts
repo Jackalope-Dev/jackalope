@@ -1,8 +1,9 @@
 import { getSkillById } from './catalog.ts';
 import legacyGuidelines from './legacy-guidelines.json' with { type: 'json' };
 import { getToolById } from './tool-registry.ts';
+import versionTwoGuidelines from './version-two-guidelines.json' with { type: 'json' };
 
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 3;
 
 export interface PromptAssemblyOptions {
   version?: number;
@@ -54,7 +55,9 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
       const rules =
         version === 1
           ? ((legacyGuidelines as Record<string, string[]>)[skillId] ?? skill.guidelines)
-          : skill.guidelines;
+          : version === 2
+            ? ((versionTwoGuidelines as Record<string, string[]>)[skillId] ?? skill.guidelines)
+            : skill.guidelines;
       for (const rule of rules) {
         skillGuidelines.add(rule);
       }
@@ -78,7 +81,7 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
   }
 
   // Collect active tools
-  const activeTools = selectedToolIds
+  const activeTools = [...new Set(selectedToolIds)]
     .map((id) => getToolById(id))
     .filter((t): t is NonNullable<typeof t> => Boolean(t));
 
@@ -99,12 +102,12 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
   const sections: string[] = [];
 
   // 1. Primary User Objective
-  sections.push(`### 🎯 Objective\n${trimmedRaw}`);
+  sections.push(`${version < 3 ? '### 🎯 Objective' : 'Task'}\n${trimmedRaw}`);
 
   // 2. Project Rules if present
   if (hasProjectRules) {
     const rulesBlock = projectRules.map((r) => `- ${r}`).join('\n');
-    sections.push(`### 📋 Project Rules\n${rulesBlock}`);
+    sections.push(`${version < 3 ? '### 📋 Project Rules' : 'Project rules'}\n${rulesBlock}`);
   }
 
   // 3. Workflow Guidelines & Constraints
@@ -114,7 +117,9 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
       .join('\n');
     const priority =
       version === 1 ? '' : 'Apply relevant guidance; explicit user instructions take precedence.\n';
-    sections.push(`### 📐 Guidelines & Quality Constraints\n${priority}${guidelinesBlock}`);
+    sections.push(
+      `${version < 3 ? '### 📐 Guidelines & Quality Constraints' : 'Relevant guidance'}\n${priority}${guidelinesBlock}`,
+    );
   }
 
   // 4. Attached Capabilities / Tools
@@ -122,7 +127,9 @@ export function assemblePrompt(options: PromptAssemblyOptions): AssembledPromptR
     const toolsBlock = activeTools
       .map((t) => `- **${t.name}**: ${t.description} (Capabilities: ${t.capabilities.join(', ')})`)
       .join('\n');
-    sections.push(`### 🛠️ Active Tools & Capabilities\n${toolsBlock}`);
+    sections.push(
+      `${version < 3 ? '### 🛠️ Active Tools & Capabilities' : 'Selected tools'}\n${toolsBlock}`,
+    );
   }
 
   return {

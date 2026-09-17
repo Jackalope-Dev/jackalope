@@ -60,6 +60,26 @@ const seconds = Number(value('--seconds', '180'));
 const tokens = Number(value('--tokens', '250000'));
 const model = value('--model', '');
 const agent = value('--agent', 'codex');
+const controlPromptsPath = value('--control-prompts', null);
+const controlPrompts = controlPromptsPath
+  ? JSON.parse(await readFile(path.resolve(controlPromptsPath), 'utf8'))
+  : null;
+if (
+  controlPrompts &&
+  (!variants.includes('control') ||
+    !controlPrompts.revision ||
+    controlPrompts.effort !== efforts.control ||
+    selected.some(
+      (id) =>
+        typeof controlPrompts.prompts?.[id] !== 'string' || !controlPrompts.prompts[id].trim(),
+    ))
+)
+  throw new Error(
+    'Frozen control prompts require a revision, matching explicit effort and every selected case.',
+  );
+const controlPromptsHash = controlPrompts
+  ? createHash('sha256').update(JSON.stringify(controlPrompts)).digest('hex')
+  : null;
 const binaries = Object.fromEntries(
   variants.map((v) => [
     v,
@@ -107,6 +127,7 @@ if (!args.includes('--execute')) {
         tokens,
         agent,
         model: model || 'Required for execution',
+        controlPromptsHash,
         instructions:
           'Pass --execute --model=<model> --after=<native test executable> --variants=direct,after --effort=balanced for a matched direct-CLI comparison. Legacy before requires --before=<baseline executable>. Trials use installed accounts; reported token limits are not hard spending caps.',
       },
@@ -159,6 +180,7 @@ if (!args.includes('--execute')) {
       saved.cliVersion !== cliVersion ||
       saved.seconds !== seconds ||
       saved.tokens !== tokens ||
+      (saved.controlPromptsHash ?? null) !== controlPromptsHash ||
       JSON.stringify(saved.speeds ?? Object.fromEntries(variants.map((v) => [v, null]))) !==
         JSON.stringify(speeds) ||
       JSON.stringify(saved.efforts ?? Object.fromEntries(variants.map((v) => [v, null]))) !==
@@ -181,20 +203,22 @@ if (!args.includes('--execute')) {
         const prompt =
           variant === 'before'
             ? baseline.prompts[id]
-            : variant === 'direct'
-              ? (fixture.directPrompt ??
-                fixture.prompt.replace(
-                  'through Jackalope computer_verify',
-                  'using your permitted shell',
-                ))
-              : [
-                  assemblePrompt({
-                    rawPrompt: fixture.prompt,
-                    selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
-                    executionMode: 'isolated',
-                  }).assembledPrompt,
-                  effortPrompt(efforts[variant] ?? undefined),
-                ].join('\n\n');
+            : variant === 'control' && controlPrompts
+              ? controlPrompts.prompts[id]
+              : variant === 'direct'
+                ? (fixture.directPrompt ??
+                  fixture.prompt.replace(
+                    'through Jackalope computer_verify',
+                    'using your permitted shell',
+                  ))
+                : [
+                    assemblePrompt({
+                      rawPrompt: fixture.prompt,
+                      selectedSkillIds: resolveTaskGuidelines(fixture.prompt, undefined),
+                      executionMode: 'isolated',
+                    }).assembledPrompt,
+                    effortPrompt(efforts[variant] ?? undefined),
+                  ].join('\n\n');
         if (!prompt) throw new Error(`Missing frozen baseline for ${id}`);
         const spec = {
           ...fixture,
@@ -332,7 +356,7 @@ if (!args.includes('--execute')) {
         const summary = qualitySummary(trials, Object.keys(binaries));
         await writeFile(
           `${comparisonPath}.tmp`,
-          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
+          `${JSON.stringify({ version: 1, baselineRevision: baseline.revision, controlPromptsHash, controlPromptsRevision: controlPrompts?.revision ?? null, executableHashes, cliVersion, agent, model, efforts, speeds, seconds, tokens, trials, interruptions, summary, limitations: 'Authored disposable tasks, not human acceptance or a direct-GUI comparison. Direct uses the installed CLI with matched model and base permissions, without Jackalope injection. Effort requests are pinned when set; other provider configuration and caching are inherited. Include failures; missing usage remains unknown. Summary covers completed trial receipts; separately retained crash interruptions can leave total experiment usage unknown.' }, null, 2)}\n`,
         );
         await rename(`${comparisonPath}.tmp`, comparisonPath);
         console.log(JSON.stringify(trials.at(-1)));

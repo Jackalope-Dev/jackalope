@@ -30,5 +30,5 @@ export function effortFor(value?: string) {
 
 export function effortPrompt(value?: string) {
   const effort = effortFor(value);
-  return `[Task approach: ${effort.name}]\n${effort.instruction}\nPreserve the user's intent and existing work. Report the outcome, checks actually performed, and remaining limitations. Leave changes ready for review; do not claim verification or merge readiness without evidence.`;
+  return `[Task approach: ${effort.name}]\n${effort.instruction}`;
 }

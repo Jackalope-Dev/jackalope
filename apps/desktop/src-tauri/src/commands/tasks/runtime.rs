@@ -605,15 +605,10 @@ impl TaskRuntime {
                 &serde_json::json!({"mcpServers":project_mcp}).to_string(),
             ]);
         }
-        // Ordered cheapest-to-reuse first: text that never varies, then text that is stable for
-        // this project, then this task. Every model call re-sends the whole prefix, so the
-        // invariant part stays byte-identical across tasks and the task itself reads last.
-        let mut input = String::from("Jackalope task context: Work in the current workspace. Preserve the user's intent and follow repository instructions. Do not commit, merge, push, or delete the workspace. In your final response explain the outcome, changed files, verification actually performed, and anything unresolved. For clarification use the supplied Jackalope question tool and retrieve the answer. Respect permission denials: do not repeat or bypass the denied action. Continue independent authorized work when useful and report what remains blocked.\n");
-        input.push_str(super::efficiency::INSTRUCTIONS);
+        // Stable instructions precede task data; actual cache boundaries belong to the CLI.
+        let mut input = super::prompt::preamble(previous.as_ref(), &adapter);
         let commit_policy = crate::commands::project_git::read(Path::new(&req.project_path))?;
-        input.push_str(super::delegation::INSTRUCTIONS);
         commit_policy.environment(&mut cmd, &[req.agent.clone()]);
-        input.push_str("\nJackalope manages commits and attribution. Leave changes uncommitted. End your result with: Commit message: <imperative summary of the actual changes>.\n");
         if req.previous_run_id.is_none() {
             // JACKALOPE_REPO_MAP=off removes the map without changing anything else, so a
             // run with and without it is otherwise identical and the difference is measurable.
@@ -721,6 +716,7 @@ impl TaskRuntime {
         self.update_checked(id, |run| {
             run.efficiency.launches += 1;
             run.efficiency.launch_prompt_bytes += input.len() as u64;
+            run.efficiency.prompt_policy_hash = Some(super::prompt::policy_hash());
         })?;
         #[cfg(test)]
         cmd.env_remove("JACKALOPE_QUALITY_SPEC");
@@ -1470,11 +1466,7 @@ impl TaskRuntime {
                 codex_speed: request.codex_speed,
                 reasoning_effort: None,
                 requested_service_tier: None,
-                efficiency: super::efficiency::Efficiency {
-                    verification_reuses: Some(0),
-                    preparation_reuses: Some(0),
-                    ..Default::default()
-                },
+                efficiency: super::efficiency::Efficiency::for_launch(),
                 dependency_invalidated: false,
                 stages: vec![],
                 progress: None,

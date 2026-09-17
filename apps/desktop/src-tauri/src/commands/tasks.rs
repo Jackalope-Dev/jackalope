@@ -14,6 +14,7 @@ mod models;
 mod performance;
 pub(super) mod preparation;
 mod project_setup;
+mod prompt;
 mod routing;
 mod runners;
 mod runtime;
