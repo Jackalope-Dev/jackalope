@@ -136,8 +136,15 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
                     theme: { light: 'github-light', dark: 'github-dark' },
                     themeType: scheme,
                     preferredHighlighter: 'shiki-js',
-                    unsafeCSS:
-                      '[data-additions-count], [data-deletions-count] { color: var(--diffs-fg); }',
+                    unsafeCSS: `
+                      [data-additions-count], [data-deletions-count] { color: var(--diffs-fg); }
+                      [data-line-type^="change-"] [style*="--diffs-token-light"] {
+                        color: light-dark(
+                          color-mix(in srgb, var(--diffs-token-light) 75%, black),
+                          color-mix(in srgb, var(--diffs-token-dark) 50%, white)
+                        );
+                      }
+                    `,
                   }}
                 />
               ))}
