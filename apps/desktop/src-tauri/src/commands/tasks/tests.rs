@@ -358,17 +358,24 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
     let selected_agent = if let Some(executable) = executable {
         let mut policy = super::super::agent_policy::AgentPolicy::default();
-        policy.custom_agents.push(super::super::agent_policy::CustomAgent {
-            id: "lifecycle-fixture".into(), name: "Lifecycle fixture".into(),
-            command: executable.to_string_lossy().into_owned(), adapter: Some(agent.into()),
-        });
+        policy
+            .custom_agents
+            .push(super::super::agent_policy::CustomAgent {
+                id: "lifecycle-fixture".into(),
+                name: "Lifecycle fixture".into(),
+                command: executable.to_string_lossy().into_owned(),
+                adapter: Some(agent.into()),
+            });
         std::fs::create_dir_all(runtime.policy_path().parent().unwrap()).unwrap();
         std::fs::write(runtime.policy_path(), serde_json::to_vec(&policy).unwrap()).unwrap();
         "lifecycle-fixture"
     } else {
         agent
     };
-    let model = executable.is_none().then(|| std::env::var("JACKALOPE_AGENT_MODEL").ok()).flatten();
+    let model = executable
+        .is_none()
+        .then(|| std::env::var("JACKALOPE_AGENT_MODEL").ok())
+        .flatten();
     let request = RunRequest {
         retry_of: None,
         live_session_id: None,
@@ -461,7 +468,10 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     assert!(first.session_id.is_some());
     assert!(first.usage.reported);
     if executable.is_some() {
-        assert!(first.verification.as_ref().is_some_and(|check| check.result.success));
+        assert!(first
+            .verification
+            .as_ref()
+            .is_some_and(|check| check.result.success));
     }
     let mut next = request.clone();
     next.id = uuid::Uuid::new_v4().to_string();
@@ -561,7 +571,11 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
         restored.inner.lock().unwrap().runs[&second.id].result,
         second.result
     );
-    let source = if executable.is_some() { "fixture protocol for" } else { "installed" };
+    let source = if executable.is_some() {
+        "fixture protocol for"
+    } else {
+        "installed"
+    };
     println!("Verified {source} {agent}: isolated edit, reported usage, continuation, account binding, cancellation, restart. Fixture: {}", root.display());
     root
 }
