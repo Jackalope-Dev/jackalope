@@ -94,7 +94,7 @@ jobs:
             cloud-${{ matrix.target }}-${{ github.ref_name }}-rust-1.98.1-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}-
       - run: pnpm verify
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features beta-access execution_access
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
         with:
           dotnet-version: '8.0.x'
