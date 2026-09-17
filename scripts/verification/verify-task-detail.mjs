@@ -318,7 +318,8 @@ try {
     }),
   );
   await tabs.getByRole('tab', { name: 'Review', exact: true }).click();
-  await page.getByText('Requirements · 1', { exact: true }).click();
+  await page.getByRole('tab', { name: 'Checks', exact: false }).click();
+  await page.getByRole('heading', { name: 'Requirements · 1', exact: true }).waitFor();
   await page.getByText('Keyboard navigation works', { exact: true }).waitFor();
   const outcomes = page.getByRole('region', {
     name: 'Expected outcomes and evidence',
@@ -336,7 +337,7 @@ try {
   await outcomes.screenshot({ path: `${output}/evidence-960-dark.png` });
   await outcomes.getByRole('button', { name: 'Cancel', exact: true }).click();
 
-  await page.getByText('Agent evidence · 0 failed checks', { exact: true }).click();
+  await page.getByRole('heading', { name: 'Agent evidence', exact: true }).waitFor();
   await page.getByText('Search with arrow keys', { exact: true }).waitFor();
   await page.getByText('Automatic checks could not finish:', { exact: false }).waitFor();
   await page.locator('.task-detail').evaluate((el) => (el.scrollTop = 0));

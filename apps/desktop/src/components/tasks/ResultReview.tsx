@@ -42,7 +42,12 @@ export function ResultReview({
   onSectionChange?: (section: ReviewSection) => void;
 }) {
   const [selected, setSelected] = useState<ReviewSection>('changes');
-  const current = section ?? selected;
+  const hasChecks = !unavailable || !!outcomes || !!evidence;
+  const requested = section ?? selected;
+  const current =
+    (requested === 'checks' && !hasChecks) || (requested === 'tools' && unavailable)
+      ? 'changes'
+      : requested;
   const [loadedReview, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,7 +84,7 @@ export function ResultReview({
           <Tabs.Trigger value="changes">
             <FileDiff size={16} aria-hidden="true" /> Changes
           </Tabs.Trigger>
-          {!unavailable && (
+          {hasChecks && (
             <Tabs.Trigger value="checks">
               <ListChecks size={16} aria-hidden="true" /> Checks{' '}
               {checkFailed && <span className="review-check-warning">Need attention</span>}
@@ -148,14 +153,16 @@ export function ResultReview({
             </>
           )}
         </ReviewPanel>
-        {!unavailable && (
+        {hasChecks && (
           <ReviewPanel current={current} value="checks">
             <section className="task-review-checks" aria-label="Review checks">
-              <ProjectVerification
-                run={run}
-                command={project?.preferences?.verifyCommand}
-                onCorrect={onCorrect}
-              />
+              {!unavailable && (
+                <ProjectVerification
+                  run={run}
+                  command={project?.preferences?.verifyCommand}
+                  onCorrect={onCorrect}
+                />
+              )}
               {outcomes}
               {evidence}
             </section>

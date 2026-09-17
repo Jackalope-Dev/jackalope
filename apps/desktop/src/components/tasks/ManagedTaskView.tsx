@@ -326,7 +326,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           }
         />
       </div>
-      <ManagedTaskJourney task={task} work={work} />
+      {viewTab !== 'review' && <ManagedTaskJourney task={task} work={work} />}
       {(error || queueError || task.error) && (
         <InlineNotice tone="error">{error || queueError || task.error}</InlineNotice>
       )}
@@ -636,7 +636,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
               outcomes={
                 <TaskOutcomes
                   run={work.combined}
-                  canReview={!work.active.length}
+                  canReview={!work.active.length && !work.integrated}
                   onCorrect={prepareCorrection}
                   onAdvance={async () => {
                     throw new Error('Continue this task through its follow-up.');

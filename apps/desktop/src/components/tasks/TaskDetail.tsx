@@ -126,7 +126,7 @@ export function TaskDetail({
             : section,
       );
       if (section === 'context') setDetailsOpen(true);
-      if (section === 'delivery' || section === 'integrate') setReviewSection('delivery');
+      if (section === 'delivery') setReviewSection('delivery');
       if (section === 'verify') setReviewSection('checks');
       if (section === 'integrate') {
         setIntegrating(true);
