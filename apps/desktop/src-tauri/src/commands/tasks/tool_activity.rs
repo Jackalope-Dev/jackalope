@@ -1,5 +1,28 @@
 use serde_json::Value;
 
+pub(super) fn preview(text: &str) -> String {
+    if let Some((_, result)) = text.split_once("\nExit: ") {
+        if let Some(code) = result
+            .lines()
+            .next()
+            .and_then(|code| code.parse::<i64>().ok())
+        {
+            return if code == 0 {
+                "Command finished".into()
+            } else {
+                format!("Command failed (exit {code})")
+            };
+        }
+        return "Command finished".into();
+    }
+    text.lines()
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .take(240)
+        .collect()
+}
+
 pub(super) fn workspace_path(raw: &str, workspace: &str) -> Option<String> {
     let path = raw.replace('\\', "/");
     let root = workspace.replace('\\', "/");
@@ -63,6 +86,23 @@ pub(super) fn label(name: &str, input: &Value, workspace: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn command_previews_keep_outcomes_without_shell_arguments_or_output() {
+        assert_eq!(
+            preview("private command\nExit: 0\nprivate output"),
+            "Command finished"
+        );
+        assert_eq!(
+            preview("private\nmultiline command\nExit: 7\noutput"),
+            "Command failed (exit 7)"
+        );
+        assert_eq!(
+            preview("private command\nExit: null\noutput"),
+            "Command finished"
+        );
+        assert_eq!(preview("Reading src/a.rs\nmore"), "Reading src/a.rs");
+    }
 
     #[test]
     fn file_activity_keeps_only_bounded_workspace_paths() {

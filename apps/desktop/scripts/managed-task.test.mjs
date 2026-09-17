@@ -96,6 +96,20 @@ test('retries remain in one parent and usage history without duplicate inbox row
   assert.equal(items[0].stage, 'working');
 });
 
+test('a completed worker does not hide a managed task blocker in its list badge', () => {
+  const completed = [
+    runs[0],
+    { ...runs[2], status: 'review', verification: { tree: 'tree', result: { success: true } } },
+  ];
+  const blocked = { ...queue, managedTasks: [{ ...task, error: 'The target branch changed.' }] };
+  const item = collectWorkspaceWork('project', [], completed, [], [], false, blocked)[0];
+  assert.equal(item.stage, 'attention');
+  assert.equal(item.statusLabel, 'Needs attention');
+  const ready = collectWorkspaceWork('project', [], completed, [], [], false, queue)[0];
+  assert.equal(ready.stage, 'review');
+  assert.equal(ready.statusLabel, 'Ready to review');
+});
+
 test('project overview groups planning, workers and retries under the dispatched request', () => {
   const retry = { ...runs[2], id: 'retry', startedAt: '2026-09-16T00:03:00Z' };
   const ordinary = {

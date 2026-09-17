@@ -26,6 +26,18 @@ test('native checks and queued checks take precedence over old agent activity', 
     'Waiting for project checks',
   );
 });
+test('command previews show outcomes without shell arguments or captured output', () => {
+  const state = liveActivity({
+    ...run,
+    activity: [
+      'private command\nExit: 0\nprivate output',
+      'private command\nExit: 7\nprivate output',
+    ],
+  });
+  assert.equal(state.current, 'Command failed (exit 7)');
+  assert.equal(state.kind, 'attention');
+  assert.deepEqual(state.recent, ['Command finished']);
+});
 test('questions and stopping do not imply that the agent is still editing', () => {
   assert.equal(
     liveActivity({ ...run, prompts: [{ status: 'pending' }] }).current,

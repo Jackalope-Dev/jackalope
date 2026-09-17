@@ -1,5 +1,10 @@
 import { useEffect, useMemo } from 'react';
-import { collectWorkspaceWork, type WorkItem, workPresence } from '../../lib/task-collection';
+import {
+  collectWorkspaceWork,
+  matchesWorkFilter,
+  type WorkItem,
+  workPresence,
+} from '../../lib/task-collection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
@@ -31,8 +36,7 @@ export function DailyWork() {
       ),
     [runs, sessionRuns, sessions, ideas, integrated, queue],
   );
-  const attention = items.filter((item) => item.stage === 'attention');
-  const ready = items.filter((item) => item.stage === 'review');
+  const needsYou = items.filter((item) => matchesWorkFilter(item, 'attention'));
   const working = items.filter((item) => item.stage === 'working');
   const openInbox = (filter = 'all') => {
     const store = useWorkViewStore.getState();
@@ -75,16 +79,13 @@ export function DailyWork() {
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => openInbox('attention')}>
-          {attention.length} need you
-        </Button>
-        <Button variant="outline" onClick={() => openInbox('review')}>
-          {ready.length} ready to review
+          Needs you · {needsYou.length}
         </Button>
         <Button variant="ghost" onClick={() => openInbox('working')}>
           {working.length} in progress
         </Button>
       </div>
-      {[...attention, ...ready].slice(0, 1).map((item) => (
+      {needsYou.slice(0, 1).map((item) => (
         <button key={item.id} type="button" className="daily-work-row" onClick={() => open(item)}>
           <span>
             <strong>{item.title}</strong>
@@ -93,9 +94,7 @@ export function DailyWork() {
           <span>{item.stage === 'review' ? 'Review result' : workPresence(item).action}</span>
         </button>
       ))}
-      {!attention.length && !ready.length && (
-        <p className="task-muted">No loaded work is waiting for your review.</p>
-      )}
+      {!needsYou.length && <p className="task-muted">No loaded work is waiting for your review.</p>}
     </section>
   );
 }

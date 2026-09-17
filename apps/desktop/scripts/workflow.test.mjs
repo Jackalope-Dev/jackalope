@@ -5,7 +5,14 @@ import { taskNotices } from '../src/lib/companion-tasks.ts';
 import { waitForStoppedAttempt } from '../src/lib/continue-task.ts';
 import { planningDraft } from '../src/lib/planning.ts';
 import { returnToProject } from '../src/lib/project-return.ts';
-import { collectWork, collectWorkspaceWork, workPresence } from '../src/lib/task-collection.ts';
+import {
+  collectWork,
+  collectWorkspaceWork,
+  matchesWorkFilter,
+  workGroup,
+  workGroups,
+  workPresence,
+} from '../src/lib/task-collection.ts';
 import {
   latestAttempt,
   mergeDestination,
@@ -24,6 +31,38 @@ const run = {
   status: 'review',
   sessionId: 'session',
 };
+
+test('Needs you includes review and blockers without changing their specific next actions', () => {
+  const items = collectWork(
+    null,
+    [],
+    [
+      run,
+      { ...run, id: 'failed-check', taskId: 'failed-check', verificationError: 'Check failed' },
+      { ...run, id: 'running', taskId: 'running', status: 'running' },
+    ],
+  );
+  const needsYou = items.filter((item) => matchesWorkFilter(item, 'attention'));
+  assert.deepEqual(
+    needsYou.map((item) => item.id),
+    ['failed-check', 'task'],
+  );
+  assert.deepEqual(
+    needsYou.map((item) => item.statusLabel),
+    ['Checks need attention', 'Ready for your review'],
+  );
+  assert.equal(workPresence(needsYou[0]).action, 'Inspect failed check');
+  assert.equal(workPresence(needsYou[1]).action, 'Review result');
+  assert.deepEqual(
+    items.filter((item) => matchesWorkFilter(item, 'review')),
+    needsYou,
+  );
+  assert.equal(workGroup('review'), 'attention');
+  assert.deepEqual(
+    workGroups.map((group) => group.label),
+    ['Needs you', 'Working', 'Saved ideas', 'Finished'],
+  );
+});
 
 test('failed or missing checks take priority over review and integration actions', () => {
   const finished = { ...run, workspace: '/repo/task', projectPath: '/repo', status: 'reviewed' };

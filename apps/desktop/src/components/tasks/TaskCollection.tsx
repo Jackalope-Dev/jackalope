@@ -22,9 +22,11 @@ import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'reac
 
 import {
   ideaStageLabels,
+  matchesWorkFilter,
   type WorkItem,
+  workGroup,
+  workGroups,
   workPresence,
-  workStages,
 } from '../../lib/task-collection';
 import type { Runner } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
@@ -80,7 +82,8 @@ export function TaskCollection({
     if (focusReturn) actionFocus.current?.focus();
   }, [focusReturn]);
   const projects = useProjectStore((state) => state.projects);
-  const { filter, layout, query } = view;
+  const { layout, query } = view;
+  const filter = workGroup(view.filter);
   const setFilter = (filter: string) => onViewChange({ ...view, filter });
   const setLayout = (layout: 'list' | 'board') => onViewChange({ ...view, layout });
   const setQuery = (query: string) => onViewChange({ ...view, query });
@@ -88,7 +91,7 @@ export function TaskCollection({
     () =>
       items.filter(
         (item) =>
-          (filter === 'all' || item.stage === filter) &&
+          matchesWorkFilter(item, filter) &&
           `${item.title} ${item.idea?.rawPrompt ?? ''} ${item.run?.prompt ?? ''}`
             .toLowerCase()
             .includes(query.trim().toLowerCase()),
@@ -183,9 +186,9 @@ export function TaskCollection({
         />
         <Select aria-label="Filter tasks by status" value={filter} onValueChange={setFilter}>
           <SelectItem value="all">All statuses</SelectItem>
-          {workStages.map((stage) => (
+          {workGroups.map((stage) => (
             <SelectItem key={stage.id} value={stage.id}>
-              {stage.label} · {items.filter((item) => item.stage === stage.id).length}
+              {stage.label} · {items.filter((item) => matchesWorkFilter(item, stage.id)).length}
             </SelectItem>
           ))}
         </Select>
@@ -387,8 +390,8 @@ export function TaskCollection({
             rows[next]?.focus();
           }}
         >
-          {workStages.map((stage) => {
-            const stageItems = filtered.filter((item) => item.stage === stage.id);
+          {workGroups.map((stage) => {
+            const stageItems = filtered.filter((item) => matchesWorkFilter(item, stage.id));
             if (!stageItems.length) return null;
             const heading = (
               <>
@@ -414,10 +417,10 @@ export function TaskCollection({
         </fieldset>
       ) : (
         <div className="work-board">
-          {workStages
+          {workGroups
             .filter((stage) => filter === 'all' || filter === stage.id)
             .map((stage) => {
-              const stageItems = filtered.filter((item) => item.stage === stage.id);
+              const stageItems = filtered.filter((item) => matchesWorkFilter(item, stage.id));
               return (
                 <section key={stage.id} className="work-column" aria-label={stage.label}>
                   <h2>
@@ -464,6 +467,17 @@ const WorkCard = memo(
     const presence = workPresence(item);
     const agent = presence.agents[0];
     const date = new Date(item.date);
+    const status = item.statusLabel ? (
+      <Badge
+        appearance="plain"
+        className="task-status"
+        variant={item.stage === 'attention' ? 'warning' : 'default'}
+      >
+        {item.statusLabel}
+      </Badge>
+    ) : item.run ? (
+      <RunStatus status={item.run.status} progress={item.run.progress} />
+    ) : null;
     return (
       <button
         id={`work-item-${item.id}`}
@@ -505,9 +519,9 @@ const WorkCard = memo(
             )}
           </span>
         </span>
-        {item.session ? (
+        {item.session || item.managed ? (
           <span className="work-item-status">
-            {item.run && <RunStatus status={item.run.status} progress={item.run.progress} />}
+            {status}
             <span className="work-item-action">
               {presence.action}
               <ChevronRight size={14} aria-hidden="true" />
@@ -521,7 +535,7 @@ const WorkCard = memo(
                 Integrated
               </Badge>
             ) : (
-              <RunStatus status={item.run.status} progress={item.run.progress} />
+              status
             )}
             <span className="work-item-action">
               {presence.action}
@@ -554,6 +568,7 @@ const WorkCard = memo(
     before.item.id === after.item.id &&
     before.item.title === after.item.title &&
     before.item.stage === after.item.stage &&
+    before.item.statusLabel === after.item.statusLabel &&
     before.item.date === after.item.date &&
     before.item.run === after.item.run &&
     before.item.session === after.item.session &&

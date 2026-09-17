@@ -273,14 +273,7 @@ impl TaskRun {
                     .rev()
                     .take(3)
                     .rev()
-                    .map(|text| {
-                        text.lines()
-                            .next()
-                            .unwrap_or_default()
-                            .chars()
-                            .take(240)
-                            .collect()
-                    })
+                    .map(|text| super::tool_activity::preview(text))
                     .collect()
             } else {
                 Default::default()

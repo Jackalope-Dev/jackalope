@@ -9,6 +9,7 @@ import { FolderOpen, ListTodo, MoreHorizontal, Plus, Radio, Workflow } from 'luc
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   collectWorkspaceWork,
+  matchesWorkFilter,
   selectedManagedTask,
   type WorkItem,
 } from '../../lib/task-collection';
@@ -149,8 +150,9 @@ export function TaskWorkspace({
     }
     if (failures.length) throw new Error(failures.join('\n'));
   };
-  const needsInput = archived ? 0 : items.filter((item) => item.stage === 'attention').length;
-  const ready = archived ? 0 : items.filter((item) => item.stage === 'review').length;
+  const needsYou = archived
+    ? 0
+    : items.filter((item) => matchesWorkFilter(item, 'attention')).length;
   const managedTask = selectedManagedTask(
     managed.queue,
     allRuns,
@@ -210,28 +212,21 @@ export function TaskWorkspace({
         }
         action={
           <div className="task-home-actions">
-            {!!(needsInput || ready) && (
+            {!!needsYou && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
                   setView({
                     ...view,
-                    filter: needsInput ? 'attention' : 'review',
+                    filter: 'attention',
                   });
                   document
                     .querySelector('.task-collection')
                     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
               >
-                {[
-                  needsInput
-                    ? `${needsInput} ${needsInput === 1 ? 'needs' : 'need'} attention`
-                    : '',
-                  ready ? `${ready} ready to review` : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+                Needs you · {needsYou}
               </Button>
             )}
             {hasWork && (

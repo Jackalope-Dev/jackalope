@@ -119,6 +119,20 @@ fn live_tool_activity_is_concrete_bounded_and_provider_independent() {
     assert_eq!(run.activity, ["Running a command"]);
     consume_event(
         &mut run,
+        r#"{"type":"item.completed","item":{"type":"command_execution","command":"private command","exit_code":1,"aggregated_output":"private output"}}"#,
+    );
+    assert_eq!(
+        run.summary().activity.last().unwrap(),
+        "Command failed (exit 1)"
+    );
+    assert!(run.activity.last().unwrap().contains("private output"));
+    consume_event(
+        &mut run,
+        r#"{"type":"item.completed","item":{"type":"mcp_tool_call","status":"failed"}}"#,
+    );
+    assert_eq!(run.activity.last().unwrap(), "Tool request failed");
+    consume_event(
+        &mut run,
         r#"{"type":"item.completed","item":{"type":"file_change","changes":[{"path":"src/a.rs"}]}}"#,
     );
     assert_eq!(run.activity.last().unwrap(), "Changed src/a.rs");

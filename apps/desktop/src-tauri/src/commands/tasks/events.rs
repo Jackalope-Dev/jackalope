@@ -128,6 +128,15 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                         ),
                     );
                 }
+            } else if item["type"] == "mcp_tool_call" {
+                activity(
+                    run,
+                    if item["status"] == "failed" {
+                        "Tool request failed"
+                    } else {
+                        "Tool finished"
+                    },
+                );
             } else if let Some(command) = item["command"].as_str() {
                 activity(
                     run,

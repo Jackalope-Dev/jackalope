@@ -5,7 +5,7 @@ import { type ManagedTask, managedTaskWork } from './managed-task.ts';
 import type { QueueView } from './queue.ts';
 import { isActive, type TaskRun } from './task-runtime.ts';
 import { taskTitle } from './task-title.ts';
-import { taskNextAction } from './task-workflow.ts';
+import { taskDecision, taskNextAction } from './task-workflow.ts';
 
 export const workStages = [
   { id: 'attention', label: 'Needs you' },
@@ -14,6 +14,16 @@ export const workStages = [
   { id: 'ideas', label: 'Saved ideas' },
   { id: 'finished', label: 'Finished' },
 ] as const;
+
+export const workGroups = workStages.filter((stage) => stage.id !== 'review');
+
+export function workGroup(stage: string) {
+  return stage === 'review' ? 'attention' : stage;
+}
+
+export function matchesWorkFilter(item: WorkItem, filter: string) {
+  return filter === 'all' || workGroup(item.stage) === workGroup(filter);
+}
 
 export const ideaStageLabels: Record<TaskTicket['status'], string> = {
   backlog: 'Idea',
@@ -32,6 +42,7 @@ export interface WorkItem {
   run?: TaskRun;
   session?: LiveSession;
   managed?: ManagedTask;
+  statusLabel?: string;
   archiveBlocked?: string;
 }
 
@@ -123,6 +134,7 @@ export function collectWorkspaceWork(
         title: task.title,
         date: task.createdAt,
         managed: task,
+        statusLabel: work.status,
         idea: ideas.find(
           (idea) => idea.runId === task.id && idea.projectId === task.request.projectId,
         ),
@@ -159,6 +171,7 @@ export function collectWorkspaceWork(
                   : 'ideas',
         run: work.latest,
         session,
+        statusLabel: work.status,
         archiveBlocked: 'Chat sessions stay together. Open Chat to finish or resume it.',
       });
     }
@@ -248,6 +261,7 @@ export function collectWork(
       date: run.startedAt,
       idea,
       run,
+      statusLabel: taskDecision(run, integratedRunIds.includes(run.id)).label,
       archiveBlocked: blocked.has(run.taskId)
         ? 'Finish or resolve all attempts and save their history first. Chat tasks stay with their session.'
         : undefined,

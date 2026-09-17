@@ -3,6 +3,13 @@ import { isActive, type TaskRun } from './task-runtime.ts';
 const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`, 'g');
 
 export function activityLine(text: string) {
+  const exit = text.match(/\nExit: ([^\n]+)/);
+  if (exit) {
+    const code = Number(exit[1]);
+    return Number.isInteger(code) && code !== 0
+      ? `Command failed (exit ${code})`
+      : 'Command finished';
+  }
   return text.replace(ansiEscape, '').trim().split('\n')[0].slice(0, 240);
 }
 
@@ -10,7 +17,7 @@ export function activityKind(
   text: string,
 ): 'attention' | 'read' | 'edit' | 'search' | 'check' | 'activity' {
   if (
-    /^(tool request failed|file change failed|error\b|permission denied)|(?: · |: )(failed|error|denied)$/i.test(
+    /^(tool request failed|file change failed|command failed|error\b|permission denied)|(?: · |: )(failed|error|denied)$/i.test(
       text,
     )
   )
