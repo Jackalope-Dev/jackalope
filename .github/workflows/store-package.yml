@@ -80,7 +80,7 @@ jobs:
       - id: package
         shell: pwsh
         run: ./scripts/release/store.ps1 -Mode $env:RELEASE_MODE -Channel $env:RELEASE_CHANNEL
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always() && steps.package.outcome == 'success'
         with:
           name: store-${{ env.RELEASE_CHANNEL }}-${{ needs.plan.outputs.mode }}
@@ -131,7 +131,7 @@ jobs:
           if ($receipts.Count -ne 1) { throw 'Expected exactly one Store candidate.' }
           node scripts/release/store-submit.mjs $receipts[0].DirectoryName
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: store-${{ needs.plan.outputs.channel }}-submission-result
