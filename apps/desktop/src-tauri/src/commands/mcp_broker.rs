@@ -33,11 +33,11 @@ pub struct BrokerUsage {
     pub catalog_bytes: usize,
     pub schema_bytes_returned: u64,
     #[serde(default)]
-    pub result_bytes_received: u64,
+    pub result_bytes_received: Option<u64>,
     #[serde(default)]
-    pub result_bytes_returned: u64,
+    pub result_bytes_returned: Option<u64>,
     #[serde(default)]
-    pub result_reads: u64,
+    pub result_reads: Option<u64>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -163,7 +163,12 @@ impl Broker {
                     })
                     .collect(),
                 leases: VecDeque::new(),
-                usage: BrokerUsage::default(),
+                usage: BrokerUsage {
+                    result_bytes_received: Some(0),
+                    result_bytes_returned: Some(0),
+                    result_reads: Some(0),
+                    ..BrokerUsage::default()
+                },
                 results: VecDeque::new(),
             }),
             closed,
@@ -243,8 +248,8 @@ impl Broker {
             return Err("This attempt has ended.".into());
         }
         let result = results::read(&catalog.results, &input)?;
-        catalog.usage.result_reads += 1;
-        catalog.usage.result_bytes_returned +=
+        *catalog.usage.result_reads.get_or_insert(0) += 1;
+        *catalog.usage.result_bytes_returned.get_or_insert(0) +=
             serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
         Ok((result, catalog.usage.clone()))
     }
@@ -442,10 +447,10 @@ async fn execute_catalog(
     if serde_json::to_vec(&result).map_or(true, |value| value.len() > 1_000_000) {
         return Ok((CallToolResult::error(vec![rmcp::model::ContentBlock::text("The tool completed but its result exceeds 1 MB. Request a smaller result; do not repeat a write operation.")]), catalog.usage.clone()));
     }
-    catalog.usage.result_bytes_received +=
+    *catalog.usage.result_bytes_received.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
     result = results::select(result, input.output.as_ref(), &mut catalog.results);
-    catalog.usage.result_bytes_returned +=
+    *catalog.usage.result_bytes_returned.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
     Ok((result, catalog.usage.clone()))
 }

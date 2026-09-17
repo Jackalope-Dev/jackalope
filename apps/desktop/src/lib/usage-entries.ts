@@ -20,6 +20,7 @@ export function usageEntries(runs: TaskRun[]) {
       codexSpeed: undefined,
       requestedServiceTier: undefined,
       efficiency: undefined,
+      mcpUsage: undefined,
 
       startedAt: handoff.recordedAt,
       status: 'failed' as const,
@@ -58,6 +59,7 @@ export function usageEntries(runs: TaskRun[]) {
       codexSpeed: undefined,
       requestedServiceTier: undefined,
       efficiency: undefined,
+      mcpUsage: undefined,
 
       startedAt: attempt.recordedAt,
       status: attempt.error ? ('failed' as const) : run.status,

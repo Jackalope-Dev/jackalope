@@ -53,7 +53,10 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::write(&source, serde_json::to_vec(&spec["toolFixture"])?)?;
         let server_path = root.join("tool-server.cjs");
         let counter = root.join("tool-calls.txt");
-        std::fs::write(&server_path, r#"const fs=require('node:fs'), data=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));let calls=0;require('readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);const send=result=>console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result}));if(q.method==='initialize')send({protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'result-fixture',version:'1'}});if(q.method==='tools/list')send({tools:[{name:'fixture_report',description:'Return a report keyed by record ID in structuredContent.report.',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{}}}]});if(q.method==='tools/call'){fs.writeFileSync(process.argv[3],String(++calls));send({content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data,isError:false});}});"#)?;
+        std::fs::write(
+            &server_path,
+            r#"const fs=require('node:fs'), data=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));let calls=0;require('readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);const send=result=>console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result}));if(q.method==='initialize')send({protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'result-fixture',version:'1'}});if(q.method==='tools/list')send({tools:[{name:'fixture_report',description:'Return a report keyed by record ID in structuredContent.report.',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{}}}]});if(q.method==='tools/call'){fs.writeFileSync(process.argv[3],String(++calls));send({content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data,isError:false});}});"#,
+        )?;
         let config = json!({"command":"node","args":[server_path,source,counter]});
         spec["fixtureMcp"] = json!({"quality_fixture":config});
         if !direct {
@@ -161,7 +164,11 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
             .lines()
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect();
-    let tool_calls = has_fixture.then(|| std::fs::read_to_string(root.join("tool-calls.txt")).ok().and_then(|text| text.parse::<u64>().ok()));
+    let tool_calls = has_fixture.then(|| {
+        std::fs::read_to_string(root.join("tool-calls.txt"))
+            .ok()
+            .and_then(|text| text.parse::<u64>().ok())
+    });
     let report = json!({"version":1,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
         "budgetStopped":stopped,"launchError":launch_error,"oracle":oracle,

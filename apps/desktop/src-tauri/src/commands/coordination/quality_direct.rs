@@ -62,9 +62,16 @@ pub(super) fn run(
     let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, effort);
     if let Some(servers) = spec["fixtureMcp"].as_object() {
         if adapter == "codex" {
-            for value in crate::commands::mcp::codex_overrides(servers)? { cmd.args(["-c", &value]); }
+            for value in crate::commands::mcp::codex_overrides(servers)? {
+                cmd.args(["-c", &value]);
+            }
         } else if adapter == "claude" {
-            cmd.args(["--mcp-config", &serde_json::json!({"mcpServers":servers}).to_string(), "--allowedTools", "mcp__quality_fixture__fixture_report"]);
+            cmd.args([
+                "--mcp-config",
+                &serde_json::json!({"mcpServers":servers}).to_string(),
+                "--allowedTools",
+                "mcp__quality_fixture__fixture_report",
+            ]);
         }
     }
     let codex_speed =

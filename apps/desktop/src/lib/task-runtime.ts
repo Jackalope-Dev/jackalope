@@ -34,6 +34,7 @@ export interface TaskRun {
     toolCalls?: Record<string, number>;
     toolObservationsTruncated?: boolean;
     launchPromptBytes: number;
+    promptPolicyHash?: string | null;
     launches: number;
     verificationCalls: number;
     verificationFailures: number;
@@ -153,9 +154,9 @@ export interface TaskRun {
     catalogTools: number;
     catalogBytes: number;
     schemaBytesReturned: number;
-    resultBytesReceived?: number;
-    resultBytesReturned?: number;
-    resultReads?: number;
+    resultBytesReceived?: number | null;
+    resultBytesReturned?: number | null;
+    resultReads?: number | null;
   };
   usageObservations?: {
     messageId: string;
