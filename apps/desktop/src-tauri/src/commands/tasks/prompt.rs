@@ -3,14 +3,14 @@ use sha2::{Digest, Sha256};
 const CORE: &str = "Jackalope task context: Use the assigned workspace; preserve user intent, existing work and repository instructions. Leave changes uncommitted; do not merge, push or delete the workspace. Permission denials prohibit retries or bypasses; continue independent authorized work. Use the supplied question tool for blocking decisions and retrieve the answer. Report the outcome, changed files, checks actually performed and unresolved issues. End with: Commit message: <imperative summary of actual changes>.\n";
 
 pub(super) fn policy_hash() -> String {
-    format!(
-        "{:x}",
-        Sha256::digest(format!(
-            "{CORE}{}{}",
-            super::efficiency::INSTRUCTIONS,
-            super::delegation::INSTRUCTIONS
-        ))
-    )
+    Sha256::digest(format!(
+        "{CORE}{}{}",
+        super::efficiency::INSTRUCTIONS,
+        super::delegation::INSTRUCTIONS
+    ))
+    .iter()
+    .map(|byte| format!("{byte:02x}"))
+    .collect()
 }
 
 pub(super) fn preamble(previous: Option<&super::TaskRun>, adapter: &str) -> String {

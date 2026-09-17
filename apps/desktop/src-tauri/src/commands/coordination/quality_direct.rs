@@ -60,6 +60,13 @@ pub(super) fn run(
         return Err("Direct trials support Codex and Claude".into());
     }
     let reasoning_effort = tasks::effort::configure(&mut cmd, &adapter, effort);
+    if let Some(servers) = spec["fixtureMcp"].as_object() {
+        if adapter == "codex" {
+            for value in crate::commands::mcp::codex_overrides(servers)? { cmd.args(["-c", &value]); }
+        } else if adapter == "claude" {
+            cmd.args(["--mcp-config", &serde_json::json!({"mcpServers":servers}).to_string(), "--allowedTools", "mcp__quality_fixture__fixture_report"]);
+        }
+    }
     let codex_speed =
         serde_json::from_value(spec["codexSpeed"].clone()).map_err(|e| e.to_string())?;
     let requested_service_tier = tasks::speed::configure(&mut cmd, &adapter, codex_speed);

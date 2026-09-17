@@ -75,6 +75,9 @@ release dates.
   idle cleanup, account/configuration changes and matched cold/warm latency.
 - [ ] Measure documentation round trips, provider tokens and routing quality on matched
   tasks after context/prompt changes. Keep all eligible models and quality-first selection.
+  Include versioned prompt comparisons, resumed sessions, bounded maps and recoverable
+  tool-result selection. Require representative independent acceptance before broad
+  website claims; retain failures, cache accounting and correction work.
 
 - [ ] Compare repeated single, serial and staged evaluations with matched provider/model
   budgets and independent human review. Validate feature snapshot recovery, shared

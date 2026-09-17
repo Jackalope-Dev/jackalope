@@ -40,6 +40,10 @@ dispatch and CPU-based check capacity are implemented. Execution timings and off
 delivery comparisons retain waits, failures and missing review evidence. Validate
 complete task delivery and quality on representative repositories before claiming gains.
 
+Versioned prompt guidance, same-policy continuation context and recoverable tool-result
+selection are implemented. Sanitized comparison exports retain matched configurations,
+oracle outcomes and reporting limits. Broader independent acceptance remains open.
+
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)
 exercise these contracts; installed startup, memory and responsiveness acceptance remains open.

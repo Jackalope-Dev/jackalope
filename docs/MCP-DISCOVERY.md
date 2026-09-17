@@ -68,6 +68,22 @@ Tool schemas/results may still appear in activity reported by the agent.
 
 ## Management and measurement
 
+Calls may opt into `output: {jsonPointers: ["/structuredContent/items"], maxChars: 6000}`.
+Pointers address the captured MCP response; missing pointers, errors and non-text
+content preserve the original result. Small results also remain unchanged when
+a preview would add overhead. A shorter response includes the selected data or a
+clearly marked text preview and a `resultHandle`. `read_tool_result`, or authenticated
+`POST /v1/tools/result`, accepts `{resultHandle, offset, limit}` to page through the
+complete captured JSON without rerunning the upstream operation. Offsets count
+Unicode characters. Follow `nextOffset` with the same handle.
+
+Only the latest four selected results, each within the existing 1 MB capture limit,
+remain in attempt-owned memory. Handles expire at attempt completion and cannot
+cross attempts. These controls do not intercept tools delivered directly to a CLI,
+grant permissions or filter failures. Usage records captured/returned response bytes
+and snapshot reads, including expansion overhead; bytes do not establish token or
+cost savings. Selection is deterministic and makes no model call.
+
 Jackalope-owned global/project `mcp_servers.json` files use the same native protected
 storage as device keys: Windows DPAPI, macOS Keychain or Linux Secret Service.
 Valid legacy plaintext objects and existing Jackalope backup files migrate on read

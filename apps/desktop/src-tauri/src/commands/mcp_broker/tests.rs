@@ -33,6 +33,34 @@ fn folder() -> PathBuf {
     path
 }
 
+#[tokio::test]
+async fn selected_results_expand_without_repeating_calls_or_crossing_attempts() {
+    let path = folder();
+    let broker = Broker::default();
+    for id in ["one", "two"] {
+        broker.prepare(id, vec![fixture(SERVER)], path.clone(), None).unwrap();
+    }
+    let (found, _) = broker.search("one", search("tool_19")).await.unwrap();
+    let mut input = execute(found["tools"][0]["handle"].as_str().unwrap());
+    input.arguments.insert("value".into(), json!("source-data".repeat(2000)));
+    input.output = Some(serde_json::from_value(json!({"jsonPointers":["/structuredContent/calls"]})).unwrap());
+    let (selected, usage) = broker.read("one", input).await.unwrap();
+    assert_eq!(usage.calls, 1);
+    assert!(usage.result_bytes_returned < usage.result_bytes_received / 10);
+    let selected = serde_json::to_value(selected).unwrap();
+    let value: Value = serde_json::from_str(selected["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(value["selected"]["/structuredContent/calls"], 1);
+    let input = || serde_json::from_value(json!({"resultHandle":value["resultHandle"],"limit":1000})).unwrap();
+    assert!(broker.read_result("two", input()).await.is_err());
+    let (_, usage) = broker.read_result("one", input()).await.unwrap();
+    assert_eq!(usage.calls, 1);
+    assert_eq!(usage.result_reads, 1);
+    broker.close("one");
+    assert!(broker.read_result("one", input()).await.is_err());
+    broker.close("two");
+    remove_fixture(path).await;
+}
+
 async fn remove_fixture(path: PathBuf) {
     // Windows can retain the process's working-directory handle briefly after termination.
     for _ in 0..50 {

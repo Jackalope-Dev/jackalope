@@ -97,7 +97,7 @@ export const roadmapStages = [
         title: 'The small things that earn trust.',
         summary: 'Keyboard access, performance, and feedback from early users.',
         detail:
-          'Task updates, history loading, and rich rendering have local performance improvements. Concurrent account checks, more focused codebase maps, and fewer unnecessary routing calls reduce repeated setup work. Local agents can use a separately checked title model, and local helpers can reuse short-lived servers. Comparisons retain correctness, total usage, and latency. Installed startup, memory, accessibility, saved-data recovery, and external beta trials remain release work. Required account access, optional settings sync, and feedback flows also need installed-app and delivery checks before wider use.',
+          'Task updates, history loading, and rich rendering have local performance improvements. Concurrent account checks, focused codebase maps, scoped task guidance and reusable context help avoid repeated work. Connected tools can return selected data while keeping the complete response available. Local agents can use a separately checked title model, and local helpers can reuse short-lived servers. Comparisons retain correctness, total usage, latency and missing measurements; broader savings claims still need independent validation. Installed startup, memory, accessibility, saved-data recovery, and external beta trials remain release work. Required account access, optional settings sync, and feedback flows also need installed-app and delivery checks before wider use.',
       },
     ],
   },

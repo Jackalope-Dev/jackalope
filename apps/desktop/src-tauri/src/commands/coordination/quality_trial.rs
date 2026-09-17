@@ -10,7 +10,7 @@ async fn installed_quality_trial() {
 
 async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let spec_path = PathBuf::from(std::env::var("JACKALOPE_QUALITY_SPEC")?);
-    let spec: Value = serde_json::from_slice(&std::fs::read(&spec_path)?)?;
+    let mut spec: Value = serde_json::from_slice(&std::fs::read(&spec_path)?)?;
     let root = std::env::temp_dir().join(format!("jackalope-quality-{}", Uuid::new_v4()));
     let repo = root.join("repo");
     std::fs::create_dir_all(&repo)?;
@@ -45,6 +45,24 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let service = Coordinator::new(root.join("profile/coordination"), runtime.clone())?;
     let _owner = Owner(runtime.clone(), service.clone());
     let direct = spec["variant"] == "direct";
+    let project_id = Uuid::new_v4().to_string();
+    let fixture_scope = format!("project:{project_id}");
+    let has_fixture = spec["toolFixture"].is_object();
+    if has_fixture {
+        let source = root.join("tool-data.json");
+        std::fs::write(&source, serde_json::to_vec(&spec["toolFixture"])?)?;
+        let server_path = root.join("tool-server.cjs");
+        let counter = root.join("tool-calls.txt");
+        std::fs::write(&server_path, r#"const fs=require('node:fs'), data=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));let calls=0;require('readline').createInterface({input:process.stdin}).on('line',line=>{const q=JSON.parse(line);const send=result=>console.log(JSON.stringify({jsonrpc:'2.0',id:q.id,result}));if(q.method==='initialize')send({protocolVersion:'2025-11-25',capabilities:{tools:{}},serverInfo:{name:'result-fixture',version:'1'}});if(q.method==='tools/list')send({tools:[{name:'fixture_report',description:'Return a report keyed by record ID in structuredContent.report.',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{}}}]});if(q.method==='tools/call'){fs.writeFileSync(process.argv[3],String(++calls));send({content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data,isError:false});}});"#)?;
+        let config = json!({"command":"node","args":[server_path,source,counter]});
+        spec["fixtureMcp"] = json!({"quality_fixture":config});
+        if !direct {
+            crate::commands::mcp::mcp_save_server(serde_json::from_value(json!({
+                "id":"quality_fixture","name":"Disposable tool-result fixture","scope":fixture_scope,"transport":"stdio",
+                "command":"node","args":config["args"],"discovery":true
+            }))?).await?;
+        }
+    }
     if !direct {
         service.launch();
     }
@@ -79,9 +97,9 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         service
             .start_manual(serde_json::from_value(json!({
-                "id":id,"projectId":Uuid::new_v4().to_string(),"projectName":"Quality benchmark",
+                "id":id,"projectId":project_id,"projectName":"Quality benchmark",
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
-                "isolated":true,"targetBranch":"main","connectionIds":[],
+                "isolated":true,"targetBranch":"main","connectionIds":if has_fixture {vec!["quality_fixture"]} else {vec![]},
                 "contextSelection":{"memoryOff":true},"prompt":spec["prompt"],
                 "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
             }))?)
@@ -143,7 +161,8 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
             .lines()
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect();
-    let report = json!({"version":1,"case":spec["id"],"variant":spec["variant"],
+    let tool_calls = has_fixture.then(|| std::fs::read_to_string(root.join("tool-calls.txt")).ok().and_then(|text| text.parse::<u64>().ok()));
+    let report = json!({"version":1,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
         "budgetStopped":stopped,"launchError":launch_error,"oracle":oracle,
         "promptBytes":if direct { spec["prompt"].as_str().map(str::len) } else { input.as_ref().map(Vec::len) },"run":run,"agentVerification":agent_verification,
@@ -152,6 +171,9 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let receipt = root.join("quality.json");
     std::fs::write(&receipt, serde_json::to_vec_pretty(&report)?)?;
     println!("Quality receipt: {}", receipt.display());
+    if has_fixture && !direct {
+        crate::commands::mcp::mcp_delete_server("quality_fixture".into(), fixture_scope).await?;
+    }
     Ok(())
 }
 

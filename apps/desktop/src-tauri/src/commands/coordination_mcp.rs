@@ -718,6 +718,7 @@ mod tests {
         assert!(names.contains(&"inbox"));
         assert!(names.contains(&"acknowledge_message"));
         assert!(names.contains(&"read_tool"));
+        assert!(names.contains(&"read_tool_result"));
         assert!(names.contains(&"search_tools"));
         assert!(names.contains(&"execute_tool"));
         assert!(names.contains(&"project"));

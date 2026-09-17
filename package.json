@@ -27,6 +27,7 @@
     "check:dependencies": "node scripts/security/dependencies.mjs",
     "evaluate:execution": "node scripts/evaluation/run.mjs",
     "evaluate:quality": "node scripts/evaluation/quality.mjs",
+    "evaluate:context": "node scripts/evaluation/context-report.mjs",
     "evaluate:speed": "node scripts/evaluation/speed.mjs",
     "evaluate:jev": "node scripts/evaluation/jev.mjs",
     "evaluate:routing": "node scripts/evaluation/routing.mjs",

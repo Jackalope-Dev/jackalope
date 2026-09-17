@@ -46,7 +46,10 @@ pub(super) struct Snapshot {
 }
 
 fn response(value: Value) -> CallToolResult {
-    CallToolResult::success(vec![rmcp::model::ContentBlock::text(value.to_string())])
+    let mut result =
+        CallToolResult::success(vec![rmcp::model::ContentBlock::text(value.to_string())]);
+    result.result_type = Some(rmcp::model::ResultType::COMPLETE);
+    result
 }
 
 pub(super) fn select(

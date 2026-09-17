@@ -7,7 +7,7 @@ provider's own GUI.
 
 ## Prompt and output contracts
 
-- Every worker launch and continuation asks the lead to assess delegation after
+- Fresh worker launches ask the lead to assess delegation after
   inspecting repository context. Small or tightly coupled work stays sequential;
   useful independent work can use the provider's available, permitted subagent
   tools without a separate split decision from the user. Explicit user/repository
@@ -17,11 +17,15 @@ provider's own GUI.
   is launched to emulate them. These are agent instructions, not native enforcement
   of a worker count or evidence that a provider actually delegated. Provider
   lifecycle, usage coverage and quality still require installed trials.
+- Confirmed Codex, Claude, OpenCode and Grok native-session continuations with the
+  same recorded prompt-policy hash reuse prior workflow instructions. Current task,
+  contract, workspace, permissions and coordination data remain explicit. Older
+  receipts, changed policies and other adapters receive full guidance.
 - Automatic guidelines distinguish design tokens from authentication tokens, skip
   negated requests and fenced examples, and avoid a debugging workflow for spelling
   fixes. Explicitly selected guidelines and project defaults remain available.
 - Generated instructions identify the worktree Jackalope already assigned. Saved
-  version-one ideas reconstruct their original generated text before migration;
+  version-one and version-two ideas reconstruct their original generated text before migration;
   edited instructions remain verbatim.
 - Native MCP adapters use their tool descriptions. Grok, Antigravity and Gemini CLI receive a
   short authenticated `GET /v1/help` bootstrap instead of the entire HTTP manual
@@ -35,7 +39,8 @@ provider's own GUI.
   changes, failures and unresolved concerns justify additional verification.
 - Repository maps rank file paths and bounded Tree-sitter declarations, include
   related test names and task-referenced file locations, and remain limited to
-  6 KB. Cached lines are advisory and must be verified before edits. Scans share
+  6 KB, or 3 KB when the request explicitly names one or two indexed files.
+  Cached lines are advisory and must be verified before edits. Scans share
   a lock per repository/commit, allowing unrelated repositories to scan independently.
   Account capacity reads share in-flight refreshes and use at most four concurrent
   reads, preserving candidate order and final policy/quota reservation checks.
@@ -89,7 +94,7 @@ configuration. Completed trials, including failures, are retained. The driver ch
 CLI/binary identity, budgets and pending fixture text before resuming. Record crash
 interruptions separately; missing usage makes total experiment consumption unknown.
 
-Before/after order alternates across repetitions. Keep the account, explicit model,
+Variant order rotates across repetitions. Keep the account, explicit model,
 reasoning configuration, fixtures and limits matched. Report usage coverage; missing
 usage is unknown. Sum input and output across **all** attempts, including failures,
 and divide by oracle successes. Cached input is reported separately and must not be
@@ -115,6 +120,44 @@ production tail latency or unchanged quality on real projects.
 
 
 ## Effort, direct harness comparisons and routing evidence
+
+Capture current frontend prompts before edits with `pnpm evaluate:quality --
+--effort=balanced --save-prompts=<file> --revision=<source-reference>` and the same
+`--cases` selection intended for execution. Preserve the native control executable
+separately. `--control-prompts=<file>` uses those frozen prompts with `--control=<exe>`;
+the explicit effort must match. Resume checks the prompt snapshot hash as well as
+the existing executable and provider configuration evidence.
+
+`pnpm evaluate:context comparison.json public-report.json [baseline] [candidate]`
+creates a sanitized aggregate for reviewing potential public claims. Defaults compare
+`direct` with `after`; use `control` to compare the preserved Jackalope baseline.
+It excludes prompts, local paths, account fingerprints and raw receipts, retaining
+source/build hashes, task IDs, configurations, counts, missing data and limitations.
+All retained failed trials remain in totals. Duplicate trials are rejected.
+Claims require matched configurations/cases, complete evidence, passing independent
+oracles, at least three cases with three repetitions each, and a positive lower
+bound from a deterministic case-cluster bootstrap. These are conservative reporting
+checks, not proof of generalization or human quality equivalence. Report the exact
+suite and limitations beside any public number. Tokens are not dollars or quota;
+provider cache state is inherited. Do not publish raw task receipts.
+
+Prompt and context guidance follows [OpenAI's model guidance](https://developers.openai.com/api/docs/guides/latest-model),
+[provider cache boundaries](https://developers.openai.com/api/docs/guides/prompt-caching),
+[targeted tool results](https://www.anthropic.com/engineering/writing-tools-for-agents)
+and [Aider's bounded repository maps](https://aider.chat/docs/repomap.html).
+These sources motivate local comparisons, not Jackalope savings claims.
+
+For an isolated large-response comparison, generate an authored suite with
+`node scripts/evaluation/tool-result-cases.mjs <suite.json>` and pass it to the
+quality runner with `--suite=<suite.json> --variants=direct,after`. Use a current
+native test binary for both variants. The fixture owns a local read-only MCP
+server outside the agent workspace; direct runs receive it through their native
+MCP configuration and Jackalope runs through on-demand discovery. Both receive
+the same extraction request and source payload. A unique temporary project
+connection is removed after each Jackalope trial; global CLI configuration is
+unchanged. Calls, returned bytes, output correctness and unrelated edits are
+recorded or checked independently. These synthetic large payloads test a specific
+tool-response workflow and do not represent ordinary coding-task savings.
 
 New captured tasks send Quick/Balanced/Thorough as low/medium/high model effort
 requests to Codex and Claude, in addition to the task approach instructions.

@@ -115,6 +115,29 @@ if (
 )
   throw new Error('Invalid quality evaluation options.');
 if (!args.includes('--execute')) {
+  if (value('--save-prompts', null)) {
+    if (!requestedEffort) throw new Error('Pin --effort when saving a prompt baseline.');
+    const prompts = Object.fromEntries(
+      selected.map((id) => [
+        id,
+        [
+          assemblePrompt({
+            rawPrompt: cases.find((c) => c.id === id).prompt,
+            selectedSkillIds: resolveTaskGuidelines(
+              cases.find((c) => c.id === id).prompt,
+              undefined,
+            ),
+            executionMode: 'isolated',
+          }).assembledPrompt,
+          effortPrompt(requestedEffort),
+        ].join('\n\n'),
+      ]),
+    );
+    await writeFile(
+      path.resolve(value('--save-prompts')),
+      `${JSON.stringify({ revision: value('--revision', 'working-tree'), effort: requestedEffort, prompts }, null, 2)}\n`,
+    );
+  }
   console.log(
     JSON.stringify(
       {
@@ -194,7 +217,8 @@ if (!args.includes('--execute')) {
   for (const id of selected)
     for (let repetition = 1; repetition <= repeat; repetition++) {
       const fixture = cases.find((c) => c.id === id);
-      const order = repetition % 2 ? variants : [...variants].reverse();
+      const offset = (repetition - 1) % variants.length;
+      const order = [...variants.slice(offset), ...variants.slice(0, offset)];
       for (const variant of order) {
         const completed = trials.some(
           (trial) =>
@@ -317,6 +341,7 @@ if (!args.includes('--execute')) {
           oraclePassed:
             execution.code === 0 &&
             !report?.budgetStopped &&
+            (!fixture.toolFixture || report?.fixtureToolCalls > 0) &&
             run?.status === 'review' &&
             report?.oracle?.success === true,
           behavioralOraclePassed: report?.oracle?.success === true,
@@ -339,6 +364,8 @@ if (!args.includes('--execute')) {
           requestedServiceTier: run?.requestedServiceTier ?? null,
           reasoningEffort: run?.reasoningEffort ?? null,
           efficiency: run?.efficiency ?? null,
+          mcpUsage: run?.mcpUsage ?? null,
+          fixtureToolCalls: report?.fixtureToolCalls ?? null,
           stages: run?.stages ?? [],
           usageBreakdown: run ? runUsageBreakdown([run]) : null,
           accepted: null,

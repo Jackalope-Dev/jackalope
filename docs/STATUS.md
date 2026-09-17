@@ -127,6 +127,11 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
   Symbol definitions, related tests and explicit file locations sharpen retrieval;
   per-repository locks allow independent scans. Detailed launch timings and latency
   summaries retain failures and missing measurements in quality comparisons.
+- Versioned prompt guidance scopes checks to repository requirements and affected
+  behavior. Confirmed same-policy native resumes reuse workflow context. Optional
+  MCP result selection retains expandable source data without repeating calls.
+  Matched comparison exports omit private receipts and gate scoped public claims;
+  representative quality, monetary savings and installed acceptance remain open.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup includes project, agents, decisions, behavior, appearance and an optional
   first task. Theme editors open directly; existing saved app/project choices remain compatible.

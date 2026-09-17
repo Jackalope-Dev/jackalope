@@ -13,6 +13,39 @@ import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../src/lib/skills/task-context.ts';
 import { effortPrompt } from '../src/lib/task-effort.ts';
 
+test('prompt baselines pin effort and selected cases without launching providers', () => {
+  const output = mkdtempSync(path.join(tmpdir(), 'jackalope-prompt-baseline-'));
+  const filename = path.join(output, 'prompts.json');
+  const script = fileURLToPath(new URL('../../../scripts/evaluation/quality.mjs', import.meta.url));
+  const invoke = (args) =>
+    spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', windowsHide: true });
+  const saved = invoke([
+    '--effort=balanced',
+    '--cases=copy-edit',
+    `--save-prompts=${filename}`,
+    '--revision=fixture-source',
+  ]);
+  assert.equal(saved.status, 0, saved.stderr);
+  const snapshot = JSON.parse(readFileSync(filename, 'utf8'));
+  assert.equal(snapshot.effort, 'balanced');
+  assert.deepEqual(Object.keys(snapshot.prompts), ['copy-edit']);
+  const options = [
+    '--variants=control,after',
+    '--cases=copy-edit',
+    `--control-prompts=${filename}`,
+  ];
+  assert.equal(invoke([...options, '--effort=balanced']).status, 0);
+  assert.notEqual(invoke([...options, '--effort=quick']).status, 0);
+  assert.notEqual(
+    invoke([
+      ...options.filter((arg) => !arg.startsWith('--cases=')),
+      '--effort=balanced',
+      '--cases=csv-cell',
+    ]).status,
+    0,
+  );
+});
+
 test('resuming completed trials launches no workers and rejects changed configuration', () => {
   const output = mkdtempSync(path.join(tmpdir(), 'jackalope-quality-resume-'));
   const executable = path.join(output, 'not-an-agent.exe');

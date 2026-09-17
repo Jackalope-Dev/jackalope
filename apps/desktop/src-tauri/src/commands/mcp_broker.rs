@@ -570,11 +570,11 @@ fn rank(terms: &[String], server: &str, tool: &Tool) -> usize {
 
 pub(super) fn record_usage(runtime: &super::tasks::TaskRuntime, run: &TaskRun, usage: BrokerUsage) {
     runtime.update(&run.id, |record| {
-        if record
-            .mcp_usage
-            .as_ref()
-            .is_none_or(|old| old.searches <= usage.searches && old.calls <= usage.calls)
-        {
+        if record.mcp_usage.as_ref().is_none_or(|old| {
+            old.searches <= usage.searches
+                && old.calls <= usage.calls
+                && old.result_reads <= usage.result_reads
+        }) {
             record.mcp_usage = Some(usage);
         }
     });
