@@ -451,12 +451,7 @@ export function LandingPage({
             </div>
           </div>
           <div className="hero-visual">
-            <button
-              type="button"
-              className="hero-window"
-              onClick={onPlay}
-              aria-label={`See the workspace in action: ${tour.durationSeconds} sec Jackalope app tour`}
-            >
+            <button type="button" className="hero-window" onClick={onPlay}>
               <span className="hero-window-meta">
                 <span>More room to build.</span>
               </span>
