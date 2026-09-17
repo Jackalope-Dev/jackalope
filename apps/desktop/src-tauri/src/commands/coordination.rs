@@ -703,3 +703,21 @@ async fn bridge_tool_read(
     super::mcp_broker::record_usage(&service.runtime, &run, usage);
     Ok(Json(result))
 }
+
+async fn bridge_tool_result(
+    WebState(service): WebState<Coordinator>,
+    headers: HeaderMap,
+    Json(input): Json<super::mcp_broker::results::ReadInput>,
+) -> Result<Json<rmcp::model::CallToolResult>, (StatusCode, String)> {
+    let run = service
+        .authorized_run(&headers)
+        .map_err(|status| (status, "Unauthorized".into()))?;
+    let (result, usage) = service
+        .runtime
+        .mcp_broker
+        .read_result(&run.id, input)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+    super::mcp_broker::record_usage(&service.runtime, &run, usage);
+    Ok(Json(result))
+}

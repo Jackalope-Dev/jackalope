@@ -195,7 +195,7 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Call a discovered tool that its selected connection declares read-only. Requires a search handle; rejects tools that are mutable or lack a read-only declaration.",
+        description = "Call a discovered read-only tool using its search handle. Optional output.jsonPointers selects fields from the MCP result; output.maxChars bounds a text preview. Omitted data is recoverable with read_tool_result. Mutable tools are rejected.",
         annotations(
             read_only_hint = true,
             destructive_hint = false,
@@ -223,7 +223,31 @@ impl CoordinationTools {
     }
 
     #[tool(
-        description = "Execute a tool using a handle returned by search_tools and arguments matching its schema. May change external data. Discovery does not authorize side effects. Never retry uncertain writes automatically.",
+        description = "Read a selected tool result by resultHandle, offset and limit without executing the tool again. Returns captured JSON text with nextOffset. Handles are scoped to this attempt and its latest four selected results.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn read_tool_result(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::mcp_broker::results::ReadInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
+            .service
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        let (result, usage) = self
+            .service
+            .runtime
+            .mcp_broker
+            .read_result(&run.id, input)
+            .await
+            .map_err(|e| ErrorData::invalid_request(e, None))?;
+        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
+        Ok(result)
+    }
+
+    #[tool(
+        description = "Execute a tool using a handle returned by search_tools and schema-valid arguments. May change external data. Discovery does not authorize side effects. Never retry uncertain writes. Optional output selects a recoverable result preview as in read_tool.",
         annotations(
             read_only_hint = false,
             destructive_hint = true,

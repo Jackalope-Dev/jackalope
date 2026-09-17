@@ -24,6 +24,7 @@ fn execute(handle: &str) -> ExecuteInput {
     ExecuteInput {
         handle: handle.into(),
         arguments: json!({"value":"hello"}).as_object().unwrap().clone(),
+        output: None,
     }
 }
 fn folder() -> PathBuf {

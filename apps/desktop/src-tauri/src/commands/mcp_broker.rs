@@ -17,6 +17,7 @@ use std::{
 use tokio::sync::{watch, Mutex as AsyncMutex};
 
 type Client = mcp::Connection;
+pub mod results;
 const MAX_TOOLS: usize = 1024;
 const MAX_CATALOG_BYTES: usize = 2_000_000;
 const MAX_SCHEMA_BYTES: usize = 32_000;
@@ -31,6 +32,12 @@ pub struct BrokerUsage {
     pub catalog_tools: usize,
     pub catalog_bytes: usize,
     pub schema_bytes_returned: u64,
+    #[serde(default)]
+    pub result_bytes_received: u64,
+    #[serde(default)]
+    pub result_bytes_returned: u64,
+    #[serde(default)]
+    pub result_reads: u64,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -57,6 +64,7 @@ pub struct ExecuteInput {
     pub handle: String,
     #[serde(default)]
     pub arguments: serde_json::Map<String, Value>,
+    pub output: Option<results::Selection>,
 }
 
 pub(super) fn validate_connection(server: &McpServerConfig) -> Result<(), String> {
@@ -109,6 +117,7 @@ struct Catalog {
     connections: BTreeMap<String, Connection>,
     leases: VecDeque<Lease>,
     usage: BrokerUsage,
+    results: VecDeque<results::Snapshot>,
 }
 struct Attempt {
     catalog: AsyncMutex<Catalog>,
@@ -155,6 +164,7 @@ impl Broker {
                     .collect(),
                 leases: VecDeque::new(),
                 usage: BrokerUsage::default(),
+                results: VecDeque::new(),
             }),
             closed,
             workspace,
@@ -222,12 +232,32 @@ impl Broker {
         self.execute_with_policy(run, input, false).await
     }
 
+    pub async fn read_result(
+        &self,
+        run: &str,
+        input: results::ReadInput,
+    ) -> Result<(CallToolResult, BrokerUsage), String> {
+        let attempt = self.attempt(run)?;
+        let mut catalog = attempt.catalog.lock().await;
+        if *attempt.closed.borrow() {
+            return Err("This attempt has ended.".into());
+        }
+        let result = results::read(&catalog.results, &input)?;
+        catalog.usage.result_reads += 1;
+        catalog.usage.result_bytes_returned +=
+            serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
+        Ok((result, catalog.usage.clone()))
+    }
+
     async fn execute_with_policy(
         &self,
         run: &str,
         input: ExecuteInput,
         read_only: bool,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
+        if let Some(output) = &input.output {
+            output.validate()?;
+        }
         if input.handle.len() > 80
             || serde_json::to_vec(&input.arguments)
                 .map_err(|_| "Invalid arguments")?
@@ -412,6 +442,11 @@ async fn execute_catalog(
     if serde_json::to_vec(&result).map_or(true, |value| value.len() > 1_000_000) {
         return Ok((CallToolResult::error(vec![rmcp::model::ContentBlock::text("The tool completed but its result exceeds 1 MB. Request a smaller result; do not repeat a write operation.")]), catalog.usage.clone()));
     }
+    catalog.usage.result_bytes_received +=
+        serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
+    result = results::select(result, input.output.as_ref(), &mut catalog.results);
+    catalog.usage.result_bytes_returned +=
+        serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
     Ok((result, catalog.usage.clone()))
 }
 

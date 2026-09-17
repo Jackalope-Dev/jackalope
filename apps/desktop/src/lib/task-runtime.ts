@@ -153,6 +153,9 @@ export interface TaskRun {
     catalogTools: number;
     catalogBytes: number;
     schemaBytesReturned: number;
+    resultBytesReceived?: number;
+    resultBytesReturned?: number;
+    resultReads?: number;
   };
   usageObservations?: {
     messageId: string;
