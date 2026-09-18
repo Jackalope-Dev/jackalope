@@ -8,13 +8,9 @@ pub(super) struct Fixture(std::path::PathBuf);
 
 impl Fixture {
     pub(super) fn configure(runtime: &TaskRuntime) -> Result<Option<Self>, String> {
-        if ![
-            "JACKALOPE_JEV_QUESTIONS",
-            "JACKALOPE_JEV_PREPARATION",
-            "JACKALOPE_CONTEXT_PRUNING",
-        ]
-        .iter()
-        .any(|name| std::env::var(name).is_ok_and(|value| value == "on"))
+        if !["JACKALOPE_JEV_QUESTIONS"]
+            .iter()
+            .any(|name| std::env::var(name).is_ok_and(|value| value == "on"))
         {
             return Ok(None);
         }

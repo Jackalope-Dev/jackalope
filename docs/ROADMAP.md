@@ -50,11 +50,13 @@ dispatch and CPU-based check capacity are implemented. Execution timings and off
 delivery comparisons retain waits, failures and missing review evidence. Validate
 complete task delivery and quality on representative repositories before claiming gains.
 
-Versioned prompt guidance and recoverable tool-result selection are implemented;
-compact prompts and same-policy continuation context remain opt-in experiments.
-Read-only pipelines compose local data operations through MCP and HTTP; optional
-automatic Jev relevance retains recoverable evidence. Cross-agent adoption and
-end-to-end savings remain evaluation work.
+Versioned prompt guidance and recoverable tool-result selection are implemented.
+Ordinary tasks default to concise instructions, available tool schemas and final
+automatic saved checks, with full ownership guidance for managed assignments.
+Content-keyed syntax caching and recoverable explicit result selection are core
+behavior. Local failure triage can avoid redundant classification of recorded facts;
+same-policy managed-task continuation remains an experiment. Cross-agent adoption
+and end-to-end savings remain evaluation work.
 Final requirement assessments help users inspect evidence before acceptance.
 Sanitized comparison exports retain matched configurations,
 oracle outcomes and reporting limits. Broader independent acceptance remains open.
@@ -63,12 +65,10 @@ evaluation suites; the public benchmark methodology keeps their scope explicit.
 Source-attributed repair fixtures and separate workflow, source preparation, tool and continuation
 experiments support screening. Human review exports and complete-attempt cost
 accounting support independent confirmation before broader product claims.
-Read-only batches, captured-result queries and literal source excerpts, deferred OpenCode tool discovery,
-conditional source reads, syntax reuse, lean launches, bounded
-delegation planning, agent-callable typed Jev questions with native evidence reads,
-explicit Jev question contracts prepared before worker launch,
-recoverable Jev relevance selection before large tool-result delivery,
-and shadow Jev assistance remain opt-in evaluation capabilities.
+Captured-result queries and previews, deferred OpenCode tool discovery,
+conditional source reads, bounded delegation planning, agent-callable typed Jev
+questions with native evidence reads and shadow Jev assistance retain separate
+evaluation controls.
 
 Durable incremental history saves, concurrent loading, changed-record UI updates
 and background rich rendering are implemented. Local [performance fixtures](PERFORMANCE.md)

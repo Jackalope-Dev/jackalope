@@ -32,7 +32,6 @@ export interface KnowledgeEntry {
   updatedAt: string;
 }
 export interface ContextSelection {
-  jevPreparation?: JevPreparation | null;
   advanceWorkflow?: boolean;
   outcomes?: string[];
   inputValues?: Record<string, string>;

@@ -2,57 +2,12 @@ use super::automatic::*;
 use super::*;
 use serde_json::{json, Value};
 
+mod claude;
+
 struct Fixture {
     root: PathBuf,
     runtime: TaskRuntime,
     service: Coordinator,
-}
-
-#[tokio::test]
-async fn pipeline_http_requires_current_attempt_and_never_authorizes_browser_origins() {
-    let f = Fixture::new();
-    f.running("reader-run");
-    let input = || {
-        Json(
-            serde_json::from_value(json!({
-                "sources":[{"id":"source","resultHandle":"missing"}],
-                "source":"source","rows":{"pointer":"/structuredContent/items"}
-            }))
-            .unwrap(),
-        )
-    };
-    assert_eq!(
-        bridge_tool_pipeline(WebState(f.service.clone()), headers("invalid"), input())
-            .await
-            .unwrap_err()
-            .0,
-        StatusCode::UNAUTHORIZED
-    );
-    let mut origin = headers("reader-run");
-    origin.insert("origin", "https://example.invalid".parse().unwrap());
-    assert_eq!(
-        bridge_tool_pipeline(WebState(f.service.clone()), origin, input())
-            .await
-            .unwrap_err()
-            .0,
-        StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        bridge_tool_pipeline(WebState(f.service.clone()), headers("reader-run"), input())
-            .await
-            .unwrap_err()
-            .0,
-        StatusCode::BAD_REQUEST
-    );
-    f.runtime
-        .update("reader-run", |run| run.status = "review".into());
-    assert_eq!(
-        bridge_tool_pipeline(WebState(f.service.clone()), headers("reader-run"), input())
-            .await
-            .unwrap_err()
-            .0,
-        StatusCode::UNAUTHORIZED
-    );
 }
 
 impl Fixture {
@@ -658,18 +613,47 @@ async fn http_and_native_mcp_responses_deliver_updates_and_preserve_tool_results
     let message = fixture
         .message("mcp-delivery", Some("reader-run-task"))
         .await;
-    let list: Value = client
-        .post(format!("{endpoint}/mcp"))
-        .bearer_auth("reader-run")
-        .header("accept", "application/json, text/event-stream")
-        .json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-    assert!(list["result"]["tools"].is_array());
+    for version in ["2025-11-25", "2026-07-28"] {
+        let meta = json!({"io.modelcontextprotocol/protocolVersion":version,
+            "io.modelcontextprotocol/clientInfo":{"name":"fixture","version":"1"},
+            "io.modelcontextprotocol/clientCapabilities":{}});
+        let list: Value = client
+            .post(format!("{endpoint}/mcp"))
+            .bearer_auth("reader-run")
+            .header("accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", version)
+            .header("Mcp-Method", "tools/list")
+            .json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":meta}}))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert!(list["result"]["tools"].is_array(), "{list}");
+        assert_eq!(list["result"]["ttlMs"], 0);
+        assert_eq!(list["result"]["cacheScope"], "private");
+        let discovery: Value = client
+            .post(format!("{endpoint}/mcp"))
+            .bearer_auth("reader-run")
+            .header("accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", version)
+            .header("Mcp-Method", "server/discover")
+            .json(
+                &json!({"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":meta}}),
+            )
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(
+            discovery["result"]["capabilities"]["tools"],
+            json!({}),
+            "{discovery}"
+        );
+    }
     for attempt in 0..2 {
         let response: Value = client.post(format!("{endpoint}/mcp")).bearer_auth("reader-run")
             .header("accept", "application/json, text/event-stream")

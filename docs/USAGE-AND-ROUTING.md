@@ -102,15 +102,6 @@ second agent assessment.
   explicit evidence paths and batching independent judgments. The native bridge
   can supply bounded workspace file excerpts or the attempt's captured tool results
   directly to TypeSafe, returning source hashes/ranges without echoing the text.
-  Explicit native task requests can also supply `contextSelection.jevPreparation`
-  with the same state/questions shape and file sources. With agent questions enabled,
-  Jackalope evaluates this batch after workspace preparation and before worker launch,
-  supplying compact answers and source provenance without an agent tool round trip.
-  This experimental API requires an authored question contract; it does not discover
-  repository files or infer a question schema automatically. Failures retain the
-  original task and report unavailable advice. Retries reread sources and re-evaluate;
-  continuations require a new explicit contract. Receipts preserve the full answers,
-  usage and request, and preparation cannot replace checks or confer permissions.
   Limits are eight requests per attempt, 32 questions, eight sources and 128 KB
   per request. Failed evaluations count toward the request limit. Missing sources
   fail explicitly; partial file ranges identify the next line. Advice never grants

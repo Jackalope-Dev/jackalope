@@ -3,7 +3,7 @@ import legacyGuidelines from './legacy-guidelines.json' with { type: 'json' };
 import { getToolById } from './tool-registry.ts';
 import versionTwoGuidelines from './version-two-guidelines.json' with { type: 'json' };
 
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 4;
 
 export interface PromptAssemblyOptions {
   version?: number;

@@ -4,7 +4,7 @@ import { detectSkillsFromPrompt, getSkillById, VETTED_SKILLS } from '../src/lib/
 import { assemblePrompt } from '../src/lib/skills/context-assembler.ts';
 import { getToolById, VETTED_TOOLS } from '../src/lib/skills/tool-registry.ts';
 
-test('final-phase experiment resolves debugging timing without changing saved v2 prompts', () => {
+test('default final-phase guidance preserves diagnostics and saved v2 prompts', () => {
   const options = {
     rawPrompt: 'Fix the scheduler',
     selectedSkillIds: ['systematic-debugging'],
@@ -12,6 +12,7 @@ test('final-phase experiment resolves debugging timing without changing saved v2
   };
   const legacy = assemblePrompt({ ...options, version: 2 }).assembledPrompt;
   const candidate = assemblePrompt({ ...options, version: 4 }).assembledPrompt;
+  assert.equal(assemblePrompt(options).assembledPrompt, candidate);
   assert.match(legacy, /Reproduce behavioral defects with a focused failing check/);
   assert.match(candidate, /only when its result is needed/);
   assert.match(candidate, /explicit user or repository instructions/);
@@ -96,7 +97,7 @@ test('assemblePrompt supplements prompt additively and preserves original prompt
   assert.equal(result.activeToolCount, 1);
   assert.ok(result.assembledPrompt.startsWith('### 🎯 Objective\nFix auth token race condition\n'));
   assert.ok(result.assembledPrompt.includes('Guidelines & Quality Constraints'));
-  assert.ok(result.assembledPrompt.includes('all existing regression tests'));
+  assert.ok(result.assembledPrompt.includes('including repository-required checks'));
   assert.ok(result.assembledPrompt.includes('do not create another worktree'));
   assert.ok(result.assembledPrompt.includes('Active Tools & Capabilities'));
   assert.ok(result.assembledPrompt.includes('Scoped Filesystem MCP'));

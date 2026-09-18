@@ -28,7 +28,7 @@ export function effortFor(value?: string) {
   return taskEfforts.find((effort) => effort.id === value) ?? taskEfforts[1];
 }
 
-export function effortPrompt(value?: string, compact = false, scoped = false) {
+export function effortPrompt(value?: string, compact = false, scoped = true) {
   const effort = effortFor(value);
   const instruction =
     scoped && effort.id === 'balanced'

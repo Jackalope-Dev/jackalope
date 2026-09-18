@@ -9,6 +9,9 @@ export const registry = JSON.parse(
 export const registrySha256 = createHash('sha256').update(JSON.stringify(registry)).digest('hex');
 
 export function validateExperiments(options) {
+  for (const name of Object.keys(options)) {
+    if (!Object.hasOwn(registry.fields, name)) throw new Error(`Unknown experiment: ${name}.`);
+  }
   for (const [name, field] of Object.entries(registry.fields)) {
     const value = options[name] ?? field.default;
     if (!field.values.includes(value)) throw new Error(`Invalid ${name}.`);

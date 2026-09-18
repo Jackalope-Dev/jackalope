@@ -64,9 +64,6 @@ pub(super) fn run(
             "--permission-mode",
             "acceptEdits",
         ]);
-        if let Some(check) = spec["check"].as_str() {
-            cmd.args(["--allowedTools", &format!("Bash({check})")]);
-        }
     } else if adapter == "antigravity" {
         tasks::antigravity::configure(&mut cmd, &repo.to_string_lossy(), None);
     } else if adapter == "opencode" {
@@ -87,13 +84,13 @@ pub(super) fn run(
             cmd.args([
                 "--mcp-config",
                 &serde_json::json!({"mcpServers":servers}).to_string(),
-                "--allowedTools",
-                &servers
-                    .keys()
-                    .map(|name| format!("mcp__{name}__fixture_report"))
-                    .collect::<Vec<_>>()
-                    .join(","),
             ]);
+        }
+    }
+    if adapter == "claude" {
+        let allowed = claude_allowed_tools(spec);
+        if !allowed.is_empty() {
+            cmd.arg("--allowedTools").args(allowed);
         }
     }
     let codex_speed =
@@ -179,9 +176,9 @@ pub(super) fn run(
             Err(e) => break Err(e.to_string()),
             _ => {}
         }
-        let usage = run.lock().unwrap().usage.clone();
+        let observed = observed_tokens(&run.lock().unwrap());
         if began.elapsed().as_secs() >= spec["seconds"].as_u64().unwrap_or(180)
-            || usage.input.saturating_add(usage.output) >= spec["tokens"].as_u64().unwrap_or(250000)
+            || observed >= spec["tokens"].as_u64().unwrap_or(250000)
         {
             stopped = true;
             break Err("Observed benchmark budget reached".into());
@@ -220,4 +217,78 @@ pub(super) fn run(
         result.diagnostics.push(text);
     }
     Ok((result, stopped))
+}
+
+fn claude_allowed_tools(spec: &Value) -> Vec<String> {
+    let mut allowed = Vec::new();
+    if let Some(check) = spec["check"]
+        .as_str()
+        .filter(|check| !check.trim().is_empty())
+    {
+        allowed.push(format!("Bash({check})"));
+        if cfg!(windows) {
+            allowed.push(format!("PowerShell({check})"));
+        }
+    }
+    if let Some(servers) = spec["fixtureMcp"].as_object() {
+        allowed.extend(
+            servers
+                .keys()
+                .map(|name| format!("mcp__{name}__fixture_report")),
+        );
+    }
+    allowed
+}
+
+pub(super) fn observed_tokens(run: &TaskRun) -> u64 {
+    let messages = run.usage_observations.iter().fold(0u64, |total, message| {
+        total
+            .saturating_add(message.input)
+            .saturating_add(message.output)
+    });
+    // Message observations precede some CLIs' final aggregate and already include cached input.
+    messages.max(run.usage.input.saturating_add(run.usage.output))
+}
+
+#[test]
+fn budgets_use_message_usage_before_final_totals_without_double_counting() {
+    let mut run = TaskRun::default();
+    assert_eq!(observed_tokens(&run), 0);
+    for (id, output) in [("first", 2), ("first", 4), ("second", 3)] {
+        tasks::consume_adapter_event(
+            &mut run,
+            &serde_json::json!({
+                "type":"assistant", "message":{"id":id,"content":[],"usage":{
+                    "input_tokens":10,"output_tokens":output,"cache_read_input_tokens":20,
+                    "cache_creation_input_tokens":5}}
+            })
+            .to_string(),
+            "claude",
+        );
+    }
+    assert!(!run.usage.reported);
+    assert_eq!(observed_tokens(&run), 77);
+    run.usage.input = 70;
+    run.usage.output = 7;
+    assert_eq!(observed_tokens(&run), 77);
+    run.usage.input = 100;
+    assert_eq!(observed_tokens(&run), 107);
+    run.usage.input = u64::MAX;
+    assert_eq!(observed_tokens(&run), u64::MAX);
+}
+
+#[test]
+fn claude_fixture_permissions_include_only_saved_checks_and_fixture_reads() {
+    let allowed = claude_allowed_tools(&serde_json::json!({
+        "check":"node check.mjs", "fixtureMcp":{"quality_fixture":{},"quality_fixture_1":{}}
+    }));
+    assert!(allowed.contains(&"Bash(node check.mjs)".into()));
+    assert_eq!(
+        allowed.contains(&"PowerShell(node check.mjs)".into()),
+        cfg!(windows)
+    );
+    assert!(allowed.contains(&"mcp__quality_fixture__fixture_report".into()));
+    assert!(allowed.contains(&"mcp__quality_fixture_1__fixture_report".into()));
+    assert_eq!(allowed.len(), if cfg!(windows) { 4 } else { 3 });
+    assert!(claude_allowed_tools(&serde_json::json!({"check":"  "})).is_empty());
 }

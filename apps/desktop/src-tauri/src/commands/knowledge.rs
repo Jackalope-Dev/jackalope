@@ -62,6 +62,7 @@ pub struct ContextSelection {
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextReceipt {
+    // Preserve historical preparation evidence without executing it on a new launch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jev_preparation: Option<super::decisions::agent_questions::Input>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

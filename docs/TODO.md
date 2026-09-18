@@ -84,21 +84,16 @@ release dates.
   independently; freeze promising settings before new held-out confirmation.
   Include OpenCode deferred-tool discovery and client permission preservation;
   require native client compatibility before extending it to other adapters.
-  Compare bounded multi-connection batches, captured-result queries, ordinary-task launch/final checks,
-  repeated source ranges, dirty-file syntax reuse and delegation admission costs.
+  Compare captured-result queries, repeated source ranges, dirty-file syntax reuse
+  and delegation admission on workflows that actually exercise those mechanisms.
   Label shadow Jev false negatives independently before enabling new suppression.
-  Compare opt-in agent Jev questions with agent-only judgments, including direct
+  Compare optional agent Jev questions with agent-only judgments, including direct
   evidence reads, request overhead, all helper costs and uncertain-answer fallbacks.
-  Screen explicit prelaunch question contracts separately from freeform tasks; use
-  matched direct, Jackalope-only and Jev arms with equivalent supplied evidence.
-  Screen large-result Jev relevance reads against the same native tools and local
-  selectors; independently check necessary-row retention and include helper overhead.
-  Validate combined retrieval policies before delivery, including named-read paths,
-  paging and recovery. Record actual policy/helper use separately from availability;
-  include the shared read pipeline and automatic relevance controls, permission
-  parity, partial-result failures and total inference/recovery costs. Compare
-  literal captured-text excerpts on narrow and paraphrased requests, retaining
-  neighboring exceptions and measuring all recovery turns.
+  Confirm ordinary-task core behavior on small and large tasks across static and
+  dynamic tool clients, preserving managed ownership and explicit check requirements.
+  Evaluate combinations only with a concrete interaction hypothesis; include native
+  output offloading, permission parity and every recovery turn. Freeze promising
+  configurations before independent held-out confirmation.
   Keep adapter-specific history hooks separate from shared broker behavior.
   Require independent original-patch acceptance for quality claims. Counterbalanced
   review-time and correction measurements are separate prerequisites for claiming faster review.

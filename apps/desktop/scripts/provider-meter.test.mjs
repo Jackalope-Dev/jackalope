@@ -57,7 +57,7 @@ test('shared experiment registry pins every native setting and checks dependenci
   const environment = experimentEnvironment(options);
   assert.equal(Object.keys(options).length, Object.keys(registry.fields).length);
   assert.equal(environment.JACKALOPE_WARM_API_HELPERS, 'off');
-  assert.equal(environment.JACKALOPE_CONTEXT_PRUNING, 'off');
+  assert.equal(environment.JACKALOPE_CONTEXT_PRUNING, undefined);
   assert.throws(() => experimentEnvironment({ ...options, 'result-preview': 'on' }), /requires/);
 });
 

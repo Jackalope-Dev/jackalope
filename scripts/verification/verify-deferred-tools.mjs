@@ -106,11 +106,8 @@ try {
     OPENCODE_DISABLE_PROJECT_CONFIG: 'true',
     OPENCODE_DISABLE_AUTOUPDATE: 'true',
     JACKALOPE_QUALITY_SPEC: spec,
-    JACKALOPE_EXECUTION_PROFILE: 'lean',
     JACKALOPE_TOOL_SURFACE: 'deferred',
-    JACKALOPE_CONTEXT_PRUNING: 'off',
     JACKALOPE_JEV_QUESTIONS: 'off',
-    JACKALOPE_JEV_PREPARATION: 'off',
   });
   const result = await new Promise((resolve, reject) => {
     const child = spawn(

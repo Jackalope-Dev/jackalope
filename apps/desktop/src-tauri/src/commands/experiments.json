@@ -3,28 +3,23 @@
   "fields": {
     "workflow": {
       "values": ["legacy", "final"],
-      "default": "legacy",
+      "default": "final",
       "environment": null
     },
     "task-approach": {
       "values": ["general", "scoped"],
-      "default": "general",
+      "default": "scoped",
       "environment": null
     },
     "tool-surface": {
       "values": ["full", "available", "deferred"],
-      "default": "full",
+      "default": "available",
       "environment": "JACKALOPE_TOOL_SURFACE"
     },
     "named-read": {
       "values": ["off", "on"],
       "default": "off",
       "environment": "JACKALOPE_NAMED_READ"
-    },
-    "result-selection": {
-      "values": ["on", "off"],
-      "default": "on",
-      "environment": "JACKALOPE_RESULT_SELECTION"
     },
     "result-queries": {
       "values": ["off", "on"],
@@ -61,58 +56,15 @@
       "default": "off",
       "environment": "JACKALOPE_SOURCE_CONTEXT"
     },
-    "batch-read": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_BATCH_READ"
-    },
-    "execution-profile": {
-      "values": ["standard", "lean"],
-      "default": "standard",
-      "environment": "JACKALOPE_EXECUTION_PROFILE"
-    },
-    "verification-flow": {
-      "values": ["agent", "final"],
-      "default": "agent",
-      "environment": "JACKALOPE_VERIFICATION_FLOW"
-    },
     "context-read": {
       "values": ["off", "on"],
       "default": "off",
       "environment": "JACKALOPE_CONTEXT_READ"
     },
-    "context-pruning": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_CONTEXT_PRUNING"
-    },
-    "result-excerpts": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_RESULT_EXCERPTS",
-      "requires": { "on": { "result-queries": "on", "result-selection": "on" } }
-    },
-    "auto-relevance": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_AUTO_RELEVANCE",
-      "requires": { "on": { "context-pruning": "on" } }
-    },
-    "read-pipeline": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_READ_PIPELINE",
-      "requires": { "on": { "result-queries": "on" } }
-    },
     "history-compaction": {
       "values": ["off", "deduplicate"],
       "default": "off",
       "environment": "JACKALOPE_HISTORY_COMPACTION"
-    },
-    "analysis-cache": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_ANALYSIS_CACHE"
     },
     "dispatch-plan": {
       "values": ["off", "on"],
@@ -128,16 +80,6 @@
       "values": ["off", "on"],
       "default": "off",
       "environment": "JACKALOPE_JEV_QUESTIONS"
-    },
-    "jev-preparation": {
-      "values": ["off", "on"],
-      "default": "off",
-      "environment": "JACKALOPE_JEV_PREPARATION"
-    },
-    "failure-triage": {
-      "values": ["jev", "local"],
-      "default": "jev",
-      "environment": "JACKALOPE_FAILURE_TRIAGE"
     },
     "context-style": {
       "values": ["off", "compact"],

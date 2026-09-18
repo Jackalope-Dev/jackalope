@@ -6,14 +6,6 @@ pub(super) fn project(
     handle: &str,
     structured: bool,
 ) -> Option<Value> {
-    if let Some(search) = &selection.text {
-        return Some(excerpts::project(
-            value,
-            search,
-            handle,
-            selection.max_chars.unwrap_or(6_000),
-        ));
-    }
     let mut fields = serde_json::Map::new();
     for pointer in &selection.json_pointers {
         fields.insert(pointer.clone(), value.pointer(pointer)?.clone());

@@ -130,7 +130,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
                 "isolated":true,"targetBranch":"main","connectionIds":fixture_ids,
                 "contextSelection":{"memoryOff":true,"outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default(),
-                    "jevPreparation":if crate::commands::experiments::is("JACKALOPE_JEV_PREPARATION", "on") { spec["jevPreparation"].clone() } else { Value::Null }},"prompt":spec["prompt"],
+                    "jevPreparation":null},"prompt":spec["prompt"],
                 "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
             }))?)
             .err()
@@ -151,8 +151,8 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 || runs
                     .iter()
                     .filter(|r| attempt_ids.contains(&r.id))
-                    .map(|r| r.usage.input + r.usage.output)
-                    .sum::<u64>()
+                    .map(super::quality_direct::observed_tokens)
+                    .fold(0u64, u64::saturating_add)
                     >= tokens;
             if !["starting", "running", "stopping"].contains(&run.status.as_str()) {
                 stopped |= budget_exceeded;

@@ -150,35 +150,22 @@ representative benefit and installed-platform acceptance remain open.
   Symbol definitions, related tests and explicit file locations sharpen retrieval;
   per-repository locks allow independent scans. Detailed launch timings and latency
   summaries retain failures and missing measurements in quality comparisons.
-- Compact version-three guidance and same-policy native context reuse remain
-  opt-in experiments; normal tasks retain version-two guidance. Optional
-  MCP result selection retains expandable source data without repeating calls.
-  Matched comparison exports omit private receipts and gate scoped public claims;
-  representative quality, monetary savings and installed acceptance remain open.
-  Independent experiment switches cover final-phase and task-scoped guidance,
-  available tool exposure, exact read-only tool lookup, explicit source preparation,
-  field selection, maps and continuation
-  context. Source-attributed repair fixtures, multi-turn accounting, model-price
-  bounds and randomized human review exports support screening before confirmation.
-  Screening can stop between matched repetitions while retaining interrupted attempts.
-  Further opt-in controls cover read-only batches, captured-result row queries, a lean ordinary-task launch,
-  final native checks, conditional source ranges, content-keyed syntax reuse,
-  deferred OpenCode browser/desktop schemas with native discovery and permissions,
-  bounded delegation planning and shadow Jev assistance. Opt-in agent questions
-  expose typed Jev batches with native file/captured-result evidence and separate
-  usage accounting. Explicit task contracts can prepare file-backed Jev batches before
-  worker launch; ordinary tasks do not infer these contracts. Their end-to-end savings
-  require calibration. Experimental Jev relevance reads can filter large structured
-  results before delivery while retaining uncertainty and recoverable originals;
-  net savings and necessary-evidence retention need independent task measurement.
-  Bounded read-only pipelines share local filters, joins, projection and counts
-  across MCP and HTTP. A separate automatic Jev delivery experiment assesses
-  eligible unselected results with recoverable originals; both remain opt-in.
-  A separate captured-text experiment returns literal excerpts with source paths,
-  character offsets and recoverable originals through either transport.
-  Connection execution no
-  longer holds the shared broker catalog lock during network calls. These changes
-  have separate local and installed-agent screening paths; general savings remain unproven.
+- New tasks use version-four final-phase guidance and concise ordinary-task native
+  instructions. Managed assignments retain full ownership guidance. Required
+  checks remain explicit; final automatic checks reuse a successful result only
+  for the same workspace snapshot. Content-keyed syntax caching and recoverable
+  result-field selection are core behavior, with static-client coordination tools
+  preserved. Local failure triage can classify recorded quota/check facts.
+  Remaining evaluation controls cover captured-result queries and previews, small
+  tool catalogs, exact named reads, source preparation and conditional source reads,
+  managed-task context reuse, deferred OpenCode tools, delegation planning and shadow
+  Jev assistance. Optional agent questions expose typed Jev judgments over native
+  file/captured-result evidence, with separate usage accounting.
+  Matched exports retain complete-attempt usage, failures and private-receipt
+  boundaries. Source-attributed repair fixtures and randomized review sets support
+  screening; representative quality, monetary savings and installed acceptance
+  remain open. Connection execution avoids holding the shared broker catalog lock
+  during network calls. General task savings remain unproven.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup includes project, agents, decisions, behavior, appearance and an optional
   first task. Theme editors open directly; existing saved app/project choices remain compatible.

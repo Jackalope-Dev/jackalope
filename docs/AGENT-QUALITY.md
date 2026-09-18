@@ -21,20 +21,6 @@ commands saved to source, or published receipts. The ignored native
 `installed_agent_questions_trial` accepts `JACKALOPE_JEV_QUESTIONS_SPEC` for bounded
 tool-only measurements; these omit worker execution and cannot establish task savings.
 
-`--after-jev-preparation=on` applies a suite case's explicit `jevPreparation` contract
-before worker launch using the same disposable profile safeguards. Include that
-contract and its evidence in files available to every arm, with equivalent task
-instructions; candidate-only expert annotations would confound the comparison.
-Measure complete elapsed time and helper usage, retain failures, and distinguish
-authored workflow preprocessing from autonomous freeform task performance.
-
-`--after-context-pruning=on` enables experimental Jev selection inside read-only
-tool delivery, using the same protected test profile and helper accounting. Give
-every arm identical raw prompts, source data and recovery access. Freeze necessary
-row labels independently of the answer oracle; stop on any necessary-row omission
-even when the worker recovers a correct answer. Count helper tokens, native tool
-overhead and full task duration. Source byte reductions alone are not agent savings.
-
 ## Prompt and output contracts
 
 - Fresh worker launches ask the lead to assess delegation after
@@ -51,10 +37,12 @@ overhead and full task duration. Source byte reductions alone are not agent savi
   same recorded prompt-policy hash reuse prior workflow instructions. Current task,
   contract, workspace, permissions and coordination data remain explicit. Older
   receipts, changed policies and other adapters receive full guidance.
-  Normal tasks retain version-two guidance and the full preamble. The quality runner's
-  `--compact-prompts` flag selects version-three frontend guidance and sets
-  `JACKALOPE_CONTEXT_EXPERIMENT=compact` only for the candidate. Keep it experimental
-  until matched task evidence supports enabling it.
+  Normal tasks use version-four final-phase guidance and a concise preamble;
+  managed assignments retain full ownership instructions. The quality runner's
+  `--compact-prompts --after-workflow=legacy` flags reproduce version-three
+  frontend guidance for comparison. Ordinary tasks retain their concise native
+  preamble; native compact/context-reuse experiments apply only to the full
+  managed-task preamble. Keep these boundaries explicit in comparisons.
 - Automatic guidelines distinguish design tokens from authentication tokens, skip
   negated requests and fenced examples, and avoid a debugging workflow for spelling
   fixes. Explicitly selected guidelines and project defaults remain available.
@@ -103,6 +91,20 @@ overhead and full task duration. Source byte reductions alone are not agent savi
   continue, with unresolved blockers reported.
 
 ## Repeatable comparison
+
+The ignored native test
+`commands::coordination::automatic_tests::claude::installed_claude_connects_without_inference`
+uses the installed Claude CLI control protocol to check the real bridge's tool catalog
+without sending a model prompt. It retains diagnostics in a disposable temporary
+profile and does not establish model quality or installed desktop acceptance.
+
+Direct Claude fixtures allow the exact saved check through Bash and, on Windows,
+PowerShell, together with the selected fixture reads in one allowlist. Existing
+client denials still apply; no wildcard shell permission is granted.
+Both comparison arms enforce token limits against the greater of reported aggregate
+usage and deduplicated per-message usage, which can arrive before a CLI's final total.
+These are overlapping observations, not additive costs. Delayed reporting can still
+overshoot a limit, and partial observations do not establish complete billed usage.
 
 `scripts/evaluation/opencode-history-plugin.mjs` provides an evaluation-only
 `experimental.chat.messages.transform` control. Load its absolute file URL through
@@ -228,31 +230,20 @@ on a separately frozen held-out suite before making a savings claim.
 The quality runner accepts per-variant `--after-workflow=final`,
 `--after-task-approach=scoped`,
 `--after-tool-surface=available`, `--after-named-read=on`,
-`--control-result-selection=off`, `--after-repo-map=off` and
+`--after-repo-map=off`,
 `--after-context-reuse=on` and `--after-source-context=on` switches; replace `after`
 with `control` as needed.
 `--after-result-queries=on` enables queries over captured MCP responses;
 `--after-result-preview=on` additionally bounds large unselected responses while
-keeping the complete source recoverable. Preview requires result queries and
-result selection. `--after-initial-tools=small` measures eager delivery of a
+keeping the complete source recoverable. Preview requires result queries. `--after-initial-tools=small` measures eager delivery of a
 complete bounded catalog. Keep these controls explicit in saved comparisons.
-Defaults retain existing behavior. `--after-result-excerpts=on` with result queries
-and selection enables literal searches with recoverable source excerpts. Compare
-first-read selection and captured-result recovery; include paraphrases, adjacent
-exceptions, conflicting sources, partial data and all subsequent recovery work.
-Literal match counts do not establish necessary-evidence recall.
-`--after-read-pipeline=on` with result queries
-enables composed read-only data operations through MCP and HTTP. Independently,
-`--after-auto-relevance=on` with context pruning and connected Jev questions
-assesses eligible unselected results before delivery. Record actual calls,
-selection receipts, helper costs and recovery alongside all-attempt outcomes;
-tool availability does not establish use or benefit. Generate small and large
-authored join cases with `node scripts/evaluation/pipeline-cases.mjs <suite.json>`;
-both sizes belong to one task family and are screening fixtures.
-The final-workflow experiment changes only
+Authored multi-source join cases can be generated with
+`node scripts/evaluation/pipeline-cases.mjs <suite.json>`. The name identifies the
+fixture family, not an available agent tool. Both sizes are screening fixtures.
+The default final-workflow policy updates
 version-two debugging guidance. Scoped task-approach guidance limits call-site
 investigation to code changes while preserving applicable instructions and checks;
-it is opt-in for Balanced tasks. Saved
+it is the default for Balanced tasks. Saved
 version-two and compact version-three prompts
 remain reproducible. Context reuse independently tests established native sessions
 with the same policy hash; missing sessions or changed policies receive full guidance.
@@ -272,7 +263,7 @@ arguments are already known. Incomplete catalogs, duplicate names, changed schem
 disallowed tools and mutating operations cannot take this shortcut. It preserves
 attempt ownership, connection allowlists, cancellation and result recovery.
 
-`--after-tool-surface=deferred` with `--after-execution-profile=lean` defers browser,
+`--after-tool-surface=deferred` defers browser,
 desktop and coordination schemas for ordinary OpenCode tasks. The discovery tool
 adds requested groups to the attempt's catalog and emits MCP list-changed notifications.
 Calls still use their original named tools and permissions; no generic execution
@@ -521,13 +512,19 @@ Matching cases alone does not establish unchanged quality or a speed improvement
 
 ### Local optimization controls
 
-The following native process settings are experimental and default off. Quality
-trials expose matching variant flags such as `--after-batch-read=on`; retained plans
-and resume validation include these settings. Test each change independently before
-combining it. Native agents retain their own tools, permissions and account binding.
+Ordinary tasks use concise instructions and final automatic saved checks; syntax
+analysis caching and explicit result selection are core behavior. Managed assignments
+retain full ownership guidance. Explicit repository/user check requirements still
+apply, and successful saved checks are reused only for an unchanged snapshot.
 
-The new `read_tools`, `read_context`, `plan_delegation` and deferred coordination
-discovery tools use native MCP with Codex, Claude Code, OpenCode and Kimi. The HTTP
+The registry covers remaining evaluation controls such as available tool schemas,
+captured-result queries and source preparation. Quality trials pin those values in
+retained plans and resume validation. Unknown or retired controls fail explicitly;
+reproduce historical runs with their frozen source and executable. Native agents
+retain their own tools, permissions and account binding.
+
+The `read_context` and `plan_delegation` tools use native MCP with
+Codex, Claude Code, OpenCode and Kimi. Dynamic discovery is OpenCode-only. The HTTP
 bridge adapters retain their existing endpoints. Source queries return at most
 twelve ranked files and 16 KB of candidate metadata; source ranges remain bounded
 and independently expandable. These controls are process experiments, not a saved
@@ -535,17 +532,12 @@ user setting or proof of a faster workflow.
 
 | Setting | Behavior |
 | --- | --- |
-| `JACKALOPE_BATCH_READ=on` | Exposes bounded read-only batches across selected connections, with recoverable local row filtering, projection and counts. |
 | `JACKALOPE_RESULT_QUERIES=on` | Exposes exact queries over captured tool results, complete JSON row pages, bounded path hints and explicit selection guidance. Records row selection, fallback, truncation and expansion counters. |
 | `JACKALOPE_RESULT_PREVIEW=on` | With result queries enabled, captures large unselected text/JSON responses locally and returns explicit previews with recoverable originals. Errors and non-text responses remain intact. |
 | `JACKALOPE_INITIAL_TOOLS=small` | Attempts discovery for up to three seconds before launch. Supplies a complete catalog only when it has at most four tools and 6 KB of metadata; other catalogs retain on-demand discovery. Initialization time and broker searches remain in the measurements. |
-| `JACKALOPE_EXECUTION_PROFILE=lean` | Shortens ordinary-task native instructions and defers optional coordination schemas. Managed assignments retain full ownership instructions. |
-| `JACKALOPE_VERIFICATION_FLOW=final` | Ordinary tasks with automatic checks rely on the existing final snapshot-bound check instead of a mandatory in-agent check call. Explicit repository/user checks still apply; failed checks remain visible and managed repairs retain their existing limits. |
 | `JACKALOPE_CONTEXT_READ=on` | Exposes bounded source ranges and ranked symbol locations. Previously read block hashes can omit unchanged text; callers must retain that text in context. Explicitly requested blocks are not reranked away. |
-| `JACKALOPE_ANALYSIS_CACHE=on` | Reuses bounded syntax-analysis outputs by source bytes, path and language. Dirty files are reread and changed content invalidates analysis; directory traversal and reference resolution still run. |
 | `JACKALOPE_DISPATCH_PLAN=on` | Exposes a local admission aid for two or three workers, disjoint write scopes, bounded context and explicit overhead/token estimates. It does not launch agents, authorize delegation or enforce provider spending. |
 | `JACKALOPE_JEV_ASSISTANCE=shadow` | Records configured relevance/review assessments without changing selected context or suppressing monitors. Source candidate ranking is shadow-only. Existing Jev settings and credentials are required. |
-| `JACKALOPE_FAILURE_TRIAGE=local` | Uses recorded quota and check-interruption facts before requesting a Jev failure classification. It grants no retry authority. |
 
 `node scripts/evaluation/assistance.mjs receipts.json labels.json report.json`
 compares retained decision receipts with independent labels containing `recordId`,
@@ -553,10 +545,10 @@ compares retained decision receipts with independent labels containing `recordId
 negatives and incomplete cost reporting remain explicit. Shadow proposals are never
 reported as actual avoided agent launches or downstream savings.
 
-The ignored native tests `local_optimization_trial` and `local_analysis_cache_trial`
-emit JSON observations for transport concurrency, exact selection, repeated source
-reads and syntax caching without model calls. Their fixtures exclude agent reasoning
-and cannot establish end-to-end savings. `optimization-cases.mjs` supplies separate
+The ignored native test `local_analysis_cache_trial` compares content-keyed syntax
+reuse with fresh parsing, including content hashing and identical-output assertions.
+It excludes filesystem traversal, reads and model work, and cannot establish
+end-to-end savings. `optimization-cases.mjs` supplies separate
 authored repairs and a multi-service investigation for matched installed-agent pilots.
 Multiple `toolFixtures` give both native controls and Jackalope the same independent
 service data. Keep these screening cases separate from held-out confirmation.

@@ -87,26 +87,35 @@ test('optimization oracles reject broken fixtures and accept independent referen
 
 test('optimization controls are explicit and independently reproducible', () => {
   const options = experimentOptions(
-    [
-      '--after-batch-read=on',
-      '--after-result-queries=on',
-      '--after-result-preview=on',
-      '--after-verification-flow=final',
-      '--after-execution-profile=lean',
-      '--after-jev-preparation=on',
-    ],
+    ['--after-result-queries=on', '--after-result-preview=on'],
     ['control', 'after'],
   );
-  assert.equal(options.control['batch-read'], 'off');
-  assert.equal(options.control['jev-preparation'], 'off');
-  assert.equal(experimentEnvironment(options.after).JACKALOPE_JEV_PREPARATION, 'on');
-  assert.equal(options.control['execution-profile'], 'standard');
   assert.equal(options.control['result-queries'], 'off');
   assert.equal(options.control['result-preview'], 'off');
   assert.equal(experimentEnvironment(options.after).JACKALOPE_RESULT_QUERIES, 'on');
   assert.equal(experimentEnvironment(options.after).JACKALOPE_RESULT_PREVIEW, 'on');
-  assert.equal(experimentEnvironment(options.after).JACKALOPE_VERIFICATION_FLOW, 'final');
   assert.throws(() => experimentOptions(['--after-jev-assistance=skip'], ['after']));
+});
+
+test('retired paths and core behavior cannot be enabled or disabled through experiment controls', () => {
+  const fields = [
+    'batch-read',
+    'result-artifacts',
+    'result-excerpts',
+    'read-pipeline',
+    'auto-relevance',
+    'context-pruning',
+    'jev-preparation',
+    'analysis-cache',
+    'result-selection',
+    'execution-profile',
+    'verification-flow',
+    'failure-triage',
+  ];
+  for (const field of fields) {
+    assert.throws(() => experimentOptions([`--after-${field}=on`], ['after']), /Unknown/);
+    assert.throws(() => experimentEnvironment({ [field]: 'off' }), /Unknown/);
+  }
 });
 
 test('retrieval suites have disjoint seeds and exact independently checked oracles', async () => {

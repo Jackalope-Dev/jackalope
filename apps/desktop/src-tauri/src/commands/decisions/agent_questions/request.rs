@@ -83,18 +83,6 @@ fn content(value: &Value, limit: usize, allow_null: bool) -> bool {
 }
 
 impl Input {
-    pub(crate) fn validate_preparation(&self) -> Result<(), String> {
-        self.validate()?;
-        if self
-            .sources
-            .values()
-            .any(|source| matches!(source, Source::ToolResult { .. }))
-        {
-            return Err("Task preparation accepts file sources only; captured tool results do not exist before execution.".into());
-        }
-        Ok(())
-    }
-
     pub(super) fn validate(&self) -> Result<(), String> {
         if !content(&self.state, 96_000, false)
             || self.questions.is_empty()

@@ -16,6 +16,11 @@ their configured adapter. Manual, queued and scheduled attempts use the same
 launch path. No model API proxy, additional API key, Node sidecar or embedding
 model is required by the broker (an upstream stdio server may require its own runtime).
 
+The task bridge supplies private, zero-TTL tool catalogs for both legacy MCP clients
+and revision 2026-07-28. Static catalogs do not advertise change notifications.
+The internal OpenCode deferred-catalog experiment negotiates legacy revisions because
+its updates use in-stream notifications rather than `subscriptions/listen`.
+
 ## Marketplace and connection setup
 
 The marketplace opens on a bundled Recommended collection. `curated-servers.ts`
@@ -160,14 +165,9 @@ connections to proceed without holding a shared catalog lock across network wait
 Schema/allowlist checks, attempt cancellation and account ownership remain in force.
 Usage records connection waits and tool execution separately.
 
-The optional `JACKALOPE_BATCH_READ=on` experiment exposes `read_tools` for up to eight
-independent read-only calls with at most four connections active. Results retain input
-order and per-call errors. Each call can select exact JSON fields or filter/project/count
-array rows through `output.rows`. Calls without an explicit selection retain full results.
-Missing required fields preserve the original result;
-row outputs include source indices and pagination. Complete selected results remain
-recoverable through `read_tool_result` for the latest sixteen selections in the attempt.
-Batching never authorizes a mutable operation or retries one automatically.
+Explicit field selections retain the complete original for `read_tool_result`
+recovery in the attempt's latest-sixteen snapshot buffer. Missing required fields
+preserve the original result. Unselected responses retain native delivery.
 
 `JACKALOPE_RESULT_QUERIES=on` independently enables local queries over a captured
 result through `read_tool_result.output`. It accepts the same row selection as the
@@ -231,74 +231,6 @@ fail explicitly. Batch independent questions sharing evidence; use a later reque
 only when it needs an earlier answer. Unknown or uncertain answers require inspection,
 not automatic exclusion. See [usage and routing](USAGE-AND-ROUTING.md) for limits,
 accounting and the opt-in policy.
-
-With `JACKALOPE_CONTEXT_PRUNING=on` and connected, enabled Jev agent questions,
-`read_relevant_tool` (`POST /v1/tools/read-relevant`) can assess a large read-only
-response before agent delivery. Supply `{handle, arguments, pointer, query,
-keepIndices?}`; the array pointer is relative to `structuredContent`. It accepts
-8–32 rows in 16–80 KB of complete structured evidence, with text content that
-exactly mirrors that evidence. Errors, media, additional text, partial results,
-unsupported shapes and failed assessments retain the original response. Exact
-predicates should use local row selection instead.
-
-Each row is scored against the complete task, acceptance requirements and read
-purpose. Only unrelated probabilities of at least 0.95 permit removal; pinned
-rows, explicit error rows, malformed scores and uncertainty are retained. Metadata
-outside the array stays intact. A selection receipt supplies original source
-indices, a hash, the decision record and a recovery handle in the attempt's
-latest-16 snapshot buffer. Assessment uses the shared eight-request Jev limit and
-records helper usage separately; broker byte accounting measures actual delivery.
-This opt-in experiment does not modify provider session history or establish
-completeness, quality equivalence or net savings.
-
-`JACKALOPE_RESULT_EXCERPTS=on` adds `output.text` to ordinary read selection and
-captured-result queries through both MCP and HTTP. It requires result queries and
-result selection. Supply `terms` (one to eight literal phrases), optional `pointer`
-into the original MCP envelope, `contextChars` (0–1000), `cursor` and `limit`.
-For example, `output:{text:{terms:['lock order','interrupted work']},maxChars:6000}`
-searches all string values in `structuredContent`, or text-only `content` when
-structured data is absent. Matching uses OR and ASCII case folding, without
-regular expressions or semantic ranking. JSON keys are not searched.
-
-Results contain verbatim excerpts with RFC 6901 pointers, Unicode character
-`start`/`end` offsets (end exclusive), total string lengths and an original-source
-hash. An enclosing string `source` field is carried as an untrusted label when
-available. Nearby overlapping windows merge. Pages alternate between terms so
-common terms do not crowd out distinct matches; each term retains source order
-and all conflicting matches remain pageable. Send `nextCursor` as
-`output.text.cursor` with an unchanged query and captured handle. Cursors bind to
-the source content, terms, pointer and context size; changing these requires a new
-search without a cursor. Recovery never makes another remote call. Metadata includes the scope,
-searched strings/characters, matching occurrences/excerpts and source partiality.
-No literal match does not establish irrelevance; paraphrases can require different
-terms or original-source recovery. Traversal, match and output limits fail
-explicitly with a recovery handle instead of claiming a complete empty search.
-This experiment remains off by default and does not search provider-owned tools.
-
-`JACKALOPE_READ_PIPELINE=on` exposes `read_pipeline` and the equivalent
-`POST /v1/tools/pipeline`. Supply one to four uniquely named sources, each with
-`read:{handle,arguments}` or `read:{name,server?,arguments}`, or a captured
-`resultHandle`. `source` chooses the base; `rows` supplies its array pointer,
-equality filters, final columns, pagination or count. Up to three `joins` specify
-`source`, `pointer`, `leftKey` and `rightKey`. Joins retain unmatched left rows as
-null and reject duplicate right keys. Base columns keep their original paths;
-`/row/...` explicitly qualifies base fields and `/joined/<source>/...` selects
-joined fields. Only the final output is delivered, with source indices
-and original recovery handles. Missing fields, partial data and nonmirrored
-content produce explicit failures. All reads preserve existing connection scope,
-allowlists, schema revalidation and cancellation. This experiment requires result
-queries; it does not execute generated code or intercept provider-owned tools.
-
-`JACKALOPE_AUTO_RELEVANCE=on` additionally requires context pruning and enabled,
-connected Jev agent questions. Ordinary, named and batched broker reads without
-exact row or field selection assess eligible results containing one unambiguous
-array. Character budgets apply after assessment; exact selections retain their
-semantics. Pipelines can assess
-complete results without filters, projection or count-only requests. Small,
-ambiguous and unsupported results retain local handling. Eligible failed Jev
-assessments retain the full result unless an explicit character budget was supplied.
-Recovery never repeats the remote read or Jev assessment. These controls remain
-off by default pending necessary-evidence and total cost/latency evaluation.
 
 Ordinary native tests cover stdio and authenticated HTTP discovery, pagination,
 small schema responses, execution handles, changed definitions, allow/deny lists,

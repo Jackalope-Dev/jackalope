@@ -242,10 +242,7 @@ pub fn review(
         || run.error.is_some()
         || run.verification_error.is_some()
         || run.verification.as_ref().is_some_and(|v| !v.result.success);
-    let local = if options.failure_triage
-        && failed
-        && crate::commands::experiments::is("JACKALOPE_FAILURE_TRIAGE", "local")
-    {
+    let local = if options.failure_triage && failed {
         local_failure(run)
     } else {
         None

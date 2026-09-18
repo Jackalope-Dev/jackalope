@@ -174,11 +174,20 @@ give Jackalope control of the model's conversation history or built-in tools.
 | --- | --- |
 | Task instructions, selected context, workspace ownership and final saved checks | Shared task runtime across native adapters. Required user/repository checks still apply. |
 | Model reasoning effort | Native flags for Codex and Claude Code. Other adapters retain provider defaults; an effort instruction is not evidence that a provider setting changed. |
-| Exact result selection, previews, literal source excerpts and Jev relevance reads | Shared broker for selected on-demand connections. Codex, Claude, OpenCode and Kimi use native MCP; Grok, Antigravity and Gemini use the HTTP bridge. Excerpt searches are opt-in and preserve source offsets and original recovery. These do not intercept the agent's own shell or file tools. |
-| Read pipelines and automatic Jev relevance | Opt-in shared service through MCP and HTTP: bounded read-only filters, joins, projection and counts with recoverable sources. Automatic relevance requires enabled Jev questions and context pruning; explicit selections retain exact semantics. Installed-agent adoption and end-to-end benefit remain unverified. |
+| Exact result selection and recovery | Shared broker for selected on-demand connections. Codex, Claude, OpenCode and Kimi use native MCP; Grok, Antigravity and Gemini use the HTTP bridge. Explicit selections retain the captured original. These do not intercept the agent's own shell or file tools. |
 | Optional browser, desktop and coordination schemas loaded during execution | Opt-in lean OpenCode discovery, using MCP list-changed notifications. Other adapters retain existing catalogs until client refresh and permission behavior are verified. |
-| Batch reads, source-range reads and delegation planning | Experimental native MCP tools for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
+| Source-range reads and delegation planning | Experimental native MCP tools for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
 | Native history rewriting | The evaluation-only OpenCode plugin can deduplicate exact read results. It is not installed by ordinary task launches or implemented across all adapters. |
+
+Ordinary tasks use concise launch instructions and hide unavailable tool schemas
+by default. Static MCP clients retain coordination tools; dynamic loading remains
+an OpenCode-only experiment. Managed assignments retain full ownership guidance.
+When automatic verification is configured, the final workspace receives the saved
+check without requiring a duplicate agent call. Explicit user/repository checks
+and necessary diagnostics still apply; automatic checks remain pending until run.
+Content-keyed syntax caching and local classification of recorded quota/check
+interruptions are enabled by default. These avoid repeated local work; they do not
+establish universal token, latency or quality improvements.
 
 Additional providers using OpenCode share its adapter protocol and tools. They
 still need model-specific tool-call, usage, cancellation, continuation and quality

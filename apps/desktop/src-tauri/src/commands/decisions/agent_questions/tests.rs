@@ -18,6 +18,27 @@ fn input() -> Value {
 }
 
 #[test]
+fn historical_preparation_receipts_remain_readable_without_adding_prompt_advice() {
+    let legacy = json!({"entries":[], "bytes":0, "jevPreparation":input(),
+        "jevPreparationResult":{"answers":{"blocked":true}}});
+    let receipt: crate::commands::knowledge::ContextReceipt =
+        serde_json::from_value(legacy.clone()).unwrap();
+    assert!(receipt.text().is_empty());
+    let saved = serde_json::to_value(receipt).unwrap();
+    assert_eq!(
+        saved["jevPreparation"]["questions"],
+        legacy["jevPreparation"]["questions"]
+    );
+    assert_eq!(
+        saved["jevPreparationResult"],
+        legacy["jevPreparationResult"]
+    );
+    let old: crate::commands::knowledge::ContextReceipt =
+        serde_json::from_value(json!({"entries":[],"bytes":0})).unwrap();
+    assert!(old.jev_preparation.is_none());
+}
+
+#[test]
 fn typed_questions_reject_invalid_or_oversized_contracts() {
     let parsed: Input = serde_json::from_value(input()).unwrap();
     parsed.validate().unwrap();
@@ -75,86 +96,6 @@ fn failed_calls_and_parallel_reservations_share_an_attempt_limit() {
     run.status = "review".into();
     assert!(!reserve(&mut run, 1));
     assert_eq!(run.efficiency.jev_question_calls, Some(0));
-}
-
-#[test]
-fn preparation_rejects_attempt_handles_and_preserves_typed_contracts() {
-    let parsed: Input = serde_json::from_value(input()).unwrap();
-    parsed.validate_preparation().unwrap();
-    let restored: Input = serde_json::from_value(serde_json::to_value(parsed).unwrap()).unwrap();
-    restored.validate_preparation().unwrap();
-    let mut value = input();
-    value["sources"] = json!({"prior":{"kind":"tool_result","resultHandle":"old-attempt"}});
-    assert!(serde_json::from_value::<Input>(value)
-        .unwrap()
-        .validate_preparation()
-        .is_err());
-    let old: crate::commands::knowledge::ContextReceipt =
-        serde_json::from_value(json!({"entries":[],"bytes":0})).unwrap();
-    assert!(old.jev_preparation.is_none());
-    assert!(old.jev_preparation_result.is_none());
-}
-
-#[test]
-fn preparation_clears_stale_answers_and_falls_back_without_opt_in() {
-    let root = std::env::temp_dir().join(format!(
-        "jackalope-jev-preparation-{}",
-        uuid::Uuid::new_v4()
-    ));
-    std::fs::create_dir_all(root.join("history")).unwrap();
-    let initial = run(&root);
-    std::fs::write(
-        root.join(format!("history/{}.json", initial.id)),
-        serde_json::to_vec(&initial).unwrap(),
-    )
-    .unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
-    runtime
-        .update_checked(&initial.id, |run| run.status = "running".into())
-        .unwrap();
-    let mut request: crate::commands::tasks::RunRequest = serde_json::from_value(json!({
-        "id":initial.id,"projectId":initial.project_id,"projectName":"Fixture","projectPath":root,
-        "agent":"codex","prompt":initial.prompt,"isolated":false
-    }))
-    .unwrap();
-    request.context_receipt.jev_preparation = Some(serde_json::from_value(input()).unwrap());
-    request.context_receipt.jev_preparation_result =
-        Some(json!({"status":"answered","answers":{"stale":true}}));
-    preparation::prepare(&runtime, &initial, &mut request).unwrap();
-    let result = request
-        .context_receipt
-        .jev_preparation_result
-        .as_ref()
-        .unwrap();
-    assert_eq!(result["status"], "unavailable");
-    assert!(result.get("answers").is_none());
-    assert!(evaluation::records(&runtime).unwrap().is_empty());
-    request.context_receipt.jev_preparation = None;
-    preparation::prepare(&runtime, &initial, &mut request).unwrap();
-    assert!(request.context_receipt.jev_preparation_result.is_none());
-    assert!(preparation::prompt(None).is_empty());
-    drop(runtime);
-    std::fs::remove_dir_all(root).unwrap();
-}
-
-#[test]
-fn preparation_prompt_keeps_uncertainty_and_provenance_without_full_distributions() {
-    let receipt = json!({"status":"answered","recordId":"receipt-id","sources":{"report":{"nextLine":81}},
-        "answers":{"kind":{"type":"choice","choice":"other","confidence":0.51,"probabilities":{"other":0.51,"dependency":0.49}},
-        "blocked":{"type":"noul","noul":0.4}}});
-    let prompt = preparation::prompt(Some(&receipt));
-    for retained in [
-        "receipt-id",
-        "nextLine",
-        "0.51",
-        "0.4",
-        "untrusted",
-        "required checks",
-    ] {
-        assert!(prompt.contains(retained));
-    }
-    assert!(!prompt.contains("probabilities"));
-    assert!(receipt["answers"]["kind"].get("probabilities").is_some());
 }
 
 #[tokio::test]

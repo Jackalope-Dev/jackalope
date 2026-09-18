@@ -17,10 +17,6 @@ use std::{
 use tokio::sync::{watch, Mutex as AsyncMutex};
 
 type Client = mcp::Connection;
-pub mod batch;
-pub mod delivery;
-pub mod pipeline;
-pub mod relevance;
 pub mod results;
 const MAX_TOOLS: usize = 1024;
 const MAX_CATALOG_BYTES: usize = 2_000_000;
@@ -366,7 +362,7 @@ impl Broker {
         run: &str,
         input: ExecuteInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
-        self.execute_with_policy(run, input, true, true).await
+        self.execute_with_policy(run, input, true).await
     }
 
     pub async fn execute(
@@ -374,39 +370,7 @@ impl Broker {
         run: &str,
         input: ExecuteInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
-        self.execute_with_policy(run, input, false, true).await
-    }
-
-    async fn capture_result(&self, run: &str, result: &CallToolResult) -> Result<String, String> {
-        let attempt = self.attempt(run)?;
-        let mut catalog = attempt.catalog.lock().await;
-        if *attempt.closed.borrow() {
-            return Err("This attempt has ended.".into());
-        }
-        results::capture(result, &mut catalog.results)
-    }
-
-    async fn record_delivery(
-        &self,
-        run: &str,
-        result: &CallToolResult,
-        selection: Option<Value>,
-    ) -> Result<BrokerUsage, String> {
-        let attempt = self.attempt(run)?;
-        let mut catalog = attempt.catalog.lock().await;
-        if *attempt.closed.borrow() {
-            return Err("This attempt has ended.".into());
-        }
-        *catalog.usage.result_bytes_returned.get_or_insert(0) +=
-            serde_json::to_vec(result).map_err(|e| e.to_string())?.len() as u64;
-        if let Some(selection) = selection {
-            catalog
-                .usage
-                .relevance_selections
-                .get_or_insert_with(Vec::new)
-                .push(selection);
-        }
-        Ok(catalog.usage.clone())
+        self.execute_with_policy(run, input, false).await
     }
 
     pub async fn read_result(
@@ -466,7 +430,6 @@ impl Broker {
         run: &str,
         input: ExecuteInput,
         read_only: bool,
-        deliver: bool,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
         if let Some(output) = &input.output {
             output.validate()?;
@@ -486,7 +449,7 @@ impl Broker {
         }
         tokio::select! {
             _ = closed.changed() => Err("The attempt ended; an in-flight tool may already have taken effect. Do not retry blindly.".into()),
-            result = execute_catalog(&attempt, input, read_only, deliver) => result,
+            result = execute_catalog(&attempt, input, read_only) => result,
         }
     }
 }
@@ -634,7 +597,6 @@ async fn execute_catalog(
     attempt: &Attempt,
     input: ExecuteInput,
     read_only: bool,
-    deliver: bool,
 ) -> Result<(CallToolResult, BrokerUsage), String> {
     let catalog = attempt.catalog.lock().await;
     let lease = catalog
@@ -718,15 +680,8 @@ async fn execute_catalog(
     }
     *catalog.usage.result_bytes_received.get_or_insert(0) +=
         serde_json::to_vec(&result).map_or(0, |value| value.len()) as u64;
-    if !deliver {
-        return Ok((result, catalog.usage.clone()));
-    }
-    let selection = if crate::commands::experiments::is("JACKALOPE_RESULT_SELECTION", "off") {
-        None
-    } else {
-        input.output.as_ref()
-    };
-    let (selected, stats) = results::select_measured(result, selection, &mut catalog.results);
+    let (selected, stats) =
+        results::select_measured(result, input.output.as_ref(), &mut catalog.results);
     result = selected;
     catalog.usage.selection(stats);
     *catalog.usage.result_bytes_returned.get_or_insert(0) +=

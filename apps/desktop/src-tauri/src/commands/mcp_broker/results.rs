@@ -1,15 +1,10 @@
 use super::*;
-pub(crate) mod excerpts;
 mod query;
 pub(super) mod rows;
 
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Selection {
-    #[schemars(
-        description = "Literal text search with bounded verbatim excerpts and source offsets. Alternative to rows/jsonPointers; requires the result-excerpts experiment. The original stays recoverable."
-    )]
-    pub text: Option<excerpts::TextSearch>,
     #[schemars(
         description = "Optional exact filtering/projection/count of an array. Uses RFC 6901 pointers relative to each row for columns and equality filters; returns source indices. Missing fields preserve the original result."
     )]
@@ -20,7 +15,7 @@ pub struct Selection {
     )]
     pub json_pointers: Vec<String>,
     #[schemars(
-        description = "Maximum Unicode characters returned now (256-16000). The complete captured result stays available through read_tool_result without executing the tool again."
+        description = "Maximum selected-data Unicode characters (256-16000), plus recovery metadata. The complete captured result stays available through read_tool_result without executing the tool again."
     )]
     pub max_chars: Option<usize>,
 }
@@ -30,20 +25,8 @@ impl Selection {
         if let Some(rows) = &self.rows {
             rows.validate()?;
         }
-        if let Some(text) = &self.text {
-            if !excerpts::enabled() {
-                return Err("Captured text excerpts are not enabled.".into());
-            }
-            text.validate()?;
-        }
-        if usize::from(self.rows.is_some())
-            + usize::from(self.text.is_some())
-            + usize::from(!self.json_pointers.is_empty())
-            > 1
-        {
-            return Err(
-                "Choose text search, row operations or JSON pointers, not a combination.".into(),
-            );
+        if self.rows.is_some() && !self.json_pointers.is_empty() {
+            return Err("Choose row operations or JSON pointers, not both.".into());
         }
         if self.json_pointers.len() > 16
             || self
@@ -76,32 +59,6 @@ pub struct ReadInput {
 pub(super) struct Snapshot {
     handle: String,
     json: String,
-}
-
-pub(super) fn captured_result(
-    snapshots: &VecDeque<Snapshot>,
-    handle: &str,
-) -> Result<CallToolResult, String> {
-    let snapshot = snapshots
-        .iter()
-        .find(|item| item.handle == handle)
-        .ok_or("Captured result expired or belongs to another attempt; no remote call was made.")?;
-    serde_json::from_str(&snapshot.json).map_err(|_| "Captured result unavailable.".into())
-}
-
-pub(super) fn capture(
-    result: &CallToolResult,
-    snapshots: &mut VecDeque<Snapshot>,
-) -> Result<String, String> {
-    let handle = uuid::Uuid::new_v4().to_string();
-    snapshots.push_back(Snapshot {
-        handle: handle.clone(),
-        json: serde_json::to_string(result).map_err(|e| e.to_string())?,
-    });
-    while snapshots.len() > 16 {
-        snapshots.pop_front();
-    }
-    Ok(handle)
 }
 
 #[derive(Default)]
@@ -147,8 +104,7 @@ pub(super) fn select_measured(
         &result,
         selection.is_none()
             && structured
-            && crate::commands::experiments::is("JACKALOPE_RESULT_PREVIEW", "on")
-            && !crate::commands::experiments::is("JACKALOPE_RESULT_SELECTION", "off"),
+            && crate::commands::experiments::is("JACKALOPE_RESULT_PREVIEW", "on"),
     );
     let result = select_inner(
         result,
@@ -163,7 +119,6 @@ pub(super) fn select_measured(
 fn automatic_preview(result: &CallToolResult, enabled: bool) -> Option<Selection> {
     (enabled && serde_json::to_vec(result).is_ok_and(|value| value.len() > 16_000)).then_some(
         Selection {
-            text: None,
             rows: None,
             json_pointers: vec![],
             max_chars: Some(2000),
@@ -204,7 +159,6 @@ fn select_inner(
     let truncated = projection["truncated"] == true;
     let projected = response(projection, structured);
     if selection.rows.is_none()
-        && selection.text.is_none()
         && serde_json::to_vec(&projected).map_or(usize::MAX, |v| v.len())
             >= serde_json::to_vec(&result).map_or(0, |v| v.len())
     {
@@ -237,7 +191,7 @@ pub(super) fn read(
     if let Some(selection) = &input.output {
         selection.validate()?;
         if input.offset != 0 || input.limit.is_some() {
-            return Err("Use output.rows.offset/limit or output.text.cursor for queries; do not combine a query with character paging.".into());
+            return Err("Use output.rows.offset/limit for queries; do not combine a query with character paging.".into());
         }
         let value: Value =
             serde_json::from_str(&snapshot.json).map_err(|_| "Captured JSON is unavailable.")?;

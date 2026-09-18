@@ -2,7 +2,6 @@ use super::{evaluation, options, DecisionKind, TaskRuntime};
 use crate::commands::{jev, tasks::TaskRun};
 use serde_json::{json, Value};
 
-pub mod preparation;
 mod request;
 #[cfg(test)]
 mod tests;
@@ -25,15 +24,6 @@ pub fn help() -> Value {
 }
 
 pub async fn ask(runtime: &TaskRuntime, run: &TaskRun, input: Input) -> Result<Value, String> {
-    evaluate_questions(runtime, run, input, DecisionKind::AgentQuestions).await
-}
-
-async fn evaluate_questions(
-    runtime: &TaskRuntime,
-    run: &TaskRun,
-    input: Input,
-    kind: DecisionKind,
-) -> Result<Value, String> {
     if !runtime.is_running(&run.id) || !available(runtime, &run.project_id) {
         return Err("Jev task questions require an active attempt, a connected Jev decision mode and enabled agent questions.".into());
     }
@@ -51,7 +41,7 @@ async fn evaluate_questions(
         runtime,
         &run.project_id,
         Some(&run.id),
-        kind,
+        DecisionKind::AgentQuestions,
         1,
         &payload,
         false,
@@ -59,14 +49,7 @@ async fn evaluate_questions(
     )
     .await;
     runtime.update(&run.id, |current| {
-        current.efficiency.timing(
-            if kind == DecisionKind::TaskPreparation {
-                "jevPreparation"
-            } else {
-                "jevQuestions"
-            },
-            started.elapsed(),
-        )
+        current.efficiency.timing("jevQuestions", started.elapsed())
     });
     let result = result?
         .ok_or("Jev task questions became unavailable; continue with local or agent methods.")?;

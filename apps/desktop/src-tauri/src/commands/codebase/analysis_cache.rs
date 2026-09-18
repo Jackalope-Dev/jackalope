@@ -12,9 +12,6 @@ struct Entry {
 static CACHE: LazyLock<Mutex<VecDeque<Entry>>> = LazyLock::new(|| Mutex::new(VecDeque::new()));
 
 pub(super) fn analyze(parser: &mut Parser, path: &str, text: &str, rust: bool) -> Analysis {
-    if !crate::commands::experiments::is("JACKALOPE_ANALYSIS_CACHE", "on") {
-        return super::analyze(parser, path, text, rust);
-    }
     cached(parser, path, text, rust)
 }
 

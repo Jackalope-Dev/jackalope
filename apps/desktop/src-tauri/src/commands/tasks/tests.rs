@@ -933,7 +933,8 @@ process.stdin.on('end', () => {
     // task itself reads last. Keep both ends pinned: a reorder that buries the task, or that
     // lets per-task text ahead of the preamble, silently costs cache hits or instruction focus.
     assert!(delivered.starts_with("Jackalope task context:"));
-    assert!(delivered.contains(super::delegation::INSTRUCTIONS));
+    assert!(delivered.contains(&super::prompt::lean_preamble()));
+    assert!(delivered.contains("delegate only permitted independent work"));
     assert!(delivered.contains("Leave changes uncommitted"));
     assert!(delivered.trim_end().ends_with("Fixture only"));
     assert!(

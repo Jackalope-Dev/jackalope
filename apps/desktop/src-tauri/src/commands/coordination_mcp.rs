@@ -387,69 +387,11 @@ impl CoordinationTools {
             .service
             .authorized_run(&request_headers(&context)?)
             .map_err(bridge_error)?;
-        super::mcp_broker::delivery::read(
-            &self.service.runtime,
-            &run,
-            super::mcp_broker::batch::ReadCall::Handle(input),
-        )
-        .await
-        .map_err(|e| ErrorData::invalid_request(e, None))
-    }
-
-    #[tool(
-        description = "Experimental Jev relevance selection before receiving a large read-only result. Supply the discovered handle, arguments, complete read purpose and array pointer relative to structuredContent. Only high-confidence irrelevant rows are omitted; original rows are recoverable with read_tool_result. Prefer local output.rows for exact predicates. Unsupported results and failures return the original. Jev usage is charged and recorded.",
-        annotations(
-            read_only_hint = true,
-            destructive_hint = false,
-            open_world_hint = true
-        )
-    )]
-    async fn read_relevant_tool(
-        &self,
-        context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::mcp_broker::relevance::Input>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let run = self
-            .service
-            .authorized_run(&request_headers(&context)?)
-            .map_err(bridge_error)?;
-        super::mcp_broker::relevance::read(&self.service.runtime, &run, input)
-            .await
-            .map_err(|e| ErrorData::invalid_request(e, None))
-    }
-
-    #[tool(
-        description = "Batch one to eight independent read-only calls by discovered handle or exact name/server with known arguments. Different connections overlap with bounded concurrency. Use output.rows for local exact filtering, projection and counts. Results retain input order and individual errors; selected originals remain recoverable. Does not authorize writes.",
-        annotations(
-            read_only_hint = true,
-            destructive_hint = false,
-            open_world_hint = true
-        )
-    )]
-    async fn read_tools(
-        &self,
-        context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::mcp_broker::batch::BatchInput>,
-    ) -> Result<CallToolResult, ErrorData> {
-        if !crate::commands::experiments::is("JACKALOPE_BATCH_READ", "on") {
-            return Err(ErrorData::invalid_request(
-                "Batch reads are not enabled.",
-                None,
-            ));
-        }
-        let run = self
-            .service
-            .authorized_run(&request_headers(&context)?)
-            .map_err(bridge_error)?;
         let (result, usage) = self
             .service
             .runtime
             .mcp_broker
-            .read_batch_context(
-                &run.id,
-                input,
-                Some((self.service.runtime.clone(), run.clone())),
-            )
+            .read(&run.id, input)
             .await
             .map_err(|e| ErrorData::invalid_request(e, None))?;
         super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
@@ -473,35 +415,15 @@ impl CoordinationTools {
             .service
             .authorized_run(&request_headers(&context)?)
             .map_err(bridge_error)?;
-        super::mcp_broker::delivery::read(
-            &self.service.runtime,
-            &run,
-            super::mcp_broker::batch::ReadCall::Named(input),
-        )
-        .await
-        .map_err(|e| ErrorData::invalid_request(e, None))
-    }
-
-    #[tool(
-        description = "Compose read-only retrieval, exact filtering, unique-key left joins, projection and counts in one local pipeline. Only final output enters context; source handles recover originals. Use known tool arguments or search first. Rejects partial data, missing fields and ambiguous join keys. Does not authorize writes.",
-        annotations(
-            read_only_hint = true,
-            destructive_hint = false,
-            open_world_hint = true
-        )
-    )]
-    async fn read_pipeline(
-        &self,
-        context: RequestContext<RoleServer>,
-        Parameters(input): Parameters<super::mcp_broker::pipeline::Input>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let run = self
+        let (result, usage) = self
             .service
-            .authorized_run(&request_headers(&context)?)
-            .map_err(bridge_error)?;
-        super::mcp_broker::pipeline::read(&self.service.runtime, &run, input)
+            .runtime
+            .mcp_broker
+            .read_named(&run.id, input)
             .await
-            .map_err(|e| ErrorData::invalid_request(e, None))
+            .map_err(|e| ErrorData::invalid_request(e, None))?;
+        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
+        Ok(result)
     }
 
     #[tool(
@@ -964,8 +886,30 @@ impl CoordinationTools {
     instructions = "Use supplied launch context. Refresh project for shared-interface changes, scope uncertainty or new coordination needs. Use harness tools for relevant evidence, user questions and final verification."
 )]
 impl ServerHandler for CoordinationTools {
+    fn supported_protocol_versions(
+        &self,
+    ) -> std::borrow::Cow<'static, [rmcp::model::ProtocolVersion]> {
+        if crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred") {
+            // Deferred discovery uses legacy in-stream notifications, not subscriptions/listen.
+            return std::borrow::Cow::Owned(
+                rmcp::model::ProtocolVersion::KNOWN_VERSIONS
+                    .iter()
+                    .filter(|version| **version < rmcp::model::ProtocolVersion::V_2026_07_28)
+                    .cloned()
+                    .collect(),
+            );
+        }
+        std::borrow::Cow::Borrowed(rmcp::model::ProtocolVersion::KNOWN_VERSIONS)
+    }
+
     fn get_info(&self) -> rmcp::model::ServerInfo {
-        rmcp::model::ServerInfo::new(rmcp::model::ServerCapabilities::builder().enable_tools().enable_tool_list_changed().build())
+        let mut capabilities = rmcp::model::ServerCapabilities::builder()
+            .enable_tools()
+            .build();
+        if crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred") {
+            capabilities.tools.as_mut().unwrap().list_changed = Some(true);
+        }
+        rmcp::model::ServerInfo::new(capabilities)
             .with_server_info(rmcp::model::Implementation::new("jackalope", "0.1.0"))
             .with_instructions("Use supplied launch context. Refresh project for shared-interface changes, scope uncertainty or new coordination needs. Use harness tools for relevant evidence, user questions and final verification.")
     }
@@ -984,32 +928,15 @@ impl ServerHandler for CoordinationTools {
         if !super::decisions::agent_questions::available(&self.service.runtime, &run.project_id) {
             tools.retain(|tool| tool.name != "ask_jev");
         }
-        if !super::mcp_broker::relevance::available(&self.service.runtime, &run.project_id) {
-            tools.retain(|tool| tool.name != "read_relevant_tool");
-        }
         if !crate::commands::experiments::is("JACKALOPE_DISPATCH_PLAN", "on") {
             tools.retain(|tool| tool.name != "plan_delegation");
         }
         if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
             tools.retain(|tool| tool.name != "read_context");
         }
-        let batch = crate::commands::experiments::is("JACKALOPE_BATCH_READ", "on");
-        if !super::mcp_broker::pipeline::enabled() {
-            tools.retain(|tool| tool.name != "read_pipeline");
-        }
         let queries = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
-        if !batch {
-            tools.retain(|tool| tool.name != "read_tools");
-        }
         for tool in &mut tools {
-            if !super::mcp_broker::results::excerpts::enabled() {
-                let mut schema = serde_json::Value::Object((*tool.input_schema).clone());
-                omit_selection_schema(&mut schema, "text", "TextSearch");
-                if let serde_json::Value::Object(schema) = schema {
-                    tool.input_schema = std::sync::Arc::new(schema);
-                }
-            }
-            if !batch && !queries {
+            if !queries {
                 if matches!(
                     tool.name.as_ref(),
                     "read_tool" | "execute_tool" | "read_named_tool"
@@ -1041,22 +968,13 @@ impl ServerHandler for CoordinationTools {
             tools.retain(|tool| tool.name != "read_named_tool");
         }
         let lean = run.efficiency.execution_profile.as_deref() == Some("lean");
-        if !lean {
+        if !catalog::deferred(&run) {
             tools.retain(|tool| tool.name != "discover_harness_tools");
         }
         if lean || crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "available") {
             let discovery = self.service.runtime.mcp_broker.has_attempt(&run.id);
             tools.retain(|tool| {
                 available_tool(tool.name.as_ref(), discovery, run.verify_command.as_deref())
-            });
-        }
-        if lean {
-            tools.retain(|tool| {
-                catalog::deferred(&run)
-                    || !matches!(
-                        tool.name.as_ref(),
-                        "message" | "inbox" | "acknowledge_message" | "agreement"
-                    )
             });
         }
         if catalog::deferred(&run) {
@@ -1083,16 +1001,17 @@ impl ServerHandler for CoordinationTools {
             tools,
             meta: None,
             next_cursor: None,
-            ttl_ms: None,
-            cache_scope: None,
+            ttl_ms: Some(0),
+            cache_scope: Some(rmcp::model::CacheScope::Private),
         })
     }
 }
 
 fn available_tool(name: &str, discovery: bool, check: Option<&str>) -> bool {
     match name {
-        "search_tools" | "read_tool" | "read_relevant_tool" | "read_named_tool" | "read_tools"
-        | "read_tool_result" | "read_pipeline" | "execute_tool" => discovery,
+        "search_tools" | "read_tool" | "read_named_tool" | "read_tool_result" | "execute_tool" => {
+            discovery
+        }
         "computer_verify" => check.is_some_and(|value| !value.trim().is_empty()),
         _ => true,
     }
@@ -1163,25 +1082,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn disabled_excerpt_schema_preserves_unrelated_text_inputs() {
-        let router = CoordinationTools::platform_router();
-        for tool in router.list_all() {
-            let mut schema = serde_json::to_value(&tool.input_schema).unwrap();
-            let original = schema.clone();
-            omit_selection_schema(&mut schema, "text", "TextSearch");
-            assert!(!schema.to_string().contains("#/$defs/TextSearch"));
-            if tool.name == "read_tool_result" {
-                assert!(original.to_string().contains("#/$defs/TextSearch"));
-                assert!(schema.to_string().contains("#/$defs/Rows"));
-            }
-        }
-        let mut unrelated = serde_json::json!({"properties":{"text":{"type":"string"}}});
-        let original = unrelated.clone();
-        omit_selection_schema(&mut unrelated, "text", "TextSearch");
-        assert_eq!(unrelated, original);
-    }
-
-    #[test]
     fn ordinary_read_schemas_omit_experimental_row_fields_and_references() {
         let router = CoordinationTools::platform_router();
         for tool in router.list_all().into_iter().filter(|tool| {
@@ -1221,14 +1121,18 @@ mod tests {
         let router = CoordinationTools::platform_router();
         let tools = router.list_all();
         let names: Vec<_> = tools.iter().map(|tool| tool.name.as_ref()).collect();
-        for name in [
-            "read_tools",
-            "read_context",
-            "plan_delegation",
-            "discover_harness_tools",
-        ] {
+        for name in ["read_context", "plan_delegation", "discover_harness_tools"] {
             assert!(names.contains(&name), "Missing native route: {name}");
         }
+        for name in ["read_tools", "read_pipeline", "read_relevant_tool"] {
+            assert!(!names.contains(&name), "Retired native route: {name}");
+        }
+        assert!(
+            serde_json::from_value::<super::super::mcp_broker::results::Selection>(
+                serde_json::json!({"text":{"terms":["example"]}})
+            )
+            .is_err()
+        );
         assert!(names.contains(&"inbox"));
         assert!(names.contains(&"acknowledge_message"));
         assert!(names.contains(&"read_tool"));

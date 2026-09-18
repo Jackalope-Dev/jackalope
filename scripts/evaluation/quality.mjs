@@ -4,7 +4,10 @@ import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { release } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
+import {
+  assemblePrompt,
+  PROMPT_VERSION,
+} from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
@@ -181,7 +184,7 @@ if (!args.includes('--execute')) {
         id,
         [
           assemblePrompt({
-            version: compactPrompts ? 3 : 2,
+            version: compactPrompts ? 3 : PROMPT_VERSION,
             rawPrompt: cases.find((c) => c.id === id).prompt,
             selectedSkillIds: resolveTaskGuidelines(
               cases.find((c) => c.id === id).prompt,
