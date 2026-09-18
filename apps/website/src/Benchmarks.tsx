@@ -297,9 +297,12 @@ export function BenchmarksPage() {
             accounting, replication, and recorded resource and cache conditions. The lower
             confidence bound must show at least a 10% time or cost improvement and rule out a
             quality regression exceeding two percentage points. Those are reporting thresholds, not
-            guarantees; satisfying the minimum sample alone does not pass the gate. Related seeded
-            defects share a source-family cluster in the 2,000-resample bootstrap. These claims
-            concern agent execution; human review time is a separate, optional measurement.
+            guarantees; satisfying the minimum sample alone does not pass the gate. With the current
+            Wilson-bound quality method, even perfect results in both arms require at least 189
+            independent families to meet the two-point tolerance. Study size and power assumptions
+            must be established before confirmation. Related seeded defects share a source-family
+            cluster in the 2,000-resample bootstrap. These claims concern agent execution; human
+            review time is a separate, optional measurement.
           </li>
         </ol>
         <p>

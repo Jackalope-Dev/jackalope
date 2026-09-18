@@ -5,6 +5,7 @@ export interface AgentProfile {
   name: string;
   group?: 'work' | 'personal' | null;
   tag?: string | null;
+  preferredModel?: string | null;
 }
 
 export interface AgentProfilesView {
@@ -55,6 +56,9 @@ export const signInAgentProfile = (agent: string, id: string, cols = 80, rows = 
 
 export const saveAgentProfileKey = (agent: string, id: string, name: string, value: string) =>
   nativeTask<void>('agent_profile_save_key', { agent, id, name, value });
+
+export const completeProviderProfile = (id: string, model: string, activate: boolean) =>
+  nativeTask<void>('agent_profile_complete_provider', { id, model, activate });
 
 export interface SignInView {
   state: 'running' | 'exited' | 'cancelled' | 'timedOut' | 'failed';

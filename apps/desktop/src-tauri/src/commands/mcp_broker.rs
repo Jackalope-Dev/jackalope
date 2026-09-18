@@ -408,7 +408,7 @@ impl Broker {
         input: results::ReadInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
         if input.output.is_some()
-            && !std::env::var("JACKALOPE_RESULT_QUERIES").is_ok_and(|value| value == "on")
+            && !crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on")
         {
             return Err("Captured-result queries are not enabled.".into());
         }
@@ -714,8 +714,7 @@ async fn execute_catalog(
     if !deliver {
         return Ok((result, catalog.usage.clone()));
     }
-    let selection = if std::env::var("JACKALOPE_RESULT_SELECTION").is_ok_and(|value| value == "off")
-    {
+    let selection = if crate::commands::experiments::is("JACKALOPE_RESULT_SELECTION", "off") {
         None
     } else {
         input.output.as_ref()

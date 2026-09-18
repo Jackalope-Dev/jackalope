@@ -9,6 +9,8 @@ use std::{
 };
 use tauri::State;
 use tokio::{io::AsyncReadExt, process::Command, sync::Mutex, time::timeout};
+mod metadata;
+pub(super) use metadata::evidence;
 
 #[derive(Clone, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -16,6 +18,8 @@ pub struct AgentModel {
     id: String,
     name: String,
     is_default: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<super::decisions::options::ModelEvidence>,
 }
 
 #[derive(Clone, Serialize)]
@@ -64,6 +68,7 @@ fn parse_models(value: &Value) -> Vec<AgentModel> {
             id: id.into(),
             name: name.chars().filter(|c| !c.is_control()).take(160).collect(),
             is_default: entry["isDefault"].as_bool().unwrap_or(false),
+            metadata: None,
         });
     }
     models
@@ -111,6 +116,7 @@ async fn read_catalog(
     executable: &Path,
     binding: &agent_profiles::AccountBinding,
 ) -> Result<Vec<AgentModel>, String> {
+    let _runner_lease = super::managed_runtime::acquire(executable)?;
     if adapter == "antigravity" {
         super::capacity::antigravity::require_commands(binding, executable).await?;
         let output = super::capacity::antigravity::output(
@@ -157,7 +163,7 @@ async fn read_catalog(
     }
     if adapter == "opencode" {
         let mut command = Command::new(executable);
-        command.arg("models");
+        command.args(["models", "--verbose"]);
         if let Some(provider) = agent_profiles::api_provider(binding)? {
             command.arg(provider);
         }
@@ -177,14 +183,14 @@ async fn read_catalog(
             .stdout
             .take()
             .ok_or("Model output unavailable")?
-            .take(1_048_577);
+            .take(4_194_305);
         let result = timeout(Duration::from_secs(20), async {
             let mut bytes = Vec::new();
             output
                 .read_to_end(&mut bytes)
                 .await
                 .map_err(|_| "Could not read the model list")?;
-            if bytes.len() > 1_048_576 {
+            if bytes.len() > 4_194_304 {
                 return Err("Model output exceeded the response limit".into());
             }
             if !child
@@ -198,14 +204,9 @@ async fn read_catalog(
                         .into(),
                 );
             }
-            let values: Vec<Value> = String::from_utf8_lossy(&bytes)
-                .lines()
-                .map(str::trim)
-                .filter(|id| valid_id(id) && id.contains('/'))
-                .take(512)
-                .map(|id| json!({"id":id}))
-                .collect();
-            Ok(parse_models(&Value::Array(values)))
+            let models = metadata::parse(&String::from_utf8_lossy(&bytes));
+            metadata::remember(binding, &models);
+            Ok(models)
         })
         .await
         .unwrap_or_else(|_| Err("Model discovery timed out.".into()));
@@ -277,7 +278,7 @@ pub async fn agent_models(
     )?;
     if let Some(model) = agent_profiles::local_model(&binding)? {
         return Ok(ModelCatalog {
-            models: vec![AgentModel { id: format!("{}/{model}", super::local_ai::PROVIDER), name: format!("Local · {model}"), is_default: true }],
+            models: vec![AgentModel { id: format!("{}/{model}", super::local_ai::PROVIDER), name: format!("Local · {model}"), is_default: true, metadata: None }],
             source: "local".into(), account: Some(binding.label), checked_at: chrono::Utc::now().to_rfc3339(),
             detail: "This local account uses the model checked during setup. Ollama must be running; current availability is checked at launch.".into(),
         });
@@ -329,7 +330,8 @@ mod tests {
             vec![AgentModel {
                 id: "reported-model".into(),
                 name: "Current model".into(),
-                is_default: true
+                is_default: true,
+                metadata: None
             }]
         );
         assert!(parse_antigravity_model(

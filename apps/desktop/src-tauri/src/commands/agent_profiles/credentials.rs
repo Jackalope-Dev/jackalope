@@ -103,7 +103,9 @@ pub fn agent_profile_save_key(
     })
     .map_err(|_| "Could not prepare the API key.")?;
     let path = binding.directory.join("api-key.bin");
-    crate::commands::account_storage::write(&path, &bytes)
+    crate::commands::account_storage::write(&path, &bytes)?;
+    runtime.invalidate_account_helpers(&binding.directory);
+    Ok(())
 }
 
 #[cfg(test)]

@@ -75,6 +75,13 @@ For DeepSeek, use **Connect an API provider** in Agents, choose DeepSeek and ent
 your key. Jackalope prepares its private OpenCode runner before saving the key and
 discovering models. No separate OpenCode installation or account is required.
 The OpenCode account's **Provider API key** action supports the same flow.
+The provider connection flow saves its selected model on that named account,
+including when it is not selected for new tasks. Completion saves the preference,
+pending-account state and optional activation together. A later settings-sync
+failure leaves the connection saved and permits retry. Explicit task model choices
+win, followed by the account preference and then the runner's fallback default;
+model restrictions still apply. The active account's preference can be changed in
+Models & Executable. Existing sessions retain their requested model.
 Existing OpenCode provider sign-ins remain available. The selected runner supplies
 model discovery; Jackalope does not pin a DeepSeek model
 or treat catalog visibility as proof of access. Follow the provider's

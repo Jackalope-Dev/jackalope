@@ -4,27 +4,8 @@ const CORE: &str = "Jackalope task context: Use the assigned workspace; preserve
 
 pub(super) fn policy_hash() -> String {
     Sha256::digest(format!(
-        "{}:{}:{}:{}:{}:{}",
-        compact_enabled(),
-        reuse_enabled(),
-        std::env::var("JACKALOPE_EXECUTION_PROFILE").unwrap_or_default(),
-        [
-            "JACKALOPE_VERIFICATION_FLOW",
-            "JACKALOPE_CONTEXT_READ",
-            "JACKALOPE_ANALYSIS_CACHE",
-            "JACKALOPE_DISPATCH_PLAN",
-            "JACKALOPE_BATCH_READ",
-            "JACKALOPE_RESULT_QUERIES",
-            "JACKALOPE_RESULT_PREVIEW",
-            "JACKALOPE_INITIAL_TOOLS",
-            "JACKALOPE_TOOL_SURFACE",
-            "JACKALOPE_NAMED_READ",
-            "JACKALOPE_SOURCE_CONTEXT",
-            "JACKALOPE_JEV_ASSISTANCE",
-            "JACKALOPE_FAILURE_TRIAGE"
-        ]
-        .map(|name| format!("{name}={}", std::env::var(name).unwrap_or_default()))
-        .join(";"),
+        "{}:{}:{}",
+        crate::commands::experiments::fingerprint(),
         compact_preamble(None, ""),
         lean_preamble()
     ))
@@ -49,11 +30,11 @@ pub(super) fn preamble(previous: Option<&super::TaskRun>, adapter: &str) -> Stri
 }
 
 fn compact_enabled() -> bool {
-    std::env::var("JACKALOPE_CONTEXT_EXPERIMENT").is_ok_and(|value| value == "compact")
+    crate::commands::experiments::is("JACKALOPE_CONTEXT_EXPERIMENT", "compact")
 }
 
 fn reuse_enabled() -> bool {
-    std::env::var("JACKALOPE_CONTEXT_REUSE").is_ok_and(|value| value == "on")
+    crate::commands::experiments::is("JACKALOPE_CONTEXT_REUSE", "on")
 }
 
 fn can_reuse(previous: Option<&super::TaskRun>, adapter: &str, policy: &str) -> bool {

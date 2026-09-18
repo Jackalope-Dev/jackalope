@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "fields": {
+    "workflow": {
+      "values": ["legacy", "final"],
+      "default": "legacy",
+      "environment": null
+    },
+    "task-approach": {
+      "values": ["general", "scoped"],
+      "default": "general",
+      "environment": null
+    },
+    "tool-surface": {
+      "values": ["full", "available"],
+      "default": "full",
+      "environment": "JACKALOPE_TOOL_SURFACE"
+    },
+    "named-read": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_NAMED_READ"
+    },
+    "result-selection": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_RESULT_SELECTION"
+    },
+    "result-queries": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_RESULT_QUERIES"
+    },
+    "result-preview": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_RESULT_PREVIEW",
+      "requires": {
+        "on": {
+          "result-queries": "on"
+        }
+      }
+    },
+    "initial-tools": {
+      "values": ["search", "small"],
+      "default": "search",
+      "environment": "JACKALOPE_INITIAL_TOOLS"
+    },
+    "repo-map": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_REPO_MAP"
+    },
+    "context-reuse": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_CONTEXT_REUSE"
+    },
+    "source-context": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_SOURCE_CONTEXT"
+    },
+    "batch-read": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_BATCH_READ"
+    },
+    "execution-profile": {
+      "values": ["standard", "lean"],
+      "default": "standard",
+      "environment": "JACKALOPE_EXECUTION_PROFILE"
+    },
+    "verification-flow": {
+      "values": ["agent", "final"],
+      "default": "agent",
+      "environment": "JACKALOPE_VERIFICATION_FLOW"
+    },
+    "context-read": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_CONTEXT_READ"
+    },
+    "context-pruning": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_CONTEXT_PRUNING"
+    },
+    "history-compaction": {
+      "values": ["off", "deduplicate"],
+      "default": "off",
+      "environment": "JACKALOPE_HISTORY_COMPACTION"
+    },
+    "analysis-cache": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_ANALYSIS_CACHE"
+    },
+    "dispatch-plan": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_DISPATCH_PLAN"
+    },
+    "jev-assistance": {
+      "values": ["active", "shadow"],
+      "default": "active",
+      "environment": "JACKALOPE_JEV_ASSISTANCE"
+    },
+    "jev-questions": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_JEV_QUESTIONS"
+    },
+    "jev-preparation": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_JEV_PREPARATION"
+    },
+    "failure-triage": {
+      "values": ["jev", "local"],
+      "default": "jev",
+      "environment": "JACKALOPE_FAILURE_TRIAGE"
+    },
+    "context-style": {
+      "values": ["off", "compact"],
+      "default": "off",
+      "environment": "JACKALOPE_CONTEXT_EXPERIMENT"
+    },
+    "warm-opencode": {
+      "values": ["on", "off"],
+      "default": "on",
+      "environment": "JACKALOPE_WARM_OPENCODE"
+    },
+    "warm-api-helpers": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_WARM_API_HELPERS"
+    }
+  }
+}

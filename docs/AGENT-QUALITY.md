@@ -201,6 +201,22 @@ provider cache state is inherited. Do not publish raw task receipts.
 
 ### Independent experiments and publication evidence
 
+`apps/desktop/src-tauri/src/commands/experiments.json` is the versioned registry of experiment defaults,
+allowed values, environment names and dependencies. The evaluation driver records
+its digest, and native continuation fingerprints include all registered native
+settings. Invalid combinations are rejected by the driver. Optimization defaults
+remain conservative; an implementation is not evidence of a benefit.
+
+Run `pnpm evaluate:plan --families=20 --pass-rate=1` before budgeting confirmation.
+The current quality gate subtracts the baseline upper Wilson bound from the
+candidate lower Wilson bound using independent source-family outcomes and z=1.96.
+Its 2-point tolerance requires at least 189 independent families even when both
+arms pass every task. The 50-task/20-family eligibility floor cannot by itself
+satisfy that gate. This feasibility calculation is not a power analysis: freeze
+sampling, family definitions, quality tolerance, method and power assumptions
+before collecting new held-out results. Repeated runs of a family do not increase
+its independent sample count.
+
 For adaptive screening, pass `--stop-file=<path>` and create that file to stop
 before the next matched case repetition. The current repetition finishes so both
 variants remain comparable. The runner checkpoints its plan before dispatch and
@@ -545,6 +561,17 @@ auxiliary request, such as native session-title generation. Treat its CLI-report
 cost as a worker estimate, not a billing total. Keep
 `nativeAuxiliaryAccountingComplete` false until all provider requests have been
 measured; missing fields in older OpenCode comparisons also block total-cost claims.
+For an isolated DeepSeek/OpenCode screening run, `--provider-meter=deepseek` starts
+an authenticated loopback meter, confines the provider and model, redirects its
+endpoint, disables project configuration and uses fresh XDG directories. It reads
+`DEEPSEEK_API_KEY` or the existing OpenCode DeepSeek credential; the child receives
+only a per-run proxy token. Both arms use the same isolation. Reports retain request
+counts, status, usage, cache counts and duration without prompts, responses or keys.
+Auxiliary calls and retries are included. Missing usage or any incomplete/failed
+request leaves totals unknown. The cost gate uses complete meter totals only for
+runs without separate helper or routing receipts; mixed workflows still require
+reconciliation to prevent omissions and double charging. Warm API helper timing
+is a separate opt-in experiment, not a task-quality result.
 Jackalope supplies a deterministic title for new OpenCode tasks to avoid redundant
 title generation; resumed sessions retain their existing titles. Direct controls
 retain the native default behavior.

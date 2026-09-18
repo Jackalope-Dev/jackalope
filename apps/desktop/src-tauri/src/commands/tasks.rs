@@ -74,6 +74,12 @@ pub struct TaskRuntime {
     _owner: Arc<super::file_lock::FileLock>,
 }
 
+impl TaskRuntime {
+    pub(super) fn invalidate_account_helpers(&self, directory: &Path) {
+        self.warm_helpers.invalidate_account(directory);
+    }
+}
+
 fn command(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut cmd = Command::new(program);
     #[cfg(windows)]

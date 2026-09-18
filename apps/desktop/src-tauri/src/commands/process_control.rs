@@ -282,6 +282,8 @@ pub fn run_supervised(
     canceled: impl Fn() -> bool,
     observe: impl Fn(&[u8], bool) + Send + Sync + 'static,
 ) -> Result<CommandResult, String> {
+    let _runner_lease =
+        super::managed_runtime::acquire(std::path::Path::new(command.get_program()))?;
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

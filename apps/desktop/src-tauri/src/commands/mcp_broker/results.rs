@@ -109,13 +109,13 @@ pub(super) fn select_measured(
     snapshots: &mut VecDeque<Snapshot>,
 ) -> (CallToolResult, SelectionStats) {
     let mut stats = SelectionStats::default();
-    let structured = std::env::var("JACKALOPE_RESULT_QUERIES").is_ok_and(|value| value == "on");
+    let structured = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
     let preview = automatic_preview(
         &result,
         selection.is_none()
             && structured
-            && std::env::var("JACKALOPE_RESULT_PREVIEW").is_ok_and(|value| value == "on")
-            && !std::env::var("JACKALOPE_RESULT_SELECTION").is_ok_and(|value| value == "off"),
+            && crate::commands::experiments::is("JACKALOPE_RESULT_PREVIEW", "on")
+            && !crate::commands::experiments::is("JACKALOPE_RESULT_SELECTION", "off"),
     );
     let result = select_inner(
         result,

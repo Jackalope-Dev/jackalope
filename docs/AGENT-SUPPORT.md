@@ -212,17 +212,31 @@ Runners live under `task-runs-v1/agent-runtimes` in the app's selected profile.
 Explicit executable overrides win, followed by the verified private runner and
 then ordinary CLI discovery. A damaged active runner fails with a repair message
 instead of silently selecting another executable. Reconnect an API provider or
-use Local AI setup to repair it. Valid installations work offline and are reused
+use **Agents → OpenCode → Models & Executable** to check and repair it. Valid installations work offline and are reused
 after restart; provider requests and first-time model discovery still need their
 own connectivity. Automatic runner updates are disabled for managed launches.
 To update the pin, verify all platform digests and license provenance, change the
 version and manifest together, then repeat native setup and lifecycle checks.
-Old version directories remain intact so running processes are not overwritten.
+Runner settings show the installed version, pinned version when different,
+integrity status and disk use. Clean unused versions removes idle obsolete versions
+and abandoned downloads. Remove idle runner also removes an idle selected version,
+without deleting accounts. Owned tasks, discovery, sign-in, probes and warm helpers
+hold cross-process leases; maintenance retains their versions. Unknown folder
+contents and links are preserved. Failed cleanup is retryable.
 Resetting Jackalope removes its private runner along with other app-owned data.
 
 This changes executable delivery, not task permissions, account binding, process
 ownership or MCP contracts. API tasks retain their owned child processes; the
-existing bounded warm helper pool is restricted to managed local-model accounts.
+default warm helper pool is restricted to managed local-model accounts.
+`JACKALOPE_WARM_API_HELPERS=on` additionally permits protected named API accounts for
+helper-only calls with all tools denied, project configuration disabled and only
+the bound provider enabled. The pool separates executable, account, credentials,
+model, configuration and working directory. It retains at most two servers for
+120 idle seconds; cancellation, failure and shutdown terminate owned servers.
+Replacing or removing an account key invalidates that account's servers and in-flight
+starts without clearing other accounts' pools.
+This experiment remains off by default pending representative latency and memory
+measurements. A warmed helper uses a new session for every request.
 
 The ignored `installed_runtime_trial` test downloads and runs the pinned binary
 under a fresh absolute `JACKALOPE_RUNTIME_TRIAL_DIR`. It checks private resolution,

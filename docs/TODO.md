@@ -129,6 +129,11 @@ release dates.
   Include DeepSeek key import, protected named-account execution and model selection.
   Validate private runner download, cancellation, integrity repair and pinned-version
   upgrades in installed Windows, macOS and GNU Linux builds on x64 and ARM64.
+  Cover active-process maintenance, connection completion retry and per-account models.
+- [ ] Screen isolated warm API helpers for latency, memory and cancellation; reconcile
+  request-level provider accounting with mixed helper/Jev routing costs before
+  confirmation. Freeze independent family sampling and statistical power assumptions;
+  use the study planner to reject infeasible confirmation sizes.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without
   weakening process ownership, usage accounting or saved-session compatibility.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports

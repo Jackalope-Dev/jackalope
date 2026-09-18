@@ -44,6 +44,7 @@ pub(in crate::commands) fn run_bounded(
     let directory = runtime.directory.join("helper-workspace");
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let prompt_path = directory.join(format!("{}.txt", uuid::Uuid::new_v4()));
+    let _runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
     let mut cmd = command(executable);
     let _configuration = routing::process::configure(&mut cmd, &adapter, &prompt_path, prompt)?;
     crate::commands::agent_profiles::apply_binding(&mut cmd, binding)?;

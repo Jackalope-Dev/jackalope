@@ -7,7 +7,7 @@ use crate::commands::{
 use serde_json::{json, Value};
 
 fn shadow_mode() -> bool {
-    std::env::var("JACKALOPE_JEV_ASSISTANCE").is_ok_and(|value| value == "shadow")
+    crate::commands::experiments::is("JACKALOPE_JEV_ASSISTANCE", "shadow")
 }
 
 fn local_failure(run: &TaskRun) -> Option<String> {
@@ -244,7 +244,7 @@ pub fn review(
         || run.verification.as_ref().is_some_and(|v| !v.result.success);
     let local = if options.failure_triage
         && failed
-        && std::env::var("JACKALOPE_FAILURE_TRIAGE").is_ok_and(|value| value == "local")
+        && crate::commands::experiments::is("JACKALOPE_FAILURE_TRIAGE", "local")
     {
         local_failure(run)
     } else {

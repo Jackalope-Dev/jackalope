@@ -67,6 +67,45 @@ export function publicImpact(comparison, options) {
       totalTokens: row.totalTokens,
       agentUsage: row.agentUsage ?? null,
       agentReportedCostUsd: row.agentReportedCostUsd ?? null,
+      providerAccounting: row.providerAccounting
+        ? {
+            version: row.providerAccounting.version,
+            provider: row.providerAccounting.provider,
+            complete: row.providerAccounting.complete,
+            usage: row.providerAccounting.usage,
+            maxRequestInput: row.providerAccounting.maxRequestInput,
+            requests: row.providerAccounting.requests.map(
+              ({
+                sequence,
+                model,
+                status,
+                elapsedMs,
+                usage,
+                finished,
+                startedAt,
+                reportedModel,
+                toolCount,
+                toolSchemaBytes,
+                messageCount,
+                messageBytes,
+              }) => ({
+                sequence,
+                model,
+                status,
+                elapsedMs,
+                usage,
+                finished,
+                startedAt,
+                reportedModel,
+                toolCount,
+                toolSchemaBytes,
+                messageCount,
+                messageBytes,
+              }),
+            ),
+          }
+        : null,
+      experimentRegistry: row.experimentRegistry ?? null,
       nativeAuxiliaryAccountingComplete:
         comparison.agent === 'opencode'
           ? row.nativeAuxiliaryAccountingComplete === true

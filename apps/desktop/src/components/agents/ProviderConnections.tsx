@@ -5,11 +5,10 @@ import { useRef, useState } from 'react';
 import type { ModelCatalog } from '../../lib/agent-models';
 import {
   type AgentProfile,
-  checkAgentProfile,
+  completeProviderProfile,
   createAgentProfile,
   deleteAgentProfile,
   saveAgentProfileKey,
-  setActiveAgentProfile,
 } from '../../lib/agent-profiles';
 import { type ApiProvider, apiProviders } from '../../lib/api-providers';
 import { useManagedRuntime } from '../../lib/managed-runtime';
@@ -106,32 +105,22 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
               }
               if (!profile.current || !models.some((item) => item.id === model))
                 throw new Error('Choose a discovered model.');
-              const status = await checkAgentProfile('opencode', profile.current.id);
-              if (status.state !== 'configured' && status.state !== 'signedIn')
-                throw new Error(status.detail);
+              await completeProviderProfile(profile.current.id, model, useForTasks);
               saved.current = true;
-              useAgentAccountsStore.getState().setStatus('opencode', profile.current.id, status);
               if (useForTasks) {
                 const config = useAgentConfigStore.getState();
-                const options = config.runnerOptions.opencode ?? {
-                  models: [],
-                  defaultModel: '',
-                  restrictModels: false,
-                };
-                await setActiveAgentProfile('opencode', profile.current.id);
                 config.toggleAgent('opencode', true);
-                config.setRunnerOptions('opencode', {
-                  ...options,
-                  defaultModel: model,
-                  models: [...new Set([...options.models, model])],
-                });
                 await syncAgentConfig();
               }
               await useAgentAccountsStore.getState().load('opencode', true);
               await useExecutionStore.getState().discover();
               onClose();
             } catch (cause) {
-              setError(String(cause));
+              setError(
+                saved.current
+                  ? `Your account and model are saved. Finishing setup failed; retry to finish or close to keep the connection. ${String(cause)}`
+                  : String(cause),
+              );
             } finally {
               setBusy(false);
             }

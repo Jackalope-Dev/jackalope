@@ -27,7 +27,7 @@ pub struct Input {
 }
 
 pub fn available(runtime: &TaskRuntime, project: &str) -> bool {
-    std::env::var("JACKALOPE_CONTEXT_PRUNING").is_ok_and(|value| value == "on")
+    crate::commands::experiments::is("JACKALOPE_CONTEXT_PRUNING", "on")
         && agent_questions::available(runtime, project)
 }
 

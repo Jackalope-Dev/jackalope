@@ -27,6 +27,7 @@ import { AgentInstallGuide } from './AgentInstallGuide';
 import { AgentModels } from './AgentModels';
 import { AgentSupport } from './AgentSupport';
 import { LocalAiSetup } from './LocalAiSetup';
+import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 import './agents-workspace.css';
 import './agent-manager.css';
 
@@ -409,6 +410,9 @@ export function AgentManager({ initialAgentId }: { initialAgentId?: string }) {
                   restricted={options.restrictModels}
                   onChange={update}
                 />
+                {desktop &&
+                  (('adapter' in selected ? selected.adapter : selected.id) ?? selected.id) ===
+                    'opencode' && <ManagedRuntimeSettings />}
               </>
             )}
           </div>

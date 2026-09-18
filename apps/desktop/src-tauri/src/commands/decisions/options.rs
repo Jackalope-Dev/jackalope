@@ -15,7 +15,7 @@ pub enum Objective {
     Economical,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModelEvidence {
     pub adapter: String,
@@ -28,6 +28,12 @@ pub struct ModelEvidence {
     pub efforts: Vec<String>,
     pub input_usd_per_million: Option<f64>,
     pub output_usd_per_million: Option<f64>,
+    #[serde(default)]
+    pub output_tokens: Option<u64>,
+    #[serde(default)]
+    pub cache_read_usd_per_million: Option<f64>,
+    #[serde(default)]
+    pub cache_write_usd_per_million: Option<f64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -65,15 +71,23 @@ impl Options {
                 || model
                     .context_tokens
                     .is_some_and(|n| n == 0 || n > 10_000_000)
+                || model
+                    .output_tokens
+                    .is_some_and(|n| n == 0 || n > 10_000_000)
                 || model.efforts.len() > 8
                 || model
                     .efforts
                     .iter()
                     .any(|s| !["low", "medium", "high", "xhigh", "max"].contains(&s.as_str()))
-                || [model.input_usd_per_million, model.output_usd_per_million]
-                    .into_iter()
-                    .flatten()
-                    .any(|n| !n.is_finite() || !(0.0..=10000.0).contains(&n))
+                || [
+                    model.input_usd_per_million,
+                    model.output_usd_per_million,
+                    model.cache_read_usd_per_million,
+                    model.cache_write_usd_per_million,
+                ]
+                .into_iter()
+                .flatten()
+                .any(|n| !n.is_finite() || !(0.0..=10000.0).contains(&n))
             {
                 return Err("Model evidence needs unique adapter/model IDs, bounded capabilities, a source, an RFC 3339 check date and valid limits/prices.".into());
             }

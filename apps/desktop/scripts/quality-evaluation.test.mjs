@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { registry, registrySha256 } from '../../../scripts/evaluation/experiments.mjs';
 import { qualityCases } from '../../../scripts/evaluation/quality-cases.mjs';
 import { qualitySummary } from '../../../scripts/evaluation/quality-metrics.mjs';
 import { evaluationReadiness, providerStopReason } from '../../../scripts/evaluation/readiness.mjs';
@@ -89,10 +90,12 @@ test('resuming completed trials launches no workers and rejects changed configur
   const comparison = path.join(output, 'comparison.json');
   const saved = {
     plan: {
+      experimentRegistry: { version: registry.version, sha256: registrySha256 },
       cases: [fixture.id],
       variants: ['before', 'after'],
       repeat: 1,
       compactPrompts: false,
+      providerMeter: null,
       suiteSha256: createHash('sha256')
         .update(JSON.stringify([fixture]))
         .digest('hex'),

@@ -16,7 +16,7 @@ import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
 import '/src/components/ui/experience.css';
 const f = window.providerFixture = {
-  profiles: [], calls: [], failModels: false, failDelete: false, activeId: null, failRunner: false, delayRunner: false,
+  profiles: [], calls: [], failModels: false, failDelete: false, activeId: null, failRunner: false, delayRunner: false, failSync: false,
   options: () => useAgentConfigStore.getState().runnerOptions,
   theme: isDark => applyThemeTokens({ ...DEFAULT_THEME, isDark }),
 };
@@ -47,8 +47,13 @@ window.__TAURI_INTERNALS__ = { transformCallback: () => 0, unregisterCallback: (
     case 'agent_profile_status':
       f.profiles.find(profile => profile.id === args.id).pending = false;
       return {state:'configured',identity:null,detail:'Saved, not validated.',checkedAt:new Date().toISOString()};
+    case 'agent_profile_complete_provider': {
+      const profile = f.profiles.find(p => p.id === args.id);
+      profile.pending = false; profile.preferredModel = args.model;
+      if(args.activate) f.activeId = args.id; return;
+    }
     case 'agent_profile_set_active': f.activeId = args.id; return;
-    case 'agent_save_policy': return;
+    case 'agent_save_policy': if(f.failSync) throw new Error('Settings sync failed'); return;
     case 'agent_profile_list': return { profiles:f.profiles.filter(p => !p.pending), activeId:f.activeId, envVar:'XDG_DATA_HOME' };
     case 'agent_profile_delete':
       if (f.failDelete) throw new Error('Cleanup failed. Retry cancellation.');
@@ -167,6 +172,14 @@ try {
   assert.equal(await page.evaluate(() => window.providerFixture.activeId), null);
   await dialog.getByRole('checkbox').check();
   await page.screenshot({ path: `${output}/model-960-dark.png` });
+  await page.evaluate(() => {
+    window.providerFixture.failSync = true;
+  });
+  await dialog.getByRole('button', { name: 'Finish connection' }).click();
+  await dialog.getByRole('alert').filter({ hasText: 'Your account and model are saved' }).waitFor();
+  await page.evaluate(() => {
+    window.providerFixture.failSync = false;
+  });
   await dialog.getByRole('button', { name: 'Finish connection' }).click();
   await dialog.waitFor({ state: 'hidden' });
   const state = await page.evaluate(() => ({
@@ -179,7 +192,8 @@ try {
   assert.equal(state.profiles.length, 1);
   assert.equal(state.profiles[0].pending, false);
   assert.equal(state.activeId, state.profiles[0].id);
-  assert.equal(state.options.opencode.defaultModel, 'deepseek/pro');
+  assert.equal(state.profiles[0].preferredModel, 'deepseek/pro');
+  assert.notEqual(state.options.opencode?.defaultModel, 'deepseek/pro');
   assert.equal(state.calls.filter((call) => call.command === 'agent_profile_save_key').length, 2);
   assert.ok(
     state.calls.findIndex((call) => call.command === 'managed_runtime_prepare') <
@@ -191,6 +205,14 @@ try {
       .every((call) => call.name === 'DEEPSEEK_API_KEY'),
   );
   assert.ok(!state.storage.includes('fixture-never-a-real-key'));
+  await open.click();
+  await dialog.getByLabel('API key', { exact: true }).fill('fixture-never-a-real-key');
+  await dialog.getByRole('button', { name: 'Save key & find models' }).click();
+  await dialog.getByRole('button', { name: 'Finish connection' }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  const inactive = await page.evaluate(() => window.providerFixture.profiles[1]);
+  assert.equal(inactive.preferredModel, 'deepseek/flash');
+  assert.equal(await page.evaluate(() => window.providerFixture.activeId), state.activeId);
   assert.deepEqual(errors, []);
   console.log(
     'Provider connection fixtures passed: keyboard/focus, 3 sizes, themes, reduced motion, missing CLI, download progress, integrity retry, owned cancellation before key storage, discovery retry, profile cleanup, provider filtering, explicit default and no key in browser persistence. No live authentication performed.',

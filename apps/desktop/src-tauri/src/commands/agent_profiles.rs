@@ -36,6 +36,12 @@ pub struct AgentProfile {
     pub group: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+    #[serde(
+        default,
+        rename = "preferredModel",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub preferred_model: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -156,6 +162,65 @@ pub struct AccountBinding {
     pub profile_id: Option<String>,
     pub directory: PathBuf,
     pub label: String,
+}
+
+pub(super) fn preferred_model(binding: &AccountBinding) -> Result<Option<String>, String> {
+    let Some(id) = binding.profile_id.as_deref() else {
+        return Ok(None);
+    };
+    let root = binding
+        .directory
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("Invalid account directory.")?;
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let manifest = load_checked(root)?;
+    Ok(manifest
+        .agents
+        .get(&binding.adapter)
+        .and_then(|entry| entry.profiles.iter().find(|profile| profile.id == id))
+        .and_then(|profile| profile.preferred_model.clone()))
+}
+
+fn complete_provider(root: &Path, id: &str, model: &str, activate: bool) -> Result<(), String> {
+    let _profiles = PROFILE_LOCK.lock().map_err(|e| e.to_string())?;
+    let binding = bind_account(root, "opencode", Some(id))?;
+    let provider = api_provider(&binding)?.ok_or("Save a provider key before finishing setup.")?;
+    if model.len() > 256
+        || model.chars().any(char::is_control)
+        || !model.starts_with(&format!("{provider}/"))
+        || model.trim() != model
+        || model.len() <= provider.len() + 1
+    {
+        return Err("Choose a model from this account's provider.".into());
+    }
+    let mut manifest = load_checked(root)?;
+    let entry = manifest
+        .agents
+        .get_mut("opencode")
+        .ok_or("Unknown account")?;
+    let profile = entry
+        .profiles
+        .iter_mut()
+        .find(|profile| profile.id == id)
+        .ok_or("Unknown account")?;
+    profile.preferred_model = Some(model.to_owned());
+    entry.pending.retain(|pending| pending != id);
+    if activate {
+        entry.active = Some(id.to_owned());
+    }
+    save(root, &manifest)
+}
+
+#[tauri::command]
+pub fn agent_profile_complete_provider(
+    runtime: State<'_, TaskRuntime>,
+    id: String,
+    model: String,
+    activate: bool,
+) -> Result<(), String> {
+    runtime.access.ensure()?;
+    complete_provider(&runtime.profiles_root(), &id, &model, activate)
 }
 
 pub(in crate::commands) fn routing_accounts(
@@ -453,6 +518,7 @@ pub(in crate::commands) fn create_local(
         .find(|p| p.tag.as_deref() == Some(&tag))
         .cloned()
         .unwrap_or_else(|| AgentProfile {
+            preferred_model: None,
             id: uuid::Uuid::new_v4().to_string(),
             name: format!("Local · {}", verification.model),
             group: None,
@@ -545,6 +611,7 @@ pub fn agent_profile_create(
     let entry = manifest.agents.entry(agent.clone()).or_default();
     let id = uuid::Uuid::new_v4().to_string();
     let profile = AgentProfile {
+        preferred_model: None,
         id: id.clone(),
         name: name.to_string(),
         group,
@@ -725,6 +792,7 @@ pub fn agent_profile_delete(
             return Err("The account directory resolves outside its managed location.".into());
         }
         super::account_storage::remove(&directory.join("api-key.bin"))?;
+        runtime.invalidate_account_helpers(&directory);
         fs::remove_dir_all(&directory)
             .map_err(|e| format!("Account files could not be removed: {e}"))?;
     }
@@ -821,6 +889,84 @@ fn resolve_profile_dir(root: &Path, agent: &str, explicit_id: Option<&str>) -> O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn account_model_overrides_global_default_but_preserves_explicit_choice_and_restrictions() {
+        let root = temp_root();
+        let manifest: Manifest = serde_json::from_value(serde_json::json!({"agents":{"opencode":{
+            "profiles":[{"id":"paid","name":"Paid","preferredModel":"deepseek/flash"}],"active":"paid"
+        }}})).unwrap();
+        save(&root, &manifest).unwrap();
+        let binding = bind_account(&root, "opencode", None).unwrap();
+        let mut policy = super::super::agent_policy::AgentPolicy::default();
+        policy
+            .runner_options
+            .entry("opencode".into())
+            .or_default()
+            .default_model = "other/default".into();
+        assert_eq!(
+            policy
+                .model_for_account("opencode", None, &binding)
+                .unwrap()
+                .as_deref(),
+            Some("deepseek/flash")
+        );
+        assert_eq!(
+            policy
+                .model_for_account("opencode", Some("deepseek/pro"), &binding)
+                .unwrap()
+                .as_deref(),
+            Some("deepseek/pro")
+        );
+        policy
+            .runner_options
+            .get_mut("opencode")
+            .unwrap()
+            .restrict_models = true;
+        assert!(policy
+            .model_for_account("opencode", None, &binding)
+            .is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn provider_completion_is_atomic_retryable_and_keeps_inactive_model_preferences() {
+        let root = temp_root();
+        let manifest: Manifest = serde_json::from_value(serde_json::json!({"agents":{"opencode":{
+            "profiles":[{"id":"paid","name":"Paid"},{"id":"old","name":"Old"}],"pending":["paid"],"active":"old"
+        }}})).unwrap();
+        save(&root, &manifest).unwrap();
+        let binding = bind_account(&root, "opencode", Some("paid")).unwrap();
+        fs::create_dir_all(&binding.directory).unwrap();
+        super::super::account_storage::write(
+            &binding.directory.join("api-key.bin"),
+            br#"{"name":"DEEPSEEK_API_KEY","value":"fixture-key"}"#,
+        )
+        .unwrap();
+        assert!(complete_provider(&root, "paid", "other/model", true).is_err());
+        assert_eq!(
+            load_checked(&root).unwrap().agents["opencode"].pending,
+            vec!["paid"]
+        );
+        complete_provider(&root, "paid", "deepseek/flash", false).unwrap();
+        let saved = load_checked(&root).unwrap();
+        assert_eq!(saved.agents["opencode"].active.as_deref(), Some("old"));
+        assert!(saved.agents["opencode"].pending.is_empty());
+        assert_eq!(
+            preferred_model(&binding).unwrap().as_deref(),
+            Some("deepseek/flash")
+        );
+        complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
+        complete_provider(&root, "paid", "deepseek/flash", true).unwrap();
+        assert_eq!(
+            load_checked(&root).unwrap().agents["opencode"]
+                .active
+                .as_deref(),
+            Some("paid")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
 
     #[test]
     fn local_profiles_preserve_other_accounts_and_process_permissions() {
@@ -967,6 +1113,7 @@ mod tests {
             serde_json::from_str(r#"{"id":"old-id","name":"Work"}"#).unwrap();
         assert_eq!(profile.group, None);
         let grouped = AgentProfile {
+            preferred_model: None,
             group: Some("work".into()),
             ..profile
         };
@@ -1141,12 +1288,14 @@ mod tests {
         let mut manifest = Manifest::default();
         let entry = manifest.agents.entry("codex".into()).or_default();
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "work".into(),
             name: "Work".into(),
             group: None,
             tag: None,
         });
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "personal".into(),
             name: "Personal".into(),
             group: None,
@@ -1181,12 +1330,14 @@ mod tests {
             AgentEntry {
                 profiles: vec![
                     AgentProfile {
+                        preferred_model: None,
                         id: "work".into(),
                         name: "Work".into(),
                         group: None,
                         tag: None,
                     },
                     AgentProfile {
+                        preferred_model: None,
                         id: "personal".into(),
                         name: "Personal".into(),
                         group: None,
@@ -1242,12 +1393,14 @@ mod tests {
         let mut manifest = Manifest::default();
         let entry = manifest.agents.entry("codex".into()).or_default();
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "a".into(),
             name: "Work".into(),
             group: None,
             tag: None,
         });
         entry.profiles.push(AgentProfile {
+            preferred_model: None,
             id: "b".into(),
             name: "Personal".into(),
             group: None,

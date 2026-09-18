@@ -93,6 +93,45 @@ fn cancellation_is_owned_and_a_second_setup_cannot_replace_it() {
     assert!(check_cancel(&first.canceled).is_err());
     drop(first);
     assert!(service.begin(&uuid::Uuid::new_v4().to_string()).is_ok());
+    let early = uuid::Uuid::new_v4().to_string();
+    service.cancel(&early);
+    assert!(service.begin(&early).err().unwrap().contains("canceled"));
+}
+
+#[test]
+fn cleanup_preserves_running_versions_and_recovers_abandoned_downloads() {
+    let root = Temporary::new();
+    let old = activate(&root.0, b"old");
+    let lease = lifecycle::acquire_in(&root.0, &old).unwrap().unwrap();
+    let current = activate(&root.0, b"new");
+    let abandoned = root.0.join(uuid::Uuid::new_v4().to_string());
+    fs::create_dir(&abandoned).unwrap();
+    fs::write(abandoned.join("download.tgz"), b"partial").unwrap();
+    lifecycle::cleanup(&root.0, false).unwrap();
+    assert!(old.exists());
+    assert!(current.exists());
+    assert!(!abandoned.exists());
+    drop(lease);
+    lifecycle::cleanup(&root.0, false).unwrap();
+    assert!(!old.exists());
+    assert!(current.exists());
+    let running = lifecycle::acquire_in(&root.0, &current).unwrap();
+    lifecycle::cleanup(&root.0, true).unwrap();
+    assert!(receipt::resolve(&root.0).unwrap().is_some());
+    drop(running);
+    lifecycle::cleanup(&root.0, true).unwrap();
+    assert!(receipt::resolve(&root.0).unwrap().is_none());
+    assert!(lifecycle::acquire_in(&root.0, &current).is_err());
+}
+
+#[test]
+fn cleanup_preserves_unknown_contents_and_rejects_links() {
+    let root = Temporary::new();
+    let path = activate(&root.0, b"fixture");
+    fs::write(path.parent().unwrap().join("user-file"), b"keep").unwrap();
+    lifecycle::cleanup(&root.0, true).unwrap();
+    assert!(path.exists());
+    assert!(path.parent().unwrap().join("user-file").exists());
 }
 
 #[test]

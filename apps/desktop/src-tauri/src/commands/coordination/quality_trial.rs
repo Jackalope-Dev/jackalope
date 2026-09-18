@@ -130,7 +130,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
                 "isolated":true,"targetBranch":"main","connectionIds":fixture_ids,
                 "contextSelection":{"memoryOff":true,"outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default(),
-                    "jevPreparation":if std::env::var("JACKALOPE_JEV_PREPARATION").is_ok_and(|value| value == "on") { spec["jevPreparation"].clone() } else { Value::Null }},"prompt":spec["prompt"],
+                    "jevPreparation":if crate::commands::experiments::is("JACKALOPE_JEV_PREPARATION", "on") { spec["jevPreparation"].clone() } else { Value::Null }},"prompt":spec["prompt"],
                 "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
             }))?)
             .err()

@@ -4,6 +4,14 @@ Jackalope is prerelease software. This page describes source behavior, not a rec
 of completed trials or deployed environments. See [contributor priorities](TODO.md)
 and [release requirements](RELEASE.md) for outstanding acceptance work.
 
+Provider connections retain per-account models. Private runner settings support
+integrity inspection, repair and idle-version cleanup with process leases.
+Account-scoped catalog limits and prices supplement explicitly supplied Jev model
+evidence; catalog facts do not prove quality, credit or upstream freshness.
+Experiment settings share a versioned registry. Optional DeepSeek request metering,
+quality-study feasibility planning and isolated warm API helpers support screening;
+representative benefit and installed-platform acceptance remain open.
+
 ## Desktop workspace
 
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.

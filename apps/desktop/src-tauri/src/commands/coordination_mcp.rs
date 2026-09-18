@@ -142,7 +142,7 @@ impl CoordinationTools {
         context: RequestContext<RoleServer>,
         Parameters(input): Parameters<super::tasks::dispatch_plan::Input>,
     ) -> Result<CallToolResult, ErrorData> {
-        if !std::env::var("JACKALOPE_DISPATCH_PLAN").is_ok_and(|value| value == "on") {
+        if !crate::commands::experiments::is("JACKALOPE_DISPATCH_PLAN", "on") {
             return Err(ErrorData::invalid_request(
                 "Delegation planning is not enabled.",
                 None,
@@ -170,7 +170,7 @@ impl CoordinationTools {
         context: RequestContext<RoleServer>,
         Parameters(input): Parameters<super::codebase::context_read::Input>,
     ) -> Result<CallToolResult, ErrorData> {
-        if !std::env::var("JACKALOPE_CONTEXT_READ").is_ok_and(|value| value == "on") {
+        if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
             return Err(ErrorData::invalid_request(
                 "Source context reads are not enabled.",
                 None,
@@ -404,7 +404,7 @@ impl CoordinationTools {
         context: RequestContext<RoleServer>,
         Parameters(input): Parameters<super::mcp_broker::batch::BatchInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        if !std::env::var("JACKALOPE_BATCH_READ").is_ok_and(|value| value == "on") {
+        if !crate::commands::experiments::is("JACKALOPE_BATCH_READ", "on") {
             return Err(ErrorData::invalid_request(
                 "Batch reads are not enabled.",
                 None,
@@ -930,14 +930,14 @@ impl ServerHandler for CoordinationTools {
         if !super::mcp_broker::relevance::available(&self.service.runtime, &run.project_id) {
             tools.retain(|tool| tool.name != "read_relevant_tool");
         }
-        if !std::env::var("JACKALOPE_DISPATCH_PLAN").is_ok_and(|value| value == "on") {
+        if !crate::commands::experiments::is("JACKALOPE_DISPATCH_PLAN", "on") {
             tools.retain(|tool| tool.name != "plan_delegation");
         }
-        if !std::env::var("JACKALOPE_CONTEXT_READ").is_ok_and(|value| value == "on") {
+        if !crate::commands::experiments::is("JACKALOPE_CONTEXT_READ", "on") {
             tools.retain(|tool| tool.name != "read_context");
         }
-        let batch = std::env::var("JACKALOPE_BATCH_READ").is_ok_and(|value| value == "on");
-        let queries = std::env::var("JACKALOPE_RESULT_QUERIES").is_ok_and(|value| value == "on");
+        let batch = crate::commands::experiments::is("JACKALOPE_BATCH_READ", "on");
+        let queries = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
         if !batch {
             tools.retain(|tool| tool.name != "read_tools");
         }
@@ -970,14 +970,14 @@ impl ServerHandler for CoordinationTools {
                 }
             }
         }
-        if !std::env::var("JACKALOPE_NAMED_READ").is_ok_and(|value| value == "on") {
+        if !crate::commands::experiments::is("JACKALOPE_NAMED_READ", "on") {
             tools.retain(|tool| tool.name != "read_named_tool");
         }
         let lean = run.efficiency.execution_profile.as_deref() == Some("lean");
         if !lean {
             tools.retain(|tool| tool.name != "discover_harness_tools");
         }
-        if lean || std::env::var("JACKALOPE_TOOL_SURFACE").is_ok_and(|value| value == "available") {
+        if lean || crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "available") {
             let discovery = self.service.runtime.mcp_broker.has_attempt(&run.id);
             tools.retain(|tool| {
                 available_tool(tool.name.as_ref(), discovery, run.verify_command.as_deref())

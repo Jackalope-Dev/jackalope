@@ -31,6 +31,7 @@ pub(super) fn run(
     if !policy.account_allowed("", agent, &binding) {
         return Err("Account is disabled".into());
     }
+    let _runner_lease = crate::commands::managed_runtime::acquire(&executable)?;
     let mut cmd = Command::new(executable);
     let mut fixture_config = if adapter == "antigravity" && spec["fixtureMcp"].is_object() {
         Some(fixture_mcp::FixtureConfig::install(

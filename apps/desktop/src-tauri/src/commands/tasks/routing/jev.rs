@@ -29,11 +29,12 @@ fn request(
     .expect("checked capability catalog");
     let assessed = assessed_workers(candidates);
     let workers: Vec<_> = assessed.iter().map(|candidate| {
-        let evidence = options.model(&candidate.adapter, candidate.model.as_deref());
+        let evidence = options.model(&candidate.adapter, candidate.model.as_deref()).cloned()
+            .or_else(|| crate::commands::agent_models::evidence(&candidate.binding, candidate.model.as_deref()));
         json!({"id":candidate.id,"agent":candidate.agent,"adapter":candidate.adapter,"model":candidate.model,
             "capabilities":capabilities[&candidate.adapter],"toolDelivery":decisions::context::tool_evidence(req,&candidate.adapter),
-            "modelEvidence":evidence,"requestedEffort":req.effort,"modelEvidenceSource":"User-supplied sourced facts; not independently verified by Jackalope.",
-            "modelEvidenceStale":evidence.is_some_and(|e| chrono::DateTime::parse_from_rfc3339(&e.checked_at).is_ok_and(|at| Utc::now().signed_duration_since(at).num_days()>90))})
+            "modelEvidence":evidence,"requestedEffort":req.effort,"modelEvidenceSource":"Explicit user evidence takes precedence over this account's discovered catalog. Neither establishes task quality or provider access. Catalog retrieval time does not establish upstream freshness.",
+            "modelEvidenceStale":evidence.as_ref().is_some_and(|e| chrono::DateTime::parse_from_rfc3339(&e.checked_at).is_ok_and(|at| Utc::now().signed_duration_since(at).num_days()>90))})
     }).collect();
     let mut questions = serde_json::Map::new();
     for (index, candidate) in assessed.iter().enumerate() {

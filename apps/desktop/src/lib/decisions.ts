@@ -67,6 +67,9 @@ export interface ModelEvidence {
   efforts: string[];
   inputUsdPerMillion: number | null;
   outputUsdPerMillion: number | null;
+  outputTokens?: number | null;
+  cacheReadUsdPerMillion?: number | null;
+  cacheWriteUsdPerMillion?: number | null;
 }
 
 export interface DecisionOptions {

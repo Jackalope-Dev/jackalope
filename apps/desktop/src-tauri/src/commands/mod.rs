@@ -23,6 +23,7 @@ pub mod agent_policy;
 pub mod agent_profiles;
 pub mod agent_sign_in;
 pub mod decisions;
+mod experiments;
 pub mod jev;
 pub mod local_ai;
 pub mod local_detection;

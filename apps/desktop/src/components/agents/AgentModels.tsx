@@ -2,7 +2,9 @@ import { Input, RefreshIcon } from '@jackalope/ui';
 import { Check, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useAgentModels } from '../../lib/agent-models';
+import { completeProviderProfile } from '../../lib/agent-profiles';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
+import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { LoadingState } from '../ui/LoadingState';
@@ -25,6 +27,11 @@ export function AgentModels({
   onChange: (patch: { models?: string[]; defaultModel?: string; restrictModels?: boolean }) => void;
 }) {
   const modelSelectId = useId();
+  const accountModelId = useId();
+  const accountView = useAgentAccountsStore((state) => state.agents[agentId]?.view);
+  const account = accountView?.profiles.find((profile) => profile.id === accountView.activeId);
+  const [accountError, setAccountError] = useState('');
+  const [savingAccount, setSavingAccount] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const { catalog, loading, error, refresh } = useAgentModels(agentId, revision);
   const [query, setQuery] = useState('');
@@ -77,6 +84,36 @@ export function AgentModels({
       {loading && <LoadingState label="Reading available models…" compact />}
       {error && <InlineNotice tone="error">{error}</InlineNotice>}
       {catalog?.detail && <p className="task-muted text-xs">{catalog.detail}</p>}
+      {agentId === 'opencode' && account?.preferredModel && (
+        <label className="task-label" htmlFor={accountModelId}>
+          Model for {account.name}
+          <Select
+            id={accountModelId}
+            aria-label="Account preferred model"
+            value={account.preferredModel}
+            disabled={loading || savingAccount}
+            onValueChange={async (model) => {
+              setSavingAccount(true);
+              setAccountError('');
+              try {
+                await completeProviderProfile(account.id, model, false);
+                await useAgentAccountsStore.getState().load(agentId, true);
+              } catch (cause) {
+                setAccountError(String(cause));
+              } finally {
+                setSavingAccount(false);
+              }
+            }}
+          >
+            {models.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                {model.name}
+              </SelectItem>
+            ))}
+          </Select>
+        </label>
+      )}
+      {accountError && <InlineNotice tone="error">{accountError}</InlineNotice>}
       {!loading && !models.length && (
         <p className="task-muted">
           Available models could not be detected. Model selection is unavailable.
@@ -174,10 +211,27 @@ export function AgentModels({
                     {model.id}
                     {model.isDefault ? ' · CLI default' : ''}
                   </small>
+                  {model.metadata && (
+                    <small>
+                      {model.metadata.contextTokens != null
+                        ? `${model.metadata.contextTokens.toLocaleString()} context`
+                        : 'Context unknown'}
+                      {model.metadata.inputUsdPerMillion != null &&
+                        ` · $${model.metadata.inputUsdPerMillion}/M input`}
+                      {model.metadata.outputUsdPerMillion != null &&
+                        ` · $${model.metadata.outputUsdPerMillion}/M output`}
+                    </small>
+                  )}
                 </span>
               </Button>
             ))}
           </div>
+          {visibleModels.some((model) => model.metadata) && (
+            <p className="task-muted text-xs">
+              Limits and prices come from OpenCode’s model catalog and account configuration.
+              Catalog freshness, model access and task quality require separate checks.
+            </p>
+          )}
           {!query && models.length > 12 && (
             <Button variant="ghost" onClick={() => setShowAll(!showAll)}>
               {showAll ? 'Show fewer models' : `Show all ${models.length} models`}
@@ -187,7 +241,9 @@ export function AgentModels({
             <p className="task-muted">No models match this search.</p>
           )}
           <label className="task-label" htmlFor={modelSelectId}>
-            Choose a default model
+            {account?.preferredModel
+              ? 'Fallback default for other accounts'
+              : 'Choose a default model'}
             <Select
               id={modelSelectId}
               aria-label="Choose a discovered default model"

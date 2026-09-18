@@ -14,14 +14,13 @@ Open **Agents → Try a local agent**, or use the same entry during onboarding.
    establish acceleration or usable VRAM.
 2. Review an optional model download and its memory guidance. Sizes are approximate
    upstream tag sizes; tags and packages can change.
-3. Install Ollama and OpenCode, then explicitly start the model download. Windows
-   offers WinGet buttons for `Ollama.Ollama` and `SST.opencode`, with official
-   downloads as a fallback. macOS/Linux use the official setup links. Open Ollama
-   and recheck if its local service is not running. WinGet may require system
-   approval or a restart; stopping it cannot roll back completed installations.
-   Download and installer progress, elapsed time, cancellation and failures appear
-   within the selected tool or model row. A quiet installer does not report a percentage;
-   its elapsed time stays visible until it finishes or reaches the installation timeout.
+3. Install Ollama and prepare Jackalope's private OpenCode runner, then explicitly
+   start the model download. Windows offers WinGet for Ollama; other platforms use
+   its official setup link. The private runner downloads from Jackalope's pinned
+   manifest and does not require a separate OpenCode installation. Open Ollama and
+   recheck if its service is not running. Download and installer progress, elapsed
+   time, cancellation and failures appear in the selected row. Canceling an
+   installer cannot roll back completed installation steps.
 4. Run the local check. Jackalope creates an Ollama alias with a 65,536-token
    context, asks OpenCode to edit a file in an owned disposable folder, and
    continues the same session to create a second file. A matching session ID,
@@ -41,8 +40,8 @@ Open **Agents → Try a local agent**, or use the same entry during onboarding.
 Memory figures are conservative starting points, **not measured acceptance
 thresholds or speed guarantees**. Context, GPU memory and other apps affect
 whether a model fits. Ollama's Windows documentation also requires at least
-4 GB for its runtime, separate from weights. The OpenCode installer selects the current package; its size and dependencies
-can change.
+4 GB for its runtime, separate from weights. The private OpenCode runner uses the version and integrity pins described in
+[agent support](AGENT-SUPPORT.md#private-opencode-runner).
 
 Model requests use `127.0.0.1:11434`. Native download requests bypass proxies and
 redirects. Download progress comes from Ollama's layer byte counts; totals remain

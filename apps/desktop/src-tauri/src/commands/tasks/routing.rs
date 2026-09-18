@@ -501,12 +501,25 @@ impl TaskRuntime {
                 if let Some(id) = &local_id {
                     account_models = vec![Some(id.clone())];
                 } else {
+                    if let Some(preferred) = agent_profiles::preferred_model(&binding)? {
+                        account_models.retain(Option::is_some);
+                        account_models.insert(0, Some(preferred));
+                    }
                     account_models.retain(|model| {
                         !model
                             .as_ref()
                             .is_some_and(|id| id.starts_with("jackalope-local/"))
                     });
+                    if let Some(provider) = agent_profiles::api_provider(&binding)? {
+                        account_models.retain(|model| {
+                            model
+                                .as_ref()
+                                .is_some_and(|id| id.starts_with(&format!("{provider}/")))
+                        });
+                    }
                 }
+                account_models.sort();
+                account_models.dedup();
                 account_models.retain(|model| policy.model(&agent, model.as_deref()).is_ok());
                 if account_models.is_empty() {
                     continue;

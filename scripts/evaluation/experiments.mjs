@@ -1,43 +1,49 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+export const registry = JSON.parse(
+  readFileSync(
+    new URL('../../apps/desktop/src-tauri/src/commands/experiments.json', import.meta.url),
+    'utf8',
+  ),
+);
+export const registrySha256 = createHash('sha256').update(JSON.stringify(registry)).digest('hex');
+
+export function validateExperiments(options) {
+  for (const [name, field] of Object.entries(registry.fields)) {
+    const value = options[name] ?? field.default;
+    if (!field.values.includes(value)) throw new Error(`Invalid ${name}.`);
+    for (const [dependency, required] of Object.entries(field.requires?.[value] ?? {})) {
+      if ((options[dependency] ?? registry.fields[dependency].default) !== required)
+        throw new Error(`${name}=${value} requires ${dependency}=${required}.`);
+    }
+  }
+}
 
 export function experimentOptions(args, variants) {
-  const fields = {
-    workflow: ['legacy', 'final'],
-    'task-approach': ['general', 'scoped'],
-    'tool-surface': ['full', 'available'],
-    'named-read': ['off', 'on'],
-    'result-selection': ['on', 'off'],
-    'result-queries': ['off', 'on'],
-    'result-preview': ['off', 'on'],
-    'initial-tools': ['search', 'small'],
-    'repo-map': ['on', 'off'],
-    'context-reuse': ['off', 'on'],
-    'source-context': ['off', 'on'],
-    'batch-read': ['off', 'on'],
-    'execution-profile': ['standard', 'lean'],
-    'verification-flow': ['agent', 'final'],
-    'context-read': ['off', 'on'],
-    'context-pruning': ['off', 'on'],
-    'history-compaction': ['off', 'deduplicate'],
-    'analysis-cache': ['off', 'on'],
-    'dispatch-plan': ['off', 'on'],
-    'jev-assistance': ['active', 'shadow'],
-    'jev-questions': ['off', 'on'],
-    'jev-preparation': ['off', 'on'],
-    'failure-triage': ['jev', 'local'],
-  };
+  const fields = registry.fields;
+  for (const variant of variants) {
+    const seen = new Set();
+    for (const arg of args.filter((arg) => arg.startsWith(`--${variant}-`))) {
+      if (arg.startsWith('--control-prompts=')) continue;
+      const name = arg.slice(variant.length + 3).split('=')[0];
+      if (!Object.hasOwn(fields, name) && !['model', 'effort', 'codex-speed'].includes(name))
+        throw new Error(`Unknown ${variant} experiment: ${name}.`);
+      if (seen.has(name)) throw new Error(`Duplicate ${variant} option: ${name}.`);
+      seen.add(name);
+    }
+  }
   return Object.fromEntries(
     variants.map((variant) => [
       variant,
       Object.fromEntries(
-        Object.entries(fields).map(([name, allowed]) => {
+        Object.entries(fields).map(([name, field]) => {
           const value =
             args
               .find((arg) => arg.startsWith(`--${variant}-${name}=`))
               ?.split('=')
               .slice(1)
-              .join('=') ?? allowed[0];
-          if (!allowed.includes(value)) throw new Error(`Invalid ${variant} ${name}.`);
+              .join('=') ?? field.default;
+          if (!field.values.includes(value)) throw new Error(`Invalid ${variant} ${name}.`);
           return [name, value];
         }),
       ),
@@ -46,29 +52,12 @@ export function experimentOptions(args, variants) {
 }
 
 export function experimentEnvironment(options) {
-  return {
-    JACKALOPE_TOOL_SURFACE: options['tool-surface'],
-    JACKALOPE_NAMED_READ: options['named-read'],
-    JACKALOPE_RESULT_SELECTION: options['result-selection'],
-    JACKALOPE_RESULT_QUERIES: options['result-queries'],
-    JACKALOPE_RESULT_PREVIEW: options['result-preview'],
-    JACKALOPE_INITIAL_TOOLS: options['initial-tools'],
-    JACKALOPE_REPO_MAP: options['repo-map'],
-    JACKALOPE_CONTEXT_REUSE: options['context-reuse'],
-    JACKALOPE_SOURCE_CONTEXT: options['source-context'],
-    JACKALOPE_BATCH_READ: options['batch-read'],
-    JACKALOPE_EXECUTION_PROFILE: options['execution-profile'],
-    JACKALOPE_VERIFICATION_FLOW: options['verification-flow'],
-    JACKALOPE_CONTEXT_READ: options['context-read'],
-    JACKALOPE_CONTEXT_PRUNING: options['context-pruning'],
-    JACKALOPE_HISTORY_COMPACTION: options['history-compaction'],
-    JACKALOPE_ANALYSIS_CACHE: options['analysis-cache'],
-    JACKALOPE_DISPATCH_PLAN: options['dispatch-plan'],
-    JACKALOPE_JEV_ASSISTANCE: options['jev-assistance'],
-    JACKALOPE_JEV_QUESTIONS: options['jev-questions'],
-    JACKALOPE_JEV_PREPARATION: options['jev-preparation'],
-    JACKALOPE_FAILURE_TRIAGE: options['failure-triage'],
-  };
+  validateExperiments(options);
+  return Object.fromEntries(
+    Object.entries(registry.fields)
+      .filter(([, field]) => field.environment)
+      .map(([name, field]) => [field.environment, options[name] ?? field.default]),
+  );
 }
 
 export function variantOrder(variants, id, repetition, seed) {

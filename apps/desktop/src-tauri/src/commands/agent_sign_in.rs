@@ -70,6 +70,7 @@ struct Session {
     terminal: Option<crate::state::PtySession>,
     tree: Option<ProcessTree>,
     lease: Option<Lease>,
+    runner_lease: Option<super::managed_runtime::UseGuard>,
     state: &'static str,
     exit_code: Option<u32>,
     output: VecDeque<OutputChunk>,
@@ -101,6 +102,7 @@ impl Session {
             let _ = terminal.child.wait();
         }
         self.lease.take();
+        self.runner_lease.take();
         self.state = state;
     }
 }
@@ -169,6 +171,7 @@ fn spawn_session(
     rows: u16,
 ) -> Result<Arc<Mutex<Session>>, String> {
     let lease = Lease::acquire(binding.directory.clone())?;
+    let runner_lease = super::managed_runtime::acquire(&executable)?;
     let pair = native_pty_system()
         .openpty(size(cols, rows))
         .map_err(|_| "Could not open the sign-in terminal.")?;
@@ -206,6 +209,7 @@ fn spawn_session(
         }),
         tree: Some(tree),
         lease: Some(lease),
+        runner_lease,
         state: "running",
         exit_code: None,
         output: VecDeque::new(),

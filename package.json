@@ -28,6 +28,7 @@
     "evaluate:execution": "node scripts/evaluation/run.mjs",
     "evaluate:quality": "node scripts/evaluation/quality.mjs",
     "evaluate:context": "node scripts/evaluation/context-report.mjs",
+    "evaluate:plan": "node scripts/evaluation/study-plan.mjs",
     "evaluate:impact": "node scripts/evaluation/impact-report.mjs",
     "evaluate:review": "node scripts/evaluation/review-study.mjs",
     "evaluate:website": "node scripts/evaluation/website.mjs",

@@ -8,6 +8,14 @@ The website uses apps/website/src/roadmap-content.ts for its interactive roadmap
 and discovery output. Keep its Built, In progress, Up next and Further out stages
 aligned with this guide when capabilities or priorities change.
 
+Provider connections retain per-account models. Private runner settings support
+integrity inspection, repair and idle-version cleanup with process leases.
+Account-scoped catalog limits and prices supplement explicitly supplied Jev model
+evidence; catalog facts do not prove quality, credit or upstream freshness.
+Experiment settings share a versioned registry. Optional DeepSeek request metering,
+quality-study feasibility planning and isolated warm API helpers support screening;
+representative benefit and installed-platform acceptance remain open.
+
 ## Built: the local workspace
 
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.

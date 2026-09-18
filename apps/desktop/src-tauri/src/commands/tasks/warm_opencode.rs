@@ -12,6 +12,7 @@ pub(super) struct Pool {
     reaper: std::sync::OnceLock<Reaper>,
     unavailable: Mutex<HashMap<[u8; 32], std::time::Instant>>,
     generation: AtomicU64,
+    account_revisions: Mutex<HashMap<PathBuf, u64>>,
 }
 
 struct Reaper {
@@ -29,6 +30,7 @@ impl Drop for Reaper {
 }
 
 struct Entry {
+    account: PathBuf,
     key: [u8; 32],
     server: Mutex<Option<Server>>,
     busy: AtomicBool,
@@ -40,6 +42,7 @@ struct Server {
     tree: ProcessTree,
     url: String,
     password: String,
+    _runner_lease: Option<crate::commands::managed_runtime::UseGuard>,
 }
 
 impl Drop for Server {
@@ -123,6 +126,28 @@ fn identity(cmd: &Command) -> [u8; 32] {
 }
 
 impl Pool {
+    fn account_revision(&self, directory: &Path) -> u64 {
+        self.account_revisions
+            .lock()
+            .unwrap()
+            .get(directory)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub fn invalidate_account(&self, directory: &Path) {
+        let mut revisions = self.account_revisions.lock().unwrap();
+        *revisions.entry(directory.to_owned()).or_default() += 1;
+        drop(revisions);
+        self.entries.lock().unwrap().retain(|entry| {
+            if entry.account != directory {
+                return true;
+            }
+            entry.server.lock().unwrap().take();
+            false
+        });
+    }
+
     pub fn clear(&self) {
         self.generation.fetch_add(1, Ordering::SeqCst);
         for entry in self.entries.lock().unwrap().drain(..) {
@@ -137,7 +162,17 @@ impl Pool {
         canceled: impl Fn() -> bool,
     ) -> Result<Option<Lease>, String> {
         let generation = self.generation.load(Ordering::SeqCst);
-        let interrupted = || canceled() || self.generation.load(Ordering::SeqCst) != generation;
+        let revision = self.account_revision(&binding.directory);
+        let interrupted = || {
+            canceled()
+                || self.generation.load(Ordering::SeqCst) != generation
+                || self.account_revision(&binding.directory) != revision
+        };
+        if binding.profile_id.is_some()
+            && crate::commands::experiments::is("JACKALOPE_WARM_API_HELPERS", "on")
+        {
+            agent_profiles::apply_binding(cmd, binding)?;
+        }
         let lease = self.try_attach(cmd, binding, &interrupted);
         if interrupted() {
             return Err("The helper request was stopped.".into());
@@ -151,20 +186,17 @@ impl Pool {
         binding: &agent_profiles::AccountBinding,
         canceled: impl Fn() -> bool,
     ) -> Option<Lease> {
-        // Only managed local helpers have a complete, credential-free provider configuration.
-        // Worker MCP tokens and arbitrary account/plugin configuration must never be pooled.
-        if agent_profiles::local_model(binding)
+        let local = agent_profiles::local_model(binding)
             .ok()
             .flatten()
-            .is_none()
-            || canceled()
-        {
+            .is_some();
+        if canceled() || (!local && !configure_api_helper(cmd, binding)) {
             return None;
         }
         let configuration = binding.directory.join("helper-config");
         std::fs::create_dir_all(&configuration).ok()?;
         cmd.env("XDG_CONFIG_HOME", configuration).args(["--pure"]);
-        if std::env::var("JACKALOPE_WARM_OPENCODE").is_ok_and(|value| value == "off") {
+        if crate::commands::experiments::is("JACKALOPE_WARM_OPENCODE", "off") {
             return None;
         }
         self.reaper.get_or_init(|| {
@@ -219,6 +251,7 @@ impl Pool {
                 return None;
             }
             let entry = Arc::new(Entry {
+                account: binding.directory.clone(),
                 key,
                 server: Mutex::new(None),
                 busy: AtomicBool::new(true),
@@ -277,6 +310,53 @@ impl Pool {
             .env("OPENCODE_SERVER_USERNAME", "jackalope");
         Some(lease)
     }
+}
+
+fn configure_api_helper(cmd: &mut Command, binding: &agent_profiles::AccountBinding) -> bool {
+    if !crate::commands::experiments::is("JACKALOPE_WARM_API_HELPERS", "on") {
+        return false;
+    }
+    let Some(provider) = agent_profiles::api_provider(binding).ok().flatten() else {
+        return false;
+    };
+    let configuration = cmd
+        .get_envs()
+        .find(|(key, _)| *key == "OPENCODE_CONFIG_CONTENT")
+        .and_then(|(_, value)| value)
+        .and_then(|value| value.to_str())
+        .and_then(|value| serde_json::from_str::<Value>(value).ok());
+    let Some(configuration) = configuration else {
+        return false;
+    };
+    if configuration["permission"] != "deny"
+        || configuration["mcp"]
+            .as_object()
+            .is_some_and(|mcp| !mcp.is_empty())
+    {
+        return false;
+    }
+    let args: Vec<_> = cmd
+        .get_args()
+        .map(|value| value.to_string_lossy().into_owned())
+        .collect();
+    let Some(model) = args
+        .windows(2)
+        .find(|pair| pair[0] == "--model")
+        .map(|pair| pair[1].clone())
+    else {
+        return false;
+    };
+    if !model.starts_with(&format!("{provider}/")) {
+        return false;
+    }
+    cmd.env("OPENCODE_CONFIG_CONTENT", serde_json::json!({
+        "enabled_providers":[provider],"model":model,"small_model":model,"share":"disabled",
+        "permission":"deny","agent":{"build":{"permission":"deny","tools":{"*":false}}},"mcp":{},"plugin":[]
+    }).to_string())
+        .env("OPENCODE_DISABLE_PROJECT_CONFIG", "true")
+        .env_remove("OPENCODE_CONFIG").env_remove("OPENCODE_CONFIG_DIR")
+        .env_remove("JACKALOPE_BRIDGE_TOKEN");
+    true
 }
 
 fn api(
@@ -412,6 +492,8 @@ fn start(source: &Command, canceled: &impl Fn() -> bool) -> Result<Server, Strin
     .stdout(Stdio::null())
     .stderr(Stdio::null());
     drop(listener);
+    let runner_lease =
+        crate::commands::managed_runtime::acquire(std::path::Path::new(cmd.get_program()))?;
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
     let tree = match ProcessTree::attach(&child) {
         Ok(tree) => tree,
@@ -426,6 +508,7 @@ fn start(source: &Command, canceled: &impl Fn() -> bool) -> Result<Server, Strin
         tree,
         url: format!("http://127.0.0.1:{port}"),
         password,
+        _runner_lease: runner_lease,
     };
     let client = reqwest::Client::builder()
         .no_proxy()

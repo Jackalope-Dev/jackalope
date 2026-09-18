@@ -7,7 +7,9 @@
     "description": "Jackalope can prepare a private agent runner when connecting DeepSeek and other supported API providers.",
     "items": [
       "One guided setup downloads and verifies the runner, then saves your protected API key and discovers models.",
-      "Tasks, configured helpers and local-model setup share the runner while keeping account and model choices separate."
+      "Tasks, configured helpers and local-model setup share the runner while keeping account and model choices separate.",
+      "Provider connections retain a model per account and recover from incomplete setup without discarding the connection.",
+      "Inspect runner integrity and disk use, repair the pinned runner, and clean idle versions while active processes retain their runtime."
     ],
     "note": "In development. Installed cross-platform acceptance remains in progress."
   },

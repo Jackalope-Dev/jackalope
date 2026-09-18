@@ -11,6 +11,14 @@ use std::{
 use tauri::{ipc::Channel, State};
 
 mod install;
+mod lifecycle;
+pub(super) use lifecycle::acquire;
+
+#[tauri::command]
+pub async fn managed_runtime_cleanup(remove_active: bool) -> Result<lifecycle::Cleanup, String> {
+    lifecycle::managed_runtime_cleanup(remove_active).await
+}
+pub(super) use lifecycle::UseGuard;
 mod receipt;
 #[cfg(test)]
 mod tests;
@@ -90,6 +98,7 @@ pub(super) fn executable() -> Result<Option<PathBuf>, String> {
 #[derive(Default)]
 pub struct ManagedRuntime {
     active: Arc<Mutex<Option<(String, Arc<AtomicBool>)>>>,
+    canceled: Mutex<std::collections::HashSet<String>>,
 }
 
 struct Operation {
@@ -108,6 +117,9 @@ impl ManagedRuntime {
     fn begin(&self, id: &str) -> Result<Operation, String> {
         uuid::Uuid::parse_str(id).map_err(|_| "Invalid runner setup operation.".to_string())?;
         let mut active = self.active.lock().map_err(|e| e.to_string())?;
+        if self.canceled.lock().map_err(|e| e.to_string())?.remove(id) {
+            return Err("Runner setup canceled. You can retry when ready.".into());
+        }
         if active.is_some() {
             return Err(
                 "Runner setup is already running. Wait for it to finish or cancel that setup."
@@ -122,9 +134,17 @@ impl ManagedRuntime {
         })
     }
     fn cancel(&self, id: &str) {
+        if uuid::Uuid::parse_str(id).is_err() {
+            return;
+        }
         if let Ok(active) = self.active.lock() {
             if let Some((_, canceled)) = active.as_ref().filter(|(owner, _)| owner == id) {
                 canceled.store(true, Ordering::SeqCst);
+            } else if let Ok(mut pending) = self.canceled.lock() {
+                if pending.len() >= 64 {
+                    pending.clear();
+                }
+                pending.insert(id.to_owned());
             }
         }
     }
@@ -145,6 +165,9 @@ pub struct RuntimeStatus {
     installed: bool,
     version: &'static str,
     detail: Option<String>,
+    disk_bytes: Option<u64>,
+    source: &'static str,
+    installed_version: Option<String>,
 }
 
 #[tauri::command]
@@ -156,6 +179,13 @@ pub async fn managed_runtime_status() -> Result<RuntimeStatus, String> {
             installed: matches!(found, Ok(Some(_))),
             version: VERSION,
             detail: found.err(),
+            disk_bytes: ROOT.get().and_then(|root| lifecycle::disk_bytes(root).ok()),
+            source: "Jackalope private runner",
+            installed_version: ROOT
+                .get()
+                .and_then(|root| history::read_bounded(&root.join("active.json"), 8192).ok())
+                .and_then(|bytes| serde_json::from_slice::<receipt::Receipt>(&bytes).ok())
+                .map(|receipt| receipt.version.chars().take(64).collect()),
         }
     })
     .await

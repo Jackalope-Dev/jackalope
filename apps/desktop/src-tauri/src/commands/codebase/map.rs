@@ -331,7 +331,7 @@ pub(crate) fn prepare_task_map(
         .filter(|file| task.contains(&file.path))
         .count();
     let budget = if (1..=2).contains(&explicit)
-        && std::env::var("JACKALOPE_CONTEXT_EXPERIMENT").is_ok_and(|value| value == "compact")
+        && crate::commands::experiments::is("JACKALOPE_CONTEXT_EXPERIMENT", "compact")
     {
         budget.min(3_000)
     } else {

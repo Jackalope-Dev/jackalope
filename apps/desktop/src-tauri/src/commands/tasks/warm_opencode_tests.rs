@@ -10,6 +10,21 @@ impl Drop for Fixture {
 #[test]
 #[ignore = "Real OpenCode protocol with a fake loopback model; set JACKALOPE_OPENCODE_EXE"]
 fn warm_opencode_protocol() {
+    protocol(false);
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "Real private API helper protocol with fake loopback provider; set JACKALOPE_OPENCODE_EXE and JACKALOPE_WARM_API_HELPERS=on"]
+fn warm_opencode_api_protocol() {
+    assert!(crate::commands::experiments::is(
+        "JACKALOPE_WARM_API_HELPERS",
+        "on"
+    ));
+    protocol(true);
+}
+
+fn protocol(api: bool) {
     let executable = std::env::var("JACKALOPE_OPENCODE_EXE").expect("set JACKALOPE_OPENCODE_EXE");
     let fixture = Fixture(
         std::env::temp_dir().join(format!("jackalope-warm-probe-{}", uuid::Uuid::new_v4())),
@@ -64,9 +79,35 @@ http.createServer(async (req, res) => {
         label: "Local protocol fixture".into(),
     };
     std::fs::create_dir_all(&binding.directory).unwrap();
-    std::fs::write(binding.directory.join("jackalope-local.json"), r#"{"model":"qwen3.5:4b","digest":"fixture","inferenceDigest":"fixture","elapsedMs":0,"checkedAt":"fixture"}"#).unwrap();
-    let config = serde_json::json!({"model":"fixture/model","small_model":"fixture/model","enabled_providers":["fixture"],"share":"disabled","permission":"deny",
+    if !api {
+        std::fs::write(binding.directory.join("jackalope-local.json"), r#"{"model":"qwen3.5:4b","digest":"fixture","inferenceDigest":"fixture","elapsedMs":0,"checkedAt":"fixture"}"#).unwrap();
+    }
+    if api {
+        crate::commands::account_storage::write(
+            &binding.directory.join("api-key.bin"),
+            br#"{"name":"DEEPSEEK_API_KEY","value":"fixture"}"#,
+        )
+        .unwrap();
+    }
+    let mut config = serde_json::json!({"model":"fixture/model","small_model":"fixture/model","enabled_providers":["fixture"],"share":"disabled","permission":"deny",
         "provider":{"fixture":{"npm":"@ai-sdk/openai-compatible","name":"Fake local provider","options":{"baseURL":format!("http://127.0.0.1:{}/v1",port.trim())},"models":{"model":{"id":"fixture","limit":{"context":8192,"output":512}}}}}});
+    let model = if api {
+        "deepseek/fixture"
+    } else {
+        "fixture/model"
+    };
+    if api {
+        let provider = config["provider"]["fixture"].take();
+        config["provider"] = serde_json::json!({"deepseek":provider});
+        config["provider"]["deepseek"]["models"] =
+            serde_json::json!({"fixture":{"id":"fixture","limit":{"context":8192,"output":512}}});
+        config["enabled_providers"] = serde_json::json!(["deepseek"]);
+        config["model"] = serde_json::json!(model);
+        config["small_model"] = serde_json::json!(model);
+        let configuration = binding.directory.join("helper-config/opencode");
+        std::fs::create_dir_all(&configuration).unwrap();
+        std::fs::write(configuration.join("opencode.json"), config.to_string()).unwrap();
+    }
     let make = |prompt: &str| {
         let mut cmd = command(&executable);
         cmd.current_dir(&fixture.0)
@@ -75,11 +116,12 @@ http.createServer(async (req, res) => {
                 "--format",
                 "json",
                 "--model",
-                "fixture/model",
+                model,
                 "--title",
                 "Protocol check",
                 prompt,
             ])
+            .env("DEEPSEEK_API_KEY", "fixture")
             .env("OPENCODE_CONFIG_CONTENT", config.to_string())
             .env("OPENCODE_DISABLE_PROJECT_CONFIG", "true")
             .env_remove("OPENCODE_CONFIG")
@@ -93,6 +135,7 @@ http.createServer(async (req, res) => {
     let pool = Pool::default();
     let mut sessions = Vec::new();
     let mut elapsed = Vec::new();
+    let mut working_sets = Vec::<Option<u64>>::new();
     let mut endpoint = String::new();
     for (index, prompt) in ["FIRST_REQUEST", "SECOND_REQUEST"].iter().enumerate() {
         let started = std::time::Instant::now();
@@ -152,6 +195,16 @@ http.createServer(async (req, res) => {
                 .to_owned(),
         );
         elapsed.push(started.elapsed().as_millis());
+        let pid = lease
+            .entry
+            .server
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .child
+            .id();
+        working_sets.push(working_set(pid));
         lease.complete();
     }
     assert_ne!(sessions[0], sessions[1]);
@@ -189,9 +242,16 @@ http.createServer(async (req, res) => {
     assert!(response.is_err());
     println!(
         "WARM_PROTOCOL {}",
-        serde_json::json!({"fixture":true,"realModelInference":false,"coldMs":elapsed[0],"warmMs":elapsed[1],"distinctSessions":true,"cancellationStoppedServer":true})
+        serde_json::json!({"fixture":true,"apiAccount":api,"realModelInference":false,"coldMs":elapsed[0],"warmMs":elapsed[1],"serverWorkingSetBytes":working_sets,"distinctSessions":true,"cancellationStoppedServer":true})
     );
     let mut cmd = make("FINAL_REQUEST");
+    let mut lease = pool.attach(&mut cmd, &binding, || false).unwrap().unwrap();
+    assert!(!lease.reused);
+    lease.complete();
+    drop(lease);
+    pool.invalidate_account(&binding.directory);
+    assert!(pool.entries.lock().unwrap().is_empty());
+    let mut cmd = make("AFTER_CREDENTIAL_CHANGE");
     let mut lease = pool.attach(&mut cmd, &binding, || false).unwrap().unwrap();
     assert!(!lease.reused);
     lease.complete();
@@ -212,4 +272,30 @@ http.createServer(async (req, res) => {
 fn executable_node() -> PathBuf {
     crate::commands::platform::find_on_path(if cfg!(windows) { "node.exe" } else { "node" })
         .expect("Node.js is installed")
+}
+
+fn working_set(pid: u32) -> Option<u64> {
+    #[cfg(windows)]
+    {
+        command("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!("(Get-Process -Id {pid}).WorkingSet64"),
+            ])
+            .output()
+            .ok()
+            .filter(|out| out.status.success())
+            .and_then(|out| {
+                String::from_utf8_lossy(&out.stdout)
+                    .trim()
+                    .parse::<u64>()
+                    .ok()
+            })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pid;
+        None
+    }
 }

@@ -9,12 +9,19 @@ import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-co
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
 import { aggregateAttempts } from './attempts.mjs';
-import { experimentEnvironment, experimentOptions, variantOrder } from './experiments.mjs';
+import {
+  experimentEnvironment,
+  experimentOptions,
+  registry,
+  registrySha256,
+  variantOrder,
+} from './experiments.mjs';
 import {
   historyExperimentEnvironment,
   historyExperimentIdentity,
   historyExperimentReceipt,
 } from './history-experiment.mjs';
+import { prepareProviderMeter } from './provider-meter.mjs';
 import { qualityCases } from './quality-cases.mjs';
 import { qualitySummary } from './quality-metrics.mjs';
 import { providerStopReason, requireEvaluationPass } from './readiness.mjs';
@@ -31,7 +38,7 @@ const cases = suitePath
 if (
   !Array.isArray(cases) ||
   !cases.length ||
-  cases.length > 100 ||
+  cases.length > 1000 ||
   new Set(cases.map((c) => c.id)).size !== cases.length ||
   cases.some(
     (c) =>
@@ -69,13 +76,13 @@ const compactPrompts = args.includes('--compact-prompts');
 const stopOnFailure = args.includes('--stop-on-failure');
 const experiments = experimentOptions(args, variants);
 const orderSeed = value('--order-seed', null);
+for (const variant of variants) {
+  if (compactPrompts && variant === 'after') experiments[variant]['context-style'] = 'compact';
+  experimentEnvironment(experiments[variant]);
+}
 const experimental = args.some((arg) =>
-  variants.some(
-    (v) =>
-      arg.startsWith(`--${v}-`) &&
-      /-(workflow|task-approach|tool-surface|named-read|result-selection|result-queries|result-preview|initial-tools|repo-map|context-reuse|source-context|batch-read|execution-profile|verification-flow|context-read|context-pruning|history-compaction|analysis-cache|dispatch-plan|jev-assistance|jev-questions|jev-preparation|failure-triage)=/.test(
-        arg,
-      ),
+  variants.some((variant) =>
+    Object.keys(registry.fields).some((name) => arg.startsWith(`--${variant}-${name}=`)),
   ),
 );
 const requestedEffort = value('--effort', null);
@@ -94,6 +101,16 @@ const tokens = Number(value('--tokens', '250000'));
 const model = value('--model', '');
 const models = Object.fromEntries(variants.map((v) => [v, value(`--${v}-model`, model)]));
 const agent = value('--agent', 'codex');
+const providerMeter = value('--provider-meter', null);
+if (
+  providerMeter !== null &&
+  (providerMeter !== 'deepseek' ||
+    agent !== 'opencode' ||
+    Object.values(models).some((model) => !/^deepseek\/[\w.-]+$/.test(model)))
+)
+  throw new Error(
+    'Provider metering currently supports explicit DeepSeek models through OpenCode only.',
+  );
 const controlPromptsPath = value('--control-prompts', null);
 const controlPrompts = controlPromptsPath
   ? JSON.parse(await readFile(path.resolve(controlPromptsPath), 'utf8'))
@@ -184,6 +201,7 @@ if (!args.includes('--execute')) {
   console.log(
     JSON.stringify(
       {
+        experimentRegistry: { version: registry.version, sha256: registrySha256 },
         cases: selected,
         variants: Object.keys(binaries),
         repeat,
@@ -243,10 +261,12 @@ if (!args.includes('--execute')) {
   };
   const comparisonPath = path.join(output, 'comparison.json');
   const plan = {
+    experimentRegistry: { version: registry.version, sha256: registrySha256 },
     cases: selected,
     variants,
     repeat,
     compactPrompts,
+    providerMeter,
     ...(stopOnFailure ? { stopOnFailure: true } : {}),
     ...(experimental ? { experiments } : {}),
     ...(historyIdentity ? { historyCompaction: historyIdentity } : {}),
@@ -396,60 +416,79 @@ if (!args.includes('--execute')) {
         activeTrial = { case: id, variant, repetition, startedAt: new Date().toISOString() };
         await checkpoint();
         console.log(`Quality: ${id}, ${variant}, repetition ${repetition}`);
-        const execution = await new Promise((resolve) => {
-          const child = spawn(
-            binaries[variant],
-            [
-              'commands::coordination::quality_trial::installed_quality_trial',
-              '--ignored',
-              '--exact',
-              '--nocapture',
-            ],
-            {
-              cwd: root,
-              windowsHide: true,
-              env: {
-                ...process.env,
-                JACKALOPE_QUALITY_SPEC: specPath,
-                RUST_TEST_THREADS: '1',
-                JACKALOPE_CONTEXT_EXPERIMENT:
-                  compactPrompts && variant === 'after' ? 'compact' : 'off',
-                ...experimentEnvironment(experiments[variant]),
-                ...historyEnv,
+        const meter = providerMeter
+          ? await prepareProviderMeter(
+              path.join(output, `${id}-${repetition}-${variant}-provider`),
+              models[variant],
+            )
+          : null;
+        let execution,
+          providerAccounting = null;
+        try {
+          execution = await new Promise((resolve) => {
+            const child = spawn(
+              binaries[variant],
+              [
+                'commands::coordination::quality_trial::installed_quality_trial',
+                '--ignored',
+                '--exact',
+                '--nocapture',
+              ],
+              {
+                cwd: root,
+                windowsHide: true,
+                env: {
+                  ...(meter?.env ?? process.env),
+                  JACKALOPE_QUALITY_SPEC: specPath,
+                  RUST_TEST_THREADS: '1',
+                  JACKALOPE_CONTEXT_EXPERIMENT:
+                    compactPrompts && variant === 'after' ? 'compact' : 'off',
+                  ...experimentEnvironment(experiments[variant]),
+                  ...historyEnv,
+                },
+                stdio: ['ignore', 'pipe', 'pipe'],
               },
-              stdio: ['ignore', 'pipe', 'pipe'],
-            },
-          );
-          let stdout = '',
-            stderr = '',
-            timedOut = false;
-          const timer = setTimeout(
-            () => {
-              timedOut = true;
-              if (process.platform === 'win32' && child.pid)
-                spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
-                  windowsHide: true,
-                  stdio: 'ignore',
-                });
-              else child.kill('SIGTERM');
-            },
-            (seconds + 120) * 1000,
-          );
-          child.stdout.on('data', (chunk) => {
-            stdout = (stdout + chunk).slice(-100000);
+            );
+            let stdout = '',
+              stderr = '',
+              timedOut = false;
+            const timer = setTimeout(
+              () => {
+                timedOut = true;
+                if (process.platform === 'win32' && child.pid)
+                  spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+                    windowsHide: true,
+                    stdio: 'ignore',
+                  });
+                else child.kill('SIGTERM');
+              },
+              (seconds + 120) * 1000,
+            );
+            child.stdout.on('data', (chunk) => {
+              stdout = (stdout + chunk).slice(-100000);
+            });
+            child.stderr.on('data', (chunk) => {
+              stderr = (stderr + chunk).slice(-16000);
+            });
+            child.on('error', (error) => {
+              clearTimeout(timer);
+              resolve({ error: error.message, stdout, stderr });
+            });
+            child.on('close', (code) => {
+              clearTimeout(timer);
+              resolve({ code, timedOut, stdout, stderr });
+            });
           });
-          child.stderr.on('data', (chunk) => {
-            stderr = (stderr + chunk).slice(-16000);
-          });
-          child.on('error', (error) => {
-            clearTimeout(timer);
-            resolve({ error: error.message, stdout, stderr });
-          });
-          child.on('close', (code) => {
-            clearTimeout(timer);
-            resolve({ code, timedOut, stdout, stderr });
-          });
-        });
+        } finally {
+          if (meter) {
+            providerAccounting = await meter.close();
+            await writeFile(
+              path.join(output, `${id}-${repetition}-${variant}.provider.json`),
+              `${JSON.stringify(providerAccounting, null, 2)}\n`,
+              { mode: 0o600 },
+            );
+          }
+        }
         await writeFile(
           path.join(output, `${id}-${repetition}-${variant}.log`),
           `${execution.stdout}\n${execution.stderr}`,
@@ -475,15 +514,23 @@ if (!args.includes('--execute')) {
           helperCostUsd,
           helperAccountingComplete,
         } = aggregateAttempts(report);
+        const nativeAccountingComplete =
+          agent === 'opencode'
+            ? providerAccounting?.complete === true &&
+              helperUsages.length === 0 &&
+              runs.every((run) => !run.routing)
+            : null;
+        const measuredUsage = nativeAccountingComplete ? providerAccounting.usage : usage;
         const budgetExceeded = report
           ? report.budgetStopped === true ||
             report.elapsedMs >= seconds * 1000 ||
-            (usage !== null && usage.input + usage.output >= tokens)
+            (measuredUsage !== null && measuredUsage.input + measuredUsage.output >= tokens)
           : null;
         trials.push({
           case: id,
           model: models[variant],
           experiments: experiments[variant],
+          experimentRegistry: { version: registry.version, sha256: registrySha256 },
           historyCompaction: await historyExperimentReceipt(historyMode, historyReceiptPath),
           source: fixture.source ?? null,
           variant,
@@ -537,7 +584,8 @@ if (!args.includes('--execute')) {
           usageBreakdown: runs.length ? runUsageBreakdown(runs, helperUsages) : null,
           agentUsage,
           agentReportedCostUsd,
-          nativeAuxiliaryAccountingComplete: agent === 'opencode' ? false : null,
+          providerAccounting,
+          nativeAuxiliaryAccountingComplete: nativeAccountingComplete,
           helperUsage,
           helperCostUsd,
           helperAccountingComplete,
@@ -548,11 +596,11 @@ if (!args.includes('--execute')) {
           quotaFailure: runs.some((run) => run.quotaFailure) || false,
           elapsedMs: report?.elapsedMs ?? null,
           promptBytes: report?.promptBytes ?? null,
-          input: usage?.input ?? null,
-          output: usage?.output ?? null,
-          cacheRead: usage?.cacheRead ?? null,
-          cacheWrite: usage?.cacheWrite ?? null,
-          totalTokens: usage ? usage.input + usage.output : null,
+          input: measuredUsage?.input ?? null,
+          output: measuredUsage?.output ?? null,
+          cacheRead: measuredUsage?.cacheRead ?? null,
+          cacheWrite: measuredUsage?.cacheWrite ?? null,
+          totalTokens: measuredUsage ? measuredUsage.input + measuredUsage.output : null,
           answeredQuestions: run?.prompts?.filter((p) => p.status === 'answered').length ?? 0,
         });
         activeTrial = null;

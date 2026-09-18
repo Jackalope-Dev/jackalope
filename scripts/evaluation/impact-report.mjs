@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { studyPlan, wilson } from './study-plan.mjs';
 
 const measured = (n) => Number.isFinite(n) && n >= 0;
 const sum = (values) =>
@@ -11,16 +12,6 @@ const quantile = (values, p) =>
   values.length
     ? [...values].sort((a, b) => a - b)[Math.max(0, Math.ceil(p * values.length) - 1)]
     : null;
-
-function wilson(successes, count) {
-  if (!count) return [0, 1];
-  const z = 1.96,
-    p = successes / count,
-    d = 1 + (z * z) / count;
-  const center = (p + (z * z) / (2 * count)) / d,
-    radius = (z * Math.sqrt((p * (1 - p)) / count + (z * z) / (4 * count * count))) / d;
-  return [Math.max(0, center - radius), Math.min(1, center + radius)];
-}
 
 export function pricedBounds(row, pricing) {
   if (!pricing) return null;
@@ -91,7 +82,15 @@ export function impactReport(
           !review.notes?.trim())
       )
         throw new Error('Invalid independent review.');
-      const modelUsage = Object.hasOwn(row, 'agentUsage') ? row.agentUsage : row;
+      const modelUsage =
+        row.nativeAuxiliaryAccountingComplete === true && row.providerAccounting?.complete
+          ? {
+              ...row.providerAccounting.usage,
+              maxRequestInput: row.providerAccounting.maxRequestInput,
+            }
+          : Object.hasOwn(row, 'agentUsage')
+            ? row.agentUsage
+            : row;
       const estimatedCostUsd = modelUsage
         ? pricedUsage(modelUsage, pricing[row.model ?? comparison.model])
         : null;
@@ -345,6 +344,7 @@ export function impactReport(
     complete,
     distinctTasks: cases.length,
     independentFamilies: families.length,
+    studyPlanning: families.length ? studyPlan({ families: families.length }) : null,
     totals,
     reductions: {
       tokensPerSuccess: reduction(
