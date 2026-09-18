@@ -642,6 +642,56 @@ Jev distribution concentration is not a task-success probability. Include missed
 requirements, false monitor suppression and unnecessary escalations in independent
 review. Broader real-repository and installed-provider acceptance remains required.
 
+## Bounded project-learning evaluations
+
+`scripts/evaluation/learning-cases.mjs` supplies authored screening fixtures, not
+real user history or held-out evidence. Learning suites carry `learningHistory`
+and a `taskAt` cutoff. Every arm receives the same history in
+`PROJECT-HISTORY.json`, named in the identical user prompt. Native test profiles
+also import those historical receipts for Jackalope's normal lesson selection.
+All attempts, checks and reviews must predate the scored task. Use
+`--after-learning=local` to exercise local selection and `--after-learning=jev`
+for optional Jev reranking with `JACKALOPE_JEV_TEST_KEY` supplied privately.
+The `learning` switch is an evaluation control; production project learning
+remains enabled by default. Missing production keys skip optional Jev assistance.
+
+The offline optimizer uses existing native agent adapters, without a Python or
+Bedrock dependency. Partition source families into `train`, `validation` and
+`holdout` before execution; related tasks cannot cross those boundaries.
+
+1. Run training cases with `evaluate:quality`, retaining every trial. Then run
+   `pnpm evaluate:learning prepare <suite.json> <training-comparison.json> <output>`.
+   This creates a reflection suite containing only training prompts, measurements
+   and bounded diagnostics. It refuses reflection when training has no observed
+   behavior or scope failure; infrastructure failures and passing tasks alone do
+   not justify extra quality guidance. Run that suite through `evaluate:quality`; retain its
+   usage and latency as offline optimization overhead.
+2. Read the generated `candidate.json`. Run
+   `pnpm evaluate:learning freeze <suite.json> <training-comparison.json> <candidate.json> <output>`.
+   Guidance is limited to 1,200 UTF-8 bytes and must cite observed training tasks.
+   The resulting validation suite adds it only to the `after` arm, subordinate to
+   current user and repository instructions. It does not install a production policy.
+3. Run the frozen validation suite with `--variants=control,after`, identical
+   explicit model, effort and experiment settings. Use at least four distinct
+   validation tasks. Run `pnpm evaluate:learning assess <frozen.json> <suite.json>
+   <validation-comparison.json> <output>` to check complete matched coverage,
+   first-pass gains, no previously passing task regression, and at most 10% total
+   token/time overhead. Only an eligible candidate produces a held-out suite.
+   Validation attempts must postdate freezing; existing outputs are never overwritten.
+
+Freeze the final confirmation protocol before examining held-out results. Count
+failed candidates and reflection work in development overhead. The impact report's
+separate `qualityPublication` gate requires a predeclared `first-pass-acceptance`
+primary outcome, one attempt per original task, independent acceptance, at least
+50 tasks and 20 source families, replication, complete costs, and a source-family
+cluster bootstrap lower bound of five percentage points for the task acceptance gain.
+The separate conservative family-success noninferiority check still applies. Total measured
+execution time and conservative cost must remain within 10% of the baseline.
+Record offline optimization cost/time separately when `includesOptimization` is
+true. The existing efficiency gate still requires its own confidence bounds.
+First-pass acceptance does not establish the number of corrections avoided;
+correction rounds remain unknown until actually observed.
+
 ## Daily-use pilot
 
 Use a consenting cohort of ten developers spanning first-time and experienced agent

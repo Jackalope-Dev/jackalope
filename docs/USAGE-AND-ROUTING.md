@@ -94,6 +94,12 @@ and Jev is connected for that scope, relevant repository guidance, candidate les
 diffs, results and check output may be sent to TypeSafe. Each call records usage even
 when the response is rejected. Helpers fall back to existing behavior without a
 second agent assessment.
+Without a usable saved key, optional assistance and discovery skip Jev entirely.
+Automatic review lessons enter either local or Jev selection only after a later
+reviewed attempt in the same task accepts the same requirement with a matching
+successful check of that tree. Unresolved feedback stays available in Project
+context; explicitly edited lessons remain under user control. Historical checks
+establish the lesson's provenance, not correctness of a new task.
 
 - Agent questions expose `ask_jev` over native MCP and `POST /v1/jev/questions`
   to active task attempts. This experiment requires an enabled project option,
@@ -109,6 +115,7 @@ second agent assessment.
   arithmetic and syntax stay local. End-to-end savings require matched evaluation.
 
 - Context selection reranks a bounded set of saved lessons before new worker starts.
+  It skips the API when local selection already contains every eligible candidate.
   Explicit workflows and lesson exclusions remain authoritative. Uncertain existing
   lessons remain included; only strong irrelevance/conflict evidence removes them.
   At app scope, the same option reranks Ask Jackalope documentation passages.

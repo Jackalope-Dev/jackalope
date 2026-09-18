@@ -116,7 +116,9 @@ representative benefit and installed-platform acceptance remain open.
   exports and [archive management](HISTORY-RECOVERY.md).
 - Project guidance, editable lessons and codebase maps. Context
   previews and saved receipts explain lesson selection with revision/source evidence;
-  Chat supports per-request lesson opt-outs.
+  Chat supports per-request lesson opt-outs. Automatic review lessons require a later
+  accepted revision and a successful check of the accepted tree; unresolved notes
+  remain visible without entering task context.
 - MCP connections with a curated marketplace, publisher setup presets, token entry,
   agent sign-in guidance and save-and-check results. Full AllMCPs search and custom
   connections remain available; live publisher/account acceptance remains open.
@@ -163,7 +165,10 @@ representative benefit and installed-platform acceptance remain open.
   file/captured-result evidence, with separate usage accounting.
   Matched exports retain complete-attempt usage, failures and private-receipt
   boundaries. Source-attributed repair fixtures and randomized review sets support
-  screening; representative quality, monetary savings and installed acceptance
+  screening. Chronological shared-history fixtures, bounded offline prompt candidates
+  and separate validation/holdout gates support learning experiments. Quality reporting
+  distinguishes first-pass acceptance from unmeasured correction rounds; representative
+  quality, monetary savings and installed acceptance
   remain open. Connection execution avoids holding the shared broker catalog lock
   during network calls. General task savings remain unproven.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.

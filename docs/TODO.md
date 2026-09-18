@@ -107,6 +107,11 @@ release dates.
   Keep adapter-specific history hooks separate from shared broker behavior.
   Require independent original-patch acceptance for quality claims. Counterbalanced
   review-time and correction measurements are separate prerequisites for claiming faster review.
+  Exercise validated project lessons with identical chronological history available
+  to both arms. Use the bounded training/validation/holdout optimizer before changing
+  default guidance; measure reflection overhead and optional Jev reranking separately.
+  Confirm first-pass acceptance gains on representative tasks before claiming fewer
+  corrections; authored learning fixtures only screen mechanisms.
 
 - [ ] Compare repeated single, serial and staged evaluations with matched provider/model
   budgets and independent human review. Validate feature snapshot recovery, shared

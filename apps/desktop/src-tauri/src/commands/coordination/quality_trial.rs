@@ -2,6 +2,7 @@ use super::*;
 use serde_json::{json, Value};
 use std::{path::Component, time::Instant};
 mod jev_fixture;
+mod learning;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Runs one installed-agent benchmark in a disposable workspace; requires JACKALOPE_QUALITY_SPEC"]
@@ -42,12 +43,17 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     ] {
         super::evaluation_trial::git(&repo, &args)?;
     }
+    let project_id = Uuid::new_v4().to_string();
+    learning::seed(&root, &repo, &project_id, &spec)?;
     let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
-    let _jev = jev_fixture::Fixture::configure(&runtime)?;
+    let learning_mode = spec["learningMode"].as_str().unwrap_or("off").to_owned();
+    if !["off", "local", "jev"].contains(&learning_mode.as_str()) {
+        return Err("Invalid learning mode".into());
+    }
+    let _jev = jev_fixture::Fixture::configure(&runtime, learning_mode == "jev")?;
     let service = Coordinator::new(root.join("profile/coordination"), runtime.clone())?;
     let mut owner = Owner(runtime.clone(), service.clone(), None);
     let direct = spec["variant"] == "direct";
-    let project_id = Uuid::new_v4().to_string();
     let fixture_scope = format!("project:{project_id}");
     let fixtures = if let Some(fixtures) = spec["toolFixtures"].as_array() {
         fixtures.clone()
@@ -129,7 +135,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 "id":id,"projectId":project_id,"projectName":"Quality benchmark",
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
                 "isolated":true,"targetBranch":"main","connectionIds":fixture_ids,
-                "contextSelection":{"memoryOff":true,"outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default(),
+                "contextSelection":{"memoryOff":learning_mode == "off","outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default(),
                     "jevPreparation":null},"prompt":spec["prompt"],
                 "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
             }))?)

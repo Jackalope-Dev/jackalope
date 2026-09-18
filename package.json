@@ -27,6 +27,7 @@
     "check:dependencies": "node scripts/security/dependencies.mjs",
     "evaluate:execution": "node scripts/evaluation/run.mjs",
     "evaluate:quality": "node scripts/evaluation/quality.mjs",
+    "evaluate:learning": "node scripts/evaluation/learning.mjs",
     "evaluate:context": "node scripts/evaluation/context-report.mjs",
     "evaluate:plan": "node scripts/evaluation/study-plan.mjs",
     "evaluate:impact": "node scripts/evaluation/impact-report.mjs",

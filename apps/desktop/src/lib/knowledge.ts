@@ -15,6 +15,12 @@ export interface KnowledgeEntry {
     kind: 'preference' | 'adjustment' | 'review' | 'repository' | 'verification';
     evidence: string[];
     managed: boolean;
+    resolution?: {
+      runId: string;
+      requirementId: string;
+      tree: string;
+      checkedAt: string;
+    } | null;
   } | null;
   dismissed?: boolean;
   process?: ProcessTemplate;

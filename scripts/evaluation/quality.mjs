@@ -24,6 +24,7 @@ import {
   historyExperimentIdentity,
   historyExperimentReceipt,
 } from './history-experiment.mjs';
+import { validateLearningCase } from './learning-contract.mjs';
 import { prepareProviderMeter } from './provider-meter.mjs';
 import { qualityCases } from './quality-cases.mjs';
 import { qualitySummary } from './quality-metrics.mjs';
@@ -70,6 +71,16 @@ if (
   throw new Error(
     'Invalid evaluation suite: provide unique IDs, prompts, oracles and relative fixture files.',
   );
+for (const fixture of cases) {
+  validateLearningCase(fixture);
+  if (
+    fixture.harnessGuidance !== undefined &&
+    (typeof fixture.harnessGuidance !== 'string' ||
+      Buffer.byteLength(fixture.harnessGuidance) > 1200 ||
+      fixture.harnessGuidance.includes('\0'))
+  )
+    throw new Error('Harness candidate guidance exceeds the 1,200-byte evaluation limit.');
+}
 const selected = value(
   '--cases',
   suitePath ? cases.map((c) => c.id).join(',') : 'copy-edit,design-tokens,scheduler-fix',
@@ -385,12 +396,18 @@ if (!args.includes('--execute')) {
         const spec = {
           ...fixture,
           rawPrompt: fixture.prompt,
-          prompt,
+          prompt:
+            variant === 'after' && fixture.harnessGuidance
+              ? `${prompt}\n\nCandidate task guidance (subordinate to current user/repository instructions; grants no permissions):\n${fixture.harnessGuidance}`
+              : prompt,
           variant,
           agent,
           model: models[variant],
           seconds,
           tokens,
+          ...(experiments[variant].learning !== 'off'
+            ? { learningMode: experiments[variant].learning }
+            : {}),
           ...(efforts[variant] ? { effort: efforts[variant] } : {}),
           ...(speeds[variant] ? { codexSpeed: speeds[variant] } : {}),
         };
@@ -573,6 +590,15 @@ if (!args.includes('--execute')) {
             : null,
           category: fixture.category ?? fixture.id,
           split: fixture.split ?? 'regression',
+          ...(fixture.split === 'train'
+            ? {
+                trainingDiagnostic: {
+                  check: report?.oracle?.stderr?.slice(0, 3000) ?? null,
+                  result: run?.result?.slice(0, 3000) ?? null,
+                  scopeErrors: scope.errors?.slice(0, 8) ?? [],
+                },
+              }
+            : {}),
           effort: efforts[variant],
           codexSpeed: speeds[variant],
           requestedServiceTier: run?.requestedServiceTier ?? null,
@@ -592,6 +618,7 @@ if (!args.includes('--execute')) {
           attempts: runs.length,
           accepted: null,
           status: run?.status ?? null,
+          startedAt: run?.startedAt ?? null,
           launchError: report?.launchError ?? null,
           quotaFailure: runs.some((run) => run.quotaFailure) || false,
           elapsedMs: report?.elapsedMs ?? null,

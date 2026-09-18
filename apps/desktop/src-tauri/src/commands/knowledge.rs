@@ -331,6 +331,9 @@ fn select(
             .filter(|e| {
                 e.enabled
                     && !e.dismissed
+                    && e.automatic
+                        .as_ref()
+                        .is_none_or(|source| source.selectable())
                     && e.kind == KnowledgeKind::Memory
                     && e.content.len() <= 800
                     && e.title.len() <= 120
@@ -347,11 +350,9 @@ fn select(
             })
             .filter(|(score, entry)| {
                 *score
-                    >= if entry
-                        .automatic
-                        .as_ref()
-                        .is_some_and(|source| source.kind == "adjustment")
-                    {
+                    >= if entry.automatic.as_ref().is_some_and(|source| {
+                        matches!(source.kind.as_str(), "adjustment" | "review")
+                    }) {
                         2
                     } else {
                         1

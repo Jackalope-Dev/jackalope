@@ -7,11 +7,9 @@ use crate::commands::{
 pub(super) struct Fixture(std::path::PathBuf);
 
 impl Fixture {
-    pub(super) fn configure(runtime: &TaskRuntime) -> Result<Option<Self>, String> {
-        if !["JACKALOPE_JEV_QUESTIONS"]
-            .iter()
-            .any(|name| std::env::var(name).is_ok_and(|value| value == "on"))
-        {
+    pub(super) fn configure(runtime: &TaskRuntime, learning: bool) -> Result<Option<Self>, String> {
+        let questions = std::env::var("JACKALOPE_JEV_QUESTIONS").is_ok_and(|value| value == "on");
+        if !learning && !questions {
             return Ok(None);
         }
         let key = std::env::var("JACKALOPE_JEV_TEST_KEY")
@@ -24,7 +22,7 @@ impl Fixture {
         settings::save(&directory, &mut preferences)?;
         std::fs::write(
             directory.join("options.json"),
-            br#"{"default":{"agentQuestions":true}}"#,
+            serde_json::to_vec(&serde_json::json!({"default":{"agentQuestions":questions,"contextSelection":learning}})).map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
         let fixture = Self(directory.join("api-key.bin"));

@@ -47,9 +47,13 @@ pub async fn shadow_candidates(
 }
 
 fn enabled(runtime: &TaskRuntime, project: &str) -> Option<options::Options> {
-    (super::policy(runtime, project).ok()?.mode == super::DecisionMode::Jev)
-        .then(|| options::options(runtime, project).ok())
-        .flatten()
+    (super::policy(runtime, project).ok()?.mode == super::DecisionMode::Jev
+        && jev::key_for_routing(runtime, project)
+            .ok()
+            .flatten()
+            .is_some())
+    .then(|| options::options(runtime, project).ok())
+    .flatten()
 }
 
 fn relevance_questions(items: &[Value]) -> Value {
@@ -98,6 +102,9 @@ pub fn select_context(runtime: &TaskRuntime, req: &mut RunRequest) -> Result<(),
             e.kind == KnowledgeKind::Memory
                 && e.enabled
                 && !e.dismissed
+                && e.automatic
+                    .as_ref()
+                    .is_none_or(|source| source.selectable())
                 && e.content.len() <= 800
                 && !req.context_selection.excluded_memory_ids.contains(&e.id)
         })
@@ -123,7 +130,13 @@ pub fn select_context(runtime: &TaskRuntime, req: &mut RunRequest) -> Result<(),
         .collect();
     candidates.retain(|e| selected.contains(&e.id));
     candidates.sort_by(|a, b| a.id.cmp(&b.id));
-    if candidates.is_empty() {
+    let original: Vec<_> = candidates
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| req.context_receipt.entries.iter().any(|old| old.id == e.id))
+        .map(|(i, _)| i)
+        .collect();
+    if candidates.len() == original.len() {
         return Ok(());
     }
     let items:Vec<_>=candidates.iter().map(|e|json!({"id":e.id,"revision":e.revision,"sourceHead":e.source_head,"updatedAt":e.updated_at,"text":e.content,"title":e.title})).collect();
@@ -147,12 +160,6 @@ pub fn select_context(runtime: &TaskRuntime, req: &mut RunRequest) -> Result<(),
     {
         return Ok(());
     }
-    let original: Vec<_> = candidates
-        .iter()
-        .enumerate()
-        .filter(|(_, e)| req.context_receipt.entries.iter().any(|old| old.id == e.id))
-        .map(|(i, _)| i)
-        .collect();
     let selected = ranked_items(&result.record.answers, candidates.len(), &original, 3);
     req.context_receipt
         .entries
@@ -439,6 +446,26 @@ pub fn monitor(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn missing_key_skips_optional_assistance_and_discovery() {
+        let root = std::env::temp_dir().join(format!("jackalope-no-jev-{}", uuid::Uuid::new_v4()));
+        let runtime = TaskRuntime::new(root.join("history")).unwrap();
+        let directory = super::super::settings::directory(&runtime);
+        let mut preferences = super::super::settings::Preferences {
+            mode: super::super::DecisionMode::Jev,
+            ..Default::default()
+        };
+        super::super::settings::save(&directory, &mut preferences).unwrap();
+        std::fs::write(
+            directory.join("options.json"),
+            r#"{"default":{"contextSelection":true,"toolDiscovery":true}}"#,
+        )
+        .unwrap();
+        assert!(enabled(&runtime, "project").is_none());
+        assert!(!super::super::discovery::enabled(&runtime, "project"));
+        drop(runtime);
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn uncertain_existing_context_survives_but_confidently_irrelevant_context_can_be_removed() {
         let answers = json!({"relevance_0":{"probabilities":{"0":0.5,"1":0.4,"2":0.1}},"conflict_0":{"noul":0.5},

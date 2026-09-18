@@ -57,6 +57,11 @@ dispatch and CPU-based check capacity are implemented. Execution timings and off
 delivery comparisons retain waits, failures and missing review evidence. Validate
 complete task delivery and quality on representative repositories before claiming gains.
 
+Project review lessons require resolved feedback and matching successful checks.
+Chronological history comparisons and bounded offline prompt optimization have
+separate validation and held-out gates. Representative first-pass acceptance and
+actual correction counts still need measurement before making outcome claims.
+
 Versioned prompt guidance and recoverable tool-result selection are implemented.
 Ordinary tasks default to concise instructions, available tool schemas and final
 automatic saved checks, with full ownership guidance for managed assignments.

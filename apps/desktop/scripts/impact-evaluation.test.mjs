@@ -159,6 +159,86 @@ test('cost separates cache reads and missing measurements never become zero', ()
   );
 });
 
+test('quality claim gates require independent first-pass acceptance and preserve unknown corrections', () => {
+  const cases = Array.from({ length: 50 }, (_, i) => `quality-${i}`);
+  const comparison = {
+    model: 'test-model',
+    plan: { cases, repeat: 1 },
+    trials: ['control', 'after'].flatMap((variant) =>
+      cases.map((id, i) => ({
+        case: id,
+        source: { family: id },
+        variant,
+        repetition: 1,
+        split: 'holdout',
+        receipt: `${variant}:${id}`,
+        oraclePassed: variant === 'after' || i < 25,
+        attempts: 1,
+        elapsedMs: 100,
+        input: 90,
+        output: 10,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 100,
+      })),
+    ),
+  };
+  const options = {
+    reviews: Object.fromEntries(
+      comparison.trials.map((row) => [
+        row.receipt,
+        { accepted: row.oraclePassed, notes: 'Independent original-patch review.' },
+      ]),
+    ),
+    pricing: {
+      'test-model': { source: 'test', date: '2026-09-18', input: 1, output: 1, cachedInput: 1 },
+    },
+    protocol: {
+      phase: 'confirmation',
+      frozenBeforeRun: true,
+      replicated: true,
+      resourceLimits: 'equal',
+      cachePolicy: 'recorded',
+      primaryOutcome: 'first-pass-acceptance',
+    },
+  };
+  const report = impactReport(comparison, options);
+  assert.equal(report.qualityPublication.eligible, true);
+  assert.ok(report.quality.firstPassAcceptanceDifferencePercentagePoints.low >= 5);
+  assert.equal(report.quality.firstPassAcceptance.after.rate, 1);
+  assert.equal(report.quality.correctionRounds, null);
+  comparison.trials[0].attempts = 2;
+  const corrected = impactReport(comparison, options);
+  assert.equal(corrected.qualityPublication.eligible, false);
+  assert.equal(corrected.quality.firstPassAcceptance.control, null);
+  assert.equal(
+    impactReport(comparison, { ...options, reviews: {} }).qualityPublication.eligible,
+    false,
+  );
+  const unequal = {
+    ...comparison,
+    plan: { cases: Array.from({ length: 100 }, (_, i) => `unequal-${i}`), repeat: 1 },
+  };
+  unequal.trials = ['control', 'after'].flatMap((variant) =>
+    unequal.plan.cases.map((id, i) => ({
+      ...comparison.trials[1],
+      case: id,
+      variant,
+      attempts: 1,
+      receipt: `${variant}:${id}`,
+      source: { family: i < 80 ? 'large-family' : id },
+      oraclePassed: variant === 'control' ? i < 80 : i >= 80,
+    })),
+  );
+  const unequalReviews = Object.fromEntries(
+    unequal.trials.map((row) => [row.receipt, { accepted: row.oraclePassed, notes: 'Reviewed.' }]),
+  );
+  const regressed = impactReport(unequal, { ...options, reviews: unequalReviews });
+  assert.ok(regressed.quality.conservativeFamilySuccessDifferenceLowerBound > 0.05);
+  assert.equal(regressed.qualityPublication.eligible, false);
+  assert.ok(regressed.quality.firstPassAcceptanceDifferencePercentagePoints.low < 0);
+});
+
 test('impact reports retain failed costs and refuse marketing claims on tiny repeated fixtures', () => {
   const comparison = {
     plan: { cases: ['a', 'b', 'c'], repeat: 1 },

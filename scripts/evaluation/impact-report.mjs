@@ -245,6 +245,7 @@ export function impactReport(
     'acceptedExecutionMs',
     'deliveryMs',
     'conservativeTotalCostUsd',
+    'firstPassAcceptance',
   ]) {
     const samples = [];
     for (
@@ -252,7 +253,8 @@ export function impactReport(
       i < 2000 &&
       matched &&
       families.length >= 3 &&
-      (key !== 'acceptedExecutionMs' || humanComplete);
+      (!['acceptedExecutionMs', 'firstPassAcceptance'].includes(key) || humanComplete) &&
+      (key !== 'firstPassAcceptance' || rows.every((row) => row.attempts === 1));
       i++
     ) {
       const selected = [];
@@ -262,6 +264,12 @@ export function impactReport(
         selected.push(...rows.filter((row) => familyOf(row) === family));
       }
       const values = [baseline, candidate].map((variant) => {
+        if (key === 'firstPassAcceptance') {
+          const group = selected.filter((row) => row.variant === variant);
+          return (
+            group.filter((row) => row.oraclePassed && row.accepted === true).length / group.length
+          );
+        }
         const group = selected.filter((row) => row.variant === variant),
           passed = group.filter(
             (row) =>
@@ -279,8 +287,9 @@ export function impactReport(
         );
         return passed && total !== null ? total / passed : null;
       });
-      const r = reduction(...values);
-      if (r !== null) samples.push(r);
+      const r =
+        key === 'firstPassAcceptance' ? 100 * (values[1] - values[0]) : reduction(...values);
+      if (r !== null && Number.isFinite(r)) samples.push(r);
     }
     intervals[key] =
       samples.length === 2000
@@ -311,13 +320,14 @@ export function impactReport(
     publicationBlockers.push(
       'Quality uncertainty does not rule out a two-percentage-point regression; this is a reporting tolerance, not a guarantee.',
     );
+  const efficiencyBlockers = [];
   if (
     !Object.entries(intervals).some(
       ([key, interval]) =>
         ['acceptedExecutionMs', 'conservativeTotalCostUsd'].includes(key) && interval?.low >= 10,
     )
   )
-    publicationBlockers.push(
+    efficiencyBlockers.push(
       'No measured time or conservatively estimated total-cost improvement with a lower confidence bound of at least 10%.',
     );
   if (!protocol.replicated || !protocol.resourceLimits || !protocol.cachePolicy)
@@ -336,6 +346,36 @@ export function impactReport(
       ? ['Helper, fallback or correction costs are incomplete.']
       : []),
   );
+  const qualityBlockers = [...publicationBlockers];
+  if (protocol.primaryOutcome !== 'first-pass-acceptance')
+    qualityBlockers.push('First-pass acceptance must be the predeclared primary outcome.');
+  if (rows.some((row) => row.attempts !== 1))
+    qualityBlockers.push('First-pass claims require exactly one attempt per original task.');
+  if (intervals.firstPassAcceptance === null || intervals.firstPassAcceptance.low < 5)
+    qualityBlockers.push(
+      'The source-family-clustered first-pass acceptance gain must have a lower confidence bound of at least five percentage points.',
+    );
+  const resourceRatios = {
+    elapsedMs:
+      totals[baseline].elapsedMs > 0 && measured(totals[candidate].elapsedMs)
+        ? totals[candidate].elapsedMs / totals[baseline].elapsedMs
+        : null,
+    cost:
+      totals[baseline].totalCostBoundsUsd?.low > 0 &&
+      measured(totals[candidate].totalCostBoundsUsd?.high)
+        ? totals[candidate].totalCostBoundsUsd.high / totals[baseline].totalCostBoundsUsd.low
+        : null,
+  };
+  if (Object.values(resourceRatios).some((ratio) => ratio === null || ratio > 1.1))
+    qualityBlockers.push(
+      'Quality claims require measured total time and conservative cost within 10% of the baseline.',
+    );
+  if (
+    protocol.includesOptimization &&
+    ![protocol.optimizationCostUsd, protocol.optimizationMs].every(measured)
+  )
+    qualityBlockers.push('Record the full offline optimization cost and time separately.');
+  publicationBlockers.push(...efficiencyBlockers);
   return {
     version: 1,
     baseline,
@@ -362,7 +402,40 @@ export function impactReport(
       ),
     },
     intervals,
-    quality: { conservativeFamilySuccessDifferenceLowerBound: qualityBound },
+    quality: {
+      conservativeFamilySuccessDifferenceLowerBound: qualityBound,
+      firstPassAcceptanceDifferencePercentagePoints: intervals.firstPassAcceptance,
+      firstPassAcceptance: Object.fromEntries(
+        [baseline, candidate].map((variant) => {
+          const group = rows.filter((row) => row.variant === variant);
+          return [
+            variant,
+            group.length && group.every((row) => row.attempts === 1 && row.accepted !== null)
+              ? {
+                  accepted: totals[variant].accepted,
+                  trials: group.length,
+                  rate: totals[variant].accepted / group.length,
+                }
+              : null,
+          ];
+        }),
+      ),
+      correctionRounds: null,
+      resourceRatios,
+    },
+    qualityPublication: {
+      scope: 'first-pass-acceptance',
+      eligible: qualityBlockers.length === 0,
+      blockers: qualityBlockers,
+      optimization: protocol.includesOptimization
+        ? {
+            costUsd: protocol.optimizationCostUsd ?? null,
+            elapsedMs: protocol.optimizationMs ?? null,
+          }
+        : null,
+      limitation:
+        'Higher first-pass acceptance is not a measurement of correction rounds or human review time. Offline optimization overhead is reported separately; this gate does not authorize speed or cost claims.',
+    },
     publication: {
       scope: 'agent-execution',
       eligible: publicationBlockers.length === 0,

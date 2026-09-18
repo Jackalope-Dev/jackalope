@@ -1,6 +1,11 @@
 {
   "version": 1,
   "fields": {
+    "learning": {
+      "values": ["off", "local", "jev"],
+      "default": "off",
+      "environment": null
+    },
     "workflow": {
       "values": ["legacy", "final"],
       "default": "final",

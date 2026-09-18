@@ -7,6 +7,10 @@ mod trial;
 
 pub fn enabled(runtime: &TaskRuntime, project: &str) -> bool {
     super::policy(runtime, project).is_ok_and(|p| p.mode == DecisionMode::Jev)
+        && jev::key_for_routing(runtime, project)
+            .ok()
+            .flatten()
+            .is_some()
         && options::options(runtime, project).is_ok_and(|o| o.tool_discovery)
 }
 
