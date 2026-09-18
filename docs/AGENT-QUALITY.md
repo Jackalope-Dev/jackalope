@@ -178,6 +178,62 @@ records remain unknown rather than zero. Small fixture samples do not establish
 production tail latency or unchanged quality on real projects.
 
 
+## External container benchmarks
+
+`scripts/evaluation/harbor_agent.py` adapts Harbor 0.23.0 to the existing ignored
+native quality runner. Both arms receive the same upstream instruction and prepared
+repository. `direct` invokes the native CLI; `jackalope` assembles the production
+task guidance and uses the normal coordinator/runtime in the current directory.
+The container supplies isolation. This measures focused execution, not UI assessment,
+managed plans, worktree integration or installed desktop acceptance.
+
+Use a separate Python environment (`uv pip install harbor==0.23.0`) and Docker or
+another Harbor sandbox. The payload builder currently supports Linux x86_64 and a
+self-contained OpenCode executable. Other adapter names retain their native quality
+contracts but need matching payloads and separate acceptance. The desktop does not
+ship Harbor or require Python for normal execution.
+
+Before building the native test executable, freeze its working source:
+
+```sh
+python3 scripts/evaluation/harbor-package.py freeze /private/eval/source.json
+cargo test --locked --lib --manifest-path apps/desktop/src-tauri/Cargo.toml --no-run
+python3 scripts/evaluation/harbor-package.py --source-manifest /private/eval/source.json \
+  --binary /absolute/native-test-executable --node /absolute/node \
+  --opencode /absolute/opencode --output /private/eval/package
+```
+
+The package records source, binary and payload hashes and refuses changed native
+source or an existing output directory. Set `PYTHONPATH` to `scripts/evaluation`
+and configure Harbor's agent `import_path` as `harbor_agent:JackalopeAgent`, with an
+explicit `model_name` and `kwargs`: `payload`, `payload_sha256`, `variant`
+(`direct` or `jackalope`), `agent`, `seconds`, `tokens`, and optional
+`provider_meter: deepseek`. Agent runtime budgets support 30–1,800 seconds and
+1,000–10,000,000 delayed reported tokens. Give Harbor additional setup/shutdown
+time. These are screening limits, not hard billing caps or official benchmark budgets.
+
+The adapter requires the task's working directory to be its prepared Git root,
+creates the same evaluation branch in both arms, and leaves repository contents
+unchanged during setup. Task-provided MCP servers and skills are currently rejected
+instead of silently omitted. Upstream verifiers run separately after agent execution;
+no gold patch, oracle or generated fixture enters the agent request. A matching
+`JACKALOPE_EXTERNAL_WORKSPACE` explicitly authorizes the test-only in-place mode.
+
+DeepSeek credentials come from the parent process environment, never job arguments
+or saved configuration. Metering gives the worker a temporary proxy token and retains
+all provider request usage without request/response content. Optional `jev_questions`
+requires a privately supplied test key and functioning protected credential storage;
+ordinary runs require no Jev key. Retain native receipts, provider accounting and
+Harbor results, including setup failures and timeouts. Keep unknown costs unknown.
+
+Pin dataset revisions, images, clients, payload and task selection before execution.
+Validate unmodified failures and reference-solution passes before scoring a task.
+Counterbalance arm order and keep setup, execution and verifier time separate.
+Report shorter-budget subsets as pilots; they are not official leaderboard scores.
+Keep development and held-out tasks disjoint, including overlapping upstream task
+families. Standard graders establish benchmark outcomes, not human acceptance or
+the number of review corrections avoided.
+
 ## Effort, direct harness comparisons and routing evidence
 
 Capture current frontend prompts before edits with `pnpm evaluate:quality --

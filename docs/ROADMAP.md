@@ -51,6 +51,8 @@ remain in progress; implementation does not establish release availability.
 Focused task guidance and retrievable compact verification output are implemented.
 [Quality trials](AGENT-QUALITY.md) compare the changed behavior against a preserved
 baseline; broader provider comparisons and independent acceptance remain in progress.
+External container benchmarks can exercise the native task path with unchanged
+upstream grading; representative benefits still require matched confirmation.
 
 Codex speed controls, fresh context for changed workspaces, dependency-priority
 dispatch and CPU-based check capacity are implemented. Execution timings and offline

@@ -79,6 +79,9 @@ release dates.
   review. Preserve failures and missing usage. Meet separate training/held-out
   gates before enabling automatic effort escalation or learned routing. Validate
   effort overrides and long verification cancellation in installed applications.
+  Use the Harbor adapter for pinned external repository tasks, validate upstream
+  graders and compare matched native/Jackalope runs before expanding to other harnesses.
+  Extend container payload/provider coverage and independently confirm any pilot signal.
 - [ ] Validate [local setup](LOCAL-AI.md) with real models in the packaged app:
   hardware/memory requirements, current installers, download cancellation/resume,
   account selection and continued tasks. Check macOS/Linux and enterprise configuration.

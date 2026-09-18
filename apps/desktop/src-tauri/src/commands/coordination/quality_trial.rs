@@ -1,8 +1,9 @@
 use super::*;
 use serde_json::{json, Value};
-use std::{path::Component, time::Instant};
+use std::time::Instant;
 mod jev_fixture;
 mod learning;
+mod workspace;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Runs one installed-agent benchmark in a disposable workspace; requires JACKALOPE_QUALITY_SPEC"]
@@ -14,35 +15,9 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let spec_path = PathBuf::from(std::env::var("JACKALOPE_QUALITY_SPEC")?);
     let mut spec: Value = serde_json::from_slice(&std::fs::read(&spec_path)?)?;
     let root = std::env::temp_dir().join(format!("jackalope-quality-{}", Uuid::new_v4()));
-    let repo = root.join("repo");
-    std::fs::create_dir_all(&repo)?;
-    for (name, content) in spec["files"].as_object().ok_or("Missing fixture files")? {
-        let relative = PathBuf::from(name);
-        if relative
-            .components()
-            .any(|c| !matches!(c, Component::Normal(_)))
-        {
-            return Err("Fixture paths must be relative without traversal".into());
-        }
-        let path = repo.join(relative);
-        std::fs::create_dir_all(path.parent().ok_or("Invalid fixture path")?)?;
-        std::fs::write(path, content.as_str().ok_or("Invalid fixture content")?)?;
-    }
-    for args in [
-        vec!["init", "-b", "main"],
-        vec!["config", "user.name", "Evaluation fixture"],
-        vec!["config", "user.email", "evaluation@example.invalid"],
-        vec!["config", "commit.gpgsign", "false"],
-        vec!["add", "."],
-        vec!["commit", "-m", "Evaluation fixture"],
-        vec![
-            "config",
-            "jackalope.commitPolicy",
-            r#"{"attribution":"user","name":"Evaluation fixture","email":"evaluation@example.invalid","cleanupAfterMerge":false,"autoCheckpoint":false}"#,
-        ],
-    ] {
-        super::evaluation_trial::git(&repo, &args)?;
-    }
+    let external = spec["externalWorkspace"].is_string();
+    let repo = workspace::prepare(&root, &spec)?;
+    let target_branch = super::evaluation_trial::git(&repo, &["symbolic-ref", "--short", "HEAD"])?;
     let project_id = Uuid::new_v4().to_string();
     learning::seed(&root, &repo, &project_id, &spec)?;
     let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
@@ -113,7 +88,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     let tokens = spec["tokens"]
         .as_u64()
         .unwrap_or(250_000)
-        .clamp(1000, 1_000_000);
+        .clamp(1000, if external { 10_000_000 } else { 1_000_000 });
     let started = Instant::now();
     let direct_result = if direct {
         Some(super::quality_direct::run(&runtime, &repo, &spec))
@@ -134,7 +109,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
             .start_manual(serde_json::from_value(json!({
                 "id":id,"projectId":project_id,"projectName":"Quality benchmark",
                 "projectPath":repo,"agent":spec["agent"],"model":spec["model"],
-                "isolated":true,"targetBranch":"main","connectionIds":fixture_ids,
+                "isolated":!external,"targetBranch":target_branch,"connectionIds":fixture_ids,
                 "contextSelection":{"memoryOff":learning_mode == "off","outcomes":spec["outcomes"].as_array().cloned().unwrap_or_default(),
                     "jevPreparation":null},"prompt":spec["prompt"],
                 "verifyCommand":spec["check"],"autoVerify":true,"effort":spec["effort"],"codexSpeed":spec["codexSpeed"]
@@ -198,12 +173,16 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
         .filter_map(|id| runs.iter().find(|r| &r.id == id))
         .collect();
     let run = direct_run.or_else(|| runs.iter().find(|r| r.id == id));
-    std::fs::write(
-        root.join("oracle.cjs"),
-        spec["oracle"].as_str().ok_or("Missing oracle")?,
-    )?;
+    if !external {
+        std::fs::write(
+            root.join("oracle.cjs"),
+            spec["oracle"].as_str().ok_or("Missing oracle")?,
+        )?;
+    }
     let oracle = if let Some(run) = run.filter(|r| {
-        !["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
+        !external && {
+            !["starting", "running", "stopping", "interrupted"].contains(&r.status.as_str())
+        }
     }) {
         let mut command = std::process::Command::new("node");
         command.arg(root.join("oracle.cjs")).arg(&run.workspace);
@@ -236,7 +215,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
                 .is_some_and(|id| attempt_ids.contains(id))
         })
         .collect::<Vec<_>>();
-    let report = json!({"version":2,"decisionRecords":decisions,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
+    let report = json!({"version":2,"externalWorkspace":external,"decisionRecords":decisions,"case":spec["id"],"variant":spec["variant"],"fixtureToolCalls":tool_calls,
         "agent":spec["agent"],"model":spec["model"],"elapsedMs":elapsed,
         "budgetStopped":stopped,"launchError":launch_error,"oracle":oracle,
         "promptBytes":if direct { spec["prompt"].as_str().map(str::len) } else if followups.is_empty() { input.as_ref().map(Vec::len) } else { Some(attempts.iter().map(|r| r.efficiency.launch_prompt_bytes as usize).sum()) },"run":run,"attempts":if followups.is_empty() {None} else {Some(&attempts)},"agentVerification":agent_verification,

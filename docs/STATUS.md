@@ -171,6 +171,9 @@ representative benefit and installed-platform acceptance remain open.
   quality, monetary savings and installed acceptance
   remain open. Connection execution avoids holding the shared broker catalog lock
   during network calls. General task savings remain unproven.
+  An external Harbor adapter runs prepared Git repositories through the same native
+  task path with separate upstream grading and optional request metering. Its initial
+  payload targets Linux x86_64/OpenCode; broader provider and benchmark acceptance remain open.
 - Shared appearance, guided onboarding, task notifications and optional settings sync.
   Project setup includes project, agents, decisions, behavior, appearance and an optional
   first task. Theme editors open directly; existing saved app/project choices remain compatible.
