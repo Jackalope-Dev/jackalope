@@ -540,6 +540,14 @@ failed trial and records the unfinished matrix. Keep this option in the frozen p
 do not mix an early-stopped screen with a completed confirmation study.
 
 Direct controls support Codex, Claude Code, OpenCode and Antigravity (`agy`).
+OpenCode step receipts include worker reasoning tokens but do not capture every
+auxiliary request, such as native session-title generation. Treat its CLI-reported
+cost as a worker estimate, not a billing total. Keep
+`nativeAuxiliaryAccountingComplete` false until all provider requests have been
+measured; missing fields in older OpenCode comparisons also block total-cost claims.
+Jackalope supplies a deterministic title for new OpenCode tasks to avoid redundant
+title generation; resumed sessions retain their existing titles. Direct controls
+retain the native default behavior.
 Antigravity shares the production stream parser and inherits its CLI permissions;
 permission denials, missing terminal results and absent usage remain failures or
 unknown measurements. Antigravity tool fixtures use a temporary workspace-local

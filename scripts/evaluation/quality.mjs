@@ -537,6 +537,7 @@ if (!args.includes('--execute')) {
           usageBreakdown: runs.length ? runUsageBreakdown(runs, helperUsages) : null,
           agentUsage,
           agentReportedCostUsd,
+          nativeAuxiliaryAccountingComplete: agent === 'opencode' ? false : null,
           helperUsage,
           helperCostUsd,
           helperAccountingComplete,

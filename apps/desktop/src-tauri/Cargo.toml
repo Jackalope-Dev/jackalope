@@ -46,6 +46,8 @@ dunce = "1"
 oxc_resolver = "11"
 notify-debouncer-mini = "=0.7.0"
 gix = { version = "=0.87.1", default-features = false, features = ["sha1", "sha256"] }
+flate2 = "1.1.10"
+tar = "0.4.46"
 
 [features]
 default = ["custom-protocol"]

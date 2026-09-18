@@ -253,6 +253,33 @@ test('impact reports retain failed costs and refuse marketing claims on tiny rep
       impactReport(separatePrices, priceOptions).totals.after.totalCostBoundsUsd.low - 0.0003063,
     ) < 1e-12,
   );
+  const partialNative = { ...separatePrices, agent: 'opencode' };
+  const nativeReport = impactReport(partialNative, priceOptions);
+  assert.equal(nativeReport.totals.after.totalCostBoundsUsd, null);
+  assert.equal(nativeReport.reductions.conservativeTotalCostPerSuccess, null);
+  assert.ok(nativeReport.totals.after.estimatedModelCostUsd > 0);
+  assert.ok(nativeReport.publication.blockers.some((text) => text.includes('auxiliary requests')));
+  assert.ok(
+    impactReport(
+      {
+        ...partialNative,
+        trials: partialNative.trials.map((row) => ({
+          ...row,
+          nativeAuxiliaryAccountingComplete: true,
+        })),
+      },
+      priceOptions,
+    ).totals.after.totalCostBoundsUsd,
+  );
+  const nativeExport = publicImpact(partialNative, {
+    id: 'native-accounting',
+    title: 'Native accounting',
+    detail: 'Worker measurements only',
+    labels: { control: 'Baseline', after: 'Candidate' },
+  });
+  assert.ok(
+    nativeExport.trialMeasurements.every((row) => row.nativeAuxiliaryAccountingComplete === false),
+  );
   separatePrices.trials[0].helperCostUsd = null;
   assert.equal(impactReport(separatePrices, priceOptions).totals.control.totalCostBoundsUsd, null);
   const wrongPlan = { ...comparison, plan: { cases: ['a', 'b', 'unrun'], repeat: 1 } };

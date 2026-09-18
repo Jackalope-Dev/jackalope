@@ -98,6 +98,10 @@ export function impactReport(
       const modelCostBounds = modelUsage
         ? pricedBounds(modelUsage, pricing[row.model ?? comparison.model])
         : null;
+      const nativeAuxiliaryAccountingComplete =
+        (row.agent ?? comparison.agent) === 'opencode'
+          ? row.nativeAuxiliaryAccountingComplete === true
+          : (row.nativeAuxiliaryAccountingComplete ?? null);
       const helperCostUsd = Object.hasOwn(row, 'helperCostUsd')
         ? row.helperCostUsd
         : protocol.includesHelpers
@@ -116,6 +120,7 @@ export function impactReport(
         reviewMinutes: review?.reviewMinutes ?? null,
         correctionMinutes: review?.correctionMinutes ?? null,
         estimatedCostUsd,
+        nativeAuxiliaryAccountingComplete,
         helperCostUsd: helperCostUsd ?? null,
         fallbackCostUsd,
         correctionCostUsd,
@@ -124,7 +129,7 @@ export function impactReport(
             ? row.elapsedMs + 60000 * (review.reviewMinutes + review.correctionMinutes)
             : null,
         costBounds:
-          modelCostBounds && extraCost !== null
+          nativeAuxiliaryAccountingComplete !== false && modelCostBounds && extraCost !== null
             ? { low: modelCostBounds.low + extraCost, high: modelCostBounds.high + extraCost }
             : null,
       };
@@ -286,6 +291,8 @@ export function impactReport(
   const publicationBlockers = [];
   if (rows.some((row) => row.helperAccountingComplete === false))
     publicationBlockers.push('Helper accounting was not captured for every trial.');
+  if (rows.some((row) => row.nativeAuxiliaryAccountingComplete === false))
+    publicationBlockers.push('Native-agent auxiliary requests are not fully observed.');
   if (!complete) publicationBlockers.push('The planned paired matrix or accounting is incomplete.');
   if (cases.length < 50 || families.length < 20)
     publicationBlockers.push(

@@ -66,6 +66,11 @@ export function publicImpact(comparison, options) {
       cacheWrite: row.cacheWrite,
       totalTokens: row.totalTokens,
       agentUsage: row.agentUsage ?? null,
+      agentReportedCostUsd: row.agentReportedCostUsd ?? null,
+      nativeAuxiliaryAccountingComplete:
+        comparison.agent === 'opencode'
+          ? row.nativeAuxiliaryAccountingComplete === true
+          : (row.nativeAuxiliaryAccountingComplete ?? null),
       helperUsage: row.helperUsage ?? null,
       helperCostUsd: row.helperCostUsd ?? null,
       helperAccountingComplete: row.helperAccountingComplete ?? false,

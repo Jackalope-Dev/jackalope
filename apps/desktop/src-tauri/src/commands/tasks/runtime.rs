@@ -540,6 +540,8 @@ impl TaskRuntime {
                 crate::commands::previews::ensure_idle(&old.workspace)?;
                 crate::commands::verification::ensure_idle(&old.workspace)?;
                 cmd.args(["--session", old.session_id.as_deref().unwrap()]);
+            } else {
+                cmd.args(["--title", &format!("Jackalope task {id}")]);
             }
         } else if adapter == "grok" {
             cmd.args([
