@@ -197,7 +197,7 @@ pub async fn local_ai_inspect() -> Result<Value, String> {
         .collect();
     Ok(
         json!({"hardware":hardware,"models":models(),"installedModels":installed,"ollamaOnline":found.is_ok(),
-        "opencodeInstalled":tasks::executable("opencode").is_ok(),"canInstall":cfg!(windows) && winget().is_ok(),
+        "opencodeInstalled":tasks::executable("opencode").is_ok(),"canPrepareRunner":super::managed_runtime::supported(),"canInstall":cfg!(windows) && winget().is_ok(),
         "runtimeDiskBytes":4_000_000_000u64,"catalogCheckedAt":"2026-09-10","endpoint":ENDPOINT}),
     )
 }

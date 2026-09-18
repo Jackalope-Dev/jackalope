@@ -415,6 +415,7 @@ pub fn apply_binding(
             return Err("Add a Gemini API key to this Antigravity account before using it.".into());
         }
     }
+    super::managed_runtime::configure(command);
     Ok(())
 }
 

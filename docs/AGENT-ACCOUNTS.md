@@ -71,12 +71,20 @@ that saved profile instead of silently falling back to another account.
 
 ## Device-owned API keys
 
-For DeepSeek, select OpenCode → Provider API key, create a named account and choose
-DeepSeek in the provider selector. Then select an available `deepseek/…` model in
-that account's model settings. Existing OpenCode provider sign-ins remain available.
-The installed CLI supplies model discovery; Jackalope does not pin a DeepSeek model
+For DeepSeek, use **Connect an API provider** in Agents, choose DeepSeek and enter
+your key. Jackalope prepares its private OpenCode runner before saving the key and
+discovering models. No separate OpenCode installation or account is required.
+The OpenCode account's **Provider API key** action supports the same flow.
+Existing OpenCode provider sign-ins remain available. The selected runner supplies
+model discovery; Jackalope does not pin a DeepSeek model
 or treat catalog visibility as proof of access. Follow the provider's
 [OpenCode compatibility guidance](https://api-docs.deepseek.com/quick_start/agent_integrations/opencode/).
+
+Preparation has progress, cancellation and retry. A failed or canceled download
+does not save the entered key. Each app profile keeps one active pinned runner;
+tasks, model discovery, routing helpers and Ask Jackalope share its executable
+resolver while retaining their selected account and model. Explicit executable
+overrides take precedence. See [runner maintenance](AGENT-SUPPORT.md#private-opencode-runner).
 
 Environment discovery recognizes `DEEPSEEK_API_KEY` and imports it into a separate
 OpenCode account only when selected. New OpenCode key imports use protected device

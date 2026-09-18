@@ -336,6 +336,16 @@ fn only_aider_and_goose_remain_explicitly_unimplemented() {
 #[ignore = "Runs a paid or free installed agent in a disposable repository; set JACKALOPE_AGENT_TRIAL"]
 fn installed_agent_lifecycle_trial() {
     let agent = std::env::var("JACKALOPE_AGENT_TRIAL").expect("Choose the agent explicitly");
+    if agent == "opencode" {
+        if let Some(directory) = std::env::var_os("JACKALOPE_RUNTIME_TRIAL_DIR") {
+            let directory = PathBuf::from(directory);
+            assert!(directory.is_absolute());
+            crate::commands::managed_runtime::initialize(directory.clone());
+            assert!(super::executable("opencode")
+                .unwrap()
+                .starts_with(directory));
+        }
+    }
     agent_lifecycle_trial(&agent, None);
 }
 

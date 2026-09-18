@@ -26,6 +26,7 @@ pub mod decisions;
 pub mod jev;
 pub mod local_ai;
 pub mod local_detection;
+pub mod managed_runtime;
 mod retrieval;
 
 pub mod history;

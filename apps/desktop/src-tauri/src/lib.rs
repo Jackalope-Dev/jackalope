@@ -36,6 +36,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(SignInService::default())
         .manage(commands::local_ai::LocalAi::default())
+        .manage(commands::managed_runtime::ManagedRuntime::default())
         .manage(CapacityService::default())
         .manage(commands::agent_models::ModelCatalogService::default())
         .setup(move |app| {
@@ -50,6 +51,7 @@ pub fn run() {
                 .map(std::path::PathBuf::from)
                 .unwrap_or(directory);
             let resetting = reset_on_startup(&directory)?;
+            commands::managed_runtime::initialize(directory.join("agent-runtimes"));
             let runtime = TaskRuntime::new(directory.clone())?;
             runtime.observe_changes(app.handle().clone());
             let helper = commands::helper::Helper::new(directory.clone(), runtime.clone());
@@ -162,6 +164,9 @@ pub fn run() {
             commands::local_ai::local_ai_verify,
             commands::local_ai::local_ai_connect,
             commands::local_ai::local_ai_cancel,
+            commands::managed_runtime::managed_runtime_status,
+            commands::managed_runtime::managed_runtime_prepare,
+            commands::managed_runtime::managed_runtime_cancel,
             pty_spawn,
             pty_write,
             pty_resize,

@@ -12,21 +12,23 @@ import {
   setActiveAgentProfile,
 } from '../../lib/agent-profiles';
 import { type ApiProvider, apiProviders } from '../../lib/api-providers';
+import { useManagedRuntime } from '../../lib/managed-runtime';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
 import { syncAgentConfig, useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
-import { openAgentConfiguration } from '../layout/navigation';
 import { Button } from '../ui/button';
 import { DialogContent, DialogFooter, DialogHeader } from '../ui/Dialog';
 import { FormField } from '../ui/FormField';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose: () => void }) {
   const focus = useDialogFocus();
+  const runner = useManagedRuntime();
   const [name, setName] = useState(provider.name as string);
   const [key, setKey] = useState('');
   const profile = useRef<AgentProfile | null>(null);
@@ -76,8 +78,8 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
           title={`Connect ${provider.name}`}
           description={
             <>
-              Use your {provider.name} API key. OpenCode runs the agent and its tools; API usage is
-              billed by {provider.name}.
+              Use your {provider.name} API key. Jackalope downloads its private OpenCode runner on
+              first connection (up to 65 MB). API usage is billed by {provider.name}.
             </>
           }
         />
@@ -90,6 +92,7 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
             setError('');
             try {
               if (!keySaved) {
+                await runner.prepare();
                 profile.current ??= await createAgentProfile('opencode', name.trim(), null);
                 await saveAgentProfileKey('opencode', profile.current.id, provider.key, key);
                 setKey('');
@@ -205,6 +208,12 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
               )}
             </>
           )}
+          {runner.preparing && (
+            <ManagedRuntimeProgress
+              progress={runner.progress}
+              onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+            />
+          )}
           {error && <InlineNotice tone="error">{error}</InlineNotice>}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>
@@ -231,15 +240,13 @@ function ConnectProvider({ provider, onClose }: { provider: ApiProvider; onClose
 
 export function ProviderConnections() {
   const [provider, setProvider] = useState<ApiProvider>();
-  const installed = useExecutionStore((state) =>
-    state.runners.some((runner) => runner.id === 'opencode' && runner.available),
-  );
   return (
     <section className="workspace-stack" aria-label="Connect an API provider">
       <div>
         <h2 className="text-base font-medium">Connect an API provider</h2>
         <p className="task-muted">
-          Bring your own key for DeepSeek and other providers. Agent tools run through OpenCode.
+          Bring your own key for DeepSeek and other providers. No separate OpenCode installation or
+          account is needed.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -254,14 +261,6 @@ export function ProviderConnections() {
           </Button>
         ))}
       </div>
-      {!installed && (
-        <p className="task-muted">
-          OpenCode is required for these connections.{' '}
-          <Button variant="ghost" onClick={() => openAgentConfiguration('opencode')}>
-            Set up OpenCode
-          </Button>
-        </p>
-      )}
       {provider && (
         <ConnectProvider
           key={provider.id}

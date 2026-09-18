@@ -3,10 +3,12 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { type AgentProfile, saveAgentProfileKey } from '../../lib/agent-profiles';
 import { apiProviders } from '../../lib/api-providers';
+import { useManagedRuntime } from '../../lib/managed-runtime';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
 import { useDialogFocus } from '../ui/useDialogFocus';
+import { ManagedRuntimeProgress } from './ManagedRuntimeProgress';
 
 export function AgentKeySignIn({
   agentId,
@@ -24,6 +26,7 @@ export function AgentKeySignIn({
   returnFocus: HTMLElement | null;
 }) {
   const focus = useDialogFocus();
+  const runner = useManagedRuntime();
   const antigravity = agentId === 'antigravity';
   const [provider, setProvider] = useState(antigravity ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY');
   const [key, setKey] = useState('');
@@ -68,7 +71,7 @@ export function AgentKeySignIn({
             {antigravity
               ? 'Separate Antigravity accounts use Gemini API keys, with separate API billing. Google subscription logins still use the existing CLI account.'
               : agentId === 'opencode'
-                ? 'Connect DeepSeek or another provider through OpenCode. After saving, select a model from that provider. Saving a key does not verify model access or available credit.'
+                ? 'Connect DeepSeek or another provider. Jackalope prepares its private OpenCode runner on first use (up to 65 MB). After saving, select a model from that provider. Model access and credit are checked when a task runs.'
                 : 'Connect a provider API key for this account. Each account keeps its own credentials and provider billing.'}
           </Dialog.Description>
           <form
@@ -78,6 +81,7 @@ export function AgentKeySignIn({
               setBusy(true);
               setError('');
               try {
+                if (agentId === 'opencode') await runner.prepare();
                 await saveAgentProfileKey(agentId, profile.id, provider, key);
                 setKey('');
                 await onSaved(useForTasks);
@@ -128,6 +132,12 @@ export function AgentKeySignIn({
               />
               Use for new tasks
             </label>
+            {runner.preparing && (
+              <ManagedRuntimeProgress
+                progress={runner.progress}
+                onCancel={() => void runner.cancel().catch((cause) => setError(String(cause)))}
+              />
+            )}
             {error && <InlineNotice tone="error">{error}</InlineNotice>}
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" disabled={busy} onClick={() => void close()}>

@@ -20,10 +20,11 @@ const f = window.accountFixture = {
   calls: [], outcome: 'running', failDelete: false, delayStart: false,
   theme: appearance => applyThemeTokens({ ...DEFAULT_THEME, isDark: appearance === 'dark' }),
 };
-window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
+window.__TAURI_INTERNALS__ = { transformCallback: () => 0, unregisterCallback: () => {}, invoke: async (command, args = {}) => {
   f.calls.push({ command, ...args });
   const profile = f.profiles.find(p => p.id === args.id);
   switch (command) {
+    case 'managed_runtime_prepare': return;
     case 'agent_profile_list': return {
       profiles: f.profiles.filter(p => !p.pending), activeId: null,
       defaultName: 'CLI account', defaultGroup: null, defaultTag: null, envVar: 'CODEX_HOME',
@@ -79,7 +80,7 @@ try {
   await page.route('**/src/main.tsx', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
-  await page.goto(url);
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const edit = page.getByRole('button', { name: 'Edit Personal', exact: true });
   await edit.waitFor();
   for (const width of [1280, 960]) {

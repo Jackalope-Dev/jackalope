@@ -193,6 +193,44 @@ Their task launch explicitly fails with an explanation instead of falling throug
 to Grok's flags. Account setup must not be presented as task execution acceptance.
 Copilot and other agents without a native adapter cannot execute tasks.
 
+## Private OpenCode runner
+
+API-key connection and Local AI setup can download a private OpenCode 1.18.31
+runner without npm, Node, Bun or a separate CLI installation. Supported downloads
+are Windows, macOS and GNU Linux on x64 and ARM64; x64 uses the baseline CPU build.
+Installed-platform acceptance is separate from the download manifest.
+
+`commands/managed_runtime/assets.json` pins registry URLs and SHA-512 archive
+digests. Native code bounds the download and extraction, accepts only the exact
+regular executable, retains its upstream MIT license and atomically activates a
+receipt with an executable SHA-256. Downloads run only from explicit setup, with
+progress, operation-owned cancellation and a cross-process installation lock.
+Interrupted attempts never replace the active receipt. Failed preparation is
+retryable; abandoned staging folders after a process crash are inert.
+
+Runners live under `task-runs-v1/agent-runtimes` in the app's selected profile.
+Explicit executable overrides win, followed by the verified private runner and
+then ordinary CLI discovery. A damaged active runner fails with a repair message
+instead of silently selecting another executable. Reconnect an API provider or
+use Local AI setup to repair it. Valid installations work offline and are reused
+after restart; provider requests and first-time model discovery still need their
+own connectivity. Automatic runner updates are disabled for managed launches.
+To update the pin, verify all platform digests and license provenance, change the
+version and manifest together, then repeat native setup and lifecycle checks.
+Old version directories remain intact so running processes are not overwritten.
+Resetting Jackalope removes its private runner along with other app-owned data.
+
+This changes executable delivery, not task permissions, account binding, process
+ownership or MCP contracts. API tasks retain their owned child processes; the
+existing bounded warm helper pool is restricted to managed local-model accounts.
+
+The ignored `installed_runtime_trial` test downloads and runs the pinned binary
+under a fresh absolute `JACKALOPE_RUNTIME_TRIAL_DIR`. It checks private resolution,
+the version, offline reuse and executable override precedence without model usage.
+Provider lifecycle validation remains a separate check.
+Set `JACKALOPE_RUNTIME_TRIAL_DIR` to an existing prepared trial directory when
+running `installed_agent_lifecycle_trial` with OpenCode to test that private binary.
+
 ## Run opt-in validation
 
 The test uses the selected installed agent and may consume provider usage.

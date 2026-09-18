@@ -1,5 +1,17 @@
 [
   {
+    "id": "connect-api-providers-without-a-separate-cli-install",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "Connect API providers without a separate CLI install",
+    "description": "Jackalope can prepare a private agent runner when connecting DeepSeek and other supported API providers.",
+    "items": [
+      "One guided setup downloads and verifies the runner, then saves your protected API key and discovers models.",
+      "Tasks, configured helpers and local-model setup share the runner while keeping account and model choices separate."
+    ],
+    "note": "In development. Installed cross-platform acceptance remains in progress."
+  },
+  {
     "id": "curated-mcp-marketplace",
     "date": "2026-09-17",
     "status": "In development",

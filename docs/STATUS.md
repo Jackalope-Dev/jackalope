@@ -63,7 +63,9 @@ and [release requirements](RELEASE.md) for outstanding acceptance work.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
   quota handoff. Explicit assignments and continuation identities remain pinned.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,
-  using protected OpenCode account keys and discovered models. It also supports local
+  using protected OpenCode account keys and discovered models. First connection can
+  prepare a pinned private runner with progress and retry; no separate OpenCode
+  installation is needed. Local AI setup shares that runner. It also supports local
   key import alongside provider CLI sign-in. Saved keys do not prove model access.
   Capacity discovery shares bounded concurrent refreshes. Equivalent explicit
   agent/model choices select an account without an extra model call.

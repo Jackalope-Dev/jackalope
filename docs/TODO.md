@@ -127,6 +127,8 @@ release dates.
 - [ ] Validate OpenCode direct MCP, Grok model discovery and Antigravity quota refresh with
   installed profiles; retain explicit CLI/version boundaries from the capability boundaries.
   Include DeepSeek key import, protected named-account execution and model selection.
+  Validate private runner download, cancellation, integrity repair and pinned-version
+  upgrades in installed Windows, macOS and GNU Linux builds on x64 and ARM64.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without
   weakening process ownership, usage accounting or saved-session compatibility.
 - [ ] Add isolated Antigravity subscription accounts only when its CLI supports

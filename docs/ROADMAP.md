@@ -14,6 +14,7 @@ aligned with this guide when capabilities or priorities change.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
 - Provider accounts, model/effort choices, capacity-aware routing and usage reporting.
   OpenCode accepts protected provider keys, including DeepSeek, alongside CLI sign-in.
+  Guided API and local-model setup can prepare a private runner without a separate CLI install.
   Decisions can use local rules, an agent or optional Jev assistance. Jev supports
   repository/model evidence, cost objectives and opt-in context, result, monitor and
   assignment assistance; live calibration and installed acceptance remain open.

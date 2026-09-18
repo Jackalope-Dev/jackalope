@@ -16,14 +16,22 @@ import '/src/index.css';
 import '/src/components/tasks/task-workspace.css';
 import '/src/components/ui/experience.css';
 const f = window.providerFixture = {
-  profiles: [], calls: [], failModels: false, failDelete: false, activeId: null,
+  profiles: [], calls: [], failModels: false, failDelete: false, activeId: null, failRunner: false, delayRunner: false,
   options: () => useAgentConfigStore.getState().runnerOptions,
   theme: isDark => applyThemeTokens({ ...DEFAULT_THEME, isDark }),
 };
-useExecutionStore.setState({ runners: [{id:'opencode',available:true}], discover: async () => {} });
-window.__TAURI_INTERNALS__ = { invoke: async (command, args = {}) => {
+useExecutionStore.setState({ runners: [{id:'opencode',available:false}], discover: async () => {} });
+window.__TAURI_INTERNALS__ = { transformCallback: () => 0, unregisterCallback: () => {}, invoke: async (command, args = {}) => {
   f.calls.push({ command, ...args, ...(command === 'agent_profile_save_key' ? {value:'[redacted]'} : {}) });
   switch (command) {
+    case 'managed_runtime_prepare':
+      if (f.failRunner) throw new Error('Runner integrity check failed. Retry the download.');
+      args.progress.onmessage({phase:'download',message:'Downloading the private OpenCode runner',completed:30000000,total:60000000});
+      if (f.delayRunner) return new Promise((resolve, reject) => { f.cancelRunner = reject; f.runnerOperation = args.operationId; });
+      return;
+    case 'managed_runtime_cancel':
+      if (args.operationId === f.runnerOperation) f.cancelRunner(new Error('Runner setup canceled. You can retry when ready.'));
+      return;
     case 'agent_profile_create': {
       const profile = { id: crypto.randomUUID(), name: args.name, pending: true };
       f.profiles.push(profile); return profile;
@@ -57,7 +65,10 @@ try {
   const page = await browser.newPage();
   page.setDefaultTimeout(10000);
   const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('pageerror', (error) => {
+    errors.push(error.message);
+    console.error(error.message);
+  });
   await page.route('**/src/main.tsx', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: fixture }),
   );
@@ -106,6 +117,28 @@ try {
   await open.click();
   await dialog.getByLabel('API key', { exact: true }).fill('fixture-never-a-real-key');
   await page.evaluate(() => {
+    window.providerFixture.failRunner = true;
+  });
+  await dialog.getByRole('button', { name: 'Save key & find models' }).click();
+  await dialog.getByRole('alert').filter({ hasText: 'Runner integrity check failed' }).waitFor();
+  assert.equal(await page.evaluate(() => window.providerFixture.profiles.length), 0);
+  assert.equal(
+    await dialog.getByLabel('API key', { exact: true }).inputValue(),
+    'fixture-never-a-real-key',
+  );
+  await page.evaluate(() => {
+    window.providerFixture.failRunner = false;
+    window.providerFixture.delayRunner = true;
+  });
+  await dialog.getByRole('button', { name: 'Save key & find models' }).click();
+  await dialog.getByRole('progressbar', { name: 'Runner download' }).waitFor();
+  assert.equal(await dialog.getByRole('progressbar').getAttribute('value'), '50');
+  await page.screenshot({ path: `${output}/download-960-dark.png` });
+  await dialog.getByRole('button', { name: 'Cancel runner setup' }).click();
+  await dialog.getByRole('alert').filter({ hasText: 'Runner setup canceled' }).waitFor();
+  assert.equal(await page.evaluate(() => window.providerFixture.profiles.length), 0);
+  await page.evaluate(() => {
+    window.providerFixture.delayRunner = false;
     window.providerFixture.failModels = true;
   });
   await dialog.getByRole('button', { name: 'Save key & find models' }).click();
@@ -149,6 +182,10 @@ try {
   assert.equal(state.options.opencode.defaultModel, 'deepseek/pro');
   assert.equal(state.calls.filter((call) => call.command === 'agent_profile_save_key').length, 2);
   assert.ok(
+    state.calls.findIndex((call) => call.command === 'managed_runtime_prepare') <
+      state.calls.findIndex((call) => call.command === 'agent_profile_create'),
+  );
+  assert.ok(
     state.calls
       .filter((call) => call.command === 'agent_profile_save_key')
       .every((call) => call.name === 'DEEPSEEK_API_KEY'),
@@ -156,7 +193,7 @@ try {
   assert.ok(!state.storage.includes('fixture-never-a-real-key'));
   assert.deepEqual(errors, []);
   console.log(
-    'Provider connection fixtures passed: keyboard/focus, 3 sizes, themes, reduced motion, password field, discovery retry, cancellation cleanup, provider filtering, explicit default and no key in browser persistence. No live authentication performed.',
+    'Provider connection fixtures passed: keyboard/focus, 3 sizes, themes, reduced motion, missing CLI, download progress, integrity retry, owned cancellation before key storage, discovery retry, profile cleanup, provider filtering, explicit default and no key in browser persistence. No live authentication performed.',
   );
 } finally {
   await browser.close();

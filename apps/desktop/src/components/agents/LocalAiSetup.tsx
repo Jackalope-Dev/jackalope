@@ -29,6 +29,7 @@ import {
   localHelperModels,
   modelFit,
 } from '../../lib/local-ai';
+import { useManagedRuntime } from '../../lib/managed-runtime';
 import { nativeTask } from '../../lib/task-runtime';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import { useAgentAccountsStore } from '../../stores/agentAccountsStore';
@@ -116,6 +117,7 @@ export function LocalAiSteps({
   projectSetup?: boolean;
 }) {
   const [inspection, setInspection] = useState<LocalInspection | null>(preview ?? null);
+  const runner = useManagedRuntime();
   const [step, setStep] = useState(0);
   const [selected, setSelected] = useState('qwen3.5:4b');
   const [helperModel, setHelperModel] = useState('');
@@ -124,6 +126,9 @@ export function LocalAiSteps({
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState<LocalProgress | null>(null);
+  useEffect(() => {
+    if (runner.preparing) setProgress(runner.progress);
+  }, [runner.preparing, runner.progress]);
   const [verification, setVerification] = useState<LocalVerification | null>(null);
   const [connected, setConnected] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -207,7 +212,8 @@ export function LocalAiSteps({
       tool,
       `Preparing ${tool === 'ollama' ? 'Ollama' : 'OpenCode'} installation…`,
       async () => {
-        await withProgress('local_ai_install', { tool });
+        if (tool === 'opencode') await runner.prepare(false);
+        else await withProgress('local_ai_install', { tool });
         await inspect();
       },
     );
@@ -259,7 +265,8 @@ export function LocalAiSteps({
             : async () => {
                 setStopping(true);
                 try {
-                  await nativeTask('local_ai_cancel');
+                  if (runner.preparing) await runner.cancel();
+                  else await nativeTask('local_ai_cancel');
                 } catch (cause) {
                   setError(String(cause));
                   setStopping(false);
@@ -408,18 +415,18 @@ export function LocalAiSteps({
               </InstallRow>
               <InstallRow
                 title="OpenCode"
-                detail="Connects the model to file edits and agent tools · installer size varies"
+                detail="Connects the model to agent tools · private runner, up to 65 MB to download"
                 done={inspection.opencodeInstalled}
                 activity={status('opencode')}
                 pending={activity === 'opencode' && !!busy}
               >
-                {inspection.canInstall && (
+                {inspection.canPrepareRunner && (
                   <Button
                     variant="outline"
                     disabled={!desktop || !!busy}
                     onClick={() => install('opencode')}
                   >
-                    Install OpenCode
+                    Prepare runner
                   </Button>
                 )}
                 <Button
@@ -464,8 +471,8 @@ export function LocalAiSteps({
             )}
             {inspection.canInstall && (
               <p className="local-ai-caption">
-                Install buttons use Windows Package Manager and accept the selected package’s
-                installation agreements.
+                Installing Ollama uses Windows Package Manager and accepts its installation
+                agreements.
               </p>
             )}
             {inspection.hardware.freeDiskBytes !== null &&

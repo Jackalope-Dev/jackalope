@@ -129,6 +129,11 @@ pub(in crate::commands) fn executable(agent: &str) -> Result<PathBuf, String> {
     if !BUILTIN_AGENTS.contains(&agent) {
         return Err("Unsupported agent".into());
     }
+    if agent == "opencode" {
+        if let Some(path) = crate::commands::managed_runtime::executable()? {
+            return Ok(path);
+        }
+    }
     let binary = if agent == "antigravity" { "agy" } else { agent };
     let candidates: Vec<String> = if cfg!(windows) {
         vec![

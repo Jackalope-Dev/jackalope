@@ -20,6 +20,7 @@ export interface LocalInspection {
   ollamaOnline: boolean;
   opencodeInstalled: boolean;
   canInstall: boolean;
+  canPrepareRunner?: boolean;
   runtimeDiskBytes: number;
   catalogCheckedAt: string;
 }
