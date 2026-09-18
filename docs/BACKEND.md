@@ -47,12 +47,40 @@ Submitting feedback does not require telemetry to be enabled. See
 [monitoring and payload contracts](BETA-MONITORING.md) and
 [feedback invitations](FEEDBACK-INVITATIONS.md) for delivery and retention behavior.
 
+## Trusted hosts and companion
+
+`commands/remote` owns a separate, disabled-by-default loopback service, normally port
+9472. The UI enables explicit project templates; remote requests can supply a project
+identifier and task text, never a project path, executable, agent account or arbitrary
+native command. New sessions use isolation and the host's saved agent/check settings.
+Native execution access and coordinator/runtime safeguards still apply.
+
+The allowlisted API exposes pairing and task status, detail, review, start, follow-up,
+question response, pause/resume and stop. Device tokens are random bearer credentials;
+only their hashes are saved on the host. Single-use pairing codes expire after five
+minutes and are limited to twenty attempts. Native host/client records use protected
+storage; browser tokens stay on the paired origin. Revocation and project removal
+reject subsequent requests. Already accepted actions can finish.
+
+Host and Origin validation, request limits, same-origin assets and a restrictive CSP
+protect the HTTP boundary. Desktop SSH transport requires an existing authenticated
+alias and a verified host key; forwarding is loopback-only and process-owned. HTTPS
+clients reject redirects and plain HTTP addresses. Phone access requires a trusted
+HTTPS proxy. Optional Tailscale Serve setup uses private port 8443, refuses an existing
+listener there and leaves other Serve configuration intact. Disabling Jackalope access
+stops its API; Tailscale configuration remains with its owner.
+
+Messages retain request IDs across reconnect/reload and reuse the native durable session
+or follow-up receipts. Network failure never automatically resends a mutation. Disconnect
+does not cancel host tasks; host exit follows normal local task shutdown/recovery rules.
+The companion is a separate Vite entry served from bundled desktop assets. Installed
+SSH, Tailscale, phone and cross-platform acceptance remain required.
+
 ## Remaining service work
 
 Client disclosure, opt-out, bounded delivery and explicit feedback Send are implemented.
 Activation still needs migrated infrastructure, configured private Access/email settings,
 sender verification and installed beta traffic acceptance. Keep credentials out of source.
 
-Pairing, presence, remote dispatch/reconnect, companion clients and a compatible
-self-hosted/managed offering remain roadmap work. They need an explicit architecture
-and authorization model rather than reuse of the local bridge as a public API.
+Managed hosting, shared remote workspaces and native mobile applications remain roadmap
+work. They must preserve the separate remote API and its scoped authorization boundary.

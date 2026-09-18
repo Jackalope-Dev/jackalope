@@ -1,5 +1,18 @@
 [
   {
+    "id": "focused-workflows-and-trusted-hosts",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "Review, revise and continue across devices",
+    "description": "More direct ways to turn issues and review feedback into the next useful action.",
+    "items": [
+      "Saved line comments and visual element selections prepare batched follow-ups.",
+      "Keep the conversation beside Review or Preview and browse GitHub, Linear and Jira issues.",
+      "Pair trusted hosts and use a responsive HTTPS companion to follow and steer work."
+    ],
+    "note": "Implemented for validation. Installed multi-device, provider and platform acceptance remain in progress."
+  },
+  {
     "id": "connect-api-providers-without-a-separate-cli-install",
     "date": "2026-09-18",
     "status": "In development",

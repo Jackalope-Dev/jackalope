@@ -24,6 +24,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { navigateWorkspace } from '../layout/navigation';
+import { IssuePicker } from '../tasks/IssuePicker';
 import { ProjectReturn } from '../tasks/ProjectReturn';
 import type { Readiness } from '../tasks/WorkspaceReadiness';
 import { Button } from '../ui/button';
@@ -184,6 +185,24 @@ export function ProjectOverview({ onOpenProject }: { onOpenProject: () => void }
               </div>
             }
           />
+
+          <Disclosure>
+            <DisclosureSummary>Start from an issue</DisclosureSummary>
+            <IssuePicker
+              projectPath={project.path}
+              onDraft={(prompt) => {
+                const key = `jackalope-live-start:${project.id}`;
+                const combined = [localStorage.getItem(key), prompt].filter(Boolean).join('\n\n');
+                if (new TextEncoder().encode(combined).length > 12000)
+                  throw new Error(
+                    'Your existing task draft is full. Send or shorten it before adding this issue.',
+                  );
+                localStorage.setItem(key, combined);
+                useLiveSessionStore.getState().select(null);
+                navigateWorkspace('live-sessions');
+              }}
+            />
+          </Disclosure>
 
           {/* 4-Card Status Overview Grid */}
           <div className="project-stat-grid">

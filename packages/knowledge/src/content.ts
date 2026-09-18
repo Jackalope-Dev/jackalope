@@ -1154,11 +1154,29 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'review-feedback',
+        question: 'How do I discuss specific changes or start from an issue?',
+        paragraphs: [
+          'In Review, use the line gutter or Add comment to attach feedback to a file and line. Add the unresolved comments to one follow-up, then review and send it. Earlier-patch comments retain their original location and ask the agent to recheck it. Show conversation keeps the result alongside Review or Preview; smaller windows stack the panes.',
+          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI. Connect Linear or Jira Cloud in Settings → Connected work. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
+        ],
+      },
+      {
+        id: 'remote-access',
+        question: 'How do I continue from another computer or my phone?',
+        paragraphs: [
+          'On the machine that runs your work, open Settings → Remote access, enable paired devices, select projects and save. Keep Jackalope running. Selected projects share task content and allow paired devices to start isolated tasks, answer questions and send follow-ups using the host’s saved settings.',
+          'For another desktop, open Tasks → Hosts → Connect a host. Use an SSH alias that already signs in with a verified host key, or an HTTPS address. Create a pairing code on the host and paste it on the connecting desktop.',
+          'For a phone, set up private HTTPS with Tailscale after signing both devices into Tailscale, or enter your existing HTTPS proxy address under Connection settings. Create a pairing link, open it on the phone and name the device. Links work once and expire after five minutes. Revoke devices from the host settings.',
+          'Work continues on the host when you disconnect. Refresh status before retrying an interrupted action. Reconnecting reuses saved send identifiers to avoid duplicate messages. Host restart retains normal paused/recovery behavior. Phone and multi-device installed acceptance remain in progress; native mobile applications and managed hosting are not included.',
+        ],
+      },
+      {
         id: 'try-result',
         question: 'How do I see the result and request a correction?',
         paragraphs: [
-          'Choose Try result after work stops. Detect or enter your project’s local preview command, review it, and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
-          'Use the embedded page or open it in your browser. Describe what should change and add it to your follow-up. Capture screenshot and page details opens a fresh browser and lets you attach a screenshot, page element and errors. That fresh capture does not copy the embedded page’s sign-in or unsaved interactions.',
+          'Open Preview after work stops. Jackalope detects a supported local preview command when none is saved. Review the command and choose Start preview. Jackalope remembers the command and can choose an available port. A responding server means the preview is reachable; inspect the behavior and project checks before accepting the work.',
+          'Use Select in preview to open the task-owned preview browser. Interact or sign in there, select an element, describe the change and add your selections to a follow-up. It captures that browser’s current state, with a cropped screenshot and HTML/style context. Selection notes survive view changes. The embedded page has separate browser state. A fresh page snapshot remains available in a disclosure.',
           'A preview holds its workspace while running. Stop preview and continue saves its logs and resumes work with your follow-up. Running tasks offer Queue follow-up and Stop & send. Queued instructions stay in order, continue in the same workspace and account, and pause after failures or restart. Run or cancel queued follow-ups before merging. Chat also lets you queue messages or explicitly stop current work and send.',
           'On Chat’s start page, pick up work waiting across your projects. Session limits can pause later batches after a batch count or an estimated dollar threshold. A running batch can exceed the threshold, and missing cost reports pause further work when a cost limit is set. This is not a provider billing cap.',
         ],

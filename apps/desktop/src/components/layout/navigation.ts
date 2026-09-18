@@ -31,6 +31,14 @@ export const WORKSPACE_VIEWS = [
     primary: false,
   },
   {
+    id: 'remote-hosts',
+    label: 'Hosts',
+    description: 'Connect to trusted hosts and continue work from another device.',
+    icon: Network,
+    group: 'tasks',
+    primary: false,
+  },
+  {
     id: 'project-overview',
     label: 'Project',
     description: 'Resume work, prepare your project and deliver results.',
@@ -174,7 +182,13 @@ export function navigateWorkspace(tab: ActiveTab) {
   window.dispatchEvent(new CustomEvent('jackalope:navigate', { detail: tab }));
 }
 export function openSettings(
-  category: 'General' | 'System' | 'Diagnostics' | 'Invitations' | 'Updates & support',
+  category:
+    | 'General'
+    | 'System'
+    | 'Diagnostics'
+    | 'Invitations'
+    | 'Updates & support'
+    | 'Connected work',
 ) {
   window.dispatchEvent(new CustomEvent('jackalope:open-settings', { detail: category }));
 }

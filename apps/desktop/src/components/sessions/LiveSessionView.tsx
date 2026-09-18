@@ -32,6 +32,7 @@ import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
 import { TaskLiveActivity } from '../tasks/TaskLiveActivity';
 import { TaskPreview } from '../tasks/TaskPreview';
+import { WorkSourceLink } from '../tasks/WorkSourceLink';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Tooltip } from '../ui/Tooltip';
@@ -72,6 +73,7 @@ export function LiveSessionView({
     useLiveSessionStore.getState().select(null);
   };
   const [expanded, setExpanded] = useState(initialDetailsOpen);
+  const split = useWorkViewStore((state) => state.split[`session:${session.id}`] ?? false);
   const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState(() => {
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
@@ -89,16 +91,26 @@ export function LiveSessionView({
     revision: number;
     applied: (error?: string) => void;
   }>();
+  const addingFeedback = useRef(false);
   const append = (text: string) =>
     new Promise<void>((resolve, reject) => {
       if (session.closed) {
         reject(new Error('This session is finished. Copy the delivery handoff into a new task.'));
         return;
       }
+      if (addingFeedback.current) {
+        reject(new Error('Wait for the current feedback to be added, then try again.'));
+        return;
+      }
+      addingFeedback.current = true;
       setAddition((value) => ({
         text,
         revision: (value?.revision ?? 0) + 1,
-        applied: (error) => (error ? reject(new Error(error)) : resolve()),
+        applied: (error) => {
+          addingFeedback.current = false;
+          if (error) reject(new Error(error));
+          else resolve();
+        },
       }));
     });
   const [error, setError] = useState('');
@@ -303,10 +315,11 @@ export function LiveSessionView({
           <InlineNotice tone="error">{error || session.error}</InlineNotice>
         </div>
       )}
+      <WorkSourceLink prompts={session.messages.map((message) => message.text)} />
       <div
         className="live-columns"
         data-expanded={expanded}
-        data-result-view={(expanded && tab !== 'work') || undefined}
+        data-result-view={(expanded && tab !== 'work' && !split) || undefined}
       >
         <div className="live-conversation">
           {!collapsed && (
@@ -426,6 +439,17 @@ export function LiveSessionView({
         </div>
         {expanded && (
           <aside className="live-work" id="live-session-work">
+            {tab !== 'work' && (
+              <Button
+                variant="ghost"
+                aria-pressed={split}
+                onClick={() =>
+                  useWorkViewStore.getState().setSplit(`session:${session.id}`, !split)
+                }
+              >
+                {split ? 'Hide conversation' : 'Show conversation'}
+              </Button>
+            )}
             <fieldset className="live-tabs" aria-label="Session details">
               {(['work', 'changes', 'preview'] as const).map((value) => (
                 <Button
@@ -572,9 +596,7 @@ export function LiveSessionView({
                     ) : undefined
                   }
                   onRefresh={showReview}
-                  onCorrect={(text) => {
-                    void append(text).catch((cause) => setError(String(cause)));
-                  }}
+                  onCorrect={session.closed ? undefined : append}
                   evidence={
                     review && <CopyButton text={review.patchPath} label="Copy patch path" />
                   }
@@ -620,7 +642,11 @@ export function LiveSessionView({
                   This result is integrated. Continue in a new chat to preview further changes.
                 </p>
               ) : latest && !active ? (
-                <TaskPreview run={latest} onFeedback={session.closed ? undefined : append} />
+                <TaskPreview
+                  key={latest.id}
+                  run={latest}
+                  onFeedback={session.closed ? undefined : append}
+                />
               ) : (
                 <p className="live-muted">
                   {active

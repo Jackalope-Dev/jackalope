@@ -30,7 +30,7 @@ impl TaskRuntime {
             .collect())
     }
 
-    pub(super) fn snapshot(&self, detail: Option<&str>) -> Vec<TaskRun> {
+    pub(in crate::commands) fn snapshot(&self, detail: Option<&str>) -> Vec<TaskRun> {
         let inner = self.inner.lock().unwrap();
         let mut runs: Vec<_> = inner
             .runs

@@ -32,9 +32,12 @@ export function ChangedFiles({
       {files.length > 0 && (
         <nav className="changed-files-list" aria-label="Changed files">
           {reviewId && (
-            <p className="changed-files-progress" role="status">
+            <p
+              className="changed-files-progress"
+              role="status"
+              title="Review marks reset when changes update"
+            >
               {files.filter((path) => reviewed?.includes(path)).length} of {files.length} reviewed
-              <small>Optional · resets when changes update</small>
             </p>
           )}
           {files.length > 1 && (

@@ -1,6 +1,7 @@
 import { Disclosure, DisclosureSummary } from '@jackalope/ui';
 import { ArrowRight, Check, FileDiff, GitMerge, ListChecks, RefreshCw } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { reviewFingerprint } from '../../lib/review-fingerprint';
 import { nativeTask, type Review, type TaskRun } from '../../lib/task-runtime';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
@@ -11,6 +12,7 @@ import { ChangedFiles } from './ChangedFiles';
 import { DecisionAdvice } from './DecisionAdvice';
 import { ProjectVerification } from './ProjectVerification';
 import { ReviewActions } from './ReviewActions';
+import { ReviewFeedback } from './ReviewFeedback';
 import './result-review.css';
 
 export type ReviewSection = 'changes' | 'checks' | 'delivery';
@@ -30,7 +32,7 @@ export function ResultReview({
   canApprove = true,
 }: {
   run: TaskRun;
-  onCorrect?: (prompt: string) => void;
+  onCorrect?: (prompt: string) => void | Promise<void>;
   outcomes?: ReactNode;
   evidence?: ReactNode;
   visible?: boolean;
@@ -160,12 +162,19 @@ export function ResultReview({
               <section className="task-review-output" aria-label="Changed files">
                 {review && (
                   <>
-                    <ChangedFiles
+                    <ReviewFeedback
+                      taskId={run.taskId}
+                      revision={reviewFingerprint(review.diff)}
                       files={review.files}
-                      patch={review.diff}
-                      visible={visible && current === 'changes'}
-                      reviewId={run.id}
-                    />
+                      onFeedback={onCorrect}
+                    >
+                      <ChangedFiles
+                        files={review.files}
+                        patch={review.diff}
+                        visible={visible && current === 'changes'}
+                        reviewId={run.id}
+                      />
+                    </ReviewFeedback>
                     {review.note && (
                       <Disclosure>
                         <DisclosureSummary>About these changes</DisclosureSummary>

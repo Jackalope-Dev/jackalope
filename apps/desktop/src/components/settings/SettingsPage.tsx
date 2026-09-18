@@ -30,6 +30,8 @@ import { Setting, SettingGroup } from './Setting';
 import { SystemInfoView } from './SystemInfo';
 import { WindowBehaviorSettings } from './WindowBehaviorSettings';
 import './settings.css';
+import { IssueConnections } from './IssueConnections';
+import { RemoteAccess } from './RemoteAccess';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -43,6 +45,8 @@ const categories = [
   'Invitations',
   'Appearance',
   'Agents',
+  'Connected work',
+  'Remote access',
   'Decisions',
   'Privacy',
   'Project',
@@ -102,6 +106,8 @@ export function SettingsPage({
         Appearance: 'theme color light dark atmosphere picker toolbar',
         Agents:
           'default models available detected allowed restrict cli command executable configuration automatic quota handoff',
+        'Connected work': 'GitHub Linear Jira issues pull requests API token',
+        'Remote access': 'hosts phone companion SSH pairing Tailscale device',
         Decisions: 'Jackalope routing Jev TypeSafe API key automatic agent cost tokens capacity',
         Privacy: 'marketplace MCP network telemetry crash reporting',
         Project: 'repository name path agent instructions verification command',
@@ -249,6 +255,8 @@ export function SettingsPage({
               {c === 'Jackalope account' && (
                 <JackalopeAccount onInvitations={() => setCategory('Invitations')} />
               )}
+              {c === 'Connected work' && <IssueConnections />}
+              {c === 'Remote access' && <RemoteAccess />}
               {c === 'Invitations' && (
                 <ReferralSettings onAccount={() => setCategory('Jackalope account')} />
               )}

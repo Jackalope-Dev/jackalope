@@ -26,7 +26,7 @@ fn identifier(value: &str) -> Result<String, String> {
     Ok(value.into())
 }
 
-fn gh(path: &Path, args: &[&str]) -> Result<String, String> {
+pub(super) fn gh(path: &Path, args: &[&str]) -> Result<String, String> {
     let mut command = Command::new("gh");
     command
         .current_dir(path)
@@ -54,7 +54,7 @@ fn bounded(text: &str, bytes: usize) -> (String, bool) {
     (text[..end].into(), end < text.len())
 }
 
-fn inspect(path: &Path, kind: &str, value: &str) -> Result<WorkflowContext, String> {
+pub(super) fn inspect(path: &Path, kind: &str, value: &str) -> Result<WorkflowContext, String> {
     let number = identifier(value)?;
     let args = match kind {
         "issue" => vec![

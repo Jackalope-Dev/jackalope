@@ -78,6 +78,8 @@ names; changes must preserve both sides and old saved records.
 | knowledge.rs, monitors.rs | Project lessons/workflows, immutable task context receipts and local Git change checks |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
+| issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
+| remote.rs, remote/ | Project-scoped pairing API, protected host connections, SSH forwarding and companion assets |
 | verification.rs, artifacts.rs, release.rs | Saved checks, artifacts, diagnostics and signed updater |
 
 Lock order is **coordinator state → execution guard → runtime state**.

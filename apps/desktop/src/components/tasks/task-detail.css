@@ -108,6 +108,50 @@
 .task-detail .result-canvas {
   padding-block: 16px;
 }
+.task-working-area {
+  container-type: inline-size;
+}
+.conversation-toggle {
+  align-self: flex-end;
+}
+.task-view-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.task-view-controls .result-tabs {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.task-view-controls .conversation-toggle {
+  align-self: center;
+}
+.result-canvas[data-alongside="true"] {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
+  gap: 20px;
+}
+.result-canvas[data-alongside="true"] > [data-state] {
+  min-width: 0;
+  overflow: auto;
+}
+.result-canvas[data-alongside="true"] > [data-state]:first-child {
+  border-right: 1px solid var(--color-border-subtle);
+  padding-right: 16px;
+}
+@container (max-width: 760px) {
+  .result-canvas[data-alongside="true"] {
+    display: block;
+  }
+  .result-canvas[data-alongside="true"] > [data-state]:first-child {
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+    margin-bottom: 16px;
+  }
+}
 .task-detail .result-canvas > .ui-tabs-content {
   padding-top: 0;
 }

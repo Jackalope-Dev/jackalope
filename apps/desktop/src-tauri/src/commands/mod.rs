@@ -50,6 +50,8 @@ pub mod browser;
 pub mod delivery;
 pub mod desktop_control;
 pub mod github_workflows;
+pub mod issues;
+pub mod remote;
 pub mod review_progress;
 pub mod workflow_feedback;
 

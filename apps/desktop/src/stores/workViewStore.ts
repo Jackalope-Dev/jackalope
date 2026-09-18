@@ -11,6 +11,8 @@ interface WorkViewState {
   scope: 'all' | 'project';
   views: Record<string, WorkView>;
   reading: Record<string, string>;
+  split: Record<string, boolean>;
+  setSplit: (id: string, split: boolean) => void;
   remember: (id: string, section: string) => void;
   request: { id: string; section: string; revision: number } | null;
   setScope: (scope: 'all' | 'project') => void;
@@ -23,6 +25,8 @@ export const useWorkViewStore = create<WorkViewState>()(
       scope: 'project',
       views: {},
       reading: {},
+      split: {},
+      setSplit: (id, split) => set((state) => ({ split: { ...state.split, [id]: split } })),
       remember: (id, section) =>
         set((state) => ({
           reading: Object.fromEntries(
@@ -41,7 +45,7 @@ export const useWorkViewStore = create<WorkViewState>()(
     }),
     {
       name: 'jackalope-work-views',
-      partialize: ({ scope, views, reading }) => ({ scope, views, reading }),
+      partialize: ({ scope, views, reading, split }) => ({ scope, views, reading, split }),
     },
   ),
 );

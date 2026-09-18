@@ -25,11 +25,6 @@
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
-.changed-files-progress small {
-  display: block;
-  margin-top: 4px;
-  color: var(--color-text-muted);
-}
 .changed-file-row {
   display: flex;
   align-items: start;
@@ -65,11 +60,15 @@
 }
 .changed-files-list button span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .changed-files-list button small {
   display: block;
   opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .changed-files-list button:hover {
   background: var(--color-surface-hover);

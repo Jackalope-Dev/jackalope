@@ -15,6 +15,12 @@ export const roadmapStages = [
     link: { label: 'Explore agent compatibility', href: '/agents/' },
     items: [
       {
+        title: 'Feedback where the work happens.',
+        summary: 'Line comments, visual selections, and issues that become task drafts.',
+        detail:
+          'Comment on changed lines and collect feedback into one follow-up. Keep the conversation beside Review or Preview. Select an element in a persistent preview browser to capture its current state, screenshot and style context. Browse GitHub, Linear and Jira issues, then review the task draft before starting. These workflows use the existing workspace controls and remain subject to installed acceptance.',
+      },
+      {
         title: 'Your place before early access.',
         summary: 'Waitlist progress and referral sharing in the desktop app.',
         detail:
@@ -82,6 +88,12 @@ export const roadmapStages = [
     link: { label: 'Follow the development changelog', href: '/changelog/' },
     items: [
       {
+        title: 'Continue from another device.',
+        summary: 'Trusted hosts and a responsive phone companion, in validation.',
+        detail:
+          'Pair a device, choose shared projects, and check tasks, answer questions, send follow-ups or review changes. Desktop hosts connect over SSH or HTTPS; phones use HTTPS with optional private Tailscale setup. Work stays on its host when a client disconnects. Native multi-device and platform acceptance remain in progress; this is not a released hosting service.',
+      },
+      {
         title: 'A first run worth coming back to.',
         summary: 'Setup, agent sign-in, and a clear path to your first task.',
         detail:
@@ -140,21 +152,9 @@ export const roadmapStages = [
     title: 'Your next idea could start anywhere.',
     description:
       'A task shouldn’t lose its thread when you step away. We’re exploring how to bring the same continuity and control to work across machines.',
-    next: 'Remote workflows come first; team collaboration follows what proves useful.',
+    next: 'Validate individual remote workflows before extending them to teams.',
     link: { label: 'Explore the local workflow', href: '/tour/' },
     items: [
-      {
-        title: 'Your machines, connected.',
-        summary: 'Pair a trusted host and keep control of where work runs.',
-        detail:
-          'Remote execution needs scoped identity, host capabilities, pairing, and safe reconnect behavior. The intention is to dispatch, steer, and review across machines while keeping project and tool permissions understandable. Remote execution is not available today.',
-      },
-      {
-        title: 'Check in from your phone.',
-        summary: 'Follow a task, answer a question, or review the next step.',
-        detail:
-          'A remote companion could keep you connected to work running on a trusted machine. Phone access is exploratory; the interaction, permission model, and delivery are still to be designed.',
-      },
       {
         title: 'More ways to work together.',
         summary: 'Shared workflows, team spaces, and hosting choices.',

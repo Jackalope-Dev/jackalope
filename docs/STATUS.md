@@ -212,6 +212,20 @@ process guardians, browser ownership, notifications and tray/Dock behavior have
 platform-specific implementations. Native CI and device checks are described in
 [platform contracts](CROSS-PLATFORM-RELEASES.md#platform-contracts).
 
+Review supports saved line comments, batched correction drafts and an optional conversation
+beside Changes or Preview. Visual selection opens a task-owned browser and captures the
+selected element from its current page state, with a cropped screenshot and bounded
+HTML/style context. Selection notes survive view changes; the browser closes with its preview.
+GitHub, Linear and Jira Cloud issue browsers prepare editable task drafts and retain source
+links. GitHub uses the installed CLI; Linear/Jira credentials use protected native storage.
+
+Trusted hosts and a responsive phone companion are implemented for native validation.
+Settings → Remote access scopes paired devices to selected projects. A separate loopback
+API supports task status, questions, follow-ups, new isolated sessions and change review.
+Desktop connections use verified SSH forwarding or HTTPS; phones use HTTPS, with optional
+private Tailscale Serve setup. Work continues through client disconnection. Live multi-device,
+provider, Tailscale and cross-platform acceptance remain open.
+
 ## Known limits
 
 Aider and Goose account setup does not include native task execution. Gemini CLI
@@ -230,6 +244,6 @@ update acceptance remain platform-specific requirements. Real-model quality and
 lesson/routing improvements require matched trials and independent review. Automated
 checks do not establish service delivery or installed-app acceptance.
 
-Remote execution, enforced monetary budgets and team collaboration remain future work. Use
+Managed remote hosting, native mobile apps, enforced monetary budgets and team collaboration remain future work. Use
 the [documentation index](README.md), [contribution guide](../CONTRIBUTING.md) and
 [licensing guide](LICENSING.md) for development and redistribution.

@@ -20,6 +20,8 @@ representative benefit and installed-platform acceptance remain open.
 
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
+  Saved line comments, visual element selection, a conversation beside review and
+  GitHub/Linear/Jira issue intake keep corrections and source work together.
 - Provider accounts, model/effort choices, capacity-aware routing and usage reporting.
   OpenCode accepts protected provider keys, including DeepSeek, alongside CLI sign-in.
   Guided API and local-model setup can prepare a private runner without a separate CLI install.
@@ -40,6 +42,11 @@ installed-app acceptance remain separate. See [current capabilities and limits](
 for the detailed inventory and [contributor priorities](TODO.md) for outstanding checks.
 
 ## In progress: dependable everyday use
+
+Trusted-host pairing and a responsive web companion support scoped task check-ins,
+questions, follow-ups, dispatch and change review. SSH forwarding and HTTPS retain
+the host's execution ownership. Native multi-device, transport and provider acceptance
+remain in progress; implementation does not establish release availability.
 
 Focused task guidance and retrievable compact verification output are implemented.
 [Quality trials](AGENT-QUALITY.md) compare the changed behavior against a preserved
@@ -99,8 +106,6 @@ unfinished work. See [usage and routing](USAGE-AND-ROUTING.md).
 
 ## Further out: work across machines
 
-Explore scoped identity, trusted-host pairing, remote dispatch, steering, review
-and reconnect. A companion could support remote task check-ins. Managed and
-self-hosted remote services, shared workspaces and team collaboration depend on
-validated individual remote workflows. These are exploratory directions;
-remote execution is not available today. See [BACKEND.md](BACKEND.md).
+Managed hosting, native mobile applications, shared workspaces and team collaboration
+depend on validated individual remote workflows. These remain exploratory directions.
+See [BACKEND.md](BACKEND.md).

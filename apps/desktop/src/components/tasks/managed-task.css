@@ -15,11 +15,43 @@
   gap: 16px;
   min-width: 0;
 }
-.managed-task-tabs > [hidden] {
+.managed-task-tabs > [hidden],
+.managed-task-panels > [hidden] {
   display: none;
 }
-.managed-task-tabs > [role="tabpanel"] {
+.managed-task-tabs > [role="tabpanel"],
+.managed-task-panels > [role="tabpanel"] {
   padding-top: 0;
+}
+.managed-task-tabs {
+  container-type: inline-size;
+}
+.managed-task-panels {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+.managed-task-panels[data-alongside="true"] {
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
+  align-items: start;
+}
+.managed-task-panels[data-alongside="true"] > .managed-overview {
+  max-height: 70vh;
+  overflow: auto;
+  padding-right: 16px;
+  border-right: 1px solid var(--color-border-subtle);
+}
+@container (max-width: 760px) {
+  .managed-task-panels[data-alongside="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .managed-task-panels[data-alongside="true"] > .managed-overview {
+    max-height: 260px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-right: 0;
+    padding-bottom: 16px;
+  }
 }
 .managed-agent {
   display: grid;

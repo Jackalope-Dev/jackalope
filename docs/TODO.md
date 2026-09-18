@@ -7,6 +7,16 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Validate line comments, stale-patch anchors, batched feedback, split conversation and
+  visual selection in installed WebViews. Include keyboard access, storage failures,
+  authenticated preview state, cancellation, view changes and large patches.
+- [ ] Accept GitHub, Linear and Jira issue intake with live accounts, pagination, revoked
+  credentials, Unicode descriptions and retained source links through follow-ups.
+- [ ] Accept trusted-host and responsive companion workflows on real devices: SSH host-key
+  failure, HTTPS setup, pairing expiry, device revocation, project removal, questions,
+  disconnect/retry without duplicate sends and host restart. Cover protected storage and
+  Tailscale Serve coexistence on each platform; validate access boundaries independently.
+
 - [ ] Validate the unified work list, project scope, command search, persistent follow-up,
   preview readiness/cancellation/evidence capture and PR/CI reads in installed WebViews.
   Test first-result, visual correction, failed-check recovery, project return and delivery
@@ -231,5 +241,5 @@ release dates.
 - [ ] Verify downloaded artifacts, publication recovery and the selected channel;
   follow [release acceptance](RELEASE.md) and [platform requirements](CROSS-PLATFORM-RELEASES.md).
 
-Remote identity, pairing, dispatch, reconnect, companion access and collaboration
-remain exploratory directions in [BACKEND.md](BACKEND.md) and the roadmap.
+Managed hosting, native mobile applications and collaboration remain exploratory
+directions in [BACKEND.md](BACKEND.md) and the roadmap.

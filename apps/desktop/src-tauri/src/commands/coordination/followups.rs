@@ -53,7 +53,7 @@ impl Coordinator {
             .collect())
     }
 
-    fn enqueue_followup(
+    pub(in crate::commands) fn enqueue_followup(
         &self,
         id: String,
         run_id: &str,

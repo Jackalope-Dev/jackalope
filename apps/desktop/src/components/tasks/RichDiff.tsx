@@ -3,8 +3,10 @@ import { FileDiff, Virtualizer, WorkerPoolContextProvider } from '@pierre/diffs/
 import DiffHighlightWorker from '@pierre/diffs/worker/worker.js?worker';
 import { useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from '../../hooks/useColorScheme';
+import { reviewExcerpt } from '../../lib/review-feedback';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
+import { useReviewFeedback } from './ReviewFeedback';
 import './rich-content.css';
 
 const poolOptions = {
@@ -19,6 +21,7 @@ const highlighterOptions = {
 
 export default function RichDiff({ patch, file }: { patch: string; file?: string }) {
   const scheme = useColorScheme();
+  const feedback = useReviewFeedback();
   const [split, setSplit] = useState(false);
   const [wrap, setWrap] = useState(false);
   const [raw, setRaw] = useState(false);
@@ -129,7 +132,40 @@ export default function RichDiff({ patch, file }: { patch: string; file?: string
                 <FileDiff
                   key={entry.name}
                   fileDiff={entry}
+                  lineAnnotations={feedback?.comments
+                    .filter(
+                      (comment) =>
+                        !comment.resolved &&
+                        comment.revision === feedback.revision &&
+                        comment.file === entry.name,
+                    )
+                    .map((comment) => ({
+                      side: comment.side,
+                      lineNumber: comment.line,
+                      metadata: comment,
+                    }))}
+                  renderAnnotation={({ metadata }) =>
+                    metadata && (
+                      <button
+                        type="button"
+                        className="review-inline-comment"
+                        onClick={() => feedback?.edit(metadata)}
+                      >
+                        {metadata.text}
+                      </button>
+                    )
+                  }
                   options={{
+                    enableGutterUtility: !!feedback?.add,
+                    onGutterUtilityClick: feedback?.add
+                      ? (range) =>
+                          feedback.add?.({
+                            file: entry.name,
+                            line: range.start,
+                            side: range.side ?? 'additions',
+                            excerpt: reviewExcerpt(entry, range.start, range.side ?? 'additions'),
+                          })
+                      : undefined,
                     diffStyle: split ? 'split' : 'unified',
                     overflow: wrap ? 'wrap' : 'scroll',
                     theme: { light: 'github-light', dark: 'github-dark' },

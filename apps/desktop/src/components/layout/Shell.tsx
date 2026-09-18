@@ -52,6 +52,9 @@ const RepoTodos = lazy(() => import('../tasks/RepoTodos').then((m) => ({ default
 const LiveSessions = lazy(() =>
   import('../sessions/LiveSessions').then((m) => ({ default: m.LiveSessions })),
 );
+const RemoteHosts = lazy(() =>
+  import('../remote/RemoteHosts').then((m) => ({ default: m.RemoteHosts })),
+);
 const CodebaseMap = lazy(() =>
   import('../visualizer/CodebaseMap').then((m) => ({ default: m.CodebaseMap })),
 );
@@ -509,6 +512,15 @@ export function Shell({
             )}
             {activeTab === 'live-sessions' && (
               <LiveSessions project={project} onOpenProject={openProjectSetup} />
+            )}
+            {activeTab === 'remote-hosts' && (
+              <RemoteHosts
+                onSetup={() => {
+                  setSettingsProjectId(undefined);
+                  setSettingsCategory('Remote access');
+                  setActiveTab('preferences');
+                }}
+              />
             )}
             {activeTab === 'repo-todos' && (
               <RepoTodos

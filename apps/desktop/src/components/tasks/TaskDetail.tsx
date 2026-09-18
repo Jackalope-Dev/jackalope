@@ -20,6 +20,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { waitForStoppedAttempt } from '../../lib/continue-task';
 import { recoveryHandoff } from '../../lib/project-return';
+import { appendFeedbackDraft } from '../../lib/review-feedback';
 import type { TaskFollowUp } from '../../lib/task-followups';
 import {
   canRetry,
@@ -59,6 +60,7 @@ import { TaskTiming } from './TaskTiming';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
 import { ValidationJourney } from './ValidationJourney';
+import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 import './task-detail.css';
 
@@ -146,6 +148,8 @@ export function TaskDetail({
   const [connections, setConnections] = useState<McpServerConfig[] | null>(null);
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
+  const split = useWorkViewStore((state) => state.split[run.taskId] ?? false);
+  const alongside = split && ['changes', 'preview'].includes(tab);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
   const previewRunning = useManagedPreview(run.id, !active && !integrated);
@@ -439,7 +443,7 @@ export function TaskDetail({
         key={`${run.id}:${run.verification?.checkedAt ?? 'unchecked'}`}
         run={run}
         canReview={finished && isLatest && !integrated}
-        onCorrect={(prompt) => draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })}
+        onCorrect={(prompt) => draft(key, { prompt: appendFeedbackDraft(reply, prompt, 24000) })}
         onAdvance={async () => {
           await start({
             projectId: run.projectId,
@@ -486,6 +490,7 @@ export function TaskDetail({
         </Button>
         <WorkspaceHeading title={title} titleRef={heading} description={run.projectName} />
         <div className="task-detail-utilities">
+          <WorkSourceLink prompts={attempts.map((attempt) => attempt.prompt)} />
           {attempts.length > 1 && (
             <Select
               aria-label="Attempt history"
@@ -657,20 +662,32 @@ export function TaskDetail({
         </div>
       )}
       <Tabs.Root className="task-working-area" value={tab} onValueChange={setTab}>
-        <Tabs.List className="result-tabs" aria-label="Task sections">
-          {[
-            { value: 'result', label: 'Result' },
-            { value: 'changes', label: 'Review' },
-            { value: 'preview', label: 'Preview' },
-            { value: 'activity', label: 'Activity' },
-          ].map(({ value, label }) => (
-            <Tabs.Trigger key={value} value={value}>
-              {label}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-        <div className="result-canvas">
-          <Tabs.Content value="result">
+        <div className="task-view-controls">
+          <Tabs.List className="result-tabs" aria-label="Task sections">
+            {[
+              { value: 'result', label: 'Result' },
+              { value: 'changes', label: 'Review' },
+              { value: 'preview', label: 'Preview' },
+              { value: 'activity', label: 'Activity' },
+            ].map(({ value, label }) => (
+              <Tabs.Trigger key={value} value={value}>
+                {label}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+          {['changes', 'preview'].includes(tab) && (
+            <Button
+              variant="ghost"
+              className="conversation-toggle"
+              aria-pressed={split}
+              onClick={() => useWorkViewStore.getState().setSplit(run.taskId, !split)}
+            >
+              {split ? 'Hide conversation' : 'Show conversation'}
+            </Button>
+          )}
+        </div>
+        <div className="result-canvas" data-alongside={alongside || undefined}>
+          <Tabs.Content value="result" forceMount hidden={tab !== 'result' && !alongside}>
             {attempts
               .filter((attempt) => Date.parse(attempt.startedAt) < Date.parse(run.startedAt))
               .map((attempt, index) => (
@@ -748,8 +765,11 @@ export function TaskDetail({
                 }
                 onCorrect={
                   canContinue
-                    ? (prompt) =>
-                        draft(key, { prompt: [reply, prompt].filter(Boolean).join('\n\n') })
+                    ? (text) => {
+                        const prompt = appendFeedbackDraft(reply, text, 24000);
+                        draft(key, { prompt });
+                        document.getElementById('task-reply')?.focus();
+                      }
                     : undefined
                 }
                 delivery={
@@ -986,11 +1006,7 @@ export function TaskDetail({
                 onFeedback={
                   canContinue
                     ? (text) => {
-                        const prompt = [reply, text].filter(Boolean).join('\n\n');
-                        if (prompt.length > 24000)
-                          throw new Error(
-                            'Feedback would exceed the follow-up limit. Send or shorten the existing draft first.',
-                          );
+                        const prompt = appendFeedbackDraft(reply, text, 24000);
                         draft(key, { prompt });
                         document.getElementById('task-reply')?.focus();
                       }

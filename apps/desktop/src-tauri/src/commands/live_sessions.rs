@@ -31,8 +31,8 @@ pub struct SessionMessage {
 
 #[derive(Deserialize)]
 pub struct FirstMessage {
-    id: String,
-    text: String,
+    pub(super) id: String,
+    pub(super) text: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -231,7 +231,7 @@ impl LiveSessions {
             .ok_or_else(|| "Session not found.".into())
     }
 
-    fn snapshot(&self, id: Option<&str>) -> Result<SessionSnapshot, String> {
+    pub(super) fn snapshot(&self, id: Option<&str>) -> Result<SessionSnapshot, String> {
         let inner = self.inner.lock().map_err(|e| e.to_string())?;
         let mut sessions = inner.ledger.sessions.clone();
         let error = inner.error.clone();
@@ -271,7 +271,7 @@ impl LiveSessions {
         self.create_with_limits(id, title, request, first_message, SessionLimits::default())
     }
 
-    fn create_with_limits(
+    pub(super) fn create_with_limits(
         &self,
         id: String,
         title: String,
@@ -364,7 +364,7 @@ impl LiveSessions {
         })
     }
 
-    fn send(
+    pub(super) fn send(
         &self,
         id: &str,
         message_id: String,
@@ -424,7 +424,12 @@ impl LiveSessions {
         })
     }
 
-    fn action(&self, id: &str, action: &str, message_id: Option<&str>) -> Result<(), String> {
+    pub(super) fn action(
+        &self,
+        id: &str,
+        action: &str,
+        message_id: Option<&str>,
+    ) -> Result<(), String> {
         let _gate = self.gate.lock().map_err(|e| e.to_string())?;
         let integrated = self.integrated_ids()?;
         let runs = self.runtime.live_session_runs(None)?;
@@ -934,7 +939,7 @@ impl LiveSessions {
         Ok(guard)
     }
 
-    fn review(&self, id: &str) -> Result<SessionReview, String> {
+    pub(super) fn review(&self, id: &str) -> Result<SessionReview, String> {
         let _gate = self.gate.lock().map_err(|e| e.to_string())?;
         let session = {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;

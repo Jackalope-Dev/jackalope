@@ -68,6 +68,9 @@ pub fn run() {
             coordinator.launch();
             let sessions = commands::live_sessions::LiveSessions::new(directory.join("live-sessions/sessions.json"), runtime.clone(), coordinator.clone());
             sessions.launch(app.handle().clone());
+            let remote = commands::remote::RemoteAccess::new(preferences.join("remote-access.bin"), runtime.clone(), coordinator.clone(), sessions.clone(), app.handle().clone());
+            remote.launch();
+            app.manage(remote);
             app.manage(sessions);
             let scheduler = Scheduler::new(directory.join("schedules.json"), coordinator.clone());
             scheduler.launch();
@@ -212,6 +215,8 @@ pub fn run() {
             commands::previews::task_preview_stop,
             commands::previews::task_preview_inspect,
             commands::previews::task_preview_inspect_cancel,
+            commands::previews::design::task_preview_design_open,
+            commands::previews::design::task_preview_design_capture,
             commands::delivery::task_delivery_status,
             commands::outcomes::task_outcome_review,
             task_review,
@@ -219,6 +224,19 @@ pub fn run() {
             commands::workflow_feedback::task_usefulness,
             commands::workflow_feedback::workflow_report,
             commands::github_workflows::project_github_context,
+            commands::issues::project_issues,
+            commands::issues::issue_connections,
+            commands::issues::issue_connection_save,
+            commands::issues::issue_connection_remove,
+            commands::remote::remote_status,
+            commands::remote::remote_configure,
+            commands::remote::remote_pairing,
+            commands::remote::remote_revoke,
+            commands::remote::remote_private_https,
+            commands::remote::remote_hosts,
+            commands::remote::remote_host_pair,
+            commands::remote::remote_host_request,
+            commands::remote::remote_host_remove,
             commands::review_progress::task_review_progress,
             commands::verification::task_verify,
             task_respond_prompt,
@@ -287,6 +305,8 @@ pub fn run() {
             }
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
                 app.state::<commands::helper::Helper>().stop();
+                app.state::<commands::remote::RemoteAccess>().shutdown();
+                commands::remote::close_tunnels();
                 app.state::<Scheduler>().shutdown();
                 app.state::<commands::notifications::Notifications>().shutdown();
                 app.state::<commands::live_sessions::LiveSessions>().shutdown();

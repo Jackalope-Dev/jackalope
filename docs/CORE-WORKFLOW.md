@@ -18,6 +18,11 @@ inspectable. Project connection loading must finish before dispatch. An explicit
 empty connection list stays empty through save/restore. Task setup opens existing
 agent, project and connection controls without discarding the draft.
 
+Connected work browses GitHub issues and pull requests, Linear issues and Jira Cloud
+issues. Selecting one prepares an editable draft with its source link; it does not
+start work or update the issue. GitHub uses the existing CLI sign-in. Linear and Jira
+connections are tested before their tokens are saved in protected native storage.
+
 ## Work and results
 
 Tasks opens Chat. Inbox defaults to the selected project's work and offers an explicit All work scope.
@@ -51,6 +56,10 @@ Activity keeps
 searchable agent messages. Details contains account, model, workspace, instructions,
 usage, the original request and connection choices. Attempt history stays beside the page navigation.
 Changes load automatically for finished work; diff rendering waits until Review is visible.
+Line comments persist locally, retain their patch revision and can be batched into a
+follow-up. Comments from an earlier patch remain visible with stale-location context;
+resolving a comment does not approve the work. Show conversation keeps the exchange
+beside Review or Preview, stacking the panels in narrow layouts.
 Long errors keep a concise summary with expandable full details. Copy output and
 Make recurring share the task actions menu. Questions and save recovery remain
 visible above the task sections. Follow-up stays visible while the content scrolls.
@@ -148,3 +157,7 @@ and run `node scripts/verification/verify-task-detail.mjs`. This browser fixture
 checks task states, review sections, keyboard navigation, live step progress,
 preparation-failure detail, retry dispatch and continuation guards; it does not
 launch agents or establish native execution acceptance.
+
+`node scripts/verification/verify-workflow-velocity.mjs` starts its own Vite fixture
+and checks line comments, split review, issue drafts, saved visual notes and companion
+retries across reload and new attempts. It uses mocked native and remote requests.

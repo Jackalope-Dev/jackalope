@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         app: path.resolve(import.meta.dirname, 'index.html'),
+        companion: path.resolve(import.meta.dirname, 'companion.html'),
         ...(mode === 'lab' ? { design: path.resolve(import.meta.dirname, 'design-lab.html') } : {}),
       },
     },

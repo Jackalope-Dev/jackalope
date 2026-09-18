@@ -207,6 +207,89 @@ async fn real_agent_browser_workflow() {
     println!("Real browser evidence retained at {}", directory.display());
 }
 
+#[tokio::test]
+#[ignore = "Opens a disposable preview window and captures a selected element with the bundled browser"]
+async fn real_preview_picker_preserves_current_state_and_crops_the_selection() {
+    let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+        .await
+        .unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let app = axum::Router::new().route("/", axum::routing::get(|| async {
+        axum::response::Html(r#"<!doctype html><html lang="en"><title>Jackalope preview trial</title><button id="target" style="width:200px;height:60px" onclick="this.textContent='Saved current state'">Save</button></html>"#)
+    }));
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    let id = format!("design-test-{}", uuid::Uuid::new_v4());
+    struct Cleanup {
+        id: String,
+        server: tokio::task::JoinHandle<()>,
+    }
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            close(&self.id);
+            self.server.abort();
+        }
+    }
+    let _cleanup = Cleanup {
+        id: id.clone(),
+        server,
+    };
+    register_preview(&id);
+    browser_navigate(&id, &format!("http://127.0.0.1:{port}/"))
+        .await
+        .unwrap();
+    let click = || BrowserInteractRequest {
+        action: "click".into(),
+        selector: "#target".into(),
+        text: None,
+    };
+    browser_interact(&id, click()).await.unwrap();
+    assert!(preview_selection(&id, port, Some(json!({})))
+        .await
+        .unwrap()
+        .is_null());
+    browser_interact(&id, click()).await.unwrap();
+    let selection = preview_selection(&id, port, None).await.unwrap();
+    assert!(selection["html"]
+        .as_str()
+        .unwrap()
+        .contains("Saved current state"));
+    assert!(!selection["html"].as_str().unwrap().contains("onclick"));
+    assert_eq!(selection["styles"]["width"], "200px");
+    let directory = std::env::temp_dir().join(format!("jl-picker-test-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&directory).unwrap();
+    let capture = preview_screenshot(&id, &directory, selection["id"].as_str().unwrap())
+        .await
+        .unwrap();
+    assert_eq!((capture.width, capture.height), (200, 60));
+    assert!(std::fs::read(&capture.file_path)
+        .unwrap()
+        .starts_with(b"\x89PNG"));
+    preview_selection(&id, port, Some(json!({}))).await.unwrap();
+    browser_interact(&id, click()).await.unwrap();
+    let next = preview_selection(&id, port, None).await.unwrap();
+    assert_ne!(next["id"], selection["id"]);
+    assert!(next["html"]
+        .as_str()
+        .unwrap()
+        .contains("Saved current state"));
+    assert!(preview_selection(
+        &id,
+        if port == u16::MAX { port - 1 } else { port + 1 },
+        None
+    )
+    .await
+    .unwrap()
+    .is_null());
+    close(&id);
+    assert!(preview_selection(&id, port, None).await.is_err());
+    println!(
+        "Real selected-element screenshot retained at {}",
+        capture.file_path
+    );
+}
+
 #[test]
 fn accessibility_checkpoint_preserves_findings_and_manual_review() {
     for (violations, incomplete, status) in

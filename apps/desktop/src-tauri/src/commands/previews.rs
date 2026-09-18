@@ -9,6 +9,7 @@ use std::{
     time::Duration,
 };
 use tauri::State;
+pub mod design;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,6 +56,7 @@ pub fn ensure_idle(workspace: &str) -> Result<(), String> {
 }
 
 pub fn close_all() {
+    design::close_all();
     if let Ok(mut sessions) = sessions().lock() {
         for preview in sessions.values_mut() {
             preview.tree.terminate();
@@ -458,6 +460,7 @@ pub async fn task_preview_stop(id: String, state: State<'_, TaskRuntime>) -> Res
 
 fn stop_preview(runtime: &TaskRuntime, id: String) -> Result<(), String> {
     let _guard = integration::execution_guard()?;
+    design::close(&id);
     let mut sessions = sessions().lock().map_err(|e| e.to_string())?;
     let Some(preview) = sessions.get_mut(&id) else {
         return Ok(());

@@ -7,6 +7,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { Select, SelectItem } from '../ui/Select';
+import { DesignPreview } from './DesignPreview';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import type { Readiness } from './WorkspaceReadiness';
 
@@ -35,8 +36,16 @@ export function TaskPreview({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [route, setRoute] = useState('/');
-  const [address, setAddress] = useState('/');
+  const addressKey = `jackalope-preview-address:${run.id}`;
+  const [address, setAddress] = useState(() => {
+    try {
+      const saved = localStorage.getItem(addressKey) ?? '/';
+      return previewUrl(1024, saved) ? saved : '/';
+    } catch {
+      return '/';
+    }
+  });
+  const [route, setRoute] = useState(address);
   const [reload, setReload] = useState(0);
   const [narrow, setNarrow] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -51,6 +60,19 @@ export function TaskPreview({
   const inspectionId = useRef<string | null>(null);
   const statusRevision = useRef(0);
   const mutating = useRef(false);
+  useEffect(() => {
+    if (project?.preferences?.previewCommand !== undefined || !run.workspace) return;
+    let alive = true;
+    void nativeTask<Readiness>('project_readiness', { path: run.workspace })
+      .then((result) => {
+        if (alive && result.previewCommand)
+          setCommand((value) => value || result.previewCommand || '');
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [run.workspace, project?.preferences?.previewCommand]);
   useEffect(
     () => () => {
       if (inspectionId.current)
@@ -226,6 +248,7 @@ export function TaskPreview({
       )}
       {preview?.ready && url && (
         <>
+          <DesignPreview key={run.id} runId={run.id} path={address} onFeedback={onFeedback} />
           <form
             className="flex flex-wrap items-end gap-2"
             onSubmit={(event) => {
@@ -236,6 +259,9 @@ export function TaskPreview({
               }
               setError('');
               setAddress(route);
+              try {
+                localStorage.setItem(addressKey, route);
+              } catch {}
               setLoaded(false);
               setReload((value) => value + 1);
             }}
@@ -272,62 +298,65 @@ export function TaskPreview({
           </div>
           <p className="task-muted">
             {loaded
-              ? 'Local preview. If embedding is blocked, use Open in browser. A responding server does not establish passing checks.'
-              : 'Loading page… If the project blocks embedded previews, use Open in browser.'}
+              ? 'Use Select in preview to capture an element and describe a change.'
+              : 'Loading page… If this page stays blank, use Open in browser.'}
           </p>
-          <div className="space-y-2">
-            <Button
-              variant="outline"
-              disabled={inspecting}
-              loading={inspecting}
-              loadingLabel="Capturing…"
-              onClick={async () => {
-                const requestId = crypto.randomUUID();
-                inspectionId.current = requestId;
-                setInspecting(true);
-                setError('');
-                setInspection(null);
-                setElement('');
-                try {
-                  const result = await nativeTask<{
-                    screenshot: ScreenshotArtifact;
-                    snapshot: string;
-                    errors: string;
-                  }>('task_preview_inspect', { id: run.id, requestId, path: address, narrow });
-                  if (inspectionId.current === requestId) setInspection(result);
-                } catch (cause) {
-                  if (inspectionId.current === requestId) setError(String(cause));
-                } finally {
-                  if (inspectionId.current === requestId) {
-                    inspectionId.current = null;
-                    setInspecting(false);
-                  }
-                }
-              }}
-            >
-              Capture evidence
-            </Button>
-            {inspecting && (
+          <Disclosure>
+            <DisclosureSummary>Capture a fresh page snapshot</DisclosureSummary>
+            <div className="space-y-2">
               <Button
-                variant="ghost"
-                onClick={() => {
-                  const requestId = inspectionId.current;
-                  inspectionId.current = null;
-                  setInspecting(false);
-                  if (requestId)
-                    void nativeTask('task_preview_inspect_cancel', { requestId }).catch((cause) =>
-                      setError(String(cause)),
-                    );
+                variant="outline"
+                disabled={inspecting}
+                loading={inspecting}
+                loadingLabel="Capturing…"
+                onClick={async () => {
+                  const requestId = crypto.randomUUID();
+                  inspectionId.current = requestId;
+                  setInspecting(true);
+                  setError('');
+                  setInspection(null);
+                  setElement('');
+                  try {
+                    const result = await nativeTask<{
+                      screenshot: ScreenshotArtifact;
+                      snapshot: string;
+                      errors: string;
+                    }>('task_preview_inspect', { id: run.id, requestId, path: address, narrow });
+                    if (inspectionId.current === requestId) setInspection(result);
+                  } catch (cause) {
+                    if (inspectionId.current === requestId) setError(String(cause));
+                  } finally {
+                    if (inspectionId.current === requestId) {
+                      inspectionId.current = null;
+                      setInspecting(false);
+                    }
+                  }
                 }}
               >
-                Cancel capture
+                Capture evidence
               </Button>
-            )}
-            <p className="task-muted">
-              Captures a fresh browser session. Current sign-in and unsaved interactions are not
-              copied.
-            </p>
-          </div>
+              {inspecting && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    const requestId = inspectionId.current;
+                    inspectionId.current = null;
+                    setInspecting(false);
+                    if (requestId)
+                      void nativeTask('task_preview_inspect_cancel', { requestId }).catch((cause) =>
+                        setError(String(cause)),
+                      );
+                  }}
+                >
+                  Cancel capture
+                </Button>
+              )}
+              <p className="task-muted">
+                Captures a fresh browser session. Current sign-in and unsaved interactions are not
+                copied.
+              </p>
+            </div>
+          </Disclosure>
         </>
       )}
       {inspection && (

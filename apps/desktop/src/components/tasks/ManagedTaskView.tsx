@@ -10,12 +10,14 @@ import {
   previewTaskPlan,
 } from '../../lib/managed-task';
 import { queueCommand } from '../../lib/queue';
+import { appendFeedbackDraft } from '../../lib/review-feedback';
 import { isActive, nativeTask, type TaskRun } from '../../lib/task-runtime';
 import { taskDecision } from '../../lib/task-workflow';
 import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
@@ -34,6 +36,7 @@ import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
+import { WorkSourceLink } from './WorkSourceLink';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
 
@@ -50,8 +53,13 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [activityId, setActivityId] = useState<string | null>(null);
-  const [correction, setCorrection] = useState('');
+  const correctionKey = `managed-reply:${task.id}`;
+  const correction = useExecutionStore((state) => state.drafts[correctionKey]?.prompt ?? '');
+  const setCorrection = (prompt: string) =>
+    useExecutionStore.getState().draft(correctionKey, { prompt });
   const [viewTab, setViewTab] = useState('overview');
+  const split = useWorkViewStore((state) => state.split[`managed:${task.id}`] ?? false);
+  const alongside = split && ['review', 'preview'].includes(viewTab);
   const [planPending, setPlanPending] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
   const pageRef = useRef<HTMLElement>(null);
@@ -202,8 +210,8 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
     if (task.started) await managedTaskCommand('action', { id: task.id, action: 'resume' });
   };
   const prepareCorrection = (text: string) => {
-    setCorrection(text);
-    setViewTab('overview');
+    setCorrection(appendFeedbackDraft(correction, text));
+    if (!alongside) setViewTab('overview');
     requestAnimationFrame(() => document.getElementById('managed-result-correction')?.focus());
   };
   const lead = work.active[0] ?? work.combined ?? work.planner;
@@ -306,7 +314,15 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
                   </Button>
                 )}
               {hasResult && !work.integrated && !work.active.length && viewTab !== 'overview' && (
-                <Button variant="outline" onClick={() => prepareCorrection(correction)}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewTab('overview');
+                    requestAnimationFrame(() =>
+                      document.getElementById('managed-result-correction')?.focus(),
+                    );
+                  }}
+                >
                   Request changes
                 </Button>
               )}
@@ -339,6 +355,7 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
         <UserPromptCard key={prompt.id} runId={run.id} prompt={prompt} active />
       ))}
       <Tabs.Root className="managed-task-tabs" value={viewTab} onValueChange={setViewTab}>
+        <WorkSourceLink prompts={[task.request.prompt]} />
         <Tabs.List aria-label="Planned task views">
           <Tabs.Trigger ref={overviewTabRef} value="overview">
             Overview
@@ -354,318 +371,346 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
           </Tabs.Trigger>
           <Tabs.Trigger value="details">Details</Tabs.Trigger>
         </Tabs.List>
-        <Tabs.Content value="overview" className="managed-overview">
-          {showAssignments && (
-            <section className="workspace-section workspace-stack" aria-label="Assignments">
-              <WorkspaceSectionHeading title="Assignments" />
-              {assignments}
-            </section>
-          )}
-          {!task.started && (
-            <section className="workspace-section workspace-stack" aria-label="Proposed work">
-              {work.planner && isActive(work.planner) ? (
-                <Panel className="managed-planning-status">
-                  <ManagedTaskAgent provider={work.planner.agent} run={work.planner} />
-                  <div className="managed-agent-message">
-                    <span className="managed-agent-name">
-                      {getAgentMetadata(work.planner.agent)?.name ?? work.planner.agent}
-                    </span>
-                    <h2>Planning your task</h2>
-                    <TaskLiveActivity run={work.planner} />
-                  </div>
-                  <Button variant="outline" onClick={() => openActivity(work.planner as TaskRun)}>
-                    <Activity size={16} aria-hidden="true" /> View activity
-                  </Button>
-                </Panel>
-              ) : planPending ? (
-                <p className="task-muted" role="status">
-                  Loading the proposed plan…
-                </p>
-              ) : !plan.length ? (
-                <Panel className="workspace-stack">
+        {['review', 'preview'].includes(viewTab) && (
+          <Button
+            variant="ghost"
+            className="self-start"
+            aria-pressed={split}
+            onClick={() => useWorkViewStore.getState().setSplit(`managed:${task.id}`, !split)}
+          >
+            {split ? 'Hide conversation' : 'Show conversation'}
+          </Button>
+        )}
+        <div className="managed-task-panels" data-alongside={alongside || undefined}>
+          <Tabs.Content
+            value="overview"
+            className="managed-overview"
+            forceMount
+            hidden={viewTab !== 'overview' && !alongside}
+          >
+            {showAssignments && (
+              <section className="workspace-section workspace-stack" aria-label="Assignments">
+                <WorkspaceSectionHeading title="Assignments" />
+                {assignments}
+              </section>
+            )}
+            {!task.started && (
+              <section className="workspace-section workspace-stack" aria-label="Proposed work">
+                {work.planner && isActive(work.planner) ? (
+                  <Panel className="managed-planning-status">
+                    <ManagedTaskAgent provider={work.planner.agent} run={work.planner} />
+                    <div className="managed-agent-message">
+                      <span className="managed-agent-name">
+                        {getAgentMetadata(work.planner.agent)?.name ?? work.planner.agent}
+                      </span>
+                      <h2>Planning your task</h2>
+                      <TaskLiveActivity run={work.planner} />
+                    </div>
+                    <Button variant="outline" onClick={() => openActivity(work.planner as TaskRun)}>
+                      <Activity size={16} aria-hidden="true" /> View activity
+                    </Button>
+                  </Panel>
+                ) : planPending ? (
+                  <p className="task-muted" role="status">
+                    Loading the proposed plan…
+                  </p>
+                ) : !plan.length ? (
+                  <Panel className="workspace-stack">
+                    <WorkspaceSectionHeading
+                      title="Planning needs attention"
+                      description={work.planner?.error}
+                    />
+                    <div className="managed-task-actions">
+                      <Button
+                        disabled={busy}
+                        onClick={() => {
+                          if (work.planner && ['review', 'reviewed'].includes(work.planner.status))
+                            setPreviewRevision((value) => value + 1);
+                          else
+                            void act(() =>
+                              managedTaskCommand('action', { id: task.id, action: 'retry-plan' }),
+                            );
+                        }}
+                      >
+                        {work.planner && ['review', 'reviewed'].includes(work.planner.status)
+                          ? 'Reload plan'
+                          : 'Retry planning'}
+                      </Button>
+                      {work.planner && (
+                        <Button
+                          variant="outline"
+                          onClick={() => openActivity(work.planner as TaskRun)}
+                        >
+                          View activity
+                        </Button>
+                      )}
+                    </div>
+                  </Panel>
+                ) : (
                   <WorkspaceSectionHeading
-                    title="Planning needs attention"
-                    description={work.planner?.error}
+                    title="Review your plan"
+                    description={`${plan.length} steps`}
                   />
-                  <div className="managed-task-actions">
+                )}
+                {!!plan.length && (
+                  <ol className="managed-plan">
+                    {plan.map((step, index) => (
+                      <li key={step.key}>
+                        <Panel className="managed-plan-step">
+                          <header>
+                            <ManagedTaskAgent provider={step.agent} />
+                            <div>
+                              <span className="managed-agent-name">
+                                {getAgentMetadata(step.agent)?.name ??
+                                  (step.agent === 'auto' ? 'Automatic' : step.agent)}
+                              </span>
+                              <h3>{step.title}</h3>
+                            </div>
+                            <span className="managed-plan-number" aria-hidden="true">
+                              {index + 1}
+                            </span>
+                          </header>
+                          <p className="managed-plan-description">
+                            {step.prompt.split('\n\nComplete request')[0]}
+                          </p>
+                          <p className="managed-plan-dependency">
+                            {step.dependsOn.length
+                              ? `After: ${step.dependsOn.map((key) => plan.find((entry) => entry.key === key)?.title ?? key).join(', ')}`
+                              : 'Can start independently'}
+                          </p>
+                          <ul className="managed-plan-scopes" aria-label="Files and folders">
+                            {step.scopes.map((scope) => (
+                              <li key={scope}>
+                                <code>{scope}</code>
+                              </li>
+                            ))}
+                          </ul>
+                        </Panel>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {!!plan.length && (
+                  <div className="managed-plan-start">
                     <Button
                       disabled={busy}
-                      onClick={() => {
-                        if (work.planner && ['review', 'reviewed'].includes(work.planner.status))
-                          setPreviewRevision((value) => value + 1);
-                        else
-                          void act(() =>
-                            managedTaskCommand('action', { id: task.id, action: 'retry-plan' }),
-                          );
-                      }}
+                      onClick={() =>
+                        void act(() =>
+                          managedTaskCommand('start', { id: task.id, plannerRunId: planRunId }),
+                        )
+                      }
                     >
-                      {work.planner && ['review', 'reviewed'].includes(work.planner.status)
-                        ? 'Reload plan'
-                        : 'Retry planning'}
+                      Start reviewed plan
                     </Button>
                     {work.planner && (
                       <Button
                         variant="outline"
-                        onClick={() => openActivity(work.planner as TaskRun)}
+                        onClick={() => openDetails(work.planner as TaskRun)}
                       >
-                        View activity
+                        Adjust plan
                       </Button>
                     )}
                   </div>
-                </Panel>
-              ) : (
-                <WorkspaceSectionHeading
-                  title="Review your plan"
-                  description={`${plan.length} steps`}
-                />
-              )}
-              {!!plan.length && (
-                <ol className="managed-plan">
-                  {plan.map((step, index) => (
-                    <li key={step.key}>
-                      <Panel className="managed-plan-step">
-                        <header>
-                          <ManagedTaskAgent provider={step.agent} />
-                          <div>
-                            <span className="managed-agent-name">
-                              {getAgentMetadata(step.agent)?.name ??
-                                (step.agent === 'auto' ? 'Automatic' : step.agent)}
-                            </span>
-                            <h3>{step.title}</h3>
-                          </div>
-                          <span className="managed-plan-number" aria-hidden="true">
-                            {index + 1}
-                          </span>
-                        </header>
-                        <p className="managed-plan-description">
-                          {step.prompt.split('\n\nComplete request')[0]}
-                        </p>
-                        <p className="managed-plan-dependency">
-                          {step.dependsOn.length
-                            ? `After: ${step.dependsOn.map((key) => plan.find((entry) => entry.key === key)?.title ?? key).join(', ')}`
-                            : 'Can start independently'}
-                        </p>
-                        <ul className="managed-plan-scopes" aria-label="Files and folders">
-                          {step.scopes.map((scope) => (
-                            <li key={scope}>
-                              <code>{scope}</code>
-                            </li>
-                          ))}
-                        </ul>
-                      </Panel>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {!!plan.length && (
-                <div className="managed-plan-start">
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(() =>
-                        managedTaskCommand('start', { id: task.id, plannerRunId: planRunId }),
-                      )
-                    }
-                  >
-                    Start reviewed plan
-                  </Button>
-                  {work.planner && (
-                    <Button variant="outline" onClick={() => openDetails(work.planner as TaskRun)}>
-                      Adjust plan
-                    </Button>
+                )}
+              </section>
+            )}
+            {work.combined && !isActive(work.combined) && !detail && (
+              <section className="managed-result" aria-label="Complete task result">
+                <div className="managed-result-body">
+                  {work.combined.detailsOmitted ? (
+                    <p role="status">Loading the combined result…</p>
+                  ) : (
+                    <Suspense fallback={<p>Loading result…</p>}>
+                      <TaskMarkdown
+                        content={work.combined.result || 'Open review to inspect this result.'}
+                        active={false}
+                        onOpenLink={(url) => void openExternalUrl(url)}
+                      />
+                    </Suspense>
                   )}
                 </div>
-              )}
-            </section>
-          )}
-          {work.combined && !isActive(work.combined) && !detail && (
-            <section className="managed-result" aria-label="Complete task result">
-              <div className="managed-result-body">
-                {work.combined.detailsOmitted ? (
-                  <p role="status">Loading the combined result…</p>
+                {!work.integrated && !work.active.length && (
+                  <div className="managed-followup">
+                    <FormField label="What would you like to change?">
+                      <Textarea
+                        id="managed-result-correction"
+                        rows={2}
+                        maxLength={12000}
+                        value={correction}
+                        placeholder="Describe a change to this result…"
+                        onChange={(event) => setCorrection(event.target.value)}
+                      />
+                    </FormField>
+                    <Button
+                      variant="outline"
+                      disabled={busy || !correction.trim()}
+                      onClick={() => void act(() => continueRun(work.combined as TaskRun))}
+                    >
+                      {previewRunning ? 'Stop preview and update result' : 'Update result'}
+                    </Button>
+                  </div>
+                )}
+              </section>
+            )}
+            {detail && (
+              <Panel
+                id="managed-attempt-result"
+                tabIndex={-1}
+                aria-label="Assignment details"
+                className="managed-attempt-result workspace-stack"
+              >
+                <WorkspaceSectionHeading
+                  level={3}
+                  title={
+                    detail.id === work.planner?.id
+                      ? 'Planning result'
+                      : (work.steps.find(({ run }) => run?.id === detail.id)?.item.title ??
+                        'Follow-up')
+                  }
+                  action={
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setDetailId(null);
+                        requestAnimationFrame(() => overviewTabRef.current?.focus());
+                      }}
+                    >
+                      Close details
+                    </Button>
+                  }
+                />
+                {detail.error && <InlineNotice tone="error">{detail.error}</InlineNotice>}
+                {detail.detailsOmitted ? (
+                  <p role="status">Loading result…</p>
                 ) : (
                   <Suspense fallback={<p>Loading result…</p>}>
                     <TaskMarkdown
-                      content={work.combined.result || 'Open review to inspect this result.'}
-                      active={false}
+                      content={
+                        detail.result ||
+                        (isActive(detail)
+                          ? 'The result will appear here when the agent finishes.'
+                          : 'No result was recorded. Open activity to inspect this attempt.')
+                      }
+                      active={isActive(detail)}
                       onOpenLink={(url) => void openExternalUrl(url)}
                     />
                   </Suspense>
                 )}
-              </div>
-              {!work.integrated && !work.active.length && (
-                <div className="managed-followup">
-                  <FormField label="What would you like to change?">
-                    <Textarea
-                      id="managed-result-correction"
-                      rows={2}
-                      maxLength={12000}
-                      value={correction}
-                      placeholder="Describe a change to this result…"
-                      onChange={(event) => setCorrection(event.target.value)}
-                    />
-                  </FormField>
-                  <Button
-                    variant="outline"
-                    disabled={busy || !correction.trim()}
-                    onClick={() => void act(() => continueRun(work.combined as TaskRun))}
-                  >
-                    {previewRunning ? 'Stop preview and update result' : 'Update result'}
-                  </Button>
-                </div>
-              )}
-            </section>
-          )}
-          {detail && (
-            <Panel
-              id="managed-attempt-result"
-              tabIndex={-1}
-              aria-label="Assignment details"
-              className="managed-attempt-result workspace-stack"
-            >
-              <WorkspaceSectionHeading
-                level={3}
-                title={
-                  detail.id === work.planner?.id
-                    ? 'Planning result'
-                    : (work.steps.find(({ run }) => run?.id === detail.id)?.item.title ??
-                      'Follow-up')
+                <Button
+                  variant="outline"
+                  className="self-start"
+                  onClick={() => openActivity(detail)}
+                >
+                  <Activity size={16} aria-hidden="true" /> View activity
+                </Button>
+                {!isActive(detail) &&
+                  detail.id !== work.combined?.id &&
+                  !work.integrated &&
+                  !work.active.length && (
+                    <>
+                      {['failed', 'stopped'].includes(detail.status) &&
+                        detail.id === work.planner?.id && (
+                          <Button
+                            disabled={busy}
+                            onClick={() =>
+                              void act(async () => {
+                                await managedTaskCommand('action', {
+                                  id: task.id,
+                                  action: 'retry-plan',
+                                });
+                                setDetailId(null);
+                              })
+                            }
+                          >
+                            Retry planning
+                          </Button>
+                        )}
+                      {['review', 'reviewed'].includes(detail.status) &&
+                        (detail.id === work.planner?.id ||
+                          work.steps.some(({ run }) => run?.id === detail.id)) &&
+                        (!task.started ||
+                          detail.id === work.combined?.id ||
+                          !work.steps.some(
+                            ({ item }) =>
+                              item.dependencies.includes(
+                                work.steps.find(({ run }) => run?.id === detail.id)?.item.id ?? '',
+                              ) && !!item.runId,
+                          )) && (
+                          <>
+                            <label className="task-label" htmlFor="managed-correction">
+                              Follow up in this task
+                            </label>
+                            <Textarea
+                              id="managed-correction"
+                              rows={3}
+                              maxLength={12000}
+                              value={correction}
+                              onChange={(event) => setCorrection(event.target.value)}
+                            />
+                            <Button
+                              disabled={busy || !correction.trim()}
+                              onClick={() => void act(() => continueRun(detail))}
+                            >
+                              Send follow-up
+                            </Button>
+                          </>
+                        )}
+                    </>
+                  )}
+              </Panel>
+            )}
+          </Tabs.Content>
+          {hasResult && work.combined && (
+            <Tabs.Content value="review" forceMount hidden={viewTab !== 'review'}>
+              <ResultReview
+                canApprove={!work.active.length && !work.integrated}
+                key={work.combined.id}
+                run={work.combined}
+                visible={viewTab === 'review'}
+                onCorrect={!work.integrated && !work.active.length ? prepareCorrection : undefined}
+                unavailable={
+                  work.integrated ? (
+                    <p className="task-muted">The applied patch is saved in the merge receipt.</p>
+                  ) : undefined
                 }
-                action={
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setDetailId(null);
-                      requestAnimationFrame(() => overviewTabRef.current?.focus());
+                outcomes={
+                  <TaskOutcomes
+                    run={work.combined}
+                    canReview={!work.active.length && !work.integrated}
+                    onCorrect={prepareCorrection}
+                    onAdvance={async () => {
+                      throw new Error('Continue this task through its follow-up.');
                     }}
-                  >
-                    Close details
-                  </Button>
+                  />
+                }
+                delivery={
+                  project && (
+                    <MergeReview
+                      key={selectionKey}
+                      project={project}
+                      runs={runs}
+                      items={work.items}
+                      merged={queue.mergedRunIds}
+                      onChanged={refreshAll}
+                      onlyRunIds={reviewRunIds}
+                      managedTitle={task.title}
+                      changesReviewed={!work.integrated}
+                    />
+                  )
                 }
               />
-              {detail.error && <InlineNotice tone="error">{detail.error}</InlineNotice>}
-              {detail.detailsOmitted ? (
-                <p role="status">Loading result…</p>
-              ) : (
-                <Suspense fallback={<p>Loading result…</p>}>
-                  <TaskMarkdown
-                    content={
-                      detail.result ||
-                      (isActive(detail)
-                        ? 'The result will appear here when the agent finishes.'
-                        : 'No result was recorded. Open activity to inspect this attempt.')
-                    }
-                    active={isActive(detail)}
-                    onOpenLink={(url) => void openExternalUrl(url)}
-                  />
-                </Suspense>
-              )}
-              <Button variant="outline" className="self-start" onClick={() => openActivity(detail)}>
-                <Activity size={16} aria-hidden="true" /> View activity
-              </Button>
-              {!isActive(detail) &&
-                detail.id !== work.combined?.id &&
-                !work.integrated &&
-                !work.active.length && (
-                  <>
-                    {['failed', 'stopped'].includes(detail.status) &&
-                      detail.id === work.planner?.id && (
-                        <Button
-                          disabled={busy}
-                          onClick={() =>
-                            void act(async () => {
-                              await managedTaskCommand('action', {
-                                id: task.id,
-                                action: 'retry-plan',
-                              });
-                              setDetailId(null);
-                            })
-                          }
-                        >
-                          Retry planning
-                        </Button>
-                      )}
-                    {['review', 'reviewed'].includes(detail.status) &&
-                      (detail.id === work.planner?.id ||
-                        work.steps.some(({ run }) => run?.id === detail.id)) &&
-                      (!task.started ||
-                        detail.id === work.combined?.id ||
-                        !work.steps.some(
-                          ({ item }) =>
-                            item.dependencies.includes(
-                              work.steps.find(({ run }) => run?.id === detail.id)?.item.id ?? '',
-                            ) && !!item.runId,
-                        )) && (
-                        <>
-                          <label className="task-label" htmlFor="managed-correction">
-                            Follow up in this task
-                          </label>
-                          <Textarea
-                            id="managed-correction"
-                            rows={3}
-                            maxLength={12000}
-                            value={correction}
-                            onChange={(event) => setCorrection(event.target.value)}
-                          />
-                          <Button
-                            disabled={busy || !correction.trim()}
-                            onClick={() => void act(() => continueRun(detail))}
-                          >
-                            Send follow-up
-                          </Button>
-                        </>
-                      )}
-                  </>
-                )}
-            </Panel>
+            </Tabs.Content>
           )}
-        </Tabs.Content>
-        {hasResult && work.combined && (
-          <Tabs.Content value="review" forceMount hidden={viewTab !== 'review'}>
-            <ResultReview
-              canApprove={!work.active.length && !work.integrated}
-              key={work.combined.id}
-              run={work.combined}
-              visible={viewTab === 'review'}
-              onCorrect={prepareCorrection}
-              unavailable={
-                work.integrated ? (
-                  <p className="task-muted">The applied patch is saved in the merge receipt.</p>
-                ) : undefined
-              }
-              outcomes={
-                <TaskOutcomes
-                  run={work.combined}
-                  canReview={!work.active.length && !work.integrated}
-                  onCorrect={prepareCorrection}
-                  onAdvance={async () => {
-                    throw new Error('Continue this task through its follow-up.');
-                  }}
-                />
-              }
-              delivery={
-                project && (
-                  <MergeReview
-                    key={selectionKey}
-                    project={project}
-                    runs={runs}
-                    items={work.items}
-                    merged={queue.mergedRunIds}
-                    onChanged={refreshAll}
-                    onlyRunIds={reviewRunIds}
-                    managedTitle={task.title}
-                    changesReviewed={!work.integrated}
-                  />
-                )
-              }
-            />
-          </Tabs.Content>
-        )}
-        {hasResult && work.combined && !work.integrated && (
-          <Tabs.Content value="preview">
-            <TaskPreview run={work.combined} onFeedback={prepareCorrection} />
-          </Tabs.Content>
-        )}
+          {hasResult && work.combined && !work.integrated && (
+            <Tabs.Content value="preview">
+              <TaskPreview
+                key={work.combined.id}
+                run={work.combined}
+                onFeedback={prepareCorrection}
+              />
+            </Tabs.Content>
+          )}
+        </div>
         <Tabs.Content value="activity" className="managed-activity">
           {activityRun ? (
             <>
