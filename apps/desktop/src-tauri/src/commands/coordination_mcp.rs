@@ -19,6 +19,8 @@ use rmcp::{
 };
 use serde::Deserialize;
 
+mod catalog;
+
 #[derive(Clone)]
 struct CoordinationTools {
     service: Coordinator,
@@ -222,9 +224,36 @@ impl CoordinationTools {
         context: RequestContext<RoleServer>,
         Parameters(input): Parameters<HarnessDiscoveryInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.service
+        let run = self
+            .service
             .authorized_run(&request_headers(&context)?)
             .map_err(bridge_error)?;
+        if catalog::deferred(&run) {
+            let names = catalog::requested(&input.names)
+                .map_err(|error| ErrorData::invalid_params(error, None))?;
+            self.service
+                .runtime
+                .update_checked(&run.id, |run| {
+                    run.efficiency
+                        .discovered_harness_tools
+                        .extend(names.iter().cloned());
+                })
+                .map_err(|error| ErrorData::internal_error(error, None))?;
+            context
+                .peer
+                .notify_tool_list_changed()
+                .await
+                .map_err(|error| ErrorData::internal_error(error.to_string(), None))?;
+            let tools: Vec<_> = self
+                .tool_router
+                .list_all()
+                .into_iter()
+                .filter(|tool| names.contains(tool.name.as_ref()))
+                .collect();
+            return Ok(CallToolResult::structured(
+                serde_json::json!({"tools":tools,"hint":"These tools are now included in tools/list. Use their normal named calls and permissions. Discovery grants no approval and does not execute an operation."}),
+            ));
+        }
         let optional = ["message", "inbox", "acknowledge_message", "agreement"];
         if input.names.len() > 4
             || input
@@ -913,6 +942,12 @@ impl CoordinationTools {
     instructions = "Use supplied launch context. Refresh project for shared-interface changes, scope uncertainty or new coordination needs. Use harness tools for relevant evidence, user questions and final verification."
 )]
 impl ServerHandler for CoordinationTools {
+    fn get_info(&self) -> rmcp::model::ServerInfo {
+        rmcp::model::ServerInfo::new(rmcp::model::ServerCapabilities::builder().enable_tools().enable_tool_list_changed().build())
+            .with_server_info(rmcp::model::Implementation::new("jackalope", "0.1.0"))
+            .with_instructions("Use supplied launch context. Refresh project for shared-interface changes, scope uncertainty or new coordination needs. Use harness tools for relevant evidence, user questions and final verification.")
+    }
+
     async fn list_tools(
         &self,
         _request: Option<rmcp::model::PaginatedRequestParams>,
@@ -985,11 +1020,31 @@ impl ServerHandler for CoordinationTools {
         }
         if lean {
             tools.retain(|tool| {
-                !matches!(
-                    tool.name.as_ref(),
-                    "message" | "inbox" | "acknowledge_message" | "agreement"
-                )
+                catalog::deferred(&run)
+                    || !matches!(
+                        tool.name.as_ref(),
+                        "message" | "inbox" | "acknowledge_message" | "agreement"
+                    )
             });
+        }
+        if catalog::deferred(&run) {
+            tools.retain(|tool| {
+                catalog::visible(tool.name.as_ref(), &run.efficiency.discovered_harness_tools)
+            });
+            if let Some(discover) = tools
+                .iter_mut()
+                .find(|tool| tool.name == "discover_harness_tools")
+            {
+                discover.description = Some("Load optional native tools by names or groups: browser (navigation, screenshots, page interaction), desktop (user-approved window control), coordination (messages and shared interfaces). Empty names loads all. Use returned tools through their normal named calls; permissions are unchanged.".into());
+                let mut schema = (*discover.input_schema).clone();
+                if let Some(names) = schema
+                    .get_mut("properties")
+                    .and_then(|value| value.get_mut("names"))
+                {
+                    names["description"] = serde_json::json!("Tool names or groups: browser, desktop, coordination. Empty loads all optional tools.");
+                }
+                discover.input_schema = std::sync::Arc::new(schema);
+            }
         }
         Ok(rmcp::model::ListToolsResult {
             result_type: Some(rmcp::model::ResultType::COMPLETE),
@@ -1052,7 +1107,7 @@ pub(super) fn router(service: Coordinator) -> Router {
     let worker_service = service.clone();
     let mut config = StreamableHttpServerConfig::default();
     config.legacy_session_mode = false;
-    config.json_response = true;
+    config.json_response = !crate::commands::experiments::is("JACKALOPE_TOOL_SURFACE", "deferred");
     config.max_request_body_bytes = 65_536;
     let transport: StreamableHttpService<CoordinationTools, LocalSessionManager> =
         StreamableHttpService::new(

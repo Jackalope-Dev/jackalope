@@ -163,6 +163,7 @@ representative benefit and installed-platform acceptance remain open.
   Screening can stop between matched repetitions while retaining interrupted attempts.
   Further opt-in controls cover read-only batches, captured-result row queries, a lean ordinary-task launch,
   final native checks, conditional source ranges, content-keyed syntax reuse,
+  deferred OpenCode browser/desktop schemas with native discovery and permissions,
   bounded delegation planning and shadow Jev assistance. Opt-in agent questions
   expose typed Jev batches with native file/captured-result evidence and separate
   usage accounting. Explicit task contracts can prepare file-backed Jev batches before

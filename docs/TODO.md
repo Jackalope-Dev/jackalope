@@ -82,6 +82,8 @@ release dates.
   Screen available-tool exposure, exact read-only lookup, explicit source preparation
   and task-scoped/final-phase guidance
   independently; freeze promising settings before new held-out confirmation.
+  Include OpenCode deferred-tool discovery and client permission preservation;
+  require native client compatibility before extending it to other adapters.
   Compare bounded multi-connection batches, captured-result queries, ordinary-task launch/final checks,
   repeated source ranges, dirty-file syntax reuse and delegation admission costs.
   Label shadow Jev false negatives independently before enabling new suppression.
@@ -91,6 +93,9 @@ release dates.
   matched direct, Jackalope-only and Jev arms with equivalent supplied evidence.
   Screen large-result Jev relevance reads against the same native tools and local
   selectors; independently check necessary-row retention and include helper overhead.
+  Validate combined retrieval policies before delivery, including named-read paths,
+  paging and recovery. Record actual policy/helper use separately from availability;
+  keep adapter-specific history hooks separate from shared broker behavior.
   Require independent original-patch acceptance for quality claims. Counterbalanced
   review-time and correction measurements are separate prerequisites for claiming faster review.
 
@@ -131,7 +136,7 @@ release dates.
   upgrades in installed Windows, macOS and GNU Linux builds on x64 and ARM64.
   Cover active-process maintenance, connection completion retry and per-account models.
 - [ ] Screen isolated warm API helpers for latency, memory and cancellation; reconcile
-  request-level provider accounting with mixed helper/Jev routing costs before
+  request-level provider accounting with mixed agent-helper and routing costs before
   confirmation. Freeze independent family sampling and statistical power assumptions;
   use the study planner to reject infeasible confirmation sizes.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without

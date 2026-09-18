@@ -112,6 +112,8 @@ pub struct Timing {
 pub struct Efficiency {
     pub execution_profile: Option<String>,
     pub verification_flow: Option<String>,
+    #[serde(skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+    pub discovered_harness_tools: std::collections::BTreeSet<String>,
     pub native_verification_calls: Option<u64>,
     pub context_blocks_unchanged: Option<u64>,
     pub delegation_plans: Option<u64>,

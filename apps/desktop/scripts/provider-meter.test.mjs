@@ -1,12 +1,47 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  aggregateAttempts,
+  reconcileProviderUsage,
+} from '../../../scripts/evaluation/attempts.mjs';
+import {
   experimentEnvironment,
   experimentOptions,
   registry,
 } from '../../../scripts/evaluation/experiments.mjs';
 import { deepseekUsage, startProviderMeter } from '../../../scripts/evaluation/provider-meter.mjs';
 import { studyPlan } from '../../../scripts/evaluation/study-plan.mjs';
+
+test('provider totals replace worker reports while disjoint Jev helpers are added once', () => {
+  const usage = (input) => ({ reported: true, input, output: 2, cacheRead: 0, cacheWrite: 0 });
+  const report = { run: { id: 'run', usage: usage(20) }, decisionRecords: [] };
+  const meter = { provider: 'deepseek', complete: true, usage: usage(30) };
+  assert.equal(reconcileProviderUsage(aggregateAttempts(report), meter).usage.input, 30);
+  report.decisionRecords.push({
+    id: 'helper',
+    runId: 'run',
+    decision: {
+      provider: 'jev',
+      modelCallAttempted: true,
+      attempts: [{ provider: 'jev' }],
+      usage: usage(10),
+    },
+  });
+  assert.equal(reconcileProviderUsage(aggregateAttempts(report), meter).usage.input, 40);
+  report.decisionRecords.push(report.decisionRecords[0]);
+  assert.equal(reconcileProviderUsage(aggregateAttempts(report), meter).usage.input, 40);
+  report.decisionRecords[0].decision.attempts.push({ provider: 'agent' });
+  assert.equal(reconcileProviderUsage(aggregateAttempts(report), meter).nativeComplete, false);
+  report.decisionRecords[0].decision.attempts.pop();
+  report.decisionRecords[0].accountedElsewhere = true;
+  assert.equal(reconcileProviderUsage(aggregateAttempts(report), meter).nativeComplete, false);
+  report.decisionRecords[0].accountedElsewhere = false;
+  report.decisionRecords[0].decision.usage = { reported: false };
+  assert.equal(reconcileProviderUsage(aggregateAttempts(report), meter).usage, null);
+  report.run.routing = {};
+  assert.equal(reconcileProviderUsage(aggregateAttempts(report), meter).nativeComplete, false);
+  assert.equal(reconcileProviderUsage(aggregateAttempts(null), meter).nativeComplete, false);
+});
 
 test('study planning catches impossible quality gates without treating feasibility as power', () => {
   assert.equal(studyPlan().necessaryPerfectFamilies, 189);

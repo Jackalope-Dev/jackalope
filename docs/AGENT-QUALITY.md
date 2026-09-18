@@ -259,6 +259,16 @@ arguments are already known. Incomplete catalogs, duplicate names, changed schem
 disallowed tools and mutating operations cannot take this shortcut. It preserves
 attempt ownership, connection allowlists, cancellation and result recovery.
 
+`--after-tool-surface=deferred` with `--after-execution-profile=lean` defers browser,
+desktop and coordination schemas for ordinary OpenCode tasks. The discovery tool
+adds requested groups to the attempt's catalog and emits MCP list-changed notifications.
+Calls still use their original named tools and permissions; no generic execution
+wrapper is introduced. Other adapters and managed assignments retain their existing
+catalogs. This experiment needs a client that refreshes tools during execution.
+Run `node scripts/verification/verify-deferred-tools.mjs <absolute-native-test-executable>`
+with pinned OpenCode on PATH to check discovery with a fake loopback provider. Repeat
+with `--deny-browser` to check that discovery does not override client permissions.
+
 Source-context preparation is opt-in and runs before the first worker call. It reads
 up to four small, explicitly named source files inside the assigned workspace, with
 an 8,000-byte serialized file-entry budget. Complete UTF-8 snapshots include paths
@@ -569,8 +579,10 @@ only a per-run proxy token. Both arms use the same isolation. Reports retain req
 counts, status, usage, cache counts and duration without prompts, responses or keys.
 Auxiliary calls and retries are included. Missing usage or any incomplete/failed
 request leaves totals unknown. The cost gate uses complete meter totals only for
-runs without separate helper or routing receipts; mixed workflows still require
-reconciliation to prevent omissions and double charging. Warm API helper timing
+runs without routing or agent-helper receipts. Separate, reported Jev-only helper
+attempts can be added once to complete provider usage, while their monetary costs
+remain priced separately. Missing receipts, unknown usage, mixed-provider fallbacks
+and helpers accounted elsewhere block that reconciliation. Warm API helper timing
 is a separate opt-in experiment, not a task-quality result.
 Jackalope supplies a deterministic title for new OpenCode tasks to avoid redundant
 title generation; resumed sessions retain their existing titles. Direct controls

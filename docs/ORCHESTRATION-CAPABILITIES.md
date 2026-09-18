@@ -16,9 +16,9 @@ Antigravity can execute work but cannot coordinate routing-only requests. See
 
 ## Shared tools and guidance
 
-All six adapters receive the task intent, repository rules, frozen project context,
+All seven native adapters receive the task intent, repository rules, frozen project context,
 verification instructions and a task-scoped authenticated bridge. Codex, Claude,
-OpenCode and Kimi receive native MCP tools on bridged tasks. Grok and Antigravity
+OpenCode and Kimi receive native MCP tools on bridged tasks. Grok, Antigravity and Gemini
 use permitted HTTP calls. The same bridge implements project awareness, messages,
 user questions and saved answers, browser evidence, validation and selected
 on-demand connection discovery. No transport bypasses a denied permission.

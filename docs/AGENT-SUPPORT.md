@@ -164,6 +164,27 @@ agent has passed real browser, question or third-party OAuth tool trials.
 This table describes Jackalope’s adapter interfaces. Missing integration does not
 imply that the provider lacks the underlying capability.
 
+Jackalope coordinates installed agent harnesses; it does not own every model turn
+inside those processes. Accounts created through Connect an API provider use the
+OpenCode harness and its tool loop, with a private runner available through setup.
+Changing credentials from a CLI login to an API key does not by itself
+give Jackalope control of the model's conversation history or built-in tools.
+
+| Execution control | Current scope |
+| --- | --- |
+| Task instructions, selected context, workspace ownership and final saved checks | Shared task runtime across native adapters. Required user/repository checks still apply. |
+| Model reasoning effort | Native flags for Codex and Claude Code. Other adapters retain provider defaults; an effort instruction is not evidence that a provider setting changed. |
+| Exact result selection, previews and Jev relevance reads | Shared broker for selected on-demand connections. Codex, Claude, OpenCode and Kimi use native MCP; Grok, Antigravity and Gemini use the HTTP bridge. These do not intercept the agent's own shell or file tools. |
+| Optional browser, desktop and coordination schemas loaded during execution | Opt-in lean OpenCode discovery, using MCP list-changed notifications. Other adapters retain existing catalogs until client refresh and permission behavior are verified. |
+| Batch reads, source-range reads and delegation planning | Experimental native MCP tools for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
+| Native history rewriting | The evaluation-only OpenCode plugin can deduplicate exact read results. It is not installed by ordinary task launches or implemented across all adapters. |
+
+Additional providers using OpenCode share its adapter protocol and tools. They
+still need model-specific tool-call, usage, cancellation, continuation and quality
+acceptance. A new agent harness needs its own protocol adapter and capability checks;
+a new model name alone does not establish those contracts. See
+[evaluation controls](AGENT-QUALITY.md#local-optimization-controls) for opt-in settings.
+
 | Area | Finding and current behavior |
 | --- | --- |
 | Kimi tools, questions, usage and helpers | Implemented through ACP, local session totals, the membership API and explicit tool-free agent definitions. Cache/cost and helper token totals are absent from these output interfaces; unknown values are preserved. |

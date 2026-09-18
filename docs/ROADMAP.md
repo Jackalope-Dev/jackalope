@@ -60,7 +60,8 @@ evaluation suites; the public benchmark methodology keeps their scope explicit.
 Source-attributed repair fixtures and separate workflow, source preparation, tool and continuation
 experiments support screening. Human review exports and complete-attempt cost
 accounting support independent confirmation before broader product claims.
-Read-only batches, captured-result queries, conditional source reads, syntax reuse, lean launches, bounded
+Read-only batches, captured-result queries, deferred OpenCode tool discovery,
+conditional source reads, syntax reuse, lean launches, bounded
 delegation planning, agent-callable typed Jev questions with native evidence reads,
 explicit Jev question contracts prepared before worker launch,
 recoverable Jev relevance selection before large tool-result delivery,

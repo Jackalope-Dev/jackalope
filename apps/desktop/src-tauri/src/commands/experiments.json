@@ -12,7 +12,7 @@
       "environment": null
     },
     "tool-surface": {
-      "values": ["full", "available"],
+      "values": ["full", "available", "deferred"],
       "default": "full",
       "environment": "JACKALOPE_TOOL_SURFACE"
     },

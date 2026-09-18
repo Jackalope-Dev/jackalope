@@ -38,8 +38,12 @@ export function aggregateAttempts(report) {
     agentUsage,
     agentReportedCostUsd: sum(runs.map((run) => run.usage?.estimatedCostUsd)),
     helperUsages,
+    helpers,
     helperUsage: aggregate(helperUsages),
     helperAccountingComplete: Array.isArray(report?.decisionRecords),
+    helpersAccountedElsewhere: (report?.decisionRecords ?? []).some(
+      (record) => record.accountedElsewhere && ids.has(record.runId),
+    ),
     helperCostUsd: helpers.length ? sum(helperUsages.map((usage) => usage.estimatedCostUsd)) : 0,
   };
   if (runs.length < 2) return { ...accounting, efficiency: report?.run?.efficiency ?? null };
@@ -68,5 +72,37 @@ export function aggregateAttempts(report) {
         ].map((key) => [key, sum(runs.map((run) => run.efficiency?.[key]))]),
       ),
     },
+  };
+}
+
+export function reconcileProviderUsage(accounting, meter) {
+  const separateHelpers = accounting.helpers.every(
+    ({ decision }) =>
+      decision &&
+      ['jev', 'local_rules'].includes(decision.provider) &&
+      (!decision.modelCallAttempted || decision.attempts?.length > 0) &&
+      (decision.attempts ?? []).every((attempt) =>
+        ['jev', 'local_rules'].includes(attempt.provider),
+      ),
+  );
+  const nativeComplete =
+    meter?.complete === true &&
+    meter.provider === 'deepseek' &&
+    accounting.helperAccountingComplete &&
+    !accounting.helpersAccountedElsewhere &&
+    separateHelpers &&
+    accounting.runs.length > 0 &&
+    accounting.runs.every((run) => !run.routing);
+  return {
+    nativeComplete,
+    usage:
+      nativeComplete && accounting.helperUsage !== null
+        ? Object.fromEntries(
+            ['input', 'output', 'cacheRead', 'cacheWrite'].map((key) => [
+              key,
+              meter.usage[key] + accounting.helperUsage[key],
+            ]),
+          )
+        : null,
   };
 }

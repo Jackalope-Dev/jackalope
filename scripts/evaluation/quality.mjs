@@ -8,7 +8,7 @@ import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assemb
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
 import { runUsageBreakdown } from '../../apps/desktop/src/lib/usage-breakdown.ts';
-import { aggregateAttempts } from './attempts.mjs';
+import { aggregateAttempts, reconcileProviderUsage } from './attempts.mjs';
 import {
   experimentEnvironment,
   experimentOptions,
@@ -503,6 +503,7 @@ if (!args.includes('--execute')) {
         }
         const run = report?.run;
         const scope = await checkScope(fixture, run?.workspace);
+        const accounting = aggregateAttempts(report);
         const {
           runs,
           usage,
@@ -513,14 +514,10 @@ if (!args.includes('--execute')) {
           helperUsage,
           helperCostUsd,
           helperAccountingComplete,
-        } = aggregateAttempts(report);
-        const nativeAccountingComplete =
-          agent === 'opencode'
-            ? providerAccounting?.complete === true &&
-              helperUsages.length === 0 &&
-              runs.every((run) => !run.routing)
-            : null;
-        const measuredUsage = nativeAccountingComplete ? providerAccounting.usage : usage;
+        } = accounting;
+        const reconciled = reconcileProviderUsage(accounting, providerAccounting);
+        const nativeAccountingComplete = agent === 'opencode' ? reconciled.nativeComplete : null;
+        const measuredUsage = nativeAccountingComplete ? reconciled.usage : usage;
         const budgetExceeded = report
           ? report.budgetStopped === true ||
             report.elapsedMs >= seconds * 1000 ||
