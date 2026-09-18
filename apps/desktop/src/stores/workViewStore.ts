@@ -13,6 +13,7 @@ interface WorkViewState {
   reading: Record<string, string>;
   split: Record<string, boolean>;
   setSplit: (id: string, split: boolean) => void;
+  resetSplits: (ids: string[]) => void;
   remember: (id: string, section: string) => void;
   request: { id: string; section: string; revision: number } | null;
   setScope: (scope: 'all' | 'project') => void;
@@ -26,6 +27,12 @@ export const useWorkViewStore = create<WorkViewState>()(
       views: {},
       reading: {},
       split: {},
+      resetSplits: (ids) =>
+        set((state) => ({
+          split: Object.fromEntries(
+            Object.entries(state.split).filter(([id]) => !ids.includes(id)),
+          ),
+        })),
       setSplit: (id, split) => set((state) => ({ split: { ...state.split, [id]: split } })),
       remember: (id, section) =>
         set((state) => ({

@@ -81,6 +81,23 @@ class JackalopeAgent(BaseAgent):
         (self.logs_dir / "runner-versions.txt").write_text(result.stdout or "")
 
     async def run(self, instruction: str, environment: BaseEnvironment, context: AgentContext) -> None:
+        if environment.network_policy.network_mode.value != 'allowlist':
+            raise ValueError('Repository scoring requires an agent-phase network allowlist excluding published solutions.')
+        probe = await environment.exec('command -v curl', timeout_sec=5)
+        if probe.return_code:
+            raise ValueError('Source-access validation requires curl in the task environment.')
+        for host in ['github.com', 'api.github.com', 'raw.githubusercontent.com']:
+            probe = await environment.exec(
+                'curl --silent --insecure --connect-timeout 2 --max-time 4 --output /dev/null https://' + host,
+                timeout_sec=6,
+            )
+            if probe.return_code == 0:
+                raise ValueError('Published solution host remains reachable: ' + host)
+        (self.logs_dir / 'source-access-guard.json').write_text(json.dumps({
+            'networkMode': environment.network_policy.network_mode.value,
+            'allowedHosts': environment.network_policy.allowed_hosts,
+            'githubBlocked': True,
+        }))
         config = {
             "id": self.session_id,
             "variant": self.options.variant,

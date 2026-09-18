@@ -37,6 +37,7 @@ import { describeRunUsage } from '../../lib/usage-insights';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { Button } from '../ui/button';
@@ -60,6 +61,8 @@ import { TaskTiming } from './TaskTiming';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
 import { ValidationJourney } from './ValidationJourney';
+import { WorkContext } from './WorkContext';
+import { WorkFeedbackInbox } from './WorkFeedbackInbox';
 import { WorkSourceLink } from './WorkSourceLink';
 import { WorkspaceReadiness } from './WorkspaceReadiness';
 import './task-detail.css';
@@ -115,6 +118,7 @@ export function TaskDetail({
   useEffect(() => {
     if (workRequest?.id !== run.id) return;
     const section = workRequest.section;
+    if (section === 'terminal') return;
     if (section === 'question' || section === 'recovery') {
       document
         .getElementById(section === 'question' ? 'task-questions' : 'task-recovery')
@@ -148,7 +152,8 @@ export function TaskDetail({
   const [connections, setConnections] = useState<McpServerConfig[] | null>(null);
   const applied = useCallback(() => setIntegrated(true), []);
   const key = `reply:${run.taskId}`;
-  const split = useWorkViewStore((state) => state.split[run.taskId] ?? false);
+  const preset = useWorkbenchStore((state) => state.presets[run.projectId] ?? 'focus');
+  const split = useWorkViewStore((state) => state.split[run.taskId] ?? preset === 'build');
   const alongside = split && ['changes', 'preview'].includes(tab);
   const reply = drafts[key]?.prompt ?? '';
   const active = isActive(run);
@@ -489,6 +494,22 @@ export function TaskDetail({
           All tasks
         </Button>
         <WorkspaceHeading title={title} titleRef={heading} description={run.projectName} />
+        <WorkContext key={`context:${run.taskId}`} run={run} />
+        {isLatest && !integrated && (
+          <WorkFeedbackInbox
+            key={`feedback:${run.taskId}`}
+            taskId={run.taskId}
+            onFeedback={(text) =>
+              draft(key, {
+                prompt: appendFeedbackDraft(
+                  useExecutionStore.getState().drafts[key]?.prompt ?? '',
+                  text,
+                  24000,
+                ),
+              })
+            }
+          />
+        )}
         <div className="task-detail-utilities">
           <WorkSourceLink prompts={attempts.map((attempt) => attempt.prompt)} />
           {attempts.length > 1 && (

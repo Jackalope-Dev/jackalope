@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { type SessionSnapshot, sessionCommand } from '../lib/live-session';
 import { observeRefresh } from '../lib/observe-refresh';
+import { knownSessionRevisions, mergeSessionChanges } from '../lib/session-changes';
 import { isTauriEnvironment } from '../lib/tauri-bridge';
 
 interface SessionsState extends SessionSnapshot {
@@ -28,8 +29,22 @@ export const useLiveSessionStore = create<SessionsState>((set, get) => ({
       return refresh.then(() => (pendingId !== undefined ? get().refresh(pendingId) : undefined));
     }
     pendingId = undefined;
-    refresh = sessionCommand<SessionSnapshot>('snapshot', { id })
-      .then((snapshot) => set({ ...snapshot, loading: false }))
+    refresh = sessionCommand<SessionSnapshot>('snapshot', {
+      id,
+      known: knownSessionRevisions(get().revisions),
+    })
+      .then((snapshot) => {
+        const current = get();
+        const next = mergeSessionChanges(current, snapshot);
+        if (
+          !current.loading &&
+          next.sessions === current.sessions &&
+          next.runs === current.runs &&
+          next.error === current.error
+        )
+          return;
+        set({ ...next, loading: false });
+      })
       .catch((error) => set({ error: String(error), loading: false }))
       .finally(() => {
         refresh = undefined;

@@ -7,6 +7,28 @@ isolated parallel work, coordination and review before integration.
 
 ### Live sessions
 
+The project toolbar offers Focus, Build and Oversee layouts. Build starts review and
+preview beside the conversation; Oversee opens Needs you. Choosing a preset resets
+that project's task layout overrides. Individual conversation toggles remain available.
+
+The task toolbar shows the branch and changes since a previous visit. Task context
+opens the workspace and saved checks. Terminal opens a shell view in that exact
+workspace; Workspace tools opens its installed editor or a separate task window.
+The task terminal is a separate shell, not a resumed provider conversation. Stop it
+before agent work, checks, previews or integration. Its bounded output survives closing
+and reopening a view while the app runs. Controls reject commands addressed to an
+earlier shell after another window restarts it. Quitting stops its owned process tree.
+Result, review, preview and terminal panes can open in separate windows. These share
+native task state; result panes cannot independently launch a follow-up or approve work.
+Feedback from another window is retained locally until added to a reply draft or dismissed.
+
+Topics opens an editor to group original chat messages without moving them or changing dispatch.
+Message selection is searchable and loads more results on demand.
+Suggestions use local headings and opening lines. Rename, regroup or discard suggestions,
+then save. Topic edits reject stale revisions from another window. Prepare task draft
+retains source chat/message references and selected instructions; starting that task is
+a separate action through ordinary capture. Ungrouping preserves the original messages.
+
 Open **Tasks → Chat** and send a message, or choose **Open Chat** from Inbox.
 The first message names the session;
 history groups sessions by attention, activity and completion, with recent work first.

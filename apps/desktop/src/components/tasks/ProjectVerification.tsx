@@ -12,9 +12,10 @@ export function ProjectVerification({
 }: {
   run: TaskRun;
   command?: string;
-  onCorrect?: (prompt: string) => void;
+  onCorrect?: (prompt: string) => void | Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Verification | null>(null);
   const check =
@@ -46,7 +47,7 @@ export function ProjectVerification({
         {selected && (
           <Button
             variant="outline"
-            disabled={busy}
+            disabled={busy || correcting}
             onClick={() => void verify()}
             loading={busy}
             loadingLabel="Checking…"
@@ -89,14 +90,25 @@ export function ProjectVerification({
           {onCorrect && !check.result.success && (
             <Button
               variant="outline"
-              onClick={() => {
+              disabled={busy || correcting}
+              loading={correcting}
+              loadingLabel="Saving feedback…"
+              onClick={async () => {
                 const output = `${check.result.stdout}\n${check.result.stderr}`
                   .trim()
                   .slice(0, 8000);
-                document.getElementById('task-reply')?.focus();
-                onCorrect(
-                  `The project check failed. Fix the cause, keep the change focused, and run the same check.\n\nCommand: ${check.command || selected}\nExit: ${check.result.exitCode ?? 'unknown'}\n\n${output}`,
-                );
+                setCorrecting(true);
+                setError('');
+                try {
+                  await onCorrect(
+                    `The project check failed. Fix the cause, keep the change focused, and run the same check.\n\nCommand: ${check.command || selected}\nExit: ${check.result.exitCode ?? 'unknown'}\n\n${output}`,
+                  );
+                  document.getElementById('task-reply')?.focus();
+                } catch (cause) {
+                  setError(String(cause));
+                } finally {
+                  setCorrecting(false);
+                }
               }}
             >
               Ask agent to fix

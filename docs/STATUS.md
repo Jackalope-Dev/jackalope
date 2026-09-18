@@ -14,9 +14,27 @@ representative benefit and installed-platform acceptance remain open.
 
 ## Desktop workspace
 
+- Focus, Build and Oversee presets save per project and reset conversation-layout
+  overrides when selected. Needs you prioritizes recovery and questions, then older
+  reviews. Task context retains a compact visit receipt, workspace identity and checks.
+- Task workspace tools include a native terminal with bounded reconnectable output,
+  VS Code/Cursor workspace links and separate result, review, preview and terminal
+  windows. A running task terminal reserves its workspace against agent work, checks,
+  previews, integration and cleanup. Closing a pane keeps it running; quitting stops it.
+  Feedback from separate panes is saved locally for explicit addition to the reply draft.
+  Separate panes retain their own task drafts; their refreshes do not replace the main
+  window's draft or selection. Queue pause and stop remain visible in Focus mode.
+- Chat topics are reversible, revision-checked groups of source messages. Local
+  suggestions use headings and opening lines; a saved topic can prepare a separate task
+  draft without launching it. Original conversations remain intact.
+- Live-session snapshots transfer changed records and preserve unchanged renderer
+  objects. Older replies retain searchable text with formatting on demand. Usage & quota
+  can record and export bounded local UI/native timings without uploading content.
+  Installed multi-window acceptance and comparative workflow measurements remain open.
+
 - Projects, saved task drafts, queues, recurring schedules and local change monitors.
-- Project setup includes agents, decisions, Git behavior, appearance and an optional
-  first task. Background command detection fills unset preferences without running
+- Essential project setup includes agents, Git behavior and an optional first task;
+  customization adds decisions and appearance. Background command detection fills unset preferences without running
   commands or replacing explicit choices; inspection failure does not block setup.
 - Tasks opens Chat first. Inbox keeps the project-scoped work list that includes chats,
   with remembered filters, compact capture and keyboard row navigation. Work rows show

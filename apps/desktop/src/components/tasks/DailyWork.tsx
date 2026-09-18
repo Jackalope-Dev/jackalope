@@ -1,10 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import {
-  collectWorkspaceWork,
-  matchesWorkFilter,
-  type WorkItem,
-  workPresence,
-} from '../../lib/task-collection';
+import { collectWorkspaceWork, type WorkItem, workPresence } from '../../lib/task-collection';
+import { taskDecision } from '../../lib/task-workflow';
+import { attentionQueue } from '../../lib/workbench';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { observeManagedTasks, useManagedTaskStore } from '../../stores/managedTaskStore';
@@ -36,7 +33,7 @@ export function DailyWork() {
       ),
     [runs, sessionRuns, sessions, ideas, integrated, queue],
   );
-  const needsYou = items.filter((item) => matchesWorkFilter(item, 'attention'));
+  const needsYou = attentionQueue(items);
   const working = items.filter((item) => item.stage === 'working');
   const openInbox = (filter = 'all') => {
     const store = useWorkViewStore.getState();
@@ -58,7 +55,7 @@ export function DailyWork() {
       navigateWorkspace('live-sessions');
     } else if (item.run) {
       useProjectStore.getState().selectProject(item.run.projectId);
-      useWorkViewStore.getState().open(item.run.id, item.stage === 'review' ? 'changes' : 'result');
+      useWorkViewStore.getState().open(item.run.id, taskDecision(item.run).section);
       useExecutionStore.getState().select(item.run.id);
       navigateWorkspace('kanban');
     }
@@ -85,11 +82,15 @@ export function DailyWork() {
           {working.length} in progress
         </Button>
       </div>
-      {needsYou.slice(0, 1).map((item) => (
+      {needsYou.slice(0, 4).map((item) => (
         <button key={item.id} type="button" className="daily-work-row" onClick={() => open(item)}>
           <span>
             <strong>{item.title}</strong>
             <small>{item.run?.projectName ?? item.session?.request.projectName}</small>
+            <small>
+              {item.run?.prompts?.find((prompt) => prompt.status === 'pending')?.question ??
+                item.statusLabel}
+            </small>
           </span>
           <span>{item.stage === 'review' ? 'Review result' : workPresence(item).action}</span>
         </button>

@@ -122,6 +122,15 @@ try {
   );
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.getByRole('heading', { name: 'Search walkthrough' }).waitFor();
+  assert.equal(await page.locator('.live-status').getAttribute('aria-expanded'), 'false');
+  assert.equal(
+    await page.getByRole('button', { name: 'Pause queue', exact: true }).isVisible(),
+    true,
+  );
+  assert.equal(
+    await page.getByRole('button', { name: 'Stop work', exact: true }).isVisible(),
+    true,
+  );
   await page.getByRole('button', { name: 'Chat options', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Session limits', exact: true }).click();
   await page.getByLabel('Pause after this many batches').fill('8');
@@ -281,6 +290,7 @@ try {
   assert.equal(await input.inputValue(), 'Preserve this if stopping fails.');
   await page.evaluate(() => window.sessionFixture.run({ status: 'review' }));
   await input.fill('x'.repeat(11990));
+  await page.locator('.live-status').click();
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   assert.equal(
     await page.getByRole('textbox', { name: 'What should change?', exact: true }).count(),
@@ -297,9 +307,13 @@ try {
   );
   await page.getByLabel('Preview command', { exact: true }).fill('node app.mjs --port {port}');
   await page.getByRole('button', { name: 'Start preview', exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Capture a fresh page snapshot' }).click();
   await page.getByRole('button', { name: 'Capture evidence', exact: true }).click();
   await page.getByRole('button', { name: 'Add evidence to follow-up', exact: true }).click();
-  await page.getByText('This would exceed the message limit.', { exact: false }).first().waitFor();
+  await page
+    .getByText('Send or shorten your follow-up before adding more feedback.', { exact: false })
+    .first()
+    .waitFor();
   assert.equal((await input.inputValue()).length, 11990);
   await input.fill('Keep the keyboard shortcuts.');
   await page.getByRole('button', { name: 'Add evidence to follow-up', exact: true }).click();

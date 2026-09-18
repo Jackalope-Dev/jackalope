@@ -18,6 +18,11 @@ representative benefit and installed-platform acceptance remain open.
 
 ## Built: the local workspace
 
+- Per-project Focus, Build and Oversee layouts, task terminals, detachable task views
+  and reversible chat topics that prepare source-linked drafts. Local timing exports
+  and incremental session updates support performance investigation; installed acceptance
+  and representative comparisons remain in progress.
+
 - Projects, saved tasks, chat sessions and reviewed plans with isolated Git worktrees.
   Follow-ups, previews, recorded checks and guarded integration keep work reviewable.
   Saved line comments, visual element selection, a conversation beside review and

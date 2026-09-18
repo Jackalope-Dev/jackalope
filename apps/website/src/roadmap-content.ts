@@ -15,6 +15,12 @@ export const roadmapStages = [
     link: { label: 'Explore agent compatibility', href: '/agents/' },
     items: [
       {
+        title: 'A workspace that fits how you work.',
+        summary: 'Focus, Build and Oversee layouts, task terminals and separate windows.',
+        detail:
+          'Choose a project layout, keep review beside the conversation, or focus on work that needs you. Open a shell in the task workspace, hand its files to an installed editor, or pop out a result, review, preview or terminal. Group chat messages into reversible topics and prepare source-linked task drafts. Saved feedback returns to the task before sending. Incremental session updates and optional local timing exports support performance investigation. Installed acceptance and comparisons of real workflow efficiency remain in progress.',
+      },
+      {
         title: 'Feedback where the work happens.',
         summary: 'Line comments, visual selections, and issues that become task drafts.',
         detail:

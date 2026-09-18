@@ -7,6 +7,7 @@ import { shortcutLabel } from '../../lib/platform-shortcuts';
 import { isTauriEnvironment } from '../../lib/tauri-bridge';
 import type { Feature } from '../../lib/telemetry';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
+import { observeWorkbenchPerformance } from '../../lib/workbench-performance';
 import { useExecutionStore } from '../../stores/executionStore';
 import { observeHelper, useHelperStore } from '../../stores/helperStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
@@ -14,6 +15,7 @@ import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { observeWorkbenchPreferences } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Companion } from '../mascot/Companion';
 import { CompanionSources } from '../mascot/CompanionSources';
@@ -43,6 +45,7 @@ import {
 } from './navigation';
 import { ResizeHandles } from './ResizeHandles';
 import { TitleBar } from './TitleBar';
+import { WorkspacePresetPicker } from './WorkspacePresetPicker';
 
 export type { ActiveTab } from './navigation';
 
@@ -119,6 +122,42 @@ export function Shell({
     if (!isTauriEnvironment()) return;
     let disposed = false;
     let stop: (() => void) | undefined;
+    void listen<{ id: string; pane: string; sessionId?: string }>(
+      'work-pane-open',
+      async ({ payload }) => {
+        if (payload.sessionId) {
+          await useLiveSessionStore.getState().refresh(payload.sessionId);
+          if (disposed) return;
+          const session = useLiveSessionStore
+            .getState()
+            .sessions.find((session) => session.id === payload.sessionId);
+          if (session) useProjectStore.getState().selectProject(session.request.projectId);
+          useLiveSessionStore.getState().select(payload.sessionId);
+          setActiveTab('live-sessions');
+        } else {
+          useExecutionStore.getState().select(payload.id);
+          await useExecutionStore.getState().refresh();
+          if (disposed) return;
+          const run = useExecutionStore.getState().runs.find((run) => run.id === payload.id);
+          if (run) useProjectStore.getState().selectProject(run.projectId);
+          useManagedTaskStore.getState().select(null);
+          useWorkViewStore.getState().open(payload.id, payload.pane);
+          setActiveTab('kanban');
+        }
+      },
+    ).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, []);
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let disposed = false;
+    let stop: (() => void) | undefined;
     void listen<string>('live-session-open', async ({ payload }) => {
       await useLiveSessionStore.getState().refresh(payload);
       if (disposed) return;
@@ -136,6 +175,8 @@ export function Shell({
     };
   }, []);
   useEffect(observeHelper, []);
+  useEffect(observeWorkbenchPreferences, []);
+  useEffect(observeWorkbenchPerformance, []);
   useEffect(() => {
     useHelperStore.setState({ screen: activeTab });
   }, [activeTab]);
@@ -355,6 +396,7 @@ export function Shell({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {project && <WorkspacePresetPicker projectId={project.id} />}
           {(activeTab !== 'kanban' || selectedTaskId) && (
             <Tooltip content={`New task (${shortcutLabel('Shift+N')})`}>
               <button

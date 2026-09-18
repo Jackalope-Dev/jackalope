@@ -54,6 +54,10 @@ let revision: number | undefined;
 let previousDetailId: string | null = null;
 let refreshing: Promise<void> | undefined;
 let discovering: Promise<void> | undefined;
+const windowParameters = new URLSearchParams(
+  typeof window === 'undefined' ? '' : window.location.search,
+);
+const workPane = windowParameters.get('workPane');
 export const useExecutionStore = create<ExecutionState>()(
   persist(
     (set, get) => ({
@@ -146,7 +150,9 @@ export const useExecutionStore = create<ExecutionState>()(
       },
     }),
     {
-      name: 'jackalope-execution-ui-v1',
+      name: workPane
+        ? `jackalope-execution-ui-v1:work-pane:${workPane}:${windowParameters.get('pane') ?? 'result'}`
+        : 'jackalope-execution-ui-v1',
       partialize: (state) => ({ drafts: state.drafts, selectedId: state.selectedId }),
     },
   ),

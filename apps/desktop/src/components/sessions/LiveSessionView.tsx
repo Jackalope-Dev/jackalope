@@ -7,10 +7,13 @@ import {
   ExternalLink,
   Minus,
   PanelRightClose,
+  Pause,
   Pin,
+  Play,
+  Square,
   X,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentGaze } from '../../hooks/useAgentGaze';
 import {
   type LiveSession,
@@ -24,6 +27,7 @@ import { taskDecision } from '../../lib/task-workflow';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/tauri-bridge';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { TaskLearning } from '../knowledge/TaskLearning';
 import { AgentQuestion } from '../tasks/AgentQuestion';
@@ -32,6 +36,8 @@ import { ResultReview } from '../tasks/ResultReview';
 import { deliveryHandoff, TaskDelivery } from '../tasks/TaskDelivery';
 import { TaskLiveActivity } from '../tasks/TaskLiveActivity';
 import { TaskPreview } from '../tasks/TaskPreview';
+import { WorkContext } from '../tasks/WorkContext';
+import { WorkFeedbackInbox } from '../tasks/WorkFeedbackInbox';
 import { WorkSourceLink } from '../tasks/WorkSourceLink';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -40,16 +46,16 @@ import { ChatOptions } from './ChatOptions';
 import { SessionComposer } from './SessionComposer';
 import { SessionLimits } from './SessionLimits';
 import { SessionRecovery } from './SessionRecovery';
+import { SessionTopics } from './SessionTopics';
+import { TranscriptResult } from './TranscriptResult';
 import './live-session.css';
-
-const TaskMarkdown = lazy(() => import('../tasks/TaskMarkdown'));
 
 export function LiveSessionView({
   session,
   runs,
   detached = false,
   onBack,
-  initialDetailsOpen = !detached,
+  initialDetailsOpen,
 }: {
   session: LiveSession;
   runs: TaskRun[];
@@ -58,6 +64,19 @@ export function LiveSessionView({
   initialDetailsOpen?: boolean;
 }) {
   const { active, latest, pending, questions, status } = sessionWork(session, runs);
+  const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
+  const batchById = useMemo(
+    () => new Map(session.batches.map((batch) => [batch.runId, batch])),
+    [session.batches],
+  );
+  const messageById = useMemo(
+    () => new Map(session.messages.map((message) => [message.id, message])),
+    [session.messages],
+  );
+  const recentBatches = useMemo(
+    () => new Set(session.batches.slice(-20).map((batch) => batch.runId)),
+    [session.batches],
+  );
   const project = useProjectStore((state) =>
     state.projects.find((item) => item.id === session.request.projectId),
   );
@@ -72,8 +91,14 @@ export function LiveSessionView({
     localStorage.setItem(key, existing ? `${existing}\n\n${text}` : text);
     useLiveSessionStore.getState().select(null);
   };
-  const [expanded, setExpanded] = useState(initialDetailsOpen);
-  const split = useWorkViewStore((state) => state.split[`session:${session.id}`] ?? false);
+  const preset = useWorkbenchStore((state) => state.presets[session.request.projectId] ?? 'focus');
+  const [expanded, setExpanded] = useState(initialDetailsOpen ?? (preset === 'build' && !detached));
+  useEffect(() => {
+    if (initialDetailsOpen === undefined) setExpanded(preset === 'build' && !detached);
+  }, [preset, detached, initialDetailsOpen]);
+  const split = useWorkViewStore(
+    (state) => state.split[`session:${session.id}`] ?? preset === 'build',
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState(() => {
     const saved = useWorkViewStore.getState().reading[`session:${session.id}`];
@@ -294,6 +319,60 @@ export function LiveSessionView({
           </span>
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
+        <Button
+          variant="outline"
+          size={detached ? 'icon' : undefined}
+          aria-label={
+            integrated
+              ? 'Integrated'
+              : session.closed
+                ? 'Reopen session'
+                : session.paused
+                  ? 'Resume queue'
+                  : 'Pause queue'
+          }
+          disabled={busy || integrated}
+          onClick={() =>
+            void act(() =>
+              sessionCommand('action', {
+                id: session.id,
+                action: session.paused || session.closed ? 'resume' : 'pause',
+              }),
+            )
+          }
+        >
+          {detached ? (
+            session.paused || session.closed ? (
+              <Play size={16} />
+            ) : (
+              <Pause size={16} />
+            )
+          ) : integrated ? (
+            'Integrated'
+          ) : session.closed ? (
+            'Reopen session'
+          ) : session.paused ? (
+            'Resume queue'
+          ) : (
+            'Pause queue'
+          )}
+        </Button>
+        {active && (
+          <Button
+            variant="outline"
+            size={detached ? 'icon' : undefined}
+            aria-label="Stop work"
+            disabled={busy}
+            onClick={() =>
+              void act(async () => {
+                await sessionCommand('action', { id: session.id, action: 'pause' });
+                await nativeTask('task_stop', { id: active.id });
+              })
+            }
+          >
+            {detached ? <Square size={16} /> : 'Stop work'}
+          </Button>
+        )}
         {detached ? (
           <Button
             variant="ghost"
@@ -316,6 +395,23 @@ export function LiveSessionView({
         </div>
       )}
       <WorkSourceLink prompts={session.messages.map((message) => message.text)} />
+      {latest && !detached && (
+        <WorkContext key={`context:${session.id}`} run={latest}>
+          <SessionTopics key={`topics:${session.id}`} session={session} />
+        </WorkContext>
+      )}
+      {latest && !detached && !session.closed && (
+        <WorkFeedbackInbox
+          key={`feedback:${latest.taskId}`}
+          taskId={latest.taskId}
+          onFeedback={append}
+        />
+      )}
+      {!latest && !detached && (
+        <div className="work-toolbar">
+          <SessionTopics key={`topics:${session.id}`} session={session} />
+        </div>
+      )}
       <div
         className="live-columns"
         data-expanded={expanded}
@@ -339,8 +435,8 @@ export function LiveSessionView({
                 </div>
               )}
               {session.messages.map((message) => {
-                const batch = session.batches.find((batch) => batch.runId === message.runId);
-                const run = runs.find((run) => run.id === message.runId);
+                const batch = message.runId ? batchById.get(message.runId) : undefined;
+                const run = message.runId ? runById.get(message.runId) : undefined;
                 const lastInBatch = batch?.messageIds.at(-1) === message.id;
                 return (
                   <div key={message.id}>
@@ -391,7 +487,8 @@ export function LiveSessionView({
                             {run.agent === 'auto' ? 'Jackalope' : run.agent}
                           </span>
                           <Suspense fallback={<p>{run.result}</p>}>
-                            <TaskMarkdown
+                            <TranscriptResult
+                              recent={recentBatches.has(run.id)}
                               content={run.result}
                               active={isActive(run)}
                               onOpenLink={(url) => void act(() => openExternalUrl(url))}
@@ -475,8 +572,8 @@ export function LiveSessionView({
               <>
                 <div className="live-work-list">
                   {session.batches.map((batch, index) => {
-                    const run = runs.find((r) => r.id === batch.runId);
-                    const message = session.messages.find((m) => batch.messageIds.includes(m.id));
+                    const run = runById.get(batch.runId);
+                    const message = messageById.get(batch.messageIds[0]);
                     return (
                       <div className="live-work-row" key={batch.runId}>
                         <span className="live-mascot">
@@ -506,40 +603,6 @@ export function LiveSessionView({
                   })}
                 </div>
                 <div className="live-work-actions">
-                  <Button
-                    variant="outline"
-                    disabled={busy || integrated}
-                    onClick={() =>
-                      void act(() =>
-                        sessionCommand('action', {
-                          id: session.id,
-                          action: session.paused || session.closed ? 'resume' : 'pause',
-                        }),
-                      )
-                    }
-                  >
-                    {integrated
-                      ? 'Integrated'
-                      : session.closed
-                        ? 'Reopen session'
-                        : session.paused
-                          ? 'Resume queue'
-                          : 'Pause queue'}
-                  </Button>
-                  {active && (
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() =>
-                        void act(async () => {
-                          await sessionCommand('action', { id: session.id, action: 'pause' });
-                          await nativeTask('task_stop', { id: active.id });
-                        })
-                      }
-                    >
-                      Stop work
-                    </Button>
-                  )}
                   {!active && session.batches.at(-1)?.error && (
                     <Button
                       variant="outline"

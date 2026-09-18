@@ -92,6 +92,7 @@
 }
 .live-statusbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -467,6 +468,19 @@
 }
 .live-session-detached .live-title h1 {
   font-size: var(--text-sm);
+}
+.live-session-detached .live-statusbar {
+  gap: 4px;
+  padding: 0 8px;
+}
+.live-session-detached .live-status {
+  flex: 1;
+  min-width: 0;
+}
+.live-session-detached .live-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .live-session-detached .live-columns {
   display: flex;

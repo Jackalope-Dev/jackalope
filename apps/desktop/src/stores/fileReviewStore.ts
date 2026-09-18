@@ -28,3 +28,8 @@ export const useFileReviewStore = create<FileReviewState>()(
     { name: 'jackalope-file-reviews' },
   ),
 );
+
+if (typeof window !== 'undefined')
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'jackalope-file-reviews') void useFileReviewStore.persist.rehydrate();
+  });

@@ -8,6 +8,8 @@ export type OnboardingStep = 'project' | 'agent' | 'routing' | 'behavior' | 'the
 export type OnboardingStatus = 'new' | 'active' | 'complete' | 'skipped';
 
 interface OnboardingState {
+  customize: boolean;
+  setCustomize: (customize: boolean) => void;
   status: OnboardingStatus;
   step: OnboardingStep;
   projectId: string | null;
@@ -29,6 +31,8 @@ interface OnboardingState {
 export const useOnboardingStore = create<OnboardingState>()(
   persist(
     (set, get) => ({
+      customize: false,
+      setCustomize: (customize) => set({ customize }),
       status: 'new',
       step: 'project',
       projectId: null,
@@ -44,6 +48,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       },
       begin: (projectId) =>
         set({
+          customize: false,
           status: 'active',
           step: 'project',
           projectId: projectId ?? null,
@@ -89,6 +94,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         return {
           ...current,
           ...value,
+          customize: value.customize ?? ['routing', 'behavior', 'theme'].includes(value.step ?? ''),
           pendingProject: value.pendingProject ?? null,
           firstTask: value.firstTask ?? null,
           routingFallback:

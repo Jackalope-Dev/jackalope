@@ -53,6 +53,7 @@ pub(super) struct Lease(PathBuf);
 
 // Call under the execution guard so launch, integration and cleanup cannot race reservation.
 pub(super) fn reserve(workspace: &str) -> Result<Lease, String> {
+    crate::commands::work_terminal::ensure_idle(workspace)?;
     let path = std::fs::canonicalize(workspace).map_err(|e| e.to_string())?;
     if !WORKSPACES
         .lock()

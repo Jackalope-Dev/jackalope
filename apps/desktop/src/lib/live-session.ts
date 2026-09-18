@@ -20,6 +20,8 @@ export interface SessionDraft {
   revision: number;
 }
 export interface LiveSession {
+  topics?: SessionTopic[];
+  topicsRevision?: number;
   limits?: SessionLimits;
   integratedRunId?: string | null;
   id: string;
@@ -35,11 +37,17 @@ export interface LiveSession {
   draft: SessionDraft;
   error: string | null;
 }
+export interface SessionTopic {
+  id: string;
+  title: string;
+  messageIds: string[];
+}
 export interface SessionLimits {
   maxBatches: number | null;
   pauseAtEstimatedUsd: number | null;
 }
 export interface SessionSnapshot {
+  revisions?: Record<string, string>;
   sessions: LiveSession[];
   runs: TaskRun[];
   error: string | null;
@@ -68,17 +76,17 @@ export function sessionRunNeedsAttention(run: TaskRun) {
 export function sessionWork(session: LiveSession, runs: TaskRun[]) {
   const ids = new Set(session.batches.map((batch) => batch.runId));
   const work = runs.filter((run) => ids.has(run.id));
+  const byId = new Map(work.map((run) => [run.id, run]));
+  const batches = new Map(session.batches.map((batch) => [batch.runId, batch]));
   const latest = session.batches
-    .map((batch) => work.find((run) => run.id === batch.runId))
+    .map((batch) => byId.get(batch.runId))
     .filter((run): run is TaskRun => !!run)
     .at(-1);
   const active = work.find(isActive);
   const pending = session.messages.filter(
     (message) =>
       !message.canceled &&
-      (!message.runId ||
-        (!work.some((run) => run.id === message.runId) &&
-          !session.batches.find((batch) => batch.runId === message.runId)?.error)),
+      (!message.runId || (!byId.has(message.runId) && !batches.get(message.runId)?.error)),
   ).length;
   const questions = active?.prompts?.filter((prompt) => prompt.status === 'pending') ?? [];
   const failed = latest && !isActive(latest) && sessionRunNeedsAttention(latest);

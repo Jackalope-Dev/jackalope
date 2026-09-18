@@ -1,4 +1,5 @@
 use super::*;
+mod workbench;
 
 pub(super) fn sample(agent: &str) -> TaskRun {
     TaskRun {

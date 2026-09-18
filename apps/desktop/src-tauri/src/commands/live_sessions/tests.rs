@@ -1,6 +1,36 @@
 use super::*;
 use std::process::Command;
 
+#[test]
+fn topic_grouping_is_durable_revision_checked_and_does_not_dispatch() {
+    let (_root, service, id) = fixture();
+    let message_id = Uuid::new_v4().to_string();
+    service
+        .send(
+            &id,
+            message_id.clone(),
+            "Keep the original instructions".into(),
+            None,
+        )
+        .unwrap();
+    let topic = SessionTopic {
+        id: Uuid::new_v4().to_string(),
+        title: "UI".into(),
+        message_ids: vec![message_id],
+    };
+    service.save_topics(&id, 0, vec![topic.clone()]).unwrap();
+    assert!(service.save_topics(&id, 0, vec![]).is_err());
+    let saved: Ledger = serde_json::from_slice(&std::fs::read(&service.path).unwrap()).unwrap();
+    assert_eq!(saved.sessions[0].topics[0].id, topic.id);
+    assert_eq!(saved.sessions[0].messages.len(), 1);
+    assert!(saved.sessions[0].batches.is_empty());
+    service.save_topics(&id, 1, vec![]).unwrap();
+    let session = service.snapshot(None).unwrap().sessions.remove(0);
+    assert_eq!(session.topics_revision, 2);
+    assert!(session.topics.is_empty());
+    assert_eq!(session.messages[0].text, "Keep the original instructions");
+}
+
 fn fixture() -> (PathBuf, LiveSessions, String) {
     let root = std::env::temp_dir().join(format!("jackalope-live-{}", Uuid::new_v4()));
     let repo = root.join("repo");

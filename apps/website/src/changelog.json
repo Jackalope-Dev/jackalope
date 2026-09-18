@@ -1,5 +1,18 @@
 [
   {
+    "id": "flexible-task-workspaces",
+    "date": "2026-09-18",
+    "status": "In development",
+    "title": "A workspace that fits your workflow",
+    "description": "Project layouts, task terminals, separate windows and reversible chat topics keep work and feedback together.",
+    "items": [
+      "Choose Focus, Build or Oversee, and use essential or customized project setup.",
+      "Open task workspace tools and save feedback from separate review and preview windows.",
+      "Prepare source-linked drafts from chat topics and record local workflow timings."
+    ],
+    "note": "In development. Installed platform acceptance and comparative user studies remain in progress."
+  },
+  {
     "id": "focused-workflows-and-trusted-hosts",
     "date": "2026-09-18",
     "status": "In development",

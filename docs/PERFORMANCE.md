@@ -35,7 +35,29 @@ switches. Production checks require a successful worker highlight, bounded rende
 line counts and keyboard access to the final line; a main-thread fallback cannot
 silently satisfy worker acceptance. The isolated preview selects an available port.
 
+Run `node scripts/verification/verify-workbench.mjs` for isolated browser checks of
+workspace layouts, terminal focus and reconnect, topic selection in large conversations,
+detached-window drafts and feedback recovery. It starts its own Vite server and uses
+mock native commands; it does not prove installed shell or window behavior.
+
 ## Runtime contracts
+
+- Live-session clients send bounded content revisions. Native snapshots return only
+  changed sessions and attempts plus the complete current revision inventory. The
+  renderer removes missing records and retains unchanged object identities. Legacy
+  full snapshots remain supported. Native loading and hashing still inspect history;
+  this does not implement a separate on-disk history index.
+  Requests carry at most 20,000 known revisions. Larger inventories stay intact;
+  records omitted from the request are transferred again rather than dropped.
+- Hidden windows coalesce native notifications until visible, retaining their periodic
+  fallback. Session lookups use indexes, and only the latest 20 replies format richly
+  by default. Earlier text remains searchable and can be formatted explicitly.
+- Usage & quota offers opt-in timing capture for the current window. At most 2,000
+  samples stay in memory; exports contain metric names and aggregate timings, never
+  command arguments or content. Event Timing covers events at least 16 ms, and long-task
+  entries at least 50 ms, where supported. Unsupported metrics remain absent. Compare
+  matched journeys, hardware, provider settings, costs and review/correction effort;
+  timings alone do not establish superior outcomes or human time saved.
 
 - A single ordered writer owns task persistence. Output changes append sequenced
   field updates to a journal and flush before acknowledgment. Checkpoints atomically

@@ -17,6 +17,7 @@ import { openExternalUrl } from '../../lib/tauri-bridge';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useWorkbenchStore } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { Button } from '../ui/button';
 import { InlineNotice } from '../ui/InlineNotice';
@@ -36,6 +37,8 @@ import { TaskOutcomes } from './TaskOutcomes';
 import { TaskPreview } from './TaskPreview';
 import { UserPromptCard } from './UserPromptCard';
 import { useManagedPreview } from './useManagedPreview';
+import { WorkContext } from './WorkContext';
+import { WorkFeedbackInbox } from './WorkFeedbackInbox';
 import { WorkSourceLink } from './WorkSourceLink';
 
 const TaskMarkdown = lazy(() => import('./TaskMarkdown'));
@@ -58,7 +61,10 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
   const setCorrection = (prompt: string) =>
     useExecutionStore.getState().draft(correctionKey, { prompt });
   const [viewTab, setViewTab] = useState('overview');
-  const split = useWorkViewStore((state) => state.split[`managed:${task.id}`] ?? false);
+  const preset = useWorkbenchStore((state) => state.presets[task.request.projectId] ?? 'focus');
+  const split = useWorkViewStore(
+    (state) => state.split[`managed:${task.id}`] ?? preset === 'build',
+  );
   const alongside = split && ['review', 'preview'].includes(viewTab);
   const [planPending, setPlanPending] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
@@ -356,6 +362,14 @@ export function ManagedTaskView({ task, onBack }: { task: ManagedTask; onBack: (
       ))}
       <Tabs.Root className="managed-task-tabs" value={viewTab} onValueChange={setViewTab}>
         <WorkSourceLink prompts={[task.request.prompt]} />
+        {work.combined && <WorkContext key={`context:${task.id}`} run={work.combined} />}
+        {work.combined && !work.integrated && (
+          <WorkFeedbackInbox
+            key={`feedback:${work.combined.taskId}`}
+            taskId={work.combined.taskId}
+            onFeedback={prepareCorrection}
+          />
+        )}
         <Tabs.List aria-label="Planned task views">
           <Tabs.Trigger ref={overviewTabRef} value="overview">
             Overview

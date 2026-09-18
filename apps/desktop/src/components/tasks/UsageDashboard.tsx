@@ -27,6 +27,7 @@ import { CapacityPanel } from './CapacityPanel';
 import { DecisionUsage, useTaskDecisionUsage } from './DecisionUsage';
 import { JevConnectionUsage } from './JevConnectionUsage';
 import { tokenLabel, UsageInsights } from './UsageInsights';
+import { WorkflowPerformance } from './WorkflowPerformance';
 export function UsageDashboard({ onTask }: { onTask: () => void }) {
   const { runs, select, loading, error, historyError, refresh } = useExecutionStore();
   const { projects, selectProject } = useProjectStore();
@@ -249,6 +250,7 @@ export function UsageDashboard({ onTask }: { onTask: () => void }) {
         }
       />
       <div className="workspace-sections">
+        <WorkflowPerformance />
         <CapacityPanel />
         <section className="workspace-section workspace-stack" aria-label="Task usage">
           <WorkspaceSectionHeading

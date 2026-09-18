@@ -36,6 +36,7 @@ fn sessions() -> &'static Mutex<HashMap<String, Preview>> {
 }
 
 pub fn ensure_idle(workspace: &str) -> Result<(), String> {
+    super::work_terminal::ensure_idle(workspace)?;
     let path = dunce::canonicalize(workspace).map_err(|e| e.to_string())?;
     let mut sessions = sessions().lock().map_err(|e| e.to_string())?;
     for preview in sessions.values_mut() {

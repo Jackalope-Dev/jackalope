@@ -80,6 +80,7 @@ export function CommandPalette({
     ? [
         { label: taskDecision(current).action, section: taskDecision(current).section },
         { label: 'Open conversation', section: 'result' },
+        { label: 'Open task terminal and workspace tools', section: 'terminal' },
         ...(['review', 'reviewed', 'failed', 'stopped'].includes(current.status)
           ? [
               { label: 'Try result', section: 'preview' },

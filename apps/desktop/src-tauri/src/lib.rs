@@ -108,6 +108,7 @@ pub fn run() {
             commands::live_sessions::live_session_draft,
             commands::live_sessions::live_session_action,
             commands::live_sessions::live_session_window,
+            commands::live_sessions::live_session_topics,
             commands::live_sessions::live_session_window_pin,
             commands::live_sessions::live_session_review,
             commands::live_sessions::live_session_recover,
@@ -172,6 +173,13 @@ pub fn run() {
             commands::managed_runtime::managed_runtime_prepare,
             commands::managed_runtime::managed_runtime_cancel,
             pty_spawn,
+            commands::work_terminal::task_terminal_start,
+            commands::work_windows::task_work_window,
+            commands::work_windows::task_open_editor,
+            commands::work_terminal::task_terminal_status,
+            commands::work_terminal::task_terminal_write,
+            commands::work_terminal::task_terminal_resize,
+            commands::work_terminal::task_terminal_stop,
             pty_write,
             pty_resize,
             pty_kill,
@@ -312,6 +320,7 @@ pub fn run() {
                 app.state::<commands::live_sessions::LiveSessions>().shutdown();
                 commands::browser::close_all();
                 commands::previews::close_all();
+                commands::work_terminal::close_all();
                 app.state::<Coordinator>().shutdown();
                 app.state::<TaskRuntime>().stop_all();
                 app.state::<AppState>().kill_all_pty_sessions();

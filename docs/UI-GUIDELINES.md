@@ -107,8 +107,10 @@ has no cancel exit; users reach the final step before entering the workspace.
 The first task remains optional on that final step. Give slow or failed checks a
 clear retry path.
 
-The project flow is project → agents → decisions → behavior → appearance → first task.
-Keep all six steps visible in the progress list. Detect workspace command defaults in
+Essential project setup is project → agents → behavior → first task. Optional
+customization adds decisions before behavior and appearance before the first task.
+Show the chosen steps in the progress list and preserve saved advanced setup on reload.
+Detect workspace command defaults in
 the background without a manual inspection step. Preserve explicit choices, including
 empty commands, and ignore stale results after changing projects or leaving setup.
 Detected defaults are provisional until entry and must not run commands or enable

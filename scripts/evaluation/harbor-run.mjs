@@ -1,8 +1,7 @@
-import { execFile, spawn } from 'node:child_process';
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { copyFile, mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { promisify } from 'node:util';
 import { assemblePrompt } from '../../apps/desktop/src/lib/skills/context-assembler.ts';
 import { resolveTaskGuidelines } from '../../apps/desktop/src/lib/skills/task-context.ts';
 import { effortPrompt } from '../../apps/desktop/src/lib/task-effort.ts';
@@ -104,7 +103,10 @@ export async function runExternal(inputPath, output, binary) {
       child.once('close', (code, signal) => resolve({ code, signal, stdout, stderr }));
     });
   } finally {
-    if (meter) provider = await meter.close();
+    if (meter) {
+      provider = await meter.close();
+      await writeFile(path.join(output, 'provider.json'), JSON.stringify(provider, null, 2));
+    }
   }
   const elapsedMs = performance.now() - began;
   await writeFile(path.join(output, 'native.log'), `${execution.stdout}\n${execution.stderr}`);
@@ -120,17 +122,6 @@ export async function runExternal(inputPath, output, binary) {
       ).catch((error) => {
         if (error.code !== 'ENOENT') throw error;
       });
-    }
-    if (input.agent === 'opencode' && receipt.run?.sessionId) {
-      const exported = await promisify(execFile)('opencode', ['export', receipt.run.sessionId], {
-        env: meter?.env ?? process.env,
-        cwd: spec.externalWorkspace,
-        timeout: 30_000,
-        maxBuffer: 32 * 1024 * 1024,
-        windowsHide: true,
-      });
-      JSON.parse(exported.stdout);
-      await writeFile(path.join(output, 'session.json'), exported.stdout, { mode: 0o600 });
     }
   }
   const accounting = aggregateAttempts(receipt);
@@ -157,6 +148,33 @@ export async function runExternal(inputPath, output, binary) {
       'External verifier owns grading. First attempt in a fresh container, current-directory execution through production runtime. No UI assessment, managed plan, worktree merge, human acceptance or correction-time measurement. Reported token budgets are delayed, not billing caps.',
   };
   await writeFile(path.join(output, 'jackalope-result.json'), JSON.stringify(report, null, 2));
+  if (input.agent === 'opencode' && receipt?.run?.sessionId) {
+    const target = path.join(output, 'session.json');
+    const file = await open(target, 'wx', 0o600);
+    try {
+      await new Promise((resolve, reject) => {
+        const child = spawn('opencode', ['export', receipt.run.sessionId], {
+          env: meter?.env ?? process.env,
+          cwd: spec.externalWorkspace,
+          stdio: ['ignore', file.fd, 'ignore'],
+          timeout: 30_000,
+          windowsHide: true,
+        });
+        child.once('error', reject);
+        child.once('close', (code) =>
+          code === 0 ? resolve() : reject(new Error('Session export failed')),
+        );
+      });
+      JSON.parse(await readFile(target, 'utf8'));
+    } catch {
+      await writeFile(
+        path.join(output, 'trajectory-error.txt'),
+        'Complete session export unavailable. Provider and native receipts are retained.\n',
+      );
+    } finally {
+      await file.close();
+    }
+  }
   if (execution.code !== 0 || !receipt)
     throw new Error('Native evaluation failed; inspect native.log.');
   return report;

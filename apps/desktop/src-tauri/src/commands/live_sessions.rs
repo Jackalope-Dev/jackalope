@@ -1,5 +1,8 @@
 mod windows;
 pub use windows::*;
+mod changes;
+mod topics;
+pub use topics::*;
 
 use super::{
     coordination::Coordinator,
@@ -56,6 +59,10 @@ pub struct SessionDraft {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LiveSession {
+    #[serde(default)]
+    pub topics: Vec<SessionTopic>,
+    #[serde(default)]
+    pub topics_revision: u64,
     #[serde(default)]
     pub limits: SessionLimits,
     #[serde(default)]
@@ -138,6 +145,8 @@ struct Ledger {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSnapshot {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revisions: Option<std::collections::BTreeMap<String, String>>,
     pub sessions: Vec<LiveSession>,
     pub runs: Vec<TaskRun>,
     pub error: Option<String>,
@@ -254,6 +263,7 @@ impl LiveSessions {
         }
         let runs = self.runtime.live_session_runs(id)?;
         Ok(SessionSnapshot {
+            revisions: None,
             sessions,
             runs,
             error,
@@ -345,6 +355,8 @@ impl LiveSessions {
                 })
                 .collect();
             ledger.sessions.push(LiveSession {
+                topics: Vec::new(),
+                topics_revision: 0,
                 limits,
                 integrated_run_id: None,
                 pinned: false,
@@ -775,11 +787,18 @@ fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
 pub async fn live_session_snapshot(
     service: State<'_, LiveSessions>,
     id: Option<String>,
+    known: Option<std::collections::BTreeMap<String, String>>,
 ) -> Result<SessionSnapshot, String> {
     let service = service.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || service.snapshot(id.as_deref()))
-        .await
-        .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        let snapshot = service.snapshot(id.as_deref())?;
+        match known {
+            Some(known) => changes::changed_snapshot(snapshot, &known),
+            None => Ok(snapshot),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

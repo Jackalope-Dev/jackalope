@@ -7,6 +7,14 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept task terminals and detached panes in installed Windows, macOS and Linux
+  builds: reconnect, Unicode output, shell exit, stale feedback, simultaneous windows,
+  process cleanup, workspace removal and agent/check/preview reservation conflicts.
+  Validate editor protocol handlers and per-project layout persistence on those systems.
+- [ ] Compare Focus, Build and Oversee on representative first-task, correction and
+  return-to-work journeys. Include topic regrouping, stale revisions, draft promotion,
+  large histories and local timing exports; report human effort and outcome quality.
+
 - [ ] Validate line comments, stale-patch anchors, batched feedback, split conversation and
   visual selection in installed WebViews. Include keyboard access, storage failures,
   authenticated preview state, cancellation, view changes and large patches.
@@ -32,8 +40,8 @@ release dates.
   pending-message guards, unavailable cost and batch-limit pauses. Independent native
   task planning remains separate from the shared-workspace batch flow.
 - [ ] Validate installed onboarding, project changes, saved drafts, inferred
-  defaults and explicit overrides, including cancellation and restart. Cover all six
-  project-setup steps, appearance rollback and automatic command detection.
+  defaults and explicit overrides, including cancellation and restart. Cover essential
+  and customized project setup, appearance rollback and automatic command detection.
 - [ ] Validate ordinary-task follow-up queues with installed providers, including
   stop-and-send, restart pauses, failed saves, cancellation and merge guards.
 - [ ] Run the [daily-use pilot](AGENT-QUALITY.md#daily-use-pilot) with consenting users
