@@ -95,7 +95,11 @@ release dates.
   selectors; independently check necessary-row retention and include helper overhead.
   Validate combined retrieval policies before delivery, including named-read paths,
   paging and recovery. Record actual policy/helper use separately from availability;
-  keep adapter-specific history hooks separate from shared broker behavior.
+  include the shared read pipeline and automatic relevance controls, permission
+  parity, partial-result failures and total inference/recovery costs. Compare
+  literal captured-text excerpts on narrow and paraphrased requests, retaining
+  neighboring exceptions and measuring all recovery turns.
+  Keep adapter-specific history hooks separate from shared broker behavior.
   Require independent original-patch acceptance for quality claims. Counterbalanced
   review-time and correction measurements are separate prerequisites for claiming faster review.
 

@@ -22,6 +22,15 @@ impl Broker {
         run: &str,
         input: BatchInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
+        self.read_batch_context(run, input, None).await
+    }
+
+    pub async fn read_batch_context(
+        &self,
+        run: &str,
+        input: BatchInput,
+        context: Option<(crate::commands::tasks::TaskRuntime, TaskRun)>,
+    ) -> Result<(CallToolResult, BrokerUsage), String> {
         if input.calls.is_empty() || input.calls.len() > 8 {
             return Err("Batch one to eight independent read-only calls.".into());
         }
@@ -112,6 +121,7 @@ impl Broker {
         let slots = Arc::new(tokio::sync::Semaphore::new(4));
         let count: usize = groups.values().map(Vec::len).sum();
         for calls in groups.into_values() {
+            let context = context.clone();
             let broker = self.clone();
             let run = run.to_owned();
             let slots = slots.clone();
@@ -119,7 +129,14 @@ impl Broker {
                 let _slot = slots.acquire_owned().await.map_err(|e| e.to_string())?;
                 let mut results = Vec::new();
                 for (index, call) in calls {
-                    results.push((index, broker.read(&run, call).await));
+                    let result = if let Some((runtime, task)) = &context {
+                        delivery::read(runtime, task, ReadCall::Handle(call))
+                            .await
+                            .map(|result| (result, BrokerUsage::default()))
+                    } else {
+                        broker.read(&run, call).await
+                    };
+                    results.push((index, result));
                 }
                 Ok::<_, String>(results)
             });

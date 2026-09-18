@@ -4,6 +4,19 @@ fn input() -> Input {
     serde_json::from_value(json!({"handle":"test","pointer":"/report/items","query":"Find all causes, exceptions and dependencies of the timeout."})).unwrap()
 }
 
+#[test]
+fn automatic_selection_requires_one_complete_eligible_array() {
+    let result = original();
+    assert_eq!(automatic_input(&result).unwrap().pointer, "/report/items");
+    let mut ambiguous = result.clone();
+    ambiguous.structured_content.as_mut().unwrap()["other"] = json!([1]);
+    assert!(automatic_input(&ambiguous).is_none());
+    let mut error = result.clone();
+    error.is_error = Some(true);
+    assert!(automatic_input(&error).is_none());
+    assert!(automatic_input(&CallToolResult::structured(json!({"items":[1,2]}))).is_none());
+}
+
 fn original() -> CallToolResult {
     let data = json!({"report":{"items":(0..12).map(|index| json!({"id":index,"body":"Evidence paragraph. ".repeat(100)})).collect::<Vec<_>>(),"version":3},"notice":"Complete source"});
     serde_json::from_value(json!({"content":[{"type":"text","text":data.to_string(),"annotations":{"audience":["assistant"]}}],"structuredContent":data,"isError":false,"_meta":{"source":"fixture"}})).unwrap()

@@ -387,15 +387,13 @@ impl CoordinationTools {
             .service
             .authorized_run(&request_headers(&context)?)
             .map_err(bridge_error)?;
-        let (result, usage) = self
-            .service
-            .runtime
-            .mcp_broker
-            .read(&run.id, input)
-            .await
-            .map_err(|e| ErrorData::invalid_request(e, None))?;
-        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
-        Ok(result)
+        super::mcp_broker::delivery::read(
+            &self.service.runtime,
+            &run,
+            super::mcp_broker::batch::ReadCall::Handle(input),
+        )
+        .await
+        .map_err(|e| ErrorData::invalid_request(e, None))
     }
 
     #[tool(
@@ -447,7 +445,11 @@ impl CoordinationTools {
             .service
             .runtime
             .mcp_broker
-            .read_batch(&run.id, input)
+            .read_batch_context(
+                &run.id,
+                input,
+                Some((self.service.runtime.clone(), run.clone())),
+            )
             .await
             .map_err(|e| ErrorData::invalid_request(e, None))?;
         super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
@@ -471,15 +473,35 @@ impl CoordinationTools {
             .service
             .authorized_run(&request_headers(&context)?)
             .map_err(bridge_error)?;
-        let (result, usage) = self
+        super::mcp_broker::delivery::read(
+            &self.service.runtime,
+            &run,
+            super::mcp_broker::batch::ReadCall::Named(input),
+        )
+        .await
+        .map_err(|e| ErrorData::invalid_request(e, None))
+    }
+
+    #[tool(
+        description = "Compose read-only retrieval, exact filtering, unique-key left joins, projection and counts in one local pipeline. Only final output enters context; source handles recover originals. Use known tool arguments or search first. Rejects partial data, missing fields and ambiguous join keys. Does not authorize writes.",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            open_world_hint = true
+        )
+    )]
+    async fn read_pipeline(
+        &self,
+        context: RequestContext<RoleServer>,
+        Parameters(input): Parameters<super::mcp_broker::pipeline::Input>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let run = self
             .service
-            .runtime
-            .mcp_broker
-            .read_named(&run.id, input)
+            .authorized_run(&request_headers(&context)?)
+            .map_err(bridge_error)?;
+        super::mcp_broker::pipeline::read(&self.service.runtime, &run, input)
             .await
-            .map_err(|error| ErrorData::invalid_request(error, None))?;
-        super::mcp_broker::record_usage(&self.service.runtime, &run, usage);
-        Ok(result)
+            .map_err(|e| ErrorData::invalid_request(e, None))
     }
 
     #[tool(
@@ -972,11 +994,21 @@ impl ServerHandler for CoordinationTools {
             tools.retain(|tool| tool.name != "read_context");
         }
         let batch = crate::commands::experiments::is("JACKALOPE_BATCH_READ", "on");
+        if !super::mcp_broker::pipeline::enabled() {
+            tools.retain(|tool| tool.name != "read_pipeline");
+        }
         let queries = crate::commands::experiments::is("JACKALOPE_RESULT_QUERIES", "on");
         if !batch {
             tools.retain(|tool| tool.name != "read_tools");
         }
         for tool in &mut tools {
+            if !super::mcp_broker::results::excerpts::enabled() {
+                let mut schema = serde_json::Value::Object((*tool.input_schema).clone());
+                omit_selection_schema(&mut schema, "text", "TextSearch");
+                if let serde_json::Value::Object(schema) = schema {
+                    tool.input_schema = std::sync::Arc::new(schema);
+                }
+            }
             if !batch && !queries {
                 if matches!(
                     tool.name.as_ref(),
@@ -1060,34 +1092,40 @@ impl ServerHandler for CoordinationTools {
 fn available_tool(name: &str, discovery: bool, check: Option<&str>) -> bool {
     match name {
         "search_tools" | "read_tool" | "read_relevant_tool" | "read_named_tool" | "read_tools"
-        | "read_tool_result" | "execute_tool" => discovery,
+        | "read_tool_result" | "read_pipeline" | "execute_tool" => discovery,
         "computer_verify" => check.is_some_and(|value| !value.trim().is_empty()),
         _ => true,
     }
 }
 
 fn omit_row_schema(value: &mut serde_json::Value) {
+    omit_selection_schema(value, "rows", "Rows");
+}
+
+fn omit_selection_schema(value: &mut serde_json::Value, field: &str, definition: &str) {
     match value {
         serde_json::Value::Object(object) => {
             if let Some(properties) = object
                 .get_mut("properties")
                 .and_then(serde_json::Value::as_object_mut)
             {
-                properties.remove("rows");
+                if properties.contains_key("jsonPointers") {
+                    properties.remove(field);
+                }
             }
             if let Some(definitions) = object
                 .get_mut("$defs")
                 .and_then(serde_json::Value::as_object_mut)
             {
-                definitions.remove("Rows");
+                definitions.remove(definition);
             }
             for child in object.values_mut() {
-                omit_row_schema(child);
+                omit_selection_schema(child, field, definition);
             }
         }
         serde_json::Value::Array(items) => {
             for item in items {
-                omit_row_schema(item);
+                omit_selection_schema(item, field, definition);
             }
         }
         _ => {}
@@ -1123,6 +1161,25 @@ pub(super) fn router(service: Coordinator) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn disabled_excerpt_schema_preserves_unrelated_text_inputs() {
+        let router = CoordinationTools::platform_router();
+        for tool in router.list_all() {
+            let mut schema = serde_json::to_value(&tool.input_schema).unwrap();
+            let original = schema.clone();
+            omit_selection_schema(&mut schema, "text", "TextSearch");
+            assert!(!schema.to_string().contains("#/$defs/TextSearch"));
+            if tool.name == "read_tool_result" {
+                assert!(original.to_string().contains("#/$defs/TextSearch"));
+                assert!(schema.to_string().contains("#/$defs/Rows"));
+            }
+        }
+        let mut unrelated = serde_json::json!({"properties":{"text":{"type":"string"}}});
+        let original = unrelated.clone();
+        omit_selection_schema(&mut unrelated, "text", "TextSearch");
+        assert_eq!(unrelated, original);
+    }
 
     #[test]
     fn ordinary_read_schemas_omit_experimental_row_fields_and_references() {

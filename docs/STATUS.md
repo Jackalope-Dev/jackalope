@@ -171,6 +171,11 @@ representative benefit and installed-platform acceptance remain open.
   require calibration. Experimental Jev relevance reads can filter large structured
   results before delivery while retaining uncertainty and recoverable originals;
   net savings and necessary-evidence retention need independent task measurement.
+  Bounded read-only pipelines share local filters, joins, projection and counts
+  across MCP and HTTP. A separate automatic Jev delivery experiment assesses
+  eligible unselected results with recoverable originals; both remain opt-in.
+  A separate captured-text experiment returns literal excerpts with source paths,
+  character offsets and recoverable originals through either transport.
   Connection execution no
   longer holds the shared broker catalog lock during network calls. These changes
   have separate local and installed-agent screening paths; general savings remain unproven.

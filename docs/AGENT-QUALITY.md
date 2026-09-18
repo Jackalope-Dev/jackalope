@@ -236,7 +236,20 @@ with `control` as needed.
 keeping the complete source recoverable. Preview requires result queries and
 result selection. `--after-initial-tools=small` measures eager delivery of a
 complete bounded catalog. Keep these controls explicit in saved comparisons.
-Defaults retain existing behavior. The final-workflow experiment changes only
+Defaults retain existing behavior. `--after-result-excerpts=on` with result queries
+and selection enables literal searches with recoverable source excerpts. Compare
+first-read selection and captured-result recovery; include paraphrases, adjacent
+exceptions, conflicting sources, partial data and all subsequent recovery work.
+Literal match counts do not establish necessary-evidence recall.
+`--after-read-pipeline=on` with result queries
+enables composed read-only data operations through MCP and HTTP. Independently,
+`--after-auto-relevance=on` with context pruning and connected Jev questions
+assesses eligible unselected results before delivery. Record actual calls,
+selection receipts, helper costs and recovery alongside all-attempt outcomes;
+tool availability does not establish use or benefit. Generate small and large
+authored join cases with `node scripts/evaluation/pipeline-cases.mjs <suite.json>`;
+both sizes belong to one task family and are screening fixtures.
+The final-workflow experiment changes only
 version-two debugging guidance. Scoped task-approach guidance limits call-site
 investigation to code changes while preserving applicable instructions and checks;
 it is opt-in for Balanced tasks. Saved

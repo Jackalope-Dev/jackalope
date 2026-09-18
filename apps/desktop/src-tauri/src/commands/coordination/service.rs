@@ -424,6 +424,7 @@ impl Coordinator {
                         .route("/v1/tools/execute", post(bridge_tool_execute))
                         .route("/v1/tools/read", post(bridge_tool_read))
                         .route("/v1/tools/read-relevant", post(bridge_tool_read_relevant))
+                        .route("/v1/tools/pipeline", post(bridge_tool_pipeline))
                         .route("/v1/tools/result", post(bridge_tool_result))
                         .route("/v1/messages", post(bridge_message))
                         .route("/v1/messages", get(inbox::bridge_inbox))

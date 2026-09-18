@@ -251,6 +251,55 @@ records helper usage separately; broker byte accounting measures actual delivery
 This opt-in experiment does not modify provider session history or establish
 completeness, quality equivalence or net savings.
 
+`JACKALOPE_RESULT_EXCERPTS=on` adds `output.text` to ordinary read selection and
+captured-result queries through both MCP and HTTP. It requires result queries and
+result selection. Supply `terms` (one to eight literal phrases), optional `pointer`
+into the original MCP envelope, `contextChars` (0–1000), `cursor` and `limit`.
+For example, `output:{text:{terms:['lock order','interrupted work']},maxChars:6000}`
+searches all string values in `structuredContent`, or text-only `content` when
+structured data is absent. Matching uses OR and ASCII case folding, without
+regular expressions or semantic ranking. JSON keys are not searched.
+
+Results contain verbatim excerpts with RFC 6901 pointers, Unicode character
+`start`/`end` offsets (end exclusive), total string lengths and an original-source
+hash. An enclosing string `source` field is carried as an untrusted label when
+available. Nearby overlapping windows merge. Pages alternate between terms so
+common terms do not crowd out distinct matches; each term retains source order
+and all conflicting matches remain pageable. Send `nextCursor` as
+`output.text.cursor` with an unchanged query and captured handle. Cursors bind to
+the source content, terms, pointer and context size; changing these requires a new
+search without a cursor. Recovery never makes another remote call. Metadata includes the scope,
+searched strings/characters, matching occurrences/excerpts and source partiality.
+No literal match does not establish irrelevance; paraphrases can require different
+terms or original-source recovery. Traversal, match and output limits fail
+explicitly with a recovery handle instead of claiming a complete empty search.
+This experiment remains off by default and does not search provider-owned tools.
+
+`JACKALOPE_READ_PIPELINE=on` exposes `read_pipeline` and the equivalent
+`POST /v1/tools/pipeline`. Supply one to four uniquely named sources, each with
+`read:{handle,arguments}` or `read:{name,server?,arguments}`, or a captured
+`resultHandle`. `source` chooses the base; `rows` supplies its array pointer,
+equality filters, final columns, pagination or count. Up to three `joins` specify
+`source`, `pointer`, `leftKey` and `rightKey`. Joins retain unmatched left rows as
+null and reject duplicate right keys. Base columns keep their original paths;
+`/row/...` explicitly qualifies base fields and `/joined/<source>/...` selects
+joined fields. Only the final output is delivered, with source indices
+and original recovery handles. Missing fields, partial data and nonmirrored
+content produce explicit failures. All reads preserve existing connection scope,
+allowlists, schema revalidation and cancellation. This experiment requires result
+queries; it does not execute generated code or intercept provider-owned tools.
+
+`JACKALOPE_AUTO_RELEVANCE=on` additionally requires context pruning and enabled,
+connected Jev agent questions. Ordinary, named and batched broker reads without
+exact row or field selection assess eligible results containing one unambiguous
+array. Character budgets apply after assessment; exact selections retain their
+semantics. Pipelines can assess
+complete results without filters, projection or count-only requests. Small,
+ambiguous and unsupported results retain local handling. Eligible failed Jev
+assessments retain the full result unless an explicit character budget was supplied.
+Recovery never repeats the remote read or Jev assessment. These controls remain
+off by default pending necessary-evidence and total cost/latency evaluation.
+
 Ordinary native tests cover stdio and authenticated HTTP discovery, pagination,
 small schema responses, execution handles, changed definitions, allow/deny lists,
 account-directory separation, protocol revision conversion and process cleanup. These are protocol fixtures.

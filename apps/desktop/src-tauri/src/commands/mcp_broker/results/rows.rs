@@ -17,7 +17,7 @@ pub struct Rows {
 }
 
 impl Rows {
-    pub(super) fn validate(&self) -> Result<(), String> {
+    pub(in crate::commands::mcp_broker) fn validate(&self) -> Result<(), String> {
         let pointers = std::iter::once(&self.pointer)
             .chain(self.where_equals.keys())
             .chain(&self.columns);
@@ -37,7 +37,10 @@ impl Rows {
         Ok(())
     }
 
-    pub(super) fn select(&self, value: &Value) -> Option<Value> {
+    pub(in crate::commands::mcp_broker) fn matching<'a>(
+        &self,
+        value: &'a Value,
+    ) -> Option<Vec<(usize, &'a Value)>> {
         let rows = value.pointer(&self.pointer)?.as_array()?;
         let mut matches = Vec::new();
         for (index, row) in rows.iter().enumerate() {
@@ -50,6 +53,12 @@ impl Rows {
                 matches.push((index, row));
             }
         }
+        Some(matches)
+    }
+
+    pub(in crate::commands::mcp_broker) fn select(&self, value: &Value) -> Option<Value> {
+        let rows = value.pointer(&self.pointer)?.as_array()?;
+        let matches = self.matching(value)?;
         let mut selected = Vec::new();
         if !self.count_only {
             for (index, row) in matches

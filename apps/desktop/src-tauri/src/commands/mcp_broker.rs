@@ -18,6 +18,8 @@ use tokio::sync::{watch, Mutex as AsyncMutex};
 
 type Client = mcp::Connection;
 pub mod batch;
+pub mod delivery;
+pub mod pipeline;
 pub mod relevance;
 pub mod results;
 const MAX_TOOLS: usize = 1024;
@@ -206,6 +208,15 @@ impl Broker {
         run: &str,
         input: NamedReadInput,
     ) -> Result<(CallToolResult, BrokerUsage), String> {
+        let input = self.resolve_named(run, input).await?;
+        self.read(run, input).await
+    }
+
+    async fn resolve_named(
+        &self,
+        run: &str,
+        input: NamedReadInput,
+    ) -> Result<ExecuteInput, String> {
         if input.name.is_empty() || input.name.len() > 256 {
             return Err("Supply an exact tool name of 1-256 bytes.".into());
         }
@@ -224,15 +235,11 @@ impl Broker {
             )
             .await?;
         let handle = named_read_handle(&found, &input.name)?;
-        self.read(
-            run,
-            ExecuteInput {
-                handle,
-                arguments: input.arguments,
-                output: input.output,
-            },
-        )
-        .await
+        Ok(ExecuteInput {
+            handle,
+            arguments: input.arguments,
+            output: input.output,
+        })
     }
 
     pub fn prepare(

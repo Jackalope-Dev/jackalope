@@ -86,6 +86,24 @@
       "default": "off",
       "environment": "JACKALOPE_CONTEXT_PRUNING"
     },
+    "result-excerpts": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_RESULT_EXCERPTS",
+      "requires": { "on": { "result-queries": "on", "result-selection": "on" } }
+    },
+    "auto-relevance": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_AUTO_RELEVANCE",
+      "requires": { "on": { "context-pruning": "on" } }
+    },
+    "read-pipeline": {
+      "values": ["off", "on"],
+      "default": "off",
+      "environment": "JACKALOPE_READ_PIPELINE",
+      "requires": { "on": { "result-queries": "on" } }
+    },
     "history-compaction": {
       "values": ["off", "deduplicate"],
       "default": "off",

@@ -8,6 +8,53 @@ struct Fixture {
     service: Coordinator,
 }
 
+#[tokio::test]
+async fn pipeline_http_requires_current_attempt_and_never_authorizes_browser_origins() {
+    let f = Fixture::new();
+    f.running("reader-run");
+    let input = || {
+        Json(
+            serde_json::from_value(json!({
+                "sources":[{"id":"source","resultHandle":"missing"}],
+                "source":"source","rows":{"pointer":"/structuredContent/items"}
+            }))
+            .unwrap(),
+        )
+    };
+    assert_eq!(
+        bridge_tool_pipeline(WebState(f.service.clone()), headers("invalid"), input())
+            .await
+            .unwrap_err()
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let mut origin = headers("reader-run");
+    origin.insert("origin", "https://example.invalid".parse().unwrap());
+    assert_eq!(
+        bridge_tool_pipeline(WebState(f.service.clone()), origin, input())
+            .await
+            .unwrap_err()
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        bridge_tool_pipeline(WebState(f.service.clone()), headers("reader-run"), input())
+            .await
+            .unwrap_err()
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    f.runtime
+        .update("reader-run", |run| run.status = "review".into());
+    assert_eq!(
+        bridge_tool_pipeline(WebState(f.service.clone()), headers("reader-run"), input())
+            .await
+            .unwrap_err()
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
 impl Fixture {
     fn new() -> Self {
         let root = std::env::temp_dir().join(format!("jackalope-automatic-{}", Uuid::new_v4()));

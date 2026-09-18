@@ -86,7 +86,7 @@ fn evidence(result: &CallToolResult, input: &Input) -> Option<Value> {
     Some(data.clone())
 }
 
-fn incomplete(value: &Value) -> bool {
+pub(super) fn incomplete(value: &Value) -> bool {
     match value {
         Value::Object(fields) => fields.iter().any(|(key, value)| {
             (["partial", "truncated", "hasMore"].contains(&key.as_str()) && value == true)
@@ -227,17 +227,35 @@ pub async fn read(
         )
         .await?;
     record_usage(runtime, run, usage);
+    let (delivered, selection) = filter(runtime, run, original, &input).await?;
+    let usage = broker
+        .record_delivery(&run.id, &delivered, selection)
+        .await?;
+    record_usage(runtime, run, usage);
+    Ok(delivered)
+}
+
+pub(super) async fn filter(
+    runtime: &TaskRuntime,
+    run: &TaskRun,
+    original: CallToolResult,
+    input: &Input,
+) -> Result<(CallToolResult, Option<Value>), String> {
+    let broker = &runtime.mcp_broker;
     let mut delivered = original.clone();
     let mut selection = None;
-    if let Some(data) = evidence(&original, &input) {
+    if let Some(data) = evidence(&original, input) {
         let handle = broker.capture_result(&run.id, &original).await?;
         let request = serde_json::from_value(json!({
             "state":{"purpose":input.query,"evidence":data},
-            "questions":questions(&input, &data)
+            "questions":questions(input, &data)
         }))
         .map_err(|e| format!("Invalid relevance request: {e}"))?;
         if let Ok(answer) = agent_questions::ask(runtime, run, request).await {
-            if let Some((selected, receipt)) = select(&original, &input, &data, &answer, &handle) {
+            selection = Some(
+                json!({"resultHandle":handle,"status":answer["status"],"recordId":answer["recordId"],"applied":false}),
+            );
+            if let Some((selected, receipt)) = select(&original, input, &data, &answer, &handle) {
                 delivered = selected;
                 selection = Some(receipt);
             }
@@ -246,9 +264,43 @@ pub async fn read(
     if !runtime.is_running(&run.id) {
         return Err("This attempt has ended.".into());
     }
-    let usage = broker
-        .record_delivery(&run.id, &delivered, selection)
-        .await?;
-    record_usage(runtime, run, usage);
-    Ok(delivered)
+    Ok((delivered, selection))
+}
+
+pub(super) fn automatic_input(result: &CallToolResult) -> Option<Input> {
+    fn arrays(value: &Value, path: &str, depth: usize, found: &mut Vec<String>) {
+        if depth > 8 || found.len() > 1 {
+            return;
+        }
+        match value {
+            Value::Array(_) => found.push(path.to_owned()),
+            Value::Object(fields) => {
+                for (key, value) in fields {
+                    arrays(
+                        value,
+                        &format!("{path}/{}", key.replace('~', "~0").replace('/', "~1")),
+                        depth + 1,
+                        found,
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    let data = result.structured_content.as_ref()?;
+    let mut found = Vec::new();
+    arrays(data, "", 0, &mut found);
+    if found.len() != 1 {
+        return None;
+    }
+    let input = Input {
+        handle: String::new(),
+        arguments: serde_json::Map::new(),
+        pointer: found.pop()?,
+        query: "Retain every fact potentially needed to complete the entire current task and its requirements, including indirect dependencies, exceptions and comparisons.".into(),
+        keep_indices: Vec::new(),
+    };
+    validate(&input).ok()?;
+    evidence(result, &input)?;
+    Some(input)
 }

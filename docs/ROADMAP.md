@@ -52,6 +52,9 @@ complete task delivery and quality on representative repositories before claimin
 
 Versioned prompt guidance and recoverable tool-result selection are implemented;
 compact prompts and same-policy continuation context remain opt-in experiments.
+Read-only pipelines compose local data operations through MCP and HTTP; optional
+automatic Jev relevance retains recoverable evidence. Cross-agent adoption and
+end-to-end savings remain evaluation work.
 Final requirement assessments help users inspect evidence before acceptance.
 Sanitized comparison exports retain matched configurations,
 oracle outcomes and reporting limits. Broader independent acceptance remains open.
@@ -60,7 +63,7 @@ evaluation suites; the public benchmark methodology keeps their scope explicit.
 Source-attributed repair fixtures and separate workflow, source preparation, tool and continuation
 experiments support screening. Human review exports and complete-attempt cost
 accounting support independent confirmation before broader product claims.
-Read-only batches, captured-result queries, deferred OpenCode tool discovery,
+Read-only batches, captured-result queries and literal source excerpts, deferred OpenCode tool discovery,
 conditional source reads, syntax reuse, lean launches, bounded
 delegation planning, agent-callable typed Jev questions with native evidence reads,
 explicit Jev question contracts prepared before worker launch,
